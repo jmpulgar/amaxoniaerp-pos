@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.remote
 
+import android.os.Build
 import com.amaxonia.pos.data.local.AppJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -8,33 +9,54 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-
 import io.ktor.client.plugins.HttpTimeout
+import okhttp3.ConnectionSpec
+import okhttp3.OkHttpClient
+import okhttp3.TlsVersion
+import java.util.concurrent.TimeUnit
 
 /**
  * Cliente HTTP de Ktor configurado dinámicamente según el país seleccionado.
- * A diferencia de la implementación estática anterior, este cliente usa un provider
- * de URL base que puede cambiar en runtime cuando el usuario selecciona otro país.
+ * En Android 10 (API 29) se fuerza TLS 1.2 para evitar cierres en el handshake SSL.
  */
 class ApiClient(
     private val apiConfigManager: ApiConfigManager
 ) {
     /**
      * Crea un nuevo HttpClient con la URL base actual.
-     * Este método debe llamarse cada vez que se necesita un cliente actualizado.
+     * En API 29 usa un OkHttpClient con TLS 1.2 para compatibilidad.
      */
     fun createHttpClient(): HttpClient {
+        val okHttpClient = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+            // Android 10 y anteriores: forzar TLS 1.2 para evitar crashes en el SSL handshake
+            val tls12Spec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                .tlsVersions(TlsVersion.TLS_1_2)
+                .build()
+            OkHttpClient.Builder()
+                .connectionSpecs(listOf(tls12Spec, ConnectionSpec.CLEARTEXT))
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .build()
+        } else {
+            null
+        }
+
         return HttpClient(OkHttp) {
+            if (okHttpClient != null) {
+                engine {
+                    preconfigured = okHttpClient
+                }
+            }
             install(ContentNegotiation) {
                 json(AppJson)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 10000 // 10 segundos
-                connectTimeoutMillis = 10000 // 10 segundos
+                requestTimeoutMillis = 10000
+                connectTimeoutMillis = 10000
                 socketTimeoutMillis = 10000
             }
             defaultRequest {
-                // Usa la URL base actual del ApiConfigManager
                 url(apiConfigManager.baseUrl.value)
                 contentType(ContentType.Application.Json)
             }

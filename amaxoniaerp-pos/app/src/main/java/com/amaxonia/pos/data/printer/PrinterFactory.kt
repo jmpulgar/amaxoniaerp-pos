@@ -24,8 +24,17 @@ class PrinterFactory(
     @Volatile
     private var isHydrated = false
 
-    private val theFactoryPrinter: PrinterRepository by lazy {
-        TheFactoryPrinterImpl(appContext)
+    /** Carga bajo demanda; si la librería fiscal falla (p. ej. en Android 10), no se cierra la app. */
+    @Volatile
+    private var theFactoryPrinterInstance: PrinterRepository? = null
+
+    private fun getTheFactoryPrinterOrNull(): PrinterRepository? {
+        if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
+        synchronized(this) {
+            if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
+            theFactoryPrinterInstance = runCatching { TheFactoryPrinterImpl(appContext) }.getOrNull()
+            return theFactoryPrinterInstance
+        }
     }
 
     init {
@@ -50,7 +59,7 @@ class PrinterFactory(
         }
 
         return when (printerType) {
-            PrinterType.THE_FACTORY_HKA -> theFactoryPrinter
+            PrinterType.THE_FACTORY_HKA -> getTheFactoryPrinterOrNull()
             PrinterType.NONE,
             PrinterType.GENERIC_BLUETOOTH,
             PrinterType.SUNMI_V2 -> null
