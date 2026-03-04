@@ -3,6 +3,8 @@ package com.amaxonia.pos.data.remote.api
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
+import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
+import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 
 interface CajaApi {
     suspend fun getCajas(
@@ -21,4 +23,10 @@ interface CajaApi {
         authHeader: String,
         companyDb: String
     ): Result<CajaStatusResponse>
+
+    suspend fun closeCaja(
+        request: CierreCajaRequest,
+        authHeader: String,
+        companyDb: String
+    ): Result<CierreCajaResponse>
 }

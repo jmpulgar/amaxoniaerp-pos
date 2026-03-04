@@ -59,5 +59,8 @@ data class DashboardState(
     val viewMode: ProductViewMode = ProductViewMode.GRID,
     val bottomSelected: Int = 0,
     val error: String? = null,
-    val manualEntryValue: String = ""
+    val manualEntryValue: String = "",
+
+    // --- AUTO-CLOSE ---
+    val autoCloseMessage: String? = null
 )

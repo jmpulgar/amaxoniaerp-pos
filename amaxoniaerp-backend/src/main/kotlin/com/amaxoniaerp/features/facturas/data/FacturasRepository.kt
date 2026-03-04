@@ -1,7 +1,11 @@
 package com.amaxoniaerp.features.facturas.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.facturas.domain.FacturaDetalleItem
+import com.amaxoniaerp.features.facturas.domain.FacturaDetalleResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaSummary
+import com.amaxoniaerp.features.facturas.domain.FacturasResumen
+import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
@@ -11,6 +15,8 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.sum
+import org.jetbrains.exposed.sql.count
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -59,6 +65,97 @@ class FacturasRepository {
         data to total
     }
 
+    suspend fun getFacturaDetalle(
+        database: Database,
+        facturaId: String,
+    ): FacturaDetalleResponse? = dbQuery(database) {
+        // Get the invoice header first
+        val factura = FacturasTable
+            .selectAll()
+            .where { FacturasTable.idFactura eq facturaId }
+            .limit(1)
+            .firstOrNull()
+            ?: return@dbQuery null
+
+        val codFactura = factura[FacturasTable.codFactura]
+
+        // Get line items
+        val items = SalesFacturaDetalleTable
+            .selectAll()
+            .where { SalesFacturaDetalleTable.idFactura eq facturaId }
+            .map { row ->
+                FacturaDetalleItem(
+                    id = row[SalesFacturaDetalleTable.idDetalleFactura],
+                    descripcion = row[SalesFacturaDetalleTable.itemDescripcion],
+                    cantidad = row[SalesFacturaDetalleTable.itemCantidadTotal].toDouble(),
+                    precioUnitario = row[SalesFacturaDetalleTable.itemPrecioSinIva].toDouble(),
+                    totalConIva = row[SalesFacturaDetalleTable.itemTotalConIva].toDouble(),
+                    codigo = row[SalesFacturaDetalleTable.itemCodigo],
+                    referencia = row[SalesFacturaDetalleTable.itemReferencia],
+                )
+            }
+
+        FacturaDetalleResponse(
+            idFactura = facturaId,
+            codFactura = codFactura,
+            items = items,
+        )
+    }
+
+    suspend fun getResumen(
+        database: Database,
+    ): FacturasResumen = dbQuery(database) {
+        val rows = FacturasTable
+            .join(EstatusTable, JoinType.LEFT, FacturasTable.codEstatus, EstatusTable.codEstatus)
+            .selectAll()
+            .toList()
+
+        var ventasBrutas = 0.0
+        var ventasNetas = 0.0
+        var cancelaciones = 0.0
+        var totalPagadas = 0
+        var totalAnuladas = 0
+        var moneda = "USD"
+
+        for (row in rows) {
+            val descripcionEstatus = row[EstatusTable.descripcion] ?: ""
+            val total = row[FacturasTable.totalTotalFactura].toDouble()
+            val totalGeneral = row[FacturasTable.totalizarTotalGeneral].toDouble()
+
+            val isAnulada = descripcionEstatus.equals("Anulada", ignoreCase = true) ||
+                descripcionEstatus.equals("Anulado", ignoreCase = true)
+
+            if (isAnulada) {
+                cancelaciones += total
+                totalAnuladas++
+            } else {
+                ventasBrutas += totalGeneral
+                ventasNetas += total
+                totalPagadas++
+            }
+
+            if (moneda == "USD") {
+                val m = row[FacturasTable.abrMonedaBase]?.takeIf { it.isNotBlank() }
+                if (m != null) moneda = m
+            }
+        }
+
+        val descuentos = (ventasBrutas - ventasNetas).coerceAtLeast(0.0)
+        val ticketPromedio = if (totalPagadas > 0) ventasNetas / totalPagadas else 0.0
+
+        FacturasResumen(
+            ventasBrutas = ventasBrutas,
+            ventasNetas = ventasNetas,
+            descuentos = descuentos,
+            cancelaciones = cancelaciones,
+            totalFacturas = rows.size,
+            totalFacturasPagadas = totalPagadas,
+            totalFacturasAnuladas = totalAnuladas,
+            ticketPromedio = ticketPromedio,
+            moneda = moneda,
+        )
+    }
+
     private fun mapRowToFacturaSummary(row: ResultRow): FacturaSummary {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
@@ -81,18 +178,22 @@ class FacturasRepository {
         val apellido = row[FacturasClientesTable.apellido] ?: ""
         val nombreCompleto = "$nombre $apellido".trim().uppercase()
 
+        val moneda = row[FacturasTable.abrMonedaBase]?.takeIf { it.isNotBlank() } ?: "USD"
+
         return FacturaSummary(
             id = row[FacturasTable.idFactura],
             codigo = row[FacturasTable.codFactura],
             codigoFiscal = codigoFiscalFinal ?: "",
             numeroDocumentoFiscal = row[FacturasTable.numeroDocumentoFiscal] ?: "",
             fecha = formatDate(row[FacturasTable.fechaFactura], dateFormatter),
+            fechaCreacion = formatDateTime(row[FacturasTable.fechaCreacion], dateTimeFormatter),
             fechaDgi = formatDateTime(row[FacturasTable.fechaRecepcionDGI], dateTimeFormatter),
             clienteNombre = nombreCompleto,
             clienteIdentificacion = row[FacturasClientesTable.rif].uppercase(),
             total = row[FacturasTable.totalTotalFactura].toDouble(),
             estatus = estatusFinal,
             formaPago = formaPago,
+            moneda = moneda,
         )
     }
 

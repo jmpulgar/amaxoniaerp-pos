@@ -13,6 +13,7 @@ import com.amaxonia.pos.data.remote.dto.LoginResponse
 import com.amaxonia.pos.data.remote.dto.ProductDto
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,7 @@ class LocalStore(
     private val productsKey = stringPreferencesKey("products_cache")
     private val clientsKey = stringPreferencesKey("clients_cache")
     private val selectedCountryKey = stringPreferencesKey("selected_country_code")
+    private val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
 
     suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
         val json = AppJson.encodeToString(snapshot)
@@ -98,6 +100,24 @@ class LocalStore(
         val json = context.dataStore.data.first()[clientsKey] ?: return emptyList()
         return runCatching { AppJson.decodeFromString(ListSerializer(ClientDto.serializer()), json) }
             .getOrDefault(emptyList())
+    }
+
+    suspend fun saveSelectedPrinterType(printerType: PrinterType) {
+        context.dataStore.edit { prefs ->
+            prefs[selectedPrinterTypeKey] = printerType.name
+        }
+    }
+
+    suspend fun readSelectedPrinterType(): PrinterType {
+        return selectedPrinterTypeFlow().first()
+    }
+
+    fun selectedPrinterTypeFlow(): Flow<PrinterType> {
+        return context.dataStore.data.map { prefs ->
+            prefs[selectedPrinterTypeKey]
+                ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
+                ?: PrinterType.NONE
+        }
     }
 
     // ============ COUNTRY SELECTION ============

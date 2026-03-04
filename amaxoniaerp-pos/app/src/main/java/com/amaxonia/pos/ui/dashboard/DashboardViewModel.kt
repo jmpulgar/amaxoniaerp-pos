@@ -7,6 +7,7 @@ import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 class DashboardViewModel(
     private val productRepository: ProductRepository,
@@ -111,7 +114,46 @@ class DashboardViewModel(
     fun selectAndOpenCaja(caja: Caja, montoApertura: Double) {
         viewModelScope.launch {
             _state.update { it.copy(isLoadingCajas = true) }
-            
+
+            // Step 1: Check if this caja has an open session from a previous day
+            val statusResult = cajaRepository.checkCajaStatus(caja.idCaja)
+            val needsAutoClose = statusResult.getOrNull()?.let { status ->
+                if (status.isOpen && status.cajaSecuencia != null) {
+                    isFromPreviousDay(status.cajaSecuencia.fechaApertura)
+                } else false
+            } ?: false
+
+            // Step 2: If stale session exists, auto-close it first
+            if (needsAutoClose) {
+                val secuencia = statusResult.getOrNull()!!.cajaSecuencia!!
+                val closeRequest = CierreCajaRequest(
+                    idCajaSecuencia = secuencia.idCajaSecuencia,
+                    idCaja = caja.idCaja,
+                    montoCierre = secuencia.montoApertura,
+                    totalEfectivo = 0.0,
+                    totalTarjeta = 0.0,
+                    totalOtros = 0.0,
+                    totalVentas = 0.0,
+                    cantidadTransacciones = 0
+                )
+                val closeResult = cajaRepository.closeCaja(closeRequest)
+                if (closeResult.isFailure) {
+                    _state.update {
+                        it.copy(
+                            isLoadingCajas = false,
+                            error = "Error al cerrar sesion anterior: ${closeResult.exceptionOrNull()?.message}"
+                        )
+                    }
+                    return@launch
+                }
+                _state.update {
+                    it.copy(
+                        autoCloseMessage = "Se cerro automaticamente la sesion del dia ${secuencia.fechaApertura}"
+                    )
+                }
+            }
+
+            // Step 3: Open the new caja session
             val request = AperturaRequest(
                 idCaja = caja.idCaja,
                 montoApertura = montoApertura,
@@ -122,27 +164,45 @@ class DashboardViewModel(
                 devolucionInicial = 0,
                 zInicial = 0
             )
-            
+
             cajaRepository.openCaja(request).fold(
-                onSuccess = { 
+                onSuccess = {
                     cajaRepository.setActiveCaja(caja)
-                    _state.update { 
+                    _state.update {
                         it.copy(
                             isLoadingCajas = false,
                             showCajaSelector = false
-                        ) 
+                        )
                     }
                 },
                 onFailure = { error ->
-                    _state.update { 
+                    _state.update {
                         it.copy(
                             isLoadingCajas = false,
                             error = "Error al abrir caja: ${error.message}"
-                        ) 
+                        )
                     }
                 }
             )
         }
+    }
+
+    /**
+     * Checks if [fechaApertura] is from a day before today.
+     * Supports ISO-8601 (`yyyy-MM-dd'T'...`) and plain `yyyy-MM-dd` formats.
+     */
+    private fun isFromPreviousDay(fechaApertura: String): Boolean {
+        return try {
+            val dateStr = fechaApertura.substringBefore("T")
+            val openDate = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
+            openDate.isBefore(LocalDate.now())
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun dismissAutoCloseMessage() {
+        _state.update { it.copy(autoCloseMessage = null) }
     }
 
     fun getProductImageUrl(photoPath: String): String {

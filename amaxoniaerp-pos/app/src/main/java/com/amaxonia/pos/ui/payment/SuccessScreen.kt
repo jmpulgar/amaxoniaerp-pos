@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,10 +36,16 @@ fun SuccessScreen(
     changeDue: Double,
     paymentMethodsLabel: String,
     codFactura: String,
+    transactionId: String,
+    initialPrintMessage: String,
+    onPrintReceipt: suspend (String) -> Result<String>,
     onNextOrder: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     val scale = remember { Animatable(0.85f) }
+    var isPrinting by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         visible = true
@@ -47,134 +55,163 @@ fun SuccessScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1565C0)) // Fondo Azul
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    LaunchedEffect(initialPrintMessage) {
+        if (initialPrintMessage.isNotBlank()) {
+            snackbarHostState.showSnackbar(initialPrintMessage)
+        }
+    }
 
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220))
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = Color(0xFF1565C0)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF1565C0))
+                .padding(paddingValues)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220))
             ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .graphicsLayer {
-                        scaleX = scale.value
-                        scaleY = scale.value
-                    },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Icono Check
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .background(Color(0xFFE3F2FD), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Color(0xFF1565C0),
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    "¡Transacción Exitosa!",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1565C0)
-                )
-
-                Text(
-                    if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Detalles del pago
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF1565C0), RoundedCornerShape(8.dp))
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                    Divider(color = Color.White.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
-                    Text(
-                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Email y Recibo digital
-                OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
-                    placeholder = { Text("Correo electrónico") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = {}, // Lógica para enviar correo
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE3F2FD)),
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
-                    Text("ENVIAR RECIBO", color = Color(0xFF1565C0))
+                    Column(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .graphicsLayer {
+                                scaleX = scale.value
+                                scaleY = scale.value
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .background(Color(0xFFE3F2FD), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color(0xFF1565C0),
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            "¡Transacción Exitosa!",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1565C0)
+                        )
+
+                        Text(
+                            if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1565C0), RoundedCornerShape(8.dp))
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                            Text(
+                                "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        OutlinedTextField(
+                            value = "",
+                            onValueChange = {},
+                            placeholder = { Text("Correo electrónico") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = {},
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE3F2FD)),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text("ENVIAR RECIBO", color = Color(0xFF1565C0))
+                        }
+                    }
                 }
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            OutlinedButton(
+                onClick = {
+                    if (transactionId.isBlank()) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("No hay transaccion para imprimir")
+                        }
+                        return@OutlinedButton
+                    }
+                    scope.launch {
+                        isPrinting = true
+                        val result = onPrintReceipt(transactionId)
+                        val feedback = result.getOrElse { error ->
+                            error.message ?: "No se pudo imprimir el recibo"
+                        }
+                        snackbarHostState.showSnackbar(feedback)
+                        isPrinting = false
+                    }
+                },
+                enabled = !isPrinting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR RECIBO")
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Botones Inferiores
-        OutlinedButton(
-            onClick = {}, // Lógica para imprimir
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text("IMPRIMIR RECIBO")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = onNextOrder,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text("SIGUIENTE ORDEN", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+            Button(
+                onClick = onNextOrder,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("SIGUIENTE ORDEN", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

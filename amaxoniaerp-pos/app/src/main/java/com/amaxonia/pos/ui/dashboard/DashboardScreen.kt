@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -63,8 +65,10 @@ fun DashboardScreen(
     onNavigateToProducts: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToReports: () -> Unit,
+    onNavigateToPrinterSettings: () -> Unit,
     onNavigateToCart: () -> Unit,
-    onStartNewOrder: () -> Unit
+    onStartNewOrder: () -> Unit,
+    onNavigateToCierreCaja: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -92,69 +96,27 @@ fun DashboardScreen(
         }
     }
 
+    // --- Snackbar for auto-close notifications ---
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.autoCloseMessage) {
+        state.autoCloseMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+            viewModel.dismissAutoCloseMessage()
+        }
+    }
+
+    // --- CajaSelectorSheet (replaces old AlertDialog) ---
     if (state.showCajaSelector) {
-        AlertDialog(
-            onDismissRequest = { 
-                // Permitimos cancelar si ya tiene una caja seleccionada previamente,
-                // si no (es su primer ingreso), no lo dejamos.
+        CajaSelectorSheet(
+            cajas = state.availableCajas,
+            isLoading = state.isLoadingCajas,
+            errorMessage = state.error,
+            onSelectCaja = { caja -> viewModel.selectAndOpenCaja(caja, 0.0) },
+            onReload = { viewModel.fetchAvailableCajas() },
+            onDismiss = {
+                // Allow dismiss only if a caja was already selected
                 if (state.cajaPrincipalNombre != "Caja no seleccionada") {
                     viewModel.setShowCajaSelector(false)
-                }
-            },
-            title = { Text("Seleccionar Caja", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    if (state.isLoadingCajas) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else if (state.availableCajas.isEmpty()) {
-                        Text("No hay cajas configuradas en la sucursal activa.")
-                    } else {
-                        LazyColumn {
-                            items(state.availableCajas, key = { it.idCaja }) { caja ->
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .clickable {
-                                            viewModel.selectAndOpenCaja(caja, 0.0)
-                                        },
-                                    color = Color(0xFFE8F0FF),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text(caja.descripcion ?: "Caja sin nombre", fontWeight = FontWeight.Bold, color = AmaxoniaBlue)
-                                        Text("Código: ${caja.codCaja} | Serie: ${caja.serieCaja}", fontSize = 12.sp, color = Color.Gray)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (state.error != null) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = state.error!!,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (state.error != null) {
-                        TextButton(onClick = { viewModel.setShowCajaSelector(false) }) {
-                            Text("Cancelar", color = Color.Gray)
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                    Button(onClick = { viewModel.fetchAvailableCajas() }) {
-                        Text("Recargar")
-                    }
                 }
             }
         )
@@ -234,7 +196,7 @@ fun DashboardScreen(
                     DrawerMenuItem(Icons.Default.PointOfSale, "POS", isSelected = true) {
                         scope.launch { drawerState.close() }
                     }
-                    DrawerMenuItem(Icons.Default.ListAlt, "Crear Pedido") {
+                    DrawerMenuItem(Icons.AutoMirrored.Filled.ListAlt, "Crear Pedido") {
                         scope.launch { drawerState.close() }
                         viewModel.startNewOrder() // Limpia carrito
                         onStartNewOrder() // Navega a selección de cliente
@@ -246,6 +208,14 @@ fun DashboardScreen(
                     DrawerMenuItem(Icons.Default.BarChart, "Reportes") {
                         scope.launch { drawerState.close() }
                         onNavigateToReports()
+                    }
+                    DrawerMenuItem(Icons.Default.Print, "Configuracion de Impresora") {
+                        scope.launch { drawerState.close() }
+                        onNavigateToPrinterSettings()
+                    }
+                    DrawerMenuItem(Icons.Default.Lock, "Cerrar Caja") {
+                        scope.launch { drawerState.close() }
+                        onNavigateToCierreCaja()
                     }
                     DrawerMenuItem(Icons.Default.Refresh, "Actualizar datos") {
                         SyncScheduler.enqueueManual(context)
@@ -268,6 +238,7 @@ fun DashboardScreen(
     ) {
         Scaffold(
             containerColor = BgLightGray,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = {
@@ -314,7 +285,7 @@ fun DashboardScreen(
                         }
                         IconButton(onClick = { viewModel.toggleViewMode() }) {
                             Icon(
-                                imageVector = if (state.viewMode == ProductViewMode.GRID) Icons.Default.ViewList else Icons.Default.GridView,
+                                imageVector = if (state.viewMode == ProductViewMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                                 contentDescription = "Cambiar vista",
                                 tint = AmaxoniaBlue
                             )

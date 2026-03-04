@@ -14,12 +14,14 @@ object FacturasTable : Table("factura") {
     val idCaja = varchar("id_caja", 36)
     val fechaFactura = varchar("fechaFactura", 20).nullable()
     val fechaRecepcionDGI = varchar("fechaRecepcionDGI", 25).nullable()
+    val fechaCreacion = varchar("fecha_creacion", 25).nullable()
     val totalTotalFactura = decimal("TotalTotalFactura", 10, 2).default(0.0.toBigDecimal())
     val totalizarTotalGeneral = decimal("totalizar_total_general", 10, 2).default(0.0.toBigDecimal())
     val formaPago = varchar("formapago", 20)
     val cufe = text("cufe").nullable()
     val tipoFactura = varchar("tipo_factura", 50)
     val usuarioCreacion = varchar("usuario_creacion", 40)
+    val abrMonedaBase = varchar("abr_moneda_base", 10).nullable()
 
     override val primaryKey = PrimaryKey(idFactura)
 }

@@ -94,6 +94,12 @@ class ApiService(
         return response.data
     }
 
+    suspend fun getFacturasResumen(token: String): FacturasResumenDto {
+        return client.get("facturas/resumen") {
+            authHeaders(token)
+        }.body()
+    }
+
     suspend fun createProduct(token: String, request: CreateProductRequest): ProductDto {
         return client.post("items") {
             authHeaders(token)

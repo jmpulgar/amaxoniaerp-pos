@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.payment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.printer.PrinterFactory
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
@@ -37,7 +38,8 @@ class PaymentViewModel(
     private val cajaRepository: CajaRepository,
     private val cartRepository: CartRepository,
     private val salesRepository: SalesRepository,
-    private val localStore: LocalStore
+    private val localStore: LocalStore,
+    private val printerFactory: PrinterFactory
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PaymentState())
@@ -354,58 +356,101 @@ class PaymentViewModel(
                 )
             )
 
-            salesRepository.processSale(saleRequest).fold(
-                onSuccess = { response ->
-                    val formatter = DateTimeFormatter.ofPattern("hh:mm a")
-                    val dateHeaderFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy")
-                    val now = LocalDateTime.now()
-
-                    val newTransaction = Transaction(
-                        id = UUID.randomUUID().toString(),
-                        invoiceNumber = response.codFactura,
-                        time = now.format(formatter),
-                        amount = Money.toDouble(currentState.totalAmountMoney),
-                        currency = "USD",
-                        status = TransactionStatus.PAID,
-                        dateHeader = now.format(dateHeaderFormatter)
+            val saleResult = salesRepository.processSale(saleRequest)
+            if (saleResult.isFailure) {
+                val error = saleResult.exceptionOrNull()
+                val backendMessage = error?.message?.takeIf { it.isNotBlank() }
+                _state.update {
+                    it.copy(
+                        isProcessingPayment = false,
+                        paymentError = backendMessage
+                            ?: "No se pudo procesar la venta. Intenta nuevamente"
                     )
-
-                    transactionRepository.saveTransaction(newTransaction)
-                    val methods = payments
-                        .mapNotNull { payment ->
-                            currentState.formasPago.firstOrNull { it.idFormaPago == payment.idFormaPago }
-                                ?.descripcion
-                                ?.takeIf { it.isNotBlank() }
-                                ?: payment.tipoMovimiento
-                        }
-                        .distinct()
-                        .joinToString(" + ")
-
-                    _state.update { it.copy(isSuccess = true, isProcessingPayment = false, paymentError = null) }
-                    onSuccess(
-                        PaymentSuccessPayload(
-                            changeDue = currentState.changeDue,
-                            paymentMethodsLabel = methods,
-                            codFactura = response.codFactura
-                        )
-                    )
-                },
-                onFailure = { error ->
-                    val backendMessage = error.message?.takeIf { it.isNotBlank() }
-                    _state.update {
-                        it.copy(
-                            isProcessingPayment = false,
-                            paymentError = backendMessage
-                                ?: "No se pudo procesar la venta. Intenta nuevamente"
-                        )
-                    }
                 }
+                return@launch
+            }
+
+            val response = saleResult.getOrThrow()
+            val formatter = DateTimeFormatter.ofPattern("hh:mm a")
+            val dateHeaderFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy")
+            val now = LocalDateTime.now()
+
+            val newTransaction = Transaction(
+                id = UUID.randomUUID().toString(),
+                invoiceNumber = response.codFactura,
+                time = now.format(formatter),
+                amount = Money.toDouble(currentState.totalAmountMoney),
+                currency = "USD",
+                status = TransactionStatus.PAID,
+                dateHeader = now.format(dateHeaderFormatter)
+            )
+
+            transactionRepository.saveTransaction(newTransaction).onFailure { saveError ->
+                _state.update {
+                    it.copy(
+                        isProcessingPayment = false,
+                        paymentError = saveError.message
+                            ?: "La venta se proceso, pero no se pudo guardar la transaccion local"
+                    )
+                }
+                return@launch
+            }
+
+            val methods = payments
+                .mapNotNull { payment ->
+                    currentState.formasPago.firstOrNull { it.idFormaPago == payment.idFormaPago }
+                        ?.descripcion
+                        ?.takeIf { it.isNotBlank() }
+                        ?: payment.tipoMovimiento
+                }
+                .distinct()
+                .joinToString(" + ")
+
+            val printFeedback = printReceiptIfConfigured(newTransaction)
+
+            _state.update {
+                it.copy(
+                    isSuccess = true,
+                    isProcessingPayment = false,
+                    paymentError = null,
+                    receiptPrintMessage = printFeedback
+                )
+            }
+
+            onSuccess(
+                PaymentSuccessPayload(
+                    changeDue = currentState.changeDue,
+                    paymentMethodsLabel = methods,
+                    codFactura = response.codFactura,
+                    transactionId = newTransaction.id,
+                    receiptPrintMessage = printFeedback
+                )
             )
         }
     }
 
     fun clearPaymentError() {
         _state.update { it.copy(paymentError = null) }
+    }
+
+    fun clearReceiptPrintMessage() {
+        _state.update { it.copy(receiptPrintMessage = null) }
+    }
+
+    private suspend fun printReceiptIfConfigured(transaction: Transaction): String? {
+        val activePrinter = printerFactory.getActivePrinter() ?: return null
+        return activePrinter.printReceipt(transaction).fold(
+            onSuccess = { isStarted ->
+                if (isStarted) {
+                    "Imprimiendo recibo..."
+                } else {
+                    "No se pudo iniciar la impresion del recibo"
+                }
+            },
+            onFailure = { throwable ->
+                throwable.message ?: "No se pudo imprimir el recibo"
+            }
+        )
     }
 
     private fun buildFormapagoDetalle(state: PaymentState): FormapagoDetallePayload {

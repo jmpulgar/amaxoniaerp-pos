@@ -28,3 +28,35 @@ data class AperturaRequest(
     val devolucionInicial: Int = 0,
     val zInicial: Int = 0
 )
+
+@Serializable
+data class CierreCajaRequest(
+    val idCajaSecuencia: String,
+    val idCaja: String,
+    val montoCierre: Double,
+    val totalEfectivo: Double = 0.0,
+    val totalTarjeta: Double = 0.0,
+    val totalOtros: Double = 0.0,
+    val totalVentas: Double = 0.0,
+    val cantidadTransacciones: Int = 0
+)
+
+@Serializable
+data class CierreCajaResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val error: String? = null
+)
+
+/** Summary shown in the close-register UI. */
+data class CierreCajaSummary(
+    val cajaName: String = "",
+    val openedAt: String = "",
+    val openAmount: Double = 0.0,
+    val totalSales: Double = 0.0,
+    val totalCash: Double = 0.0,
+    val totalCard: Double = 0.0,
+    val totalOther: Double = 0.0,
+    val transactionCount: Int = 0,
+    val expectedClose: Double = 0.0
+)

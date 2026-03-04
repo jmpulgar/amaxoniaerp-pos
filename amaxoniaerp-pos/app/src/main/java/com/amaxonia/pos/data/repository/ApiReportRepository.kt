@@ -3,18 +3,17 @@ package com.amaxonia.pos.data.repository
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.BestSellerProduct
-import com.amaxonia.pos.domain.model.PaymentMethodStats
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.ReportRepository
 
 /**
- * Implementación de ReportRepository que usa la API real para best sellers.
- * El resto de métodos se delegan al mock (pantalla Reportes).
+ * Real implementation of ReportRepository that uses the API for both
+ * summary stats (GET /facturas/resumen) and best sellers (GET /items/best-sellers).
+ * No mock fallback — all data comes from the backend.
  */
 class ApiReportRepository(
     private val apiService: ApiService,
     private val localStore: LocalStore,
-    private val fallback: ReportRepository
 ) : ReportRepository {
 
     private val bestSellerColors = longArrayOf(
@@ -28,7 +27,29 @@ class ApiReportRepository(
         0xFFEF6C00
     )
 
-    override suspend fun getSummaryStats(): Result<SummaryStats> = fallback.getSummaryStats()
+    override suspend fun getSummaryStats(): Result<SummaryStats> {
+        val token = localStore.readCompanySession()?.token
+        if (token.isNullOrBlank()) {
+            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        }
+        return runCatching {
+            val dto = apiService.getFacturasResumen(token)
+            SummaryStats(
+                grossSales = dto.ventasBrutas,
+                netSales = dto.ventasNetas,
+                discounts = dto.descuentos,
+                cancellations = dto.cancelaciones,
+                totalTransactions = dto.totalFacturas,
+                totalPaid = dto.totalFacturasPagadas,
+                totalCancelled = dto.totalFacturasAnuladas,
+                ticketPromedio = dto.ticketPromedio,
+                moneda = dto.moneda,
+            )
+        }.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { Result.failure(it) }
+        )
+    }
 
     override suspend fun getBestSellers(): Result<List<BestSellerProduct>> {
         val token = localStore.readCompanySession()?.token
@@ -54,8 +75,4 @@ class ApiReportRepository(
             onFailure = { Result.failure(it) }
         )
     }
-
-    override suspend fun getChartData(): Result<List<Float>> = fallback.getChartData()
-
-    override suspend fun getPaymentMethodStats(): Result<PaymentMethodStats> = fallback.getPaymentMethodStats()
 }

@@ -1,7 +1,6 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.domain.model.BestSellerProduct
-import com.amaxonia.pos.domain.model.PaymentMethodStats
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.ReportRepository
 import kotlinx.coroutines.delay
@@ -13,14 +12,18 @@ class MockReportRepository : ReportRepository {
     override suspend fun getSummaryStats(): Result<SummaryStats> {
         simulateNetworkDelay()
         if (shouldSimulateError()) {
-            return Result.failure(Exception("Error al cargar estadísticas de resumen"))
+            return Result.failure(Exception("Error al cargar estadisticas de resumen"))
         }
         val summary = SummaryStats(
             grossSales = 31200.00,
             netSales = 11000.00,
             discounts = 430.00,
             cancellations = 0.00,
-            totalTransactions = 112
+            totalTransactions = 112,
+            totalPaid = 110,
+            totalCancelled = 2,
+            ticketPromedio = 100.00,
+            moneda = "USD",
         )
         return Result.success(summary)
     }
@@ -28,12 +31,12 @@ class MockReportRepository : ReportRepository {
     override suspend fun getBestSellers(): Result<List<BestSellerProduct>> {
         simulateNetworkDelay()
         if (shouldSimulateError()) {
-            return Result.failure(Exception("Error al cargar productos más vendidos"))
+            return Result.failure(Exception("Error al cargar productos mas vendidos"))
         }
         val bestSellers = listOf(
             BestSellerProduct(
                 id = "1",
-                name = "Ensalada de Atún",
+                name = "Ensalada de Atun",
                 price = 12.50,
                 salesCount = 45,
                 progress = 1.0f,
@@ -41,7 +44,7 @@ class MockReportRepository : ReportRepository {
             ),
             BestSellerProduct(
                 id = "2",
-                name = "Ensalada César",
+                name = "Ensalada Cesar",
                 price = 10.99,
                 salesCount = 38,
                 progress = 0.84f,
@@ -57,29 +60,6 @@ class MockReportRepository : ReportRepository {
             )
         )
         return Result.success(bestSellers)
-    }
-
-    override suspend fun getChartData(): Result<List<Float>> {
-        simulateNetworkDelay()
-        if (shouldSimulateError()) {
-            return Result.failure(Exception("Error al cargar datos del gráfico"))
-        }
-        val chartData = listOf(0.2f, 0.5f, 0.8f, 0.6f, 0.9f, 0.7f, 1.0f)
-        return Result.success(chartData)
-    }
-
-    override suspend fun getPaymentMethodStats(): Result<PaymentMethodStats> {
-        simulateNetworkDelay()
-        if (shouldSimulateError()) {
-            return Result.failure(Exception("Error al cargar estadísticas de métodos de pago"))
-        }
-        val stats = PaymentMethodStats(
-            method = "Cash",
-            amount = 8500.00,
-            count = 78,
-            percentage = 70
-        )
-        return Result.success(stats)
     }
 
     private suspend fun simulateNetworkDelay() {

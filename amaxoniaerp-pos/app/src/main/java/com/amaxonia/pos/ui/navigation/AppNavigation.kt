@@ -15,6 +15,7 @@ import com.amaxonia.pos.ui.clients.ClientListScreen
 import com.amaxonia.pos.ui.clients.ClientSelectionScreen
 import com.amaxonia.pos.ui.company.CompanySelectionScreen
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.dashboard.DashboardScreen
 import com.amaxonia.pos.ui.history.HistoryScreen
 import com.amaxonia.pos.ui.login.LoginScreen
@@ -23,22 +24,31 @@ import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
 import com.amaxonia.pos.ui.products.ProductListScreen
 import com.amaxonia.pos.ui.reports.ReportsScreen
+import com.amaxonia.pos.ui.settings.SettingsScreen
 import com.amaxonia.pos.ui.sync.SyncScreen
 import com.amaxonia.pos.ui.welcome.WelcomeScreen
 import com.amaxonia.pos.data.sync.SyncScheduler
 import kotlinx.coroutines.launch
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(startDestination: String) {
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    // Obtenemos el repo aquí para inyectarlo en acciones rápidas
     val cartRepository = DependencyContainer.cartRepository
+
+    // Navegar desde el drawer: siempre deja el back stack limpio como [dashboard -> destino].
+    // launchSingleTop evita duplicados, popUpTo(dashboard) evita acumulación.
+    fun navigateFromDrawer(route: String) {
+        navController.navigate(route) {
+            popUpTo("dashboard") { inclusive = false }
+            launchSingleTop = true
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = "welcome"
+        startDestination = startDestination
     ) {
         composable("welcome") {
             WelcomeScreen(
@@ -50,7 +60,10 @@ fun AppNavigation() {
         composable("login") {
             LoginScreen(
                 onLoginSuccess = {
-                    navController.navigate("select_company") { popUpTo("login") { inclusive = true } }
+                    // Limpia todo el stack y va a select_company
+                    navController.navigate("select_company") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -61,7 +74,10 @@ fun AppNavigation() {
                 onCompanySelected = {
                     SyncScheduler.enqueueManual(context)
                     SyncScheduler.schedulePeriodic(context)
-                    navController.navigate("dashboard") { popUpTo("select_company") { inclusive = true } }
+                    // Limpia todo el stack y va a dashboard
+                    navController.navigate("dashboard") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -70,7 +86,9 @@ fun AppNavigation() {
         composable("catalog_sync") {
             SyncScreen(
                 onSyncCompleted = {
-                    navController.navigate("dashboard") { popUpTo("catalog_sync") { inclusive = true } }
+                    navController.navigate("dashboard") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
         }
@@ -80,16 +98,35 @@ fun AppNavigation() {
                 onLogout = {
                     scope.launch {
                         DependencyContainer.authRepository.logout()
-                        navController.navigate("welcome") { popUpTo(0) { inclusive = true } }
+                        navController.navigate("welcome") {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 },
-                onNavigateToClients = { navController.navigate("clients_list") },
-                onNavigateToProducts = { navController.navigate("products_list") },
-                onNavigateToHistory = { navController.navigate("history") },
-                onNavigateToReports = { navController.navigate("reports") },
+                // Todas las navegaciones del drawer pasan por navigateFromDrawer
+                onNavigateToClients = { navigateFromDrawer("clients_list") },
+                onNavigateToProducts = { navigateFromDrawer("products_list") },
+                onNavigateToHistory = { navigateFromDrawer("history") },
+                onNavigateToReports = { navigateFromDrawer("reports") },
+                onNavigateToPrinterSettings = { navigateFromDrawer("printer_settings") },
                 onNavigateToCart = { navController.navigate("cart") },
-                // NUEVO: Al crear pedido nuevo, vamos a seleccionar cliente con modo selección
-                onStartNewOrder = { navController.navigate("client_selection_mode") }
+                onStartNewOrder = { navigateFromDrawer("client_selection_mode") },
+                onNavigateToCierreCaja = { navigateFromDrawer("cierre_caja") }
+            )
+        }
+
+        composable("printer_settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable("cierre_caja") {
+            CierreCajaScreen(
+                onBack = { navController.popBackStack() },
+                onCloseSuccess = {
+                    navController.navigate("dashboard") {
+                        popUpTo("dashboard") { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -116,7 +153,6 @@ fun AppNavigation() {
             )
         }
 
-        // NUEVA RUTA: Selección de Cliente
         composable("client_selection_mode") {
             ClientSelectionScreen(
                 onBack = { navController.popBackStack() },
@@ -162,22 +198,18 @@ fun AppNavigation() {
             )
         }
 
-        // --- NUEVA RUTA: CARRITO ---
         composable("cart") {
             CartScreen(
                 onBack = { navController.popBackStack() },
                 onCheckout = { total ->
-                    // Navegar al pago enviando el total
                     navController.navigate("payment/$total")
                 },
                 onSelectClient = {
-                    // Navegamos a la lista de clientes en modo selección
                     navController.navigate("client_selection_mode")
                 }
             )
         }
 
-        // Ruta para ir a Pagar
         composable(
             route = "payment/{total}",
             arguments = listOf(navArgument("total") { type = NavType.StringType })
@@ -189,33 +221,67 @@ fun AppNavigation() {
                 onPaymentSuccess = { payload ->
                     val methods = Uri.encode(payload.paymentMethodsLabel)
                     val codFactura = Uri.encode(payload.codFactura)
-                    // Navegar a éxito, eliminando la pantalla de pago del stack
-                    navController.navigate("payment_success/${payload.changeDue}?methods=$methods&codFactura=$codFactura") {
+                    val transactionId = Uri.encode(payload.transactionId)
+                    val printMessage = Uri.encode(payload.receiptPrintMessage.orEmpty())
+                    navController.navigate(
+                        "payment_success/${payload.changeDue}?methods=$methods&codFactura=$codFactura&transactionId=$transactionId&printMessage=$printMessage"
+                    ) {
                         popUpTo("dashboard") { inclusive = false }
                     }
                 }
             )
         }
 
-        // Ruta de Transacción Exitosa
         composable(
-            route = "payment_success/{change}?methods={methods}&codFactura={codFactura}",
+            route = "payment_success/{change}?methods={methods}&codFactura={codFactura}&transactionId={transactionId}&printMessage={printMessage}",
             arguments = listOf(
                 navArgument("change") { type = NavType.StringType },
                 navArgument("methods") { type = NavType.StringType; defaultValue = "" },
-                navArgument("codFactura") { type = NavType.StringType; defaultValue = "" }
+                navArgument("codFactura") { type = NavType.StringType; defaultValue = "" },
+                navArgument("transactionId") { type = NavType.StringType; defaultValue = "" },
+                navArgument("printMessage") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val change = backStackEntry.arguments?.getString("change")?.toDoubleOrNull() ?: 0.0
             val methods = Uri.decode(backStackEntry.arguments?.getString("methods").orEmpty())
             val codFactura = Uri.decode(backStackEntry.arguments?.getString("codFactura").orEmpty())
+            val transactionId = Uri.decode(backStackEntry.arguments?.getString("transactionId").orEmpty())
+            val printMessage = Uri.decode(backStackEntry.arguments?.getString("printMessage").orEmpty())
             SuccessScreen(
                 changeDue = change,
                 paymentMethodsLabel = methods,
                 codFactura = codFactura,
+                transactionId = transactionId,
+                initialPrintMessage = printMessage,
+                onPrintReceipt = { trxId ->
+                    val transactionResult = DependencyContainer.transactionRepository.getTransactionById(trxId)
+                    if (transactionResult.isFailure) {
+                        Result.failure(transactionResult.exceptionOrNull() ?: IllegalStateException("No se encontro la transaccion"))
+                    } else {
+                        val printer = DependencyContainer.printerFactory.getActivePrinter()
+                        if (printer == null) {
+                            Result.failure(IllegalStateException("No hay impresora configurada"))
+                        } else {
+                            val transaction = transactionResult.getOrThrow()
+                            printer.printReceipt(transaction).fold(
+                                onSuccess = { started ->
+                                    if (started) {
+                                        Result.success("Imprimiendo recibo...")
+                                    } else {
+                                        Result.failure(
+                                            IllegalStateException("No se pudo iniciar la impresion del recibo")
+                                        )
+                                    }
+                                },
+                                onFailure = { error ->
+                                    Result.failure(error)
+                                }
+                            )
+                        }
+                    }
+                },
                 onNextOrder = {
                     cartRepository.clearCart()
-                    // Limpiar todo y volver al dashboard
                     navController.navigate("dashboard") {
                         popUpTo("dashboard") { inclusive = true }
                     }

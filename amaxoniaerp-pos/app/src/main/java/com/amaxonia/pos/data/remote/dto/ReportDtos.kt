@@ -26,3 +26,16 @@ data class BestSellerDto(
 data class BestSellersResponse(
     val data: List<BestSellerDto>
 )
+
+@Serializable
+data class FacturasResumenDto(
+    val ventasBrutas: Double = 0.0,
+    val ventasNetas: Double = 0.0,
+    val descuentos: Double = 0.0,
+    val cancelaciones: Double = 0.0,
+    val totalFacturas: Int = 0,
+    val totalFacturasPagadas: Int = 0,
+    val totalFacturasAnuladas: Int = 0,
+    val ticketPromedio: Double = 0.0,
+    val moneda: String = "USD",
+)

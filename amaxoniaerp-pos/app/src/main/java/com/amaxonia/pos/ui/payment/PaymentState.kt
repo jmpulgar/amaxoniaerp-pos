@@ -16,7 +16,8 @@ data class PaymentState(
     val lastFormapagoDetalle: FormapagoDetallePayload? = null,
     val isProcessingPayment: Boolean = false,
     val paymentError: String? = null,
-    val showInsufficientReminder: Boolean = false
+    val showInsufficientReminder: Boolean = false,
+    val receiptPrintMessage: String? = null
 ) {
     val totalAmountMoney: BigDecimal
         get() = Money.fromDouble(totalAmount)
@@ -80,5 +81,7 @@ enum class PaymentMethod {
 data class PaymentSuccessPayload(
     val changeDue: Double,
     val paymentMethodsLabel: String,
-    val codFactura: String
+    val codFactura: String,
+    val transactionId: String,
+    val receiptPrintMessage: String? = null
 )

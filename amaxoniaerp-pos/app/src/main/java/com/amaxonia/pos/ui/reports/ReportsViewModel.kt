@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.repository.ReportRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,32 +27,28 @@ class ReportsViewModel(
     private fun loadReportData() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            val summaryResult = reportRepository.getSummaryStats()
-            val bestSellersResult = reportRepository.getBestSellers()
-            val chartDataResult = reportRepository.getChartData()
-            val paymentStatsResult = reportRepository.getPaymentMethodStats()
-            val allResults = listOf(summaryResult, bestSellersResult, chartDataResult, paymentStatsResult)
-            val hasError = allResults.any { it.isFailure }
-            if (hasError) {
-                val errorMessage = allResults.firstOrNull { it.isFailure }?.exceptionOrNull()?.message
-                    ?: "Error al cargar datos de reportes"
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = errorMessage
-                    )
-                }
-            } else {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        summary = summaryResult.getOrNull() ?: it.summary,
-                        bestSellers = bestSellersResult.getOrNull() ?: it.bestSellers,
-                        chartData = chartDataResult.getOrNull() ?: it.chartData,
-                        paymentStats = paymentStatsResult.getOrNull() ?: it.paymentStats,
-                        error = null
-                    )
-                }
+
+            // Load summary and best sellers in parallel
+            val summaryDeferred = async { reportRepository.getSummaryStats() }
+            val bestSellersDeferred = async { reportRepository.getBestSellers() }
+
+            val summaryResult = summaryDeferred.await()
+            val bestSellersResult = bestSellersDeferred.await()
+
+            // Partial success: show whatever data we got
+            val errorMessage = listOf(summaryResult, bestSellersResult)
+                .firstOrNull { it.isFailure }
+                ?.exceptionOrNull()?.message
+
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    summary = summaryResult.getOrNull() ?: it.summary,
+                    bestSellers = bestSellersResult.getOrNull() ?: it.bestSellers,
+                    error = if (summaryResult.isFailure && bestSellersResult.isFailure) {
+                        errorMessage ?: "Error al cargar datos de reportes"
+                    } else null
+                )
             }
         }
     }

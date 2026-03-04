@@ -5,6 +5,8 @@ import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
+import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
+import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -13,6 +15,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -56,6 +59,39 @@ class CajaApiImpl(private val apiClient: ApiClient) : CajaApi {
 
             val responseText = response.bodyAsText()
             Result.success(parseCajaStatusResponse(responseText, "No se pudo abrir la caja"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun closeCaja(
+        request: CierreCajaRequest,
+        authHeader: String,
+        companyDb: String
+    ): Result<CierreCajaResponse> {
+        return try {
+            val response = apiClient.httpClient.post("api/cajas/close") {
+                header("Authorization", authHeader)
+                header("Company-DB", companyDb)
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+            if (response.status.isSuccess()) {
+                val responseText = response.bodyAsText()
+                val parsed = runCatching {
+                    AppJson.decodeFromString(CierreCajaResponse.serializer(), responseText)
+                }.getOrElse {
+                    CierreCajaResponse(success = true, message = "Caja cerrada correctamente")
+                }
+                Result.success(parsed)
+            } else {
+                val bodyText = response.bodyAsText()
+                val errorMsg = runCatching {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), bodyText)
+                    (json as? JsonObject)?.get("error")?.jsonPrimitive?.contentOrNull
+                }.getOrNull() ?: "No se pudo cerrar la caja"
+                Result.failure(IllegalStateException(errorMsg))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

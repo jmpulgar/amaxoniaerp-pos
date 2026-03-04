@@ -75,6 +75,73 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
 
                 call.respond(FacturasListResponse(data = facturas, total = total))
             }
+
+            get("/resumen") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.payload.getClaim("admin_db").asString()
+                if (adminDb.isNullOrBlank()) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Database not found")
+                    )
+                }
+
+                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val resumen = facturasRepository.getResumen(companyDb)
+                call.respond(resumen)
+            }
+
+            get("/{id}/detalle") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.payload.getClaim("admin_db").asString()
+                if (adminDb.isNullOrBlank()) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Database not found")
+                    )
+                }
+
+                val facturaId = call.parameters["id"]
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Missing factura ID")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val detalle = facturasRepository.getFacturaDetalle(companyDb, facturaId)
+
+                if (detalle == null) {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
+                } else {
+                    call.respond(detalle)
+                }
+            }
         }
     }
 }

@@ -254,7 +254,7 @@ fun WelcomeScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(width = 1.dp)
             ) {
                 Text(
                     text = "Solicitar tu cuenta",

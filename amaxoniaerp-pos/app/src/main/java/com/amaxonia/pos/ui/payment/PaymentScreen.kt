@@ -19,8 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Wallet
@@ -59,7 +59,8 @@ fun PaymentScreen(
             cajaRepository = DependencyContainer.cajaRepository,
             cartRepository = DependencyContainer.cartRepository,
             salesRepository = DependencyContainer.salesRepository,
-            localStore = DependencyContainer.localStore
+            localStore = DependencyContainer.localStore,
+            printerFactory = DependencyContainer.printerFactory
         )
     }
 
@@ -68,8 +69,16 @@ fun PaymentScreen(
     }
 
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.receiptPrintMessage) {
+        val message = state.receiptPrintMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearReceiptPrintMessage()
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -77,7 +86,7 @@ fun PaymentScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = Color(0xFF1565C0))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = Color(0xFF1565C0))
                     }
                 }
             )
@@ -198,7 +207,7 @@ fun RowScope.PaymentTab(title: String, isSelected: Boolean, onClick: () -> Unit)
         )
         if (isSelected) {
             Spacer(modifier = Modifier.height(8.dp))
-            Divider(color = Color(0xFF1A237E), thickness = 3.dp, modifier = Modifier.width(60.dp))
+            HorizontalDivider(color = Color(0xFF1A237E), thickness = 3.dp, modifier = Modifier.width(60.dp))
         }
     }
 }
@@ -307,7 +316,7 @@ fun CashPaymentContent(
                             .clickable { viewModel.onKeyPadInput("BACK") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Backspace, contentDescription = "Borrar", tint = Color(0xFF1565C0))
+                        Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Borrar", tint = Color(0xFF1565C0))
                     }
 
                     // Botón COBRAR / ENTER
