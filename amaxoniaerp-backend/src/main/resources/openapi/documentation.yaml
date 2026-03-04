@@ -1,0 +1,1169 @@
+openapi: "3.0.3"
+info:
+  title: "Application API"
+  description: "Application API"
+  version: "1.0.0"
+servers:
+  - url: "http://0.0.0.0:8080"
+paths:
+  /auth/login:
+    post:
+      description: "Authenticate and return identity token with companies list."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/company:
+    post:
+      description: "Select a company and return a company-scoped token."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanySelectRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanySelectResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /items:
+    get:
+      description: "List items from the company database."
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "limit"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 100
+            minimum: 1
+            maximum: 1000
+          description: "Max items to return (1-1000)."
+        - name: "offset"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+            default: 0
+            minimum: 0
+          description: "Zero-based offset."
+          - name: "search"
+            in: "query"
+            required: false
+            schema:
+              type: "string"
+            description: "Search by code, description, or barcode."
+          - name: "includeTotal"
+            in: "query"
+            required: false
+            schema:
+              type: "boolean"
+              default: true
+            description: "When false, skips total count and returns total = -1."
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsListResponse"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      description: "Create a new product in the company database."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /items/{id}:
+      put:
+        description: "Update a product in the company database."
+        security:
+          - bearerAuth: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "integer"
+            format: "int32"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /clients:
+    get:
+      description: "List clients from the company database."
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "limit"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 100
+            minimum: 1
+            maximum: 1000
+          description: "Max clients to return (1-1000)."
+        - name: "offset"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+            default: 0
+            minimum: 0
+          description: "Zero-based offset."
+          - name: "search"
+            in: "query"
+            required: false
+            schema:
+              type: "string"
+            description: "Search by code, name, or identification."
+          - name: "includeTotal"
+            in: "query"
+            required: false
+            schema:
+              type: "boolean"
+              default: true
+            description: "When false, skips total count and returns total = -1."
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientsListResponse"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      description: "Create a new client in the company database."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /clients/{id}:
+      get:
+        description: "Get a client from the company database."
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: "id"
+            in: "path"
+            required: true
+            schema:
+              type: "string"
+        responses:
+          "200":
+            description: "OK"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/Client"
+          "400":
+            description: "Bad Request"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "401":
+            description: "Unauthorized"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "403":
+            description: "Forbidden"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "404":
+            description: "Not Found"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+  /countries:
+      get:
+        description: "List countries from the company database."
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: "limit"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int32"
+              default: 100
+              minimum: 1
+              maximum: 1000
+            description: "Max countries to return (1-1000)."
+          - name: "offset"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int64"
+              default: 0
+              minimum: 0
+            description: "Zero-based offset."
+          - name: "includeTotal"
+            in: "query"
+            required: false
+            schema:
+              type: "boolean"
+              default: true
+            description: "When false, skips total count and returns total = -1."
+        responses:
+            "200":
+              description: "OK"
+              content:
+                application/json:
+                  schema:
+                    $ref: "#/components/schemas/AddressLevelsListResponse"
+          "400":
+            description: "Bad Request"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "401":
+            description: "Unauthorized"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "403":
+            description: "Forbidden"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+  /address-levels/{level}:
+      get:
+        description: "List address levels from the company database."
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: "level"
+            in: "path"
+            required: true
+            schema:
+              type: "integer"
+              format: "int32"
+              minimum: 1
+              maximum: 3
+          - name: "limit"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int32"
+              default: 100
+              minimum: 1
+              maximum: 1000
+            description: "Max records to return (1-1000)."
+          - name: "offset"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int64"
+              default: 0
+              minimum: 0
+            description: "Zero-based offset."
+          - name: "includeTotal"
+            in: "query"
+            required: false
+            schema:
+              type: "boolean"
+              default: true
+            description: "When false, skips total count and returns total = -1."
+        responses:
+          "200":
+            description: "OK"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/CatalogListResponse"
+          "400":
+            description: "Bad Request"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "401":
+            description: "Unauthorized"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+            "403":
+              description: "Forbidden"
+              content:
+                application/json:
+                  schema:
+                    $ref: "#/components/schemas/ErrorResponse"
+  /client-types:
+      get:
+        description: "List client types from the company database."
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: "limit"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int32"
+              default: 100
+              minimum: 1
+              maximum: 1000
+            description: "Max records to return (1-1000)."
+          - name: "offset"
+            in: "query"
+            required: false
+            schema:
+              type: "integer"
+              format: "int64"
+              default: 0
+              minimum: 0
+            description: "Zero-based offset."
+          - name: "includeTotal"
+            in: "query"
+            required: false
+            schema:
+              type: "boolean"
+              default: true
+            description: "When false, skips total count and returns total = -1."
+        responses:
+          "200":
+            description: "OK"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ClientTypesListResponse"
+          "400":
+            description: "Bad Request"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "401":
+            description: "Unauthorized"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+          "403":
+            description: "Forbidden"
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+      put:
+        description: "Update a client in the company database."
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /facturas:
+    get:
+      description: "List invoices from the company database."
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: "limit"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 100
+            minimum: 1
+            maximum: 1000
+          description: "Max invoices to return (1-1000)."
+        - name: "offset"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+            default: 0
+            minimum: 0
+          description: "Zero-based offset."
+        - name: "search"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Search by invoice code, client name, client identification, or status."
+        - name: "fecha_inicio"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            example: "2025-01-01"
+          description: "Start date (yyyy-MM-dd)."
+        - name: "fecha_fin"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            example: "2025-01-31"
+          description: "End date (yyyy-MM-dd)."
+        - name: "estatus"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            example: "1,2,3"
+          description: "Comma-separated status codes."
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FacturasListResponse"
+        "400":
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      bearerFormat: "JWT"
+  schemas:
+    LoginRequest:
+      type: "object"
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: "string"
+        password:
+          type: "string"
+    LoginResponse:
+      type: "object"
+      required:
+        - token
+        - user
+        - companies
+      properties:
+        token:
+          type: "string"
+        user:
+          $ref: "#/components/schemas/UserResponse"
+        companies:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/CompanyResponse"
+    UserResponse:
+      type: "object"
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: "integer"
+          format: "int32"
+        username:
+          type: "string"
+        role:
+          type: "string"
+          nullable: true
+    CompanyResponse:
+      type: "object"
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: "integer"
+          format: "int32"
+        name:
+          type: "string"
+        rif:
+          type: "string"
+          nullable: true
+    CompanySelectRequest:
+      type: "object"
+      required:
+        - companyId
+      properties:
+        companyId:
+          type: "integer"
+          format: "int32"
+    CompanySelectResponse:
+      type: "object"
+      required:
+        - success
+        - token
+        - currentCompany
+      properties:
+        success:
+          type: "boolean"
+        token:
+          type: "string"
+        currentCompany:
+          $ref: "#/components/schemas/CompanyDetailResponse"
+    CompanyDetailResponse:
+      type: "object"
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: "integer"
+          format: "int32"
+        name:
+          type: "string"
+        adminDb:
+          type: "string"
+          nullable: true
+        accountingDb:
+          type: "string"
+          nullable: true
+        payrollDb:
+          type: "string"
+          nullable: true
+    ErrorResponse:
+      type: "object"
+      required:
+        - error
+      properties:
+        error:
+          type: "string"
+    Product:
+      type: "object"
+      required:
+        - id
+        - code
+        - reference
+        - description
+        - barcode1
+        - barcode2
+        - barcode3
+        - photoUrl
+        - department
+        - section
+        - family
+        - subFamily
+        - brand
+        - line
+        - gobSegment
+        - gobFamily
+        - isExempt
+        - taxRate
+        - costActual
+        - costAverage
+        - costPrevious
+        - costCIF
+        - costFOB
+        - costProcessed
+        - commissionPercent
+        - costEuroOrigin
+        - costFranco
+        - prices
+      properties:
+        id:
+          type: "string"
+        code:
+          type: "string"
+        reference:
+          type: "string"
+        description:
+          type: "string"
+        barcode1:
+          type: "string"
+        barcode2:
+          type: "string"
+        barcode3:
+          type: "string"
+        photoUrl:
+          type: "string"
+        department:
+          type: "string"
+        section:
+          type: "string"
+        family:
+          type: "string"
+        subFamily:
+          type: "string"
+        brand:
+          type: "string"
+        line:
+          type: "string"
+        gobSegment:
+          type: "string"
+        gobFamily:
+          type: "string"
+        isExempt:
+          type: "boolean"
+        taxRate:
+          type: "number"
+          format: "double"
+        costActual:
+          type: "number"
+          format: "double"
+        costAverage:
+          type: "number"
+          format: "double"
+        costPrevious:
+          type: "number"
+          format: "double"
+        costCIF:
+          type: "number"
+          format: "double"
+        costFOB:
+          type: "number"
+          format: "double"
+        costProcessed:
+          type: "number"
+          format: "double"
+        commissionPercent:
+          type: "number"
+          format: "double"
+        costEuroOrigin:
+          type: "number"
+          format: "double"
+        costFranco:
+          type: "number"
+          format: "double"
+        prices:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/PriceLevel"
+    PriceLevel:
+      type: "object"
+      required:
+        - label
+        - price
+        - utilityPercent
+        - pricePlusUtility
+        - pricePlusTax
+        - discountPercent
+      properties:
+        label:
+          type: "string"
+        price:
+          type: "number"
+          format: "double"
+        utilityPercent:
+          type: "number"
+          format: "double"
+        pricePlusUtility:
+          type: "number"
+          format: "double"
+        pricePlusTax:
+          type: "number"
+          format: "double"
+        discountPercent:
+          type: "number"
+          format: "double"
+    CreateProductRequest:
+      type: "object"
+      required:
+        - code
+        - description
+        - prices
+      properties:
+        code:
+          type: "string"
+        description:
+          type: "string"
+        reference:
+          type: "string"
+        barcode1:
+          type: "string"
+        department:
+          type: "integer"
+          format: "int32"
+          default: 0
+        taxRate:
+          type: "number"
+          format: "double"
+          default: 7.0
+        costActual:
+          type: "number"
+          format: "double"
+          default: 0.0
+        prices:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/PriceLevel"
+      CatalogListResponse:
+        type: "object"
+        required:
+          - data
+          - total
+        properties:
+          data:
+            type: "array"
+            items:
+              type: "object"
+              additionalProperties: true
+          total:
+            type: "integer"
+            format: "int64"
+            description: "Total records when includeTotal=true; -1 when includeTotal=false."
+      AddressLevelsListResponse:
+        type: "object"
+        required:
+          - data
+          - total
+        properties:
+          data:
+            type: "array"
+            items:
+              $ref: "#/components/schemas/AddressLevelCatalog"
+          total:
+            type: "integer"
+            format: "int64"
+            description: "Total records when includeTotal=true; -1 when includeTotal=false."
+      AddressLevelCatalog:
+        type: "object"
+        required:
+          - countryCode
+          - code
+          - name
+        properties:
+          countryCode:
+            type: "string"
+          code:
+            type: "string"
+          name:
+            type: "string"
+      ClientTypeCatalog:
+        type: "object"
+        required:
+          - id
+          - description
+        properties:
+          id:
+            type: "integer"
+            format: "int32"
+          description:
+            type: "string"
+          feCode:
+            type: "string"
+            nullable: true
+      ClientTypesListResponse:
+        type: "object"
+        required:
+          - data
+          - total
+        properties:
+          data:
+            type: "array"
+            items:
+              $ref: "#/components/schemas/ClientTypeCatalog"
+          total:
+            type: "integer"
+            format: "int64"
+            description: "Total records when includeTotal=true; -1 when includeTotal=false."
+      ProductsListResponse:
+        type: "object"
+        required:
+          - data
+          - total
+        properties:
+          data:
+            type: "array"
+            items:
+              $ref: "#/components/schemas/Product"
+          total:
+            type: "integer"
+            format: "int64"
+            description: "Total records when includeTotal=true; -1 when includeTotal=false."
+      Client:
+        type: "object"
+        required:
+          - id
+          - code
+          - identification
+          - dv
+          - name
+          - lastName
+          - address
+          - phone
+          - email
+          - status
+          - clientTypeId
+          - taxpayerTypeId
+          - countryId
+        properties:
+          id:
+            type: "string"
+          code:
+            type: "string"
+          identification:
+            type: "string"
+          dv:
+            type: "string"
+          name:
+            type: "string"
+          lastName:
+            type: "string"
+          address:
+            type: "string"
+          addressLevel1:
+            type: "string"
+          addressLevel2:
+            type: "string"
+          addressLevel3:
+            type: "string"
+          phone:
+            type: "string"
+          email:
+            type: "string"
+          status:
+            type: "boolean"
+          clientTypeId:
+            type: "integer"
+            format: "int32"
+          taxpayerTypeId:
+            type: "integer"
+            format: "int32"
+          foreignAuthTypeId:
+            type: "string"
+            nullable: true
+          countryId:
+            type: "integer"
+            format: "int32"
+      CreateClientRequest:
+        type: "object"
+        required:
+          - identification
+          - name
+        properties:
+          identification:
+            type: "string"
+          name:
+            type: "string"
+          lastName:
+            type: "string"
+          address:
+            type: "string"
+          addressLevel1:
+            type: "string"
+          addressLevel2:
+            type: "string"
+          addressLevel3:
+            type: "string"
+          phone:
+            type: "string"
+          email:
+            type: "string"
+          clientTypeId:
+            type: "integer"
+            format: "int32"
+            default: 2
+          taxpayerTypeId:
+            type: "integer"
+            format: "int32"
+            default: 2
+          foreignAuthTypeId:
+            type: "string"
+            nullable: true
+          countryId:
+            type: "integer"
+            format: "int32"
+            default: 170
+      ClientsListResponse:
+        type: "object"
+        required:
+          - data
+          - total
+        properties:
+          data:
+            type: "array"
+            items:
+              $ref: "#/components/schemas/Client"
+          total:
+            type: "integer"
+            format: "int64"
+            description: "Total records when includeTotal=true; -1 when includeTotal=false."
+    FacturaSummary:
+      type: "object"
+      required:
+        - id
+        - codigo
+        - codigoFiscal
+        - numeroDocumentoFiscal
+        - fecha
+        - fechaDgi
+        - clienteNombre
+        - clienteIdentificacion
+        - total
+        - estatus
+        - formaPago
+        - items
+      properties:
+        id:
+          type: "string"
+        codigo:
+          type: "string"
+        codigoFiscal:
+          type: "string"
+        numeroDocumentoFiscal:
+          type: "string"
+        fecha:
+          type: "string"
+        fechaDgi:
+          type: "string"
+        clienteNombre:
+          type: "string"
+        clienteIdentificacion:
+          type: "string"
+        total:
+          type: "number"
+          format: "double"
+        estatus:
+          type: "string"
+        formaPago:
+          type: "string"
+        items:
+          type: "integer"
+          format: "int32"
+    FacturasListResponse:
+      type: "object"
+      required:
+        - data
+        - total
+      properties:
+        data:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/FacturaSummary"
+        total:
+          type: "integer"
+          format: "int64"

@@ -1,0 +1,17 @@
+package com.amaxonia.pos.domain.model
+
+enum class TransactionStatus(val label: String, val colorHex: Long) {
+    PAID("PAGADO", 0xFF1565C0),
+    PENDING("PENDIENTE", 0xFFFFA000),
+    CANCELLED("ANULADO", 0xFFD32F2F)
+}
+
+data class Transaction(
+    val id: String,
+    val invoiceNumber: String,
+    val time: String,
+    val amount: Double,
+    val currency: String = "USD",
+    val status: TransactionStatus = TransactionStatus.PAID,
+    val dateHeader: String
+)

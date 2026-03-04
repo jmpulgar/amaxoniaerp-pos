@@ -1,0 +1,25 @@
+ktor:
+  application:
+    modules:
+      - com.amaxoniaerp.ApplicationKt.module
+  deployment:
+    port: 8080
+    host: 0.0.0.0
+
+db:
+  config:
+    url: ${DB_CONFIG_URL:}
+    user: ${DB_CONFIG_USER:}
+    password: ${DB_CONFIG_PASS:}
+    poolSize: ${DB_CONFIG_POOL_SIZE:}
+
+jwt:
+  domain: ${JWT_DOMAIN:}
+  audience: ${JWT_AUDIENCE:}
+  realm: ${JWT_REALM:}
+  secret: ${JWT_SECRET:}
+
+# Imágenes: redirigir a este URL base si no hay archivos locales (ej. listoerp.app)
+assets:
+  baseUrl: ${ASSETS_BASE_URL:https://listoerp.app/app/api/data}
+  dataBasePath: ${DATA_BASE_PATH:}

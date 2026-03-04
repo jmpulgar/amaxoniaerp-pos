@@ -1,0 +1,406 @@
+package com.amaxoniaerp.features.items.data
+
+import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.items.domain.CreateProductRequest
+import com.amaxoniaerp.features.items.domain.ItemStockByWarehouse
+import com.amaxoniaerp.features.items.domain.ItemStockResponse
+import com.amaxoniaerp.features.items.domain.Product
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.andWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.update
+import java.math.BigDecimal
+
+/**
+ * Repositorio de items Multi-Tenant con Safe Parsing.
+ */
+class ItemsRepository {
+
+    suspend fun getItemStockByWarehouse(
+        database: Database,
+        itemId: Int
+    ): ItemStockResponse = dbQuery(database) {
+        val sql = """
+            SELECT
+                A.cod_almacen AS almacenId,
+                COALESCE(A.descripcion, '') AS almacenNombre,
+                COALESCE(A.tipo, '') AS almacenTipo,
+                COALESCE(E.cantidad, 0) AS cantidad,
+                COALESCE(E.cantidad_muestra, 0) AS cantidadMuestra,
+                COALESCE(SUM(P.cantidad), 0) AS cantidadPrecomprometida,
+                (COALESCE(E.cantidad, 0) - COALESCE(SUM(P.cantidad), 0)) AS cantidadDisponible,
+                COALESCE(E.minimo, 0) AS stockMinimo,
+                COALESCE(E.maximo, 0) AS stockMaximo,
+                COALESCE(A.orden, 999999) AS ordenAlmacen
+            FROM almacen A
+            LEFT JOIN item_existencia_almacen E
+                ON E.cod_almacen = A.cod_almacen
+                AND E.id_item = $itemId
+            LEFT JOIN item_precompromiso P
+                ON P.id_almacen = A.cod_almacen
+                AND P.id_item = $itemId
+            GROUP BY
+                A.cod_almacen,
+                A.descripcion,
+                A.tipo,
+                A.orden,
+                E.cantidad,
+                E.cantidad_muestra,
+                E.minimo,
+                E.maximo
+            ORDER BY ordenAlmacen ASC, A.cod_almacen ASC
+        """.trimIndent()
+
+        val warehouses = TransactionManager.current().exec(sql) { result ->
+            val list = mutableListOf<ItemStockByWarehouse>()
+            while (result.next()) {
+                list.add(
+                    ItemStockByWarehouse(
+                        almacenId = result.getInt("almacenId"),
+                        almacenNombre = result.getString("almacenNombre"),
+                        almacenTipo = result.getString("almacenTipo"),
+                        cantidad = result.getBigDecimal("cantidad").toSafeDouble(),
+                        cantidadMuestra = result.getBigDecimal("cantidadMuestra").toSafeDouble(),
+                        cantidadPrecomprometida = result.getBigDecimal("cantidadPrecomprometida").toSafeDouble(),
+                        cantidadDisponible = result.getBigDecimal("cantidadDisponible").toSafeDouble(),
+                        stockMinimo = result.getBigDecimal("stockMinimo").toSafeDouble(),
+                        stockMaximo = result.getBigDecimal("stockMaximo").toSafeDouble()
+                    )
+                )
+            }
+            list
+        } ?: emptyList()
+
+        val stockTotalDisponible = warehouses
+            .filter { isSaleWarehouse(it.almacenTipo) }
+            .sumOf { it.cantidadDisponible }
+
+        ItemStockResponse(
+            itemId = itemId,
+            stockTotalDisponible = stockTotalDisponible,
+            almacenes = warehouses
+        )
+    }
+
+    suspend fun listItems(
+        database: Database,
+        countryCode: String,
+        limit: Int,
+        offset: Long,
+        search: String?,
+        includeTotal: Boolean,
+        departmentId: Int? = null,
+    ): Pair<List<Product>, Long> = dbQuery(database) {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+
+        val query = table.selectAll()
+
+        if (!search.isNullOrBlank()) {
+            query.andWhere {
+                (table.codItem like "%$search%") or
+                    (table.descripcion1 like "%$search%") or
+                    (table.codigoBarras like "%$search%") or
+                    (table.referencia like "%$search%")
+            }
+        }
+        if (departmentId != null && departmentId > 0) {
+            query.andWhere { table.departamentoId eq departmentId }
+        }
+
+        val total = if (includeTotal) query.count() else -1L
+        val data = query.orderBy(table.descripcion1)
+            .limit(limit)
+            .offset(offset)
+            .map { row -> mapRowToProduct(row, countryCode) }
+
+        data to total
+    }
+
+    suspend fun listDepartments(
+        database: Database,
+        countryCode: String
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        DepartamentoTable.selectAll()
+            .orderBy(DepartamentoTable.descripcion)
+            .map { row ->
+                val id = row[DepartamentoTable.id]
+                val name = row[DepartamentoTable.descripcion]?.takeIf { it.isNotBlank() }
+                    ?: row[DepartamentoTable.codigo]?.takeIf { it.isNotBlank() }
+                    ?: "Departamento $id"
+                id to name
+            }
+    }
+
+    suspend fun getItemsByIds(
+        database: Database,
+        countryCode: String,
+        ids: List<Int>
+    ): List<Product> = if (ids.isEmpty()) emptyList() else dbQuery(database) {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+        table.selectAll()
+            .andWhere { table.idItem inList ids }
+            .map { row -> mapRowToProduct(row, countryCode) }
+    }
+
+    suspend fun getItemById(
+        database: Database,
+        countryCode: String,
+        id: Int
+    ): Product? = dbQuery(database) {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+
+        table.selectAll()
+            .andWhere { table.idItem eq id }
+            .map { row -> mapRowToProduct(row, countryCode) }
+            .singleOrNull()
+    }
+
+    suspend fun createItem(
+        database: Database,
+        countryCode: String,
+        request: CreateProductRequest
+    ): Product = dbQuery(database) {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+
+        val id = when (table) {
+            is ItemsTableVE -> {
+                table.insert {
+                    // Campos base
+                    it[codItem] = request.code
+                    it[descripcion1] = request.name
+                    it[descripcion2] = request.description
+                    it[referencia] = request.reference
+                    it[codigoBarras] = request.barcode
+                    it[codigoBarras2] = request.barcode2 ?: ""
+                    it[codigoBarras3] = request.barcode3 ?: ""
+                    it[codDepartamento] = request.departmentId
+                    it[seccionId] = request.sectionId
+                    it[familiaId] = request.familyId
+                    it[subfamiliaId] = request.subfamilyId
+                    it[marcaId] = request.brandId
+                    it[lineaId] = request.lineId
+                    it[precio1] = request.price1.toBigDecimal()
+                    it[utilidad1] = request.utility1.toBigDecimal()
+                    it[coniva1] = request.priceWithTax1.toBigDecimal()
+                    it[precio2] = request.price2.toBigDecimal()
+                    it[utilidad2] = request.utility2.toBigDecimal()
+                    it[coniva2] = request.priceWithTax2.toBigDecimal()
+                    it[precio3] = request.price3.toBigDecimal()
+                    it[utilidad3] = request.utility3.toBigDecimal()
+                    it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[costoActual] = request.currentCost.toBigDecimal()
+                    it[montoExento] = request.isTaxExempt
+                    it[iva] = request.taxRate.toBigDecimal()
+                    it[existenciaTotal] = request.totalStock
+                    it[estatus] = "A"
+                    it[codItemForma] = 1
+                    it[tipoProd] = 2
+                    it[usuarioCreacion] = "API"
+                    // Campos específicos VE (solo los que existen)
+                    it[balanza] = request.isScale ?: false
+                    it[idMonedaBase] = request.baseCurrencyId
+                } get table.idItem
+            }
+            is ItemsTablePA -> {
+                table.insert {
+                    // Campos base
+                    it[codItem] = request.code
+                    it[descripcion1] = request.name
+                    it[descripcion2] = request.description
+                    it[referencia] = request.reference
+                    it[codigoBarras] = request.barcode
+                    it[codigoBarras2] = request.barcode2 ?: ""
+                    it[codigoBarras3] = request.barcode3 ?: ""
+                    it[codDepartamento] = request.departmentId
+                    it[seccionId] = request.sectionId
+                    it[familiaId] = request.familyId
+                    it[subfamiliaId] = request.subfamilyId
+                    it[marcaId] = request.brandId
+                    it[lineaId] = request.lineId
+                    it[precio1] = request.price1.toBigDecimal()
+                    it[utilidad1] = request.utility1.toBigDecimal()
+                    it[coniva1] = request.priceWithTax1.toBigDecimal()
+                    it[precio2] = request.price2.toBigDecimal()
+                    it[utilidad2] = request.utility2.toBigDecimal()
+                    it[coniva2] = request.priceWithTax2.toBigDecimal()
+                    it[precio3] = request.price3.toBigDecimal()
+                    it[utilidad3] = request.utility3.toBigDecimal()
+                    it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[costoActual] = request.currentCost.toBigDecimal()
+                    it[montoExento] = request.isTaxExempt
+                    it[iva] = request.taxRate.toBigDecimal()
+                    it[existenciaTotal] = request.totalStock
+                    it[estatus] = "A"
+                    it[codItemForma] = 1
+                    it[tipoProd] = 2
+                    it[usuarioCreacion] = "API"
+                    // Campos específicos PA (solo los que existen)
+                    it[detallesKit] = request.kitDetails ?: "F"
+                    it[idSegmentoGob] = request.governmentSegmentId
+                    it[idFamiliaGob] = request.governmentFamilyId
+                } get table.idItem
+            }
+            else -> throw IllegalArgumentException("Tabla no soportada")
+        }
+
+        table.selectAll()
+            .andWhere { table.idItem eq id }
+            .map { row -> mapRowToProduct(row, countryCode) }
+            .single()
+    }
+
+    suspend fun updateItem(
+        database: Database,
+        countryCode: String,
+        id: Int,
+        request: CreateProductRequest
+    ): Product? = dbQuery(database) {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+
+        val updated = when (table) {
+            is ItemsTableVE -> {
+                table.update({ table.idItem eq id }) {
+                    it[codItem] = request.code
+                    it[descripcion1] = request.name
+                    it[referencia] = request.reference
+                    it[codigoBarras] = request.barcode
+                    it[precio1] = request.price1.toBigDecimal()
+                    it[utilidad1] = request.utility1.toBigDecimal()
+                    it[coniva1] = request.priceWithTax1.toBigDecimal()
+                    it[precio2] = request.price2.toBigDecimal()
+                    it[utilidad2] = request.utility2.toBigDecimal()
+                    it[coniva2] = request.priceWithTax2.toBigDecimal()
+                    it[precio3] = request.price3.toBigDecimal()
+                    it[utilidad3] = request.utility3.toBigDecimal()
+                    it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[costoActual] = request.currentCost.toBigDecimal()
+                    it[montoExento] = request.isTaxExempt
+                    it[iva] = request.taxRate.toBigDecimal()
+                    // Solo VE
+                    it[balanza] = request.isScale ?: false
+                    it[idMonedaBase] = request.baseCurrencyId
+                }
+            }
+            is ItemsTablePA -> {
+                table.update({ table.idItem eq id }) {
+                    it[codItem] = request.code
+                    it[descripcion1] = request.name
+                    it[referencia] = request.reference
+                    it[codigoBarras] = request.barcode
+                    it[precio1] = request.price1.toBigDecimal()
+                    it[utilidad1] = request.utility1.toBigDecimal()
+                    it[coniva1] = request.priceWithTax1.toBigDecimal()
+                    it[precio2] = request.price2.toBigDecimal()
+                    it[utilidad2] = request.utility2.toBigDecimal()
+                    it[coniva2] = request.priceWithTax2.toBigDecimal()
+                    it[precio3] = request.price3.toBigDecimal()
+                    it[utilidad3] = request.utility3.toBigDecimal()
+                    it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[costoActual] = request.currentCost.toBigDecimal()
+                    it[montoExento] = request.isTaxExempt
+                    it[iva] = request.taxRate.toBigDecimal()
+                    // Solo PA
+                    it[detallesKit] = request.kitDetails ?: "F"
+                    it[idSegmentoGob] = request.governmentSegmentId
+                    it[idFamiliaGob] = request.governmentFamilyId
+                }
+            }
+            else -> throw IllegalArgumentException("Tabla no soportada")
+        }
+
+        if (updated == 0) {
+            null
+        } else {
+            table.selectAll()
+                .andWhere { table.idItem eq id }
+                .map { row -> mapRowToProduct(row, countryCode) }
+                .singleOrNull()
+        }
+    }
+
+    private fun mapRowToProduct(row: ResultRow, countryCode: String): Product {
+        val table = ItemsTableFactory.getTableForCountry(countryCode)
+
+        return Product(
+            id = row[table.idItem].toString(),
+            code = row[table.codItem],
+            reference = row[table.referencia] ?: "",
+            description = row[table.descripcion1],
+            barcode1 = row[table.codigoBarras],
+            barcode2 = row[table.codigoBarras2],
+            barcode3 = row[table.codigoBarras3],
+            photoUrl = row[table.foto] ?: "",
+            department = row[table.codDepartamento].toString(),
+            section = row[table.seccionId].toString(),
+            family = row[table.familiaId].toString(),
+            subFamily = row[table.subfamiliaId].toString(),
+            brand = row[table.marcaId].toString(),
+            line = row[table.lineaId].toString(),
+            isExempt = row[table.montoExento],
+            taxRate = row[table.iva].toDouble(),
+            costActual = row[table.costoActual].toDouble(),
+            costAverage = row[table.costoPromedio].toDouble(),
+            costPrevious = row[table.costoAnterior].toDouble(),
+            prices = createPriceLevels(row, table),
+            gobSegment = "",
+            gobFamily = ""
+        ).let { product ->
+            when (table) {
+                is ItemsTableVE -> product
+                is ItemsTablePA -> product.copy(
+                    gobSegment = row.getOrNull(table.idSegmentoGob)?.toString() ?: "",
+                    gobFamily = row.getOrNull(table.idFamiliaGob)?.toString() ?: ""
+                )
+                else -> product
+            }
+        }
+    }
+
+    private fun createPriceLevels(row: ResultRow, table: BaseItemsTable): List<com.amaxoniaerp.features.items.domain.PriceLevel> {
+        return listOf(
+            com.amaxoniaerp.features.items.domain.PriceLevel(
+                label = "A",
+                price = row[table.precio1].toDouble(),
+                utilityPercent = row[table.utilidad1].toDouble(),
+                pricePlusUtility = row[table.precio1].toDouble() * (1 + row[table.utilidad1].toDouble() / 100),
+                pricePlusTax = row[table.coniva1].toDouble(),
+                discountPercent = row[table.descuento1].toDouble()
+            ),
+            com.amaxoniaerp.features.items.domain.PriceLevel(
+                label = "B",
+                price = row[table.precio2].toDouble(),
+                utilityPercent = row[table.utilidad2].toDouble(),
+                pricePlusUtility = row[table.precio2].toDouble() * (1 + row[table.utilidad2].toDouble() / 100),
+                pricePlusTax = row[table.coniva2].toDouble(),
+                discountPercent = row[table.descuento2].toDouble()
+            ),
+            com.amaxoniaerp.features.items.domain.PriceLevel(
+                label = "C",
+                price = row[table.precio3].toDouble(),
+                utilityPercent = row[table.utilidad3].toDouble(),
+                pricePlusUtility = row[table.precio3].toDouble() * (1 + row[table.utilidad3].toDouble() / 100),
+                pricePlusTax = row[table.coniva3].toDouble(),
+                discountPercent = row[table.descuento3].toDouble()
+            )
+        )
+    }
+}
+
+private fun isSaleWarehouse(tipo: String?): Boolean {
+    val normalized = tipo?.trim()?.uppercase().orEmpty()
+    if (normalized.isBlank()) return true
+    if (normalized.contains("MERMA")) return false
+    if (normalized.contains("DESPERDICIO")) return false
+    if (normalized.contains("NO_VENTA")) return false
+    return normalized !in setOf("M", "MERMA", "WASTE")
+}
+
+private fun BigDecimal?.toSafeDouble(): Double = this?.toDouble() ?: 0.0

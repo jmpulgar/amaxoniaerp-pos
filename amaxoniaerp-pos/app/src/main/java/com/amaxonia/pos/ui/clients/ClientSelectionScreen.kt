@@ -1,0 +1,197 @@
+package com.amaxonia.pos.ui.clients
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.theme.AmaxoniaBlue
+import com.amaxonia.pos.ui.theme.BgLightGray
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ClientSelectionScreen(
+    viewModel: ClientListViewModel = injectedViewModel {
+        ClientListViewModel(
+            DependencyContainer.clientRepository,
+            DependencyContainer.localStore,
+            DependencyContainer.apiConfigManager
+        )
+    },
+    onBack: () -> Unit,
+    onClientSelected: (Client) -> Unit
+) {
+    val state by viewModel.state.collectAsState()
+    val listState = rememberLazyListState()
+
+    val reachedBottom: Boolean by remember {
+        derivedStateOf {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            lastVisibleItem?.index != 0 && lastVisibleItem?.index == listState.layoutInfo.totalItemsCount - 1
+        }
+    }
+
+    LaunchedEffect(reachedBottom) {
+        if (reachedBottom) viewModel.loadMoreClients()
+    }
+
+    Scaffold(
+        containerColor = BgLightGray,
+        topBar = {
+            TopAppBar(
+                title = { Text("Seleccionar Cliente", fontWeight = FontWeight.Bold, color = AmaxoniaBlue) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = AmaxoniaBlue)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+        ) {
+            if (state.error != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            state.error ?: "Error desconocido",
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        TextButton(onClick = { viewModel.retry() }) {
+                            Text("Reintentar")
+                        }
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = { viewModel.onSearchQueryChange(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                placeholder = { Text("Buscar por nombre o documento") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = AmaxoniaBlue,
+                    unfocusedBorderColor = Color.Transparent
+                )
+            )
+            if (state.isLoading && state.clients.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AmaxoniaBlue)
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(state.clients, key = { it.id }) { client ->
+                        ClientSelectionItem(
+                            client = client,
+                            photoUrl = viewModel.getClientPhotoUrl(client),
+                            onClick = { onClientSelected(client) }
+                        )
+                    }
+                    if (state.isLoading) {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = AmaxoniaBlue)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ClientSelectionItem(client: Client, photoUrl: String, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE3F2FD)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (photoUrl.isNotBlank()) {
+                    coil.compose.AsyncImage(
+                        model = photoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Icon(Icons.Default.Person, null, tint = AmaxoniaBlue)
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${client.firstName} ${client.lastName}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF2A3256)
+                )
+                Text(
+                    text = "Doc: ${if(client.ruc.isNotEmpty()) client.ruc else client.cedula}",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+                Text(
+                    text = " ",
+                    fontSize = 11.sp,
+                    color = AmaxoniaBlue,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            // Indicador de selección
+            RadioButton(
+                selected = false, // No necesitamos estado interno, solo visual
+                onClick = onClick,
+                colors = RadioButtonDefaults.colors(selectedColor = AmaxoniaBlue)
+            )
+        }
+    }
+}
