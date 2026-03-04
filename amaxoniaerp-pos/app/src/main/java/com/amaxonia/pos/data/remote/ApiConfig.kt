@@ -1,10 +1,14 @@
 package com.amaxonia.pos.data.remote
 
+import com.amaxonia.pos.BuildConfig
+
 /**
  * URL base del backend (única para Venezuela y Panamá).
- * Emulador: http://10.0.2.2:8080/
- * Dispositivo en red local: http://<IP_DE_TU_PC>:8080/
+ *
+ * Se toma de BuildConfig:
+ * - Debug (local): http://10.0.2.2:8080/
+ * - Release (producción): https://api.listoerp.app/
  */
 object ApiConfig {
-    const val baseUrl = "http://10.0.2.2:8080/"
+    val baseUrl: String = BuildConfig.BASE_URL
 }

@@ -12,22 +12,48 @@ android {
         version = release(36)
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("amaxonia-release-key.jks") 
+            storePassword = "S3l3ctr4$"
+            keyAlias = "amaxonia-alias"
+            keyPassword = "S3l3ctr4$"
+        }
+    } // <-- ¡Esta es la llave que faltaba para cerrar signingConfigs!
+
     defaultConfig {
         applicationId = "com.amaxonia.pos"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            // Backend local para desarrollo (emulador: 10.0.2.2 → host de tu PC/servidor)
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"http://10.0.2.2:8080/\""
+            )
+        }
         release {
+            // <-- Se agregó esta línea para vincular la firma al APK de release
+            signingConfig = signingConfigs.getByName("release") 
+            
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
+            )
+            // Backend de producción (por ejemplo, para Venezuela en api.listoerp.app)
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"https://api.listoerp.app/\""
             )
         }
     }
@@ -40,6 +66,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
