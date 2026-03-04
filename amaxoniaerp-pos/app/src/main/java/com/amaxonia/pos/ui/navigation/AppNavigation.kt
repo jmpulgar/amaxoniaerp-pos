@@ -37,11 +37,35 @@ fun AppNavigation(startDestination: String) {
     val context = LocalContext.current
     val cartRepository = DependencyContainer.cartRepository
 
+    // Navega y limpia todo el back stack de forma consistente.
+    fun navigateAndClearStack(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.id) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
     // Navegar desde el drawer: siempre deja el back stack limpio como [dashboard -> destino].
     // launchSingleTop evita duplicados, popUpTo(dashboard) evita acumulación.
     fun navigateFromDrawer(route: String) {
+        if (navController.currentBackStackEntry?.destination?.route == route) return
+
+        val hasDashboardInBackStack = runCatching {
+            navController.getBackStackEntry("dashboard")
+        }.isSuccess
+
         navController.navigate(route) {
-            popUpTo("dashboard") { inclusive = false }
+            if (hasDashboardInBackStack) {
+                popUpTo("dashboard") {
+                    inclusive = false
+                    saveState = true
+                }
+                restoreState = true
+            } else {
+                popUpTo(navController.graph.id) {
+                    inclusive = false
+                }
+            }
             launchSingleTop = true
         }
     }
@@ -61,9 +85,7 @@ fun AppNavigation(startDestination: String) {
             LoginScreen(
                 onLoginSuccess = {
                     // Limpia todo el stack y va a select_company
-                    navController.navigate("select_company") {
-                        popUpTo(0) { inclusive = true }
-                    }
+                    navigateAndClearStack("select_company")
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -75,9 +97,7 @@ fun AppNavigation(startDestination: String) {
                     SyncScheduler.enqueueManual(context)
                     SyncScheduler.schedulePeriodic(context)
                     // Limpia todo el stack y va a dashboard
-                    navController.navigate("dashboard") {
-                        popUpTo(0) { inclusive = true }
-                    }
+                    navigateAndClearStack("dashboard")
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -86,9 +106,7 @@ fun AppNavigation(startDestination: String) {
         composable("catalog_sync") {
             SyncScreen(
                 onSyncCompleted = {
-                    navController.navigate("dashboard") {
-                        popUpTo(0) { inclusive = true }
-                    }
+                    navigateAndClearStack("dashboard")
                 }
             )
         }
@@ -98,9 +116,7 @@ fun AppNavigation(startDestination: String) {
                 onLogout = {
                     scope.launch {
                         DependencyContainer.authRepository.logout()
-                        navController.navigate("welcome") {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        navigateAndClearStack("welcome")
                     }
                 },
                 // Todas las navegaciones del drawer pasan por navigateFromDrawer
@@ -123,9 +139,7 @@ fun AppNavigation(startDestination: String) {
             CierreCajaScreen(
                 onBack = { navController.popBackStack() },
                 onCloseSuccess = {
-                    navController.navigate("dashboard") {
-                        popUpTo("dashboard") { inclusive = true }
-                    }
+                    navigateAndClearStack("dashboard")
                 }
             )
         }
@@ -282,9 +296,7 @@ fun AppNavigation(startDestination: String) {
                 },
                 onNextOrder = {
                     cartRepository.clearCart()
-                    navController.navigate("dashboard") {
-                        popUpTo("dashboard") { inclusive = true }
-                    }
+                    navigateAndClearStack("dashboard")
                 }
             )
         }

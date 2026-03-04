@@ -169,8 +169,10 @@ fun DashboardScreen(
                         color = Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth().clickable {
-                            scope.launch { drawerState.close() }
-                            viewModel.fetchAvailableCajas()
+                            scope.launch { 
+                                drawerState.close() 
+                                viewModel.fetchAvailableCajas()
+                            }
                         }
                     ) {
                         Row(
