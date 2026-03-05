@@ -160,6 +160,8 @@ class TheFactoryPrinterImpl(
 
     private companion object {
         val PACKAGE_CANDIDATES = listOf(
+            "com.thefactory.hkapos.fiscal.demo",
+            "com.thefactory.hkapos.fiscal",
             "com.thefactory.hkapos.fiscal.release",
             "com.thefactory.hkapos.fiscal.demo.demo"
         )

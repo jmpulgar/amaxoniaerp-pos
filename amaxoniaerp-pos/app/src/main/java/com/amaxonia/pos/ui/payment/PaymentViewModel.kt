@@ -422,7 +422,7 @@ class PaymentViewModel(
                     changeDue = currentState.changeDue,
                     paymentMethodsLabel = methods,
                     codFactura = response.codFactura,
-                    transactionId = newTransaction.id,
+                    transactionId = response.idFactura,
                     receiptPrintMessage = printFeedback
                 )
             )
