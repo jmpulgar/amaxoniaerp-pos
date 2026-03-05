@@ -27,7 +27,6 @@ import com.amaxonia.pos.domain.model.Company
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +42,7 @@ fun CompanySelectionScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val subtitleColor = Color(0xFF2A3256)
+    val subtitleColor = MaterialTheme.colorScheme.onSurface
     val filteredCompanies = remember(state.companies, searchQuery) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
@@ -58,7 +57,7 @@ fun CompanySelectionScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {},
@@ -71,7 +70,7 @@ fun CompanySelectionScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { paddingValues ->
@@ -102,7 +101,7 @@ fun CompanySelectionScreen(
                         .fillMaxWidth()
                         .weight(1f),
                     shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     if (state.error != null) {
@@ -137,7 +136,7 @@ fun CompanySelectionScreen(
                                 item {
                                     Text(
                                         text = "No hay resultados",
-                                        color = Color(0xFF7B83A7),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 14.sp
                                     )
                                 }
@@ -180,7 +179,7 @@ private fun CompanySearchField(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = null,
-                tint = Color(0xFF7B83A7)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         trailingIcon = {
@@ -189,7 +188,7 @@ private fun CompanySearchField(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Limpiar búsqueda",
-                        tint = Color(0xFF7B83A7)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -207,15 +206,15 @@ fun CompanyItemModern(
     company: Company,
     onClick: () -> Unit
 ) {
-    val iconBgColor = Color(0xFFF0F2F5)
-    val subtitleColor = Color(0xFF7B83A7)
+    val iconBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -238,7 +237,7 @@ fun CompanyItemModern(
                 text = company.name,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -251,7 +250,7 @@ fun CompanyItemModern(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
             contentDescription = "Seleccionar",
-            tint = Color(0xFFD1D5DB),
+            tint = MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(18.dp)
         )
     }

@@ -62,7 +62,6 @@ import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import com.amaxonia.pos.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,7 +76,7 @@ fun CierreCajaScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -96,7 +95,7 @@ fun CierreCajaScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -148,7 +147,7 @@ private fun LoadingContent() {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 "Cargando resumen de caja...",
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
         }
@@ -252,7 +251,7 @@ private fun ReadyContent(
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -276,7 +275,7 @@ private fun ReadyContent(
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -306,7 +305,7 @@ private fun ReadyContent(
                     if (index < lines.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 14.dp),
-                            color = Color(0xFFF0F0F0)
+                            color = MaterialTheme.colorScheme.outlineVariant
                         )
                     }
                 }
@@ -319,7 +318,7 @@ private fun ReadyContent(
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFF1F8E9)),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
         ) {
             Row(
@@ -341,14 +340,14 @@ private fun ReadyContent(
                         "Cierre Esperado",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color(0xFF2A3256)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
                     formatMoney(summary.expectedClose),
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 20.sp,
-                    color = Color(0xFF2E7D32)
+                    color = MaterialTheme.colorScheme.tertiary
                 )
             }
         }
@@ -364,8 +363,8 @@ private fun ReadyContent(
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFD32F2F),
-                disabledContainerColor = Color(0xFFD32F2F).copy(alpha = 0.5f)
+                containerColor = MaterialTheme.colorScheme.error,
+                disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
@@ -431,13 +430,13 @@ private fun SuccessContent(
             "Caja Cerrada",
             fontWeight = FontWeight.Bold,
             fontSize = 24.sp,
-            color = Color(0xFF2A3256)
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             message,
             fontSize = 14.sp,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(40.dp))
         Button(
@@ -507,7 +506,7 @@ private fun SectionTitle(text: String) {
         text = text,
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
-        color = Color(0xFF2A3256)
+        color = MaterialTheme.colorScheme.onSurface
     )
 }
 
@@ -562,7 +561,7 @@ private fun SummaryRow(
                 text = label,
                 fontSize = 15.sp,
                 fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Text(

@@ -1,6 +1,5 @@
 package com.amaxonia.pos.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,36 +8,59 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// Definimos el tema OSCURO (por si acaso, usando tu azul)
 private val DarkColorScheme = darkColorScheme(
-    primary = AmaxoniaBlue,
-    secondary = AmaxoniaBlue,
-    tertiary = TextSecondary,
-    background = TextPrimary, // Fondo oscuro
-    surface = TextPrimary
+    primary = AmaxoniaBlueDark,
+    onPrimary = Color(0xFF00315F),
+    primaryContainer = Color(0xFF004788),
+    onPrimaryContainer = Color(0xFFD7E3FF),
+    secondary = Color(0xFFBDC7E9),
+    onSecondary = Color(0xFF27304A),
+    tertiary = Color(0xFF77D0C2),
+    onTertiary = Color(0xFF003730),
+    background = BgDark,
+    onBackground = TextPrimaryDark,
+    surface = SurfaceDark,
+    onSurface = TextPrimaryDark,
+    surfaceVariant = Color(0xFF2A3244),
+    onSurfaceVariant = TextSecondaryDark,
+    outline = Color(0xFF8891A8),
+    outlineVariant = Color(0xFF3D465D),
+    error = ErrorRed,
+    onError = Color.White,
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
-// Definimos el tema CLARO (El principal de tu diseño)
 private val LightColorScheme = lightColorScheme(
     primary = AmaxoniaBlue,
-    secondary = AmaxoniaBlue,
-    tertiary = TextSecondary,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD7E3FF),
+    onPrimaryContainer = Color(0xFF001B44),
+    secondary = Color(0xFF536081),
+    onSecondary = Color.White,
+    tertiary = Color(0xFF006A60),
+    onTertiary = Color.White,
     background = BgLightGray,
     surface = SurfaceWhite,
-    onPrimary = SurfaceWhite,
-    onSecondary = SurfaceWhite,
-    onTertiary = SurfaceWhite,
     onBackground = TextPrimary,
-    onSurface = TextPrimary
+    onSurface = TextPrimary,
+    surfaceVariant = Color(0xFFDFE3EC),
+    onSurfaceVariant = TextSecondary,
+    outline = Color(0xFF757D91),
+    outlineVariant = Color(0xFFC1C6D0),
+    error = ErrorRed,
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002)
 )
 
 @Composable
 fun AmaxoniaPOSTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color está disponible en Android 12+
-    dynamicColor: Boolean = false, // Lo pongo en false para forzar TU diseño azul, no el del sistema del usuario
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

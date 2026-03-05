@@ -28,7 +28,6 @@ import com.amaxonia.pos.ui.common.components.AmaxoniaMoneyInput
 import com.amaxonia.pos.ui.common.components.FormSection
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import com.amaxonia.pos.domain.repository.Department
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +52,7 @@ fun ProductFormScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(if (state.isEditMode) "Editar Producto" else "Nuevo Producto", fontWeight = FontWeight.Bold) },
@@ -64,7 +63,7 @@ fun ProductFormScreen(
                         else Icon(Icons.Default.Save, null, tint = AmaxoniaBlue)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -102,9 +101,9 @@ fun ProductFormScreen(
                     onClick = {},
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Text("Seleccionar Foto", color = Color.Black)
+                    Text("Seleccionar Foto", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -195,7 +194,7 @@ fun ProductFormScreen(
                         onClick = { viewModel.recalculateAllPrices() },
                         modifier = Modifier.padding(top = 18.dp).background(AmaxoniaBlue, RoundedCornerShape(8.dp))
                     ) {
-                        Icon(Icons.Default.Calculate, null, tint = Color.White)
+                        Icon(Icons.Default.Calculate, null, tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -220,7 +219,7 @@ fun ProductFormScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
@@ -242,7 +241,7 @@ fun ProductFormScreen(
                             total = priceRow.pricePlusTax,
                             onUtilityChange = { val value = it.toDoubleOrNull() ?: 0.0; viewModel.updatePriceRow(index) { copy(utilityPercent = value) } },
                         )
-                        if (index < product.prices.lastIndex) HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                        if (index < product.prices.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
                     }
                 }
             }
@@ -288,7 +287,7 @@ fun CompactNumericInput(value: String, onValueChange: (String) -> Unit, modifier
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
-            .background(BgLightGray, RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
             .padding(8.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontSize = 13.sp)

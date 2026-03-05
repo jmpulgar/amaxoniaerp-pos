@@ -35,7 +35,6 @@ import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +87,7 @@ fun CartScreen(
                 title = {
                     Text(
                         "Carrito",
-                        color = Color(0xFF1565C0),
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -97,18 +96,18 @@ fun CartScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Atrás",
-                            tint = Color(0xFF1565C0)
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (state.items.isNotEmpty()) {
                 Surface(
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 16.dp,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 ) {
@@ -130,7 +129,7 @@ fun CartScreen(
                                 enabled = state.selectedClient != null,
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Verde
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
@@ -158,7 +157,7 @@ fun CartScreen(
             // SECCIÓN CLIENTE
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth().clickable { onSelectClient() }
             ) {
                 Row(
@@ -178,15 +177,15 @@ fun CartScreen(
                     }
                     if (state.selectedClient != null) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Cliente asignado:", fontSize = 12.sp, color = Color.Gray)
+                            Text("Cliente asignado:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("${state.selectedClient!!.firstName} ${state.selectedClient!!.lastName}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                         IconButton(onClick = { viewModel.removeClient() }) {
-                            Icon(Icons.Default.Delete, null, tint = Color.Red)
+                            Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
-                        Text("Asignar Cliente", modifier = Modifier.weight(1f), color = Color.Gray)
-                        Icon(Icons.Default.Add, null, tint = Color.Gray)
+                        Text("Asignar Cliente", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -195,7 +194,7 @@ fun CartScreen(
 
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = state.availableSellers.isNotEmpty()) { showSellerSheet = true }
@@ -207,7 +206,7 @@ fun CartScreen(
                     Icon(Icons.Default.Person, null, tint = AmaxoniaBlue)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Vendedor asignado:", fontSize = 12.sp, color = Color.Gray)
+                        Text("Vendedor asignado:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = state.currentSeller?.nombre ?: "Sin vendedor",
                             fontWeight = FontWeight.Bold,
@@ -219,7 +218,7 @@ fun CartScreen(
                     Icon(
                         Icons.Default.Autorenew,
                         contentDescription = "Cambiar vendedor",
-                        tint = if (state.availableSellers.isEmpty()) Color.LightGray else AmaxoniaBlue
+                        tint = if (state.availableSellers.isEmpty()) MaterialTheme.colorScheme.outline else AmaxoniaBlue
                     )
                 }
             }
@@ -228,7 +227,7 @@ fun CartScreen(
 
             if (state.items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("El carrito está vacío", color = Color.Gray)
+                    Text("El carrito está vacío", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -291,7 +290,7 @@ fun CartItemRow(
     onRemove: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -300,12 +299,12 @@ fun CartItemRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.product.description, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("$ ${item.product.prices.firstOrNull()?.pricePlusTax ?: 0.0} / ud", color = Color.Gray, fontSize = 14.sp)
+                Text("$ ${item.product.prices.firstOrNull()?.pricePlusTax ?: 0.0} / ud", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDecrease, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Remove, null, tint = Color(0xFF1565C0))
+                    Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.primary)
                 }
                 Text(
                     text = "${item.quantity}",
@@ -314,7 +313,7 @@ fun CartItemRow(
                     fontSize = 18.sp
                 )
                 IconButton(onClick = onIncrease, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Add, null, tint = Color(0xFF1565C0))
+                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -323,11 +322,11 @@ fun CartItemRow(
             Text(
                 "$ ${String.format("%.2f", item.total)}",
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1565C0)
+                color = MaterialTheme.colorScheme.primary
             )
 
             IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, null, tint = Color.Red.copy(alpha = 0.7f))
+                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
             }
         }
     }

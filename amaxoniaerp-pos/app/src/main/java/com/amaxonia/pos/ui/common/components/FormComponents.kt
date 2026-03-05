@@ -21,7 +21,7 @@ fun FormSection(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -41,7 +41,7 @@ fun AmaxoniaInput(
     onValueChange: (String) -> Unit
 ) {
     Column(modifier = modifier.padding(vertical = 6.dp)) {
-        Text(label, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
             value = value,
@@ -50,7 +50,7 @@ fun AmaxoniaInput(
             shape = RoundedCornerShape(10.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AmaxoniaBlue,
-                unfocusedBorderColor = Color.LightGray
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
             ),
             singleLine = true
         )
@@ -69,7 +69,7 @@ fun AmaxoniaDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
-        Text(label, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(4.dp))
         ExposedDropdownMenuBox(
             expanded = expanded,
@@ -87,15 +87,15 @@ fun AmaxoniaDropdown(
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AmaxoniaBlue,
-                    unfocusedBorderColor = Color.LightGray,
-                    disabledContainerColor = Color(0xFFF0F0F0),
-                    disabledBorderColor = Color.LightGray
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
             ExposedDropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.background(Color.White)
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
                 options.forEach { selectionOption ->
                     DropdownMenuItem(
@@ -120,7 +120,7 @@ fun AmaxoniaMoneyInput(
     onValueChange: (Double) -> Unit
 ) {
     Column(modifier = modifier.padding(vertical = 6.dp)) {
-        Text(label, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
         OutlinedTextField(
             value = if (value == 0.0 && !showZero) "" else String.format("%.2f", value),
             onValueChange = { onValueChange(it.toDoubleOrNull() ?: 0.0) },
@@ -131,9 +131,9 @@ fun AmaxoniaMoneyInput(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
                 focusedBorderColor = AmaxoniaBlue,
-                unfocusedBorderColor = Color.LightGray,
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true
         )

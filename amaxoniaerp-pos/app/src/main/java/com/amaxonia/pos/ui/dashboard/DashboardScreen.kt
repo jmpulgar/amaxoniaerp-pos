@@ -45,7 +45,6 @@ import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.shortName
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import androidx.work.WorkInfo
 import kotlinx.coroutines.launch
 
@@ -245,7 +244,7 @@ fun DashboardScreen(
         }
     ) {
         Scaffold(
-            containerColor = BgLightGray,
+            containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 TopAppBar(
@@ -254,12 +253,12 @@ fun DashboardScreen(
                             TextField(
                                 value = state.searchQuery,
                                 onValueChange = viewModel::setSearchQuery,
-                                placeholder = { Text("Buscar...", color = Color.Gray) },
+                                placeholder = { Text("Buscar...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 singleLine = true,
                                 textStyle = TextStyle(fontSize = 16.sp, color = AmaxoniaBlue),
                                 colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                                     focusedTextColor = AmaxoniaBlue,
                                     unfocusedTextColor = AmaxoniaBlue,
                                     cursorColor = AmaxoniaBlue,
@@ -299,7 +298,7 @@ fun DashboardScreen(
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
             },
             bottomBar = {
@@ -310,7 +309,7 @@ fun DashboardScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Surface(
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(26.dp),
                         tonalElevation = 0.dp,
                         shadowElevation = 8.dp,
@@ -351,7 +350,7 @@ fun DashboardScreen(
                 .padding(paddingValues)) {
                 if (isSyncRunning) {
                     Surface(
-                        color = Color(0xFFF2F6FF),
+                        color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -376,7 +375,7 @@ fun DashboardScreen(
                 if (state.selectedClient != null) {
                     val clientPhotoUrl = viewModel.getClientPhotoUrl(state.selectedClient!!)
                     Surface(
-                        color = Color(0xFFE8F5E9),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -400,7 +399,7 @@ fun DashboardScreen(
                                 Column {
                                     Text(
                                         text = "Cliente seleccionado:",
-                                        style = TextStyle(fontSize = 12.sp, color = Color.Gray)
+                                        style = TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     )
                                     Text(
                                         text = "${state.selectedClient!!.firstName} ${state.selectedClient!!.lastName}",
@@ -409,7 +408,7 @@ fun DashboardScreen(
                                 }
                             }
                             IconButton(onClick = { viewModel.clearSelectedClient() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Quitar cliente", tint = Color.Gray)
+                                Icon(Icons.Default.Close, contentDescription = "Quitar cliente", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -481,13 +480,13 @@ fun DashboardScreen(
                                             text = if (state.bottomSelected == 1) "Productos Más Vendidos" else state.selectedCategory,
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF2A3256)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         if (state.bottomSelected != 1) {
                                             Icon(
                                                 Icons.Default.KeyboardArrowDown,
                                                 contentDescription = "Cambiar Categoría",
-                                                tint = Color(0xFF2A3256),
+                                                tint = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.padding(start = 8.dp)
                                             )
                                         }
@@ -497,13 +496,13 @@ fun DashboardScreen(
                                         modifier = Modifier
                                             .padding(start = 8.dp)
                                             .clickable { showSellerSheet = true },
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.surface,
                                         shape = RoundedCornerShape(20.dp),
                                         shadowElevation = 1.dp,
                                     ) {
                                         Row(
                                             modifier = Modifier
-                                                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(20.dp))
+                                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
                                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
@@ -517,7 +516,7 @@ fun DashboardScreen(
                                                 text = state.currentSeller?.shortName() ?: "Vendedor",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF2A3256),
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.padding(start = 6.dp)
                                             )
                                         }
@@ -538,7 +537,7 @@ fun DashboardScreen(
                                                     "Filtrar por departamento",
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 18.sp,
-                                                    color = Color(0xFF2A3256),
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier.padding(vertical = 8.dp)
                                                 )
                                             }
@@ -547,7 +546,7 @@ fun DashboardScreen(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .clickable { viewModel.selectDepartment(null) },
-                                                    color = if (state.selectedDepartmentId == null) Color(0xFFE8F0FF) else Color.Transparent
+                                                    color = if (state.selectedDepartmentId == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
                                                 ) {
                                                     Text(
                                                         "Todos",
@@ -561,7 +560,7 @@ fun DashboardScreen(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .clickable { viewModel.selectDepartment(dept.id) },
-                                                    color = if (state.selectedDepartmentId == dept.id) Color(0xFFE8F0FF) else Color.Transparent
+                                                    color = if (state.selectedDepartmentId == dept.id) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
                                                 ) {
                                                     Text(
                                                         dept.name,
@@ -638,8 +637,8 @@ private fun BottomPillItem(
     onClick: () -> Unit,
     icon: ImageVector
 ) {
-    val bg = if (selected) Color(0xFFE8F0FF) else Color.Transparent
-    val tint = if (selected) AmaxoniaBlue else Color(0xFFB8BDC9)
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
+    val tint = if (selected) AmaxoniaBlue else MaterialTheme.colorScheme.outline
 
     Surface(
         color = bg,
@@ -661,7 +660,7 @@ fun ProductCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth().height(260.dp)
     ) {
@@ -671,7 +670,7 @@ fun ProductCard(
                     .fillMaxWidth()
                     .height(110.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (!product.imageUrl.isNullOrBlank()) {
@@ -684,7 +683,7 @@ fun ProductCard(
                     Icon(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
-                        tint = Color(0xFFB8BDC9),
+                        tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -695,7 +694,7 @@ fun ProductCard(
                     text = product.name, 
                     fontWeight = FontWeight.Bold, 
                     fontSize = 16.sp, 
-                    color = Color(0xFF2A3256),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
@@ -703,7 +702,7 @@ fun ProductCard(
                     Text(
                         text = "Ref: ${product.code}",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -742,7 +741,7 @@ fun ProductListRow(
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -756,7 +755,7 @@ fun ProductListRow(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (!product.imageUrl.isNullOrBlank()) {
@@ -769,7 +768,7 @@ fun ProductListRow(
                     Icon(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
-                        tint = Color(0xFFB8BDC9),
+                        tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -780,7 +779,7 @@ fun ProductListRow(
                     text = product.name, 
                     fontWeight = FontWeight.Bold, 
                     fontSize = 15.sp, 
-                    color = Color(0xFF2A3256),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
@@ -788,7 +787,7 @@ fun ProductListRow(
                     Text(
                         text = "Ref: ${product.code}",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
@@ -869,7 +868,7 @@ fun ManualEntryContent(
         // Pantalla del precio (Visor)
         Card(
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -884,7 +883,7 @@ fun ManualEntryContent(
                 Text(
                     text = "Monto a cobrar",
                     fontSize = 14.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -927,7 +926,7 @@ fun ManualEntryContent(
                                     if (key == "C") onClearClick() else onKeyClick(key)
                                 },
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                                 modifier = Modifier
                                     .weight(1f)
@@ -954,7 +953,7 @@ fun ManualEntryContent(
                 Button(
                     onClick = onBackspaceClick,
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     modifier = Modifier
                         .weight(1f)

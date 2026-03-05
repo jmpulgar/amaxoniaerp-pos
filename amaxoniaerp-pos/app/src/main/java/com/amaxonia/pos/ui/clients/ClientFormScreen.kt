@@ -22,7 +22,6 @@ import com.amaxonia.pos.ui.common.components.AmaxoniaInput
 import com.amaxonia.pos.ui.common.components.FormSection
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +47,7 @@ fun ClientFormScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(if (state.isEditMode) "Editar Cliente" else "Nuevo Cliente", fontWeight = FontWeight.Bold) },
@@ -63,7 +62,7 @@ fun ClientFormScreen(
                         else Icon(Icons.Default.Save, null, tint = AmaxoniaBlue)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->

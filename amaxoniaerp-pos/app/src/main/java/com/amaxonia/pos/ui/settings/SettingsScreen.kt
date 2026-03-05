@@ -31,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
@@ -60,7 +61,6 @@ import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import com.amaxonia.pos.ui.theme.SuccessGreen
 import kotlinx.coroutines.launch
 
@@ -85,7 +85,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -104,7 +104,7 @@ fun SettingsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -124,12 +124,12 @@ fun SettingsScreen(
                 text = "Tipo de Impresora",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "Selecciona la impresora conectada a tu dispositivo",
                 fontSize = 13.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
 
@@ -179,26 +179,26 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             // Test print section
-            HorizontalDivider(color = Color(0xFFE0E0E0))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = "Prueba de Impresion",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "Envia un recibo de prueba a la impresora seleccionada para verificar la conexion.",
                 fontSize = 13.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
 
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -230,13 +230,13 @@ fun SettingsScreen(
                             Text(
                                 text = "Impresora Actual",
                                 fontSize = 13.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = selectedPrinterType.displayName,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp,
-                                color = Color(0xFF2A3256)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         // Status indicator
@@ -246,7 +246,7 @@ fun SettingsScreen(
                                 .background(
                                     if (selectedPrinterType != PrinterType.NONE)
                                         SuccessGreen.copy(alpha = 0.12f)
-                                    else Color(0xFFEEEEEE)
+                                    else MaterialTheme.colorScheme.surfaceVariant
                                 )
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
@@ -254,7 +254,7 @@ fun SettingsScreen(
                                 text = if (selectedPrinterType != PrinterType.NONE) "Configurada" else "No activa",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (selectedPrinterType != PrinterType.NONE) SuccessGreen else Color.Gray
+                                color = if (selectedPrinterType != PrinterType.NONE) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -320,7 +320,7 @@ fun SettingsScreen(
                     ) {
                         if (isTestingPrint) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -364,7 +364,7 @@ private fun PrinterOptionCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = if (isSelected) Color(0xFFF0F7FF) else Color.White
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.elevatedCardElevation(
             defaultElevation = if (isSelected) 4.dp else 1.dp
@@ -400,13 +400,13 @@ private fun PrinterOptionCard(
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = Color(0xFF2A3256)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )
             }
@@ -426,7 +426,7 @@ private fun PrinterOptionCard(
                     selected = false,
                     onClick = onSelect,
                     colors = RadioButtonDefaults.colors(
-                        unselectedColor = Color(0xFFBDBDBD)
+                        unselectedColor = MaterialTheme.colorScheme.outline
                     )
                 )
             }

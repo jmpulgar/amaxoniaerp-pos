@@ -65,12 +65,12 @@ fun SuccessScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = Color(0xFF1565C0)
+        containerColor = MaterialTheme.colorScheme.primary
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF1565C0))
+                .background(MaterialTheme.colorScheme.primary)
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .navigationBarsPadding(),
@@ -91,7 +91,7 @@ fun SuccessScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         Column(
                             modifier = Modifier
@@ -105,13 +105,13 @@ fun SuccessScreen(
                             Box(
                                 modifier = Modifier
                                     .size(80.dp)
-                                    .background(Color(0xFFE3F2FD), CircleShape),
+                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color(0xFF1565C0),
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(40.dp)
                                 )
                             }
@@ -122,13 +122,13 @@ fun SuccessScreen(
                                 "¡Transacción Exitosa!",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1565C0)
+                                color = MaterialTheme.colorScheme.primary
                             )
 
                             Text(
                                 if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
                                 fontSize = 12.sp,
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 8.dp)
                             )
 
@@ -137,19 +137,19 @@ fun SuccessScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF1565C0), RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                                     .padding(16.dp)
                             ) {
                                 Text(
                                     "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 )
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                                 Text(
                                     "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 )
@@ -160,10 +160,10 @@ fun SuccessScreen(
                             Button(
                                 onClick = {},
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE3F2FD)),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                 shape = RoundedCornerShape(4.dp)
                             ) {
-                                Text("ENVIAR RECIBO", color = Color(0xFF1565C0))
+                                Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -194,8 +194,8 @@ fun SuccessScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR RECIBO")
@@ -208,10 +208,10 @@ fun SuccessScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("SIGUIENTE ORDEN", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+                Text("SIGUIENTE ORDEN", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     }

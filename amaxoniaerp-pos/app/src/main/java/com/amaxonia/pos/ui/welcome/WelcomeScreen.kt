@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.R
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -91,7 +90,7 @@ fun WelcomeScreen(
         currentImage = (currentImage + 1) % images.size
     }
 
-    val subtitleColor = Color(0xFF2A3256)
+    val subtitleColor = MaterialTheme.colorScheme.onSurface
 
     // --- TUNEABLES DEL LOGO ---
     val HEADER_HEIGHT = 76.dp
@@ -101,7 +100,7 @@ fun WelcomeScreen(
     val LOGO_NUDGE_Y = 0f
     val LOGO_TEXT_GAP = 10.dp
 
-    Scaffold(containerColor = BgLightGray) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -216,7 +215,7 @@ fun WelcomeScreen(
                 count = images.size,
                 activeIndex = currentImage,
                 activeColor = AmaxoniaBlue,
-                inactiveColor = Color(0x332A3256),
+                inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                 onSelect = { idx -> goTo(idx) }
             )
 
@@ -272,7 +271,7 @@ fun WelcomeScreen(
             ModalBottomSheet(
                 onDismissRequest = { showContactSheet = false },
                 sheetState = sheetState,
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier
@@ -291,7 +290,7 @@ fun WelcomeScreen(
                     Text(
                         text = "Elige cómo deseas contactarnos:",
                         fontSize = 14.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
 
@@ -336,7 +335,7 @@ fun ContactOptionItem(
             .fillMaxWidth()
             .height(56.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(BgLightGray)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onClick() }
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -82,11 +82,11 @@ fun PaymentScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text("Método de Pago", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+                    Text("Método de Pago", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = Color(0xFF1565C0))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             )
@@ -96,30 +96,30 @@ fun PaymentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Total a Pagar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Total a pagar :", fontSize = 16.sp, color = Color.DarkGray)
+                Text("Total a pagar :", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     "$ ${state.totalAmountText}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1565C0)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
             Spacer(modifier = Modifier.height(2.dp))
 
             // Tabs (Efectivo / Tarjeta)
-            Row(modifier = Modifier.fillMaxWidth().background(Color.White)) {
+            Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
                 PaymentTab(
                     title = "Efectivo",
                     isSelected = state.selectedMethod == PaymentMethod.CASH,
@@ -134,20 +134,20 @@ fun PaymentScreen(
 
             if (state.isLoadingFormasPago) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF1565C0))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else if (state.formasPagoError != null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
-                        color = MaterialTheme.colorScheme.error,
+                        Text(
+                            text = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
+                            color = MaterialTheme.colorScheme.error,
                         fontSize = 14.sp
                     )
                 }
             } else if (state.selectedMethod == PaymentMethod.CASH) {
                 if (state.formasPagoEfectivo.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     }
                 } else {
                     CashPaymentContent(state, viewModel, onPaymentSuccess)
@@ -155,7 +155,7 @@ fun PaymentScreen(
             } else {
                 if (state.formasPagoTarjetaOtro.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     }
                 } else {
                     NonCashPaymentContent(state, viewModel, onPaymentSuccess)
@@ -170,7 +170,7 @@ fun PaymentScreen(
                     .background(Color.Black.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
             }
         }
 
@@ -203,11 +203,11 @@ fun RowScope.PaymentTab(title: String, isSelected: Boolean, onClick: () -> Unit)
             text = title,
             fontSize = 18.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) Color(0xFF1A237E) else Color.Gray
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (isSelected) {
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = Color(0xFF1A237E), thickness = 3.dp, modifier = Modifier.width(60.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.primary, thickness = 3.dp, modifier = Modifier.width(60.dp))
         }
     }
 }
@@ -234,13 +234,13 @@ fun CashPaymentContent(
         Button(
             onClick = { viewModel.setExactAmount() },
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(8.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
         ) {
-            Icon(Icons.Default.Wallet, contentDescription = null, tint = Color(0xFF1A237E))
+            Icon(Icons.Default.Wallet, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("MONTO EXACTO", color = Color(0xFF1A237E), fontWeight = FontWeight.Bold)
+            Text("MONTO EXACTO", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -249,19 +249,19 @@ fun CashPaymentContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                 .border(
                     width = if (state.showInsufficientReminder && !state.isPaymentEnough) 2.dp else 0.dp,
-                    color = Color(0xFFD32F2F),
+                    color = MaterialTheme.colorScheme.error,
                     shape = RoundedCornerShape(8.dp)
                 )
                 .padding(16.dp)
         ) {
-            Text("Monto recibido", color = Color.DarkGray)
+            Text("Monto recibido", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))
             Row {
-                Text("$ ", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBBDEFB))
-                Text(state.tenderedAmountText, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBBDEFB))
+                Text("$ ", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(state.tenderedAmountText, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
 
             AnimatedVisibility(
@@ -271,7 +271,7 @@ fun CashPaymentContent(
             ) {
                 Text(
                     text = "Faltan $ $missingCashAmountText para completar el pago",
-                    color = Color(0xFFD32F2F),
+                    color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     modifier = Modifier
@@ -312,11 +312,11 @@ fun CashPaymentContent(
                             .weight(1f)
                             .fillMaxWidth()
                             .padding(4.dp)
-                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                             .clickable { viewModel.onKeyPadInput("BACK") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Borrar", tint = Color(0xFF1565C0))
+                        Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Borrar", tint = MaterialTheme.colorScheme.primary)
                     }
 
                     // Botón COBRAR / ENTER
@@ -330,13 +330,13 @@ fun CashPaymentContent(
                             .padding(4.dp),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (state.showInsufficientReminder && !state.isPaymentEnough) Color(0xFFD32F2F) else Color(0xFF1565C0)
+                            containerColor = if (state.showInsufficientReminder && !state.isPaymentEnough) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Cobrar",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size((34 * warningScale).dp)
                         )
                     }
@@ -352,11 +352,11 @@ fun KeypadButton(text: String, modifier: Modifier, onClick: () -> Unit) {
         modifier = modifier
             .fillMaxHeight()
             .padding(4.dp)
-            .background(Color.White, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, fontSize = 24.sp, color = Color.DarkGray)
+        Text(text, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -375,7 +375,7 @@ fun NonCashPaymentContent(
             "Formas disponibles",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A237E)
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -397,12 +397,12 @@ fun NonCashPaymentContent(
         Text(
             "Asignado: $ ${state.nonCashAssignedText}",
             fontSize = 14.sp,
-            color = Color.DarkGray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             "Pendiente: $ ${state.nonCashPendingText}",
             fontSize = 14.sp,
-            color = Color.DarkGray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -413,7 +413,7 @@ fun NonCashPaymentContent(
         ) {
             Text(
                 text = "Faltan $ ${state.nonCashPendingText} para completar el pago",
-                color = Color(0xFFD32F2F),
+                color = MaterialTheme.colorScheme.error,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -427,7 +427,7 @@ fun NonCashPaymentContent(
                 .fillMaxWidth()
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (state.isPaymentEnough) Color(0xFF1565C0) else Color(0xFF90A4AE)
+                containerColor = if (state.isPaymentEnough) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
@@ -446,7 +446,7 @@ fun NonCashRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
             .padding(12.dp)
             .clickable(onClick = onUseExactAmount),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -458,12 +458,12 @@ fun NonCashRow(
             Text(
                 forma.descripcion ?: "Forma de pago",
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A237E)
+                color = MaterialTheme.colorScheme.primary
             )
             Text(
                 forma.siglas ?: "",
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         OutlinedTextField(

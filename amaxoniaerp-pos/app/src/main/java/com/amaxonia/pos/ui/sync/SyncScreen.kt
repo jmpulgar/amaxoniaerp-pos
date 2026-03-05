@@ -25,7 +25,6 @@ import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @Composable
 fun SyncScreen(
@@ -47,7 +46,7 @@ fun SyncScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgLightGray),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(

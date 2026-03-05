@@ -25,7 +25,6 @@ import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.login.components.CountrySelector
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,13 +46,13 @@ fun LoginScreen(
     LaunchedEffect(Unit) {
         viewModel.loadSavedCountry()
     }
-    val subtitleColor = Color(0xFF2A3256)
-    val fieldBg = Color.White
-    val surface = Color.White
+    val subtitleColor = MaterialTheme.colorScheme.onSurface
+    val fieldBg = MaterialTheme.colorScheme.surface
+    val surface = MaterialTheme.colorScheme.surface
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {},
@@ -66,7 +65,7 @@ fun LoginScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { paddingValues ->
@@ -133,7 +132,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
-                                tint = Color(0xFF7B83A7)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         keyboardOptions = KeyboardOptions(
@@ -169,7 +168,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = Color(0xFF7B83A7)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         visualTransformation = if (state.isPasswordVisible) {
@@ -188,7 +187,7 @@ fun LoginScreen(
                                 Icon(
                                     imageVector = image,
                                     contentDescription = "Ver contraseña",
-                                    tint = Color(0xFF7B83A7)
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         },
@@ -220,7 +219,7 @@ fun LoginScreen(
                     ) {
                         if (state.isLoading) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(22.dp),
                                 strokeWidth = 2.5.dp
                             )

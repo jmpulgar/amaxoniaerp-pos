@@ -60,7 +60,6 @@ import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -76,7 +75,7 @@ fun HistoryScreen(
         ModalBottomSheet(
             onDismissRequest = { viewModel.dismissDetalle() },
             sheetState = sheetState,
-            containerColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             tonalElevation = 0.dp
         ) {
@@ -90,7 +89,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -109,7 +108,7 @@ fun HistoryScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -130,7 +129,7 @@ fun HistoryScreen(
                             Text(
                                 "Cargando facturas...",
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -175,7 +174,7 @@ fun HistoryScreen(
                             Icon(
                                 Icons.Rounded.Receipt,
                                 contentDescription = null,
-                                tint = Color(0xFFBDBDBD),
+                                tint = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(64.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -183,13 +182,13 @@ fun HistoryScreen(
                                 "No hay facturas registradas",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "Las facturas apareceran aqui una vez que realices ventas",
                                 fontSize = 13.sp,
-                                color = Color(0xFFBDBDBD)
+                                color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }
@@ -293,7 +292,7 @@ private fun DateStickyHeader(date: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BgLightGray)
+            .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -322,7 +321,7 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -356,7 +355,7 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
                         text = transaction.invoiceNumber,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
-                        color = Color(0xFF2A3256)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -366,28 +365,28 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
                     Icon(
                         Icons.Rounded.Schedule,
                         contentDescription = null,
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = transaction.time,
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (transaction.clienteNombre.isNotBlank()) {
                         Spacer(modifier = Modifier.width(10.dp))
                         Icon(
                             Icons.Rounded.Person,
                             contentDescription = null,
-                            tint = Color.Gray,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = transaction.clienteNombre,
                             fontSize = 12.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
@@ -408,7 +407,7 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Color(0xFFBDBDBD),
+                tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier
                     .padding(start = 4.dp)
                     .size(20.dp)
@@ -480,13 +479,13 @@ private fun FacturaDetalleSheetContent(
                         text = transaction.invoiceNumber,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = Color(0xFF2A3256)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "${transaction.dateHeader}  ${transaction.time}",
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         StatusBadge(status = transaction.status)
@@ -500,7 +499,7 @@ private fun FacturaDetalleSheetContent(
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = BgLightGray),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
@@ -517,14 +516,14 @@ private fun FacturaDetalleSheetContent(
                                     text = transaction.clienteNombre,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF2A3256)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             if (transaction.clienteIdentificacion.isNotBlank()) {
                                 Text(
                                     text = transaction.clienteIdentificacion,
                                     fontSize = 12.sp,
-                                    color = Color.Gray,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = 24.dp)
                                 )
                             }
@@ -545,7 +544,7 @@ private fun FacturaDetalleSheetContent(
                                     text = transaction.formaPago.replaceFirstChar { it.uppercase() },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF2A3256)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -554,7 +553,7 @@ private fun FacturaDetalleSheetContent(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color(0xFFEEEEEE))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(12.dp))
         }
 
@@ -571,14 +570,14 @@ private fun FacturaDetalleSheetContent(
                 text = "Productos",
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (!isLoading && items.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "(${items.size})",
                     fontSize = 13.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -603,7 +602,7 @@ private fun FacturaDetalleSheetContent(
                         Text(
                             "Cargando productos...",
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -634,7 +633,7 @@ private fun FacturaDetalleSheetContent(
                     Text(
                         "Sin productos",
                         fontSize = 14.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -653,7 +652,7 @@ private fun FacturaDetalleSheetContent(
                 // Total row
                 if (transaction != null) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = Color(0xFFEEEEEE))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -664,7 +663,7 @@ private fun FacturaDetalleSheetContent(
                             text = "Total",
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Color(0xFF2A3256)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${transaction.currency} ${String.format("%.2f", transaction.amount)}",
@@ -686,7 +685,7 @@ private fun DetalleItemRow(item: FacturaDetalleItemDto, currency: String) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = BgLightGray),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -722,7 +721,7 @@ private fun DetalleItemRow(item: FacturaDetalleItemDto, currency: String) {
                     text = item.descripcion,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    color = Color(0xFF2A3256),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -730,7 +729,7 @@ private fun DetalleItemRow(item: FacturaDetalleItemDto, currency: String) {
                     Text(
                         text = item.codigo,
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -742,12 +741,12 @@ private fun DetalleItemRow(item: FacturaDetalleItemDto, currency: String) {
                     text = "$currency ${String.format("%.2f", item.totalConIva)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = Color(0xFF2A3256)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "c/u ${String.format("%.2f", item.precioUnitario)}",
                     fontSize = 11.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

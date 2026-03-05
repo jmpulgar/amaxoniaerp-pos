@@ -46,7 +46,7 @@ fun SellerSelectorBottomSheet(
                 text = "Seleccionar vendedor",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2A3256),
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -68,7 +68,7 @@ fun SellerSelectorBottomSheet(
                                     onDismiss()
                                 },
                             shape = RoundedCornerShape(10.dp),
-                            color = if (selected) Color(0xFFE8F0FF) else Color.White,
+                            color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface,
                             tonalElevation = if (selected) 1.dp else 0.dp,
                             shadowElevation = 1.dp,
                         ) {
@@ -81,7 +81,7 @@ fun SellerSelectorBottomSheet(
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = if (selected) Color(0xFF1565C0) else Color.Gray
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = seller.nombre,
@@ -89,14 +89,14 @@ fun SellerSelectorBottomSheet(
                                     modifier = Modifier
                                         .weight(1f)
                                         .padding(start = 12.dp),
-                                    color = Color(0xFF2A3256),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                 )
                                 if (selected) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Seleccionado",
-                                        tint = Color(0xFF1565C0)
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }

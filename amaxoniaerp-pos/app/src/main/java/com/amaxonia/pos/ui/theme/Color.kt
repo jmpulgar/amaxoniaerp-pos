@@ -2,21 +2,19 @@ package com.amaxonia.pos.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Paleta de Colores Oficial Amaxonia POS ---
+val AmaxoniaBlue = Color(0xFF1B5FCC)
 
-// Color Principal (Botones, Títulos destacados)
-val AmaxoniaBlue = Color(0xFF1A72DD)
+val BgLightGray = Color(0xFFF4F6FB)
+val SurfaceWhite = Color(0xFFFFFFFF)
 
-// Colores de Fondo y Superficies
-val BgLightGray = Color(0xFFF5F5F5) // Gris claro para el fondo de las pantallas
-val SurfaceWhite = Color(0xFFFFFFFF) // Blanco para tarjetas y campos de texto
+val TextPrimary = Color(0xFF1D2230)
+val TextSecondary = Color(0xFF646E84)
 
-// Colores de Texto e Iconos
-val TextPrimary = Color(0xFF000000) // Negro para el texto principal
-// Color(0xFF000000) con 5% de opacidad se traduce a un gris muy claro para placeholders o divisores sutiles.
-// Para un gris de texto secundario más legible, usamos un gris medio estándar:
-val TextSecondary = Color(0xFF757575)
+val ErrorRed = Color(0xFFBA1A1A)
+val SuccessGreen = Color(0xFF2E7D32)
 
-// Colores de Estado y Acción
-val ErrorRed = Color(0xFFB00020)    // Rojo estándar de Material Design para errores
-val SuccessGreen = Color(0xFF4CAF50) // Verde para mensajes de éxito (opcional por ahora)
+val AmaxoniaBlueDark = Color(0xFFA8C8FF)
+val BgDark = Color(0xFF0F141F)
+val SurfaceDark = Color(0xFF151B27)
+val TextPrimaryDark = Color(0xFFE6EAF5)
+val TextSecondaryDark = Color(0xFFB1BDD6)

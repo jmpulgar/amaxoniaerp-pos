@@ -30,7 +30,6 @@ import com.amaxonia.pos.domain.model.ProductStock
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +60,7 @@ fun ProductListScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Inventario", fontWeight = FontWeight.Bold, color = AmaxoniaBlue) },
@@ -70,14 +69,14 @@ fun ProductListScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = AmaxoniaBlue)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onNavigateToForm(null) },
                 containerColor = AmaxoniaBlue,
-                contentColor = Color.White
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) { Icon(Icons.Default.Add, null) }
         }
     ) { padding ->
@@ -118,8 +117,8 @@ fun ProductListScreen(
                     leadingIcon = { Icon(Icons.Default.Search, null) },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                         focusedBorderColor = AmaxoniaBlue,
                         unfocusedBorderColor = Color.Transparent
                     )
@@ -178,12 +177,12 @@ fun ProductItem(
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(Color.White),
+                modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (imageUrl.isNotBlank()) {
@@ -193,12 +192,12 @@ fun ProductItem(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(Icons.Default.Inventory2, null, tint = Color.Gray)
+                    Icon(Icons.Default.Inventory2, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(product.description, fontWeight = FontWeight.Bold, color = Color(0xFF2A3256))
+                Text(product.description, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 val stockText = when {
                     isStockLoading -> "Cant.: ..."
                     stock != null -> "Cant.: ${formatStock(stock.stockTotalDisponible)}"
@@ -207,7 +206,7 @@ fun ProductItem(
                 Text(
                     "Ref: ${product.reference.ifBlank { product.code }} | $stockText",
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.clickable(onClick = onStockClick)
                 )
             }
@@ -218,7 +217,7 @@ fun ProductItem(
                     color = AmaxoniaBlue,
                     fontSize = 16.sp
                 )
-                Text("Precio A (Inc. Imp)", fontSize = 10.sp, color = Color.Gray)
+                Text("Precio A (Inc. Imp)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -255,7 +254,7 @@ private fun ProductStockDialog(
                 Spacer(modifier = Modifier.height(10.dp))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(stock.almacenes, key = { it.almacenId }) { almacen ->
-                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F9FC))) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                             Column(modifier = Modifier.padding(10.dp)) {
                                 Text(
                                     text = almacen.almacenNombre.ifBlank { "Almacén ${almacen.almacenId}" },
@@ -263,10 +262,10 @@ private fun ProductStockDialog(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text("Tipo: ${almacen.almacenTipo.ifBlank { "N/A" }}", fontSize = 12.sp, color = Color.Gray)
+                                Text("Tipo: ${almacen.almacenTipo.ifBlank { "N/A" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("Cant.: ${formatStock(almacen.cantidad)} | Muestra: ${formatStock(almacen.cantidadMuestra)}", fontSize = 12.sp)
                                 Text("Precomp.: ${formatStock(almacen.cantidadPrecomprometida)} | Disp.: ${formatStock(almacen.cantidadDisponible)}", fontSize = 12.sp)
-                                Text("Min/Max: ${formatStock(almacen.stockMinimo)} / ${formatStock(almacen.stockMaximo)}", fontSize = 12.sp, color = Color.Gray)
+                                Text("Min/Max: ${formatStock(almacen.stockMinimo)} / ${formatStock(almacen.stockMaximo)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

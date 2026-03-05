@@ -26,7 +26,6 @@ import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +55,7 @@ fun ClientListScreen(
     }
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Clientes", fontWeight = FontWeight.Bold, color = AmaxoniaBlue) },
@@ -65,14 +64,14 @@ fun ClientListScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = AmaxoniaBlue)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onNavigateToForm(null) },
                 containerColor = AmaxoniaBlue,
-                contentColor = Color.White
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nuevo Cliente")
             }
@@ -114,8 +113,8 @@ fun ClientListScreen(
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedBorderColor = AmaxoniaBlue,
                     unfocusedBorderColor = Color.Transparent
                 )
@@ -155,7 +154,7 @@ fun ClientListItem(client: Client, photoUrl: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
@@ -166,7 +165,7 @@ fun ClientListItem(client: Client, photoUrl: String, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE3F2FD)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (photoUrl.isNotBlank()) {
@@ -185,12 +184,12 @@ fun ClientListItem(client: Client, photoUrl: String, onClick: () -> Unit) {
                     text = "${client.firstName} ${client.lastName}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = Color(0xFF2A3256)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Doc: ${if(client.ruc.isNotEmpty()) client.ruc else client.cedula}",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 // Helper visual rápido para mostrar nombres en lugar de IDs

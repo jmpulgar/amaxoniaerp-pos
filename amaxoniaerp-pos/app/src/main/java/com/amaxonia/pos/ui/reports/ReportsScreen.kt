@@ -57,7 +57,6 @@ import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import com.amaxonia.pos.ui.theme.BgLightGray
 import com.amaxonia.pos.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +68,7 @@ fun ReportsScreen(
     val state by viewModel.state.collectAsState()
 
     Scaffold(
-        containerColor = BgLightGray,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -88,7 +87,7 @@ fun ReportsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgLightGray)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
@@ -109,7 +108,7 @@ fun ReportsScreen(
                             Text(
                                 "Cargando reportes...",
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -296,7 +295,7 @@ private fun MetricMiniCard(
     ElevatedCard(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -322,14 +321,14 @@ private fun MetricMiniCard(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = value,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = Color(0xFF2A3256)
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -342,7 +341,7 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -362,7 +361,7 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                     text = "Desglose de Facturas",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = Color(0xFF2A3256)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -389,7 +388,7 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                     Text(
                         text = "Pagadas",
                         fontSize = 14.sp,
-                        color = Color(0xFF2A3256)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
@@ -408,7 +407,7 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 color = SuccessGreen,
-                trackColor = Color(0xFFE8F5E9),
+                trackColor = MaterialTheme.colorScheme.tertiaryContainer,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -422,14 +421,14 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                     Icon(
                         Icons.Rounded.Cancel,
                         contentDescription = null,
-                        tint = Color(0xFFD32F2F),
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Anuladas",
                         fontSize = 14.sp,
-                        color = Color(0xFF2A3256)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -437,14 +436,14 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                         text = "${summary.totalCancelled}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color(0xFFD32F2F)
+                        color = MaterialTheme.colorScheme.error
                     )
                     if (summary.cancellations > 0) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "${summary.moneda} ${String.format("%.2f", summary.cancellations)}",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -460,8 +459,8 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = Color(0xFFD32F2F),
-                trackColor = Color(0xFFFFEBEE),
+                color = MaterialTheme.colorScheme.error,
+                trackColor = MaterialTheme.colorScheme.errorContainer,
             )
         }
     }
@@ -474,7 +473,7 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -494,7 +493,7 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
                     text = "Productos Mas Vendidos",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = Color(0xFF2A3256)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -511,14 +510,14 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
                         Icon(
                             Icons.Rounded.Inventory2,
                             contentDescription = null,
-                            tint = Color(0xFFBDBDBD),
+                            tint = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "No hay datos disponibles",
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -527,7 +526,7 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
                     BestSellerItem(product = product, position = index + 1)
                     if (index < bestSellers.lastIndex && index < 9) {
                         Spacer(modifier = Modifier.height(10.dp))
-                        HorizontalDivider(color = Color(0xFFF0F0F0))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
@@ -568,7 +567,7 @@ private fun BestSellerItem(product: BestSellerProduct, position: Int) {
                 text = product.name,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = Color(0xFF2A3256),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -577,7 +576,7 @@ private fun BestSellerItem(product: BestSellerProduct, position: Int) {
                 Text(
                     text = "${product.salesCount} ventas",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 LinearProgressIndicator(
