@@ -13,10 +13,12 @@ interface CajaRepository {
     val activeCaja: StateFlow<Caja?>
 
     suspend fun getCajas(): Result<List<Caja>>
+    suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String>
+    suspend fun restoreActiveCajaIfValid()
     suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse>
     suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse>
     suspend fun closeCaja(request: CierreCajaRequest): Result<CierreCajaResponse>
     suspend fun getCierreSummary(): Result<CierreCajaSummary>
-    fun setActiveCaja(caja: Caja)
-    fun clearActiveCaja()
+    suspend fun setActiveCaja(caja: Caja)
+    suspend fun clearActiveCaja()
 }

@@ -11,6 +11,7 @@ import com.amaxonia.pos.data.remote.dto.ClientDto
 import com.amaxonia.pos.data.remote.dto.CompanyDetailsDto
 import com.amaxonia.pos.data.remote.dto.LoginResponse
 import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.printer.PrinterType
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
+import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("amaxonia_pos")
 
@@ -32,6 +34,7 @@ class LocalStore(
     private val clientsKey = stringPreferencesKey("clients_cache")
     private val selectedCountryKey = stringPreferencesKey("selected_country_code")
     private val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
+    private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
 
     suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
         val json = AppJson.encodeToString(snapshot)
@@ -61,6 +64,45 @@ class LocalStore(
         context.dataStore.edit { prefs ->
             prefs.remove(authSnapshotKey)
             prefs.remove(companySessionKey)
+            prefs.remove(activeCajaKey)
+        }
+    }
+
+    suspend fun saveActiveCaja(caja: Caja) {
+        val session = readCompanySession() ?: return
+        val snapshot = ActiveCajaSnapshot(
+            companyDb = session.company.adminDb,
+            date = LocalDate.now().toString(),
+            caja = caja
+        )
+        val json = AppJson.encodeToString(snapshot)
+        context.dataStore.edit { prefs ->
+            prefs[activeCajaKey] = json
+        }
+    }
+
+    suspend fun readActiveCajaForToday(): Caja? {
+        val json = context.dataStore.data.first()[activeCajaKey] ?: return null
+        val snapshot = runCatching {
+            AppJson.decodeFromString(ActiveCajaSnapshot.serializer(), json)
+        }.getOrNull() ?: run {
+            clearActiveCaja()
+            return null
+        }
+
+        val session = readCompanySession()
+        val isSameCompany = session?.company?.adminDb == snapshot.companyDb
+        val isToday = snapshot.date == LocalDate.now().toString()
+        if (!isSameCompany || !isToday) {
+            clearActiveCaja()
+            return null
+        }
+        return snapshot.caja
+    }
+
+    suspend fun clearActiveCaja() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(activeCajaKey)
         }
     }
 
@@ -192,6 +234,13 @@ data class CompanyDetailsSnapshot(
     val adminDb: String,
     val accountingDb: String,
     val payrollDb: String
+)
+
+@Serializable
+data class ActiveCajaSnapshot(
+    val companyDb: String,
+    val date: String,
+    val caja: Caja
 )
 
 fun LoginResponse.toSnapshot(): AuthSnapshot {

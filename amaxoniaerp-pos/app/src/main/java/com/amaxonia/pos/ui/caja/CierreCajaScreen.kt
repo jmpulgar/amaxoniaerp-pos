@@ -280,35 +280,36 @@ private fun ReadyContent(
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                SummaryRow(
-                    icon = Icons.Rounded.AttachMoney,
-                    iconTint = Color(0xFF2E7D32),
-                    label = "Efectivo",
-                    value = formatMoney(summary.totalCash),
-                    valueColor = Color(0xFF2E7D32)
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 14.dp),
-                    color = Color(0xFFF0F0F0)
-                )
-                SummaryRow(
-                    icon = Icons.Rounded.CreditCard,
-                    iconTint = Color(0xFF6A1B9A),
-                    label = "Tarjeta",
-                    value = formatMoney(summary.totalCard),
-                    valueColor = Color(0xFF6A1B9A)
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 14.dp),
-                    color = Color(0xFFF0F0F0)
-                )
-                SummaryRow(
-                    icon = Icons.Rounded.AccountBalance,
-                    iconTint = Color(0xFFEF6C00),
-                    label = "Otros",
-                    value = formatMoney(summary.totalOther),
-                    valueColor = Color(0xFFEF6C00)
-                )
+                val lines = summary.paymentLines.ifEmpty {
+                    listOf(
+                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
+                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
+                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
+                    ).filter { it.amount > 0.0 }
+                }
+
+                lines.forEachIndexed { index, line ->
+                    val (icon, tint) = when (line.siglas.uppercase()) {
+                        "CASH", "EF", "EFE", "EFECTIVO" -> Icons.Rounded.AttachMoney to Color(0xFF2E7D32)
+                        "TDC", "TARJETA", "PV", "POS", "DB", "DEBITO", "CR", "CREDITO" -> Icons.Rounded.CreditCard to Color(0xFF6A1B9A)
+                        else -> Icons.Rounded.AccountBalance to Color(0xFFEF6C00)
+                    }
+
+                    SummaryRow(
+                        icon = icon,
+                        iconTint = tint,
+                        label = line.label,
+                        value = formatMoney(line.amount),
+                        valueColor = tint
+                    )
+
+                    if (index < lines.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 14.dp),
+                            color = Color(0xFFF0F0F0)
+                        )
+                    }
+                }
             }
         }
 

@@ -7,7 +7,6 @@ import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
-import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
@@ -16,8 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 class DashboardViewModel(
     private val productRepository: ProductRepository,
@@ -44,7 +41,10 @@ class DashboardViewModel(
         observeClient()
         observeSeller()
         observeCaja()
-        fetchAvailableCajas()
+        viewModelScope.launch {
+            cajaRepository.restoreActiveCajaIfValid()
+            fetchAvailableCajas()
+        }
     }
 
     private fun observeCaja() {
@@ -86,16 +86,18 @@ class DashboardViewModel(
         }
     }
 
-    fun fetchAvailableCajas() {
+    fun fetchAvailableCajas(forceShowSelector: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoadingCajas = true, showCajaSelector = false) }
+            val keepSelectorVisible = forceShowSelector || _state.value.showCajaSelector
+            _state.update { it.copy(isLoadingCajas = true, showCajaSelector = keepSelectorVisible) }
             cajaRepository.getCajas().fold(
                 onSuccess = { cajas ->
+                    val shouldShowSelector = forceShowSelector || cajaRepository.activeCaja.value == null
                     _state.update { 
                         it.copy(
                             availableCajas = cajas,
                             isLoadingCajas = false,
-                            showCajaSelector = true
+                            showCajaSelector = shouldShowSelector
                         ) 
                     }
                 },
@@ -115,48 +117,23 @@ class DashboardViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isLoadingCajas = true) }
 
-            // Step 1: Check if this caja has an open session from a previous day
-            val statusResult = cajaRepository.checkCajaStatus(caja.idCaja)
-            val needsAutoClose = statusResult.getOrNull()?.let { status ->
-                if (status.isOpen && status.cajaSecuencia != null) {
-                    isFromPreviousDay(status.cajaSecuencia.fechaApertura)
-                } else false
-            } ?: false
-
-            // Step 2: If stale session exists, auto-close it first
-            if (needsAutoClose) {
-                val secuencia = statusResult.getOrNull()!!.cajaSecuencia!!
-                val closeRequest = CierreCajaRequest(
-                    idCajaSecuencia = secuencia.idCajaSecuencia,
-                    idCaja = caja.idCaja,
-                    montoCierre = secuencia.montoApertura,
-                    totalEfectivo = 0.0,
-                    totalTarjeta = 0.0,
-                    totalOtros = 0.0,
-                    totalVentas = 0.0,
-                    cantidadTransacciones = 0
-                )
-                val closeResult = cajaRepository.closeCaja(closeRequest)
-                if (closeResult.isFailure) {
-                    _state.update {
-                        it.copy(
-                            isLoadingCajas = false,
-                            error = "Error al cerrar sesion anterior: ${closeResult.exceptionOrNull()?.message}"
-                        )
-                    }
-                    return@launch
-                }
+            val secuencia = cajaRepository.getNextSecuenciaCodigo(caja.idCaja).getOrElse { error ->
                 _state.update {
                     it.copy(
-                        autoCloseMessage = "Se cerro automaticamente la sesion del dia ${secuencia.fechaApertura}"
+                        isLoadingCajas = false,
+                        error = "Error al obtener correlativo de caja: ${error.message}"
                     )
                 }
+                return@launch
             }
 
-            // Step 3: Open the new caja session
+            val sellerId = _state.value.currentSeller?.id ?: caja.defaultSellerId
+
             val request = AperturaRequest(
                 idCaja = caja.idCaja,
                 montoApertura = montoApertura,
+                idVendedor = sellerId,
+                secuencia = secuencia,
                 serieSucursal = caja.serieSucursal ?: caja.serieCaja,
                 idSucursal = caja.idSucursal,
                 facturaInicial = 0,
@@ -184,20 +161,6 @@ class DashboardViewModel(
                     }
                 }
             )
-        }
-    }
-
-    /**
-     * Checks if [fechaApertura] is from a day before today.
-     * Supports ISO-8601 (`yyyy-MM-dd'T'...`) and plain `yyyy-MM-dd` formats.
-     */
-    private fun isFromPreviousDay(fechaApertura: String): Boolean {
-        return try {
-            val dateStr = fechaApertura.substringBefore("T")
-            val openDate = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
-            openDate.isBefore(LocalDate.now())
-        } catch (_: Exception) {
-            false
         }
     }
 

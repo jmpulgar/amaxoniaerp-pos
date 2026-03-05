@@ -11,6 +11,9 @@ object CajaTable : Table("caja") {
     val idSucursal = integer("id_sucursal").nullable()
     val codAlmacen = integer("cod_almacen").nullable()
     val serieCaja = varchar("serie_caja", 10)
+    val caja = varchar("caja", 50).nullable()
+    val fondoApertura = decimal("fondo_apertura", 10, 2).nullable()
+    val impresoraModelo = varchar("impresora_modelo", 50).nullable()
 
     override val primaryKey = PrimaryKey(idCaja)
 }
@@ -58,13 +61,23 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     
     val fechaApertura = datetime("fecha_apertura").nullable()
     val fechaCierre = datetime("fecha_cierre").nullable()
+    val fechaCreacion = datetime("fecha_creacion").nullable()
     
     // Montos base
     val montoEfectivoApertura = decimal("monto_efectivo_apertura", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoVentas = decimal("monto_efectivo_ventas", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoEntrada = decimal("monto_efectivo_entrada", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoSalida = decimal("monto_efectivo_salida", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoTotal = decimal("monto_efectivo_total", 10, 2).default(java.math.BigDecimal.ZERO)
     val montoEfectivoCierre = decimal("monto_efectivo_cierre", 10, 2).nullable().default(java.math.BigDecimal.ZERO)
     val montoEfectivoDiferencia = decimal("monto_efectivo_diferencia", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoOtrosTotal = decimal("monto_otros_total", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoOtrosCierre = decimal("monto_otros_cierre", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoOtrosDiferencia = decimal("monto_otros_diferencia", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoTotal = decimal("monto_total", 10, 2).default(java.math.BigDecimal.ZERO)
     val montoCierre = decimal("monto_cierre", 10, 2).default(java.math.BigDecimal.ZERO)
     val montoDiferencia = decimal("monto_diferencia", 10, 2).default(java.math.BigDecimal.ZERO)
+    val numeroCierreFiscal = varchar("numero_cierre_fiscal", 50).nullable()
 
     // Resto
     val usuario = varchar("usuario", 10).nullable()
@@ -79,6 +92,65 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     val fechaContabilizacion = datetime("fecha_contabilizacion").defaultExpression(org.jetbrains.exposed.sql.javatime.CurrentDateTime)
 
     override val primaryKey = PrimaryKey(idCajaSecuencia)
+}
+
+object CajaDetalleCierreTable : Table("caja_detalle_cierre") {
+    val id = varchar("id", 36)
+    val idSecuencia = varchar("id_secuencia", 36)
+    val idMonedaDenominacion = integer("id_moneda_denominacion").nullable()
+    val cantidad = integer("cantidad").default(0)
+    val valor = decimal("valor", 10, 2).default(java.math.BigDecimal.ZERO)
+    val monto = decimal("monto", 10, 2).default(java.math.BigDecimal.ZERO)
+    val serieSucursal = varchar("serie_sucursal", 10)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object CajaDetalleCierreFormaPagoTable : Table("caja_detalle_cierre_formapago") {
+    val id = varchar("id", 36)
+    val idSecuencia = varchar("id_secuencia", 36)
+    val idFormaPago = integer("id_forma_pago").nullable()
+    val montoVentas = decimal("monto_ventas", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoCierre = decimal("monto_cierre", 10, 2).default(java.math.BigDecimal.ZERO)
+    val montoDiferencia = decimal("monto_diferencia", 10, 2).default(java.math.BigDecimal.ZERO)
+    val serieSucursal = varchar("serie_sucursal", 10)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object MonedaDenominacionTable : Table("moneda_denominacion") {
+    val id = integer("id")
+    val denominacion = varchar("denominacion", 80).nullable()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object CajaMovimientoTable : Table("caja_movimiento") {
+    val id = varchar("id", 36)
+    val idSecuencia = varchar("id_secuencia", 36)
+    val tipo = varchar("tipo", 1)
+    val total = decimal("total", 10, 2).default(java.math.BigDecimal.ZERO)
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object FacturaDevolucionTable : Table("factura_devolucion") {
+    val id = varchar("id", 36)
+    val idCajaSecuencia = varchar("id_caja_secuencia", 36)
+    val idFormaPago = integer("id_forma_pago").nullable()
+    val totalTotalFactura = decimal("TotalTotalFactura", 10, 2).nullable()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object CajaFormaPagoGrupoTable : Table("caja_forma_pago_grupo") {
+    val id = integer("id")
+    val grupo = varchar("grupo", 100).nullable()
+    val imagen = text("imagen").nullable()
+    val orden = integer("orden").nullable()
+    val activo = integer("activo").nullable()
+
+    override val primaryKey = PrimaryKey(id)
 }
 
 object CajaDetalleAperturaTable : Table("caja_detalle_apertura") {

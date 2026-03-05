@@ -4,12 +4,15 @@ import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CajaSecuenciaCodigoResponse
+import com.amaxonia.pos.domain.model.caja.CajaSecuenciaGetResponse
 import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
 import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
 import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -43,6 +46,76 @@ class CajaApiImpl(private val apiClient: ApiClient) : CajaApi {
 
             val responseText = response.bodyAsText()
             Result.success(parseCajaStatusResponse(responseText, "No se pudo validar el estado de la caja"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getCajaSecuencia(
+        idSecuencia: String,
+        verifyFacturasTemporales: Boolean,
+        authHeader: String,
+        companyDb: String
+    ): Result<CajaSecuenciaGetResponse> {
+        return try {
+            val response = apiClient.httpClient.get("api/cajas/secuencia") {
+                header("Authorization", authHeader)
+                header("Company-DB", companyDb)
+                parameter("id", idSecuencia)
+                if (verifyFacturasTemporales) {
+                    parameter("by.verificar_facturas_temporales", "1")
+                }
+            }
+
+            val responseText = response.bodyAsText()
+            val parsed = runCatching {
+                AppJson.decodeFromString(CajaSecuenciaGetResponse.serializer(), responseText)
+            }.getOrElse {
+                val json = runCatching {
+                    AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                }.getOrNull()
+                if (json is JsonObject) {
+                    val error = json["error"]?.jsonPrimitive?.contentOrNull
+                    if (!error.isNullOrBlank()) {
+                        throw IllegalStateException(error)
+                    }
+                }
+                throw IllegalStateException("No se pudo obtener la secuencia de caja")
+            }
+            Result.success(parsed)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getNextSecuenciaCodigo(
+        idCaja: String,
+        authHeader: String,
+        companyDb: String
+    ): Result<CajaSecuenciaCodigoResponse> {
+        return try {
+            val response = apiClient.httpClient.get("api/cajas/secuencia/codigo") {
+                header("Authorization", authHeader)
+                header("Company-DB", companyDb)
+                parameter("id", idCaja)
+            }
+
+            val responseText = response.bodyAsText()
+            val parsed = runCatching {
+                AppJson.decodeFromString(CajaSecuenciaCodigoResponse.serializer(), responseText)
+            }.getOrElse {
+                val json = runCatching {
+                    AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                }.getOrNull()
+                if (json is JsonObject) {
+                    val error = json["error"]?.jsonPrimitive?.contentOrNull
+                    if (!error.isNullOrBlank()) {
+                        throw IllegalStateException(error)
+                    }
+                }
+                throw IllegalStateException("No se pudo obtener el correlativo de secuencia")
+            }
+            Result.success(parsed)
         } catch (e: Exception) {
             Result.failure(e)
         }

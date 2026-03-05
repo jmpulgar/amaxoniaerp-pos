@@ -47,7 +47,7 @@ class CierreCajaViewModel(
         viewModelScope.launch {
             _uiState.value = CierreCajaUiState.Closing(summary)
 
-            val caja = cajaRepository.activeCaja.value ?: run {
+            cajaRepository.activeCaja.value ?: run {
                 _uiState.value = CierreCajaUiState.Error(
                     message = "No hay caja activa para cerrar",
                     summary = summary
@@ -56,21 +56,30 @@ class CierreCajaViewModel(
             }
 
             val request = CierreCajaRequest(
-                idCajaSecuencia = "", // Will be resolved by the backend from active session
-                idCaja = caja.idCaja,
-                montoCierre = summary.expectedClose,
-                totalEfectivo = summary.totalCash,
-                totalTarjeta = summary.totalCard,
-                totalOtros = summary.totalOther,
-                totalVentas = summary.totalSales,
-                cantidadTransacciones = summary.transactionCount
+                id = summary.idCajaSecuencia,
+                monto_efectivo_ventas = summary.montoEfectivoVentas,
+                monto_efectivo_entrada = summary.montoEfectivoEntrada,
+                monto_efectivo_salida = summary.montoEfectivoSalida,
+                monto_efectivo_total = summary.montoEfectivoTotal,
+                monto_efectivo_cierre = summary.montoEfectivoCierre,
+                monto_efectivo_diferencia = summary.montoEfectivoDiferencia,
+                monto_otros_total = summary.montoOtrosTotal,
+                monto_otros_cierre = summary.montoOtrosCierre,
+                monto_otros_diferencia = summary.montoOtrosDiferencia,
+                monto_total = summary.montoTotal,
+                monto_cierre = summary.montoCierre,
+                monto_diferencia = summary.montoDiferencia,
+                detalle = summary.detalle,
+                detalle_formapago = summary.detalleFormaPago,
+                observacion_cierre = "",
+                numero_cierre_fiscal = "",
             )
 
             cajaRepository.closeCaja(request).fold(
                 onSuccess = { response ->
                     cajaRepository.clearActiveCaja()
                     _uiState.value = CierreCajaUiState.Success(
-                        message = response.message ?: "Caja cerrada correctamente"
+                        message = response.message
                     )
                 },
                 onFailure = { error ->

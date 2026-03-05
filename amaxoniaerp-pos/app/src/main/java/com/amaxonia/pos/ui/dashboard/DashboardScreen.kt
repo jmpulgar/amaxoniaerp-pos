@@ -173,7 +173,7 @@ fun DashboardScreen(
                         modifier = Modifier.fillMaxWidth().clickable {
                             scope.launch { 
                                 drawerState.close() 
-                                viewModel.fetchAvailableCajas()
+                                viewModel.fetchAvailableCajas(forceShowSelector = true)
                             }
                         }
                     ) {
