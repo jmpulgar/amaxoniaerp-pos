@@ -81,6 +81,13 @@ class ProcessSaleTransactionalRepository {
             serieSucursal = context.serieSucursal
                 ?: request.factura.serieSucursal.take(10)
         )
+        val normalizedPayments = request.pagos.map { payment ->
+            val normalizedAmount = if (payment.monto > 0.0) payment.monto else payment.montoRecibido
+            payment.copy(
+                tipoMovimiento = normalizeTipoMovimiento(payment.tipoMovimiento),
+                monto = normalizedAmount,
+            )
+        }
 
         validateWarehouseOwnership(
             request = request,
@@ -88,7 +95,11 @@ class ProcessSaleTransactionalRepository {
             context = context,
         )
 
-        return request.copy(factura = normalizedFactura, items = normalizedItems)
+        return request.copy(
+            factura = normalizedFactura,
+            items = normalizedItems,
+            pagos = normalizedPayments,
+        )
     }
 
     private fun resolveWarehouseContext(cajaId: String): WarehouseContext {
@@ -875,6 +886,23 @@ class ProcessSaleTransactionalRepository {
                 it[idAbonoDetalle] = ""
                 it[efectivoCambio] = monetaryContext.toBase(pago.efectivoCambio)
             }
+        }
+    }
+
+    private fun normalizeTipoMovimiento(value: String): String {
+        val normalized = value.trim().uppercase()
+        val allowed = setOf("DE", "TR", "CH", "MB", "OT", "TDC", "NEQ", "ABONO", "CASH")
+        if (normalized in allowed) return normalized
+
+        return when (normalized) {
+            "EF", "EFE", "EFECTIVO" -> "CASH"
+            "CK", "CK2", "CHEQUE" -> "CH"
+            "DP", "DEP", "DEPOSITO" -> "DE"
+            "TRANSFERENCIA", "TRANSF", "PM" -> "TR"
+            "TARJETA", "POS", "PV", "DB", "DEBITO", "DEBIT", "CR", "CRED", "CREDITO", "PT", "PUNTO" -> "TDC"
+            "NEQUI" -> "NEQ"
+            "GC", "CXC", "OTRO", "OTROS" -> "OT"
+            else -> "OT"
         }
     }
 
