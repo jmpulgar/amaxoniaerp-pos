@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ class ProductFormViewModel(
     fun loadProduct(productId: String?) {
         if (productId == null) {
             _state.update { it.copy(isEditMode = false, product = Product(), error = null) }
+            loadCatalogsForProduct(Product())
         } else {
             viewModelScope.launch {
                 _state.update { it.copy(isLoading = true, error = null) }
@@ -33,6 +35,7 @@ class ProductFormViewModel(
                                 error = null
                             )
                         }
+                        loadCatalogsForProduct(product)
                     },
                     onFailure = { exception ->
                         _state.update {
@@ -51,20 +54,134 @@ class ProductFormViewModel(
         _state.update { it.copy(product = it.product.block(), error = null) }
     }
 
+    fun onDepartmentChanged(departmentId: Int) {
+        _state.update {
+            it.copy(
+                product = it.product.copy(
+                    department = departmentId.toString(),
+                    section = "",
+                    family = "",
+                    subFamily = ""
+                ),
+                sections = emptyList(),
+                families = emptyList(),
+                subFamilies = emptyList(),
+                error = null
+            )
+        }
+
+        viewModelScope.launch {
+            productRepository.getSections(departmentId).fold(
+                onSuccess = { sections ->
+                    _state.update { it.copy(sections = sections) }
+                },
+                onFailure = { exception ->
+                    _state.update { it.copy(error = exception.message ?: "Error al cargar secciones") }
+                }
+            )
+        }
+    }
+
+    fun onSectionChanged(sectionId: Int) {
+        _state.update {
+            it.copy(
+                product = it.product.copy(
+                    section = sectionId.toString(),
+                    family = "",
+                    subFamily = ""
+                ),
+                families = emptyList(),
+                subFamilies = emptyList(),
+                error = null
+            )
+        }
+
+        viewModelScope.launch {
+            productRepository.getFamilies(sectionId).fold(
+                onSuccess = { families ->
+                    _state.update { it.copy(families = families) }
+                },
+                onFailure = { exception ->
+                    _state.update { it.copy(error = exception.message ?: "Error al cargar familias") }
+                }
+            )
+        }
+    }
+
+    fun onFamilyChanged(familyId: Int) {
+        _state.update {
+            it.copy(
+                product = it.product.copy(
+                    family = familyId.toString(),
+                    subFamily = ""
+                ),
+                subFamilies = emptyList(),
+                error = null
+            )
+        }
+
+        viewModelScope.launch {
+            productRepository.getSubFamilies(familyId).fold(
+                onSuccess = { subFamilies ->
+                    _state.update { it.copy(subFamilies = subFamilies) }
+                },
+                onFailure = { exception ->
+                    _state.update { it.copy(error = exception.message ?: "Error al cargar subfamilias") }
+                }
+            )
+        }
+    }
+
+    fun onBrandChanged(brandId: Int) {
+        _state.update {
+            it.copy(
+                product = it.product.copy(
+                    brand = brandId.toString(),
+                    line = ""
+                ),
+                lines = emptyList(),
+                error = null
+            )
+        }
+
+        viewModelScope.launch {
+            productRepository.getLines(brandId).fold(
+                onSuccess = { lines ->
+                    _state.update { it.copy(lines = lines) }
+                },
+                onFailure = { exception ->
+                    _state.update { it.copy(error = exception.message ?: "Error al cargar lineas") }
+                }
+            )
+        }
+    }
+
+    fun onLineChanged(lineId: Int) {
+        _state.update {
+            it.copy(
+                product = it.product.copy(line = lineId.toString()),
+                error = null
+            )
+        }
+    }
+
     fun updatePriceRow(index: Int, block: PriceLevel.() -> PriceLevel) {
         _state.update { state ->
             val currentProduct = state.product
             val currentPrices = currentProduct.prices.toMutableList()
             var updatedRow = currentPrices[index].block()
             val cost = currentProduct.costActual
-            if (cost > 0) {
-                val priceWithUtility = cost * (1 + (updatedRow.utilityPercent / 100))
-                val priceWithTax = priceWithUtility * (1 + (currentProduct.taxRate / 100))
-                updatedRow = updatedRow.copy(
-                    pricePlusUtility = priceWithUtility,
-                    pricePlusTax = priceWithTax
-                )
+            val price = if (cost > 0) cost * (1 + (updatedRow.utilityPercent / 100)) else updatedRow.price
+            val priceWithTax = if (currentProduct.isExempt) {
+                price
+            } else {
+                price * (1 + (currentProduct.taxRate / 100))
             }
+            updatedRow = updatedRow.copy(
+                price = price,
+                pricePlusUtility = price,
+                pricePlusTax = priceWithTax
+            )
             currentPrices[index] = updatedRow
             state.copy(product = currentProduct.copy(prices = currentPrices), error = null)
         }
@@ -75,10 +192,19 @@ class ProductFormViewModel(
             val cost = state.product.costActual
             val taxRate = state.product.taxRate
             val newPrices = state.product.prices.map { row ->
-                val priceWithUtility = cost * (1 + (row.utilityPercent / 100))
-                val priceWithTax = priceWithUtility * (1 + (taxRate / 100))
+                val price = if (cost > 0) {
+                    cost * (1 + (row.utilityPercent / 100))
+                } else {
+                    row.price
+                }
+                val priceWithTax = if (state.product.isExempt) {
+                    price
+                } else {
+                    price * (1 + (taxRate / 100))
+                }
                 row.copy(
-                    pricePlusUtility = priceWithUtility,
+                    price = price,
+                    pricePlusUtility = price,
                     pricePlusTax = priceWithTax
                 )
             }
@@ -103,6 +229,34 @@ class ProductFormViewModel(
                     }
                 }
             )
+        }
+    }
+
+    private fun loadCatalogsForProduct(product: Product) {
+        viewModelScope.launch {
+            val departments = productRepository.getDepartments().getOrDefault(emptyList())
+            val brands = productRepository.getBrands().getOrDefault(emptyList())
+
+            val departmentId = product.department.toIntOrNull()
+            val sectionId = product.section.toIntOrNull()
+            val familyId = product.family.toIntOrNull()
+            val brandId = product.brand.toIntOrNull()
+
+            val sections = departmentId?.let { productRepository.getSections(it).getOrDefault(emptyList()) } ?: emptyList()
+            val families = sectionId?.let { productRepository.getFamilies(it).getOrDefault(emptyList()) } ?: emptyList()
+            val subFamilies = familyId?.let { productRepository.getSubFamilies(it).getOrDefault(emptyList()) } ?: emptyList()
+            val lines = brandId?.let { productRepository.getLines(it).getOrDefault(emptyList()) } ?: emptyList()
+
+            _state.update {
+                it.copy(
+                    departments = departments,
+                    sections = sections,
+                    families = families,
+                    subFamilies = subFamilies,
+                    brands = brands,
+                    lines = lines
+                )
+            }
         }
     }
 }

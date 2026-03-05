@@ -76,6 +76,14 @@ data class CreateProductRequest(
     val utility3: Double = 0.0,
     val priceWithTax3: Double = 0.0,
 
+    val price4: Double = 0.0,
+    val utility4: Double = 0.0,
+    val priceWithTax4: Double = 0.0,
+
+    val price5: Double = 0.0,
+    val utility5: Double = 0.0,
+    val priceWithTax5: Double = 0.0,
+
     // Costos e impuestos
     val currentCost: Double = 0.0,
     val isTaxExempt: Boolean = false,

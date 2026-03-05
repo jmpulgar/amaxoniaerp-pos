@@ -61,12 +61,15 @@ fun ClientEntity.toDomain(): Client {
 
 fun ProductDto.toEntity(): ProductEntity {
     return ProductEntity(
-        id = id?.toString() ?: code.orEmpty(),
+        id = id ?: code.orEmpty(),
         code = code.orEmpty(),
         description = description.orEmpty(),
         reference = reference.orEmpty(),
         barcode1 = barcode1.orEmpty(),
-        department = department ?: 0,
+        barcode2 = barcode2.orEmpty(),
+        barcode3 = barcode3.orEmpty(),
+        department = department?.toIntOrNull() ?: 0,
+        isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
         taxRate = taxRate ?: 0.0,
         costActual = costActual ?: 0.0,
         prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices()
@@ -80,7 +83,10 @@ fun ProductEntity.toDomain(): Product {
         description = description,
         reference = reference,
         barcode1 = barcode1,
+        barcode2 = barcode2,
+        barcode3 = barcode3,
         department = department.toString(),
+        isExempt = isExempt,
         taxRate = taxRate,
         costActual = costActual,
         prices = prices.ifEmpty { generateDefaultPrices() }

@@ -113,6 +113,99 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 call.respond(DepartmentsApiResponse(data = data))
             }
 
+            get("sections") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
+                }
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                val departmentId = call.request.queryParameters["departmentId"]?.toIntOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "departmentId inválido"))
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val list = itemsRepository.listSections(database = companyDb, departmentId = departmentId)
+                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+                call.respond(DepartmentsApiResponse(data = data))
+            }
+
+            get("families") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
+                }
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                val sectionId = call.request.queryParameters["sectionId"]?.toIntOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "sectionId inválido"))
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val list = itemsRepository.listFamilies(database = companyDb, sectionId = sectionId)
+                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+                call.respond(DepartmentsApiResponse(data = data))
+            }
+
+            get("subfamilies") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
+                }
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                val familyId = call.request.queryParameters["familyId"]?.toIntOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "familyId inválido"))
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val list = itemsRepository.listSubFamilies(database = companyDb, familyId = familyId)
+                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+                call.respond(DepartmentsApiResponse(data = data))
+            }
+
+            get("brands") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
+                }
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val list = itemsRepository.listBrands(database = companyDb)
+                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+                call.respond(DepartmentsApiResponse(data = data))
+            }
+
+            get("lines") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
+                }
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                val brandId = call.request.queryParameters["brandId"]?.toIntOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "brandId inválido"))
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val list = itemsRepository.listLines(database = companyDb, brandId = brandId)
+                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+                call.respond(DepartmentsApiResponse(data = data))
+            }
+
             /**
              * GET /items/best-sellers - Productos más vendidos desde factura_detalle.
              */

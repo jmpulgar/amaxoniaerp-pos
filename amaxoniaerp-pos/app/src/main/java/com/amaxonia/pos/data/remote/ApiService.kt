@@ -86,6 +86,45 @@ class ApiService(
         return response.data
     }
 
+    suspend fun getSections(token: String, departmentId: Int): List<DepartmentDto> {
+        val response = client.get("items/sections") {
+            authHeaders(token)
+            url { parameters.append("departmentId", departmentId.toString()) }
+        }.body<DepartmentsResponse>()
+        return response.data
+    }
+
+    suspend fun getFamilies(token: String, sectionId: Int): List<DepartmentDto> {
+        val response = client.get("items/families") {
+            authHeaders(token)
+            url { parameters.append("sectionId", sectionId.toString()) }
+        }.body<DepartmentsResponse>()
+        return response.data
+    }
+
+    suspend fun getSubFamilies(token: String, familyId: Int): List<DepartmentDto> {
+        val response = client.get("items/subfamilies") {
+            authHeaders(token)
+            url { parameters.append("familyId", familyId.toString()) }
+        }.body<DepartmentsResponse>()
+        return response.data
+    }
+
+    suspend fun getBrands(token: String): List<DepartmentDto> {
+        val response = client.get("items/brands") {
+            authHeaders(token)
+        }.body<DepartmentsResponse>()
+        return response.data
+    }
+
+    suspend fun getLines(token: String, brandId: Int): List<DepartmentDto> {
+        val response = client.get("items/lines") {
+            authHeaders(token)
+            url { parameters.append("brandId", brandId.toString()) }
+        }.body<DepartmentsResponse>()
+        return response.data
+    }
+
     suspend fun getBestSellers(token: String, limit: Int = 20): List<BestSellerDto> {
         val response = client.get("items/best-sellers") {
             authHeaders(token)
@@ -111,6 +150,12 @@ class ApiService(
         return client.put("items/$id") {
             authHeaders(token)
             setBody(request)
+        }.body()
+    }
+
+    suspend fun getProductById(token: String, id: String): ProductDto {
+        return client.get("items/$id") {
+            authHeaders(token)
         }.body()
     }
 

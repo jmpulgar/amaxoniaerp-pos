@@ -24,6 +24,10 @@ import com.amaxonia.pos.domain.model.TaxpayerType
 import com.amaxonia.pos.domain.model.generateDefaultPrices
 import java.util.UUID
 
+private fun priceByLabel(prices: List<PriceLevel>, label: String): PriceLevel {
+    return prices.firstOrNull { it.label.equals(label, ignoreCase = true) } ?: PriceLevel(label = label)
+}
+
 // --- Company Mappers ---
 fun CompanyDto.toDomainCompany(): Company {
     return Company(
@@ -56,15 +60,33 @@ fun ProductDto.toDomain(): Product {
         generateDefaultPrices()
     }
     return Product(
-        id = id?.toString() ?: UUID.randomUUID().toString(),
+        id = id ?: UUID.randomUUID().toString(),
         code = code.orEmpty(),
         reference = reference.orEmpty(),
         description = description.orEmpty(),
         barcode1 = barcode1.orEmpty(),
+        barcode2 = barcode2.orEmpty(),
+        barcode3 = barcode3.orEmpty(),
         photoUrl = photoUrl.orEmpty(),
-        department = department?.toString().orEmpty(),
+        department = department.orEmpty(),
+        section = section.orEmpty(),
+        family = family.orEmpty(),
+        subFamily = subFamily.orEmpty(),
+        brand = brand.orEmpty(),
+        line = line.orEmpty(),
+        gobSegment = gobSegment.orEmpty(),
+        gobFamily = gobFamily.orEmpty(),
+        isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
         taxRate = taxRate ?: 0.0,
         costActual = costActual ?: 0.0,
+        costAverage = costAverage ?: 0.0,
+        costPrevious = costPrevious ?: 0.0,
+        costCIF = costCIF ?: 0.0,
+        costFOB = costFOB ?: 0.0,
+        costProcessed = costProcessed ?: 0.0,
+        commissionPercent = commissionPercent ?: 0.0,
+        costEuroOrigin = costEuroOrigin ?: 0.0,
+        costFranco = costFranco ?: 0.0,
         prices = mappedPrices
     )
 }
@@ -74,7 +96,7 @@ fun PriceDto.toDomain(): PriceLevel {
         label = label,
         price = price,
         utilityPercent = utilityPercent,
-        pricePlusUtility = 0.0,
+        pricePlusUtility = if (pricePlusUtility > 0.0) pricePlusUtility else price,
         pricePlusTax = pricePlusTax,
         discountPercent = discountPercent
     )
@@ -83,21 +105,37 @@ fun PriceDto.toDomain(): PriceLevel {
 fun Product.toCreateRequest(): CreateProductRequest {
     return CreateProductRequest(
         code = code,
+        name = description,
         description = description,
         reference = reference,
-        barcode1 = barcode1,
-        department = department.toIntOrNull() ?: 0,
-        taxRate = taxRate,
-        costActual = costActual,
-        prices = prices.map {
-            PriceDto(
-                label = it.label,
-                price = it.price,
-                utilityPercent = it.utilityPercent,
-                pricePlusTax = it.pricePlusTax,
-                discountPercent = it.discountPercent
-            )
-        }
+        barcode = barcode1,
+        barcode2 = barcode2,
+        barcode3 = barcode3,
+        departmentId = department.toIntOrNull() ?: 0,
+        sectionId = section.toIntOrNull() ?: 0,
+        familyId = family.toIntOrNull() ?: 0,
+        subfamilyId = subFamily.toIntOrNull() ?: 0,
+        brandId = brand.toIntOrNull() ?: 0,
+        lineId = line.toIntOrNull() ?: 0,
+        price1 = priceByLabel(prices, "A").price,
+        utility1 = priceByLabel(prices, "A").utilityPercent,
+        priceWithTax1 = if (isExempt) priceByLabel(prices, "A").price else priceByLabel(prices, "A").pricePlusTax,
+        price2 = priceByLabel(prices, "B").price,
+        utility2 = priceByLabel(prices, "B").utilityPercent,
+        priceWithTax2 = if (isExempt) priceByLabel(prices, "B").price else priceByLabel(prices, "B").pricePlusTax,
+        price3 = priceByLabel(prices, "C").price,
+        utility3 = priceByLabel(prices, "C").utilityPercent,
+        priceWithTax3 = if (isExempt) priceByLabel(prices, "C").price else priceByLabel(prices, "C").pricePlusTax,
+        price4 = priceByLabel(prices, "D").price,
+        utility4 = priceByLabel(prices, "D").utilityPercent,
+        priceWithTax4 = if (isExempt) priceByLabel(prices, "D").price else priceByLabel(prices, "D").pricePlusTax,
+        price5 = priceByLabel(prices, "E").price,
+        utility5 = priceByLabel(prices, "E").utilityPercent,
+        priceWithTax5 = if (isExempt) priceByLabel(prices, "E").price else priceByLabel(prices, "E").pricePlusTax,
+        currentCost = costActual,
+        isTaxExempt = isExempt,
+        taxRate = if (isExempt) 0.0 else taxRate,
+        totalStock = 0
     )
 }
 

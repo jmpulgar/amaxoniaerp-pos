@@ -204,7 +204,9 @@ private fun CajaCard(
                     text = caja.descripcion ?: "Caja sin nombre",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = Color(0xFF2A3256)
+                    color = Color(0xFF2A3256),
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
@@ -215,18 +217,10 @@ private fun CajaCard(
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
-                    Text(
-                        text = "  |  ",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "Serie: ${caja.serieCaja}",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
                 }
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Status badge
             Box(

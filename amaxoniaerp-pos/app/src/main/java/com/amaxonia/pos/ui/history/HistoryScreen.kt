@@ -349,7 +349,7 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // Invoice info
+                // Invoice info
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -358,10 +358,10 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
                         fontSize = 15.sp,
                         color = Color(0xFF2A3256)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    StatusBadge(status = transaction.status)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                StatusBadge(status = transaction.status)
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Rounded.Schedule,

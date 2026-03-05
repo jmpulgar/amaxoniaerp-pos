@@ -33,7 +33,10 @@ data class ProductEntity(
     val description: String,
     val reference: String,
     val barcode1: String,
+    val barcode2: String,
+    val barcode3: String,
     val department: Int,
+    val isExempt: Boolean,
     val taxRate: Double,
     val costActual: Double,
     val prices: List<PriceLevel>

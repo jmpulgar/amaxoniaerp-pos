@@ -26,6 +26,46 @@ class MockProductRepository : ProductRepository {
         ))
     }
 
+    override suspend fun getSections(departmentId: Int): Result<List<Department>> {
+        val options = when (departmentId) {
+            1 -> listOf(Department(1, "Seccion 1"), Department(2, "Seccion 2"))
+            2 -> listOf(Department(3, "Seccion 3"))
+            else -> emptyList()
+        }
+        return Result.success(options)
+    }
+
+    override suspend fun getFamilies(sectionId: Int): Result<List<Department>> {
+        val options = when (sectionId) {
+            1 -> listOf(Department(1, "Familia 1"), Department(2, "Familia 2"))
+            2 -> listOf(Department(3, "Familia 3"))
+            else -> emptyList()
+        }
+        return Result.success(options)
+    }
+
+    override suspend fun getSubFamilies(familyId: Int): Result<List<Department>> {
+        val options = when (familyId) {
+            1 -> listOf(Department(1, "Subfamilia 1"), Department(2, "Subfamilia 2"))
+            2 -> listOf(Department(3, "Subfamilia 3"))
+            else -> emptyList()
+        }
+        return Result.success(options)
+    }
+
+    override suspend fun getBrands(): Result<List<Department>> {
+        return Result.success(listOf(Department(1, "Marca 1"), Department(2, "Marca 2")))
+    }
+
+    override suspend fun getLines(brandId: Int): Result<List<Department>> {
+        val options = when (brandId) {
+            1 -> listOf(Department(1, "Linea 1"), Department(2, "Linea 2"))
+            2 -> listOf(Department(3, "Linea 3"))
+            else -> emptyList()
+        }
+        return Result.success(options)
+    }
+
     override suspend fun getAllProducts(): Result<List<Product>> {
         simulateNetworkDelay()
         if (shouldSimulateError()) {

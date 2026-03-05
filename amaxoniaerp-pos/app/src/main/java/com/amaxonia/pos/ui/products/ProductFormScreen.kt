@@ -29,6 +29,7 @@ import com.amaxonia.pos.ui.common.components.FormSection
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
 import com.amaxonia.pos.ui.theme.BgLightGray
+import com.amaxonia.pos.domain.repository.Department
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +41,12 @@ fun ProductFormScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val product = state.product
+    val departmentNames = state.departments.map { it.name }
+    val sectionNames = state.sections.map { it.name }
+    val familyNames = state.families.map { it.name }
+    val subFamilyNames = state.subFamilies.map { it.name }
+    val brandNames = state.brands.map { it.name }
+    val lineNames = state.lines.map { it.name }
 
     LaunchedEffect(productId) {
         viewModel.loadProduct(productId)
@@ -102,36 +109,87 @@ fun ProductFormScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             FormSection(title = "Categorización") {
-                val mockOptions = listOf("Opción 1", "Opción 2")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) {
-                        AmaxoniaDropdown("Departamento", mockOptions, product.department) { viewModel.updateField { copy(department = it) } }
+                        AmaxoniaDropdown(
+                            "Departamento",
+                            departmentNames,
+                            selectedOption = selectedName(state.departments, product.department)
+                        ) { selected ->
+                            state.departments.firstOrNull { it.name == selected }?.id?.let(viewModel::onDepartmentChanged)
+                        }
                     }
                     Box(Modifier.weight(1f)) {
-                        AmaxoniaDropdown("Sección", mockOptions, product.section) { viewModel.updateField { copy(section = it) } }
+                        AmaxoniaDropdown(
+                            "Sección",
+                            sectionNames,
+                            selectedOption = selectedName(state.sections, product.section),
+                            enabled = product.department.isNotBlank()
+                        ) { selected ->
+                            state.sections.firstOrNull { it.name == selected }?.id?.let(viewModel::onSectionChanged)
+                        }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) {
-                        AmaxoniaDropdown("Familia", mockOptions, product.family) { viewModel.updateField { copy(family = it) } }
+                        AmaxoniaDropdown(
+                            "Familia",
+                            familyNames,
+                            selectedOption = selectedName(state.families, product.family),
+                            enabled = product.section.isNotBlank()
+                        ) { selected ->
+                            state.families.firstOrNull { it.name == selected }?.id?.let(viewModel::onFamilyChanged)
+                        }
                     }
                     Box(Modifier.weight(1f)) {
-                        AmaxoniaDropdown("Sub Familia", mockOptions, product.subFamily) { viewModel.updateField { copy(subFamily = it) } }
+                        AmaxoniaDropdown(
+                            "Sub Familia",
+                            subFamilyNames,
+                            selectedOption = selectedName(state.subFamilies, product.subFamily),
+                            enabled = product.family.isNotBlank()
+                        ) { selected ->
+                            state.subFamilies.firstOrNull { it.name == selected }?.id?.let {
+                                viewModel.updateField { copy(subFamily = it.toString()) }
+                            }
+                        }
                     }
                 }
-                AmaxoniaDropdown("Marca", mockOptions, product.brand) { viewModel.updateField { copy(brand = it) } }
-                AmaxoniaDropdown("Línea", mockOptions, product.line) { viewModel.updateField { copy(line = it) } }
+                AmaxoniaDropdown(
+                    "Marca",
+                    brandNames,
+                    selectedOption = selectedName(state.brands, product.brand)
+                ) { selected ->
+                    state.brands.firstOrNull { it.name == selected }?.id?.let(viewModel::onBrandChanged)
+                }
+                AmaxoniaDropdown(
+                    "Línea",
+                    lineNames,
+                    selectedOption = selectedName(state.lines, product.line),
+                    enabled = product.brand.isNotBlank()
+                ) { selected ->
+                    state.lines.firstOrNull { it.name == selected }?.id?.let(viewModel::onLineChanged)
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
             FormSection(title = "Costos e Impuestos") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(0.4f)) {
                         AmaxoniaDropdown("Exento", listOf("SI", "NO"), if (product.isExempt) "SI" else "NO") {
-                            viewModel.updateField { copy(isExempt = it == "SI") }
+                            val isExempt = it == "SI"
+                            viewModel.updateField {
+                                copy(
+                                    isExempt = isExempt,
+                                    taxRate = if (isExempt) 0.0 else taxRate
+                                )
+                            }
+                            viewModel.recalculateAllPrices()
                         }
                     }
                     Box(Modifier.weight(0.4f)) {
-                        AmaxoniaMoneyInput("ITBMS %", product.taxRate) { viewModel.updateField { copy(taxRate = it) } }
+                        AmaxoniaMoneyInput("IVA %", product.taxRate, showZero = true) {
+                            viewModel.updateField { copy(taxRate = if (isExempt) 0.0 else it) }
+                            viewModel.recalculateAllPrices()
+                        }
                     }
                     IconButton(
                         onClick = { viewModel.recalculateAllPrices() },
@@ -143,17 +201,20 @@ fun ProductFormScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Costos", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AmaxoniaBlue)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AmaxoniaMoneyInput("Actual ($)", product.costActual, Modifier.weight(1f)) { viewModel.updateField { copy(costActual = it) } }
-                    AmaxoniaMoneyInput("Promedio ($)", product.costAverage, Modifier.weight(1f)) { viewModel.updateField { copy(costAverage = it) } }
+                    AmaxoniaMoneyInput("Actual ($)", product.costActual, Modifier.weight(1f), showZero = true) {
+                        viewModel.updateField { copy(costActual = it) }
+                        viewModel.recalculateAllPrices()
+                    }
+                    AmaxoniaMoneyInput("Promedio ($)", product.costAverage, Modifier.weight(1f), showZero = true) { viewModel.updateField { copy(costAverage = it) } }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AmaxoniaMoneyInput("Anterior ($)", product.costPrevious, Modifier.weight(1f)) { viewModel.updateField { copy(costPrevious = it) } }
-                    AmaxoniaMoneyInput("Procesado ($)", product.costProcessed, Modifier.weight(1f)) { viewModel.updateField { copy(costProcessed = it) } }
+                    AmaxoniaMoneyInput("Anterior ($)", product.costPrevious, Modifier.weight(1f), showZero = true) { viewModel.updateField { copy(costPrevious = it) } }
+                    AmaxoniaMoneyInput("Procesado ($)", product.costProcessed, Modifier.weight(1f), showZero = true) { viewModel.updateField { copy(costProcessed = it) } }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AmaxoniaMoneyInput("Comisión %", product.commissionPercent, Modifier.weight(1f)) { viewModel.updateField { copy(commissionPercent = it) } }
-                    AmaxoniaMoneyInput("Costo Franco", product.costFranco, Modifier.weight(1f)) { viewModel.updateField { copy(costFranco = it) } }
+                    AmaxoniaMoneyInput("Comisión %", product.commissionPercent, Modifier.weight(1f), showZero = true) { viewModel.updateField { copy(commissionPercent = it) } }
+                    AmaxoniaMoneyInput("Costo Franco", product.costFranco, Modifier.weight(1f), showZero = true) { viewModel.updateField { copy(costFranco = it) } }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -166,14 +227,16 @@ fun ProductFormScreen(
                     Text("Precios por Unidad", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AmaxoniaBlue, modifier = Modifier.padding(8.dp))
                     Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         Text("", Modifier.width(24.dp))
+                        Text("Precio", Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Text("Util %", Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Text("P. + Util", Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        Text("Total", Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Text("P. + Imp", Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     }
                     HorizontalDivider()
                     product.prices.forEachIndexed { index, priceRow ->
                         PriceRowItem(
                             label = priceRow.label,
+                            price = priceRow.price,
                             utility = priceRow.utilityPercent,
                             pricePlusUtility = priceRow.pricePlusUtility,
                             total = priceRow.pricePlusTax,
@@ -188,9 +251,15 @@ fun ProductFormScreen(
     }
 }
 
+private fun selectedName(options: List<Department>, selectedId: String): String {
+    val id = selectedId.toIntOrNull() ?: return ""
+    return options.firstOrNull { it.id == id }?.name ?: ""
+}
+
 @Composable
 fun PriceRowItem(
     label: String,
+    price: Double,
     utility: Double,
     pricePlusUtility: Double,
     total: Double,
@@ -202,6 +271,7 @@ fun PriceRowItem(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(label, fontWeight = FontWeight.Bold, color = AmaxoniaBlue, modifier = Modifier.width(24.dp), fontSize = 18.sp)
+        Text(text = String.format("%.2f", price), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 13.sp)
         CompactNumericInput(
             value = utility.toString(),
             onValueChange = onUtilityChange,

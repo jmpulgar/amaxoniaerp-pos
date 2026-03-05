@@ -112,7 +112,7 @@ class ItemsRepository {
             }
         }
         if (departmentId != null && departmentId > 0) {
-            query.andWhere { table.departamentoId eq departmentId }
+            query.andWhere { (table.departamentoId eq departmentId) or (table.codDepartamento eq departmentId) }
         }
 
         val total = if (includeTotal) query.count() else -1L
@@ -132,11 +132,137 @@ class ItemsRepository {
             .orderBy(DepartamentoTable.descripcion)
             .map { row ->
                 val id = row[DepartamentoTable.id]
-                val name = row[DepartamentoTable.descripcion]?.takeIf { it.isNotBlank() }
-                    ?: row[DepartamentoTable.codigo]?.takeIf { it.isNotBlank() }
-                    ?: "Departamento $id"
+                val code = row[DepartamentoTable.codigo]?.trim().orEmpty()
+                val desc = row[DepartamentoTable.descripcion]?.trim().orEmpty()
+                val name = when {
+                    code.isNotBlank() && desc.isNotBlank() -> "$code - $desc"
+                    desc.isNotBlank() -> desc
+                    code.isNotBlank() -> code
+                    else -> "Departamento $id"
+                }
                 id to name
             }
+    }
+
+    suspend fun listSections(
+        database: Database,
+        departmentId: Int
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        listCatalogBySql(
+            """
+            SELECT
+                S.id AS id,
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(S.codigo), ''), '') <> ''
+                         AND COALESCE(NULLIF(TRIM(S.descripcion), ''), '') <> ''
+                        THEN CONCAT(S.codigo, ' - ', S.descripcion)
+                    WHEN COALESCE(NULLIF(TRIM(S.descripcion), ''), '') <> ''
+                        THEN S.descripcion
+                    WHEN COALESCE(NULLIF(TRIM(S.codigo), ''), '') <> ''
+                        THEN S.codigo
+                    ELSE CONCAT('Seccion ', S.id)
+                END AS name
+            FROM seccion S
+            INNER JOIN seccion_departamento SD ON SD.seccion_id = S.id
+            WHERE SD.departamento_id = $departmentId
+            ORDER BY name ASC
+            """.trimIndent()
+        )
+    }
+
+    suspend fun listFamilies(
+        database: Database,
+        sectionId: Int
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        listCatalogBySql(
+            """
+            SELECT DISTINCT
+                F.id AS id,
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(F.codigo), ''), '') <> ''
+                         AND COALESCE(NULLIF(TRIM(F.descripcion), ''), '') <> ''
+                        THEN CONCAT(F.codigo, ' - ', F.descripcion)
+                    WHEN COALESCE(NULLIF(TRIM(F.descripcion), ''), '') <> ''
+                        THEN F.descripcion
+                    WHEN COALESCE(NULLIF(TRIM(F.codigo), ''), '') <> ''
+                        THEN F.codigo
+                    ELSE CONCAT('Familia ', F.id)
+                END AS name
+            FROM familia F
+            INNER JOIN item I ON I.familia_id = F.id
+            WHERE I.seccion_id = $sectionId
+            ORDER BY name ASC
+            """.trimIndent()
+        )
+    }
+
+    suspend fun listSubFamilies(
+        database: Database,
+        familyId: Int
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        listCatalogBySql(
+            """
+            SELECT
+                SF.id AS id,
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(SF.codigo), ''), '') <> ''
+                         AND COALESCE(NULLIF(TRIM(SF.descripcion), ''), '') <> ''
+                        THEN CONCAT(SF.codigo, ' - ', SF.descripcion)
+                    WHEN COALESCE(NULLIF(TRIM(SF.descripcion), ''), '') <> ''
+                        THEN SF.descripcion
+                    WHEN COALESCE(NULLIF(TRIM(SF.codigo), ''), '') <> ''
+                        THEN SF.codigo
+                    ELSE CONCAT('Subfamilia ', SF.id)
+                END AS name
+            FROM subfamilia SF
+            INNER JOIN subfamilia_familia SFF ON SFF.subfamilia_id = SF.id
+            WHERE SFF.familia_id = $familyId
+            ORDER BY name ASC
+            """.trimIndent()
+        )
+    }
+
+    suspend fun listBrands(
+        database: Database
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        listCatalogBySql(
+            """
+            SELECT
+                M.id AS id,
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(M.codigo), ''), '') <> ''
+                         AND COALESCE(NULLIF(TRIM(M.descripcion), ''), '') <> ''
+                        THEN CONCAT(M.codigo, ' - ', M.descripcion)
+                    WHEN COALESCE(NULLIF(TRIM(M.descripcion), ''), '') <> ''
+                        THEN M.descripcion
+                    WHEN COALESCE(NULLIF(TRIM(M.codigo), ''), '') <> ''
+                        THEN M.codigo
+                    ELSE CONCAT('Marca ', M.id)
+                END AS name
+            FROM marca M
+            ORDER BY name ASC
+            """.trimIndent()
+        )
+    }
+
+    suspend fun listLines(
+        database: Database,
+        brandId: Int
+    ): List<Pair<Int, String>> = dbQuery(database) {
+        listCatalogBySql(
+            """
+            SELECT
+                L.cod_linea AS id,
+                CASE
+                    WHEN COALESCE(NULLIF(TRIM(L.descripcion), ''), '') <> ''
+                        THEN CONCAT(LPAD(L.cod_linea, 5, '0'), ' - ', L.descripcion)
+                    ELSE CONCAT('Linea ', L.cod_linea)
+                END AS name
+            FROM linea L
+            WHERE L.marca = $brandId
+            ORDER BY name ASC
+            """.trimIndent()
+        )
     }
 
     suspend fun getItemsByIds(
@@ -182,10 +308,12 @@ class ItemsRepository {
                     it[codigoBarras2] = request.barcode2 ?: ""
                     it[codigoBarras3] = request.barcode3 ?: ""
                     it[codDepartamento] = request.departmentId
+                    it[departamentoId] = request.departmentId
                     it[seccionId] = request.sectionId
                     it[familiaId] = request.familyId
                     it[subfamiliaId] = request.subfamilyId
                     it[marcaId] = request.brandId
+                    it[codLinea] = request.lineId
                     it[lineaId] = request.lineId
                     it[precio1] = request.price1.toBigDecimal()
                     it[utilidad1] = request.utility1.toBigDecimal()
@@ -196,9 +324,15 @@ class ItemsRepository {
                     it[precio3] = request.price3.toBigDecimal()
                     it[utilidad3] = request.utility3.toBigDecimal()
                     it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[precio4] = request.price4.toBigDecimal()
+                    it[utilidad4] = request.utility4.toBigDecimal()
+                    it[coniva4] = request.priceWithTax4.toBigDecimal()
+                    it[precio5] = request.price5.toBigDecimal()
+                    it[utilidad5] = request.utility5.toBigDecimal()
+                    it[coniva5] = request.priceWithTax5.toBigDecimal()
                     it[costoActual] = request.currentCost.toBigDecimal()
-                    it[montoExento] = request.isTaxExempt
-                    it[iva] = request.taxRate.toBigDecimal()
+                    it[montoExento] = !request.isTaxExempt
+                    it[iva] = if (request.isTaxExempt) BigDecimal.ZERO else request.taxRate.toBigDecimal()
                     it[existenciaTotal] = request.totalStock
                     it[estatus] = "A"
                     it[codItemForma] = 1
@@ -220,10 +354,12 @@ class ItemsRepository {
                     it[codigoBarras2] = request.barcode2 ?: ""
                     it[codigoBarras3] = request.barcode3 ?: ""
                     it[codDepartamento] = request.departmentId
+                    it[departamentoId] = request.departmentId
                     it[seccionId] = request.sectionId
                     it[familiaId] = request.familyId
                     it[subfamiliaId] = request.subfamilyId
                     it[marcaId] = request.brandId
+                    it[codLinea] = request.lineId
                     it[lineaId] = request.lineId
                     it[precio1] = request.price1.toBigDecimal()
                     it[utilidad1] = request.utility1.toBigDecimal()
@@ -234,9 +370,15 @@ class ItemsRepository {
                     it[precio3] = request.price3.toBigDecimal()
                     it[utilidad3] = request.utility3.toBigDecimal()
                     it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[precio4] = request.price4.toBigDecimal()
+                    it[utilidad4] = request.utility4.toBigDecimal()
+                    it[coniva4] = request.priceWithTax4.toBigDecimal()
+                    it[precio5] = request.price5.toBigDecimal()
+                    it[utilidad5] = request.utility5.toBigDecimal()
+                    it[coniva5] = request.priceWithTax5.toBigDecimal()
                     it[costoActual] = request.currentCost.toBigDecimal()
-                    it[montoExento] = request.isTaxExempt
-                    it[iva] = request.taxRate.toBigDecimal()
+                    it[montoExento] = !request.isTaxExempt
+                    it[iva] = if (request.isTaxExempt) BigDecimal.ZERO else request.taxRate.toBigDecimal()
                     it[existenciaTotal] = request.totalStock
                     it[estatus] = "A"
                     it[codItemForma] = 1
@@ -272,6 +414,16 @@ class ItemsRepository {
                     it[descripcion1] = request.name
                     it[referencia] = request.reference
                     it[codigoBarras] = request.barcode
+                    it[codigoBarras2] = request.barcode2 ?: ""
+                    it[codigoBarras3] = request.barcode3 ?: ""
+                    it[codDepartamento] = request.departmentId
+                    it[departamentoId] = request.departmentId
+                    it[seccionId] = request.sectionId
+                    it[familiaId] = request.familyId
+                    it[subfamiliaId] = request.subfamilyId
+                    it[marcaId] = request.brandId
+                    it[codLinea] = request.lineId
+                    it[lineaId] = request.lineId
                     it[precio1] = request.price1.toBigDecimal()
                     it[utilidad1] = request.utility1.toBigDecimal()
                     it[coniva1] = request.priceWithTax1.toBigDecimal()
@@ -281,9 +433,15 @@ class ItemsRepository {
                     it[precio3] = request.price3.toBigDecimal()
                     it[utilidad3] = request.utility3.toBigDecimal()
                     it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[precio4] = request.price4.toBigDecimal()
+                    it[utilidad4] = request.utility4.toBigDecimal()
+                    it[coniva4] = request.priceWithTax4.toBigDecimal()
+                    it[precio5] = request.price5.toBigDecimal()
+                    it[utilidad5] = request.utility5.toBigDecimal()
+                    it[coniva5] = request.priceWithTax5.toBigDecimal()
                     it[costoActual] = request.currentCost.toBigDecimal()
-                    it[montoExento] = request.isTaxExempt
-                    it[iva] = request.taxRate.toBigDecimal()
+                    it[montoExento] = !request.isTaxExempt
+                    it[iva] = if (request.isTaxExempt) BigDecimal.ZERO else request.taxRate.toBigDecimal()
                     // Solo VE
                     it[balanza] = request.isScale ?: false
                     it[idMonedaBase] = request.baseCurrencyId
@@ -295,6 +453,16 @@ class ItemsRepository {
                     it[descripcion1] = request.name
                     it[referencia] = request.reference
                     it[codigoBarras] = request.barcode
+                    it[codigoBarras2] = request.barcode2 ?: ""
+                    it[codigoBarras3] = request.barcode3 ?: ""
+                    it[codDepartamento] = request.departmentId
+                    it[departamentoId] = request.departmentId
+                    it[seccionId] = request.sectionId
+                    it[familiaId] = request.familyId
+                    it[subfamiliaId] = request.subfamilyId
+                    it[marcaId] = request.brandId
+                    it[codLinea] = request.lineId
+                    it[lineaId] = request.lineId
                     it[precio1] = request.price1.toBigDecimal()
                     it[utilidad1] = request.utility1.toBigDecimal()
                     it[coniva1] = request.priceWithTax1.toBigDecimal()
@@ -304,9 +472,15 @@ class ItemsRepository {
                     it[precio3] = request.price3.toBigDecimal()
                     it[utilidad3] = request.utility3.toBigDecimal()
                     it[coniva3] = request.priceWithTax3.toBigDecimal()
+                    it[precio4] = request.price4.toBigDecimal()
+                    it[utilidad4] = request.utility4.toBigDecimal()
+                    it[coniva4] = request.priceWithTax4.toBigDecimal()
+                    it[precio5] = request.price5.toBigDecimal()
+                    it[utilidad5] = request.utility5.toBigDecimal()
+                    it[coniva5] = request.priceWithTax5.toBigDecimal()
                     it[costoActual] = request.currentCost.toBigDecimal()
-                    it[montoExento] = request.isTaxExempt
-                    it[iva] = request.taxRate.toBigDecimal()
+                    it[montoExento] = !request.isTaxExempt
+                    it[iva] = if (request.isTaxExempt) BigDecimal.ZERO else request.taxRate.toBigDecimal()
                     // Solo PA
                     it[detallesKit] = request.kitDetails ?: "F"
                     it[idSegmentoGob] = request.governmentSegmentId
@@ -328,6 +502,17 @@ class ItemsRepository {
 
     private fun mapRowToProduct(row: ResultRow, countryCode: String): Product {
         val table = ItemsTableFactory.getTableForCountry(countryCode)
+        val storedTaxRate = row[table.iva].toDouble()
+        val hasTaxInPrices = listOf(
+            row[table.coniva1].toDouble() > row[table.precio1].toDouble(),
+            row[table.coniva2].toDouble() > row[table.precio2].toDouble(),
+            row[table.coniva3].toDouble() > row[table.precio3].toDouble(),
+            row[table.coniva4].toDouble() > row[table.precio4].toDouble(),
+            row[table.coniva5].toDouble() > row[table.precio5].toDouble(),
+        ).any { it }
+        val isExempt = storedTaxRate <= 0.0 && !hasTaxInPrices
+        val resolvedLineId = row[table.lineaId].takeIf { it > 0 } ?: row[table.codLinea]
+        val resolvedBrandId = row[table.marcaId].takeIf { it > 0 } ?: resolveBrandIdByLineId(resolvedLineId)
 
         return Product(
             id = row[table.idItem].toString(),
@@ -338,14 +523,14 @@ class ItemsRepository {
             barcode2 = row[table.codigoBarras2],
             barcode3 = row[table.codigoBarras3],
             photoUrl = row[table.foto] ?: "",
-            department = row[table.codDepartamento].toString(),
+            department = (row[table.departamentoId].takeIf { it > 0 } ?: row[table.codDepartamento]).toString(),
             section = row[table.seccionId].toString(),
             family = row[table.familiaId].toString(),
             subFamily = row[table.subfamiliaId].toString(),
-            brand = row[table.marcaId].toString(),
-            line = row[table.lineaId].toString(),
-            isExempt = row[table.montoExento],
-            taxRate = row[table.iva].toDouble(),
+            brand = resolvedBrandId.toString(),
+            line = resolvedLineId.toString(),
+            isExempt = isExempt,
+            taxRate = storedTaxRate,
             costActual = row[table.costoActual].toDouble(),
             costAverage = row[table.costoPromedio].toDouble(),
             costPrevious = row[table.costoAnterior].toDouble(),
@@ -365,33 +550,76 @@ class ItemsRepository {
     }
 
     private fun createPriceLevels(row: ResultRow, table: BaseItemsTable): List<com.amaxoniaerp.features.items.domain.PriceLevel> {
+        val storedTaxRate = row[table.iva].toDouble()
+        val hasTaxInPrices = listOf(
+            row[table.coniva1].toDouble() > row[table.precio1].toDouble(),
+            row[table.coniva2].toDouble() > row[table.precio2].toDouble(),
+            row[table.coniva3].toDouble() > row[table.precio3].toDouble(),
+            row[table.coniva4].toDouble() > row[table.precio4].toDouble(),
+            row[table.coniva5].toDouble() > row[table.precio5].toDouble(),
+        ).any { it }
+        val isExempt = storedTaxRate <= 0.0 && !hasTaxInPrices
         return listOf(
             com.amaxoniaerp.features.items.domain.PriceLevel(
                 label = "A",
                 price = row[table.precio1].toDouble(),
                 utilityPercent = row[table.utilidad1].toDouble(),
-                pricePlusUtility = row[table.precio1].toDouble() * (1 + row[table.utilidad1].toDouble() / 100),
-                pricePlusTax = row[table.coniva1].toDouble(),
+                pricePlusUtility = row[table.precio1].toDouble(),
+                pricePlusTax = if (isExempt) row[table.precio1].toDouble() else row[table.coniva1].toDouble(),
                 discountPercent = row[table.descuento1].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
                 label = "B",
                 price = row[table.precio2].toDouble(),
                 utilityPercent = row[table.utilidad2].toDouble(),
-                pricePlusUtility = row[table.precio2].toDouble() * (1 + row[table.utilidad2].toDouble() / 100),
-                pricePlusTax = row[table.coniva2].toDouble(),
+                pricePlusUtility = row[table.precio2].toDouble(),
+                pricePlusTax = if (isExempt) row[table.precio2].toDouble() else row[table.coniva2].toDouble(),
                 discountPercent = row[table.descuento2].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
                 label = "C",
                 price = row[table.precio3].toDouble(),
                 utilityPercent = row[table.utilidad3].toDouble(),
-                pricePlusUtility = row[table.precio3].toDouble() * (1 + row[table.utilidad3].toDouble() / 100),
-                pricePlusTax = row[table.coniva3].toDouble(),
+                pricePlusUtility = row[table.precio3].toDouble(),
+                pricePlusTax = if (isExempt) row[table.precio3].toDouble() else row[table.coniva3].toDouble(),
                 discountPercent = row[table.descuento3].toDouble()
+            ),
+            com.amaxoniaerp.features.items.domain.PriceLevel(
+                label = "D",
+                price = row[table.precio4].toDouble(),
+                utilityPercent = row[table.utilidad4].toDouble(),
+                pricePlusUtility = row[table.precio4].toDouble(),
+                pricePlusTax = if (isExempt) row[table.precio4].toDouble() else row[table.coniva4].toDouble(),
+                discountPercent = row[table.descuento4].toDouble()
+            ),
+            com.amaxoniaerp.features.items.domain.PriceLevel(
+                label = "E",
+                price = row[table.precio5].toDouble(),
+                utilityPercent = row[table.utilidad5].toDouble(),
+                pricePlusUtility = row[table.precio5].toDouble(),
+                pricePlusTax = if (isExempt) row[table.precio5].toDouble() else row[table.coniva5].toDouble(),
+                discountPercent = row[table.descuento5].toDouble()
             )
         )
     }
+}
+
+private fun listCatalogBySql(sql: String): List<Pair<Int, String>> {
+    return TransactionManager.current().exec(sql) { result ->
+        val list = mutableListOf<Pair<Int, String>>()
+        while (result.next()) {
+            list.add(result.getInt("id") to result.getString("name"))
+        }
+        list
+    } ?: emptyList()
+}
+
+private fun resolveBrandIdByLineId(lineId: Int): Int {
+    if (lineId <= 0) return 0
+    val sql = "SELECT marca FROM linea WHERE cod_linea = $lineId LIMIT 1"
+    return TransactionManager.current().exec(sql) { rs ->
+        if (rs.next()) rs.getInt("marca") else 0
+    } ?: 0
 }
 
 private fun isSaleWarehouse(tipo: String?): Boolean {

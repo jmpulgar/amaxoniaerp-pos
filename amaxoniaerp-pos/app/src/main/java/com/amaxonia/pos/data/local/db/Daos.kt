@@ -45,6 +45,8 @@ interface ProductDao {
             "OR description LIKE :query COLLATE NOCASE " +
             "OR reference LIKE :query COLLATE NOCASE " +
             "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE " +
             "ORDER BY description LIMIT :limit OFFSET :offset"
     )
     suspend fun searchPaged(query: String, limit: Int, offset: Int): List<ProductEntity>

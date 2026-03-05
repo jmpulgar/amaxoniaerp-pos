@@ -112,6 +112,8 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             // --- HEADER LOGO ---
+            Spacer(modifier = Modifier.weight(0.1f)) // Espacio superior dinámico
+            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -161,7 +163,7 @@ fun WelcomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .weight(1f) // Mantiene la responsividad principal
                     .pointerInput(images.size) {
                         var totalDrag = 0f
                         detectHorizontalDragGestures(
@@ -210,8 +212,6 @@ fun WelcomeScreen(
             )
 
             // --- INDICADOR ---
-            Spacer(modifier = Modifier.height(12.dp))
-
             HorizontalPagerIndicator(
                 count = images.size,
                 activeIndex = currentImage,
@@ -220,7 +220,7 @@ fun WelcomeScreen(
                 onSelect = { idx -> goTo(idx) }
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(0.15f))
 
             // --- BOTÓN INICIAR SESIÓN ---
             Button(

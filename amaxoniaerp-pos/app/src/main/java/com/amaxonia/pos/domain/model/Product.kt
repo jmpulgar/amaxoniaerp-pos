@@ -45,7 +45,7 @@ data class PriceLevel(
 )
 
 fun generateDefaultPrices(): List<PriceLevel> {
-    return listOf("A", "B", "C", "D", "E", "F").map {
+    return listOf("A", "B", "C", "D", "E").map {
         PriceLevel(label = it)
     }
 }

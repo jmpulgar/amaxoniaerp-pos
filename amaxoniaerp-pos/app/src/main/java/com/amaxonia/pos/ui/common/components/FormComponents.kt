@@ -116,12 +116,13 @@ fun AmaxoniaMoneyInput(
     label: String,
     value: Double,
     modifier: Modifier = Modifier,
+    showZero: Boolean = false,
     onValueChange: (Double) -> Unit
 ) {
     Column(modifier = modifier.padding(vertical = 6.dp)) {
         Text(label, fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
         OutlinedTextField(
-            value = if (value == 0.0) "" else value.toString(),
+            value = if (value == 0.0 && !showZero) "" else String.format("%.2f", value),
             onValueChange = { onValueChange(it.toDoubleOrNull() ?: 0.0) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(8.dp),

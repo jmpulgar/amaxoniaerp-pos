@@ -30,6 +30,61 @@ class OfflineFirstProductRepository(
         }
     }
 
+    override suspend fun getSections(departmentId: Int): Result<List<Department>> {
+        val token = localStore.readCompanySession()?.token
+            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        if (!networkMonitor.isOnline()) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return runCatching {
+            apiService.getSections(token, departmentId).map { Department(it.id, it.name) }
+        }
+    }
+
+    override suspend fun getFamilies(sectionId: Int): Result<List<Department>> {
+        val token = localStore.readCompanySession()?.token
+            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        if (!networkMonitor.isOnline()) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return runCatching {
+            apiService.getFamilies(token, sectionId).map { Department(it.id, it.name) }
+        }
+    }
+
+    override suspend fun getSubFamilies(familyId: Int): Result<List<Department>> {
+        val token = localStore.readCompanySession()?.token
+            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        if (!networkMonitor.isOnline()) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return runCatching {
+            apiService.getSubFamilies(token, familyId).map { Department(it.id, it.name) }
+        }
+    }
+
+    override suspend fun getBrands(): Result<List<Department>> {
+        val token = localStore.readCompanySession()?.token
+            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        if (!networkMonitor.isOnline()) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return runCatching {
+            apiService.getBrands(token).map { Department(it.id, it.name) }
+        }
+    }
+
+    override suspend fun getLines(brandId: Int): Result<List<Department>> {
+        val token = localStore.readCompanySession()?.token
+            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        if (!networkMonitor.isOnline()) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return runCatching {
+            apiService.getLines(token, brandId).map { Department(it.id, it.name) }
+        }
+    }
+
     override suspend fun getAllProducts(page: Int, pageSize: Int): Result<List<Product>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
@@ -80,8 +135,22 @@ class OfflineFirstProductRepository(
     }
 
     override suspend fun getProductById(id: String): Result<Product> {
-        val product = productDao.getById(id)
-        return if (product != null) Result.success(product.toDomain()) else {
+        val token = localStore.readCompanySession()?.token
+        val cachedProduct = productDao.getById(id)?.toDomain()
+
+        if (!token.isNullOrBlank() && networkMonitor.isOnline()) {
+            return runCatching {
+                val remoteProduct = apiService.getProductById(token, id)
+                productDao.insertAll(listOf(remoteProduct.toEntity()))
+                remoteProduct.toDomain()
+            }.recoverCatching {
+                cachedProduct ?: throw it
+            }
+        }
+
+        return if (cachedProduct != null) {
+            Result.success(cachedProduct)
+        } else {
             Result.failure(IllegalArgumentException("Producto no encontrado"))
         }
     }

@@ -34,6 +34,7 @@ abstract class BaseItemsTable(tableName: String = "item") : Table(tableName) {
     val familiaId = integer("familia_id").default(0)
     val subfamiliaId = integer("subfamilia_id").default(0)
     val marcaId = integer("marca_id").default(0)
+    val codLinea = integer("cod_linea").default(0)
     val lineaId = integer("linea_id").default(0)
     val origenId = integer("origen_id").default(0)
     val tipoId = integer("tipo_id").default(0)
@@ -65,6 +66,18 @@ abstract class BaseItemsTable(tableName: String = "item") : Table(tableName) {
     val utilidad3 = decimal("utilidad3", 10, 2).default(0.0.toBigDecimal())
     val coniva3 = decimal("coniva3", 10, 2).default(0.0.toBigDecimal())
     val descuento3 = decimal("descuento3", 10, 2).default(0.0.toBigDecimal())
+
+    // Precios nivel 4
+    val precio4 = decimal("precio4", 10, 2).default(0.0.toBigDecimal())
+    val utilidad4 = decimal("utilidad4", 10, 2).default(0.0.toBigDecimal())
+    val coniva4 = decimal("coniva4", 10, 2).default(0.0.toBigDecimal())
+    val descuento4 = decimal("descuento4", 10, 2).default(0.0.toBigDecimal())
+
+    // Precios nivel 5
+    val precio5 = decimal("precio5", 10, 2).default(0.0.toBigDecimal())
+    val utilidad5 = decimal("utilidad5", 10, 2).default(0.0.toBigDecimal())
+    val coniva5 = decimal("coniva5", 10, 2).default(0.0.toBigDecimal())
+    val descuento5 = decimal("descuento5", 10, 2).default(0.0.toBigDecimal())
 
     // Estado
     val estatus = varchar("estatus", 1).default("A")

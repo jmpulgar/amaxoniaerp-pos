@@ -15,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashLogger.setup(this)
         DependencyContainer.initialize(applicationContext)
         enableEdgeToEdge()
 
