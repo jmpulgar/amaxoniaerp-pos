@@ -102,5 +102,5 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.material.icons.extended)
     implementation("io.coil-kt:coil-compose:2.5.0")
-    implementation(files("libs/HKACryptoLib21112025.aar"))
+    implementation(files("libs/HKACryptoLib03022026.aar"))
 }
