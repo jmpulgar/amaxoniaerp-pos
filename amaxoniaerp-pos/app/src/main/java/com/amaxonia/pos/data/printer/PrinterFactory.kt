@@ -34,7 +34,10 @@ class PrinterFactory(
             if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
             // Atrapar Throwable para evitar crashes de bajo nivel como NoClassDefFoundError en Android 10
             theFactoryPrinterInstance = try {
-                TheFactoryPrinterImpl(appContext)
+                TheFactoryPrinterImpl(
+                    context = appContext,
+                    localStore = localStore
+                )
             } catch (t: Throwable) {
                 null
             }

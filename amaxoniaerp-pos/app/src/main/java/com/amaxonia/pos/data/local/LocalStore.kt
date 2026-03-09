@@ -15,6 +15,7 @@ import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -34,6 +35,9 @@ class LocalStore(
     private val clientsKey = stringPreferencesKey("clients_cache")
     private val selectedCountryKey = stringPreferencesKey("selected_country_code")
     private val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
+    private val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
+    private val theFactoryPortKey = stringPreferencesKey("the_factory_port")
+    private val theFactoryModeKey = stringPreferencesKey("the_factory_mode")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
 
     suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
@@ -159,6 +163,28 @@ class LocalStore(
             prefs[selectedPrinterTypeKey]
                 ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
                 ?: PrinterType.NONE
+        }
+    }
+
+    suspend fun saveTheFactorySettings(settings: TheFactorySettings) {
+        context.dataStore.edit { prefs ->
+            prefs[theFactoryIpKey] = settings.ipAddress.trim()
+            prefs[theFactoryPortKey] = settings.port.trim()
+            prefs[theFactoryModeKey] = settings.openMode.trim()
+        }
+    }
+
+    suspend fun readTheFactorySettings(): TheFactorySettings {
+        return theFactorySettingsFlow().first()
+    }
+
+    fun theFactorySettingsFlow(): Flow<TheFactorySettings> {
+        return context.dataStore.data.map { prefs ->
+            TheFactorySettings(
+                ipAddress = prefs[theFactoryIpKey].orEmpty(),
+                port = prefs[theFactoryPortKey].orEmpty(),
+                openMode = prefs[theFactoryModeKey].orEmpty()
+            )
         }
     }
 

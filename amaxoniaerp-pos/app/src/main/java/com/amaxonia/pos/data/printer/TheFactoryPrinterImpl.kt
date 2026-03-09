@@ -2,16 +2,20 @@ package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import android.content.Intent
+import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
 class TheFactoryPrinterImpl(
-    context: Context
+    context: Context,
+    private val localStore: LocalStore
 ) : PrinterRepository {
 
     private val appContext = context.applicationContext
@@ -22,24 +26,42 @@ class TheFactoryPrinterImpl(
             runCatching {
                 val packageName = resolveInstalledPackage()
                     ?: throw IllegalStateException("No se encontro la app fiscal The Factory HKA instalada")
+                val settings = localStore.readTheFactorySettings()
+                validateSettings(settings)
 
                 val encryptedCommand = encryptCommand(buildCommandEnvelope(transaction))
-                val printIntent = Intent().apply {
-                    // La app fiscal espera que se invoque directamente su HomeActivity
-                    // (com.thefactory.hkapos.ui.main.HomeActivity) y no solo el launcher.
-                    setClassName(packageName, HOME_ACTIVITY_CLASS)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    putExtra(EXTRA_COMMAND_RAPID_PAY, encryptedCommand)
-                    putExtra(EXTRA_COLOR_BACKGROUND_LOADING, COLOR_PRIMARY)
-                    putExtra(EXTRA_COLOR_TEXT, COLOR_WHITE)
-                    putExtra(EXTRA_MESSAGE_PROGRESS, PRINTING_MESSAGE)
+                withContext(Dispatchers.Main) {
+                    appContext.startActivity(buildInitializationIntent(packageName, settings))
                 }
+                delay(INITIALIZATION_DELAY_MS)
 
                 withContext(Dispatchers.Main) {
-                    appContext.startActivity(printIntent)
+                    appContext.startActivity(buildPrintIntent(packageName, encryptedCommand))
                 }
                 true
             }
+        }
+    }
+
+    private fun buildInitializationIntent(packageName: String, settings: TheFactorySettings): Intent {
+        return Intent().apply {
+            setClassName(packageName, SPLASH_ACTIVITY_CLASS)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(EXTRA_PACKAGE_NAME, appContext.packageName)
+            putExtra(EXTRA_IP_CLIENT, settings.ipAddress)
+            putExtra(EXTRA_PORT_CLIENT, settings.port)
+            putExtra(EXTRA_OPEN_MODE, settings.openMode)
+        }
+    }
+
+    private fun buildPrintIntent(packageName: String, encryptedCommand: ByteArray): Intent {
+        return Intent().apply {
+            setClassName(packageName, HOME_ACTIVITY_CLASS)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(EXTRA_COMMAND_RAPID_PAY, encryptedCommand)
+            putExtra(EXTRA_COLOR_BACKGROUND_LOADING, COLOR_PRIMARY)
+            putExtra(EXTRA_COLOR_TEXT, COLOR_WHITE)
+            putExtra(EXTRA_MESSAGE_PROGRESS, PRINTING_MESSAGE)
         }
     }
 
@@ -144,6 +166,15 @@ class TheFactoryPrinterImpl(
         return response.bytes ?: throw IllegalStateException("Respuesta de cifrado invalida")
     }
 
+    private fun validateSettings(settings: TheFactorySettings) {
+        if (!settings.isConfigured()) {
+            throw IllegalStateException("Configura la IP y el puerto de The Factory HKA antes de imprimir")
+        }
+        if (settings.port.toIntOrNull() == null) {
+            throw IllegalStateException("El puerto configurado para The Factory HKA no es valido")
+        }
+    }
+
     private fun sanitizeText(value: String, maxLength: Int): String {
         return value
             .uppercase()
@@ -166,8 +197,13 @@ class TheFactoryPrinterImpl(
             "com.thefactory.hkapos.fiscal.demo.demo"
         )
 
+        const val SPLASH_ACTIVITY_CLASS = "com.thefactory.hkapos.ui.Splash"
         const val HOME_ACTIVITY_CLASS = "com.thefactory.hkapos.ui.main.HomeActivity"
 
+        const val EXTRA_PACKAGE_NAME = "packageName"
+        const val EXTRA_IP_CLIENT = "ipClient"
+        const val EXTRA_PORT_CLIENT = "portClient"
+        const val EXTRA_OPEN_MODE = "openMode"
         const val EXTRA_COMMAND_RAPID_PAY = "commandRapidPay"
         const val EXTRA_COLOR_BACKGROUND_LOADING = "colorBackgroundLoading"
         const val EXTRA_COLOR_TEXT = "colorText"
@@ -176,5 +212,6 @@ class TheFactoryPrinterImpl(
         const val COLOR_PRIMARY = "#1565C0"
         const val COLOR_WHITE = "#FFFFFFFF"
         const val PRINTING_MESSAGE = "Imprimiendo recibo..."
+        const val INITIALIZATION_DELAY_MS = 500L
     }
 }
