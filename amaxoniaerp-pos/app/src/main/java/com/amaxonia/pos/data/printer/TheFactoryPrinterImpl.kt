@@ -3,6 +3,7 @@ package com.amaxonia.pos.data.printer
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
@@ -89,7 +90,7 @@ class TheFactoryPrinterImpl(
         lines += "3"
 
         // 6. Payment close command
-        lines += mapPaymentCommand(transaction.formaPago)
+        lines += resolvePaymentCommand(transaction.paymentMethods, transaction.formaPago)
 
         return lines
     }
@@ -103,13 +104,25 @@ class TheFactoryPrinterImpl(
      * 104 = Other (transfer, check, etc.)
      * 199 = Unspecified
      */
+    private fun resolvePaymentCommand(paymentMethods: List<TransactionPaymentMethod>, formaPago: String): String {
+        paymentMethods
+            .maxByOrNull { it.amount }
+            ?.fiscalCode
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+
+        return mapPaymentCommand(formaPago)
+    }
+
     private fun mapPaymentCommand(formaPago: String): String {
         val normalized = formaPago.lowercase().trim()
         return when {
-            normalized.contains("efectivo") || normalized.contains("contado") -> "101"
-            normalized.contains("debito") || normalized.contains("debit") -> "102"
+            normalized.contains("efectivo") || normalized.contains("contado") || normalized.contains("divisa") -> "101"
+            normalized.contains("punto de venta") || normalized.contains("debito") || normalized.contains("debit") -> "102"
             normalized.contains("credito") || normalized.contains("credit") || normalized.contains("tarjeta") -> "103"
-            normalized.contains("transfer") || normalized.contains("cheque") || normalized.contains("deposito") -> "104"
+            normalized.contains("transfer") || normalized.contains("cheque") || normalized.contains("deposito") ||
+                normalized.contains("zelle") || normalized.contains("pago movil") || normalized.contains("yappy") ||
+                normalized.contains("nequi") || normalized.contains("solutech") || normalized.contains("sunmi") -> "104"
             normalized.isBlank() -> "101" // Default to cash
             else -> "199" // Unspecified
         }

@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.common
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.printer.PrinterFactory
+import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.remote.ApiClient
@@ -81,6 +82,11 @@ object DependencyContainer {
     val printerFactory: PrinterFactory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
         PrinterFactory(appContext, localStore)
+    }
+
+    val theFactoryRapidPayClient: TheFactoryRapidPayClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
+        TheFactoryRapidPayClient(appContext, localStore)
     }
 
     fun initialize(context: Context) {

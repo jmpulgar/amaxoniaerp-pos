@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.printer.PrinterFactory
+import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormaPagoDetalle
@@ -39,7 +41,8 @@ class PaymentViewModel(
     private val cartRepository: CartRepository,
     private val salesRepository: SalesRepository,
     private val localStore: LocalStore,
-    private val printerFactory: PrinterFactory
+    private val printerFactory: PrinterFactory,
+    private val rapidPayClient: TheFactoryRapidPayClient
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PaymentState())
@@ -157,6 +160,7 @@ class PaymentViewModel(
         }
 
         val formapagoDetalle = buildFormapagoDetalle(currentState)
+        val selectedPaymentMethods = buildSelectedPaymentMethods(currentState, formapagoDetalle.detalle)
         if (formapagoDetalle.detalle.isEmpty()) {
             _state.update { it.copy(paymentError = "Debes indicar al menos una forma de pago valida") }
             return
@@ -300,6 +304,18 @@ class PaymentViewModel(
                 )
             }
 
+            val gatewayResult = processGatewayPaymentsIfNeeded(selectedPaymentMethods)
+            if (gatewayResult.isFailure) {
+                _state.update {
+                    it.copy(
+                        isProcessingPayment = false,
+                        paymentError = gatewayResult.exceptionOrNull()?.message
+                            ?: "No se pudo completar el cobro en The Factory"
+                    )
+                }
+                return@launch
+            }
+
             val montosPorTipo = payments.groupBy { it.tipoMovimiento }
                 .mapValues { (_, list) -> list.sumOf { it.monto } }
 
@@ -375,6 +391,16 @@ class PaymentViewModel(
             val dateHeaderFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy")
             val now = LocalDateTime.now()
 
+            val methods = payments
+                .mapNotNull { payment ->
+                    currentState.formasPago.firstOrNull { it.idFormaPago == payment.idFormaPago }
+                        ?.descripcion
+                        ?.takeIf { it.isNotBlank() }
+                        ?: payment.tipoMovimiento
+                }
+                .distinct()
+                .joinToString(" + ")
+
             val newTransaction = Transaction(
                 id = UUID.randomUUID().toString(),
                 invoiceNumber = response.codFactura,
@@ -382,7 +408,11 @@ class PaymentViewModel(
                 amount = Money.toDouble(currentState.totalAmountMoney),
                 currency = "USD",
                 status = TransactionStatus.PAID,
-                dateHeader = now.format(dateHeaderFormatter)
+                dateHeader = now.format(dateHeaderFormatter),
+                clienteNombre = "${selectedClient.firstName} ${selectedClient.lastName}".trim(),
+                clienteIdentificacion = selectedClient.ruc.ifBlank { selectedClient.cedula },
+                formaPago = methods,
+                paymentMethods = selectedPaymentMethods
             )
 
             transactionRepository.saveTransaction(newTransaction).onFailure { saveError ->
@@ -395,16 +425,6 @@ class PaymentViewModel(
                 }
                 return@launch
             }
-
-            val methods = payments
-                .mapNotNull { payment ->
-                    currentState.formasPago.firstOrNull { it.idFormaPago == payment.idFormaPago }
-                        ?.descripcion
-                        ?.takeIf { it.isNotBlank() }
-                        ?: payment.tipoMovimiento
-                }
-                .distinct()
-                .joinToString(" + ")
 
             val printFeedback = printReceiptIfConfigured(newTransaction)
 
@@ -512,6 +532,81 @@ class PaymentViewModel(
             totalizarMontoOtros = Money.toDouble(totalOtros),
             detalle = detalle
         )
+    }
+
+    private fun buildSelectedPaymentMethods(
+        state: PaymentState,
+        detalle: List<FormaPagoDetalle>
+    ): List<TransactionPaymentMethod> {
+        return detalle.mapNotNull { item ->
+            val forma = state.formasPago.firstOrNull { it.idFormaPago == item.idFormaPago } ?: return@mapNotNull null
+            TransactionPaymentMethod(
+                description = forma.descripcion.orEmpty(),
+                sigla = forma.siglas.orEmpty(),
+                amount = item.monto,
+                fiscalCode = resolveFiscalPaymentCode(forma),
+                gatewayCommandPrefix = resolveGatewayPaymentPrefix(forma)
+            )
+        }
+    }
+
+    private suspend fun processGatewayPaymentsIfNeeded(paymentMethods: List<TransactionPaymentMethod>): Result<Unit> {
+        paymentMethods
+            .filter(::requiresRapidPay)
+            .forEach { method ->
+                val result = rapidPayClient.charge(
+                    amount = method.amount,
+                    commandPrefix = method.gatewayCommandPrefix
+                )
+                if (!result.approved) {
+                    return Result.failure(IllegalStateException(result.message))
+                }
+            }
+        return Result.success(Unit)
+    }
+
+    private fun requiresRapidPay(method: TransactionPaymentMethod): Boolean {
+        return method.gatewayCommandPrefix.isNotBlank()
+    }
+
+    private fun resolveGatewayPaymentPrefix(forma: FormaPago): String {
+        val normalized = listOf(
+            forma.descripcion.orEmpty(),
+            forma.siglas.orEmpty(),
+            forma.codigo.orEmpty()
+        ).joinToString(" ").lowercase()
+
+        return when {
+            normalized.contains("punto de venta") -> "KRV"
+            normalized.contains("debito") || normalized == "pv" || normalized.contains(" tdc") || normalized.startsWith("tdc") -> "KRV"
+            normalized.contains("credito") -> "KRV"
+            else -> ""
+        }
+    }
+
+    private fun resolveFiscalPaymentCode(forma: FormaPago): String {
+        forma.formaPagoFact
+            ?.trim()
+            ?.takeIf { it in setOf("101", "102", "103", "104", "199") }
+            ?.let { return it }
+
+        val normalized = listOf(
+            forma.descripcion.orEmpty(),
+            forma.siglas.orEmpty(),
+            forma.codigo.orEmpty()
+        ).joinToString(" ").lowercase()
+
+        return when {
+            normalized.contains("punto de venta") -> "102"
+            normalized.contains("debito") || normalized == "pv" || normalized.contains(" tdc") || normalized.startsWith("tdc") -> "102"
+            normalized.contains("credito") -> "103"
+            normalized.contains("efectivo") || normalized.contains("cash") || normalized.contains("divisa") -> "101"
+            normalized.contains("transfer") || normalized.contains("deposit") || normalized.contains("cheque") ||
+                normalized.contains("zelle") || normalized.contains("pago movil") || normalized.contains("yappy") ||
+                normalized.contains("nequi") || normalized.contains("solutech") || normalized.contains("sunmi") ||
+                normalized.contains("retencion") || normalized.contains("puntos") || normalized.contains("anticipo") -> "104"
+            else -> "199"
+        }
     }
 }
 

@@ -17,4 +17,13 @@ data class Transaction(
     val clienteNombre: String = "",
     val clienteIdentificacion: String = "",
     val formaPago: String = "",
+    val paymentMethods: List<TransactionPaymentMethod> = emptyList(),
+)
+
+data class TransactionPaymentMethod(
+    val description: String = "",
+    val sigla: String = "",
+    val amount: Double = 0.0,
+    val fiscalCode: String = "",
+    val gatewayCommandPrefix: String = ""
 )

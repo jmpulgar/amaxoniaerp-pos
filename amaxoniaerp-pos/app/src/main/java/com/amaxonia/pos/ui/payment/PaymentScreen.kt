@@ -60,7 +60,8 @@ fun PaymentScreen(
             cartRepository = DependencyContainer.cartRepository,
             salesRepository = DependencyContainer.salesRepository,
             localStore = DependencyContainer.localStore,
-            printerFactory = DependencyContainer.printerFactory
+            printerFactory = DependencyContainer.printerFactory,
+            rapidPayClient = DependencyContainer.theFactoryRapidPayClient
         )
     }
 
