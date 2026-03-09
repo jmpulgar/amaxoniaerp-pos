@@ -1,16 +1,16 @@
 package com.amaxonia.pos.data.printer
 
 import android.content.Context
-import android.content.Intent
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.net.InetSocketAddress
+import java.net.Socket
 import kotlin.math.roundToInt
 
 class TheFactoryPrinterImpl(
@@ -24,60 +24,27 @@ class TheFactoryPrinterImpl(
     override suspend fun printReceipt(transaction: Transaction): Result<Boolean> {
         return withContext(Dispatchers.IO) {
             runCatching {
-                val packageName = resolveInstalledPackage()
-                    ?: throw IllegalStateException("No se encontro la app fiscal The Factory HKA instalada")
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
 
-                val encryptedCommand = encryptCommand(buildCommandEnvelope(transaction))
-                withContext(Dispatchers.Main) {
-                    appContext.startActivity(buildInitializationIntent(packageName, settings))
-                }
-                delay(INITIALIZATION_DELAY_MS)
-
-                withContext(Dispatchers.Main) {
-                    appContext.startActivity(buildPrintIntent(packageName, encryptedCommand))
+                buildFiscalCommands(transaction).forEach { command ->
+                    sendTcpCommand(
+                        ipAddress = settings.ipAddress,
+                        port = settings.port.toInt(),
+                        command = command
+                    )
                 }
                 true
             }
         }
     }
 
-    private fun buildInitializationIntent(packageName: String, settings: TheFactorySettings): Intent {
-        return Intent().apply {
-            setClassName(packageName, SPLASH_ACTIVITY_CLASS)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(EXTRA_PACKAGE_NAME, appContext.packageName)
-            putExtra(EXTRA_IP_CLIENT, settings.ipAddress)
-            putExtra(EXTRA_PORT_CLIENT, settings.port)
-            putExtra(EXTRA_OPEN_MODE, settings.openMode)
-        }
-    }
-
-    private fun buildPrintIntent(packageName: String, encryptedCommand: ByteArray): Intent {
-        return Intent().apply {
-            setClassName(packageName, HOME_ACTIVITY_CLASS)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(EXTRA_COMMAND_RAPID_PAY, encryptedCommand)
-            putExtra(EXTRA_COLOR_BACKGROUND_LOADING, COLOR_PRIMARY)
-            putExtra(EXTRA_COLOR_TEXT, COLOR_WHITE)
-            putExtra(EXTRA_MESSAGE_PROGRESS, PRINTING_MESSAGE)
-        }
-    }
-
-    private fun buildCommandEnvelope(transaction: Transaction): String {
-        val command = buildFiscalCommand(transaction)
-        return JSONObject()
-            .put("cmd", command)
-            .toString()
-    }
-
     /**
-     * Builds the fiscal command string for The Factory HKA protocol.
+     * Builds the fiscal command list for The Factory HKA protocol.
      *
      * Protocol commands:
-     * - "iF*{invoice}" — fiscal invoice header (sets invoice number)
-     * - "i0{clientId}" — customer identification (RIF/cedula)
+     * - "iR*{clientId}" — customer tax id / identification
+     * - "iS*{clientName}" — customer name
      * - "@{text}"      — free text / comment line (non-fiscal)
      * - " {amount}{qty}{description}" — item line (space prefix = taxable item)
      *     - amount: price in cents, padded to 8 digits
@@ -90,7 +57,7 @@ class TheFactoryPrinterImpl(
      * - "104" — close with other payment method
      * - "199" — close without specifying payment method
      */
-    private fun buildFiscalCommand(transaction: Transaction): String {
+    private fun buildFiscalCommands(transaction: Transaction): List<String> {
         val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
         val description = sanitizeText("VENTA $invoice", maxLength = 30)
         val amountField = formatAmount(transaction.amount.coerceAtLeast(0.01))
@@ -99,21 +66,21 @@ class TheFactoryPrinterImpl(
 
         val lines = mutableListOf<String>()
 
-        // 1. Invoice header
-        lines += "iF*$invoice"
-
-        // 2. Customer identification (if available)
+        // 1. Customer identification (if available)
         val clientId = sanitizeText(transaction.clienteIdentificacion, maxLength = 20)
         if (clientId.isNotBlank()) {
-            lines += "i0$clientId"
+            lines += "iR*$clientId"
+        }
+
+        // 2. Customer name (if available)
+        val clientName = sanitizeText(transaction.clienteNombre, maxLength = 30)
+        if (clientName.isNotBlank()) {
+            lines += "iS*$clientName"
         }
 
         // 3. Comment lines
         lines += "@AMAXONIA POS"
-        val clientName = sanitizeText(transaction.clienteNombre, maxLength = 30)
-        if (clientName.isNotBlank()) {
-            lines += "@CLIENTE $clientName"
-        }
+        lines += "@$description"
 
         // 4. Item line
         lines += itemLine
@@ -124,7 +91,7 @@ class TheFactoryPrinterImpl(
         // 6. Payment close command
         lines += mapPaymentCommand(transaction.formaPago)
 
-        return lines.joinToString(separator = "\n")
+        return lines
     }
 
     /**
@@ -158,12 +125,54 @@ class TheFactoryPrinterImpl(
             .padStart(8, '0')
     }
 
-    private fun encryptCommand(jsonCommand: String): ByteArray {
-        val response = cryptography.encryptString(jsonCommand)
+    private fun encryptCommand(command: String): ByteArray {
+        val response = cryptography.encryptString(command)
         if (response.isError) {
             throw IllegalStateException(response.message ?: "No se pudo encriptar el comando para impresion")
         }
         return response.bytes ?: throw IllegalStateException("Respuesta de cifrado invalida")
+    }
+
+    private fun sendTcpCommand(ipAddress: String, port: Int, command: String) {
+        Socket().use { socket ->
+            socket.soTimeout = SOCKET_TIMEOUT_MS
+            socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
+            val outputStream = socket.getOutputStream()
+            outputStream.write(encryptCommand(command))
+            outputStream.flush()
+
+            val response = readSocketResponse(socket)
+            if (!isSuccessfulResponse(response)) {
+                throw IllegalStateException(
+                    "The Factory rechazo el comando fiscal '${command.take(12)}'"
+                )
+            }
+        }
+    }
+
+    private fun readSocketResponse(socket: Socket): ByteArray {
+        val inputStream = socket.getInputStream()
+        val buffer = ByteArray(1024)
+        val output = ByteArrayOutputStream()
+
+        while (true) {
+            val bytesRead = inputStream.read(buffer)
+            if (bytesRead == -1) break
+            val firstByte = buffer[0].toInt()
+            val offset = if (firstByte in 6..15) 0 else 1
+            val length = (bytesRead - offset).coerceAtLeast(0)
+            if (length > 0) {
+                output.write(buffer, offset, length)
+            }
+        }
+
+        return output.toByteArray()
+    }
+
+    private fun isSuccessfulResponse(response: ByteArray): Boolean {
+        if (response.isEmpty()) return false
+        val firstByte = response.first().toInt()
+        return firstByte == ACK || firstByte == ENQ || firstByte == NUL || response.size > 10
     }
 
     private fun validateSettings(settings: TheFactorySettings) {
@@ -182,36 +191,11 @@ class TheFactoryPrinterImpl(
             .trim()
             .take(maxLength)
     }
-
-    private fun resolveInstalledPackage(): String? {
-        return PACKAGE_CANDIDATES.firstOrNull { packageName ->
-            appContext.packageManager.getLaunchIntentForPackage(packageName) != null
-        }
-    }
-
     private companion object {
-        val PACKAGE_CANDIDATES = listOf(
-            "com.thefactory.hkapos.fiscal.demo",
-            "com.thefactory.hkapos.fiscal",
-            "com.thefactory.hkapos.fiscal.release",
-            "com.thefactory.hkapos.fiscal.demo.demo"
-        )
-
-        const val SPLASH_ACTIVITY_CLASS = "com.thefactory.hkapos.ui.Splash"
-        const val HOME_ACTIVITY_CLASS = "com.thefactory.hkapos.ui.main.HomeActivity"
-
-        const val EXTRA_PACKAGE_NAME = "packageName"
-        const val EXTRA_IP_CLIENT = "ipClient"
-        const val EXTRA_PORT_CLIENT = "portClient"
-        const val EXTRA_OPEN_MODE = "openMode"
-        const val EXTRA_COMMAND_RAPID_PAY = "commandRapidPay"
-        const val EXTRA_COLOR_BACKGROUND_LOADING = "colorBackgroundLoading"
-        const val EXTRA_COLOR_TEXT = "colorText"
-        const val EXTRA_MESSAGE_PROGRESS = "messageRapidPay"
-
-        const val COLOR_PRIMARY = "#1565C0"
-        const val COLOR_WHITE = "#FFFFFFFF"
-        const val PRINTING_MESSAGE = "Imprimiendo recibo..."
-        const val INITIALIZATION_DELAY_MS = 500L
+        const val CONNECT_TIMEOUT_MS = 3000
+        const val SOCKET_TIMEOUT_MS = 10000
+        const val NUL = 0
+        const val ENQ = 5
+        const val ACK = 6
     }
 }
