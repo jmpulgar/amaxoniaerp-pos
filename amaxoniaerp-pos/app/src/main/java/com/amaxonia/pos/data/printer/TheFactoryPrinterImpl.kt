@@ -23,11 +23,11 @@ class TheFactoryPrinterImpl(
                 val packageName = resolveInstalledPackage()
                     ?: throw IllegalStateException("No se encontro la app fiscal The Factory HKA instalada")
 
-                val baseIntent = appContext.packageManager.getLaunchIntentForPackage(packageName)
-                    ?: throw IllegalStateException("No se pudo abrir la app fiscal The Factory HKA")
-
                 val encryptedCommand = encryptCommand(buildCommandEnvelope(transaction))
-                val printIntent = Intent(baseIntent).apply {
+                val printIntent = Intent().apply {
+                    // La app fiscal espera que se invoque directamente su HomeActivity
+                    // (com.thefactory.hkapos.ui.main.HomeActivity) y no solo el launcher.
+                    setClassName(packageName, HOME_ACTIVITY_CLASS)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra(EXTRA_COMMAND_RAPID_PAY, encryptedCommand)
                     putExtra(EXTRA_COLOR_BACKGROUND_LOADING, COLOR_PRIMARY)
@@ -165,6 +165,8 @@ class TheFactoryPrinterImpl(
             "com.thefactory.hkapos.fiscal.release",
             "com.thefactory.hkapos.fiscal.demo.demo"
         )
+
+        const val HOME_ACTIVITY_CLASS = "com.thefactory.hkapos.ui.main.HomeActivity"
 
         const val EXTRA_COMMAND_RAPID_PAY = "commandRapidPay"
         const val EXTRA_COLOR_BACKGROUND_LOADING = "colorBackgroundLoading"
