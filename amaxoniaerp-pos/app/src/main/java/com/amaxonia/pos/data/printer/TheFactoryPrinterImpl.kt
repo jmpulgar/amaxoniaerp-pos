@@ -163,20 +163,32 @@ class TheFactoryPrinterImpl(
         }
     }
 
+    /**
+     * Reads the response from the HKA device.
+     *
+     * The device does NOT close the connection after responding, so we cannot
+     * loop until EOF (-1). Instead we rely on a short read-timeout: read
+     * available data and return once the device stops sending.
+     * This matches the behaviour of the SDK's ResponseSocket.getResponse().
+     */
     private fun readSocketResponse(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(1024)
+        val buffer = ByteArray(4096)
         val output = ByteArrayOutputStream()
 
-        while (true) {
-            val bytesRead = inputStream.read(buffer)
-            if (bytesRead == -1) break
-            val firstByte = buffer[0].toInt()
-            val offset = if (firstByte in 6..15) 0 else 1
-            val length = (bytesRead - offset).coerceAtLeast(0)
-            if (length > 0) {
-                output.write(buffer, offset, length)
+        val originalTimeout = socket.soTimeout
+        socket.soTimeout = READ_CHUNK_TIMEOUT_MS
+
+        try {
+            while (true) {
+                val bytesRead = inputStream.read(buffer)
+                if (bytesRead == -1) break
+                output.write(buffer, 0, bytesRead)
             }
+        } catch (_: java.net.SocketTimeoutException) {
+            // Expected: device stopped sending — we have the full response
+        } finally {
+            socket.soTimeout = originalTimeout
         }
 
         return output.toByteArray()
@@ -207,6 +219,8 @@ class TheFactoryPrinterImpl(
     private companion object {
         const val CONNECT_TIMEOUT_MS = 3000
         const val SOCKET_TIMEOUT_MS = 10000
+        /** Short timeout to detect end-of-response (device stops sending). */
+        const val READ_CHUNK_TIMEOUT_MS = 2000
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
