@@ -673,7 +673,3 @@ class PaymentViewModel(
         }
     }
 }
-
-private fun BigDecimal.coerceAtLeast(min: BigDecimal): BigDecimal {
-    return if (this < min) min else this
-}
