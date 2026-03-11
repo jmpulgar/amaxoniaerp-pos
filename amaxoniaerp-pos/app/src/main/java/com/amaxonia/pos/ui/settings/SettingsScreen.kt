@@ -19,9 +19,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -73,7 +75,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = injectedViewModel {
-        SettingsViewModel(DependencyContainer.localStore)
+        SettingsViewModel(DependencyContainer.localStore, DependencyContainer.hkaConnectionHelper)
     }
 ) {
     val selectedPrinterType by viewModel.selectedPrinterType.collectAsState()
@@ -84,6 +86,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var isTestingPrint by remember { mutableStateOf(false) }
     var isSavingTheFactorySettings by remember { mutableStateOf(false) }
+    var isTestingConnection by remember { mutableStateOf(false) }
+    var isCheckingStatus by remember { mutableStateOf(false) }
 
     LaunchedEffect(errorMessage) {
         val message = errorMessage ?: return@LaunchedEffect
@@ -269,6 +273,86 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                             }
                             Text(if (isSavingTheFactorySettings) "Guardando..." else "Guardar configuracion HKA")
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // --- Verificar Conexion & Verificar Estado ---
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Verificar Conexion
+                            Button(
+                                onClick = {
+                                    isTestingConnection = true
+                                    scope.launch {
+                                        viewModel.persistTheFactorySettings()
+                                        val msg = viewModel.testHkaConnection()
+                                        snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+                                        isTestingConnection = false
+                                    }
+                                },
+                                enabled = !isTestingConnection,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                if (isTestingConnection) {
+                                    CircularProgressIndicator(
+                                        color = MaterialTheme.colorScheme.onTertiary,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Rounded.Wifi,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Conexion", fontSize = 13.sp)
+                                }
+                            }
+
+                            // Verificar Estado
+                            Button(
+                                onClick = {
+                                    isCheckingStatus = true
+                                    scope.launch {
+                                        viewModel.persistTheFactorySettings()
+                                        val msg = viewModel.checkHkaPrinterStatus()
+                                        snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
+                                        isCheckingStatus = false
+                                    }
+                                },
+                                enabled = !isCheckingStatus,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                if (isCheckingStatus) {
+                                    CircularProgressIndicator(
+                                        color = MaterialTheme.colorScheme.onSecondary,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Rounded.Info,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Estado", fontSize = 13.sp)
+                                }
+                            }
                         }
                     }
                 }

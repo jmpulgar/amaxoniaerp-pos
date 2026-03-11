@@ -97,7 +97,6 @@ fun PaymentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .navigationBarsPadding()
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Total a Pagar

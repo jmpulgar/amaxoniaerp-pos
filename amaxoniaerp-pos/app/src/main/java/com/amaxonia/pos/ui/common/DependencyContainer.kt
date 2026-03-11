@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.common
 
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.printer.HkaConnectionHelper
 import com.amaxonia.pos.data.printer.PrinterFactory
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.domain.model.ServerCountries
@@ -87,6 +88,11 @@ object DependencyContainer {
     val theFactoryRapidPayClient: TheFactoryRapidPayClient by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
         TheFactoryRapidPayClient(appContext, localStore)
+    }
+
+    val hkaConnectionHelper: HkaConnectionHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
+        HkaConnectionHelper(appContext)
     }
 
     fun initialize(context: Context) {

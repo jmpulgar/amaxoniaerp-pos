@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.printer.HkaConnectionHelper
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import kotlinx.coroutines.flow.collect
@@ -12,7 +13,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
-    private val localStore: LocalStore
+    private val localStore: LocalStore,
+    private val hkaConnectionHelper: HkaConnectionHelper? = null
 ) : ViewModel() {
 
     private val _selectedPrinterType = MutableStateFlow(PrinterType.NONE)
@@ -90,6 +92,44 @@ class SettingsViewModel(
             }
         }.onFailure { throwable ->
             _errorMessage.value = throwable.message ?: "No se pudo guardar la configuracion de The Factory HKA"
+        }
+    }
+
+    /**
+     * Tests raw TCP connectivity to the HKA device.
+     * Matches SDK's TCPClientTest.testConnection().
+     */
+    suspend fun testHkaConnection(): String {
+        val helper = hkaConnectionHelper
+            ?: return "HkaConnectionHelper no disponible"
+        val settings = _theFactorySettings.value
+        if (settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null) {
+            return "Configura la IP y el puerto primero"
+        }
+        val result = helper.testConnection(settings.ipAddress, settings.port.toInt())
+        return if (result.success) {
+            "Conexion exitosa (${result.latencyMs}ms)"
+        } else {
+            result.errorMessage ?: "No se pudo conectar"
+        }
+    }
+
+    /**
+     * Queries the printer's fiscal status and error state.
+     * Matches SDK's MainController.checkStatus() → sends "05" encrypted.
+     */
+    suspend fun checkHkaPrinterStatus(): String {
+        val helper = hkaConnectionHelper
+            ?: return "HkaConnectionHelper no disponible"
+        val settings = _theFactorySettings.value
+        if (settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null) {
+            return "Configura la IP y el puerto primero"
+        }
+        val result = helper.checkPrinterStatus(settings.ipAddress, settings.port.toInt())
+        return if (result.success) {
+            "ESTADO: ${result.statusDescription}\nERROR: ${result.errorDescription}"
+        } else {
+            result.errorMessage ?: "No se pudo consultar el estado"
         }
     }
 }

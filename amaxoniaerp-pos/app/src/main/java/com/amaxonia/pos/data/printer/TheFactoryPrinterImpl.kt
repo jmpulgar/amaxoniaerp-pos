@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.printer
 
 import android.content.Context
+import android.util.Log
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
@@ -28,14 +29,21 @@ class TheFactoryPrinterImpl(
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
 
-                buildFiscalCommands(transaction).forEach { command ->
+                val commands = buildFiscalCommands(transaction)
+                Log.d(TAG, "printReceipt() → ${commands.size} comandos a enviar a ${settings.ipAddress}:${settings.port}")
+                commands.forEachIndexed { index, command ->
+                    Log.d(TAG, "printReceipt() → [${index + 1}/${commands.size}] enviando: '${command.take(40)}'")
                     sendTcpCommand(
                         ipAddress = settings.ipAddress,
                         port = settings.port.toInt(),
                         command = command
                     )
+                    Log.d(TAG, "printReceipt() → [${index + 1}/${commands.size}] OK")
                 }
+                Log.d(TAG, "printReceipt() → todos los comandos enviados exitosamente")
                 true
+            }.onFailure { error ->
+                Log.e(TAG, "printReceipt() → fallo: ${error.message}", error)
             }
         }
     }
@@ -150,11 +158,14 @@ class TheFactoryPrinterImpl(
         Socket().use { socket ->
             socket.soTimeout = SOCKET_TIMEOUT_MS
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
+            val encrypted = encryptCommand(command)
+            Log.d(TAG, "sendTcpCommand() → cifrado OK (${encrypted.size} bytes), enviando...")
             val outputStream = socket.getOutputStream()
-            outputStream.write(encryptCommand(command))
+            outputStream.write(encrypted)
             outputStream.flush()
 
             val response = readSocketResponse(socket)
+            Log.d(TAG, "sendTcpCommand() → respuesta: ${response.size} bytes, hex: ${response.take(8).joinToString(" ") { "%02X".format(it) }}")
             if (!isSuccessfulResponse(response)) {
                 throw IllegalStateException(
                     "The Factory rechazo el comando fiscal '${command.take(12)}'"
@@ -217,6 +228,7 @@ class TheFactoryPrinterImpl(
             .take(maxLength)
     }
     private companion object {
+        const val TAG = "HkaPrinter"
         const val CONNECT_TIMEOUT_MS = 3000
         const val SOCKET_TIMEOUT_MS = 10000
         /** Short timeout to detect end-of-response (device stops sending). */
