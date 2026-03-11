@@ -3,6 +3,7 @@ package com.amaxonia.pos.data.printer
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
+import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -17,6 +18,7 @@ class TheFactoryRapidPayClient(
 ) {
 
     private val appContext = context.applicationContext
+    private val cryptography = MainFactory().createInstance(appContext)
 
     suspend fun charge(amount: Double, commandPrefix: String): RapidPayResult {
         return withContext(Dispatchers.IO) {
@@ -25,13 +27,13 @@ class TheFactoryRapidPayClient(
                 val port = validateSettings(settings)
 
                 val command = buildSaleCommand(commandPrefix, amount)
-                val rawResponse = sendJsonCommand(
+                val responseBytes = sendEncryptedCommand(
                     ipAddress = settings.ipAddress,
                     port = port,
                     command = command
                 )
 
-                parseResponse(rawResponse)
+                parseResponse(responseBytes)
             }.getOrElse { error ->
                 RapidPayResult(
                     approved = false,
@@ -53,25 +55,36 @@ class TheFactoryRapidPayClient(
     }
 
     /**
-     * Sends the gateway command as a JSON payload over TCP, matching the
-     * protocol used by the HK20 POS app (Node.js reference implementation).
+     * Encrypts the command using hkacryptolib and sends the raw bytes over TCP.
      *
-     * The POS app expects: {"cmd":"KRV00000000000348"}\n
-     * — plain JSON, NOT encrypted. Encryption (hkacryptolib) is only used
-     *   for fiscal printer commands, not for Rapid Pay gateway commands.
+     * The local The Factory HKA POS app on Android requires all TCP commands
+     * to be encrypted via hkacryptolib (matching TCPClient.setOutPutSteamByDevice
+     * in the HKA SDK). This applies to both fiscal and gateway (Rapid Pay) commands.
      */
-    private fun sendJsonCommand(ipAddress: String, port: Int, command: String): String {
+    private fun sendEncryptedCommand(ipAddress: String, port: Int, command: String): ByteArray {
+        val encryptedBytes = encryptCommand(command)
+
         Socket().use { socket ->
             socket.soTimeout = SOCKET_TIMEOUT_MS
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
 
-            val payload = JSONObject().put("cmd", command).toString() + "\n"
             val output = socket.getOutputStream()
-            output.write(payload.toByteArray(Charsets.UTF_8))
+            output.write(encryptedBytes)
             output.flush()
 
             return readSocketResponse(socket)
         }
+    }
+
+    private fun encryptCommand(command: String): ByteArray {
+        val response = cryptography.encryptString(command)
+        if (response.isError) {
+            throw IllegalStateException(
+                response.message ?: "No se pudo encriptar el comando de pasarela"
+            )
+        }
+        return response.bytes
+            ?: throw IllegalStateException("Respuesta de cifrado invalida")
     }
 
     /**
@@ -80,11 +93,9 @@ class TheFactoryRapidPayClient(
      * The device does NOT close the connection after responding, so we cannot
      * loop until EOF (-1). Instead we use a short read-timeout: read available
      * data and return once the device stops sending (SocketTimeoutException).
-     *
-     * This mirrors the Node.js HK20 client which listens for "data" events
-     * and resolves on "end" or timeout.
+     * This matches the behaviour of the SDK's ResponseSocket.getResponse().
      */
-    private fun readSocketResponse(socket: Socket): String {
+    private fun readSocketResponse(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
         val buffer = ByteArray(4096)
         val output = ByteArrayOutputStream()
@@ -104,37 +115,86 @@ class TheFactoryRapidPayClient(
             socket.soTimeout = originalTimeout
         }
 
-        return output.toString(Charsets.UTF_8.name()).trim()
+        return output.toByteArray()
     }
 
-    private fun parseResponse(rawResponse: String): RapidPayResult {
-        if (rawResponse.isBlank()) {
+    /**
+     * Interprets the raw byte response from The Factory HKA.
+     *
+     * The response may be:
+     * - A JSON payload (possibly preceded by protocol bytes) when the gateway
+     *   transaction completes — parse for code/message.
+     * - A single protocol byte: ACK (6) = success, NAK (21) = rejected.
+     */
+    private fun parseResponse(responseBytes: ByteArray): RapidPayResult {
+        if (responseBytes.isEmpty()) {
             return RapidPayResult(
                 approved = false,
                 message = "El dispositivo HKA no envio una respuesta"
             )
         }
 
-        val parsed = runCatching { JSONObject(rawResponse) }.getOrNull()
+        // Try to extract JSON from the response (may follow leading protocol bytes)
+        val rawJson = extractJsonString(responseBytes)
 
-        // If response is a JSON array, take the first element
-        if (parsed == null) {
-            val arrayParsed = runCatching {
-                val arr = org.json.JSONArray(rawResponse)
-                if (arr.length() > 0) arr.getJSONObject(0) else null
-            }.getOrNull()
-
-            if (arrayParsed != null) {
-                return parseJsonObject(arrayParsed, rawResponse)
-            }
-
-            return RapidPayResult(
-                approved = false,
-                message = "La respuesta del dispositivo no es JSON valido: $rawResponse"
-            )
+        if (rawJson != null) {
+            return parseJsonResponse(rawJson)
         }
 
-        return parseJsonObject(parsed, rawResponse)
+        // No JSON found — interpret the protocol byte
+        val firstByte = responseBytes.first().toInt()
+        return when (firstByte) {
+            ACK -> RapidPayResult(approved = true, message = "Transaccion aprobada")
+            NAK -> RapidPayResult(approved = false, message = "Transaccion rechazada por el dispositivo")
+            else -> RapidPayResult(
+                approved = false,
+                message = "Respuesta no reconocida del dispositivo (codigo: $firstByte)"
+            )
+        }
+    }
+
+    /**
+     * Tries to find and extract a JSON object or array from the raw byte response.
+     * The JSON may start after one or more leading protocol bytes.
+     */
+    private fun extractJsonString(bytes: ByteArray): String? {
+        val raw = String(bytes, Charsets.UTF_8)
+        // Look for JSON object
+        val objStart = raw.indexOf('{')
+        if (objStart != -1) {
+            val objEnd = raw.lastIndexOf('}')
+            if (objEnd > objStart) return raw.substring(objStart, objEnd + 1)
+        }
+        // Look for JSON array
+        val arrStart = raw.indexOf('[')
+        if (arrStart != -1) {
+            val arrEnd = raw.lastIndexOf(']')
+            if (arrEnd > arrStart) return raw.substring(arrStart, arrEnd + 1)
+        }
+        return null
+    }
+
+    private fun parseJsonResponse(rawJson: String): RapidPayResult {
+        // Try as JSON object first
+        val parsed = runCatching { JSONObject(rawJson) }.getOrNull()
+        if (parsed != null) {
+            return parseJsonObject(parsed, rawJson)
+        }
+
+        // Try as JSON array — take the first element
+        val arrayParsed = runCatching {
+            val arr = org.json.JSONArray(rawJson)
+            if (arr.length() > 0) arr.getJSONObject(0) else null
+        }.getOrNull()
+
+        if (arrayParsed != null) {
+            return parseJsonObject(arrayParsed, rawJson)
+        }
+
+        return RapidPayResult(
+            approved = false,
+            message = "La respuesta del dispositivo no es JSON valido: $rawJson"
+        )
     }
 
     private fun parseJsonObject(parsed: JSONObject, rawResponse: String): RapidPayResult {
@@ -171,6 +231,8 @@ class TheFactoryRapidPayClient(
         /** Short timeout to detect end-of-response (device stops sending). */
         private const val READ_CHUNK_TIMEOUT_MS = 2000
         private const val APPROVED_CODE = 200
+        private const val ACK = 6
+        private const val NAK = 21
     }
 }
 
