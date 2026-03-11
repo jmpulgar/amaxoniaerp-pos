@@ -37,7 +37,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://10.0.2.2:8080/\""
+                "\"https://api.listoerp.app/\"" // "\"http://10.0.2.2:8080/\""
             )
         }
         release {
