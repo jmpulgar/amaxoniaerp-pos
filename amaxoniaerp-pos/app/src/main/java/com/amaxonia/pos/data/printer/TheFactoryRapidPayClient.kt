@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -21,12 +22,12 @@ class TheFactoryRapidPayClient(
         return withContext(Dispatchers.IO) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
-                validateSettings(settings.ipAddress)
+                val port = validateSettings(settings)
 
                 val command = buildSaleCommand(commandPrefix, amount)
                 val rawResponse = sendJsonCommand(
                     ipAddress = settings.ipAddress,
-                    port = PAYMENT_PORT,
+                    port = port,
                     command = command
                 )
 
@@ -105,14 +106,17 @@ class TheFactoryRapidPayClient(
         )
     }
 
-    private fun validateSettings(ipAddress: String) {
-        if (ipAddress.isBlank()) {
+    private fun validateSettings(settings: TheFactorySettings): Int {
+        if (settings.ipAddress.isBlank()) {
             throw IllegalStateException("Configura la IP de The Factory HKA antes de cobrar")
         }
+
+        return settings.port
+            .toIntOrNull()
+            ?: throw IllegalStateException("Configura un puerto valido de The Factory HKA antes de cobrar")
     }
 
     companion object {
-        private const val PAYMENT_PORT = 9100
         private const val CONNECT_TIMEOUT_MS = 3000
         private const val SOCKET_TIMEOUT_MS = 30000
         private const val APPROVED_CODE = 200

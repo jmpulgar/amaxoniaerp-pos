@@ -12,6 +12,7 @@ import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormaPagoDetalle
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.SaleCurrencyDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
@@ -551,6 +552,11 @@ class PaymentViewModel(
     }
 
     private suspend fun processGatewayPaymentsIfNeeded(paymentMethods: List<TransactionPaymentMethod>): Result<Unit> {
+        val selectedPrinterType = localStore.readSelectedPrinterType()
+        if (selectedPrinterType != PrinterType.THE_FACTORY_HKA) {
+            return Result.success(Unit)
+        }
+
         paymentMethods
             .filter(::requiresRapidPay)
             .forEach { method ->
