@@ -58,10 +58,9 @@ class TheFactoryRapidPayClient(
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
 
             val payload = JSONObject().put("cmd", command).toString() + "\n"
-            socket.getOutputStream().use { output ->
-                output.write(payload.toByteArray(Charsets.UTF_8))
-                output.flush()
-            }
+            val output = socket.getOutputStream()
+            output.write(payload.toByteArray(Charsets.UTF_8))
+            output.flush()
 
             val response = readSocketResponse(socket).trim()
             if (response.isBlank()) {
