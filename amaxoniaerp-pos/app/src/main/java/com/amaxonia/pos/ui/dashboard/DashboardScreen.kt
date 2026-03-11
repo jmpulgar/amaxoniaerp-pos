@@ -305,6 +305,7 @@ fun DashboardScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .navigationBarsPadding()
                         .padding(bottom = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {

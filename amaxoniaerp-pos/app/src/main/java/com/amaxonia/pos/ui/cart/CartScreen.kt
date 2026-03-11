@@ -111,7 +111,7 @@ fun CartScreen(
                     shadowElevation = 16.dp,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
+                    Column(modifier = Modifier.padding(24.dp).navigationBarsPadding()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
