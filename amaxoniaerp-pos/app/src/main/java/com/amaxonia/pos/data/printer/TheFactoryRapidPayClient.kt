@@ -27,7 +27,7 @@ class TheFactoryRapidPayClient(
                 val port = validateSettings(settings)
 
                 val command = buildSaleCommand(commandPrefix, amount)
-                val responseBytes = sendEncryptedCommand(
+                val responseBytes = sendEncryptedJsonCommand(
                     ipAddress = settings.ipAddress,
                     port = port,
                     command = command
@@ -55,15 +55,26 @@ class TheFactoryRapidPayClient(
     }
 
     /**
-     * Encrypts the command using hkacryptolib and sends the raw bytes over TCP.
+     * Wraps the command in a JSON envelope and encrypts the FULL JSON string
+     * before sending over TCP.
      *
-     * The local The Factory HKA POS app on Android requires all TCP commands
-     * to be encrypted via hkacryptolib (matching TCPClient.setOutPutSteamByDevice
-     * in the HKA SDK). This applies to both fiscal and gateway (Rapid Pay) commands.
+     * This matches the HKA SDK protocol exactly:
+     *   1. Command.java wraps: "KRV..." → '{"cmd":"KRV..."}'
+     *   2. TCPClient.setOutPutSteamByDevice encrypts the JSON string
+     *   3. Encrypted bytes are written to the socket
+     *   4. Response is read with getResponseJson() (raw, no byte stripping)
+     *
+     * The command string (e.g. "KRV00000000000348") is NOT encrypted directly.
+     * The JSON envelope '{"cmd":"KRV00000000000348"}' is what gets encrypted.
      */
-    private fun sendEncryptedCommand(ipAddress: String, port: Int, command: String): ByteArray {
-        val encryptedBytes = encryptCommand(command)
+    private fun sendEncryptedJsonCommand(ipAddress: String, port: Int, command: String): ByteArray {
+        // Step 1: Wrap in JSON — matches Command.java toString()
+        val jsonPayload = JSONObject().put("cmd", command).toString()
 
+        // Step 2: Encrypt the full JSON string — matches setOutPutSteamByDevice()
+        val encryptedBytes = encryptCommand(jsonPayload)
+
+        // Step 3: Send and read response — matches sendCommandJson() + getResponseJson()
         Socket().use { socket ->
             socket.soTimeout = SOCKET_TIMEOUT_MS
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
@@ -72,12 +83,12 @@ class TheFactoryRapidPayClient(
             output.write(encryptedBytes)
             output.flush()
 
-            return readSocketResponse(socket)
+            return readResponseJson(socket)
         }
     }
 
-    private fun encryptCommand(command: String): ByteArray {
-        val response = cryptography.encryptString(command)
+    private fun encryptCommand(payload: String): ByteArray {
+        val response = cryptography.encryptString(payload)
         if (response.isError) {
             throw IllegalStateException(
                 response.message ?: "No se pudo encriptar el comando de pasarela"
@@ -88,16 +99,17 @@ class TheFactoryRapidPayClient(
     }
 
     /**
-     * Reads the response from the HKA POS app.
+     * Reads the JSON response from the HKA POS app.
      *
-     * The device does NOT close the connection after responding, so we cannot
-     * loop until EOF (-1). Instead we use a short read-timeout: read available
-     * data and return once the device stops sending (SocketTimeoutException).
-     * This matches the behaviour of the SDK's ResponseSocket.getResponse().
+     * Mirrors ResponseSocket.getResponseJson(): reads ALL bytes raw
+     * (no byte stripping) until EOF or timeout.
+     *
+     * The device may close the connection after sending (EOF = -1), or it may
+     * keep it open. We use a short read-timeout to handle both cases.
      */
-    private fun readSocketResponse(socket: Socket): ByteArray {
+    private fun readResponseJson(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(4096)
+        val buffer = ByteArray(1024)
         val output = ByteArrayOutputStream()
 
         val originalTimeout = socket.soTimeout
