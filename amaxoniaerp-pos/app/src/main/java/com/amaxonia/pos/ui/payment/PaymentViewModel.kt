@@ -1,9 +1,12 @@
 package com.amaxonia.pos.ui.payment
 
+import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.printer.PrinterFactory
+import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.Transaction
@@ -25,7 +28,10 @@ import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
@@ -46,8 +52,19 @@ class PaymentViewModel(
     private val rapidPayClient: TheFactoryRapidPayClient
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "PaymentVM"
+    }
+
     private val _state = MutableStateFlow(PaymentState())
     val state = _state.asStateFlow()
+
+    /**
+     * One-shot event: emits an Intent that the UI (PaymentScreen) must launch
+     * via startActivity() to open the HKA POS gateway app.
+     */
+    private val _gatewayIntentEvent = MutableSharedFlow<Intent>(extraBufferCapacity = 1)
+    val gatewayIntentEvent: SharedFlow<Intent> = _gatewayIntentEvent.asSharedFlow()
 
     init {
         loadFormasPago()
@@ -551,23 +568,64 @@ class PaymentViewModel(
         }
     }
 
+    /**
+     * Processes gateway (Rapid Pay) payments via Android Intent to the HKA POS app.
+     *
+     * For each payment method that requires Rapid Pay:
+     * 1. Builds the encrypted Intent via TheFactoryRapidPayClient
+     * 2. Emits the Intent via gatewayIntentEvent (UI launches it with startActivity)
+     * 3. Suspends via RapidPayBridge.awaitResult() until onNewIntent delivers the result
+     * 4. If rejected, returns failure immediately
+     */
     private suspend fun processGatewayPaymentsIfNeeded(paymentMethods: List<TransactionPaymentMethod>): Result<Unit> {
         val selectedPrinterType = localStore.readSelectedPrinterType()
         if (selectedPrinterType != PrinterType.THE_FACTORY_HKA) {
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → printer no es HKA, omitiendo gateway")
             return Result.success(Unit)
         }
 
-        paymentMethods
-            .filter(::requiresRapidPay)
-            .forEach { method ->
-                val result = rapidPayClient.charge(
-                    amount = method.amount,
-                    commandPrefix = method.gatewayCommandPrefix
-                )
-                if (!result.approved) {
-                    return Result.failure(IllegalStateException(result.message))
-                }
+        val gatewayMethods = paymentMethods.filter(::requiresRapidPay)
+        if (gatewayMethods.isEmpty()) {
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → no hay metodos que requieran gateway")
+            return Result.success(Unit)
+        }
+
+        for (method in gatewayMethods) {
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → procesando ${method.description} | monto=${method.amount} | prefix=${method.gatewayCommandPrefix}")
+
+            // Step 1: Build the Intent
+            val intentResult = rapidPayClient.buildGatewayIntent(
+                amount = method.amount,
+                commandPrefix = method.gatewayCommandPrefix
+            )
+
+            if (intentResult.isFailure) {
+                val error = intentResult.exceptionOrNull()?.message ?: "Error al preparar la pasarela de pago"
+                Log.e(TAG, "processGatewayPaymentsIfNeeded() → error construyendo intent: $error")
+                return Result.failure(IllegalStateException(error))
             }
+
+            val intent = intentResult.getOrThrow()
+
+            // Step 2: Update UI state to show gateway status
+            _state.update { it.copy(gatewayStatusMessage = "Esperando respuesta de pasarela de pago...") }
+
+            // Step 3: Emit the Intent for the UI to launch
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → emitiendo intent para UI")
+            _gatewayIntentEvent.emit(intent)
+
+            // Step 4: Suspend and wait for the result from onNewIntent via RapidPayBridge
+            val result = RapidPayBridge.awaitResult()
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → resultado: approved=${result.approved} | message=${result.message}")
+
+            // Step 5: Clear gateway status
+            _state.update { it.copy(gatewayStatusMessage = null) }
+
+            if (!result.approved) {
+                return Result.failure(IllegalStateException(result.message))
+            }
+        }
+
         return Result.success(Unit)
     }
 

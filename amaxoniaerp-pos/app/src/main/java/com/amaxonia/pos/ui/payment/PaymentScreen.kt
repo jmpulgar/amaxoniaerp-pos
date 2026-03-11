@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.payment
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -65,12 +67,26 @@ fun PaymentScreen(
         )
     }
 
+    val context = LocalContext.current
+
     LaunchedEffect(totalAmount) {
         viewModel.setTotalAmount(totalAmount)
     }
 
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect gateway intent events and launch the HKA POS app
+    LaunchedEffect(Unit) {
+        viewModel.gatewayIntentEvent.collect { intent ->
+            Log.d("PaymentScreen", "Lanzando intent de pasarela HKA POS")
+            try {
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("PaymentScreen", "Error al lanzar intent HKA POS: ${e.message}", e)
+            }
+        }
+    }
 
     LaunchedEffect(state.receiptPrintMessage) {
         val message = state.receiptPrintMessage ?: return@LaunchedEffect
