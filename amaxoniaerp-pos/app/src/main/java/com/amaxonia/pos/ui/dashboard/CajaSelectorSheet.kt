@@ -201,7 +201,7 @@ private fun CajaCard(
             // Caja info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = caja.descripcion ?: "Caja sin nombre",
+                    text = caja.caja ?: caja.descripcion ?: "Caja sin nombre",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface,

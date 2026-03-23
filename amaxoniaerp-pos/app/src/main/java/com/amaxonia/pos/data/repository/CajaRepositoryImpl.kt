@@ -53,7 +53,7 @@ class CajaRepositoryImpl(
     override suspend fun restoreActiveCajaIfValid() {
         val caja = localStore.readActiveCajaForToday()
         if (caja != null) {
-            _activeCajaName.update { caja.descripcion ?: "Caja Principal" }
+            _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
             _activeCaja.update { caja }
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
@@ -162,7 +162,7 @@ class CajaRepositoryImpl(
                             CierreCajaSummary(
                                 idCajaSecuencia = dto.id,
                                 idCaja = dto.id_caja,
-                                cajaName = dto.caja?.ifBlank { null } ?: caja.descripcion ?: "Caja",
+                                cajaName = dto.caja?.ifBlank { null } ?: caja.caja ?: caja.descripcion ?: "Caja",
                                 vendedorName = dto.vendedor.orEmpty(),
                                 openedAt = dto.ffecha_apertura,
                                 openAmount = dto.monto_efectivo_apertura,
@@ -205,7 +205,7 @@ class CajaRepositoryImpl(
     }
 
     override suspend fun setActiveCaja(caja: Caja) {
-        _activeCajaName.update { caja.descripcion ?: "Caja Principal" }
+        _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
         _activeCaja.update { caja }
         localStore.saveActiveCaja(caja)
     }

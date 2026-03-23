@@ -7,6 +7,7 @@ import kotlinx.serialization.SerialName
 data class Caja(
     val idCaja: String,
     val codCaja: String?,
+    val caja: String? = null,
     val descripcion: String?,
     val estatus: Int,
     val idSucursal: Int?,

@@ -883,6 +883,7 @@ class CajaRepository {
                     Caja(
                         idCaja = idCaja,
                         codCaja = row[CajaTable.codCaja],
+                        caja = row[CajaTable.caja],
                         descripcion = row[CajaTable.descripcion],
                         estatus = row[CajaTable.codEstatus],
                         idSucursal = idSucursal,
