@@ -2,18 +2,25 @@
 set -e
 
 PROJECT_DIR="/home/amaxonia-pos"
+BACKEND_DIR="$PROJECT_DIR/amaxoniaerp-backend"
 SERVICE_NAME="amaxoniaerp-backend"
+BRANCH="main"
 
 echo "==> Entrando a $PROJECT_DIR"
 cd "$PROJECT_DIR"
 
-echo "==> Haciendo git pull"
-git pull
+echo "==> Git pull"
+git checkout "$BRANCH"
+git pull origin "$BRANCH"
 
-echo "==> Reiniciando servicio $SERVICE_NAME"
+echo "==> Build backend"
+cd "$BACKEND_DIR"
+./gradlew build
+
+echo "==> Restart servicio"
 systemctl restart "$SERVICE_NAME"
 
-echo "==> Verificando estado"
+echo "==> Status"
 systemctl status "$SERVICE_NAME" --no-pager
 
-echo "==> Deploy completado"
+echo "==> Deploy OK"
