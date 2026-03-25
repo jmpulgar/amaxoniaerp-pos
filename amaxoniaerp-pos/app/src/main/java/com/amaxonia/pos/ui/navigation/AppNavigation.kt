@@ -1,6 +1,5 @@
 package com.amaxonia.pos.ui.navigation
 
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -50,23 +49,10 @@ fun AppNavigation(startDestination: String) {
     // launchSingleTop evita duplicados, popUpTo(dashboard) evita acumulación.
     fun navigateFromDrawer(route: String) {
         if (navController.currentBackStackEntry?.destination?.route == route) return
-
-        val hasDashboardInBackStack = runCatching {
-            navController.getBackStackEntry("dashboard")
-        }.isSuccess
-
+        // Para evitar inconsistencias al hacer muchas navegaciones seguidas,
+        // evitamos saveState/restoreState y mantenemos la pila consistente.
         navController.navigate(route) {
-            if (hasDashboardInBackStack) {
-                popUpTo("dashboard") {
-                    inclusive = false
-                    saveState = true
-                }
-                restoreState = true
-            } else {
-                popUpTo(navController.graph.id) {
-                    inclusive = false
-                }
-            }
+            popUpTo("dashboard") { inclusive = false }
             launchSingleTop = true
         }
     }
@@ -247,40 +233,24 @@ fun AppNavigation(startDestination: String) {
                 totalAmount = total,
                 onBack = { navController.popBackStack() },
                 onPaymentSuccess = { payload ->
-                    val methods = Uri.encode(payload.paymentMethodsLabel)
-                    val codFactura = Uri.encode(payload.codFactura)
-                    val transactionId = Uri.encode(payload.transactionId)
-                    val printMessage = Uri.encode(payload.receiptPrintMessage.orEmpty())
-                    navController.navigate(
-                        "payment_success/${payload.changeDue}?methods=$methods&codFactura=$codFactura&transactionId=$transactionId&printMessage=$printMessage"
-                    ) {
-                        popUpTo("dashboard") { inclusive = false }
+                    scope.launch {
+                        DependencyContainer.localStore.saveLastPaymentSuccess(payload)
+                        navController.navigate("payment_success/${payload.transactionId}") {
+                            popUpTo("dashboard") { inclusive = false }
+                        }
                     }
                 }
             )
         }
 
         composable(
-            route = "payment_success/{change}?methods={methods}&codFactura={codFactura}&transactionId={transactionId}&printMessage={printMessage}",
+            route = "payment_success/{transactionId}",
             arguments = listOf(
-                navArgument("change") { type = NavType.StringType },
-                navArgument("methods") { type = NavType.StringType; defaultValue = "" },
-                navArgument("codFactura") { type = NavType.StringType; defaultValue = "" },
-                navArgument("transactionId") { type = NavType.StringType; defaultValue = "" },
-                navArgument("printMessage") { type = NavType.StringType; defaultValue = "" }
+                navArgument("transactionId") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
-            val change = backStackEntry.arguments?.getString("change")?.toDoubleOrNull() ?: 0.0
-            val methods = Uri.decode(backStackEntry.arguments?.getString("methods").orEmpty())
-            val codFactura = Uri.decode(backStackEntry.arguments?.getString("codFactura").orEmpty())
-            val transactionId = Uri.decode(backStackEntry.arguments?.getString("transactionId").orEmpty())
-            val printMessage = Uri.decode(backStackEntry.arguments?.getString("printMessage").orEmpty())
             SuccessScreen(
-                changeDue = change,
-                paymentMethodsLabel = methods,
-                codFactura = codFactura,
-                transactionId = transactionId,
-                initialPrintMessage = printMessage,
+                transactionId = backStackEntry.arguments?.getString("transactionId").orEmpty(),
                 onPrintReceipt = { trxId ->
                     val transactionResult = DependencyContainer.transactionRepository.getTransactionById(trxId)
                     if (transactionResult.isFailure) {

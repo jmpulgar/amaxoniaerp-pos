@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,24 +32,37 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.injectedViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SuccessScreen(
-    changeDue: Double,
-    paymentMethodsLabel: String,
-    codFactura: String,
     transactionId: String,
-    initialPrintMessage: String,
     onPrintReceipt: suspend (String) -> Result<String>,
     onNextOrder: () -> Unit
 ) {
+    val viewModel = injectedViewModel {
+        PaymentSuccessViewModel(
+            localStore = DependencyContainer.localStore,
+            transactionId = transactionId
+        )
+    }
+
+    val uiState by viewModel.state.collectAsState()
+    val payload = uiState.payload
+
     var visible by remember { mutableStateOf(false) }
     val scale = remember { Animatable(0.85f) }
     var isPrinting by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    val changeDue = payload?.changeDue ?: 0.0
+    val paymentMethodsLabel = payload?.paymentMethodsLabel.orEmpty()
+    val codFactura = payload?.codFactura.orEmpty()
+    val receiptPrintMessage = payload?.receiptPrintMessage.orEmpty()
 
     LaunchedEffect(Unit) {
         visible = true
@@ -58,9 +72,16 @@ fun SuccessScreen(
         )
     }
 
-    LaunchedEffect(initialPrintMessage) {
-        if (initialPrintMessage.isNotBlank()) {
-            snackbarHostState.showSnackbar(initialPrintMessage)
+    LaunchedEffect(uiState.errorMessage) {
+        val msg = uiState.errorMessage
+        if (!msg.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(receiptPrintMessage) {
+        if (receiptPrintMessage.isNotBlank()) {
+            snackbarHostState.showSnackbar(receiptPrintMessage)
         }
     }
 
@@ -102,77 +123,97 @@ fun SuccessScreen(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(24.dp)
-                                .graphicsLayer {
-                                    scaleX = scale.value
-                                    scaleY = scale.value
-                                },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                "¡Transacción Exitosa!",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
-                            Text(
-                                if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
+                        if (uiState.isLoading || payload == null) {
                             Column(
                                 modifier = Modifier
+                                    .padding(24.dp)
                                     .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                    .padding(16.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale.value
+                                        scaleY = scale.value
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                                )
-                                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
-                                Text(
-                                    "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                                )
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("Cargando detalle del recibo...", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Button(
-                                onClick = {},
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                shape = RoundedCornerShape(4.dp)
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .padding(24.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale.value
+                                        scaleY = scale.value
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.primary)
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text(
+                                    "¡Transacción Exitosa!",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Text(
+                                    if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                        .padding(16.dp)
+                                ) {
+                                    Text(
+                                        "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                    )
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                    Text(
+                                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                Button(
+                                    onClick = {},
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }

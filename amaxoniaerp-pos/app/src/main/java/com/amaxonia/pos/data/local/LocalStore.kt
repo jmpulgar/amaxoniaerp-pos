@@ -16,6 +16,7 @@ import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
+import com.amaxonia.pos.ui.payment.PaymentSuccessPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -43,6 +44,8 @@ class LocalStore(
     private val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
     private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
+    private val lastPaymentSuccessKey = stringPreferencesKey("last_payment_success")
+    private val lastPaymentSuccessTransactionIdKey = stringPreferencesKey("last_payment_success_transaction_id")
 
     suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
         val json = AppJson.encodeToString(snapshot)
@@ -258,6 +261,31 @@ class LocalStore(
         context.dataStore.edit { prefs ->
             prefs.remove(selectedCountryKey)
         }
+    }
+
+    // ============ PAYMENT SUCCESS ============
+
+    suspend fun saveLastPaymentSuccess(payload: PaymentSuccessPayload) {
+        val json = AppJson.encodeToString(PaymentSuccessPayload.serializer(), payload)
+        context.dataStore.edit { prefs ->
+            prefs[lastPaymentSuccessKey] = json
+            prefs[lastPaymentSuccessTransactionIdKey] = payload.transactionId
+        }
+    }
+
+    /**
+     * Reads the cached payment success payload.
+     * We cache only the most recent transaction to keep preferences storage small.
+     */
+    suspend fun readLastPaymentSuccess(transactionId: String): PaymentSuccessPayload? {
+        val prefs = context.dataStore.data.first()
+        val json = prefs[lastPaymentSuccessKey] ?: return null
+        val cachedTransactionId = prefs[lastPaymentSuccessTransactionIdKey] ?: return null
+        if (cachedTransactionId != transactionId) return null
+
+        return runCatching {
+            AppJson.decodeFromString(PaymentSuccessPayload.serializer(), json)
+        }.getOrNull()
     }
 }
 

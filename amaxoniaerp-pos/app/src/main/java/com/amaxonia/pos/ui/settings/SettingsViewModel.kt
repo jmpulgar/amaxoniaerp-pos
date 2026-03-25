@@ -134,6 +134,14 @@ class SettingsViewModel(
             IllegalStateException("Cliente de pasarela HKA no disponible")
         )
         val current = _theFactorySettings.value
+        val savedGateway = current.gatewayKey
+            .takeIf { it.isNotBlank() }
+            ?.let { key ->
+                GatewayOption(
+                    key = key,
+                    label = current.gatewayLabel.ifBlank { "Pasarela $key" }
+                )
+            }
         if (current.ipAddress.isBlank() || current.port.toIntOrNull() == null) {
             return Result.failure(IllegalStateException("Guarda IP y puerto antes de consultar pasarelas"))
         }
@@ -141,10 +149,10 @@ class SettingsViewModel(
         _isLoadingGateways.value = true
         return client.listGateways()
             .onSuccess { list ->
-                val fallback = if (list.isEmpty()) listOf(GatewayOption("R", "Rapid pago")) else list
-                _gatewayOptions.value = fallback
+                val options = if (list.isNotEmpty()) list else savedGateway?.let(::listOf).orEmpty()
+                _gatewayOptions.value = options
                 if (current.gatewayKey.isBlank()) {
-                    val first = fallback.firstOrNull()
+                    val first = options.firstOrNull()
                     if (first != null) {
                         onGatewaySelected(first)
                     }
@@ -153,10 +161,9 @@ class SettingsViewModel(
             .onFailure { throwable ->
                 _errorMessage.value = throwable.message ?: "No se pudo consultar pasarelas"
                 if (_gatewayOptions.value.isEmpty()) {
-                    val fallback = GatewayOption("R", "Rapid pago")
-                    _gatewayOptions.value = listOf(fallback)
+                    _gatewayOptions.value = savedGateway?.let(::listOf).orEmpty()
                     if (current.gatewayKey.isBlank()) {
-                        onGatewaySelected(fallback)
+                        savedGateway?.let(::onGatewaySelected)
                     }
                 }
             }
