@@ -48,7 +48,8 @@ fun CompanyDetailsDto.toSelectedCompany(): SelectedCompany {
         name = name,
         adminDb = adminDb,
         accountingDb = accountingDb,
-        payrollDb = payrollDb
+        payrollDb = payrollDb,
+        rif = rif.orEmpty()
     )
 }
 

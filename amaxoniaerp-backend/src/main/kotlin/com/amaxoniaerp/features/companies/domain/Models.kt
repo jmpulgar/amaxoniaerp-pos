@@ -30,6 +30,7 @@ data class CompanyDetailResponse(
     val adminDb: String?,
     val accountingDb: String?,
     val payrollDb: String?,
+    val rif: String? = null,
 )
 
 data class CompanyConfig(

@@ -460,6 +460,14 @@ class ProcessSaleTransactionalRepository {
     ) {
         val f = request.factura
         val subtotalBase = monetaryContext.toBase(f.subtotal)
+        val descuentosItemsBase = monetaryContext.toBase(
+            f.descuentosItemFactura.takeIf { it > 0.0 }
+                ?: request.items.sumOf { it.itemMontoDescuento }
+        )
+        val montoItemsBase = monetaryContext.toBase(
+            f.montoItemsFactura.takeIf { it > 0.0 }
+                ?: (f.subtotal - f.descuentosItemFactura).coerceAtLeast(0.0)
+        )
         val ivaTotalBase = monetaryContext.toBase(f.ivaTotalFactura)
         val totalGeneralBase = monetaryContext.toBase(f.totalTotalFactura)
         val fechaVencimientoFactura = today.plusDays(monetaryContext.diasVencimiento.toLong())
@@ -477,19 +485,19 @@ class ProcessSaleTransactionalRepository {
             it[codVendedor] = f.codVendedor
             it[fechaFactura] = parseDateOrToday(f.fechaFactura, today)
             it[subtotal] = subtotalBase
-            it[descuentosItemFactura] = BigDecimal.ZERO.setScale(2)
-            it[montoItemsFactura] = subtotalBase
+            it[descuentosItemFactura] = descuentosItemsBase
+            it[montoItemsFactura] = montoItemsBase
             it[ivaTotalFactura] = ivaTotalBase
             it[totalTotalFactura] = totalGeneralBase
             it[cantidadItems] = request.items.size
-            it[totalizarSubTotal] = subtotalBase
-            it[totalizarDescuentoParcial] = BigDecimal.ZERO.setScale(2)
-            it[totalizarTotalOperacion] = subtotalBase
-            it[totalizarPDescuentoGlobal] = BigDecimal.ZERO.setScale(2)
-            it[totalizarDescuentoGlobal] = BigDecimal.ZERO.setScale(2)
-            it[totalizarBaseImponible] = subtotalBase
-            it[totalizarMontoIva] = ivaTotalBase
-            it[totalizarTotalGeneral] = totalGeneralBase
+            it[totalizarSubTotal] = monetaryContext.toBase(f.totalizarSubTotal)
+            it[totalizarDescuentoParcial] = monetaryContext.toBase(f.totalizarDescuentoParcial)
+            it[totalizarTotalOperacion] = monetaryContext.toBase(f.totalizarTotalOperacion)
+            it[totalizarPDescuentoGlobal] = monetaryContext.toBase(f.totalizarPDescuentoGlobal)
+            it[totalizarDescuentoGlobal] = monetaryContext.toBase(f.totalizarDescuentoGlobal)
+            it[totalizarBaseImponible] = monetaryContext.toBase(f.totalizarBaseImponible)
+            it[totalizarMontoIva] = monetaryContext.toBase(f.totalizarMontoIva)
+            it[totalizarTotalGeneral] = monetaryContext.toBase(f.totalizarTotalGeneral)
             it[totalizarTotalRetencion] = BigDecimal.ZERO.setScale(2)
             it[formaPago] = "contado"
             it[codEstatus] = f.codEstatus
@@ -562,6 +570,8 @@ class ProcessSaleTransactionalRepository {
                 it[itemDescripcion] = item.itemDescripcion
                 it[itemCantidad] = item.itemCantidad.toScaledBigDecimal(3)
                 it[itemPrecioSinIva] = itemPriceSinIvaBase
+                it[itemDescuento] = item.itemDescuento.toMoney()
+                it[itemMontoDescuento] = monetaryContext.toBase(item.itemMontoDescuento)
                 it[itemPiva] = itemTaxRate.toMoney()
                 it[itemTotalSinIva] = itemTotalSinIvaBase
                 it[itemTotalConIva] = itemTotalConIvaBase

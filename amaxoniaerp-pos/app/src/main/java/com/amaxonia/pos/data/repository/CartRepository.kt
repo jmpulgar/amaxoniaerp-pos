@@ -36,7 +36,12 @@ class CartRepository {
                 )
                 mutable
             } else {
-                currentItems + CartItem(product = product, quantity = 1, codVendedor = currentSellerId)
+                currentItems + CartItem(
+                    product = product,
+                    quantity = 1,
+                    codVendedor = currentSellerId,
+                    unitPriceWithTax = product.prices.firstOrNull()?.pricePlusTax ?: 0.0
+                )
             }
         }
     }
@@ -59,6 +64,32 @@ class CartRepository {
 
     fun removeItem(productId: String) {
         _cartItems.update { items -> items.filter { it.product.id != productId } }
+    }
+
+    fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
+        val safePrice = unitPriceWithTax.coerceAtLeast(0.0)
+        _cartItems.update { items ->
+            items.map { item ->
+                if (item.product.id == productId) {
+                    item.copy(unitPriceWithTax = safePrice)
+                } else {
+                    item
+                }
+            }
+        }
+    }
+
+    fun updateItemDiscount(productId: String, discountPercent: Double) {
+        val safeDiscount = discountPercent.coerceIn(0.0, 100.0)
+        _cartItems.update { items ->
+            items.map { item ->
+                if (item.product.id == productId) {
+                    item.copy(discountPercent = safeDiscount)
+                } else {
+                    item
+                }
+            }
+        }
     }
 
     fun clearCart() {

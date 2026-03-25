@@ -38,6 +38,10 @@ class LocalStore(
     private val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
     private val theFactoryPortKey = stringPreferencesKey("the_factory_port")
     private val theFactoryModeKey = stringPreferencesKey("the_factory_mode")
+    private val theFactoryGatewayKey = stringPreferencesKey("the_factory_gateway_key")
+    private val theFactoryGatewayLabelKey = stringPreferencesKey("the_factory_gateway_label")
+    private val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
+    private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
 
     suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
@@ -171,6 +175,8 @@ class LocalStore(
             prefs[theFactoryIpKey] = settings.ipAddress.trim()
             prefs[theFactoryPortKey] = settings.port.trim()
             prefs[theFactoryModeKey] = settings.openMode.trim()
+            prefs[theFactoryGatewayKey] = settings.gatewayKey.trim()
+            prefs[theFactoryGatewayLabelKey] = settings.gatewayLabel.trim()
         }
     }
 
@@ -183,10 +189,39 @@ class LocalStore(
             TheFactorySettings(
                 ipAddress = prefs[theFactoryIpKey].orEmpty(),
                 port = prefs[theFactoryPortKey].orEmpty(),
-                openMode = prefs[theFactoryModeKey].orEmpty()
+                openMode = prefs[theFactoryModeKey].orEmpty(),
+                gatewayKey = prefs[theFactoryGatewayKey].orEmpty(),
+                gatewayLabel = prefs[theFactoryGatewayLabelKey].orEmpty()
             )
         }
     }
+
+    suspend fun saveAllowEditPrices(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[allowEditPricesKey] = enabled
+        }
+    }
+
+    suspend fun saveAllowDiscounts(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[allowDiscountsKey] = enabled
+        }
+    }
+
+    fun allowEditPricesFlow(): Flow<Boolean> {
+        return context.dataStore.data.map { prefs ->
+            prefs[allowEditPricesKey] ?: false
+        }
+    }
+
+    fun allowDiscountsFlow(): Flow<Boolean> {
+        return context.dataStore.data.map { prefs ->
+            prefs[allowDiscountsKey] ?: false
+        }
+    }
+
+    suspend fun readAllowEditPrices(): Boolean = allowEditPricesFlow().first()
+    suspend fun readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
 
     // ============ COUNTRY SELECTION ============
 
@@ -259,7 +294,8 @@ data class CompanyDetailsSnapshot(
     val name: String,
     val adminDb: String,
     val accountingDb: String,
-    val payrollDb: String
+    val payrollDb: String,
+    val rif: String = ""
 )
 
 @Serializable
@@ -287,6 +323,7 @@ fun CompanyDetailsDto.toSnapshot(): CompanyDetailsSnapshot {
         name = name,
         adminDb = adminDb,
         accountingDb = accountingDb,
-        payrollDb = payrollDb
+        payrollDb = payrollDb,
+        rif = rif.orEmpty()
     )
 }

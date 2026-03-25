@@ -103,7 +103,8 @@ private fun CompanySessionSnapshot.toDomain(isOffline: Boolean): CompanySession 
             name = company.name,
             adminDb = company.adminDb,
             accountingDb = company.accountingDb,
-            payrollDb = company.payrollDb
+            payrollDb = company.payrollDb,
+            rif = company.rif
         ),
         isOffline = isOffline
     )

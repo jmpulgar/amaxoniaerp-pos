@@ -34,6 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -42,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -75,13 +77,21 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = injectedViewModel {
-        SettingsViewModel(DependencyContainer.localStore, DependencyContainer.hkaConnectionHelper)
+        SettingsViewModel(
+            localStore = DependencyContainer.localStore,
+            hkaConnectionHelper = DependencyContainer.hkaConnectionHelper,
+            rapidPayClient = DependencyContainer.theFactoryRapidPayClient
+        )
     }
 ) {
     val selectedPrinterType by viewModel.selectedPrinterType.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val theFactorySettings by viewModel.theFactorySettings.collectAsState()
+    val gatewayOptions by viewModel.gatewayOptions.collectAsState()
+    val isLoadingGateways by viewModel.isLoadingGateways.collectAsState()
+    val allowEditPrices by viewModel.allowEditPrices.collectAsState()
+    val allowDiscounts by viewModel.allowDiscounts.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isTestingPrint by remember { mutableStateOf(false) }
@@ -195,6 +205,72 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = "Permisos de venta POS",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Controla si en carrito se puede editar precio y aplicar descuentos.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 14.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Permite editar precios", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Habilita cambiar precio unitario desde el carrito",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = allowEditPrices,
+                            onCheckedChange = viewModel::onAllowEditPricesChanged
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Permite agregar descuentos", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Habilita descuento porcentual por ítem en carrito",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = allowDiscounts,
+                            onCheckedChange = viewModel::onAllowDiscountsChanged
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             if (selectedPrinterType == PrinterType.THE_FACTORY_HKA) {
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -218,6 +294,12 @@ fun SettingsScreen(
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                        )
+                        Text(
+                            text = "Modelo operativo para cobro + impresion: HKA20",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
 
                         OutlinedTextField(
@@ -249,6 +331,77 @@ fun SettingsScreen(
                             )
                         )
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Pasarela de pago (HKA20)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Selecciona aquí la pasarela que se usará al cobrar desde POS.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                        )
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val saveResult = viewModel.persistTheFactorySettings(requireGatewaySelection = false)
+                                    if (saveResult.isSuccess) {
+                                        viewModel.loadGatewayOptions().onFailure { error ->
+                                            snackbarHostState.showSnackbar(
+                                                error.message ?: "No se pudo consultar pasarelas",
+                                                duration = SnackbarDuration.Long
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isLoadingGateways,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            if (isLoadingGateways) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.onSecondary,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Consultando...")
+                            } else {
+                                Text("Consultar pasarelas disponibles")
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        if (gatewayOptions.isEmpty()) {
+                            Text(
+                                text = "No hay pasarelas cargadas. Pulsa \"Consultar pasarelas disponibles\".",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                                gatewayOptions.forEach { option ->
+                                    OutlinedButton(
+                                        onClick = { viewModel.onGatewaySelected(option) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (theFactorySettings.gatewayKey == option.key) AmaxoniaBlue else MaterialTheme.colorScheme.outline
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "${option.label} (${option.key})",
+                                            color = if (theFactorySettings.gatewayKey == option.key) AmaxoniaBlue else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Button(
@@ -287,7 +440,7 @@ fun SettingsScreen(
                                 onClick = {
                                     isTestingConnection = true
                                     scope.launch {
-                                        viewModel.persistTheFactorySettings()
+                                        viewModel.persistTheFactorySettings(requireGatewaySelection = false)
                                         val msg = viewModel.testHkaConnection()
                                         snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
                                         isTestingConnection = false
@@ -323,7 +476,7 @@ fun SettingsScreen(
                                 onClick = {
                                     isCheckingStatus = true
                                     scope.launch {
-                                        viewModel.persistTheFactorySettings()
+                                        viewModel.persistTheFactorySettings(requireGatewaySelection = false)
                                         val msg = viewModel.checkHkaPrinterStatus()
                                         snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
                                         isCheckingStatus = false
@@ -457,7 +610,7 @@ fun SettingsScreen(
                             isTestingPrint = true
                             scope.launch {
                                 if (selectedPrinterType == PrinterType.THE_FACTORY_HKA) {
-                                    val saveResult = viewModel.persistTheFactorySettings()
+                                    val saveResult = viewModel.persistTheFactorySettings(requireGatewaySelection = false)
                                     if (saveResult.isFailure) {
                                         isTestingPrint = false
                                         return@launch

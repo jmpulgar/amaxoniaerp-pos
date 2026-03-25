@@ -27,7 +27,7 @@ class CompanyRepository(private val database: Database) {
         }
 
         return companies.map { company ->
-            val rif = loadCompanyRif(company.adminDb)
+            val rif = loadCompanyRifByAdminDb(company.adminDb)
             CompanyResponse(
                 id = company.id,
                 name = company.name,
@@ -52,7 +52,7 @@ class CompanyRepository(private val database: Database) {
             .singleOrNull()
     }
 
-    private suspend fun loadCompanyRif(adminDb: String?): String? {
+    suspend fun loadCompanyRifByAdminDb(adminDb: String?): String? {
         if (adminDb.isNullOrBlank()) return null
 
         return runCatching {

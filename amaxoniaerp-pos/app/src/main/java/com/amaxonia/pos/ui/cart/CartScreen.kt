@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +55,10 @@ fun CartScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showSellerSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var itemToEditPrice by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.amaxonia.pos.domain.model.CartItem?>(null) }
+    var itemToEditDiscount by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.amaxonia.pos.domain.model.CartItem?>(null) }
+    var priceInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var discountInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
 
     // Manejo del mensaje de éxito (Pedido creado)
     if (state.orderSuccessMessage != null) {
@@ -68,6 +74,70 @@ fun CartScreen(
                     viewModel.clearMessage()
                     onBack()
                 }) { Text("Aceptar") }
+            }
+        )
+    }
+
+    val editingPriceItem = itemToEditPrice
+    if (editingPriceItem != null) {
+        AlertDialog(
+            onDismissRequest = { itemToEditPrice = null },
+            confirmButton = {
+                Button(onClick = {
+                    val parsed = priceInput.toDoubleOrNull()
+                    if (parsed != null) {
+                        viewModel.updateItemPrice(editingPriceItem.product.id, parsed)
+                        itemToEditPrice = null
+                    }
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToEditPrice = null }) { Text("Cancelar") }
+            },
+            title = { Text("Editar precio unitario") },
+            text = {
+                Column {
+                    Text(editingPriceItem.product.description, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = priceInput,
+                        onValueChange = { priceInput = it },
+                        label = { Text("Precio unitario con IVA") },
+                        singleLine = true
+                    )
+                }
+            }
+        )
+    }
+
+    val editingDiscountItem = itemToEditDiscount
+    if (editingDiscountItem != null) {
+        AlertDialog(
+            onDismissRequest = { itemToEditDiscount = null },
+            confirmButton = {
+                Button(onClick = {
+                    val parsed = discountInput.toDoubleOrNull()
+                    if (parsed != null) {
+                        viewModel.updateItemDiscount(editingDiscountItem.product.id, parsed)
+                        itemToEditDiscount = null
+                    }
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToEditDiscount = null }) { Text("Cancelar") }
+            },
+            title = { Text("Aplicar descuento") },
+            text = {
+                Column {
+                    Text(editingDiscountItem.product.description, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = discountInput,
+                        onValueChange = { discountInput = it },
+                        label = { Text("Descuento (%)") },
+                        singleLine = true
+                    )
+                }
             }
         )
     }
@@ -236,7 +306,17 @@ fun CartScreen(
                             item = item,
                             onIncrease = { viewModel.increaseQuantity(item.product.id) },
                             onDecrease = { viewModel.decreaseQuantity(item.product.id) },
-                            onRemove = { viewModel.removeItem(item.product.id) }
+                            onRemove = { viewModel.removeItem(item.product.id) },
+                            allowEditPrice = state.allowEditPrices,
+                            allowDiscount = state.allowDiscounts,
+                            onEditPrice = {
+                                itemToEditPrice = item
+                                priceInput = String.format("%.2f", item.unitPriceWithTax)
+                            },
+                            onEditDiscount = {
+                                itemToEditDiscount = item
+                                discountInput = String.format("%.2f", item.discountPercent)
+                            }
                         )
                     }
                 }
@@ -287,7 +367,11 @@ fun CartItemRow(
     item: com.amaxonia.pos.domain.model.CartItem,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    allowEditPrice: Boolean,
+    allowDiscount: Boolean,
+    onEditPrice: () -> Unit,
+    onEditDiscount: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -299,7 +383,14 @@ fun CartItemRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.product.description, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("$ ${item.product.prices.firstOrNull()?.pricePlusTax ?: 0.0} / ud", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                Text("$ ${String.format("%.2f", item.unitPriceWithTax)} / ud", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                if (item.discountPercent > 0.0) {
+                    Text(
+                        "Desc: ${String.format("%.2f", item.discountPercent)}% (-$ ${String.format("%.2f", item.discountAmountWithoutTax)})",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -324,6 +415,18 @@ fun CartItemRow(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
+
+            if (allowEditPrice) {
+                IconButton(onClick = onEditPrice) {
+                    Icon(Icons.Default.Edit, contentDescription = "Editar precio", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+
+            if (allowDiscount) {
+                IconButton(onClick = onEditDiscount) {
+                    Icon(Icons.Default.Percent, contentDescription = "Aplicar descuento", tint = MaterialTheme.colorScheme.tertiary)
+                }
+            }
 
             IconButton(onClick = onRemove) {
                 Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))

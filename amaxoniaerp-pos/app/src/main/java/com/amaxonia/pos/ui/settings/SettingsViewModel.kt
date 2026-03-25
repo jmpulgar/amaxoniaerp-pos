@@ -3,7 +3,9 @@ package com.amaxonia.pos.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.printer.GatewayOption
 import com.amaxonia.pos.data.printer.HkaConnectionHelper
+import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import kotlinx.coroutines.flow.collect
@@ -14,7 +16,8 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val localStore: LocalStore,
-    private val hkaConnectionHelper: HkaConnectionHelper? = null
+    private val hkaConnectionHelper: HkaConnectionHelper? = null,
+    private val rapidPayClient: TheFactoryRapidPayClient? = null
 ) : ViewModel() {
 
     private val _selectedPrinterType = MutableStateFlow(PrinterType.NONE)
@@ -28,6 +31,14 @@ class SettingsViewModel(
 
     private val _theFactorySettings = MutableStateFlow(TheFactorySettings())
     val theFactorySettings = _theFactorySettings.asStateFlow()
+    private val _allowEditPrices = MutableStateFlow(false)
+    val allowEditPrices = _allowEditPrices.asStateFlow()
+    private val _allowDiscounts = MutableStateFlow(false)
+    val allowDiscounts = _allowDiscounts.asStateFlow()
+    private val _gatewayOptions = MutableStateFlow<List<GatewayOption>>(emptyList())
+    val gatewayOptions = _gatewayOptions.asStateFlow()
+    private val _isLoadingGateways = MutableStateFlow(false)
+    val isLoadingGateways = _isLoadingGateways.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -38,6 +49,22 @@ class SettingsViewModel(
         viewModelScope.launch {
             localStore.theFactorySettingsFlow().collect { settings ->
                 _theFactorySettings.value = settings
+                if (settings.gatewayKey.isNotBlank() && _gatewayOptions.value.none { it.key == settings.gatewayKey }) {
+                    _gatewayOptions.value = _gatewayOptions.value + GatewayOption(
+                        key = settings.gatewayKey,
+                        label = settings.gatewayLabel.ifBlank { "Pasarela ${settings.gatewayKey}" }
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            localStore.allowEditPricesFlow().collect { enabled ->
+                _allowEditPrices.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            localStore.allowDiscountsFlow().collect { enabled ->
+                _allowDiscounts.value = enabled
             }
         }
     }
@@ -75,16 +102,88 @@ class SettingsViewModel(
         }
     }
 
-    suspend fun persistTheFactorySettings(showSuccessMessage: Boolean = false): Result<Unit> {
+    fun onAllowEditPricesChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { localStore.saveAllowEditPrices(enabled) }
+                .onFailure { throwable ->
+                    _errorMessage.value = throwable.message ?: "No se pudo guardar permiso de edición de precios"
+                }
+        }
+    }
+
+    fun onAllowDiscountsChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { localStore.saveAllowDiscounts(enabled) }
+                .onFailure { throwable ->
+                    _errorMessage.value = throwable.message ?: "No se pudo guardar permiso de descuentos"
+                }
+        }
+    }
+
+    fun onGatewaySelected(option: GatewayOption) {
+        _theFactorySettings.update { current ->
+            current.copy(
+                gatewayKey = option.key.trim(),
+                gatewayLabel = option.label.trim()
+            )
+        }
+    }
+
+    suspend fun loadGatewayOptions(): Result<List<GatewayOption>> {
+        val client = rapidPayClient ?: return Result.failure(
+            IllegalStateException("Cliente de pasarela HKA no disponible")
+        )
+        val current = _theFactorySettings.value
+        if (current.ipAddress.isBlank() || current.port.toIntOrNull() == null) {
+            return Result.failure(IllegalStateException("Guarda IP y puerto antes de consultar pasarelas"))
+        }
+
+        _isLoadingGateways.value = true
+        return client.listGateways()
+            .onSuccess { list ->
+                val fallback = if (list.isEmpty()) listOf(GatewayOption("R", "Rapid pago")) else list
+                _gatewayOptions.value = fallback
+                if (current.gatewayKey.isBlank()) {
+                    val first = fallback.firstOrNull()
+                    if (first != null) {
+                        onGatewaySelected(first)
+                    }
+                }
+            }
+            .onFailure { throwable ->
+                _errorMessage.value = throwable.message ?: "No se pudo consultar pasarelas"
+                if (_gatewayOptions.value.isEmpty()) {
+                    val fallback = GatewayOption("R", "Rapid pago")
+                    _gatewayOptions.value = listOf(fallback)
+                    if (current.gatewayKey.isBlank()) {
+                        onGatewaySelected(fallback)
+                    }
+                }
+            }
+            .also {
+                _isLoadingGateways.value = false
+            }
+    }
+
+    suspend fun persistTheFactorySettings(
+        showSuccessMessage: Boolean = false,
+        requireGatewaySelection: Boolean = true
+    ): Result<Unit> {
         val settings = _theFactorySettings.value.copy(
             ipAddress = _theFactorySettings.value.ipAddress.trim(),
-            port = _theFactorySettings.value.port.trim()
+            port = _theFactorySettings.value.port.trim(),
+            openMode = _theFactorySettings.value.openMode.trim().ifBlank { "HKA20" },
+            gatewayKey = _theFactorySettings.value.gatewayKey.trim(),
+            gatewayLabel = _theFactorySettings.value.gatewayLabel.trim()
         )
 
         return runCatching {
             require(settings.ipAddress.isNotBlank()) { "Ingresa la IP de The Factory HKA" }
             require(settings.port.isNotBlank()) { "Ingresa el puerto de The Factory HKA" }
             require(settings.port.toIntOrNull() != null) { "El puerto de The Factory HKA no es valido" }
+            if (requireGatewaySelection) {
+                require(settings.gatewayKey.isNotBlank()) { "Selecciona una pasarela HKA en configuración de impresora" }
+            }
             localStore.saveTheFactorySettings(settings)
             _theFactorySettings.value = settings
             if (showSuccessMessage) {

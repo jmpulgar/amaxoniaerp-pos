@@ -50,9 +50,15 @@ data class SaleInvoiceInput(
     val formaPago: String,
     val codEstatus: Int = 2,
     val subtotal: Double,
+    val descuentosItemFactura: Double = 0.0,
     val ivaTotalFactura: Double,
     val totalTotalFactura: Double,
     val montoItemsFactura: Double,
+    val totalizarSubTotal: Double = subtotal,
+    val totalizarDescuentoParcial: Double = 0.0,
+    val totalizarTotalOperacion: Double = montoItemsFactura,
+    val totalizarPDescuentoGlobal: Double = 0.0,
+    val totalizarDescuentoGlobal: Double = 0.0,
     val totalizarBaseImponible: Double,
     val totalizarMontoIva: Double,
     val totalizarTotalGeneral: Double,
@@ -80,6 +86,10 @@ data class SaleItemInput(
     val itemCantidad: Double,
     @SerialName("_item_preciosiniva")
     val itemPrecioSinIva: Double,
+    @SerialName("_item_descuento")
+    val itemDescuento: Double = 0.0,
+    @SerialName("_item_montodescuento")
+    val itemMontoDescuento: Double = 0.0,
     @SerialName("_item_piva")
     val itemPIva: Double,
     @SerialName("_item_totalsiniva")

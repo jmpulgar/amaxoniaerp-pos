@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.payment
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -60,6 +61,14 @@ fun SuccessScreen(
     LaunchedEffect(initialPrintMessage) {
         if (initialPrintMessage.isNotBlank()) {
             snackbarHostState.showSnackbar(initialPrintMessage)
+        }
+    }
+
+    BackHandler(enabled = true) {
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                message = "Usa SIGUIENTE ORDEN para finalizar y limpiar el estado de venta"
+            )
         }
     }
 

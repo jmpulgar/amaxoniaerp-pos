@@ -56,6 +56,9 @@ class PaymentViewModel(
         private const val TAG = "PaymentVM"
     }
 
+    private var configuredGatewayKey: String = ""
+    private var configuredCommerceRif: String = ""
+
     private val _state = MutableStateFlow(PaymentState())
     val state = _state.asStateFlow()
 
@@ -68,6 +71,7 @@ class PaymentViewModel(
 
     init {
         loadFormasPago()
+        loadGatewayConfiguration()
     }
 
     fun setTotalAmount(amount: Double) {
@@ -164,6 +168,14 @@ class PaymentViewModel(
         }
     }
 
+    private fun loadGatewayConfiguration() {
+        viewModelScope.launch {
+            val settings = localStore.readTheFactorySettings()
+            configuredGatewayKey = settings.gatewayKey.trim()
+            configuredCommerceRif = localStore.readCompanySession()?.company?.rif.orEmpty().trim()
+        }
+    }
+
     fun processPayment(onSuccess: (PaymentSuccessPayload) -> Unit) {
         val currentState = _state.value
         if (!currentState.isPaymentEnough) {
@@ -179,16 +191,53 @@ class PaymentViewModel(
 
         val formapagoDetalle = buildFormapagoDetalle(currentState)
         val selectedPaymentMethods = buildSelectedPaymentMethods(currentState, formapagoDetalle.detalle)
+        val requiresGatewayConfig = formapagoDetalle.detalle.any { detail ->
+            val forma = currentState.formasPago.firstOrNull { it.idFormaPago == detail.idFormaPago }
+            forma != null && requiresRapidPayForForma(forma)
+        }
         if (formapagoDetalle.detalle.isEmpty()) {
             _state.update { it.copy(paymentError = "Debes indicar al menos una forma de pago valida") }
             return
         }
-        _state.update { it.copy(lastFormapagoDetalle = formapagoDetalle, isProcessingPayment = true, paymentError = null) }
+        _state.update {
+            it.copy(
+                lastFormapagoDetalle = formapagoDetalle,
+                isProcessingPayment = true,
+                paymentError = null,
+                gatewayStatusMessage = "Validando cobro..."
+            )
+        }
 
         viewModelScope.launch {
             val cartItems = cartRepository.cartItems.value
             val selectedClient = cartRepository.selectedClient.value
             val activeCaja = cajaRepository.activeCaja.value
+            if (requiresGatewayConfig) {
+                if (configuredGatewayKey.isBlank()) {
+                    configuredGatewayKey = localStore.readTheFactorySettings().gatewayKey.trim()
+                }
+                if (configuredCommerceRif.isBlank()) {
+                    configuredCommerceRif = localStore.readCompanySession()?.company?.rif.orEmpty().trim()
+                }
+                if (configuredGatewayKey.isBlank()) {
+                    _state.update {
+                        it.copy(
+                            isProcessingPayment = false,
+                            paymentError = "Configura una pasarela HKA en configuración de impresora"
+                        )
+                    }
+                    return@launch
+                }
+                if (configuredCommerceRif.isBlank()) {
+                    _state.update {
+                        it.copy(
+                            isProcessingPayment = false,
+                            paymentError = "No se encontró RIF comercio desde parametros_generales.rif"
+                        )
+                    }
+                    return@launch
+                }
+            }
 
             if (cartItems.isEmpty()) {
                 _state.update { it.copy(isProcessingPayment = false, paymentError = "No hay items en el carrito") }
@@ -217,7 +266,8 @@ class PaymentViewModel(
                 return@launch
             }
 
-            val idCajaSecuencia = cajaStatus.cajaSecuencia?.idCajaSecuencia
+            val cajaSecuencia = cajaStatus.cajaSecuencia
+            val idCajaSecuencia = cajaSecuencia?.idCajaSecuencia
             if (idCajaSecuencia.isNullOrBlank()) {
                 _state.update {
                     it.copy(
@@ -264,8 +314,7 @@ class PaymentViewModel(
             val mappedItems = cartItems.map { cartItem ->
                 val itemId = cartItem.product.id.toInt()
                 val qty = cartItem.quantity.toDouble()
-                val unitConIva = cartItem.product.prices.firstOrNull()?.pricePlusTax ?: 0.0
-                val totalConIva = unitConIva * qty
+                val unitConIva = cartItem.unitPriceWithTax
                 val taxRate = if (cartItem.product.isExempt) {
                     0.0
                 } else {
@@ -273,7 +322,11 @@ class PaymentViewModel(
                 }
                 val divisor = 1.0 + (taxRate / 100.0)
                 val unitSinIva = if (taxRate <= 0.0) unitConIva else unitConIva / divisor
-                val totalSinIva = if (taxRate <= 0.0) totalConIva else totalConIva / divisor
+                val subtotalSinIva = unitSinIva * qty
+                val discountPct = cartItem.discountPercent.coerceIn(0.0, 100.0)
+                val discountAmountSinIva = subtotalSinIva * (discountPct / 100.0)
+                val totalSinIva = (subtotalSinIva - discountAmountSinIva).coerceAtLeast(0.0)
+                val totalConIva = if (taxRate <= 0.0) totalSinIva else totalSinIva * divisor
                 val lineSellerId = cartItem.codVendedor.takeIf { it > 0 } ?: currentSellerId
 
                 SaleItemDto(
@@ -283,6 +336,8 @@ class PaymentViewModel(
                     itemDescripcion = cartItem.product.description,
                     itemCantidad = qty,
                     itemPrecioSinIva = unitSinIva,
+                    itemDescuento = discountPct,
+                    itemMontoDescuento = discountAmountSinIva,
                     itemPIva = taxRate,
                     itemTotalSinIva = totalSinIva,
                     itemTotalConIva = totalConIva,
@@ -293,9 +348,11 @@ class PaymentViewModel(
                 )
             }
 
-            val subtotal = mappedItems.sumOf { it.itemTotalSinIva }
+            val subtotalBruto = mappedItems.sumOf { it.itemPrecioSinIva * it.itemCantidadTotal }
+            val totalDescuentoItems = mappedItems.sumOf { it.itemMontoDescuento }
+            val subtotalNeto = mappedItems.sumOf { it.itemTotalSinIva }
             val totalGeneral = mappedItems.sumOf { it.itemTotalConIva }
-            val totalIva = totalGeneral - subtotal
+            val totalIva = totalGeneral - subtotalNeto
 
             val taxLines = mappedItems
                 .groupBy { it.itemPIva }
@@ -322,17 +379,23 @@ class PaymentViewModel(
                 )
             }
 
-            val gatewayResult = processGatewayPaymentsIfNeeded(selectedPaymentMethods)
+            val gatewayResult = processGatewayPaymentsIfNeeded(
+                paymentMethods = selectedPaymentMethods,
+                selectedClient = selectedClient
+            )
             if (gatewayResult.isFailure) {
                 _state.update {
                     it.copy(
                         isProcessingPayment = false,
+                        gatewayStatusMessage = null,
                         paymentError = gatewayResult.exceptionOrNull()?.message
                             ?: "No se pudo completar el cobro en The Factory"
                     )
                 }
                 return@launch
             }
+
+            _state.update { it.copy(gatewayStatusMessage = "Generando factura...") }
 
             val montosPorTipo = payments.groupBy { it.tipoMovimiento }
                 .mapValues { (_, list) -> list.sumOf { it.monto } }
@@ -349,16 +412,20 @@ class PaymentViewModel(
                     idCaja = activeCaja.idCaja,
                     codigoCaja = activeCaja.codCaja.orEmpty(),
                     idCajaSecuencia = idCajaSecuencia,
-                    serieSucursal = cajaStatus.cajaSecuencia?.serieSucursal
-                        ?: activeCaja.serieSucursal
-                        ?: activeCaja.serieCaja,
+                    serieSucursal = cajaSecuencia.serieSucursal,
                     formaPago = "contado",
                     codEstatus = 2,
-                    subtotal = subtotal,
+                    subtotal = subtotalBruto,
+                    descuentosItemFactura = totalDescuentoItems,
                     ivaTotalFactura = totalIva,
                     totalTotalFactura = totalGeneral,
-                    montoItemsFactura = totalGeneral,
-                    totalizarBaseImponible = subtotal,
+                    montoItemsFactura = subtotalNeto,
+                    totalizarSubTotal = subtotalBruto,
+                    totalizarDescuentoParcial = totalDescuentoItems,
+                    totalizarTotalOperacion = subtotalNeto,
+                    totalizarPDescuentoGlobal = 0.0,
+                    totalizarDescuentoGlobal = 0.0,
+                    totalizarBaseImponible = subtotalNeto,
                     totalizarMontoIva = totalIva,
                     totalizarTotalGeneral = totalGeneral,
                     usuarioCreacion = usuario,
@@ -397,6 +464,7 @@ class PaymentViewModel(
                 _state.update {
                     it.copy(
                         isProcessingPayment = false,
+                        gatewayStatusMessage = null,
                         paymentError = backendMessage
                             ?: "No se pudo procesar la venta. Intenta nuevamente"
                     )
@@ -444,6 +512,7 @@ class PaymentViewModel(
                 return@launch
             }
 
+            _state.update { it.copy(gatewayStatusMessage = "Imprimiendo factura...") }
             val printFeedback = printReceiptIfConfigured(newTransaction)
 
             _state.update {
@@ -451,6 +520,7 @@ class PaymentViewModel(
                     isSuccess = true,
                     isProcessingPayment = false,
                     paymentError = null,
+                    gatewayStatusMessage = null,
                     receiptPrintMessage = printFeedback
                 )
             }
@@ -577,10 +647,12 @@ class PaymentViewModel(
      * 3. Suspends via RapidPayBridge.awaitResult() until onNewIntent delivers the result
      * 4. If rejected, returns failure immediately
      */
-    private suspend fun processGatewayPaymentsIfNeeded(paymentMethods: List<TransactionPaymentMethod>): Result<Unit> {
-        val selectedPrinterType = localStore.readSelectedPrinterType()
-        if (selectedPrinterType != PrinterType.THE_FACTORY_HKA) {
-            Log.d(TAG, "processGatewayPaymentsIfNeeded() → printer no es HKA, omitiendo gateway")
+    private suspend fun processGatewayPaymentsIfNeeded(
+        paymentMethods: List<TransactionPaymentMethod>,
+        selectedClient: com.amaxonia.pos.domain.model.Client
+    ): Result<Unit> {
+        if (!isHka20FlowEnabled()) {
+            Log.d(TAG, "processGatewayPaymentsIfNeeded() → flujo no HKA20, omitiendo gateway")
             return Result.success(Unit)
         }
 
@@ -596,7 +668,9 @@ class PaymentViewModel(
             // Step 1: Build the Intent
             val intentResult = rapidPayClient.buildGatewayIntent(
                 amount = method.amount,
-                commandPrefix = method.gatewayCommandPrefix
+                commandPrefix = method.gatewayCommandPrefix,
+                customerIdentifier = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { selectedClient.id } },
+                commerceRif = configuredCommerceRif
             )
 
             if (intentResult.isFailure) {
@@ -634,6 +708,8 @@ class PaymentViewModel(
     }
 
     private fun resolveGatewayPaymentPrefix(forma: FormaPago): String {
+        val gatewayKey = configuredGatewayKey.takeIf { it.isNotBlank() } ?: return ""
+        if (!requiresRapidPayForForma(forma)) return ""
         val normalized = listOf(
             forma.descripcion.orEmpty(),
             forma.siglas.orEmpty(),
@@ -641,11 +717,33 @@ class PaymentViewModel(
         ).joinToString(" ").lowercase()
 
         return when {
-            normalized.contains("punto de venta") -> "KRV"
-            normalized.contains("debito") || normalized == "pv" || normalized.contains(" tdc") || normalized.startsWith("tdc") -> "KRV"
-            normalized.contains("credito") -> "KRV"
+            normalized.contains("punto de venta") -> "K${gatewayKey}V"
+            normalized.contains("debito") || normalized == "pv" || normalized.contains(" tdc") || normalized.startsWith("tdc") -> "K${gatewayKey}V"
+            normalized.contains("credito") -> "K${gatewayKey}V"
             else -> ""
         }
+    }
+
+    private fun requiresRapidPayForForma(forma: FormaPago): Boolean {
+        val normalized = listOf(
+            forma.descripcion.orEmpty(),
+            forma.siglas.orEmpty(),
+            forma.codigo.orEmpty()
+        ).joinToString(" ").lowercase()
+
+        return normalized.contains("punto de venta") ||
+            normalized.contains("debito") ||
+            normalized == "pv" ||
+            normalized.contains(" tdc") ||
+            normalized.startsWith("tdc") ||
+            normalized.contains("credito")
+    }
+
+    private suspend fun isHka20FlowEnabled(): Boolean {
+        val selectedPrinterType = localStore.readSelectedPrinterType()
+        if (selectedPrinterType != PrinterType.THE_FACTORY_HKA) return false
+        val mode = localStore.readTheFactorySettings().openMode.trim()
+        return mode.isBlank() || mode.equals("HKA20", ignoreCase = true)
     }
 
     private fun resolveFiscalPaymentCode(forma: FormaPago): String {

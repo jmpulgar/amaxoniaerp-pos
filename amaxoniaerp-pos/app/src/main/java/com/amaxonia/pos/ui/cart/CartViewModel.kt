@@ -19,7 +19,9 @@ data class CartState(
     val selectedClient: Client? = null,
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
-    val orderSuccessMessage: String? = null
+    val orderSuccessMessage: String? = null,
+    val allowEditPrices: Boolean = false,
+    val allowDiscounts: Boolean = false
 )
 
 class CartViewModel(
@@ -58,6 +60,16 @@ class CartViewModel(
                 _state.update { it.copy(availableSellers = sellers) }
             }
         }
+        viewModelScope.launch {
+            localStore.allowEditPricesFlow().collect { enabled ->
+                _state.update { it.copy(allowEditPrices = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            localStore.allowDiscountsFlow().collect { enabled ->
+                _state.update { it.copy(allowDiscounts = enabled) }
+            }
+        }
         ensureDefaultClient()
     }
 
@@ -74,6 +86,16 @@ class CartViewModel(
     fun increaseQuantity(productId: String) = cartRepository.increaseQuantity(productId)
     fun decreaseQuantity(productId: String) = cartRepository.decreaseQuantity(productId)
     fun removeItem(productId: String) = cartRepository.removeItem(productId)
+
+    fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
+        if (!_state.value.allowEditPrices) return
+        cartRepository.updateItemPrice(productId, unitPriceWithTax)
+    }
+
+    fun updateItemDiscount(productId: String, discountPercent: Double) {
+        if (!_state.value.allowDiscounts) return
+        cartRepository.updateItemDiscount(productId, discountPercent)
+    }
 
     fun clearCart() {
         cartRepository.clearCart()

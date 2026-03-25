@@ -52,5 +52,6 @@ data class CompanyDetailsDto(
     val name: String,
     val adminDb: String = "",
     val accountingDb: String = "",
-    val payrollDb: String = ""
+    val payrollDb: String = "",
+    val rif: String? = null
 )

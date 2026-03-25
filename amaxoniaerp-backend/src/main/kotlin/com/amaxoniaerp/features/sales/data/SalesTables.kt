@@ -77,6 +77,8 @@ object SalesFacturaDetalleTable : Table("factura_detalle") {
     val itemDescripcion = varchar("_item_descripcion", 500)
     val itemCantidad = decimal("_item_cantidad", 32, 3)
     val itemPrecioSinIva = decimal("_item_preciosiniva", 20, 2)
+    val itemDescuento = decimal("_item_descuento", 10, 2)
+    val itemMontoDescuento = decimal("_item_montodescuento", 20, 2)
     val itemPiva = decimal("_item_piva", 10, 2)
     val itemTotalSinIva = decimal("_item_totalsiniva", 20, 2)
     val itemTotalConIva = decimal("_item_totalconiva", 20, 2)
