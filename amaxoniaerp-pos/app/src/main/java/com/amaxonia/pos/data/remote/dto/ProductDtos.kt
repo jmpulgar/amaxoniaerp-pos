@@ -45,6 +45,22 @@ data class PriceDto(
 )
 
 @Serializable
+data class ItemLotInfoDto(
+    val idLoteItem: Int,
+    val codigoLoteItem: String,
+    val vencimiento: String? = null,
+    val disponibilidad: Int,
+    val idAlmacen: Int = 1
+)
+
+@Serializable
+data class ItemLotsResponseDto(
+    val itemId: Int,
+    val poseeConfiguracionLote: Boolean,
+    val lotes: List<ItemLotInfoDto> = emptyList()
+)
+
+@Serializable
 data class CreateProductRequest(
     val code: String,
     val name: String,

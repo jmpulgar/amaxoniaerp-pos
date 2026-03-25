@@ -69,7 +69,8 @@ fun DashboardScreen(
     onNavigateToPrinterSettings: () -> Unit,
     onNavigateToCart: () -> Unit,
     onStartNewOrder: () -> Unit,
-    onNavigateToCierreCaja: () -> Unit = {}
+    onNavigateToCierreCaja: () -> Unit = {},
+    onNavigateToDraftInvoices: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -216,7 +217,11 @@ fun DashboardScreen(
                         scope.launch { drawerState.close() }
                         onNavigateToReports()
                     }
-                    DrawerMenuItem(Icons.Default.Print, "Configuracion de Impresora") {
+                    DrawerMenuItem(Icons.Default.Description, "Facturas Pendientes") {
+                        scope.launch { drawerState.close() }
+                        onNavigateToDraftInvoices()
+                    }
+                    DrawerMenuItem(Icons.Default.Settings, "Configuracion POS") {
                         scope.launch { drawerState.close() }
                         onNavigateToPrinterSettings()
                     }

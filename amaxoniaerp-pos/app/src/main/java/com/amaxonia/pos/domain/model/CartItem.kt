@@ -1,11 +1,24 @@
 package com.amaxonia.pos.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class LotAssignment(
+    val idLoteItem: String,
+    val codigoLote: String,
+    val vencimiento: String? = null,
+    val cantidad: Int,
+    val almacen: Int = 0
+)
+
 data class CartItem(
     val product: Product,
     val quantity: Int = 1,
     val codVendedor: Int = 0,
     val unitPriceWithTax: Double = product.prices.firstOrNull()?.pricePlusTax ?: 0.0,
     val discountPercent: Double = 0.0,
+    val hasLotConfig: Boolean = false,
+    val lotAssignments: List<LotAssignment> = emptyList(),
 ) {
     val taxRate: Double
         get() = if (product.isExempt) 0.0 else product.taxRate.coerceAtLeast(0.0)

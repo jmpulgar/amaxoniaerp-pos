@@ -165,6 +165,12 @@ class ApiService(
         }.body()
     }
 
+    suspend fun getItemLots(token: String, id: String): ItemLotsResponseDto {
+        return client.get("items/$id/lots") {
+            authHeaders(token)
+        }.body()
+    }
+
     suspend fun getClients(
         token: String,
         limit: Int,

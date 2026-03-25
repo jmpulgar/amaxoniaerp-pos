@@ -16,9 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AddressLevel1Entity::class,
         AddressLevel2Entity::class,
         AddressLevel3Entity::class,
-        ClientTypeEntity::class
+        ClientTypeEntity::class,
+        DraftInvoiceEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -30,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun addressLevel2Dao(): AddressLevel2Dao
     abstract fun addressLevel3Dao(): AddressLevel3Dao
     abstract fun clientTypeDao(): ClientTypeDao
+    abstract fun draftInvoiceDao(): DraftInvoiceDao
 
     companion object {
         @Volatile
@@ -97,6 +99,25 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("UPDATE products SET isExempt = CASE WHEN IFNULL(taxRate, 0) <= 0 THEN 1 ELSE 0 END")
             }
         }
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS draft_invoices (" +
+                        "id TEXT NOT NULL, " +
+                        "clientId TEXT, " +
+                        "clientFirstName TEXT, " +
+                        "clientLastName TEXT, " +
+                        "sellerId INTEGER NOT NULL DEFAULT 0, " +
+                        "sellerName TEXT, " +
+                        "itemsJson TEXT NOT NULL, " +
+                        "total REAL NOT NULL, " +
+                        "itemCount INTEGER NOT NULL, " +
+                        "createdAt INTEGER NOT NULL, " +
+                        "PRIMARY KEY(id)" +
+                        ")"
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
@@ -104,7 +125,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "amaxonia_pos.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { instance = it }
             }

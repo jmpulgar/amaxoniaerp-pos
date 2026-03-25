@@ -344,7 +344,16 @@ class PaymentViewModel(
                     itemCantidadTotal = qty,
                     esProductoFisico = true,
                     itemCodigo = cartItem.product.code,
-                    itemReferencia = cartItem.product.reference
+                    itemReferencia = cartItem.product.reference,
+                    poseeConfiguracionLote = if (cartItem.hasLotConfig) "si" else "no",
+                    codigosLote = cartItem.lotAssignments.map { lot ->
+                        com.amaxonia.pos.domain.model.sales.SaleLotDto(
+                            idLoteItem = lot.idLoteItem.toIntOrNull() ?: 0,
+                            codigoLoteItem = lot.codigoLote,
+                            cantidad = lot.cantidad,
+                            idAlmacen = lot.almacen
+                        )
+                    }
                 )
             }
 

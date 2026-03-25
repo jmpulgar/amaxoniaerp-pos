@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.*
+import com.amaxonia.pos.domain.model.CartItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,14 +62,13 @@ fun CartScreen(
     var priceInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var discountInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
 
-    // Manejo del mensaje de éxito (Pedido creado)
+    // Mensaje de exito (borrador guardado)
     if (state.orderSuccessMessage != null) {
         AlertDialog(
             onDismissRequest = {
                 viewModel.clearMessage()
-                onBack() // Volver al dashboard
             },
-            title = { Text("Pedido Creado") },
+            title = { Text("Borrador Guardado") },
             text = { Text(state.orderSuccessMessage!!) },
             confirmButton = {
                 Button(onClick = {
@@ -170,6 +171,17 @@ fun CartScreen(
                         )
                     }
                 },
+                actions = {
+                    if (state.items.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearCart() }) {
+                            Icon(
+                                Icons.Default.DeleteSweep,
+                                contentDescription = "Limpiar carrito",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
@@ -193,10 +205,9 @@ fun CartScreen(
 
                         // Botones de Acción
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            // 1. Botón GUARDAR PEDIDO (Solo activo si hay cliente)
+                            // 1. Boton GUARDAR BORRADOR (factura pendiente local)
                             Button(
-                                onClick = { viewModel.createOrder() },
-                                enabled = state.selectedClient != null,
+                                onClick = { viewModel.saveDraft() },
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
@@ -377,59 +388,98 @@ fun CartItemRow(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.product.description, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("$ ${String.format("%.2f", item.unitPriceWithTax)} / ud", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                if (item.discountPercent > 0.0) {
-                    Text(
-                        "Desc: ${String.format("%.2f", item.discountPercent)}% (-$ ${String.format("%.2f", item.discountAmountWithoutTax)})",
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDecrease, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.primary)
-                }
-                Text(
-                    text = "${item.quantity}",
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-                IconButton(onClick = onIncrease, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
+        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+            // Descripcion completa (hasta 2 lineas)
             Text(
-                "$ ${String.format("%.2f", item.total)}",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                item.product.description,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            if (allowEditPrice) {
-                IconButton(onClick = onEditPrice) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar precio", tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Precio, controles de cantidad, total y acciones
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "$ ${String.format("%.2f", item.unitPriceWithTax)} / ud",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Controles de cantidad
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onDecrease, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        }
+                        Text(
+                            "${item.quantity}",
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        IconButton(onClick = onIncrease, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    "$ ${String.format("%.2f", item.total)}",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp
+                )
+
+                // Acciones compactas
+                if (allowEditPrice) {
+                    IconButton(onClick = onEditPrice, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar precio", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    }
+                }
+                if (allowDiscount) {
+                    IconButton(onClick = onEditDiscount, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Percent, contentDescription = "Aplicar descuento", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
+                    }
+                }
+                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
                 }
             }
 
-            if (allowDiscount) {
-                IconButton(onClick = onEditDiscount) {
-                    Icon(Icons.Default.Percent, contentDescription = "Aplicar descuento", tint = MaterialTheme.colorScheme.tertiary)
-                }
+            // Descuento (condicional)
+            if (item.discountPercent > 0.0) {
+                Text(
+                    "Desc: ${String.format("%.2f", item.discountPercent)}% (-$ ${String.format("%.2f", item.discountAmountWithoutTax)})",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+            // Lotes asignados (condicional)
+            if (item.lotAssignments.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                item.lotAssignments.forEach { lot ->
+                    Text(
+                        "Lote: ${lot.codigoLote} (${lot.cantidad} uds${if (!lot.vencimiento.isNullOrBlank()) " - Vence: ${lot.vencimiento}" else ""})",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

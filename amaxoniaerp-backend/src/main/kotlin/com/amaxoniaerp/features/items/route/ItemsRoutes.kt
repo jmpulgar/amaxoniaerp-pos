@@ -390,7 +390,48 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
             }
 
             /**
-             * GET /items/{id}/stock - Inventario por almacén con precompromisos.
+             * GET /items/{id}/lots - Lotes disponibles para un producto (FEFO).
+             */
+            get("/{id}/lots") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Token invalido")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Se requiere token de empresa")
+                    )
+                }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token")
+                    )
+
+                val adminDb = principal.getAdminDb()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta admin_db en token")
+                    )
+
+                val id = call.parameters["id"]?.toIntOrNull()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "ID de producto invalido")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val lots = itemsRepository.getItemLots(companyDb, id)
+                call.respond(lots)
+            }
+
+            /**
+             * GET /items/{id}/stock - Inventario por almacen con precompromisos.
              */
             get("/{id}/stock") {
                 val principal = call.principal<JWTPrincipal>()

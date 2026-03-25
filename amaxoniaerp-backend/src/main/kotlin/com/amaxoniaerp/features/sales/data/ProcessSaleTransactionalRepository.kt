@@ -5,6 +5,8 @@ import com.amaxoniaerp.features.companies.data.TasasCambioTable
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
+import com.amaxoniaerp.features.items.data.FacturaDetalleProductoLoteTable
+import com.amaxoniaerp.features.items.data.ItemLoteTable
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
 import com.amaxoniaerp.features.sales.domain.SaleItemInput
@@ -44,7 +46,8 @@ class ProcessSaleTransactionalRepository {
         val today = now.toLocalDate()
 
         insertFactura(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
-        insertFacturaDetalle(preparedRequest, invoiceId, now, monetaryContext)
+        val detalleIds = insertFacturaDetalle(preparedRequest, invoiceId, now, monetaryContext)
+        processLotTracking(preparedRequest, detalleIds)
         insertFacturaImpuestos(preparedRequest, invoiceId, now, monetaryContext)
         insertFacturaDetalleFormaPago(preparedRequest, invoiceId, now, monetaryContext)
 
@@ -539,14 +542,16 @@ class ProcessSaleTransactionalRepository {
         }
     }
 
+    /** Retorna lista de (detalleId, itemIndex) para vincular con lotes */
     private fun insertFacturaDetalle(
         request: ProcessSaleRequest,
         invoiceId: String,
         now: LocalDateTime,
         monetaryContext: MonetaryContext,
-    ) {
+    ): List<String> {
         val vendedorPorDefecto = request.factura.codVendedor
         val usuario = request.factura.usuarioCreacion.take(32)
+        val detalleIds = mutableListOf<String>()
 
         request.items.forEach { item ->
             val vendedorLinea = item.codVendedor?.takeIf { it > 0 } ?: vendedorPorDefecto
@@ -562,8 +567,11 @@ class ProcessSaleTransactionalRepository {
                     .setScale(2, RoundingMode.HALF_UP)
             }
 
+            val detalleId = UUID.randomUUID().toString()
+            detalleIds.add(detalleId)
+
             SalesFacturaDetalleTable.insert {
-                it[idDetalleFactura] = UUID.randomUUID().toString()
+                it[idDetalleFactura] = detalleId
                 it[idFactura] = invoiceId
                 it[idItem] = item.idItem
                 it[itemAlmacen] = item.itemAlmacen
@@ -595,6 +603,41 @@ class ProcessSaleTransactionalRepository {
                 it[codVendedor] = vendedorLinea
                 it[itemCodigo] = item.itemCodigo
                 it[itemReferencia] = item.itemReferencia
+            }
+        }
+        return detalleIds
+    }
+
+    /**
+     * Inserta trazabilidad por lote y descuenta disponibilidad en item_lote.
+     * Solo aplica a items con poseeConfiguracionLote == "si" y codigosLote no vacio.
+     */
+    private fun processLotTracking(
+        request: ProcessSaleRequest,
+        detalleIds: List<String>,
+    ) {
+        request.items.forEachIndexed { index, item ->
+            if (item.poseeConfiguracionLote.equals("si", ignoreCase = true) && item.codigosLote.isNotEmpty()) {
+                val detalleId = detalleIds.getOrNull(index) ?: return@forEachIndexed
+
+                item.codigosLote.forEach { lote ->
+                    // Insertar registro de trazabilidad
+                    FacturaDetalleProductoLoteTable.insert {
+                        it[id] = UUID.randomUUID().toString()
+                        it[idDetalleFactura] = detalleId
+                        it[idItem] = item.idItem
+                        it[idLoteItem] = lote.idLoteItem
+                        it[cantidad] = lote.cantidad
+                    }
+
+                    // Descontar disponibilidad y registrar venta en item_lote
+                    val loteCantidad = BigDecimal.valueOf(lote.cantidad.toLong())
+                    ItemLoteTable.update({ ItemLoteTable.idLoteItem eq lote.idLoteItem }) {
+                        it.update(disponibilidad, disponibilidad.minus(loteCantidad))
+                        it.update(procesamiento, procesamiento.plus(loteCantidad))
+                        it.update(venta, venta.plus(loteCantidad))
+                    }
+                }
             }
         }
     }

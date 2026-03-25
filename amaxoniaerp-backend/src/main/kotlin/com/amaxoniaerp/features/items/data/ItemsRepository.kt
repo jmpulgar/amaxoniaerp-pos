@@ -8,6 +8,8 @@ import com.amaxoniaerp.features.items.domain.Product
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import com.amaxoniaerp.features.items.domain.ItemLotInfo
+import com.amaxoniaerp.features.items.domain.ItemLotsResponse
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
@@ -498,6 +500,58 @@ class ItemsRepository {
                 .map { row -> mapRowToProduct(row, countryCode) }
                 .singleOrNull()
         }
+    }
+
+    /**
+     * Verifica si un item tiene configuracion de lote habilitada
+     * y retorna los lotes disponibles ordenados por vencimiento ASC (FEFO).
+     */
+    suspend fun getItemLots(
+        database: Database,
+        itemId: Int
+    ): ItemLotsResponse = dbQuery(database) {
+        // Verificar si el item tiene configuracion de lote habilitada
+        val hasLotConfig = TransactionManager.current().exec(
+            "SELECT CASE WHEN COUNT(*) > 0 THEN 'si' ELSE 'no' END AS posee " +
+                "FROM configuracion_lote WHERE id_item = $itemId AND habilitado = 1"
+        ) { rs ->
+            if (rs.next()) rs.getString("posee") == "si" else false
+        } ?: false
+
+        if (!hasLotConfig) {
+            return@dbQuery ItemLotsResponse(
+                itemId = itemId,
+                poseeConfiguracionLote = false,
+                lotes = emptyList()
+            )
+        }
+
+        // Obtener lotes con disponibilidad > 0 ordenados por vencimiento ASC (FEFO)
+        val lots = TransactionManager.current().exec(
+            "SELECT id_lote_item, codigo_lote_item, vencimiento, disponibilidad, cod_almacen AS id_almacen " +
+                "FROM item_lote WHERE id_item = $itemId AND disponibilidad > 0 " +
+                "ORDER BY vencimiento ASC"
+        ) { rs ->
+            val list = mutableListOf<ItemLotInfo>()
+            while (rs.next()) {
+                list.add(
+                    ItemLotInfo(
+                        idLoteItem = rs.getInt("id_lote_item"),
+                        codigoLoteItem = rs.getString("codigo_lote_item"),
+                        vencimiento = rs.getString("vencimiento"),
+                        disponibilidad = rs.getInt("disponibilidad"),
+                        idAlmacen = rs.getInt("id_almacen")
+                    )
+                )
+            }
+            list
+        } ?: emptyList()
+
+        ItemLotsResponse(
+            itemId = itemId,
+            poseeConfiguracionLote = true,
+            lotes = lots
+        )
     }
 
     private fun mapRowToProduct(row: ResultRow, countryCode: String): Product {

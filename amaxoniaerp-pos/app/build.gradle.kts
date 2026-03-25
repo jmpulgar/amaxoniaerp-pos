@@ -34,10 +34,12 @@ android {
     buildTypes {
         debug {
             // Backend local para desarrollo (emulador: 10.0.2.2 → host de tu PC/servidor)
+            // Emulador = 10.0.2.2
+            // Dispositivo Físico: 192.168.2.10
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"https://api.listoerp.app/\"" // "\"http://10.0.2.2:8080/\""
+                "\"http://192.168.2.10:8080/\"" // "\"http://10.0.2.2:8080/\""
             )
         }
         release {

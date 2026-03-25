@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.repository.CajaRepository
+import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -299,6 +300,59 @@ class DashboardViewModel(
             barcode1 = dashboardProduct.barcode ?: ""
         )
         cartRepository.addToCart(product)
+
+        // Consultar lotes FEFO en background y asignar automaticamente
+        viewModelScope.launch {
+            refreshLotsForProduct(product.id)
+        }
+    }
+
+    /** Consulta lotes FEFO desde el backend y los asigna automaticamente al item */
+    private suspend fun refreshLotsForProduct(productId: String) {
+        val session = localStore.readCompanySession() ?: return
+        val token = session.token
+        val apiService = com.amaxonia.pos.ui.common.DependencyContainer.apiService
+
+        runCatching {
+            val response = apiService.getItemLots(token, productId)
+            if (response.poseeConfiguracionLote) {
+                cartRepository.setItemHasLotConfig(productId, true)
+
+                // Obtener cantidad total del item en el carrito
+                val cartItem = cartRepository.cartItems.value.firstOrNull { it.product.id == productId }
+                val totalQty = cartItem?.quantity ?: 0
+                if (totalQty > 0 && response.lotes.isNotEmpty()) {
+                    val assignments = assignFefo(response.lotes, totalQty)
+                    cartRepository.assignLots(productId, assignments)
+                }
+            }
+        }
+    }
+
+    /** Distribuye la cantidad solicitada entre lotes del mas viejo al mas nuevo */
+    private fun assignFefo(
+        lots: List<com.amaxonia.pos.data.remote.dto.ItemLotInfoDto>,
+        totalQty: Int
+    ): List<LotAssignment> {
+        val assignments = mutableListOf<LotAssignment>()
+        var remaining = totalQty
+        for (lot in lots) {
+            if (remaining <= 0) break
+            val take = minOf(remaining, lot.disponibilidad)
+            if (take > 0) {
+                assignments.add(
+                    LotAssignment(
+                        idLoteItem = lot.idLoteItem.toString(),
+                        codigoLote = lot.codigoLoteItem,
+                        vencimiento = lot.vencimiento,
+                        cantidad = take,
+                        almacen = lot.idAlmacen
+                    )
+                )
+                remaining -= take
+            }
+        }
+        return assignments
     }
 
     fun toggleSearch() {

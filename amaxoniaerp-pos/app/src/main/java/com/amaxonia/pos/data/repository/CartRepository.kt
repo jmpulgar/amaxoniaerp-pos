@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,9 +93,29 @@ class CartRepository {
         }
     }
 
+    /** Marca un producto como que tiene configuracion de lote */
+    fun setItemHasLotConfig(productId: String, hasLotConfig: Boolean) {
+        _cartItems.update { items ->
+            items.map { item ->
+                if (item.product.id == productId) item.copy(hasLotConfig = hasLotConfig)
+                else item
+            }
+        }
+    }
+
+    /** Asigna lotes FEFO a un item del carrito */
+    fun assignLots(productId: String, lots: List<LotAssignment>) {
+        _cartItems.update { items ->
+            items.map { item ->
+                if (item.product.id == productId) item.copy(lotAssignments = lots)
+                else item
+            }
+        }
+    }
+
     fun clearCart() {
         _cartItems.value = emptyList()
-        _selectedClient.value = null // Limpiamos cliente también al finalizar
+        _selectedClient.value = null
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)

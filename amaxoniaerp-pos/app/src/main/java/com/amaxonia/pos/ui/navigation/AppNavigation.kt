@@ -24,6 +24,7 @@ import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
 import com.amaxonia.pos.ui.products.ProductListScreen
 import com.amaxonia.pos.ui.reports.ReportsScreen
+import com.amaxonia.pos.ui.drafts.DraftInvoicesScreen
 import com.amaxonia.pos.ui.settings.SettingsScreen
 import com.amaxonia.pos.ui.sync.SyncScreen
 import com.amaxonia.pos.ui.welcome.WelcomeScreen
@@ -127,12 +128,25 @@ fun AppNavigation(startDestination: String) {
                 onNavigateToPrinterSettings = { navigateFromDrawer("printer_settings") },
                 onNavigateToCart = { navController.navigate("cart") },
                 onStartNewOrder = { navigateFromDrawer("client_selection_mode") },
-                onNavigateToCierreCaja = { navigateFromDrawer("cierre_caja") }
+                onNavigateToCierreCaja = { navigateFromDrawer("cierre_caja") },
+                onNavigateToDraftInvoices = { navigateFromDrawer("draft_invoices") }
             )
         }
 
         composable("printer_settings") {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable("draft_invoices") {
+            DraftInvoicesScreen(
+                onBack = { navController.popBackStack() },
+                onDraftLoaded = {
+                    // Al cargar borrador, ir al carrito
+                    navController.navigate("cart") {
+                        popUpTo("dashboard") { inclusive = false }
+                    }
+                }
+            )
         }
 
         composable("cierre_caja") {

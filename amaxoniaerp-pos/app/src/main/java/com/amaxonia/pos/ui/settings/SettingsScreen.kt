@@ -117,7 +117,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Configuracion de Impresora",
+                        "Configuracion POS",
                         fontWeight = FontWeight.Bold,
                         color = AmaxoniaBlue
                     )

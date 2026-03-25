@@ -2,6 +2,8 @@ package com.amaxonia.pos.ui.cart
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.data.local.db.DraftInvoiceDao
+import com.amaxonia.pos.data.local.db.DraftInvoiceEntity
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 data class CartState(
     val items: List<CartItem> = emptyList(),
@@ -28,7 +31,8 @@ class CartViewModel(
     private val cartRepository: CartRepository,
     private val clientRepository: ClientRepository,
     private val localStore: com.amaxonia.pos.data.local.LocalStore,
-    private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager
+    private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager,
+    private val draftInvoiceDao: DraftInvoiceDao = com.amaxonia.pos.ui.common.DependencyContainer.draftInvoiceDao
 ) : ViewModel() {
     private val _state = MutableStateFlow(CartState())
     val state: StateFlow<CartState> = _state.asStateFlow()
@@ -83,9 +87,64 @@ class CartViewModel(
         }
     }
 
-    fun increaseQuantity(productId: String) = cartRepository.increaseQuantity(productId)
-    fun decreaseQuantity(productId: String) = cartRepository.decreaseQuantity(productId)
+    fun increaseQuantity(productId: String) {
+        cartRepository.increaseQuantity(productId)
+        refreshLotsIfNeeded(productId)
+    }
+
+    fun decreaseQuantity(productId: String) {
+        cartRepository.decreaseQuantity(productId)
+        refreshLotsIfNeeded(productId)
+    }
+
     fun removeItem(productId: String) = cartRepository.removeItem(productId)
+
+    /** Recalcula lotes FEFO cuando cambia la cantidad */
+    private fun refreshLotsIfNeeded(productId: String) {
+        val item = cartRepository.cartItems.value.firstOrNull { it.product.id == productId } ?: return
+        if (!item.hasLotConfig) return
+
+        viewModelScope.launch {
+            val session = localStore.readCompanySession() ?: return@launch
+            val apiService = com.amaxonia.pos.ui.common.DependencyContainer.apiService
+            runCatching {
+                val response = apiService.getItemLots(session.token, productId)
+                if (response.poseeConfiguracionLote && response.lotes.isNotEmpty()) {
+                    val currentItem = cartRepository.cartItems.value.firstOrNull { it.product.id == productId }
+                    val totalQty = currentItem?.quantity ?: 0
+                    if (totalQty > 0) {
+                        val assignments = assignFefo(response.lotes, totalQty)
+                        cartRepository.assignLots(productId, assignments)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun assignFefo(
+        lots: List<com.amaxonia.pos.data.remote.dto.ItemLotInfoDto>,
+        totalQty: Int
+    ): List<com.amaxonia.pos.domain.model.LotAssignment> {
+        val assignments = mutableListOf<com.amaxonia.pos.domain.model.LotAssignment>()
+        var remaining = totalQty
+        for (lot in lots) {
+            if (remaining <= 0) break
+            val take = minOf(remaining, lot.disponibilidad)
+            if (take > 0) {
+                assignments.add(
+                    com.amaxonia.pos.domain.model.LotAssignment(
+                        idLoteItem = lot.idLoteItem.toString(),
+                        codigoLote = lot.codigoLoteItem,
+                        vencimiento = lot.vencimiento,
+                        cantidad = take,
+                        almacen = lot.idAlmacen
+                    )
+                )
+                remaining -= take
+            }
+        }
+        return assignments
+    }
 
     fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
         if (!_state.value.allowEditPrices) return
@@ -110,15 +169,56 @@ class CartViewModel(
         cartRepository.setCurrentSeller(seller)
     }
 
-    fun createOrder() {
-        val client = _state.value.selectedClient ?: return
+    /** Guarda el carrito actual como factura pendiente/borrador local */
+    fun saveDraft() {
         val items = _state.value.items
         if (items.isEmpty()) return
 
-        val result = cartRepository.saveOrder(client, items, _state.value.total)
-        result.onSuccess { msg ->
-            _state.update { it.copy(orderSuccessMessage = msg) }
+        viewModelScope.launch {
+            val client = _state.value.selectedClient
+            val seller = _state.value.currentSeller
+
+            // Serializar items como JSON simplificado
+            val itemsJson = buildDraftItemsJson(items)
+
+            val draft = DraftInvoiceEntity(
+                id = UUID.randomUUID().toString(),
+                clientId = client?.id,
+                clientFirstName = client?.firstName,
+                clientLastName = client?.lastName,
+                sellerId = seller?.id ?: 0,
+                sellerName = seller?.nombre,
+                itemsJson = itemsJson,
+                total = _state.value.total,
+                itemCount = items.sumOf { it.quantity }
+            )
+
+            draftInvoiceDao.insert(draft)
+            cartRepository.clearCart()
+            val clientLabel = if (client != null) "${client.firstName} ${client.lastName}" else "Sin cliente"
+            _state.update { it.copy(orderSuccessMessage = "Borrador guardado para $clientLabel (${items.size} productos)") }
         }
+    }
+
+    private fun buildDraftItemsJson(items: List<CartItem>): String {
+        val sb = StringBuilder("[")
+        items.forEachIndexed { index, item ->
+            if (index > 0) sb.append(",")
+            sb.append("{")
+            sb.append("\"productId\":\"${item.product.id}\",")
+            sb.append("\"description\":\"${item.product.description.replace("\"", "\\\"")}\",")
+            sb.append("\"quantity\":${item.quantity},")
+            sb.append("\"unitPriceWithTax\":${item.unitPriceWithTax},")
+            sb.append("\"discountPercent\":${item.discountPercent},")
+            sb.append("\"codVendedor\":${item.codVendedor},")
+            sb.append("\"taxRate\":${item.product.taxRate},")
+            sb.append("\"isExempt\":${item.product.isExempt},")
+            sb.append("\"code\":\"${item.product.code}\",")
+            sb.append("\"barcode1\":\"${item.product.barcode1}\"")
+            sb.append("}")
+        }
+        sb.append("]")
+        return sb.toString()
     }
 
     fun clearMessage() {

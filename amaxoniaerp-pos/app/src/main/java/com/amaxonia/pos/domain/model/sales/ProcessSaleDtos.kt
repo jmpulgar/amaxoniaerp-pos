@@ -100,7 +100,22 @@ data class SaleItemDto(
     val itemCantidadTotal: Double,
     val esProductoFisico: Boolean = true,
     val itemCodigo: String = "",
-    val itemReferencia: String = ""
+    val itemReferencia: String = "",
+    @SerialName("_posee_configuracion_lote")
+    val poseeConfiguracionLote: String = "no",
+    @SerialName("_codigos_lote")
+    val codigosLote: List<SaleLotDto> = emptyList(),
+)
+
+@Serializable
+data class SaleLotDto(
+    @SerialName("id_lote_item")
+    val idLoteItem: Int,
+    @SerialName("codigo_lote_item")
+    val codigoLoteItem: String,
+    val cantidad: Int,
+    @SerialName("id_almacen")
+    val idAlmacen: Int = 1,
 )
 
 @Serializable
