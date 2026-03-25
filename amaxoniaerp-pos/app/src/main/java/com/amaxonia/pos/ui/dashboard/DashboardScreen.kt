@@ -82,6 +82,8 @@ fun DashboardScreen(
         info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
     }
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
     val filteredProducts: List<DashboardProduct> = remember(state.products, state.bestSellers, state.searchQuery, state.bottomSelected) {
         val productsToShow = if (state.bottomSelected == 1) state.bestSellers else state.products
         val q = state.searchQuery.trim().lowercase()
@@ -139,7 +141,7 @@ fun DashboardScreen(
             ModalDrawerSheet(
                 drawerContainerColor = AmaxoniaBlue,
                 drawerContentColor = Color.White,
-                modifier = Modifier.width(300.dp)
+                modifier = Modifier.width(300.dp).fillMaxHeight()
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,40 +196,56 @@ fun DashboardScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     DrawerMenuItem(Icons.Default.People, "Clientes") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToClients()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToClients() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.ShoppingBag, "Productos") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToProducts()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToProducts() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.PointOfSale, "POS", isSelected = true) {
                         scope.launch { drawerState.close() }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.ListAlt, "Crear Pedido") {
-                        scope.launch { drawerState.close() }
-                        viewModel.startNewOrder() // Limpia carrito
-                        onStartNewOrder() // Navega a selección de cliente
+                        scope.launch { 
+                            drawerState.close()
+                            viewModel.startNewOrder() // Limpia carrito
+                            onStartNewOrder() // Navega a selección de cliente
+                        }
                     }
                     DrawerMenuItem(Icons.Default.ReceiptLong, "Historial Transacciones") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToHistory()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToHistory() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.BarChart, "Reportes") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToReports()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToReports() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.Description, "Facturas Pendientes") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToDraftInvoices()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToDraftInvoices() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.Settings, "Configuracion POS") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToPrinterSettings()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToPrinterSettings() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.Lock, "Cerrar Caja") {
-                        scope.launch { drawerState.close() }
-                        onNavigateToCierreCaja()
+                        scope.launch { 
+                            drawerState.close()
+                            onNavigateToCierreCaja() 
+                        }
                     }
                     DrawerMenuItem(Icons.Default.Refresh, "Actualizar datos") {
                         SyncScheduler.enqueueManual(context)
@@ -280,7 +298,16 @@ fun DashboardScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        IconButton(onClick = { 
+                            focusManager.clearFocus()
+                            scope.launch { 
+                                try {
+                                    drawerState.open() 
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            } 
+                        }) {
                             Icon(Icons.Default.Menu, contentDescription = "Menu", tint = AmaxoniaBlue)
                         }
                     },
