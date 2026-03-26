@@ -195,6 +195,7 @@ class PaymentViewModel(
             val forma = currentState.formasPago.firstOrNull { it.idFormaPago == detail.idFormaPago }
             forma != null && requiresRapidPayForForma(forma)
         }
+
         if (formapagoDetalle.detalle.isEmpty()) {
             _state.update { it.copy(paymentError = "Debes indicar al menos una forma de pago valida") }
             return
@@ -671,40 +672,62 @@ class PaymentViewModel(
             return Result.success(Unit)
         }
 
-        for (method in gatewayMethods) {
-            Log.d(TAG, "processGatewayPaymentsIfNeeded() → procesando ${method.description} | monto=${method.amount} | prefix=${method.gatewayCommandPrefix}")
+        for ((index, method) in gatewayMethods.withIndex()) {
+            val customerCI = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { selectedClient.id } }
+            val amountCents = (method.amount.coerceAtLeast(0.01) * 100).toLong().toString().padStart(16, '0')
+            val ciDigits = customerCI.filter(Char::isDigit).take(9).ifBlank { "0" }
+            val rifNorm = configuredCommerceRif.uppercase().filter { it.isLetterOrDigit() }.take(11)
+
+            // ── HKA: Detalle del comando gateway antes de enviarlo ──
+            Log.d(TAG, "HKA ══════════════════════════════════════════════════")
+            Log.d(TAG, "HKA gateway [${index + 1}/${gatewayMethods.size}]")
+            Log.d(TAG, "HKA   formaPago      = ${method.description} (${method.sigla})")
+            Log.d(TAG, "HKA   monto           = ${method.amount}")
+            Log.d(TAG, "HKA   fiscalCode      = ${method.fiscalCode}")
+            Log.d(TAG, "HKA   gatewayPrefix   = ${method.gatewayCommandPrefix}")
+            Log.d(TAG, "HKA   customerCI      = $customerCI → digits=$ciDigits")
+            Log.d(TAG, "HKA   commerceRif     = $configuredCommerceRif → norm=$rifNorm")
+            Log.d(TAG, "HKA   comando HKA     = ${method.gatewayCommandPrefix}$amountCents|$ciDigits|$rifNorm|")
+            Log.d(TAG, "HKA   JSON envelope   = {\"cmd\":\"${method.gatewayCommandPrefix}$amountCents|$ciDigits|$rifNorm|\"}")
+            Log.d(TAG, "HKA ══════════════════════════════════════════════════")
 
             // Step 1: Build the Intent
             val intentResult = rapidPayClient.buildGatewayIntent(
                 amount = method.amount,
                 commandPrefix = method.gatewayCommandPrefix,
-                customerIdentifier = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { selectedClient.id } },
+                customerIdentifier = customerCI,
                 commerceRif = configuredCommerceRif
             )
 
             if (intentResult.isFailure) {
                 val error = intentResult.exceptionOrNull()?.message ?: "Error al preparar la pasarela de pago"
-                Log.e(TAG, "processGatewayPaymentsIfNeeded() → error construyendo intent: $error")
+                Log.e(TAG, "HKA gateway → ERROR construyendo intent: $error")
                 return Result.failure(IllegalStateException(error))
             }
 
             val intent = intentResult.getOrThrow()
+            Log.d(TAG, "HKA gateway → intent construido OK, target=${intent.component?.packageName}")
 
             // Step 2: Update UI state to show gateway status
             _state.update { it.copy(gatewayStatusMessage = "Esperando respuesta de pasarela de pago...") }
 
             // Step 3: Emit the Intent for the UI to launch
-            Log.d(TAG, "processGatewayPaymentsIfNeeded() → emitiendo intent para UI")
+            Log.d(TAG, "HKA gateway → emitiendo intent para UI (startActivity)")
             _gatewayIntentEvent.emit(intent)
 
             // Step 4: Suspend and wait for the result from onNewIntent via RapidPayBridge
+            Log.d(TAG, "HKA gateway → esperando respuesta de HKA POS app...")
             val result = RapidPayBridge.awaitResult()
-            Log.d(TAG, "processGatewayPaymentsIfNeeded() → resultado: approved=${result.approved} | message=${result.message}")
+            Log.d(TAG, "HKA gateway → respuesta recibida: approved=${result.approved} | message=${result.message}")
+            if (result.rawResponse != null) {
+                Log.d(TAG, "HKA gateway → rawResponse=${result.rawResponse.take(200)}")
+            }
 
             // Step 5: Clear gateway status
             _state.update { it.copy(gatewayStatusMessage = null) }
 
             if (!result.approved) {
+                Log.w(TAG, "HKA gateway → RECHAZADO, abortando flujo de pago")
                 return Result.failure(IllegalStateException(result.message))
             }
         }
