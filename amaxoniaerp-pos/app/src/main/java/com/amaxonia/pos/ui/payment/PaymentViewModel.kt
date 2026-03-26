@@ -177,7 +177,7 @@ class PaymentViewModel(
         }
     }
 
-    fun processPayment(onSuccess: (PaymentSuccessPayload) -> Unit) {
+    fun processPayment() {
         val currentState = _state.value
         if (!currentState.isPaymentEnough) {
             _state.update { it.copy(showInsufficientReminder = true) }
@@ -526,25 +526,26 @@ class PaymentViewModel(
             _state.update { it.copy(gatewayStatusMessage = "Imprimiendo factura...") }
             val printFeedback = printReceiptIfConfigured(newTransaction)
 
+            val successPayload = PaymentSuccessPayload(
+                changeDue = currentState.changeDue,
+                paymentMethodsLabel = methods,
+                codFactura = response.codFactura,
+                transactionId = response.idFactura,
+                receiptPrintMessage = printFeedback
+            )
+
+            Log.d(TAG, "processPayment() → flujo completado, emitiendo successPayload (codFactura=${response.codFactura})")
+
             _state.update {
                 it.copy(
                     isSuccess = true,
                     isProcessingPayment = false,
                     paymentError = null,
                     gatewayStatusMessage = null,
-                    receiptPrintMessage = printFeedback
+                    receiptPrintMessage = printFeedback,
+                    successPayload = successPayload
                 )
             }
-
-            onSuccess(
-                PaymentSuccessPayload(
-                    changeDue = currentState.changeDue,
-                    paymentMethodsLabel = methods,
-                    codFactura = response.codFactura,
-                    transactionId = response.idFactura,
-                    receiptPrintMessage = printFeedback
-                )
-            )
         }
     }
 
@@ -554,6 +555,10 @@ class PaymentViewModel(
 
     fun clearReceiptPrintMessage() {
         _state.update { it.copy(receiptPrintMessage = null) }
+    }
+
+    fun clearSuccessPayload() {
+        _state.update { it.copy(successPayload = null) }
     }
 
     private suspend fun printReceiptIfConfigured(transaction: Transaction): String? {

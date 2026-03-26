@@ -19,7 +19,9 @@ data class PaymentState(
     val showInsufficientReminder: Boolean = false,
     val receiptPrintMessage: String? = null,
     /** Status message shown while waiting for gateway (e.g. "Esperando respuesta de pasarela...") */
-    val gatewayStatusMessage: String? = null
+    val gatewayStatusMessage: String? = null,
+    /** Set when the full payment+print flow completes; consumed by UI to navigate. */
+    val successPayload: PaymentSuccessPayload? = null
 ) {
     val totalAmountMoney: BigDecimal
         get() = Money.fromDouble(totalAmount)

@@ -94,6 +94,13 @@ fun PaymentScreen(
         viewModel.clearReceiptPrintMessage()
     }
 
+    // Reaccionar al payload de éxito para navegar (reactivo al estado, no al callback)
+    LaunchedEffect(state.successPayload) {
+        val payload = state.successPayload ?: return@LaunchedEffect
+        viewModel.clearSuccessPayload()
+        onPaymentSuccess(payload)
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
@@ -167,7 +174,7 @@ fun PaymentScreen(
                         Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     }
                 } else {
-                    CashPaymentContent(state, viewModel, onPaymentSuccess)
+                    CashPaymentContent(state, viewModel)
                 }
             } else {
                 if (state.formasPagoTarjetaOtro.isEmpty()) {
@@ -175,7 +182,7 @@ fun PaymentScreen(
                         Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     }
                 } else {
-                    NonCashPaymentContent(state, viewModel, onPaymentSuccess)
+                    NonCashPaymentContent(state, viewModel)
                 }
             }
         }
@@ -232,8 +239,7 @@ fun RowScope.PaymentTab(title: String, isSelected: Boolean, onClick: () -> Unit)
 @Composable
 fun CashPaymentContent(
     state: PaymentState,
-    viewModel: PaymentViewModel,
-    onSuccess: (PaymentSuccessPayload) -> Unit
+    viewModel: PaymentViewModel
 ) {
     val missingCashAmountText = Money.format(
         (state.totalAmountMoney - state.tenderedAmountMoney)
@@ -339,7 +345,7 @@ fun CashPaymentContent(
                     // Botón COBRAR / ENTER
                     Button(
                         onClick = {
-                            viewModel.processPayment(onSuccess = onSuccess)
+                            viewModel.processPayment()
                         },
                         modifier = Modifier
                             .weight(3f)
@@ -380,8 +386,7 @@ fun KeypadButton(text: String, modifier: Modifier, onClick: () -> Unit) {
 @Composable
 fun NonCashPaymentContent(
     state: PaymentState,
-    viewModel: PaymentViewModel,
-    onSuccess: (PaymentSuccessPayload) -> Unit
+    viewModel: PaymentViewModel
 ) {
     Column(
         modifier = Modifier
@@ -438,7 +443,7 @@ fun NonCashPaymentContent(
         }
 
         Button(
-            onClick = { viewModel.processPayment(onSuccess = onSuccess) },
+            onClick = { viewModel.processPayment() },
             enabled = true,
             modifier = Modifier
                 .fillMaxWidth()
