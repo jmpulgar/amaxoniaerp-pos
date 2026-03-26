@@ -29,6 +29,20 @@ class TheFactoryPrinterImpl(
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
 
+                // Cancelar cualquier documento fiscal que haya quedado abierto por un fallo previo
+                Log.d(TAG, "printReceipt() → enviando comando '7' para cancelar documento fiscal abierto (si existe)")
+                try {
+                    sendTcpCommand(
+                        ipAddress = settings.ipAddress,
+                        port = settings.port.toInt(),
+                        command = "7"
+                    )
+                    Log.d(TAG, "printReceipt() → comando '7' enviado OK")
+                } catch (e: Exception) {
+                    // Si no habia documento abierto, la impresora puede rechazar el comando; es esperado
+                    Log.d(TAG, "printReceipt() → comando '7' ignorado (${e.message}) — no habia documento abierto")
+                }
+
                 val commands = buildFiscalCommands(transaction)
                 Log.d(TAG, "printReceipt() → ${commands.size} comandos a enviar a ${settings.ipAddress}:${settings.port}")
                 commands.forEachIndexed { index, command ->

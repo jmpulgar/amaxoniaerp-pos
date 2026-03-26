@@ -678,9 +678,9 @@ class PaymentViewModel(
             val ciDigits = customerCI.filter(Char::isDigit).take(9).ifBlank { "0" }
             val rifNorm = configuredCommerceRif.uppercase().filter { it.isLetterOrDigit() }.take(11)
 
-            // ── HKA: Detalle del comando gateway antes de enviarlo ──
+            // ── HKA: Detalle del comando de pasarela antes de enviarlo ──
             Log.d(TAG, "HKA ══════════════════════════════════════════════════")
-            Log.d(TAG, "HKA gateway [${index + 1}/${gatewayMethods.size}]")
+            Log.d(TAG, "HKA pasarela [${index + 1}/${gatewayMethods.size}] gatewayKey=$configuredGatewayKey")
             Log.d(TAG, "HKA   formaPago      = ${method.description} (${method.sigla})")
             Log.d(TAG, "HKA   monto           = ${method.amount}")
             Log.d(TAG, "HKA   fiscalCode      = ${method.fiscalCode}")
@@ -691,7 +691,7 @@ class PaymentViewModel(
             Log.d(TAG, "HKA   JSON envelope   = {\"cmd\":\"${method.gatewayCommandPrefix}$amountCents|$ciDigits|$rifNorm|\"}")
             Log.d(TAG, "HKA ══════════════════════════════════════════════════")
 
-            // Step 1: Build the Intent
+            // Construir el Intent hacia la app HKA POS con la pasarela configurada
             val intentResult = rapidPayClient.buildGatewayIntent(
                 amount = method.amount,
                 commandPrefix = method.gatewayCommandPrefix,
@@ -701,33 +701,33 @@ class PaymentViewModel(
 
             if (intentResult.isFailure) {
                 val error = intentResult.exceptionOrNull()?.message ?: "Error al preparar la pasarela de pago"
-                Log.e(TAG, "HKA gateway → ERROR construyendo intent: $error")
+                Log.e(TAG, "HKA pasarela → ERROR construyendo intent: $error")
                 return Result.failure(IllegalStateException(error))
             }
 
             val intent = intentResult.getOrThrow()
-            Log.d(TAG, "HKA gateway → intent construido OK, target=${intent.component?.packageName}")
+            Log.d(TAG, "HKA pasarela → intent construido OK, target=${intent.component?.packageName}")
 
-            // Step 2: Update UI state to show gateway status
+            // Actualizar UI
             _state.update { it.copy(gatewayStatusMessage = "Esperando respuesta de pasarela de pago...") }
 
-            // Step 3: Emit the Intent for the UI to launch
-            Log.d(TAG, "HKA gateway → emitiendo intent para UI (startActivity)")
+            // Emitir el Intent para que la UI lo lance
+            Log.d(TAG, "HKA pasarela → emitiendo intent para UI (startActivity)")
             _gatewayIntentEvent.emit(intent)
 
-            // Step 4: Suspend and wait for the result from onNewIntent via RapidPayBridge
-            Log.d(TAG, "HKA gateway → esperando respuesta de HKA POS app...")
+            // Esperar respuesta de la app HKA POS
+            Log.d(TAG, "HKA pasarela → esperando respuesta de HKA POS app (pasarela=$configuredGatewayKey)...")
             val result = RapidPayBridge.awaitResult()
-            Log.d(TAG, "HKA gateway → respuesta recibida: approved=${result.approved} | message=${result.message}")
+            Log.d(TAG, "HKA pasarela → respuesta recibida: approved=${result.approved} | message=${result.message}")
             if (result.rawResponse != null) {
-                Log.d(TAG, "HKA gateway → rawResponse=${result.rawResponse.take(200)}")
+                Log.d(TAG, "HKA pasarela → rawResponse=${result.rawResponse.take(200)}")
             }
 
-            // Step 5: Clear gateway status
+            // Limpiar estado de gateway
             _state.update { it.copy(gatewayStatusMessage = null) }
 
             if (!result.approved) {
-                Log.w(TAG, "HKA gateway → RECHAZADO, abortando flujo de pago")
+                Log.w(TAG, "HKA pasarela → RECHAZADO por pasarela=$configuredGatewayKey, abortando flujo")
                 return Result.failure(IllegalStateException(result.message))
             }
         }
