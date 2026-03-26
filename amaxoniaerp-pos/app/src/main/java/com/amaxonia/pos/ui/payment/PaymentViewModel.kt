@@ -40,6 +40,7 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import kotlin.math.roundToLong
 
 class PaymentViewModel(
     private val transactionRepository: TransactionRepository,
@@ -674,7 +675,7 @@ class PaymentViewModel(
 
         for ((index, method) in gatewayMethods.withIndex()) {
             val customerCI = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { selectedClient.id } }
-            val amountCents = (method.amount.coerceAtLeast(0.01) * 100).toLong().toString().padStart(16, '0')
+            val amountCents = (method.amount.coerceAtLeast(0.01) * 100).roundToLong().toString().padStart(16, '0')
             val ciDigits = customerCI.filter(Char::isDigit).take(9).ifBlank { "0" }
             val rifNorm = configuredCommerceRif.uppercase().filter { it.isLetterOrDigit() }.take(11)
 

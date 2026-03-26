@@ -191,29 +191,30 @@ class TheFactoryPrinterImpl(
     /**
      * Reads the response from the HKA device.
      *
-     * The device does NOT close the connection after responding, so we cannot
-     * loop until EOF (-1). Instead we rely on a short read-timeout: read
-     * available data and return once the device stops sending.
-     * This matches the behaviour of the SDK's ResponseSocket.getResponse().
+     * Matches the SDK's ResponseSocket.getResponse() behaviour:
+     * - Blocking read until EOF (-1), relying on the socket's soTimeout
+     *   (SOCKET_TIMEOUT_MS) to guard against hangs.
+     * - Byte-stripping: if the first byte of a chunk is in range 6..15,
+     *   keep it; otherwise skip byte[0] (protocol framing byte).
      */
     private fun readSocketResponse(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(4096)
+        val buffer = ByteArray(1024)
         val output = ByteArrayOutputStream()
-
-        val originalTimeout = socket.soTimeout
-        socket.soTimeout = READ_CHUNK_TIMEOUT_MS
 
         try {
             while (true) {
                 val bytesRead = inputStream.read(buffer)
                 if (bytesRead == -1) break
-                output.write(buffer, 0, bytesRead)
+                // SDK byte-stripping: skip first byte unless it's in 6..15
+                val first = buffer[0].toInt() and 0xFF
+                val offset = if (first in 6..15) 0 else 1
+                if (bytesRead > offset) {
+                    output.write(buffer, offset, bytesRead - offset)
+                }
             }
         } catch (_: java.net.SocketTimeoutException) {
-            // Expected: device stopped sending — we have the full response
-        } finally {
-            socket.soTimeout = originalTimeout
+            // Timeout from soTimeout — treat whatever we have as the full response
         }
 
         return output.toByteArray()
@@ -221,7 +222,7 @@ class TheFactoryPrinterImpl(
 
     private fun isSuccessfulResponse(response: ByteArray): Boolean {
         if (response.isEmpty()) return false
-        val firstByte = response.first().toInt()
+        val firstByte = response.first().toInt() and 0xFF
         return firstByte == ACK || firstByte == ENQ || firstByte == NUL || response.size > 10
     }
 
@@ -245,8 +246,6 @@ class TheFactoryPrinterImpl(
         const val TAG = "HkaPrinter"
         const val CONNECT_TIMEOUT_MS = 3000
         const val SOCKET_TIMEOUT_MS = 10000
-        /** Short timeout to detect end-of-response (device stops sending). */
-        const val READ_CHUNK_TIMEOUT_MS = 2000
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
