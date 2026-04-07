@@ -19,8 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.Close
@@ -65,6 +67,7 @@ fun DashboardScreen(
     onNavigateToClients: () -> Unit,
     onNavigateToProducts: () -> Unit,
     onNavigateToHistory: () -> Unit,
+    onNavigateToCreditNotes: () -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToPrinterSettings: () -> Unit,
     onNavigateToCart: () -> Unit,
@@ -217,10 +220,16 @@ fun DashboardScreen(
                             onStartNewOrder() // Navega a selección de cliente
                         }
                     }
-                    DrawerMenuItem(Icons.Default.ReceiptLong, "Historial Transacciones") {
+                    DrawerMenuItem(Icons.AutoMirrored.Filled.ReceiptLong, "Historial Transacciones") {
                         scope.launch { 
                             drawerState.close()
                             onNavigateToHistory() 
+                        }
+                    }
+                    DrawerMenuItem(Icons.AutoMirrored.Filled.AssignmentReturn, "Notas de crédito") {
+                        scope.launch {
+                            drawerState.close()
+                            onNavigateToCreditNotes()
                         }
                     }
                     DrawerMenuItem(Icons.Default.BarChart, "Reportes") {

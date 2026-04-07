@@ -15,6 +15,7 @@ import com.amaxonia.pos.ui.clients.ClientSelectionScreen
 import com.amaxonia.pos.ui.company.CompanySelectionScreen
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
+import com.amaxonia.pos.ui.creditnotes.CreditNotesScreen
 import com.amaxonia.pos.ui.dashboard.DashboardScreen
 import com.amaxonia.pos.ui.history.HistoryScreen
 import com.amaxonia.pos.ui.login.LoginScreen
@@ -110,6 +111,7 @@ fun AppNavigation(startDestination: String) {
                 onNavigateToClients = { navigateFromDrawer("clients_list") },
                 onNavigateToProducts = { navigateFromDrawer("products_list") },
                 onNavigateToHistory = { navigateFromDrawer("history") },
+                onNavigateToCreditNotes = { navigateFromDrawer("credit_notes") },
                 onNavigateToReports = { navigateFromDrawer("reports") },
                 onNavigateToPrinterSettings = { navigateFromDrawer("printer_settings") },
                 onNavigateToCart = { navController.navigate("cart") },
@@ -202,6 +204,12 @@ fun AppNavigation(startDestination: String) {
 
         composable("history") {
             HistoryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("credit_notes") {
+            CreditNotesScreen(
                 onBack = { navController.popBackStack() }
             )
         }

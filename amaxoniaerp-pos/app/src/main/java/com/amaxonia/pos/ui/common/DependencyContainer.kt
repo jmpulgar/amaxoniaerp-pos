@@ -18,6 +18,7 @@ import com.amaxonia.pos.data.repository.LocalAddressCatalogRepository
 import com.amaxonia.pos.data.repository.LocalClientTypeRepository
 import com.amaxonia.pos.data.repository.FormaPagoRepositoryImpl
 import com.amaxonia.pos.data.repository.ApiReportRepository
+import com.amaxonia.pos.data.repository.CreditNoteRepositoryImpl
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.ApiTransactionRepository
 import com.amaxonia.pos.data.repository.OfflineFirstClientRepository
@@ -28,6 +29,7 @@ import com.amaxonia.pos.domain.repository.AuthRepository
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.ClientTypeRepository
 import com.amaxonia.pos.domain.repository.CompanyRepository
+import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
@@ -35,6 +37,7 @@ import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.data.repository.CajaRepositoryImpl
+import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
 import com.amaxonia.pos.data.remote.api.FormaPagoApiImpl
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
@@ -79,6 +82,8 @@ object DependencyContainer {
     lateinit var formaPagoRepository: FormaPagoRepository
         private set
     lateinit var salesRepository: SalesRepository
+        private set
+    lateinit var creditNoteRepository: CreditNoteRepository
         private set
     lateinit var draftInvoiceDao: DraftInvoiceDao
         private set
@@ -128,6 +133,7 @@ object DependencyContainer {
         cajaRepository = CajaRepositoryImpl(com.amaxonia.pos.data.remote.api.CajaApiImpl(apiClient), localStore)
         formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore)
         salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
+        creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
         _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore)
         apiTransactionRepository = _apiTransactionRepository
         clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())

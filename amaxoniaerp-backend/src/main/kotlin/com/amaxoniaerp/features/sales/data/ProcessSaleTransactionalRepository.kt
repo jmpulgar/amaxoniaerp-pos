@@ -36,7 +36,7 @@ class ProcessSaleTransactionalRepository {
         val monetaryContext = resolveMonetaryContext(preparedRequest)
 
         validateDuplicateInvoice(preparedRequest)
-        if (!monetaryContext.validarStock.equals("NO", ignoreCase = true)) {
+        if (monetaryContext.shouldValidateStock()) {
             validateStock(preparedRequest)
         }
 
@@ -297,6 +297,8 @@ class ProcessSaleTransactionalRepository {
                 normalizedRef.setScale(2, RoundingMode.HALF_UP)
             }
         }
+
+        fun shouldValidateStock(): Boolean = validarStock.trim().equals("SI", ignoreCase = true)
     }
 
     private fun validateDuplicateInvoice(request: ProcessSaleRequest) {
@@ -755,21 +757,41 @@ class ProcessSaleTransactionalRepository {
 
         val kardexId = UUID.randomUUID().toString()
         val documentCode = "FACT-$invoiceCode"
+        val shouldValidateStock = monetaryContext.shouldValidateStock()
 
         physicalItems.forEach { item ->
             val requested = item.itemCantidadTotal.toScaledBigDecimal(2)
-            val updated = SalesStockTable.update({
-                (SalesStockTable.idItem eq item.idItem) and
-                    (SalesStockTable.codAlmacen eq item.itemAlmacen) and
-                    (SalesStockTable.cantidad greaterEq requested.toFloat())
-            }) {
-                it.update(cantidad, cantidad.minus(requested.toFloat()))
+            val updated = if (shouldValidateStock) {
+                SalesStockTable.update({
+                    (SalesStockTable.idItem eq item.idItem) and
+                        (SalesStockTable.codAlmacen eq item.itemAlmacen) and
+                        (SalesStockTable.cantidad greaterEq requested.toFloat())
+                }) {
+                    it.update(cantidad, cantidad.minus(requested.toFloat()))
+                }
+            } else {
+                SalesStockTable.update({
+                    (SalesStockTable.idItem eq item.idItem) and
+                        (SalesStockTable.codAlmacen eq item.itemAlmacen)
+                }) {
+                    it.update(cantidad, cantidad.minus(requested.toFloat()))
+                }
             }
 
-            if (updated != 1) {
-                throw InsufficientStockException(
-                    "No se pudo descontar stock para item=${item.idItem}, almacen=${item.itemAlmacen}"
-                )
+            when {
+                updated == 1 -> Unit
+                shouldValidateStock -> {
+                    throw InsufficientStockException(
+                        "No se pudo descontar stock para item=${item.idItem}, almacen=${item.itemAlmacen}"
+                    )
+                }
+                else -> {
+                    SalesStockTable.insert {
+                        it[idItem] = item.idItem
+                        it[codAlmacen] = item.itemAlmacen
+                        it[cantidad] = requested.negate().toFloat()
+                    }
+                }
             }
         }
 

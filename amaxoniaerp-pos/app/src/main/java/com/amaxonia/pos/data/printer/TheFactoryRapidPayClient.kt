@@ -40,7 +40,7 @@ class TheFactoryRapidPayClient(
     /**
      * Builds an Intent to launch the HKA POS gateway for a card payment.
      *
-     * @param amount The amount in dollars (e.g. 3.48)
+     * @param amount The amount to charge in bolivares
      * @param commandPrefix The gateway command prefix (e.g. "KRV")
      * @param customerIdentifier CI/RIF del cliente (solo dígitos, máx. 9)
      * @param commerceRif RIF del comercio desde parametros_generales.rif (máx. 11)
@@ -194,7 +194,7 @@ class TheFactoryRapidPayClient(
     /**
      * Builds the gateway sale command string.
      *
-     * Format: prefix + 16-digit zero-padded amount in cents
+      * Format: prefix + 16-digit zero-padded amount in cents
      * Example: "KRV" + "0000000000000348" = "KRV0000000000000348" (for $3.48)
      *
      * The 16-digit amount matches the SDK format exactly

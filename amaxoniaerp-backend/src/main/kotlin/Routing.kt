@@ -10,6 +10,9 @@ import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.route.clientTypesRoutes
 import com.amaxoniaerp.features.clients.route.clientsRoutes
 import com.amaxoniaerp.features.companies.domain.CompanyService
+import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
+import com.amaxoniaerp.features.creditnotes.data.CreditNoteRepository
+import com.amaxoniaerp.features.creditnotes.route.creditNoteRoutes
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.facturas.route.facturasRoutes
 import com.amaxoniaerp.features.geography.data.GeographyRepository
@@ -50,6 +53,7 @@ fun Application.configureRouting() {
     val cajaRepository = CajaRepository()
     val formasPagoRepository = FormasPagoRepository()
     val processSaleUseCase = ProcessSaleUseCase(ProcessSaleTransactionalRepository())
+    val creditNoteService = CreditNoteService(CreditNoteRepository())
 
     routing {
         get("/") {
@@ -65,6 +69,7 @@ fun Application.configureRouting() {
         cajaRouting(cajaRepository)
         posRouting(formasPagoRepository)
         salesRoutes(processSaleUseCase)
+        creditNoteRoutes(creditNoteService)
 
         val assetsBaseUrl = environment.config.propertyOrNull("assets.baseUrl")?.getString()
             ?: System.getenv("ASSETS_BASE_URL")

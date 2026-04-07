@@ -392,7 +392,9 @@ class PaymentViewModel(
 
             val gatewayResult = processGatewayPaymentsIfNeeded(
                 paymentMethods = selectedPaymentMethods,
-                selectedClient = selectedClient
+                selectedClient = selectedClient,
+                exchangeRate = currentRate,
+                isMultiCurrency = isMultiCurrency,
             )
             if (gatewayResult.isFailure) {
                 _state.update {
@@ -665,7 +667,9 @@ class PaymentViewModel(
      */
     private suspend fun processGatewayPaymentsIfNeeded(
         paymentMethods: List<TransactionPaymentMethod>,
-        selectedClient: com.amaxonia.pos.domain.model.Client
+        selectedClient: com.amaxonia.pos.domain.model.Client,
+        exchangeRate: Double,
+        isMultiCurrency: Boolean,
     ): Result<Unit> {
         if (!isHka20FlowEnabled()) {
             Log.d(TAG, "processGatewayPaymentsIfNeeded() → flujo no HKA20, omitiendo gateway")
@@ -680,7 +684,12 @@ class PaymentViewModel(
 
         for ((index, method) in gatewayMethods.withIndex()) {
             val customerCI = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { selectedClient.id } }
-            val amountCents = (method.amount.coerceAtLeast(0.01) * 100).roundToLong().toString().padStart(16, '0')
+            val gatewayAmount = resolveGatewayAmount(
+                amount = method.amount,
+                exchangeRate = exchangeRate,
+                isMultiCurrency = isMultiCurrency,
+            )
+            val amountCents = (gatewayAmount.coerceAtLeast(0.01) * 100).roundToLong().toString().padStart(16, '0')
             val ciDigits = customerCI.filter(Char::isDigit).take(9).ifBlank { "0" }
             val rifNorm = configuredCommerceRif.uppercase().filter { it.isLetterOrDigit() }.take(11)
 
@@ -688,7 +697,8 @@ class PaymentViewModel(
             Log.d(TAG, "HKA ══════════════════════════════════════════════════")
             Log.d(TAG, "HKA pasarela [${index + 1}/${gatewayMethods.size}] gatewayKey=$configuredGatewayKey")
             Log.d(TAG, "HKA   formaPago      = ${method.description} (${method.sigla})")
-            Log.d(TAG, "HKA   monto           = ${method.amount}")
+            Log.d(TAG, "HKA   monto USD       = ${method.amount}")
+            Log.d(TAG, "HKA   monto Bs        = $gatewayAmount")
             Log.d(TAG, "HKA   fiscalCode      = ${method.fiscalCode}")
             Log.d(TAG, "HKA   gatewayPrefix   = ${method.gatewayCommandPrefix}")
             Log.d(TAG, "HKA   customerCI      = $customerCI → digits=$ciDigits")
@@ -699,7 +709,7 @@ class PaymentViewModel(
 
             // Construir el Intent hacia la app HKA POS con la pasarela configurada
             val intentResult = rapidPayClient.buildGatewayIntent(
-                amount = method.amount,
+                amount = gatewayAmount,
                 commandPrefix = method.gatewayCommandPrefix,
                 customerIdentifier = customerCI,
                 commerceRif = configuredCommerceRif
@@ -748,33 +758,21 @@ class PaymentViewModel(
     private fun resolveGatewayPaymentPrefix(forma: FormaPago): String {
         val gatewayKey = configuredGatewayKey.takeIf { it.isNotBlank() } ?: return ""
         if (!requiresRapidPayForForma(forma)) return ""
-        val normalized = listOf(
-            forma.descripcion.orEmpty(),
-            forma.siglas.orEmpty(),
-            forma.codigo.orEmpty()
-        ).joinToString(" ").lowercase()
-
-        return when {
-            normalized.contains("punto de venta") -> "K${gatewayKey}V"
-            normalized.contains("debito") || normalized == "pv" || normalized.contains(" tdc") || normalized.startsWith("tdc") -> "K${gatewayKey}V"
-            normalized.contains("credito") -> "K${gatewayKey}V"
-            else -> ""
-        }
+        return "K${gatewayKey}V"
     }
 
     private fun requiresRapidPayForForma(forma: FormaPago): Boolean {
-        val normalized = listOf(
-            forma.descripcion.orEmpty(),
-            forma.siglas.orEmpty(),
-            forma.codigo.orEmpty()
-        ).joinToString(" ").lowercase()
+        return forma.descripcion.orEmpty().trim().equals("PUNTO DE VENTA", ignoreCase = true)
+    }
 
-        return normalized.contains("punto de venta") ||
-            normalized.contains("debito") ||
-            normalized == "pv" ||
-            normalized.contains(" tdc") ||
-            normalized.startsWith("tdc") ||
-            normalized.contains("credito")
+    private fun resolveGatewayAmount(amount: Double, exchangeRate: Double, isMultiCurrency: Boolean): Double {
+        val normalizedAmount = amount.coerceAtLeast(0.0)
+        if (!isMultiCurrency) {
+            return normalizedAmount
+        }
+        val normalizedRate = exchangeRate.takeIf { it > 0.0 }
+            ?: throw IllegalStateException("No se encontro una tasa valida para enviar el cobro a la pasarela")
+        return normalizedAmount * normalizedRate
     }
 
     private suspend fun isHka20FlowEnabled(): Boolean {
