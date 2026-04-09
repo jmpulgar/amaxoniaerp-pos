@@ -143,10 +143,6 @@ class CreditNotesViewModel(
         _state.update { it.copy(form = it.form.copy(observacion = value)) }
     }
 
-    fun onAnularChange(enabled: Boolean) {
-        _state.update { it.copy(form = it.form.copy(anular = enabled)) }
-    }
-
     fun onDevolverStockChange(enabled: Boolean) {
         _state.update { it.copy(form = it.form.copy(devolverStock = enabled)) }
     }

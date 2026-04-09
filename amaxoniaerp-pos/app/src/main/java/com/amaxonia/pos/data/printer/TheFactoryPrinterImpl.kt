@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.TransactionFiscalItem
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalDocumentDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalLineDto
@@ -18,6 +19,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class TheFactoryPrinterImpl(
@@ -119,10 +121,11 @@ class TheFactoryPrinterImpl(
      * - "iR*{clientId}" — customer tax id / identification
      * - "iS*{clientName}" — customer name
      * - "@{text}"      — free text / comment line (non-fiscal)
-     * - " {qty}{amount}{description}" — item line (space prefix = taxable item)
+     * - "{taxPrefix}{qty}{amount}{description}" — item line
      *     - qty: quantity entera, padded to 8 digits
      *     - amount: monto con 2 decimales implicitos, padded to 10 digits
      *     - description: up to 30 chars
+     *     - taxPrefix: ' ' exento, '!' IVA general, '"' IVA reducido, '#' IVA adicional
      * - "3"   — subtotal
      * - "101" — close with cash payment
      * - "102" — close with debit card payment
@@ -133,10 +136,8 @@ class TheFactoryPrinterImpl(
     private fun buildFiscalCommands(transaction: Transaction): List<String> {
         val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
         val description = sanitizeText("VENTA $invoice", maxLength = 30)
-        val fiscalAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
-        val quantityField = formatFiscalSaleQuantity(1) // qty=1
-        val amountField = formatFiscalSaleAmount(fiscalAmount)
-        val itemLine = " $quantityField$amountField$description"
+        val fiscalItems = transaction.fiscalItems
+            .filter { it.quantity > 0.0 && it.unitPriceWithoutTax > 0.0 }
 
         val lines = mutableListOf<String>()
 
@@ -156,8 +157,18 @@ class TheFactoryPrinterImpl(
         lines += "@AMAXONIA POS"
         lines += "@$description"
 
-        // 4. Item line
-        lines += itemLine
+        // 4. Item lines (using item IVA code and unit amount WITHOUT tax)
+        if (fiscalItems.isNotEmpty()) {
+            fiscalItems.forEach { item ->
+                lines += buildFiscalItemLine(item)
+            }
+        } else {
+            // Fallback for legacy transactions that do not have item details.
+            val fallbackAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
+            val quantityField = formatFiscalSaleQuantity(1)
+            val amountField = formatFiscalSaleAmount(fallbackAmount)
+            lines += " $quantityField$amountField$description"
+        }
 
         // 5. Subtotal
         lines += "3"
@@ -166,6 +177,28 @@ class TheFactoryPrinterImpl(
         lines += resolvePaymentCommand(transaction.paymentMethods, transaction.formaPago)
 
         return lines
+    }
+
+    private fun buildFiscalItemLine(item: TransactionFiscalItem): String {
+        val taxPrefix = resolveFiscalTaxPrefix(item.iva)
+        val quantityField = formatFiscalSaleQuantity(item.quantity.roundToInt())
+        val amountField = formatFiscalSaleAmount(item.unitPriceWithoutTax.coerceAtLeast(0.01))
+        val description = sanitizeText(item.description, maxLength = 30).ifBlank { "ITEM" }
+        return "$taxPrefix$quantityField$amountField$description"
+    }
+
+    private fun resolveFiscalTaxPrefix(iva: Double): Char {
+        val normalizedIva = iva.coerceAtLeast(0.0)
+        return when {
+            normalizedIva <= 0.0 -> ' ' // Exento
+            isSameTaxRate(normalizedIva, 8.0) -> '"' // IVA reducido
+            isSameTaxRate(normalizedIva, 31.0) -> '#' // IVA adicional
+            else -> '!' // IVA general (16% y fallback para otras tasas > 0)
+        }
+    }
+
+    private fun isSameTaxRate(actual: Double, expected: Double): Boolean {
+        return abs(actual - expected) <= TAX_RATE_TOLERANCE
     }
 
     private fun buildCreditNoteCommands(
@@ -473,6 +506,7 @@ class TheFactoryPrinterImpl(
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
+        const val TAX_RATE_TOLERANCE = 0.01
         val PRINTER_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val PRINTER_DATE_REGEX = Regex("\\d{2}/\\d{2}/\\d{4}")
     }

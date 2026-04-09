@@ -10,6 +10,7 @@ import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.TransactionFiscalItem
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.payment.FormaPago
@@ -518,7 +519,15 @@ class PaymentViewModel(
                 clienteNombre = "${selectedClient.firstName} ${selectedClient.lastName}".trim(),
                 clienteIdentificacion = selectedClient.ruc.ifBlank { selectedClient.cedula },
                 formaPago = methods,
-                paymentMethods = selectedPaymentMethods
+                paymentMethods = selectedPaymentMethods,
+                fiscalItems = mappedItems.map { item ->
+                    TransactionFiscalItem(
+                        description = item.itemDescripcion,
+                        quantity = item.itemCantidadTotal,
+                        unitPriceWithoutTax = item.itemPrecioSinIva,
+                        iva = item.itemPIva
+                    )
+                }
             )
 
             transactionRepository.saveTransaction(newTransaction).onFailure { saveError ->

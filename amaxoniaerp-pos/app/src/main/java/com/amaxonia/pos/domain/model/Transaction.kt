@@ -19,6 +19,7 @@ data class Transaction(
     val clienteIdentificacion: String = "",
     val formaPago: String = "",
     val paymentMethods: List<TransactionPaymentMethod> = emptyList(),
+    val fiscalItems: List<TransactionFiscalItem> = emptyList(),
 )
 
 data class TransactionPaymentMethod(
@@ -27,4 +28,11 @@ data class TransactionPaymentMethod(
     val amount: Double = 0.0,
     val fiscalCode: String = "",
     val gatewayCommandPrefix: String = ""
+)
+
+data class TransactionFiscalItem(
+    val description: String = "",
+    val quantity: Double = 1.0,
+    val unitPriceWithoutTax: Double = 0.0,
+    val iva: Double = 0.0,
 )
