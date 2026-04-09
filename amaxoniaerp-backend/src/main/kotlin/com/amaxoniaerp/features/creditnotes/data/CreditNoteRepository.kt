@@ -234,6 +234,7 @@ class CreditNoteRepository {
             it[descuentoGlobal] = BigDecimal.ZERO.setScale(2)
             it[pdescuentoGlobal] = BigDecimal.ZERO.setScale(2)
             it[numeroDocumentoFiscal] = ""
+            it[registroMigrado] = 0
         }
 
         processedLines.forEach { line ->
@@ -381,6 +382,14 @@ class CreditNoteRepository {
         if (lines.isEmpty()) return null
 
         val remainingAmount = lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.availableTotalConIva }
+
+        val totalOriginal = invoice.totalTotalFactura.toDouble()
+        val totalRef = invoice.totalRef?.toDouble() ?: 0.0
+        val isBs = invoice.moneda == "BS"
+
+        val totalBs = if (isBs) totalOriginal else totalRef
+        val totalUsd = if (!isBs) totalOriginal else totalRef
+
         return CreditNoteSourceInvoiceDetailResponse(
             id = invoice.idFactura,
             codigo = invoice.codFactura,
@@ -393,11 +402,14 @@ class CreditNoteRepository {
             clienteDireccion = client.direccion,
             clienteTelefono = client.telefono,
             codVendedor = invoice.codVendedor,
-            totalOriginal = invoice.totalTotalFactura.toDouble(),
+            totalOriginal = totalOriginal,
             subtotalOriginal = invoice.totalizarSubTotal.toDouble(),
             impuestoOriginal = invoice.totalizarMontoIva.toDouble(),
             remainingAmount = remainingAmount.toDouble(),
             moneda = invoice.moneda,
+            tasa = invoice.tasa?.toDouble(),
+            totalBs = totalBs,
+            totalUsd = totalUsd,
             lines = lines.map { it.toResponseLine() },
         )
     }
@@ -434,6 +446,8 @@ class CreditNoteRepository {
             facturarADireccion = row[CreditNoteFacturaTable.facturarADireccion],
             facturarATelefono = row[CreditNoteFacturaTable.facturarATelefono],
             moneda = row[CreditNoteFacturaTable.abrMonedaBase].orEmpty().ifBlank { "USD" },
+            tasa = row[CreditNoteFacturaTable.tasa],
+            totalRef = row[CreditNoteFacturaTable.totalRef],
         )
     }
 
@@ -1221,6 +1235,8 @@ class CreditNoteRepository {
         val facturarADireccion: String,
         val facturarATelefono: String,
         val moneda: String,
+        val tasa: BigDecimal?,
+        val totalRef: BigDecimal?,
     )
 
     private data class SourceInvoiceLine(

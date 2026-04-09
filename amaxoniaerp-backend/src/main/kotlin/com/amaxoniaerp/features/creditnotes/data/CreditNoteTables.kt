@@ -35,6 +35,7 @@ object CreditNoteHeaderTable : Table("factura_devolucion") {
     val descuentoGlobal = decimal("descuento_global", 20, 2).nullable()
     val pdescuentoGlobal = decimal("pdescuento_global", 20, 2).nullable()
     val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", 20).nullable()
+    val registroMigrado = integer("registro_migrado").default(0)
 
     override val primaryKey = PrimaryKey(idDevolucion)
 }
@@ -84,6 +85,8 @@ object CreditNoteFacturaTable : Table("factura") {
     val facturarADireccion = varchar("facturar_a_direccion", 250)
     val facturarATelefono = varchar("facturar_a_telefono", 50)
     val abrMonedaBase = varchar("abr_moneda_base", 10).nullable()
+    val tasa = decimal("tasa", 20, 4).nullable()
+    val totalRef = decimal("total_ref", 20, 2).nullable()
 
     override val primaryKey = PrimaryKey(idFactura)
 }

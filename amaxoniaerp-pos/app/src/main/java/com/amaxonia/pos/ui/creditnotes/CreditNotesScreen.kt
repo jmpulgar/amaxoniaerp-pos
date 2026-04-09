@@ -277,12 +277,65 @@ private fun CreditNoteCreateContent(
 
         item {
             ElevatedCard(shape = RoundedCornerShape(12.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AmaxoniaBlue)
-                    Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
-                    Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Total a devolver: ${invoice.moneda} ${formatAmount(invoice.remainingAmount)}", fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AmaxoniaBlue)
+                        Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
+                        Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            Text("${invoice.moneda} ${formatAmount(invoice.subtotalOriginal)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            Text("${invoice.moneda} ${formatAmount(invoice.totalOriginal)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                        }
+                        if (invoice.tasa != null) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Tasa (Bs)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                                Text("Bs ${formatAmount(invoice.tasa)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total USD", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            Text("USD ${formatAmount(invoice.totalUsd)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Bs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            Text("Bs ${formatAmount(invoice.totalBs)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+        
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Inventory2,
+                        contentDescription = null,
+                        tint = AmaxoniaBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Productos (${invoice.lines.size})",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    invoice.lines.forEach { line ->
+                        InvoiceLineReadOnlyCard(line = line, currency = invoice.moneda)
+                    }
                 }
             }
         }
@@ -418,12 +471,98 @@ private fun CreditNoteCard(note: CreditNoteSummaryDto, onClick: () -> Unit) {
 
 @Composable
 private fun SourceInvoiceCard(invoice: CreditNoteSourceInvoiceSummaryDto, onClick: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(invoice.codigo, fontWeight = FontWeight.Bold, color = AmaxoniaBlue, fontSize = 16.sp)
-            Text(invoice.clienteNombre, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(invoice.fecha, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Disponible: ${invoice.moneda} ${formatAmount(invoice.remainingAmount)}", fontWeight = FontWeight.Bold)
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AmaxoniaBlue.copy(alpha = 0.08f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Receipt,
+                    contentDescription = null,
+                    tint = AmaxoniaBlue,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = invoice.codigo,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = invoice.fecha,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (invoice.clienteNombre.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = invoice.clienteNombre,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                }
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = AmaxoniaBlue
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .size(20.dp)
+            )
         }
     }
 }
@@ -451,6 +590,74 @@ private fun SourceInvoiceLineEditor(
                 TextButton(onClick = onUseMax) {
                     Text("Max")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InvoiceLineReadOnlyCard(line: CreditNoteSourceInvoiceLineDto, currency: String) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(AmaxoniaBlue.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = formatQuantity(line.cantidadOriginal),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = AmaxoniaBlue
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = line.descripcion,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (line.codigo.isNotBlank()) {
+                    Text(
+                        text = line.codigo,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "$currency ${formatAmount(line.totalConIvaOriginal)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "IVA: ${formatAmount(line.pIva)}%",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

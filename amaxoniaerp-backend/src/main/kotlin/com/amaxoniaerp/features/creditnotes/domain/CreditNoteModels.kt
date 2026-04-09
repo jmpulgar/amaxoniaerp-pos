@@ -105,6 +105,9 @@ data class CreditNoteSourceInvoiceDetailResponse(
     val impuestoOriginal: Double,
     val remainingAmount: Double,
     val moneda: String,
+    val tasa: Double?,
+    val totalBs: Double,
+    val totalUsd: Double,
     val lines: List<CreditNoteSourceInvoiceLine>,
 )
 
