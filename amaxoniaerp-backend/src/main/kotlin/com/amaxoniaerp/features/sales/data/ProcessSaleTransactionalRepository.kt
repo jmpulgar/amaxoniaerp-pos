@@ -557,7 +557,7 @@ class ProcessSaleTransactionalRepository {
 
         request.items.forEach { item ->
             val vendedorLinea = item.codVendedor?.takeIf { it > 0 } ?: vendedorPorDefecto
-            val itemTaxRate = item.itemPIva.takeIf { it > 0.0 } ?: monetaryContext.defaultTaxRate
+            val itemTaxRate = item.itemPIva
             val itemTotalSinIvaBase = monetaryContext.toBase(item.itemTotalSinIva)
             val itemTotalConIvaBase = monetaryContext.toBase(item.itemTotalConIva)
             val qty = item.itemCantidadTotal.toScaledBigDecimal(3)
