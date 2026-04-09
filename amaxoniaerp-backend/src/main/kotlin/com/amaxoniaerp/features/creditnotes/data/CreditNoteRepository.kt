@@ -235,6 +235,19 @@ class CreditNoteRepository {
             it[pdescuentoGlobal] = BigDecimal.ZERO.setScale(2)
             it[numeroDocumentoFiscal] = ""
             it[registroMigrado] = 0
+            it[tipoDocumento] = "04"
+            it[naturalezaOperacion] = "01"
+            it[tipoOperacion] = 1
+            it[formatoCAFE] = 1
+            it[entregaCAFE] = 1
+            it[envioContenedor] = 1
+            it[tipoVenta] = 1
+            it[informacionInteres] = ""
+            it[cufe] = ""
+            it[qr] = ""
+            it[fechaRecepcionDGI] = now
+            it[nroProtocoloAutorizacion] = ""
+            it[fechaLimite] = now
         }
 
         processedLines.forEach { line ->
@@ -385,7 +398,7 @@ class CreditNoteRepository {
 
         val totalOriginal = invoice.totalTotalFactura.toDouble()
         val totalRef = invoice.totalRef?.toDouble() ?: 0.0
-        val isBs = invoice.moneda == "BS"
+        val isBs = invoice.moneda.equals("BS", ignoreCase = true) || invoice.moneda.equals("Bs.", ignoreCase = true)
 
         val totalBs = if (isBs) totalOriginal else totalRef
         val totalUsd = if (!isBs) totalOriginal else totalRef

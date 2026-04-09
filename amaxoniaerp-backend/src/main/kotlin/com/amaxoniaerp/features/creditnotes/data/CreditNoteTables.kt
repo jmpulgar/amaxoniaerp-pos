@@ -36,6 +36,20 @@ object CreditNoteHeaderTable : Table("factura_devolucion") {
     val pdescuentoGlobal = decimal("pdescuento_global", 20, 2).nullable()
     val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", 20).nullable()
     val registroMigrado = integer("registro_migrado").default(0)
+    val tipoDocumento = varchar("tipoDocumento", 2).default("04") // 04 es Nota de Crédito en FE
+    val naturalezaOperacion = varchar("NaturalezaOperacion", 2).default("01") // 01 Venta interna
+    val tipoOperacion = integer("tipoOperacion").default(1)
+    val formatoCAFE = integer("formatoCAFE").default(1)
+    val entregaCAFE = integer("entregaCAFE").default(1)
+    val envioContenedor = integer("envioContenedor").default(1)
+    val tipoVenta = integer("tipoVenta").default(1)
+    val informacionInteres = varchar("informacionInteres", 5000).default("")
+    val cufe = text("cufe").default("")
+    val qr = text("qr").default("")
+    val fechaRecepcionDGI = datetime("fechaRecepcionDGI").nullable()
+    val nroProtocoloAutorizacion = varchar("nroProtocoloAutorizacion", 200).default("")
+    val fechaLimite = datetime("fechaLimite").nullable()
+    val descuentoGlobalVenta = decimal("descuento_global_venta", 20, 2).nullable()
 
     override val primaryKey = PrimaryKey(idDevolucion)
 }
@@ -53,9 +67,9 @@ object CreditNoteDetailTable : Table("factura_devolucion_detalle") {
     val itemPIva = decimal("_item_piva", 10, 2)
     val itemTotalSinIva = decimal("_item_totalsiniva", 20, 2)
     val itemTotalConIva = decimal("_item_totalconiva", 20, 2)
-    val codVendedor = integer("cod_vendedor").nullable()
-    val itemCodigo = varchar("_item_codigo", 50).nullable()
-    val itemReferencia = varchar("_item_referencia", 50).nullable()
+    val codVendedor = integer("cod_vendedor")
+    val itemCodigo = varchar("_item_codigo", 50)
+    val itemReferencia = varchar("_item_referencia", 50)
 
     override val primaryKey = PrimaryKey(idDevolucionDetalle)
 }
