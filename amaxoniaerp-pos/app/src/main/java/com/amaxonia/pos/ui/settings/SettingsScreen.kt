@@ -333,6 +333,30 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        OutlinedTextField(
+                            value = theFactorySettings.printerSerial,
+                            onValueChange = viewModel::onTheFactorySerialChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Serial fiscal (iI*)") },
+                            placeholder = { Text("Ej: Z1B9999999") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AmaxoniaBlue,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Opcional recomendado: si lo defines aqui, se usa para notas de credito fiscales.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         Text(
                             text = "Pasarela de pago (HKA20)",
                             fontWeight = FontWeight.Bold,

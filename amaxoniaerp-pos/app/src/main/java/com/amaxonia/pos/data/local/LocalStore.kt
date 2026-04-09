@@ -41,6 +41,7 @@ class LocalStore(
     private val theFactoryModeKey = stringPreferencesKey("the_factory_mode")
     private val theFactoryGatewayKey = stringPreferencesKey("the_factory_gateway_key")
     private val theFactoryGatewayLabelKey = stringPreferencesKey("the_factory_gateway_label")
+    private val theFactoryPrinterSerialKey = stringPreferencesKey("the_factory_printer_serial")
     private val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
     private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
@@ -180,6 +181,7 @@ class LocalStore(
             prefs[theFactoryModeKey] = settings.openMode.trim()
             prefs[theFactoryGatewayKey] = settings.gatewayKey.trim()
             prefs[theFactoryGatewayLabelKey] = settings.gatewayLabel.trim()
+            prefs[theFactoryPrinterSerialKey] = settings.printerSerial.trim()
         }
     }
 
@@ -194,7 +196,8 @@ class LocalStore(
                 port = prefs[theFactoryPortKey].orEmpty(),
                 openMode = prefs[theFactoryModeKey].orEmpty(),
                 gatewayKey = prefs[theFactoryGatewayKey].orEmpty(),
-                gatewayLabel = prefs[theFactoryGatewayLabelKey].orEmpty()
+                gatewayLabel = prefs[theFactoryGatewayLabelKey].orEmpty(),
+                printerSerial = prefs[theFactoryPrinterSerialKey].orEmpty()
             )
         }
     }

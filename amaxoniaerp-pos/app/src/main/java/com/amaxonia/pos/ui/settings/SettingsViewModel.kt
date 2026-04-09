@@ -102,6 +102,17 @@ class SettingsViewModel(
         }
     }
 
+    fun onTheFactorySerialChanged(value: String) {
+        _theFactorySettings.update { current ->
+            current.copy(
+                printerSerial = value
+                    .uppercase()
+                    .filter(Char::isLetterOrDigit)
+                    .take(10)
+            )
+        }
+    }
+
     fun onAllowEditPricesChanged(enabled: Boolean) {
         viewModelScope.launch {
             runCatching { localStore.saveAllowEditPrices(enabled) }
@@ -181,7 +192,12 @@ class SettingsViewModel(
             port = _theFactorySettings.value.port.trim(),
             openMode = _theFactorySettings.value.openMode.trim().ifBlank { "HKA20" },
             gatewayKey = _theFactorySettings.value.gatewayKey.trim(),
-            gatewayLabel = _theFactorySettings.value.gatewayLabel.trim()
+            gatewayLabel = _theFactorySettings.value.gatewayLabel.trim(),
+            printerSerial = _theFactorySettings.value.printerSerial
+                .trim()
+                .uppercase()
+                .filter(Char::isLetterOrDigit)
+                .take(10)
         )
 
         return runCatching {

@@ -78,19 +78,32 @@ class TheFactoryPrinterImpl(
                 val printerStateBefore = runCatching {
                     readPrinterState(settings)
                 }.getOrNull()
+                if (printerStateBefore == null) {
+                    Log.w(TAG, "printCreditNote() → no se pudo leer S1 antes de imprimir; se usará serial local/backend")
+                }
 
                 cancelOpenFiscalDocument(settings)
 
-                val resolvedPrinterSerial = sanitizeText(
-                    document.printerSerial.ifBlank { printerStateBefore?.registeredMachineNumber.orEmpty() },
-                    maxLength = 10
-                )
+                val localSerial = sanitizeText(settings.printerSerial, maxLength = 10)
+                val documentSerial = sanitizeText(document.printerSerial, maxLength = 10)
+                val stateSerial = sanitizeText(printerStateBefore?.registeredMachineNumber.orEmpty(), maxLength = 10)
+                val (resolvedPrinterSerial, serialSource) = when {
+                    localSerial.isNotBlank() -> localSerial to "local_settings"
+                    documentSerial.isNotBlank() -> documentSerial to "backend_document"
+                    stateSerial.isNotBlank() -> stateSerial to "printer_state_S1"
+                    else -> "" to "none"
+                }
                 if (resolvedPrinterSerial.isBlank()) {
                     throw IllegalStateException(
                         "No se pudo obtener el serial fiscal de la impresora. " +
-                            "Verifica que el equipo responda al comando S1 y vuelve a intentar."
+                            "Configura el serial en ajustes HKA o verifica respuesta S1."
                     )
                 }
+                Log.i(
+                    TAG,
+                    "printCreditNote() → serial seleccionado='$resolvedPrinterSerial' fuente=$serialSource " +
+                        "(local='$localSerial', backend='$documentSerial', s1='$stateSerial')"
+                )
 
                 val commands = buildCreditNoteCommands(
                     document = document,
