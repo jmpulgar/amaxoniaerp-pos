@@ -81,9 +81,20 @@ class TheFactoryPrinterImpl(
 
                 cancelOpenFiscalDocument(settings)
 
+                val resolvedPrinterSerial = sanitizeText(
+                    document.printerSerial.ifBlank { printerStateBefore?.registeredMachineNumber.orEmpty() },
+                    maxLength = 10
+                )
+                if (resolvedPrinterSerial.isBlank()) {
+                    throw IllegalStateException(
+                        "No se pudo obtener el serial fiscal de la impresora. " +
+                            "Verifica que el equipo responda al comando S1 y vuelve a intentar."
+                    )
+                }
+
                 val commands = buildCreditNoteCommands(
                     document = document,
-                    printerSerial = document.printerSerial.ifBlank { printerStateBefore?.registeredMachineNumber.orEmpty() }
+                    printerSerial = resolvedPrinterSerial
                 )
 
                 Log.d(TAG, "printCreditNote() → ${commands.size} comandos a enviar a ${settings.ipAddress}:${settings.port}")
@@ -228,9 +239,7 @@ class TheFactoryPrinterImpl(
 
         lines += "iF*$referenceNumber"
         lines += "iD*$referenceDate"
-        if (normalizedPrinterSerial.isNotBlank()) {
-            lines += "iI*$normalizedPrinterSerial"
-        }
+        lines += "iI*$normalizedPrinterSerial"
 
         val address = sanitizeText(document.customerAddress, maxLength = 30)
         if (address.isNotBlank()) {
@@ -386,10 +395,9 @@ class TheFactoryPrinterImpl(
             socket.soTimeout = SOCKET_TIMEOUT_MS
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
             val encrypted = encryptCommand(command)
-            socket.getOutputStream().use { outputStream ->
-                outputStream.write(encrypted)
-                outputStream.flush()
-            }
+            val outputStream = socket.getOutputStream()
+            outputStream.write(encrypted)
+            outputStream.flush()
             val response = readSocketResponse(socket)
             if (response.isEmpty()) {
                 throw IllegalStateException("La impresora no respondió al comando $command")
