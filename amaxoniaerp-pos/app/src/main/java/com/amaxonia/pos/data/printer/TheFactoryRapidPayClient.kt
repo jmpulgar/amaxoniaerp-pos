@@ -73,7 +73,6 @@ class TheFactoryRapidPayClient(
                 putExtra(EXTRA_COLOR_BACKGROUND, COLOR_PRIMARY)
                 putExtra(EXTRA_COLOR_TEXT, COLOR_WHITE)
                 putExtra(EXTRA_MESSAGE, "Procesando pago...")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         }
     }

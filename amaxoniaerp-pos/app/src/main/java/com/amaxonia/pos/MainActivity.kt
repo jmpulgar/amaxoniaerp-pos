@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Handle Rapid Pay result if this onCreate was triggered by HKA POS re-launching us
-        handleRapidPayResult(intent)
+        handleRapidPayResult(intent, source = "onCreate")
 
         // Determinar la ruta inicial ANTES de renderizar, de forma bloqueante.
         // DataStore usa .first() que es una sola lectura de disco; es rápido y seguro aquí.
@@ -63,24 +63,25 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Called when the Activity is re-launched while already running (launchMode="singleTop").
+     * Called when the Activity is re-launched while already running (launchMode="singleTask").
      * This is how the HKA POS app returns results — it re-launches our MainActivity with extras.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         Log.d(TAG, "onNewIntent() → extras: ${intent.extras?.keySet()?.joinToString()}")
-        handleRapidPayResult(intent)
+        handleRapidPayResult(intent, source = "onNewIntent")
     }
 
     /**
      * Checks the intent for Rapid Pay result extras and delivers them to the bridge.
      */
-    private fun handleRapidPayResult(intent: Intent?) {
+    private fun handleRapidPayResult(intent: Intent?, source: String) {
         if (intent == null) return
 
         val code = intent.getStringExtra(EXTRA_RESULT_CODE) ?: return
 
-        Log.d(TAG, "handleRapidPayResult() → codigo recibido: $code")
+        Log.d(TAG, "handleRapidPayResult($source) → codigo recibido: $code")
 
         if (!RapidPayBridge.hasPendingRequest()) {
             Log.w(TAG, "handleRapidPayResult() → no hay solicitud pendiente, ignorando resultado")
