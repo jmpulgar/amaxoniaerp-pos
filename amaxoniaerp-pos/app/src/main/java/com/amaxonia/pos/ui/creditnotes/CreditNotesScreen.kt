@@ -822,31 +822,106 @@ private fun CreditNoteDetailSheet(
     isSubmitting: Boolean,
     onProcessFiscal: () -> Unit,
 ) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(detail.codigo, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = AmaxoniaBlue)
-                FiscalStatusChip(status = detail.fiscalStatus)
-                Text(detail.clienteNombre, fontWeight = FontWeight.Medium)
-                Text("Factura origen: ${detail.facturaCodigo}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Monto: ${formatAmount(detail.total)}", fontWeight = FontWeight.Bold)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+            .padding(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AmaxoniaBlue.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ReceiptLong,
+                    contentDescription = null,
+                    tint = AmaxoniaBlue,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-        }
-        items(detail.lines) { line ->
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(line.descripcion, fontWeight = FontWeight.Bold)
-                    Text("Cantidad: ${formatQuantity(line.cantidad)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Total: ${formatAmount(line.totalConIva)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = detail.codigo,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FiscalStatusChip(status = detail.fiscalStatus)
                 }
             }
         }
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (detail.clienteNombre.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = AmaxoniaBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = detail.clienteNombre,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (detail.clienteIdentificacion.isNotBlank()) {
+                        Text(
+                            text = detail.clienteIdentificacion,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 24.dp)
+                        )
+                    }
+                }
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Factura origen", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text(detail.facturaCodigo, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                }
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Monto", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text("USD ${formatAmount(detail.total)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AmaxoniaBlue)
+                }
+            }
+        }
+
         if (detail.fiscalStatus == CreditNoteFiscalStatusDto.PENDIENTE && detail.fiscalDocument != null) {
-            item {
-                Button(onClick = onProcessFiscal, enabled = !isSubmitting, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onProcessFiscal, 
+                enabled = !isSubmitting, 
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
                     Icon(Icons.Default.Print, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Procesar nota de crédito fiscal")
+                    Text("Procesar nota de crédito fiscal", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
