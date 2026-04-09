@@ -343,9 +343,7 @@ class CreditNotesViewModel(
 
     private suspend fun shouldProcessFiscal(): Boolean {
         val printerType = localStore.readSelectedPrinterType()
-        if (printerType != PrinterType.THE_FACTORY_HKA) return false
-        val mode = localStore.readTheFactorySettings().openMode.trim()
-        return mode.isBlank() || mode.equals("HKA20", ignoreCase = true)
+        return printerType == PrinterType.THE_FACTORY_HKA
     }
 
     private fun formatQuantity(value: Double): String {
