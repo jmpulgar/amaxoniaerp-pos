@@ -223,6 +223,7 @@ class CreditNoteRepository {
             it[periodoDevolucion] = request.periodo.take(MAX_PERIOD_LENGTH)
             it[contabilizado] = 0
             it[numcomContabilizado] = 0
+            it[fechaContabilizado] = creditNoteDate
             it[idCajaSecuencia] = request.idCajaSecuencia
             it[serieSucursal] = cajaContext.serieSucursal
             it[cajaSecuencia] = cajaContext.cajaSecuencia
