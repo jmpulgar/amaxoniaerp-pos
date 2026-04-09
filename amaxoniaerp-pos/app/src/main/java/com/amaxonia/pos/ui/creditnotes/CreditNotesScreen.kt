@@ -461,17 +461,99 @@ private fun SummaryBanner(title: String, value: String, amount: Double) {
 
 @Composable
 private fun CreditNoteCard(note: CreditNoteSummaryDto, onClick: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(note.codigo, fontWeight = FontWeight.Bold, color = AmaxoniaBlue, fontSize = 16.sp)
-                Spacer(modifier = Modifier.weight(1f))
-                FiscalStatusChip(status = note.fiscalStatus)
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AmaxoniaBlue.copy(alpha = 0.08f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ReceiptLong,
+                    contentDescription = null,
+                    tint = AmaxoniaBlue,
+                    modifier = Modifier.size(22.dp)
+                )
             }
-            Text(note.clienteNombre, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-            Text("Factura: ${note.facturaCodigo}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(note.fecha, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(formatAmount(note.total), fontWeight = FontWeight.Bold)
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = note.codigo,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                FiscalStatusChip(status = note.fiscalStatus)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = note.fecha,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    if (note.clienteNombre.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = note.clienteNombre,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                }
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "USD ${formatAmount(note.total)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = AmaxoniaBlue
+                )
+                Text(
+                    text = note.facturaCodigo,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
