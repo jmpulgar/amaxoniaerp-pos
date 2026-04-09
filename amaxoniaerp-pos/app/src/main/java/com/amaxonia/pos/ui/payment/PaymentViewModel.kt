@@ -506,6 +506,18 @@ class PaymentViewModel(
                 exchangeRate = currentRate,
                 isMultiCurrency = isMultiCurrency
             )
+            val fiscalItemsForPrinter = mappedItems.map { item ->
+                TransactionFiscalItem(
+                    description = item.itemDescripcion,
+                    quantity = item.itemCantidadTotal,
+                    unitPriceWithoutTax = resolveFiscalPrintAmount(
+                        amount = item.itemPrecioSinIva,
+                        exchangeRate = currentRate,
+                        isMultiCurrency = isMultiCurrency
+                    ),
+                    iva = item.itemPIva
+                )
+            }
 
             val newTransaction = Transaction(
                 id = UUID.randomUUID().toString(),
@@ -520,14 +532,7 @@ class PaymentViewModel(
                 clienteIdentificacion = selectedClient.ruc.ifBlank { selectedClient.cedula },
                 formaPago = methods,
                 paymentMethods = selectedPaymentMethods,
-                fiscalItems = mappedItems.map { item ->
-                    TransactionFiscalItem(
-                        description = item.itemDescripcion,
-                        quantity = item.itemCantidadTotal,
-                        unitPriceWithoutTax = item.itemPrecioSinIva,
-                        iva = item.itemPIva
-                    )
-                }
+                fiscalItems = fiscalItemsForPrinter
             )
 
             transactionRepository.saveTransaction(newTransaction).onFailure { saveError ->
