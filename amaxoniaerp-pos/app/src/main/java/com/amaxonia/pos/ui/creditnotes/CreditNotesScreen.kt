@@ -358,9 +358,6 @@ private fun CreditNoteCreateContent(
     }
 }
 
-
-}
-
 @Composable
 private fun SearchRow(
     value: String,
