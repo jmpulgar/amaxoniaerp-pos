@@ -358,77 +358,7 @@ private fun CreditNoteCreateContent(
     }
 }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            ElevatedCard(shape = RoundedCornerShape(16.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AmaxoniaBlue)
-                    Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
-                    Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Disponible para devolver: ${invoice.moneda} ${formatAmount(invoice.remainingAmount)}", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
 
-        item {
-            ElevatedCard(shape = RoundedCornerShape(16.dp)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = state.form.fecha, onValueChange = onFechaChange, label = { Text("Fecha") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = state.form.periodo, onValueChange = onPeriodoChange, label = { Text("Periodo") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = state.form.observacion, onValueChange = onObservacionChange, label = { Text("Observación") }, modifier = Modifier.fillMaxWidth())
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = state.form.anular, onClick = { onAnularChange(!state.form.anular) }, label = { Text("Anular factura") })
-                        FilterChip(selected = state.form.devolverStock, onClick = { onDevolverStockChange(!state.form.devolverStock) }, label = { Text("Devolver stock") })
-                    }
-                }
-            }
-        }
-
-        item {
-            ElevatedCard(shape = RoundedCornerShape(16.dp)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Destino de la nota de crédito", fontWeight = FontWeight.Bold)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettlementChip("Sin salida", CreditNoteSettlementTypeDto.NINGUNO, state.form.settlementType, onSettlementTypeChange)
-                        SettlementChip("Abono", CreditNoteSettlementTypeDto.ABONO, state.form.settlementType, onSettlementTypeChange)
-                        SettlementChip("Reintegro", CreditNoteSettlementTypeDto.REINTEGRO, state.form.settlementType, onSettlementTypeChange)
-                        SettlementChip("Certificado", CreditNoteSettlementTypeDto.CERTIFICADO_REGALO, state.form.settlementType, onSettlementTypeChange)
-                    }
-
-                    if (state.form.settlementType == CreditNoteSettlementTypeDto.REINTEGRO) {
-                        RefundMethodSelector(
-                            methods = state.availableRefundMethods,
-                            selectedId = state.form.idFormaPagoReintegro,
-                            onSelected = onRefundMethodChange,
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-            Text("Líneas a devolver", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = AmaxoniaBlue)
-        }
-
-        items(invoice.lines, key = { it.idDetalleFactura }) { line ->
-            SourceInvoiceLineEditor(
-                line = line,
-                value = state.form.cantidades[line.idDetalleFactura].orEmpty(),
-                onValueChange = { onQuantityChange(line.idDetalleFactura, it) },
-                onUseMax = { onUseMax(line.idDetalleFactura) },
-            )
-        }
-
-        item {
-            Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth().height(52.dp), enabled = !state.isSubmitting) {
-                Text("Generar nota de crédito")
-            }
-        }
-    }
 }
 
 @Composable
