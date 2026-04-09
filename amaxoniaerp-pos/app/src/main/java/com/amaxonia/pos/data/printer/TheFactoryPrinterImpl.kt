@@ -119,9 +119,9 @@ class TheFactoryPrinterImpl(
      * - "iR*{clientId}" — customer tax id / identification
      * - "iS*{clientName}" — customer name
      * - "@{text}"      — free text / comment line (non-fiscal)
-     * - " {amount}{qty}{description}" — item line (space prefix = taxable item)
-     *     - amount: price in cents, padded to 8 digits
-     *     - qty: quantity * 1000, padded to 10 digits
+     * - " {qty}{amount}{description}" — item line (space prefix = taxable item)
+     *     - qty: quantity entera, padded to 8 digits
+     *     - amount: monto con 2 decimales implicitos, padded to 10 digits
      *     - description: up to 30 chars
      * - "3"   — subtotal
      * - "101" — close with cash payment
@@ -134,9 +134,9 @@ class TheFactoryPrinterImpl(
         val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
         val description = sanitizeText("VENTA $invoice", maxLength = 30)
         val fiscalAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
-        val amountField = formatAmount(fiscalAmount)
-        val quantityField = "0000001000" // qty=1.000
-        val itemLine = " $amountField$quantityField$description"
+        val quantityField = formatFiscalSaleQuantity(1) // qty=1
+        val amountField = formatFiscalSaleAmount(fiscalAmount)
+        val itemLine = " $quantityField$amountField$description"
 
         val lines = mutableListOf<String>()
 
@@ -279,12 +279,31 @@ class TheFactoryPrinterImpl(
     }
 
     /**
-     * Formats a monetary amount as an 8-digit integer field.
-     * The Factory fiscal item commands expect whole-unit amount in this field.
-     * e.g., 580.00 -> "00000580"
+     * Formats fiscal sale amount with 2 decimal places, implied decimal point.
+     * e.g., 10.00 -> 0000001000, 10.50 -> 0000001050
+     */
+    private fun formatFiscalSaleAmount(amount: Double): String {
+        return ((amount.coerceAtLeast(0.0) * 100).roundToInt())
+            .toString()
+            .padStart(10, '0')
+    }
+
+    /**
+     * Formats fiscal sale quantity as 8-digit integer.
+     * e.g., 3 -> 00000003
+     */
+    private fun formatFiscalSaleQuantity(quantity: Int): String {
+        return quantity.coerceAtLeast(1)
+            .toString()
+            .padStart(8, '0')
+    }
+
+    /**
+     * Formats a monetary amount as cents padded to 8 digits.
+     * e.g., 12.50 -> "00001250"
      */
     private fun formatAmount(amount: Double): String {
-        return amount.roundToInt()
+        return ((amount * 100).roundToInt())
             .toString()
             .padStart(8, '0')
     }
