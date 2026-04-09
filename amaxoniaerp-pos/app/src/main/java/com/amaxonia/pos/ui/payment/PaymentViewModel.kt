@@ -500,12 +500,19 @@ class PaymentViewModel(
                 .distinct()
                 .joinToString(" + ")
 
+            val fiscalAmountBs = resolveFiscalPrintAmount(
+                amount = totalGeneral,
+                exchangeRate = currentRate,
+                isMultiCurrency = isMultiCurrency
+            )
+
             val newTransaction = Transaction(
                 id = UUID.randomUUID().toString(),
                 invoiceNumber = response.codFactura,
                 time = now.format(formatter),
                 amount = Money.toDouble(currentState.totalAmountMoney),
                 currency = "USD",
+                fiscalAmountBs = fiscalAmountBs,
                 status = TransactionStatus.PAID,
                 dateHeader = now.format(dateHeaderFormatter),
                 clienteNombre = "${selectedClient.firstName} ${selectedClient.lastName}".trim(),
@@ -773,6 +780,15 @@ class PaymentViewModel(
         val normalizedRate = exchangeRate.takeIf { it > 0.0 }
             ?: throw IllegalStateException("No se encontro una tasa valida para enviar el cobro a la pasarela")
         return normalizedAmount * normalizedRate
+    }
+
+    private fun resolveFiscalPrintAmount(amount: Double, exchangeRate: Double, isMultiCurrency: Boolean): Double {
+        val amountInBs = resolveGatewayAmount(
+            amount = amount,
+            exchangeRate = exchangeRate,
+            isMultiCurrency = isMultiCurrency
+        )
+        return Money.toDouble(Money.fromDouble(amountInBs))
     }
 
     private suspend fun isHka20FlowEnabled(): Boolean {

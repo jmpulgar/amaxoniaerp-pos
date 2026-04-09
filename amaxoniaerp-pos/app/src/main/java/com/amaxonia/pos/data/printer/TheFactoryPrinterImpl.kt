@@ -133,7 +133,8 @@ class TheFactoryPrinterImpl(
     private fun buildFiscalCommands(transaction: Transaction): List<String> {
         val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
         val description = sanitizeText("VENTA $invoice", maxLength = 30)
-        val amountField = formatAmount(transaction.amount.coerceAtLeast(0.01))
+        val fiscalAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
+        val amountField = formatAmount(fiscalAmount)
         val quantityField = "0000001000" // qty=1.000
         val itemLine = " $amountField$quantityField$description"
 
@@ -278,11 +279,12 @@ class TheFactoryPrinterImpl(
     }
 
     /**
-     * Formats a monetary amount as cents padded to 8 digits.
-     * e.g., 12.50 -> "00001250"
+     * Formats a monetary amount as an 8-digit integer field.
+     * The Factory fiscal item commands expect whole-unit amount in this field.
+     * e.g., 580.00 -> "00000580"
      */
     private fun formatAmount(amount: Double): String {
-        return ((amount * 100).roundToInt())
+        return amount.roundToInt()
             .toString()
             .padStart(8, '0')
     }

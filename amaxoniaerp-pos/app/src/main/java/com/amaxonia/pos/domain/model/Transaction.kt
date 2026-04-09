@@ -12,6 +12,7 @@ data class Transaction(
     val time: String,
     val amount: Double,
     val currency: String = "USD",
+    val fiscalAmountBs: Double? = null,
     val status: TransactionStatus = TransactionStatus.PAID,
     val dateHeader: String,
     val clienteNombre: String = "",
