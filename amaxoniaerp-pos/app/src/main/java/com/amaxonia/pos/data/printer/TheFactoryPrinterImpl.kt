@@ -279,11 +279,13 @@ class TheFactoryPrinterImpl(
     }
 
     /**
-     * Formats fiscal sale amount with 2 decimal places, implied decimal point.
-     * e.g., 10.00 -> 0000001000, 10.50 -> 0000001050
+     * Formats fiscal sale amount for The Factory sale line protocol.
+     *
+     * Empirically, this field is interpreted with 3 implied decimals by the device.
+     * e.g., 10.00 -> 0000010000, 10.50 -> 0000010500
      */
     private fun formatFiscalSaleAmount(amount: Double): String {
-        return ((amount.coerceAtLeast(0.0) * 100).roundToInt())
+        return ((amount.coerceAtLeast(0.0) * 1000).roundToInt())
             .toString()
             .padStart(10, '0')
     }
