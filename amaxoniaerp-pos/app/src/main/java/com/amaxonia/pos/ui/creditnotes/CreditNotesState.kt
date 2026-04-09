@@ -19,11 +19,9 @@ data class CreditNoteFormState(
     val fecha: String = LocalDate.now().toString(),
     val periodo: String = YearMonth.now().toString(),
     val observacion: String = "",
-    val anular: Boolean = false,
     val devolverStock: Boolean = true,
-    val settlementType: CreditNoteSettlementTypeDto = CreditNoteSettlementTypeDto.NINGUNO,
+    val generarAbono: Boolean = true,
     val idFormaPagoReintegro: Int? = null,
-    val cantidades: Map<String, String> = emptyMap(),
 )
 
 data class CreditNotesState(

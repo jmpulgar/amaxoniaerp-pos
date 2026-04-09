@@ -178,12 +178,9 @@ fun CreditNotesScreen(
                     onFechaChange = viewModel::onFechaChange,
                     onPeriodoChange = viewModel::onPeriodoChange,
                     onObservacionChange = viewModel::onObservacionChange,
-                    onAnularChange = viewModel::onAnularChange,
                     onDevolverStockChange = viewModel::onDevolverStockChange,
-                    onSettlementTypeChange = viewModel::onSettlementTypeChange,
+                    onGenerarAbonoChange = viewModel::onGenerarAbonoChange,
                     onRefundMethodChange = viewModel::onRefundMethodChange,
-                    onQuantityChange = viewModel::onQuantityChange,
-                    onUseMax = viewModel::useMaxQuantity,
                     onSubmit = viewModel::submitCreditNote,
                 )
             }
@@ -255,12 +252,9 @@ private fun CreditNoteCreateContent(
     onFechaChange: (String) -> Unit,
     onPeriodoChange: (String) -> Unit,
     onObservacionChange: (String) -> Unit,
-    onAnularChange: (Boolean) -> Unit,
     onDevolverStockChange: (Boolean) -> Unit,
-    onSettlementTypeChange: (CreditNoteSettlementTypeDto) -> Unit,
-    onRefundMethodChange: (Int) -> Unit,
-    onQuantityChange: (String, String) -> Unit,
-    onUseMax: (String) -> Unit,
+    onGenerarAbonoChange: (Boolean) -> Unit,
+    onRefundMethodChange: (Int?) -> Unit,
     onSubmit: () -> Unit,
 ) {
     val invoice = state.selectedInvoice
@@ -268,6 +262,101 @@ private fun CreditNoteCreateContent(
         EmptyState(icon = Icons.AutoMirrored.Filled.ReceiptLong, title = "Selecciona una factura", subtitle = "El flujo de creación necesita una factura origen")
         return
     }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Generar la Nota de Crédito", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground)
+                Text("Se anulará la factura y se devolverá la totalidad de las líneas.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            }
+        }
+
+        item {
+            ElevatedCard(shape = RoundedCornerShape(12.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AmaxoniaBlue)
+                    Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
+                    Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Total a devolver: ${invoice.moneda} ${formatAmount(invoice.remainingAmount)}", fontWeight = FontWeight.Black, fontSize = 16.sp)
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(value = state.form.fecha, onValueChange = onFechaChange, label = { Text("Fecha") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = state.form.periodo, onValueChange = onPeriodoChange, label = { Text("Periodo") }, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(value = state.form.observacion, onValueChange = onObservacionChange, label = { Text("Observación") }, modifier = Modifier.fillMaxWidth())
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Switch(
+                        checked = state.form.devolverStock,
+                        onCheckedChange = onDevolverStockChange,
+                        colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = AmaxoniaBlue, checkedTrackColor = AmaxoniaBlue.copy(alpha = 0.5f))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Devolver stock al inventario", fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(shape = RoundedCornerShape(12.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onGenerarAbonoChange(true) }) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = state.form.generarAbono,
+                                    onClick = { onGenerarAbonoChange(true) },
+                                    colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = AmaxoniaBlue)
+                                )
+                                Text("Si", modifier = Modifier.padding(start = 8.dp), color = if (state.form.generarAbono) AmaxoniaBlue else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onGenerarAbonoChange(false) }) {
+                                androidx.compose.material3.RadioButton(
+                                    selected = !state.form.generarAbono,
+                                    onClick = { onGenerarAbonoChange(false) },
+                                    colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = AmaxoniaBlue)
+                                )
+                                Text("No", modifier = Modifier.padding(start = 8.dp), color = if (!state.form.generarAbono) AmaxoniaBlue else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    if (!state.form.generarAbono) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Seleccione la forma de pago para realizar el reintegro al cliente:", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            RefundMethodSelector(
+                                methods = state.availableRefundMethods,
+                                selectedId = state.form.idFormaPagoReintegro,
+                                onSelected = onRefundMethodChange,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth().height(56.dp), enabled = !state.isSubmitting, shape = RoundedCornerShape(12.dp), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue)) {
+                if (state.isSubmitting) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Generar nota de crédito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),

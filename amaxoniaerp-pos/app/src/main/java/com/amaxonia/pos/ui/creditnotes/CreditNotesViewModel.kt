@@ -94,7 +94,6 @@ class CreditNotesViewModel(
                             form = CreditNoteFormState(
                                 fecha = LocalDate.now().toString(),
                                 periodo = YearMonth.now().toString(),
-                                cantidades = invoice.lines.associate { line -> line.idDetalleFactura to "" },
                             )
                         )
                     }
@@ -145,52 +144,26 @@ class CreditNotesViewModel(
     }
 
     fun onAnularChange(enabled: Boolean) {
-        _state.update { current ->
-            val invoice = current.selectedInvoice
-            val cantidades = if (enabled && invoice != null) {
-                invoice.lines.associate { line ->
-                    line.idDetalleFactura to if (line.cantidadDisponible > 0.0) formatQuantity(line.cantidadDisponible) else ""
-                }
-            } else {
-                current.form.cantidades
-            }
-            current.copy(form = current.form.copy(anular = enabled, cantidades = cantidades))
-        }
+        _state.update { it.copy(form = it.form.copy(anular = enabled)) }
     }
 
     fun onDevolverStockChange(enabled: Boolean) {
         _state.update { it.copy(form = it.form.copy(devolverStock = enabled)) }
     }
 
-    fun onSettlementTypeChange(type: CreditNoteSettlementTypeDto) {
+    fun onGenerarAbonoChange(generar: Boolean) {
         _state.update {
             it.copy(
                 form = it.form.copy(
-                    settlementType = type,
-                    idFormaPagoReintegro = if (type == CreditNoteSettlementTypeDto.REINTEGRO) it.form.idFormaPagoReintegro else null,
+                    generarAbono = generar,
+                    idFormaPagoReintegro = if (generar) null else it.form.idFormaPagoReintegro
                 )
             )
         }
     }
 
-    fun onRefundMethodChange(idFormaPago: Int) {
+    fun onRefundMethodChange(idFormaPago: Int?) {
         _state.update { it.copy(form = it.form.copy(idFormaPagoReintegro = idFormaPago)) }
-    }
-
-    fun onQuantityChange(idDetalleFactura: String, value: String) {
-        _state.update { current ->
-            current.copy(
-                form = current.form.copy(
-                    cantidades = current.form.cantidades.toMutableMap().apply { put(idDetalleFactura, value) }
-                )
-            )
-        }
-    }
-
-    fun useMaxQuantity(idDetalleFactura: String) {
-        val invoice = _state.value.selectedInvoice ?: return
-        val line = invoice.lines.firstOrNull { it.idDetalleFactura == idDetalleFactura } ?: return
-        onQuantityChange(idDetalleFactura, formatQuantity(line.cantidadDisponible))
     }
 
     fun submitCreditNote() {
@@ -216,14 +189,12 @@ class CreditNotesViewModel(
                 return@launch
             }
 
-            val detailLines = invoice.lines.mapNotNull { line ->
-                val value = currentState.form.cantidades[line.idDetalleFactura].orEmpty().replace(',', '.')
-                val quantity = value.toDoubleOrNull()?.takeIf { it > 0.0 } ?: return@mapNotNull null
-                CreateCreditNoteLineInputDto(idDetalleFactura = line.idDetalleFactura, cantidad = quantity)
-            }
-            if (detailLines.isEmpty()) {
-                _state.update { it.copy(isSubmitting = false, error = "Debes indicar al menos una línea con cantidad a devolver") }
-                return@launch
+            val settlementType = if (currentState.form.generarAbono) {
+                CreditNoteSettlementTypeDto.ABONO
+            } else if (currentState.form.idFormaPagoReintegro != null) {
+                CreditNoteSettlementTypeDto.REINTEGRO
+            } else {
+                CreditNoteSettlementTypeDto.NINGUNO
             }
 
             val payload = CreateCreditNoteRequestDto(
@@ -231,11 +202,11 @@ class CreditNotesViewModel(
                 fecha = currentState.form.fecha,
                 periodo = currentState.form.periodo,
                 observacion = currentState.form.observacion,
-                detalle = detailLines,
-                anular = currentState.form.anular,
+                detalle = emptyList(), // Devolución total
+                anular = true, // Siempre se anula
                 devolverStock = currentState.form.devolverStock,
                 idCajaSecuencia = idCajaSecuencia,
-                settlementType = currentState.form.settlementType,
+                settlementType = settlementType,
                 idFormaPagoReintegro = currentState.form.idFormaPagoReintegro,
             )
 
