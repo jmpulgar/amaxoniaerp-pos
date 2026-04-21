@@ -2,6 +2,7 @@ package com.amaxoniaerp.features.caja.data
 
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.time.BusinessClock
+import java.time.ZoneId
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.Caja
@@ -96,6 +97,13 @@ class CajaRepository {
         }
 
         val now = BusinessClock.nowForCountry(countryCode)
+        log.info(
+            "openCaja reloj negocio: countryCode={} zone={} fechaAperturaLocal={} jvmDefaultZone={}",
+            countryCode,
+            BusinessClock.zoneForCountry(countryCode),
+            now,
+            ZoneId.systemDefault(),
+        )
         val newId = UUID.randomUUID().toString()
         val nextSequence = dbQuery(database) {
             resolveNextSecuenciaCode(request.idCaja)
