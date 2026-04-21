@@ -4,14 +4,31 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.Logger
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
- * Parámetros JDBC comunes para MySQL (legacy: fechas 0000-00-00 convertidas a null).
- * `serverTimezone=UTC` alinea la sesión del driver; las marcas de negocio deben generarse con
- * [com.amaxoniaerp.core.time.BusinessClock] y verificarse en staging que `DATETIME` guarda el mismo calendario local.
+ * Parámetros JDBC comunes para MySQL (legacy: fechas 0000-00-00 convertidas a null), **sin** `serverTimezone`.
+ *
+ * `serverTimezone` se añade por país en [mysqlJdbcQueryString]: con `serverTimezone=UTC` el driver MySQL 8
+ * convertía `LocalDateTime` de negocio (p. ej. 19:40 Caracas) al persistir en `DATETIME` y guardaba 23:40 UTC.
+ * Debe coincidir con la zona usada en [com.amaxoniaerp.core.time.BusinessClock] para ese mismo `countryCode`.
  */
-private const val MYSQL_JDBC_PARAMS =
-    "useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL"
+private const val MYSQL_JDBC_PARAMS_WITHOUT_TZ =
+    "useSSL=false&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL"
+
+/** Misma convención IANA que [com.amaxoniaerp.core.time.BusinessClock] (VE/PA). */
+private fun jdbcServerTimezoneForCountry(countryCode: String): String =
+    when (countryCode.uppercase()) {
+        "VE" -> "America/Caracas"
+        "PA" -> "America/Panama"
+        else -> "UTC"
+    }
+
+private fun mysqlJdbcQueryString(countryCode: String): String {
+    val tz = URLEncoder.encode(jdbcServerTimezoneForCountry(countryCode), StandardCharsets.UTF_8)
+    return "$MYSQL_JDBC_PARAMS_WITHOUT_TZ&serverTimezone=$tz"
+}
 
 /**
  * Configuración de base de datos específica por país.
@@ -27,10 +44,10 @@ data class CountryDbConfig(
     val displayName: String
 ) {
     fun buildConfigJdbcUrl(): String =
-        "jdbc:mysql://$host:$port/$configDbName?$MYSQL_JDBC_PARAMS"
+        "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
 
     fun buildCompanyJdbcUrl(companyDbName: String): String =
-        "jdbc:mysql://$host:$port/$companyDbName?$MYSQL_JDBC_PARAMS"
+        "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
 }
 
 /**
