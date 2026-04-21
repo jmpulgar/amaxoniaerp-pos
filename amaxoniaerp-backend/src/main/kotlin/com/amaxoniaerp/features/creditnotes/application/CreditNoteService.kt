@@ -38,8 +38,8 @@ class CreditNoteService(
         CreditNoteSourceInvoiceListResponse(data = data, total = total)
     }
 
-    suspend fun getDetail(database: Database, id: String): CreditNoteDetailResponse? = dbQuery(database) {
-        repository.getCreditNoteDetail(id)
+    suspend fun getDetail(database: Database, id: String, countryCode: String): CreditNoteDetailResponse? = dbQuery(database) {
+        repository.getCreditNoteDetail(id, countryCode)
     }
 
     suspend fun getInvoiceDetail(database: Database, id: String): CreditNoteSourceInvoiceDetailResponse? = dbQuery(database) {
@@ -48,10 +48,11 @@ class CreditNoteService(
 
     suspend fun create(
         database: Database,
+        countryCode: String,
         request: CreateCreditNoteRequest,
         username: String,
     ): CreateCreditNoteResponse = dbQuery(database) {
-        repository.create(request, username)
+        repository.create(countryCode, request, username)
     }
 
     suspend fun confirmFiscal(

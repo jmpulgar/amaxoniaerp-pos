@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.clients.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTable
 import org.slf4j.LoggerFactory
 import com.amaxoniaerp.features.clients.domain.Client
@@ -16,7 +17,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
-import java.time.LocalDate
 import java.util.UUID
 
 class ClientsRepository {
@@ -54,7 +54,7 @@ class ClientsRepository {
         data to total
     }
 
-    suspend fun createClient(database: Database, request: CreateClientRequest): Client = dbQuery(database) {
+    suspend fun createClient(database: Database, countryCode: String, request: CreateClientRequest): Client = dbQuery(database) {
         val newId = UUID.randomUUID().toString()
         val generatedCode = getNextCode()
 
@@ -79,7 +79,7 @@ class ClientsRepository {
             it[permiteCredito] = false
             it[limite] = 0.00
             it[dias] = 0
-            it[fecha] = LocalDate.now().toString()
+            it[fecha] = BusinessClock.todayForCountry(countryCode).toString()
         }
 
         Client(

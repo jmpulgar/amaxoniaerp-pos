@@ -55,7 +55,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
 
                 try {
-                    val result = processSaleUseCase.execute(companyDb, request)
+                    val result = processSaleUseCase.execute(companyDb, countryCode, request)
                     call.respond(HttpStatusCode.Created, result)
                 } catch (e: DuplicateInvoiceException) {
                     call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))

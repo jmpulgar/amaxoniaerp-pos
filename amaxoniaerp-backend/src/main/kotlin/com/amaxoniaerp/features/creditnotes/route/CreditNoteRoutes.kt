@@ -100,14 +100,15 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 
             get("/{id}") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
-                val (database, _) = resolved
+                val (database, principal) = resolved
                 val id = call.parameters["id"]
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Nota de crédito requerida")
                     )
 
-                val detail = creditNoteService.getDetail(database, id)
+                val countryCode = principal.getCountryCode()!!
+                val detail = creditNoteService.getDetail(database, id, countryCode)
                     ?: return@get call.respond(
                         HttpStatusCode.NotFound,
                         mapOf("error" to "Nota de crédito no encontrada")
@@ -121,9 +122,10 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val (database, principal) = resolved
                 val request = call.receive<CreateCreditNoteRequest>()
                 val username = principal.payload.getClaim("username").asString().orEmpty().ifBlank { "POS" }
+                val countryCode = principal.getCountryCode()!!
 
                 try {
-                    val response = creditNoteService.create(database, request, username)
+                    val response = creditNoteService.create(database, countryCode, request, username)
                     call.respond(HttpStatusCode.Created, response)
                 } catch (e: CreditNoteValidationException) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))

@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.creditnotes.data
 
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalRequest
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalResponse
@@ -92,7 +93,7 @@ class CreditNoteRepository {
         return data to total
     }
 
-    fun getCreditNoteDetail(id: String): CreditNoteDetailResponse? {
+    fun getCreditNoteDetail(id: String, countryCode: String): CreditNoteDetailResponse? {
         val headerRow = CreditNoteHeaderTable
             .join(ClientsTable, JoinType.LEFT, CreditNoteHeaderTable.idCliente, ClientsTable.idCliente)
             .join(CreditNoteFacturaTable, JoinType.LEFT, CreditNoteHeaderTable.codFactura, CreditNoteFacturaTable.idFactura)
@@ -109,7 +110,7 @@ class CreditNoteRepository {
             .toList()
 
         val lines = detailRows.map(::mapDetailLine)
-        val header = mapHeaderContext(headerRow)
+        val header = mapHeaderContext(headerRow, countryCode)
         return buildDetailResponse(header, lines)
     }
 
@@ -165,7 +166,7 @@ class CreditNoteRepository {
         return buildSourceInvoiceDetail(invoiceId)
     }
 
-    fun create(request: CreateCreditNoteRequest, username: String): CreateCreditNoteResponse {
+    fun create(countryCode: String, request: CreateCreditNoteRequest, username: String): CreateCreditNoteResponse {
         if (request.idCajaSecuencia.isBlank()) {
             throw CreditNoteValidationException("La nota de crédito requiere una caja secuencia activa")
         }
@@ -196,7 +197,7 @@ class CreditNoteRepository {
         }
 
         val creditNoteDate = parseDate(request.fecha)
-        val now = LocalDateTime.now()
+        val now = BusinessClock.nowForCountry(countryCode)
         val cajaContext = resolveCajaContext(request.idCajaSecuencia)
         val nextCorrelative = advanceCreditNoteCorrelative(cajaContext.idCaja)
         val creditNoteId = UUID.randomUUID().toString()
@@ -278,7 +279,7 @@ class CreditNoteRepository {
         }
 
         if (allReturnedAfterOperation) {
-            cancelInvoiceAndOriginalCash(invoice.idFactura, username, creditNoteDate)
+            cancelInvoiceAndOriginalCash(invoice.idFactura, username, creditNoteDate, now)
         } else {
             registerPartialCreditNoteOnOriginalCash(invoice = invoice, creditNoteId = creditNoteId, creditNoteCode = creditNoteCode, total = totals.total, username = username, now = now)
         }
@@ -636,7 +637,7 @@ class CreditNoteRepository {
         return "${codigoCaja.takeIf { it.isNotBlank() } ?: "NC"}-${nextCorrelative.toString().padStart(5, '0')}"
     }
 
-    private fun cancelInvoiceAndOriginalCash(invoiceId: String, username: String, date: LocalDate) {
+    private fun cancelInvoiceAndOriginalCash(invoiceId: String, username: String, date: LocalDate, now: LocalDateTime) {
         CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoiceId }) {
             it[codEstatus] = 3
         }
@@ -662,7 +663,7 @@ class CreditNoteRepository {
                 SalesCajaNuevaReciboTable.update({ SalesCajaNuevaReciboTable.cajaReciboId inList reciboIds }) {
                     it[status] = "AN"
                     it[usuarioCreacion] = username.take(MAX_USERNAME_LENGTH)
-                    it[fechaCreacion] = LocalDateTime.of(date, LocalDateTime.now().toLocalTime())
+                    it[fechaCreacion] = LocalDateTime.of(date, now.toLocalTime())
                 }
             }
         }
@@ -1084,7 +1085,7 @@ class CreditNoteRepository {
         )
     }
 
-    private fun mapHeaderContext(row: ResultRow): CreditNoteHeaderContext {
+    private fun mapHeaderContext(row: ResultRow, countryCode: String): CreditNoteHeaderContext {
         val clienteNombre = listOf(row[ClientsTable.nombre], row[ClientsTable.apellido].orEmpty())
             .filter { it.isNotBlank() }
             .joinToString(" ")
@@ -1099,7 +1100,7 @@ class CreditNoteRepository {
             facturaId = row[CreditNoteHeaderTable.codFactura],
             facturaCodigo = row[CreditNoteFacturaTable.codFactura],
             fecha = row[CreditNoteHeaderTable.fechaDevolucion],
-            fechaCreacion = row[CreditNoteHeaderTable.fechaCreacion] ?: LocalDateTime.now(),
+            fechaCreacion = row[CreditNoteHeaderTable.fechaCreacion] ?: BusinessClock.nowForCountry(countryCode),
             periodo = row[CreditNoteHeaderTable.periodoDevolucion].orEmpty(),
             observacion = row[CreditNoteHeaderTable.observacion].orEmpty(),
             clienteNombre = clienteNombre,

@@ -10,13 +10,13 @@ import org.jetbrains.exposed.sql.Database
 class ProcessSaleUseCase(
     private val repository: ProcessSaleTransactionalRepository,
 ) {
-    suspend fun execute(database: Database, request: ProcessSaleRequest): ProcessSaleResponse {
+    suspend fun execute(database: Database, countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
         if (request.items.isEmpty()) {
             throw InvalidSaleRequestException("La factura debe contener al menos un item")
         }
 
         return dbQuery(database) {
-            repository.process(request)
+            repository.process(countryCode, request)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.clients.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.clients.data.ClientsRepository
 import com.amaxoniaerp.features.clients.domain.ClientsListResponse
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
@@ -37,6 +38,12 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
                 val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
                 val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
                 val limit = limitParam ?: 100
@@ -58,7 +65,7 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
                 call.respond(ClientsListResponse(data = clients, total = total))
             }
@@ -86,7 +93,13 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val defaultClient = clientsRepository.getDefaultClient(companyDb)
                     ?: return@get call.respond(
                         HttpStatusCode.NotFound,
@@ -119,13 +132,19 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
                 val id = call.parameters["id"]
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Invalid client id")
                     )
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val client = clientsRepository.getClientById(companyDb, id)
                     ?: return@get call.respond(
                         HttpStatusCode.NotFound,
@@ -158,6 +177,12 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
+                val countryCode = principal.getCountryCode()
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
                 val request = call.receive<CreateClientRequest>()
                 if (request.identification.isBlank() || request.name.isBlank()) {
                     return@post call.respond(
@@ -166,8 +191,8 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
-                val client = clientsRepository.createClient(companyDb, request)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val client = clientsRepository.createClient(companyDb, countryCode, request)
                 call.respond(HttpStatusCode.Created, client)
             }
 
@@ -194,6 +219,12 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
+                val countryCode = principal.getCountryCode()
+                    ?: return@put call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
                 val id = call.parameters["id"]
                     ?: return@put call.respond(
                         HttpStatusCode.BadRequest,
@@ -208,7 +239,7 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val client = clientsRepository.updateClient(companyDb, id, request)
                     ?: return@put call.respond(
                         HttpStatusCode.NotFound,

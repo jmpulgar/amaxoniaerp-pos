@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.sales.data
 
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTable
 import com.amaxoniaerp.features.companies.data.TasasCambioTable
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
@@ -31,7 +32,7 @@ import java.util.UUID
 
 class ProcessSaleTransactionalRepository {
 
-    fun process(request: ProcessSaleRequest): ProcessSaleResponse {
+    fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
         val preparedRequest = prepareRequestWithWarehouses(request)
         val monetaryContext = resolveMonetaryContext(preparedRequest)
 
@@ -42,7 +43,7 @@ class ProcessSaleTransactionalRepository {
 
         val invoiceId = preparedRequest.idFactura?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
         val invoiceCode = resolveInvoiceCode(preparedRequest)
-        val now = LocalDateTime.now()
+        val now = BusinessClock.nowForCountry(countryCode)
         val today = now.toLocalDate()
 
         insertFactura(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
@@ -807,7 +808,7 @@ class ProcessSaleTransactionalRepository {
             it[idDocumento] = invoiceId
             it[codProveedor] = 0
             it[comprobante] = "FACT"
-            it[anio] = Year.now().value % 100
+            it[anio] = Year.from(today).value % 100
             it[tipoCosto] = "PROM"
             it[estatus] = 1
             it[entregadoACodigo] = "POS"

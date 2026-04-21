@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.caja.data
 
 import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.Caja
@@ -32,15 +33,14 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 class CajaRepository {
     private val log = LoggerFactory.getLogger(CajaRepository::class.java)
 
-    suspend fun getCajaStatus(dbName: String, idCaja: String): CajaSecuencia? {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+    suspend fun getCajaStatus(countryCode: String, dbName: String, idCaja: String): CajaSecuencia? {
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return dbQuery(database) {
             val openCajas = CajaSecuenciaTable
                 .selectAll()
@@ -78,11 +78,11 @@ class CajaRepository {
         }
     }
 
-    suspend fun openCaja(dbName: String, request: AperturaRequest, username: String): Result<CajaSecuencia> {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
-        val currentOpen = getCajaStatus(dbName, request.idCaja)
+    suspend fun openCaja(countryCode: String, dbName: String, request: AperturaRequest, username: String): Result<CajaSecuencia> {
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
+        val currentOpen = getCajaStatus(countryCode, dbName, request.idCaja)
         if (currentOpen != null) {
-            autoCloseOpenSequence(dbName, currentOpen.idCajaSecuencia).fold(
+            autoCloseOpenSequence(countryCode, dbName, currentOpen.idCajaSecuencia).fold(
                 onSuccess = { },
                 onFailure = { error ->
                     return Result.failure(
@@ -95,7 +95,7 @@ class CajaRepository {
             )
         }
 
-        val now = LocalDateTime.now()
+        val now = BusinessClock.nowForCountry(countryCode)
         val newId = UUID.randomUUID().toString()
         val nextSequence = dbQuery(database) {
             resolveNextSecuenciaCode(request.idCaja)
@@ -130,13 +130,13 @@ class CajaRepository {
             }
             Result.success(Unit)
         }.mapCatching {
-            getCajaStatus(dbName, request.idCaja)
+            getCajaStatus(countryCode, dbName, request.idCaja)
                 ?: throw Exception("Failed to retrieve open caja.")
         }
     }
 
-    suspend fun getNextSecuenciaCodigo(dbName: String, idCaja: String): Result<String> {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+    suspend fun getNextSecuenciaCodigo(countryCode: String, dbName: String, idCaja: String): Result<String> {
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return runCatching {
             dbQuery(database) {
                 resolveNextSecuenciaCode(idCaja)
@@ -144,8 +144,8 @@ class CajaRepository {
         }
     }
 
-    private suspend fun autoCloseOpenSequence(dbName: String, idSecuencia: String): Result<Unit> {
-        return getCajaSecuenciaData(dbName, idSecuencia, verifyFacturasTemporales = false).fold(
+    private suspend fun autoCloseOpenSequence(countryCode: String, dbName: String, idSecuencia: String): Result<Unit> {
+        return getCajaSecuenciaData(countryCode, dbName, idSecuencia, verifyFacturasTemporales = false).fold(
             onSuccess = { data ->
                 val formaPagoTotals = buildAutoCloseFormaPagoTotals(data)
                 val montoEfectivoVentas = formaPagoTotals
@@ -192,6 +192,7 @@ class CajaRepository {
                 )
 
                 saveCajaCierreInternal(
+                    countryCode = countryCode,
                     dbName = dbName,
                     request = request,
                     validateFacturasTemporales = false,
@@ -204,11 +205,12 @@ class CajaRepository {
     }
 
     suspend fun getCajaSecuenciaData(
+        countryCode: String,
         dbName: String,
         idSecuencia: String,
         verifyFacturasTemporales: Boolean = false,
     ): Result<CajaSecuenciaData> {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return runCatching {
             dbQuery(database) {
                 val secuenciaRow = CajaSecuenciaTable
@@ -487,8 +489,9 @@ class CajaRepository {
         }
     }
 
-    suspend fun saveCajaCierre(dbName: String, request: CajaCierreSaveRequest): Result<CajaCierreSaveResponse> {
+    suspend fun saveCajaCierre(countryCode: String, dbName: String, request: CajaCierreSaveRequest): Result<CajaCierreSaveResponse> {
         return saveCajaCierreInternal(
+            countryCode = countryCode,
             dbName = dbName,
             request = request,
             validateFacturasTemporales = true,
@@ -496,11 +499,12 @@ class CajaRepository {
     }
 
     private suspend fun saveCajaCierreInternal(
+        countryCode: String,
         dbName: String,
         request: CajaCierreSaveRequest,
         validateFacturasTemporales: Boolean,
     ): Result<CajaCierreSaveResponse> {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return runCatching {
             dbQuery(database) {
                 val secuenciaRow = CajaSecuenciaTable
@@ -528,7 +532,7 @@ class CajaRepository {
                     }
                 }
 
-                val now = LocalDateTime.now()
+                val now = BusinessClock.nowForCountry(countryCode)
                 val serieSucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal]
 
                 CajaSecuenciaTable.update({ CajaSecuenciaTable.idCajaSecuencia eq request.id }) {
@@ -571,9 +575,9 @@ class CajaRepository {
         }
     }
 
-    suspend fun getCajaSequenceSummary(dbName: String, idCaja: String): CajaCierreSummary? {
-        val secuencia = getCajaStatus(dbName, idCaja) ?: return null
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+    suspend fun getCajaSequenceSummary(countryCode: String, dbName: String, idCaja: String): CajaCierreSummary? {
+        val secuencia = getCajaStatus(countryCode, dbName, idCaja) ?: return null
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
 
         return dbQuery(database) {
             val cajaName = CajaTable
@@ -742,8 +746,8 @@ class CajaRepository {
         }
     }
 
-    suspend fun getCajas(dbName: String, userId: Int): List<Caja> {
-        val database = DatabaseManager.connectToCompanyDb(dbName)
+    suspend fun getCajas(countryCode: String, dbName: String, userId: Int): List<Caja> {
+        val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return dbQuery(database) {
             val parametrosRow = ParametrosGeneralesTable
                 .select(

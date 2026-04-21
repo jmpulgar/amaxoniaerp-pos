@@ -5,7 +5,11 @@ import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.Logger
 
-/** Parámetros JDBC comunes para MySQL (legacy: fechas 0000-00-00 convertidas a null). */
+/**
+ * Parámetros JDBC comunes para MySQL (legacy: fechas 0000-00-00 convertidas a null).
+ * `serverTimezone=UTC` alinea la sesión del driver; las marcas de negocio deben generarse con
+ * [com.amaxoniaerp.core.time.BusinessClock] y verificarse en staging que `DATETIME` guarda el mismo calendario local.
+ */
 private const val MYSQL_JDBC_PARAMS =
     "useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL"
 
