@@ -75,22 +75,11 @@ class TheFactoryPrinterImpl(
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
 
-                val printerStateBefore = runCatching {
-                    readPrinterState(settings)
-                }.getOrNull()
-                if (printerStateBefore == null) {
-                    Log.w(TAG, "printCreditNote() → no se pudo leer S1 antes de imprimir; se usará serial local/backend")
-                }
-
-                cancelOpenFiscalDocument(settings)
-
                 val localSerial = sanitizeText(settings.printerSerial, maxLength = 10)
                 val documentSerial = sanitizeText(document.printerSerial, maxLength = 10)
-                val stateSerial = sanitizeText(printerStateBefore?.registeredMachineNumber.orEmpty(), maxLength = 10)
                 val (resolvedPrinterSerial, serialSource) = when {
                     localSerial.isNotBlank() -> localSerial to "local_settings"
                     documentSerial.isNotBlank() -> documentSerial to "backend_document"
-                    stateSerial.isNotBlank() -> stateSerial to "printer_state_S1"
                     else -> "" to "none"
                 }
                 if (resolvedPrinterSerial.isBlank()) {
@@ -102,7 +91,7 @@ class TheFactoryPrinterImpl(
                 Log.i(
                     TAG,
                     "printCreditNote() → serial seleccionado='$resolvedPrinterSerial' fuente=$serialSource " +
-                        "(local='$localSerial', backend='$documentSerial', s1='$stateSerial')"
+                        "(local='$localSerial', backend='$documentSerial')"
                 )
 
                 val commands = buildCreditNoteCommands(
