@@ -308,7 +308,6 @@ class CreditNoteRepository {
                 client = client,
                 username = username,
                 now = now,
-                date = creditNoteDate,
                 cajaContext = cajaContext,
             )
             CreditNoteSettlementType.CERTIFICADO_REGALO -> registerGiftCertificate(
@@ -949,7 +948,6 @@ class CreditNoteRepository {
         client: ClientContext,
         username: String,
         now: LocalDateTime,
-        date: LocalDate,
         cajaContext: CajaContext,
     ) {
         val current = CreditNoteCajaTable
@@ -967,24 +965,31 @@ class CreditNoteRepository {
         CreditNoteAbonoTable.insert {
             it[idAbono] = UUID.randomUUID().toString()
             it[codAbono] = "AB-${cajaContext.codigoCaja}-${next.toString().padStart(5, '0')}"
-            it[fecha] = date
+            it[fecha] = now
             it[vencimiento] = 0
-            it[fechaVencimiento] = date
-            it[fechaCreacion] = now
-            it[usuarioCreacion] = username.take(MAX_USERNAME_LENGTH)
-            it[fechaModificacion] = now
-            it[usuarioModificacion] = username.take(MAX_USERNAME_LENGTH)
-            it[idCliente] = client.idCliente
-            it[idCaja] = cajaContext.idCaja
+            it[fechaVencimiento] = now
             it[idVendedor] = invoice.codVendedor
             it[idCajero] = invoice.codVendedor
-            it[idSucursal] = cajaContext.idSucursal
+            it[idCliente] = client.idCliente
+            it[idCajaSecuencia] = invoice.idCajaSecuencia
             it[monto] = total
             it[saldo] = total
             it[estatus] = 1
             it[descripcion] = "Abono generado por nota de crédito $creditNoteId"
+            it[observacion] = ""
             it[tipo] = "nota_credito"
             it[idOperacion] = creditNoteId
+            it[codigoReparacion] = ""
+            it[fechaCreacion] = now
+            it[usuarioCreacion] = username.take(MAX_USERNAME_LENGTH)
+            it[fechaModificacion] = now
+            it[usuarioModificacion] = username.take(MAX_USERNAME_LENGTH)
+            it[fechaAnulacion] = now
+            it[usuarioAnulacion] = username.take(MAX_USERNAME_LENGTH)
+            it[idTransaccion] = creditNoteId
+            it[serieSucursal] = cajaContext.serieSucursal
+            it[idSucursal] = cajaContext.idSucursal
+            it[idCaja] = cajaContext.idCaja
         }
     }
 
