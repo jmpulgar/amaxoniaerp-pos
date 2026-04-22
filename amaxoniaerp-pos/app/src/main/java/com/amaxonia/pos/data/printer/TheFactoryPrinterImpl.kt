@@ -118,11 +118,15 @@ class TheFactoryPrinterImpl(
                 Log.d(TAG, "printCreditNote() → ${commands.size} comandos a enviar a ${settings.ipAddress}:${settings.port}")
                 commands.forEachIndexed { index, command ->
                     Log.d(TAG, "printCreditNote() → [${index + 1}/${commands.size}] enviando: '${command.take(40)}'")
-                    sendTcpCommand(
-                        ipAddress = settings.ipAddress,
-                        port = settings.port.toInt(),
-                        command = command
-                    )
+                    if (command == CLOSE_DOCUMENT_COMMAND_199) {
+                        sendCloseDocumentWithFallback(settings, command)
+                    } else {
+                        sendTcpCommand(
+                            ipAddress = settings.ipAddress,
+                            port = settings.port.toInt(),
+                            command = command
+                        )
+                    }
                     Log.d(TAG, "printCreditNote() → [${index + 1}/${commands.size}] OK")
                 }
 
@@ -481,6 +485,26 @@ class TheFactoryPrinterImpl(
         }
     }
 
+    private fun sendCloseDocumentWithFallback(settings: TheFactorySettings, command: String) {
+        runCatching {
+            sendTcpCommand(
+                ipAddress = settings.ipAddress,
+                port = settings.port.toInt(),
+                command = command
+            )
+        }.getOrElse { closeError ->
+            Log.w(
+                TAG,
+                "sendCloseDocumentWithFallback() → cierre '$command' rechazado (${closeError.message}). Reintentando con '$CLOSE_DOCUMENT_COMMAND_101'"
+            )
+            sendTcpCommand(
+                ipAddress = settings.ipAddress,
+                port = settings.port.toInt(),
+                command = CLOSE_DOCUMENT_COMMAND_101
+            )
+        }
+    }
+
     /**
      * Reads the response from the HKA device.
      *
@@ -543,6 +567,8 @@ class TheFactoryPrinterImpl(
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
+        const val CLOSE_DOCUMENT_COMMAND_199 = "199"
+        const val CLOSE_DOCUMENT_COMMAND_101 = "101"
         const val TAX_RATE_TOLERANCE = 0.01
         val PRINTER_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val PRINTER_DATE_REGEX = Regex("\\d{2}/\\d{2}/\\d{4}")

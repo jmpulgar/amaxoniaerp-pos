@@ -368,8 +368,11 @@ class CreditNoteRepository {
             .firstOrNull()
             ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
 
-        val normalizedFiscalCode = request.codDevolucionFiscal.trim().ifBlank { PENDING_FISCAL_CODE }
-        val normalizedDocumentNumber = request.numeroDocumentoFiscal.trim().ifBlank { normalizedFiscalCode }
+        val requestedFiscalCode = request.codDevolucionFiscal.trim()
+        val requestedDocumentNumber = request.numeroDocumentoFiscal.trim()
+        val normalizedFiscalCode = requestedFiscalCode.takeIf(::isValidFiscalValue) ?: PENDING_FISCAL_CODE
+        val normalizedDocumentNumber = requestedDocumentNumber.takeIf(::isValidFiscalValue).orEmpty()
+        val fiscalStatus = resolveFiscalStatus(normalizedFiscalCode, normalizedDocumentNumber)
 
         CreditNoteHeaderTable.update({ CreditNoteHeaderTable.idDevolucion eq id }) {
             it[codDevolucionFiscal] = normalizedFiscalCode
@@ -382,7 +385,7 @@ class CreditNoteRepository {
             success = true,
             id = id,
             codigo = header[CreditNoteHeaderTable.codDevolucion],
-            fiscalStatus = CreditNoteFiscalStatus.CONFIRMADA,
+            fiscalStatus = fiscalStatus,
             codDevolucionFiscal = normalizedFiscalCode,
             numeroDocumentoFiscal = normalizedDocumentNumber,
             printerSerial = request.printerSerial.trim(),
@@ -1059,9 +1062,10 @@ class CreditNoteRepository {
             .filter { it.isNotBlank() }
             .joinToString(" ")
             .ifBlank { "CONSUMIDOR FINAL" }
-        val fiscalNumber = row[CreditNoteHeaderTable.codDevolucionFiscal].orEmpty().ifBlank {
-            row[CreditNoteHeaderTable.numeroDocumentoFiscal].orEmpty()
-        }
+        val fiscalNumber = resolveDisplayFiscalNumber(
+            codDevolucionFiscal = row[CreditNoteHeaderTable.codDevolucionFiscal].orEmpty(),
+            numeroDocumentoFiscal = row[CreditNoteHeaderTable.numeroDocumentoFiscal].orEmpty(),
+        )
 
         return CreditNoteSummary(
             id = row[CreditNoteHeaderTable.idDevolucion],
@@ -1111,7 +1115,7 @@ class CreditNoteRepository {
             impuesto = row[CreditNoteHeaderTable.impuesto],
             total = row[CreditNoteHeaderTable.total],
             fiscalStatus = resolveFiscalStatus(codDevolucionFiscal, numeroDocumentoFiscal),
-            fiscalNumber = codDevolucionFiscal.ifBlank { numeroDocumentoFiscal },
+            fiscalNumber = resolveDisplayFiscalNumber(codDevolucionFiscal, numeroDocumentoFiscal),
             printerSerial = row[CreditNoteHeaderTable.impresoraSerial].orEmpty(),
             originalFiscalNumber = row[CreditNoteFacturaTable.numeroDocumentoFiscal].orEmpty().ifBlank {
                 row[CreditNoteFacturaTable.codFacturaFiscal].orEmpty()
@@ -1140,9 +1144,24 @@ class CreditNoteRepository {
     }
 
     private fun resolveFiscalStatus(codDevolucionFiscal: String, numeroDocumentoFiscal: String): CreditNoteFiscalStatus {
-        val hasFiscalCode = codDevolucionFiscal.isNotBlank() && codDevolucionFiscal != PENDING_FISCAL_CODE
-        val hasDocumentNumber = numeroDocumentoFiscal.isNotBlank() && numeroDocumentoFiscal != PENDING_FISCAL_CODE
+        val hasFiscalCode = isValidFiscalValue(codDevolucionFiscal)
+        val hasDocumentNumber = isValidFiscalValue(numeroDocumentoFiscal)
         return if (hasFiscalCode || hasDocumentNumber) CreditNoteFiscalStatus.CONFIRMADA else CreditNoteFiscalStatus.PENDIENTE
+    }
+
+    private fun resolveDisplayFiscalNumber(codDevolucionFiscal: String, numeroDocumentoFiscal: String): String {
+        return listOf(codDevolucionFiscal, numeroDocumentoFiscal)
+            .map(String::trim)
+            .firstOrNull(::isValidFiscalValue)
+            .orEmpty()
+    }
+
+    private fun isValidFiscalValue(value: String): Boolean {
+        val normalized = value.trim()
+        if (normalized.isBlank()) return false
+        if (normalized == PENDING_FISCAL_CODE) return false
+        val digits = normalized.filter(Char::isDigit)
+        return digits.isNotEmpty() && digits.any { it != '0' }
     }
 
     private fun parseDate(value: String): LocalDate {
