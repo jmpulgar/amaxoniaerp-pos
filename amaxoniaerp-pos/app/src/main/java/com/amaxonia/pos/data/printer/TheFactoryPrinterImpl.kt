@@ -155,9 +155,9 @@ class TheFactoryPrinterImpl(
      * - "iR*{clientId}" — customer tax id / identification
      * - "iS*{clientName}" — customer name
      * - "@{text}"      — free text / comment line (non-fiscal)
-     * - "{taxPrefix}{qty}{amount}{description}" — item line
-     *     - qty: quantity entera, padded to 8 digits
-     *     - amount: monto con 2 decimales implicitos, padded to 10 digits
+     * - "{taxPrefix}{price}{qty}{description}" — item line
+     *     - price: monto con 2 decimales implicitos (x100), padded to 10 digits
+     *     - qty: cantidad con 3 decimales implicitos (x1000), padded to 8 digits
      *     - description: up to 30 chars
      *     - taxPrefix: ' ' exento, '!' IVA general, '"' IVA reducido, '#' IVA adicional
      * - "3"   — subtotal
@@ -199,9 +199,9 @@ class TheFactoryPrinterImpl(
         } else {
             // Fallback for legacy transactions that do not have item details.
             val fallbackAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
-            val quantityField = formatFiscalSaleQuantity(1)
-            val amountField = formatFiscalSaleAmount(fallbackAmount)
-            lines += " $quantityField$amountField$description"
+            val priceField = formatPrinterPrice(fallbackAmount)
+            val quantityField = formatPrinterQty(1.0)
+            lines += " $priceField$quantityField$description"
         }
 
         // 5. Subtotal
@@ -215,10 +215,10 @@ class TheFactoryPrinterImpl(
 
     private fun buildFiscalItemLine(item: TransactionFiscalItem): String {
         val taxPrefix = resolveFiscalTaxPrefix(item.iva)
-        val quantityField = formatFiscalSaleQuantity(item.quantity.roundToInt())
-        val amountField = formatFiscalSaleAmount(item.unitPriceWithoutTax.coerceAtLeast(0.01))
+        val priceField = formatPrinterPrice(item.unitPriceWithoutTax.coerceAtLeast(0.01))
+        val quantityField = formatPrinterQty(item.quantity)
         val description = sanitizeText(item.description, maxLength = 30).ifBlank { "ITEM" }
-        return "$taxPrefix$quantityField$amountField$description"
+        return "$taxPrefix$priceField$quantityField$description"
     }
 
     private fun resolveFiscalTaxPrefix(iva: Double): Char {
@@ -294,10 +294,10 @@ class TheFactoryPrinterImpl(
     private fun buildCreditNoteItemLine(line: CreditNoteFiscalLineDto, taxCode: Int): String {
         val quantity = line.quantity.coerceAtLeast(0.001)
         val unitAmount = resolveCreditNoteUnitAmountWithoutTax(line, quantity)
-        val amountField = formatAmount(unitAmount)
-        val quantityField = formatQuantity(quantity)
+        val priceField = formatPrinterPrice(unitAmount)
+        val quantityField = formatPrinterQty(quantity)
         val description = sanitizeText(line.description, maxLength = 30).ifBlank { "DEVOLUCION" }
-        return "d$taxCode$amountField$quantityField$description"
+        return "d$taxCode$priceField$quantityField$description"
     }
 
     private fun resolveCreditNoteUnitAmountWithoutTax(line: CreditNoteFiscalLineDto, quantity: Double): Double {
@@ -359,42 +359,16 @@ class TheFactoryPrinterImpl(
         }
     }
 
-    /**
-     * Formats fiscal sale amount for The Factory sale line protocol.
-     *
-     * Empirically, this field is interpreted with 3 implied decimals by the device.
-     * e.g., 10.00 -> 0000010000, 10.50 -> 0000010500
-     */
-    private fun formatFiscalSaleAmount(amount: Double): String {
-        return ((amount.coerceAtLeast(0.0) * 1000).roundToInt())
+    private fun formatPrinterPrice(amount: Double): String {
+        return ((amount.coerceAtLeast(0.0) * 100).roundToInt())
             .toString()
             .padStart(10, '0')
     }
 
-    /**
-     * Formats fiscal sale quantity as 8-digit integer.
-     * e.g., 3 -> 00000003
-     */
-    private fun formatFiscalSaleQuantity(quantity: Int): String {
-        return quantity.coerceAtLeast(1)
+    private fun formatPrinterQty(quantity: Double): String {
+        return ((quantity.coerceAtLeast(0.0) * 1000).roundToInt())
             .toString()
             .padStart(8, '0')
-    }
-
-    /**
-     * Formats a monetary amount as cents padded to 8 digits.
-     * e.g., 12.50 -> "00001250"
-     */
-    private fun formatAmount(amount: Double): String {
-        return ((amount * 100).roundToInt())
-            .toString()
-            .padStart(8, '0')
-    }
-
-    private fun formatQuantity(quantity: Double): String {
-        return (quantity * 1000).roundToInt()
-            .toString()
-            .padStart(10, '0')
     }
 
     private fun normalizeOriginalFiscalReference(value: String): String {

@@ -543,7 +543,7 @@ private fun CreditNoteCard(note: CreditNoteSummaryDto, onClick: () -> Unit) {
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "USD ${formatAmount(note.total)}",
+                    text = "Bs ${formatAmount(note.total)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = AmaxoniaBlue
@@ -903,7 +903,7 @@ private fun CreditNoteDetailSheet(
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Monto", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Text("USD ${formatAmount(detail.total)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AmaxoniaBlue)
+                    Text("Bs ${formatAmount(detail.total)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AmaxoniaBlue)
                 }
             }
         }
