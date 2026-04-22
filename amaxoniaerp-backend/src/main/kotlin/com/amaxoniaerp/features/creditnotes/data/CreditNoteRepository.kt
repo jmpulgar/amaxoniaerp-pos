@@ -304,6 +304,7 @@ class CreditNoteRepository {
             CreditNoteSettlementType.ABONO -> registerAbono(
                 creditNoteId = creditNoteId,
                 total = totals.total,
+                invoice = invoice,
                 client = client,
                 username = username,
                 now = now,
@@ -944,6 +945,7 @@ class CreditNoteRepository {
     private fun registerAbono(
         creditNoteId: String,
         total: BigDecimal,
+        invoice: InvoiceHeader,
         client: ClientContext,
         username: String,
         now: LocalDateTime,
@@ -966,10 +968,17 @@ class CreditNoteRepository {
             it[idAbono] = UUID.randomUUID().toString()
             it[codAbono] = "AB-${cajaContext.codigoCaja}-${next.toString().padStart(5, '0')}"
             it[fecha] = date
+            it[vencimiento] = 0
+            it[fechaVencimiento] = date
             it[fechaCreacion] = now
             it[usuarioCreacion] = username.take(MAX_USERNAME_LENGTH)
+            it[fechaModificacion] = now
+            it[usuarioModificacion] = username.take(MAX_USERNAME_LENGTH)
             it[idCliente] = client.idCliente
             it[idCaja] = cajaContext.idCaja
+            it[idVendedor] = invoice.codVendedor
+            it[idCajero] = invoice.codVendedor
+            it[idSucursal] = cajaContext.idSucursal
             it[monto] = total
             it[saldo] = total
             it[estatus] = 1
