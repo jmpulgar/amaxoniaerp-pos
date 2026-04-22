@@ -6,5 +6,6 @@ data class PaymentSuccessPayload(
     val paymentMethodsLabel: String,
     val codFactura: String,
     val transactionId: String,
-    val receiptPrintMessage: String? = null
+    val receiptPrintMessage: String? = null,
+    val fiscalNumber: String = ""
 )

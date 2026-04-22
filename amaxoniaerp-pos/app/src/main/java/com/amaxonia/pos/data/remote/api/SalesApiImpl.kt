@@ -2,6 +2,8 @@ package com.amaxonia.pos.data.remote.api
 
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
+import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
+import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
@@ -9,6 +11,7 @@ import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import io.ktor.client.request.header
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -102,6 +105,36 @@ class SalesApiImpl(private val apiClient: ApiClient) : SalesApi {
                     throw IllegalStateException(error ?: "Error al obtener detalle de factura")
                 }
                 throw IllegalStateException("Respuesta invalida al obtener detalle")
+            }
+
+            Result.success(parsed)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun confirmFacturaFiscal(
+        authHeader: String,
+        facturaId: String,
+        payload: ConfirmFacturaFiscalRequestDto
+    ): Result<ConfirmFacturaFiscalResponseDto> {
+        return try {
+            val response = apiClient.httpClient.patch("facturas/$facturaId/confirmacion-fiscal") {
+                header("Authorization", authHeader)
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+
+            val responseText = response.bodyAsText()
+            val parsed = runCatching {
+                AppJson.decodeFromString(ConfirmFacturaFiscalResponseDto.serializer(), responseText)
+            }.getOrElse {
+                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                if (json is JsonObject) {
+                    val error = json["error"]?.jsonPrimitive?.contentOrNull
+                    throw IllegalStateException(error ?: "Error al confirmar factura fiscal")
+                }
+                throw IllegalStateException("Respuesta invalida al confirmar factura fiscal")
             }
 
             Result.success(parsed)

@@ -150,3 +150,20 @@ data class ProcessSaleResponseDto(
     val codFactura: String,
     val codEstatus: Int
 )
+
+@Serializable
+data class ConfirmFacturaFiscalRequestDto(
+    val numeroDocumentoFiscal: String = "",
+    val codFacturaFiscal: String = "",
+    val impresoraSerial: String = "",
+)
+
+@Serializable
+data class ConfirmFacturaFiscalResponseDto(
+    val success: Boolean,
+    val id: String,
+    val codigo: String,
+    val numeroDocumentoFiscal: String,
+    val codFacturaFiscal: String,
+    val impresoraSerial: String,
+)

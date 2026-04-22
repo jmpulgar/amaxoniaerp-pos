@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalDocumentDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalLineDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNotePrintResult
+import com.amaxonia.pos.domain.model.creditnote.ReceiptPrintResult
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
@@ -30,13 +31,12 @@ class TheFactoryPrinterImpl(
     private val appContext = context.applicationContext
     private val cryptography = MainFactory().createInstance(appContext)
 
-    override suspend fun printReceipt(transaction: Transaction): Result<Boolean> {
+    override suspend fun printReceipt(transaction: Transaction): Result<ReceiptPrintResult> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
 
-                // Cancelar cualquier documento fiscal que haya quedado abierto por un fallo previo
                 Log.d(TAG, "printReceipt() → enviando comando '7' para cancelar documento fiscal abierto (si existe)")
                 try {
                     sendTcpCommand(
@@ -46,7 +46,6 @@ class TheFactoryPrinterImpl(
                     )
                     Log.d(TAG, "printReceipt() → comando '7' enviado OK")
                 } catch (e: Exception) {
-                    // Si no habia documento abierto, la impresora puede rechazar el comando; es esperado
                     Log.d(TAG, "printReceipt() → comando '7' ignorado (${e.message}) — no habia documento abierto")
                 }
 
@@ -62,7 +61,24 @@ class TheFactoryPrinterImpl(
                     Log.d(TAG, "printReceipt() → [${index + 1}/${commands.size}] OK")
                 }
                 Log.d(TAG, "printReceipt() → todos los comandos enviados exitosamente")
-                true
+
+                val printerState = readPrinterState(settings)
+                val fiscalNumber = printerState.lastInvoiceNumber
+                    .takeIf { it > 0 }
+                    ?.toString()
+                    ?.padStart(8, '0')
+                    ?: ""
+
+                if (fiscalNumber.isBlank()) {
+                    Log.w(TAG, "printReceipt() → no se pudo determinar el número fiscal desde S1")
+                } else {
+                    Log.i(TAG, "printReceipt() → número fiscal de la factura: $fiscalNumber")
+                }
+
+                ReceiptPrintResult(
+                    fiscalNumber = fiscalNumber,
+                    printerSerial = printerState.registeredMachineNumber
+                )
             }.onFailure { error ->
                 Log.e(TAG, "printReceipt() → fallo: ${error.message}", error)
             }
@@ -417,12 +433,14 @@ class TheFactoryPrinterImpl(
         if (parts.size >= 16) {
             return PrinterStateSnapshot(
                 registeredMachineNumber = parts.getOrNull(13).orEmpty(),
+                lastInvoiceNumber = parts.getOrNull(2)?.toIntOrNull() ?: 0,
                 lastCreditNoteNumber = parts.getOrNull(6)?.toIntOrNull() ?: 0
             )
         }
 
         return PrinterStateSnapshot(
             registeredMachineNumber = parts.getOrNull(9).orEmpty(),
+            lastInvoiceNumber = parts.getOrNull(2)?.toIntOrNull() ?: 0,
             lastCreditNoteNumber = parts.getOrNull(12)?.toIntOrNull() ?: 0
         )
     }
@@ -524,5 +542,6 @@ class TheFactoryPrinterImpl(
 
 private data class PrinterStateSnapshot(
     val registeredMachineNumber: String,
+    val lastInvoiceNumber: Int,
     val lastCreditNoteNumber: Int,
 )

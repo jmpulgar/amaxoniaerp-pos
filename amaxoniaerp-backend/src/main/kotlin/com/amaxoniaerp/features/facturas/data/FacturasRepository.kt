@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.facturas.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
+import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleItem
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaSummary
@@ -17,6 +19,7 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.sql.update
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -153,6 +156,38 @@ class FacturasRepository {
             totalFacturasAnuladas = totalAnuladas,
             ticketPromedio = ticketPromedio,
             moneda = moneda,
+        )
+    }
+
+    suspend fun confirmFiscal(
+        database: Database,
+        facturaId: String,
+        request: ConfirmFacturaFiscalRequest,
+    ): ConfirmFacturaFiscalResponse = dbQuery(database) {
+        val factura = FacturasTable
+            .selectAll()
+            .where { FacturasTable.idFactura eq facturaId }
+            .limit(1)
+            .firstOrNull()
+            ?: throw NoSuchElementException("Factura no encontrada")
+
+        val normalizedNumero = request.numeroDocumentoFiscal.trim()
+        val normalizedCodFiscal = request.codFacturaFiscal.trim()
+        val normalizedSerial = request.impresoraSerial.trim()
+
+        FacturasTable.update({ FacturasTable.idFactura eq facturaId }) {
+            if (normalizedNumero.isNotBlank()) it[numeroDocumentoFiscal] = normalizedNumero
+            if (normalizedCodFiscal.isNotBlank()) it[codFacturaFiscal] = normalizedCodFiscal
+            if (normalizedSerial.isNotBlank()) it[impresoraSerial] = normalizedSerial
+        }
+
+        ConfirmFacturaFiscalResponse(
+            success = true,
+            id = facturaId,
+            codigo = factura[FacturasTable.codFactura],
+            numeroDocumentoFiscal = normalizedNumero,
+            codFacturaFiscal = normalizedCodFiscal,
+            impresoraSerial = normalizedSerial,
         )
     }
 

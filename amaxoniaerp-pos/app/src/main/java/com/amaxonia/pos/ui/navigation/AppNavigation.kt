@@ -270,14 +270,8 @@ fun AppNavigation(startDestination: String) {
                         } else {
                             val transaction = transactionResult.getOrThrow()
                             printer.printReceipt(transaction).fold(
-                                onSuccess = { started ->
-                                    if (started) {
-                                        Result.success("Imprimiendo recibo...")
-                                    } else {
-                                        Result.failure(
-                                            IllegalStateException("No se pudo iniciar la impresion del recibo")
-                                        )
-                                    }
+                                onSuccess = {
+                                    Result.success("Imprimiendo recibo...")
                                 },
                                 onFailure = { error ->
                                     Result.failure(error)

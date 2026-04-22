@@ -2,10 +2,12 @@ package com.amaxoniaerp.features.facturas.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
+import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.time.LocalDate
@@ -140,6 +142,46 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
                 } else {
                     call.respond(detalle)
+                }
+            }
+
+            patch("/{id}/confirmacion-fiscal") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@patch call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@patch call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.payload.getClaim("admin_db").asString()
+                if (adminDb.isNullOrBlank()) {
+                    return@patch call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Database not found")
+                    )
+                }
+
+                val facturaId = call.parameters["id"]
+                    ?: return@patch call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Missing factura ID")
+                    )
+
+                val request = call.receive<ConfirmFacturaFiscalRequest>()
+
+                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                try {
+                    val response = facturasRepository.confirmFiscal(companyDb, facturaId, request)
+                    call.respond(response)
+                } catch (e: NoSuchElementException) {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Factura no encontrada")))
                 }
             }
         }

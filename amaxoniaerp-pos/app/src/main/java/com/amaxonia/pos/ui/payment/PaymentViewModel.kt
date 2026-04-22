@@ -547,14 +547,29 @@ class PaymentViewModel(
             }
 
             _state.update { it.copy(gatewayStatusMessage = "Imprimiendo factura...") }
-            val printFeedback = printReceiptIfConfigured(newTransaction)
+            val printResult = printReceiptIfConfigured(newTransaction)
+            val fiscalNumberFromPrinter = printResult?.fiscalNumber?.takeIf { it.isNotBlank() }
+
+            if (!fiscalNumberFromPrinter.isNullOrBlank()) {
+                Log.i(TAG, "processPayment() → número fiscal de la impresora: $fiscalNumberFromPrinter")
+                salesRepository.confirmFacturaFiscal(
+                    facturaId = response.idFactura,
+                    payload = com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto(
+                        numeroDocumentoFiscal = fiscalNumberFromPrinter,
+                        impresoraSerial = printResult.printerSerial
+                    )
+                ).onFailure { confirmError ->
+                    Log.w(TAG, "processPayment() → no se pudo confirmar fiscal en backend: ${confirmError.message}")
+                }
+            }
 
             val successPayload = PaymentSuccessPayload(
                 changeDue = currentState.changeDue,
                 paymentMethodsLabel = methods,
                 codFactura = response.codFactura,
                 transactionId = response.idFactura,
-                receiptPrintMessage = printFeedback
+                receiptPrintMessage = printResult?.displayMessage,
+                fiscalNumber = fiscalNumberFromPrinter ?: ""
             )
 
             Log.d(TAG, "processPayment() → flujo completado, emitiendo successPayload (codFactura=${response.codFactura})")
@@ -565,7 +580,7 @@ class PaymentViewModel(
                     isProcessingPayment = false,
                     paymentError = null,
                     gatewayStatusMessage = null,
-                    receiptPrintMessage = printFeedback,
+                    receiptPrintMessage = printResult?.displayMessage,
                     successPayload = successPayload
                 )
             }
@@ -584,21 +599,31 @@ class PaymentViewModel(
         _state.update { it.copy(successPayload = null) }
     }
 
-    private suspend fun printReceiptIfConfigured(transaction: Transaction): String? {
+    private suspend fun printReceiptIfConfigured(transaction: Transaction): ReceiptPrintFeedback? {
         val activePrinter = printerFactory.getActivePrinter() ?: return null
         return activePrinter.printReceipt(transaction).fold(
-            onSuccess = { isStarted ->
-                if (isStarted) {
-                    "Imprimiendo recibo..."
-                } else {
-                    "No se pudo iniciar la impresion del recibo"
-                }
+            onSuccess = { result ->
+                ReceiptPrintFeedback(
+                    displayMessage = "Imprimiendo recibo...",
+                    fiscalNumber = result.fiscalNumber,
+                    printerSerial = result.printerSerial
+                )
             },
             onFailure = { throwable ->
-                throwable.message ?: "No se pudo imprimir el recibo"
+                ReceiptPrintFeedback(
+                    displayMessage = throwable.message ?: "No se pudo imprimir el recibo",
+                    fiscalNumber = "",
+                    printerSerial = ""
+                )
             }
         )
     }
+
+    private data class ReceiptPrintFeedback(
+        val displayMessage: String,
+        val fiscalNumber: String,
+        val printerSerial: String,
+    )
 
     private fun buildFormapagoDetalle(state: PaymentState): FormapagoDetallePayload {
         val detalle = when (state.selectedMethod) {

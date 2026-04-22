@@ -1,5 +1,7 @@
 package com.amaxonia.pos.data.remote.api
 
+import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
+import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
@@ -22,4 +24,10 @@ interface SalesApi {
         authHeader: String,
         facturaId: String
     ): Result<FacturaDetalleResponseDto>
+
+    suspend fun confirmFacturaFiscal(
+        authHeader: String,
+        facturaId: String,
+        payload: ConfirmFacturaFiscalRequestDto
+    ): Result<ConfirmFacturaFiscalResponseDto>
 }

@@ -56,3 +56,20 @@ data class FacturasResumen(
     val ticketPromedio: Double,
     val moneda: String = "USD",
 )
+
+@Serializable
+data class ConfirmFacturaFiscalRequest(
+    val numeroDocumentoFiscal: String = "",
+    val codFacturaFiscal: String = "",
+    val impresoraSerial: String = "",
+)
+
+@Serializable
+data class ConfirmFacturaFiscalResponse(
+    val success: Boolean,
+    val id: String,
+    val codigo: String,
+    val numeroDocumentoFiscal: String,
+    val codFacturaFiscal: String,
+    val impresoraSerial: String,
+)

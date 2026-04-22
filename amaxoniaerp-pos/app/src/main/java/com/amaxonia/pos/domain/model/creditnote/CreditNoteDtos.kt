@@ -228,3 +228,8 @@ data class CreditNotePrintResult(
     val fiscalNumber: String,
     val printerSerial: String,
 )
+
+data class ReceiptPrintResult(
+    val fiscalNumber: String,
+    val printerSerial: String,
+)
