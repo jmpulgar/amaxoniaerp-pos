@@ -38,6 +38,7 @@ import coil.compose.SubcomposeAsyncImageContent
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -203,7 +204,7 @@ fun CartScreen(
                             Column(horizontalAlignment = Alignment.End) {
                                 Text("$${String.format("%.2f", state.total)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AmaxoniaBlue)
                                 if (state.isMultiCurrency && state.totalBsText.isNotBlank()) {
-                                    Text("${state.abrMonedaSecundaria} ${state.totalBsText}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${formatCurrencyLabel(state.abrMonedaSecundaria)} ${state.totalBsText}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

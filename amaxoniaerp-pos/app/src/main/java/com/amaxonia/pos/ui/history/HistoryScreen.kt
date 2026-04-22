@@ -59,6 +59,7 @@ import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.AmaxoniaBlue
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -405,7 +406,7 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
                 )
                 if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
                     Text(
-                        text = "${transaction.abrMonedaSecundaria} ${String.format("%.2f", transaction.totalRef)}",
+                        text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format("%.2f", transaction.totalRef)}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -681,7 +682,7 @@ private fun FacturaDetalleSheetContent(
                             )
                             if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
                                 Text(
-                                    text = "${transaction.abrMonedaSecundaria} ${String.format("%.2f", transaction.totalRef)}",
+                                    text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format("%.2f", transaction.totalRef)}",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

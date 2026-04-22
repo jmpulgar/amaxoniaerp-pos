@@ -141,7 +141,7 @@ fun PaymentScreen(
                     )
                     if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
                         Text(
-                            "${state.abrMonedaSecundaria} ${state.totalAmountBsText}",
+                            "${state.monedaSecundariaLabel} ${state.totalAmountBsText}",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -297,7 +297,7 @@ fun CashPaymentContent(
             }
             if (state.isMultiCurrency && state.tenderedAmountBsText.isNotBlank()) {
                 Text(
-                    "${state.abrMonedaSecundaria} ${state.tenderedAmountBsText}",
+                    "${state.monedaSecundariaLabel} ${state.tenderedAmountBsText}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -312,7 +312,7 @@ fun CashPaymentContent(
                     text = buildString {
                         append("Faltan $ $missingCashAmountText para completar el pago")
                         if (state.isMultiCurrency && state.missingCashBsText.isNotBlank()) {
-                            append(" (${state.abrMonedaSecundaria} ${state.missingCashBsText})")
+                            append(" (${state.monedaSecundariaLabel} ${state.missingCashBsText})")
                         }
                     },
                     color = MaterialTheme.colorScheme.error,
@@ -441,7 +441,7 @@ fun NonCashPaymentContent(
             buildString {
                 append("Asignado: $ ${state.nonCashAssignedText}")
                 if (state.isMultiCurrency && state.nonCashAssignedBsText.isNotBlank()) {
-                    append(" (${state.abrMonedaSecundaria} ${state.nonCashAssignedBsText})")
+                    append(" (${state.monedaSecundariaLabel} ${state.nonCashAssignedBsText})")
                 }
             },
             fontSize = 14.sp,
@@ -451,7 +451,7 @@ fun NonCashPaymentContent(
             buildString {
                 append("Pendiente: $ ${state.nonCashPendingText}")
                 if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
-                    append(" (${state.abrMonedaSecundaria} ${state.nonCashPendingBsText})")
+                    append(" (${state.monedaSecundariaLabel} ${state.nonCashPendingBsText})")
                 }
             },
             fontSize = 14.sp,
@@ -468,7 +468,7 @@ fun NonCashPaymentContent(
                 text = buildString {
                     append("Faltan $ ${state.nonCashPendingText} para completar el pago")
                     if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
-                        append(" (${state.abrMonedaSecundaria} ${state.nonCashPendingBsText})")
+                        append(" (${state.monedaSecundariaLabel} ${state.nonCashPendingBsText})")
                     }
                 },
                 color = MaterialTheme.colorScheme.error,

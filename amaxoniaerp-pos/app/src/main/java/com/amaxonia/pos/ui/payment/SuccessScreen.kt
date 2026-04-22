@@ -202,14 +202,14 @@ fun SuccessScreen(
                                     )
                                     if (isMultiCurrency && totalBs > 0.0) {
                                         Text(
-                                            "Total: $ ${Money.format(Money.fromDouble(changeDue.coerceAtLeast(0.0)))} (${abrMonedaSecundaria} ${String.format("%.2f", totalBs)})",
+                                            "Total: $ ${Money.format(Money.fromDouble(changeDue.coerceAtLeast(0.0)))} (${formatCurrencyLabel(abrMonedaSecundaria)} ${String.format("%.2f", totalBs)})",
                                             color = MaterialTheme.colorScheme.onPrimary,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.align(Alignment.CenterHorizontally)
                                         )
                                     }
                                     Text(
-                                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}${if (isMultiCurrency && changeDueBs > 0.0) " (${abrMonedaSecundaria} ${String.format("%.2f", changeDueBs)})" else ""}",
+                                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}${if (isMultiCurrency && changeDueBs > 0.0) " (${formatCurrencyLabel(abrMonedaSecundaria)} ${String.format("%.2f", changeDueBs)})" else ""}",
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.align(Alignment.CenterHorizontally)

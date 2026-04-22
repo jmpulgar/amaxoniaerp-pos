@@ -106,6 +106,16 @@ data class PaymentState(
 
     val changeDueBs: Double
         get() = toBs(changeDue)
+
+    val monedaSecundariaLabel: String
+        get() = formatCurrencyLabel(abrMonedaSecundaria)
+}
+
+fun formatCurrencyLabel(abr: String): String {
+    return when (abr.uppercase().replace(".", "")) {
+        "BS", "VES", "BSF" -> "Bs."
+        else -> abr
+    }
 }
 
 internal fun BigDecimal.coerceAtLeast(min: BigDecimal): BigDecimal {
