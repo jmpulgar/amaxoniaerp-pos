@@ -243,19 +243,15 @@ class TheFactoryPrinterImpl(
                     "Confirma que la venta quedó con número fiscal guardado en el ERP o vuelve a emitir/consultar la factura."
             )
         }
-        val referenceNumber = normalizeOriginalFiscalNumber(fiscalRef)
+        val referenceNumber = normalizeOriginalFiscalReference(fiscalRef)
         val referenceDate = normalizePrinterDate(document.originalInvoiceDate.ifBlank { document.date })
         val normalizedPrinterSerial = sanitizeText(printerSerial, maxLength = 10)
         val taxCodes = resolveCreditNoteTaxCodes(document.lines)
-
-        val creditNoteShortNumber = extractShortCorrelative(document.creditNoteCode)
-        val headerLine1 = if (creditNoteShortNumber.isNotBlank()) {
-            "NC $creditNoteShortNumber"
-        } else {
-            "NC ${document.creditNoteCode}"
-        }
-        lines += "PH01${sanitizeHeaderText(headerLine1, maxLength = 40)}"
-        lines += "PH08${sanitizeHeaderText("FACT ${document.originalInvoiceCode}", maxLength = 40)}"
+        
+        // Reference data for the affected invoice first (NC fiscal flow).
+        lines += "iF*$referenceNumber"
+        lines += "iD*$referenceDate"
+        lines += "iI*$normalizedPrinterSerial"
 
         val customerId = sanitizeText(document.customerIdentifier, maxLength = 20)
         if (customerId.isNotBlank()) {
@@ -266,10 +262,6 @@ class TheFactoryPrinterImpl(
         if (customerName.isNotBlank()) {
             lines += "iS*$customerName"
         }
-
-        lines += "iF*$referenceNumber"
-        lines += "iD*$referenceDate"
-        lines += "iI*$normalizedPrinterSerial"
 
         val address = sanitizeText(document.customerAddress, maxLength = 30)
         if (address.isNotBlank()) {
@@ -290,7 +282,7 @@ class TheFactoryPrinterImpl(
         }
 
         lines += "3"
-        lines += "101"
+        lines += "199"
         return lines
     }
 
@@ -388,9 +380,13 @@ class TheFactoryPrinterImpl(
             .padStart(10, '0')
     }
 
-    private fun normalizeOriginalFiscalNumber(value: String): String {
-        val digits = value.filter(Char::isDigit).takeLast(8)
-        return digits.padStart(8, '0')
+    private fun normalizeOriginalFiscalReference(value: String): String {
+        val digits = value.filter(Char::isDigit)
+        return when {
+            digits.length >= 11 -> digits.takeLast(11)
+            digits.length >= 8 -> digits.takeLast(8)
+            else -> digits.padStart(8, '0')
+        }
     }
 
     private fun normalizePrinterDate(value: String): String {
@@ -540,30 +536,6 @@ class TheFactoryPrinterImpl(
             .take(maxLength)
     }
 
-    /**
-     * PH01/PH08 are more fragile in some firmware revisions.
-     * Keep header payload conservative: only letters, digits and spaces.
-     */
-    private fun sanitizeHeaderText(value: String, maxLength: Int): String {
-        return value
-            .uppercase()
-            .replace('-', ' ')
-            .replace('_', ' ')
-            .filter { it.isLetterOrDigit() || it == ' ' }
-            .replace(Regex("\\s+"), " ")
-            .trim()
-            .take(maxLength)
-    }
-
-    /**
-     * From codes like 018-00019 returns 00019.
-     * Some printer firmwares are stricter with PH01 payload formatting.
-     */
-    private fun extractShortCorrelative(value: String): String {
-        val lastBlock = value.substringAfterLast('-', missingDelimiterValue = value)
-        val digits = lastBlock.filter(Char::isDigit)
-        return digits.takeLast(5)
-    }
     private companion object {
         const val TAG = "HkaPrinter"
         const val CONNECT_TIMEOUT_MS = 3000
