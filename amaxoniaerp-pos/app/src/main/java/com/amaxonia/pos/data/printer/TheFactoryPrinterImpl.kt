@@ -248,7 +248,13 @@ class TheFactoryPrinterImpl(
         val normalizedPrinterSerial = sanitizeText(printerSerial, maxLength = 10)
         val taxCodes = resolveCreditNoteTaxCodes(document.lines)
 
-        lines += "PH01${sanitizeHeaderText("NC ${document.creditNoteCode}", maxLength = 40)}"
+        val creditNoteShortNumber = extractShortCorrelative(document.creditNoteCode)
+        val headerLine1 = if (creditNoteShortNumber.isNotBlank()) {
+            "NC $creditNoteShortNumber"
+        } else {
+            "NC ${document.creditNoteCode}"
+        }
+        lines += "PH01${sanitizeHeaderText(headerLine1, maxLength = 40)}"
         lines += "PH08${sanitizeHeaderText("FACT ${document.originalInvoiceCode}", maxLength = 40)}"
 
         val customerId = sanitizeText(document.customerIdentifier, maxLength = 20)
@@ -547,6 +553,16 @@ class TheFactoryPrinterImpl(
             .replace(Regex("\\s+"), " ")
             .trim()
             .take(maxLength)
+    }
+
+    /**
+     * From codes like 018-00019 returns 00019.
+     * Some printer firmwares are stricter with PH01 payload formatting.
+     */
+    private fun extractShortCorrelative(value: String): String {
+        val lastBlock = value.substringAfterLast('-', missingDelimiterValue = value)
+        val digits = lastBlock.filter(Char::isDigit)
+        return digits.takeLast(5)
     }
     private companion object {
         const val TAG = "HkaPrinter"
