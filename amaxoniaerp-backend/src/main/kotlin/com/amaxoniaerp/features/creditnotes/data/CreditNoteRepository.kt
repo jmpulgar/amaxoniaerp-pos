@@ -1063,6 +1063,7 @@ class CreditNoteRepository {
                     CreditNoteFiscalLine(
                         description = line.descripcion,
                         quantity = line.cantidad,
+                        unitPriceWithoutTax = line.precioSinIva,
                         totalWithTax = line.totalConIva,
                         taxRate = line.pIva,
                     )

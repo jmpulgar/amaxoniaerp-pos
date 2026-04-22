@@ -293,11 +293,23 @@ class TheFactoryPrinterImpl(
 
     private fun buildCreditNoteItemLine(line: CreditNoteFiscalLineDto, taxCode: Int): String {
         val quantity = line.quantity.coerceAtLeast(0.001)
-        val unitAmount = (line.totalWithTax / quantity).coerceAtLeast(0.01)
+        val unitAmount = resolveCreditNoteUnitAmountWithoutTax(line, quantity)
         val amountField = formatAmount(unitAmount)
         val quantityField = formatQuantity(quantity)
         val description = sanitizeText(line.description, maxLength = 30).ifBlank { "DEVOLUCION" }
         return "d$taxCode$amountField$quantityField$description"
+    }
+
+    private fun resolveCreditNoteUnitAmountWithoutTax(line: CreditNoteFiscalLineDto, quantity: Double): Double {
+        val unitWithoutTax = line.unitPriceWithoutTax
+        if (unitWithoutTax > 0.0) {
+            return unitWithoutTax
+        }
+
+        // Backward compatibility when backend payload does not include unitPriceWithoutTax yet.
+        val taxDivisor = 1 + (line.taxRate.coerceAtLeast(0.0) / 100.0)
+        val totalWithoutTax = line.totalWithTax / taxDivisor
+        return (totalWithoutTax / quantity).coerceAtLeast(0.01)
     }
 
     private fun resolveCreditNoteTaxCodes(lines: List<CreditNoteFiscalLineDto>): Map<Double, Int> {

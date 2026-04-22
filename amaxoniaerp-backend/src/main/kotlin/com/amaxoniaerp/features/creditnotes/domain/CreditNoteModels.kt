@@ -206,6 +206,7 @@ data class CreditNoteFiscalDocument(
 data class CreditNoteFiscalLine(
     val description: String,
     val quantity: Double,
+    val unitPriceWithoutTax: Double,
     val totalWithTax: Double,
     val taxRate: Double,
 )
