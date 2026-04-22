@@ -26,8 +26,8 @@ android {
         applicationId = "com.amaxonia.pos"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.9.1"
+        versionCode = 3
+        versionName = "0.9.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,7 +37,8 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://192.168.2.10:8080/\""
+                "\"https://api.listoerp.app/\""
+                // "\"http://192.168.2.10:8080/\""
                 // "\"http://10.0.2.2:8080/\""
             )
         }
