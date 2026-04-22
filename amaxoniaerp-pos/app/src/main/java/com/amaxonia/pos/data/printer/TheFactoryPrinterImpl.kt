@@ -90,6 +90,7 @@ class TheFactoryPrinterImpl(
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
+                cancelOpenFiscalDocument(settings)
 
                 val localSerial = sanitizeText(settings.printerSerial, maxLength = 10)
                 val documentSerial = sanitizeText(document.printerSerial, maxLength = 10)
@@ -478,8 +479,13 @@ class TheFactoryPrinterImpl(
             val response = readSocketResponse(socket)
             Log.d(TAG, "sendTcpCommand() → respuesta: ${response.size} bytes, hex: ${response.take(8).joinToString(" ") { "%02X".format(it) }}")
             if (!isSuccessfulResponse(response)) {
+                val firstByte = response.firstOrNull()?.toInt()?.and(0xFF)
                 throw IllegalStateException(
-                    "The Factory rechazo el comando fiscal '${command.take(12)}'"
+                    if (firstByte == NAK) {
+                        "The Factory rechazo el comando fiscal '${command.take(12)}' (NAK 0x15)"
+                    } else {
+                        "The Factory rechazo el comando fiscal '${command.take(12)}'"
+                    }
                 )
             }
         }
@@ -523,9 +529,10 @@ class TheFactoryPrinterImpl(
             while (true) {
                 val bytesRead = inputStream.read(buffer)
                 if (bytesRead == -1) break
-                // SDK byte-stripping: skip first byte unless it's in 6..15
+                // Preserve one-byte control responses (ACK/NAK/ENQ/NUL) for proper diagnostics.
                 val first = buffer[0].toInt() and 0xFF
-                val offset = if (first in 6..15) 0 else 1
+                val keepAsControl = bytesRead == 1 && (first == ACK || first == NAK || first == ENQ || first == NUL)
+                val offset = if (keepAsControl || first in 6..15) 0 else 1
                 if (bytesRead > offset) {
                     output.write(buffer, offset, bytesRead - offset)
                 }
@@ -567,6 +574,7 @@ class TheFactoryPrinterImpl(
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
+        const val NAK = 21
         const val CLOSE_DOCUMENT_COMMAND_199 = "199"
         const val CLOSE_DOCUMENT_COMMAND_101 = "101"
         const val TAX_RATE_TOLERANCE = 0.01
