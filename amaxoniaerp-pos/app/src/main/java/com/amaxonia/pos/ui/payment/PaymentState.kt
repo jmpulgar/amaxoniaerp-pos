@@ -112,9 +112,10 @@ data class PaymentState(
 }
 
 fun formatCurrencyLabel(abr: String): String {
-    return when (abr.uppercase().replace(".", "")) {
-        "BS", "VES", "BSF" -> "Bs."
-        else -> abr
+    val normalized = abr.uppercase().replace(".", "").trim()
+    return when (normalized) {
+        "BS", "VES", "BSF", "BSFV", "BVES" -> "Bs."
+        else -> "Bs."
     }
 }
 
