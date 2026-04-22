@@ -235,15 +235,21 @@ class TheFactoryPrinterImpl(
         printerSerial: String,
     ): List<String> {
         val lines = mutableListOf<String>()
-        val referenceNumber = normalizeOriginalFiscalNumber(
-            document.originalFiscalNumber.ifBlank { document.originalInvoiceCode }
-        )
+        val fiscalRef = document.originalFiscalNumber.trim()
+        if (fiscalRef.isBlank()) {
+            throw IllegalStateException(
+                "La factura original no tiene número de documento fiscal en el sistema. " +
+                    "El comando iF* de la nota de crédito debe usar el número fiscal de la factura impresa (no el código interno tipo 018-00015). " +
+                    "Confirma que la venta quedó con número fiscal guardado en el ERP o vuelve a emitir/consultar la factura."
+            )
+        }
+        val referenceNumber = normalizeOriginalFiscalNumber(fiscalRef)
         val referenceDate = normalizePrinterDate(document.originalInvoiceDate.ifBlank { document.date })
         val normalizedPrinterSerial = sanitizeText(printerSerial, maxLength = 10)
         val taxCodes = resolveCreditNoteTaxCodes(document.lines)
 
-        lines += "PH01${sanitizeText("NC ${document.creditNoteCode}", maxLength = 40)}"
-        lines += "PH08${sanitizeText("FACT ${document.originalInvoiceCode}", maxLength = 40)}"
+        lines += "PH01${sanitizeHeaderText("NC ${document.creditNoteCode}", maxLength = 40)}"
+        lines += "PH08${sanitizeHeaderText("FACT ${document.originalInvoiceCode}", maxLength = 40)}"
 
         val customerId = sanitizeText(document.customerIdentifier, maxLength = 20)
         if (customerId.isNotBlank()) {
@@ -524,6 +530,21 @@ class TheFactoryPrinterImpl(
         return value
             .uppercase()
             .filter { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' }
+            .trim()
+            .take(maxLength)
+    }
+
+    /**
+     * PH01/PH08 are more fragile in some firmware revisions.
+     * Keep header payload conservative: only letters, digits and spaces.
+     */
+    private fun sanitizeHeaderText(value: String, maxLength: Int): String {
+        return value
+            .uppercase()
+            .replace('-', ' ')
+            .replace('_', ' ')
+            .filter { it.isLetterOrDigit() || it == ' ' }
+            .replace(Regex("\\s+"), " ")
             .trim()
             .take(maxLength)
     }
