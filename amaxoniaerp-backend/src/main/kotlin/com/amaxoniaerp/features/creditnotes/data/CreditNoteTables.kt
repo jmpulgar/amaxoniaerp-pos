@@ -151,9 +151,9 @@ object CreditNoteCajaSecuenciaTable : Table("caja_secuencia") {
 }
 
 object CreditNoteAbonoTable : Table("abono") {
-    val idAbono = varchar("id_abono", 36)
-    val codAbono = varchar("cod_abono", 32)
-    val fecha = date("fecha")
+    val idAbono = varchar("id", 36)
+    val codAbono = varchar("codigo", 32)
+    val fecha = date("fecha_emision")
     val fechaCreacion = datetime("fecha_creacion").nullable()
     val usuarioCreacion = varchar("usuario_creacion", 50)
     val idCliente = varchar("id_cliente", 36)
