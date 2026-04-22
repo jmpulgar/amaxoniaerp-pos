@@ -23,10 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Assignment
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AttachMoney
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Receipt
@@ -42,14 +44,19 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,15 +75,30 @@ import com.amaxonia.pos.ui.theme.SuccessGreen
 @Composable
 fun CierreCajaScreen(
     viewModel: CierreCajaViewModel = injectedViewModel {
-        CierreCajaViewModel(DependencyContainer.cajaRepository)
+        CierreCajaViewModel(
+            DependencyContainer.cajaRepository,
+            DependencyContainer.printerFactory
+        )
     },
     onBack: () -> Unit,
     onCloseSuccess: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isPrintingX by viewModel.isPrintingReportX.collectAsState()
+    val isPrintingZ by viewModel.isPrintingReportZ.collectAsState()
+    val reportMessage by viewModel.reportMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(reportMessage) {
+        reportMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearReportMessage()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -112,12 +134,22 @@ fun CierreCajaScreen(
                 is CierreCajaUiState.Ready -> ReadyContent(
                     summary = state.summary,
                     isClosing = false,
-                    onConfirmClose = { viewModel.confirmClose() }
+                    isPrintingReportX = isPrintingX,
+                    isPrintingReportZ = isPrintingZ,
+                    showReportButtons = viewModel.hasActivePrinter,
+                    onConfirmClose = { viewModel.confirmClose() },
+                    onPrintReportX = { viewModel.printReportX() },
+                    onPrintReportZ = { viewModel.printReportZ() }
                 )
                 is CierreCajaUiState.Closing -> ReadyContent(
                     summary = state.summary,
                     isClosing = true,
-                    onConfirmClose = {}
+                    isPrintingReportX = false,
+                    isPrintingReportZ = false,
+                    showReportButtons = viewModel.hasActivePrinter,
+                    onConfirmClose = {},
+                    onPrintReportX = {},
+                    onPrintReportZ = {}
                 )
                 is CierreCajaUiState.Success -> SuccessContent(
                     message = state.message,
@@ -160,7 +192,12 @@ private fun LoadingContent() {
 private fun ReadyContent(
     summary: CierreCajaSummary,
     isClosing: Boolean,
-    onConfirmClose: () -> Unit
+    isPrintingReportX: Boolean,
+    isPrintingReportZ: Boolean,
+    showReportButtons: Boolean,
+    onConfirmClose: () -> Unit,
+    onPrintReportX: () -> Unit,
+    onPrintReportZ: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -353,6 +390,83 @@ private fun ReadyContent(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        if (showReportButtons) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onPrintReportX,
+                    enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = AmaxoniaBlue,
+                        disabledContentColor = AmaxoniaBlue.copy(alpha = 0.4f)
+                    )
+                ) {
+                    if (isPrintingReportX) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                            color = AmaxoniaBlue
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Assignment,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        if (isPrintingReportX) "Imprimiendo..." else "Reporte X",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onPrintReportZ,
+                    enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                        disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                    )
+                ) {
+                    if (isPrintingReportZ) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            Icons.Rounded.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        if (isPrintingReportZ) "Imprimiendo..." else "Reporte Z",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         // -- Botón Confirmar Cierre --
         Button(

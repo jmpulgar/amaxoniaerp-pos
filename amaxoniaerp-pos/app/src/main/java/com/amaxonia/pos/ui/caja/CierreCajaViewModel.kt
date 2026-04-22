@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.caja
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.data.printer.PrinterFactory
 import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
 import com.amaxonia.pos.domain.repository.CajaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,11 +11,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class CierreCajaViewModel(
-    private val cajaRepository: CajaRepository
+    private val cajaRepository: CajaRepository,
+    private val printerFactory: PrinterFactory
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<CierreCajaUiState>(CierreCajaUiState.Loading)
     val uiState: StateFlow<CierreCajaUiState> = _uiState.asStateFlow()
+
+    private val _isPrintingReportX = MutableStateFlow(false)
+    val isPrintingReportX: StateFlow<Boolean> = _isPrintingReportX.asStateFlow()
+
+    private val _isPrintingReportZ = MutableStateFlow(false)
+    val isPrintingReportZ: StateFlow<Boolean> = _isPrintingReportZ.asStateFlow()
+
+    private val _reportMessage = MutableStateFlow<String?>(null)
+    val reportMessage: StateFlow<String?> = _reportMessage.asStateFlow()
+
+    val hasActivePrinter: Boolean
+        get() = printerFactory.getActivePrinter() != null
 
     init {
         loadSummary()
@@ -34,6 +48,44 @@ class CierreCajaViewModel(
                 }
             )
         }
+    }
+
+    fun printReportX() {
+        val printer = printerFactory.getActivePrinter() ?: return
+        viewModelScope.launch {
+            _isPrintingReportX.value = true
+            _reportMessage.value = null
+            printer.printReportX().fold(
+                onSuccess = {
+                    _reportMessage.value = "Reporte X impreso correctamente"
+                },
+                onFailure = { error ->
+                    _reportMessage.value = "Error Reporte X: ${error.message}"
+                }
+            )
+            _isPrintingReportX.value = false
+        }
+    }
+
+    fun printReportZ() {
+        val printer = printerFactory.getActivePrinter() ?: return
+        viewModelScope.launch {
+            _isPrintingReportZ.value = true
+            _reportMessage.value = null
+            printer.printReportZ().fold(
+                onSuccess = {
+                    _reportMessage.value = "Reporte Z impreso correctamente"
+                },
+                onFailure = { error ->
+                    _reportMessage.value = "Error Reporte Z: ${error.message}"
+                }
+            )
+            _isPrintingReportZ.value = false
+        }
+    }
+
+    fun clearReportMessage() {
+        _reportMessage.value = null
     }
 
     fun confirmClose() {

@@ -14,6 +14,7 @@ import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
@@ -323,7 +324,55 @@ class TheFactoryPrinterImpl(
                     taxRate <= 8.0 -> 2
                     else -> 1
                 }
+        }
+    }
+
+    override suspend fun printReportX(): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val settings = localStore.readTheFactorySettings()
+                validateSettings(settings)
+
+                Log.d(TAG, "printReportX() → enviando comando 'I0X'")
+                sendTcpCommand(
+                    ipAddress = settings.ipAddress,
+                    port = settings.port.toInt(),
+                    command = "I0X",
+                    socketTimeoutMs = REPORT_SOCKET_TIMEOUT_MS
+                )
+                Log.d(TAG, "printReportX() → comando OK, esperando emisión de DNFs...")
+                delay(REPORT_DNF_DELAY_MS)
+                Log.d(TAG, "printReportX() → completado")
+                Unit
+            }.onFailure { error ->
+                Log.e(TAG, "printReportX() → fallo: ${error.message}", error)
             }
+        }
+    }
+
+    override suspend fun printReportZ(): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val settings = localStore.readTheFactorySettings()
+                validateSettings(settings)
+
+                Log.d(TAG, "printReportZ() → enviando comando 'I0Z'")
+                sendTcpCommand(
+                    ipAddress = settings.ipAddress,
+                    port = settings.port.toInt(),
+                    command = "I0Z",
+                    socketTimeoutMs = REPORT_Z_SOCKET_TIMEOUT_MS
+                )
+                Log.d(TAG, "printReportZ() → comando OK, esperando reporte de estado de transmisión (~20s)...")
+                delay(REPORT_Z_TRANSMISSION_DELAY_MS)
+                Log.d(TAG, "printReportZ() → esperando emisión de DNFs...")
+                delay(REPORT_DNF_DELAY_MS)
+                Log.d(TAG, "printReportZ() → completado")
+                Unit
+            }.onFailure { error ->
+                Log.e(TAG, "printReportZ() → fallo: ${error.message}", error)
+            }
+        }
     }
 
     /**
@@ -452,9 +501,14 @@ class TheFactoryPrinterImpl(
         return response.bytes ?: throw IllegalStateException("Respuesta de cifrado invalida")
     }
 
-    private fun sendTcpCommand(ipAddress: String, port: Int, command: String) {
+    private fun sendTcpCommand(
+        ipAddress: String,
+        port: Int,
+        command: String,
+        socketTimeoutMs: Int = SOCKET_TIMEOUT_MS
+    ) {
         Socket().use { socket ->
-            socket.soTimeout = SOCKET_TIMEOUT_MS
+            socket.soTimeout = socketTimeoutMs
             socket.connect(InetSocketAddress(ipAddress, port), CONNECT_TIMEOUT_MS)
             val encrypted = encryptCommand(command)
             Log.d(TAG, "sendTcpCommand() → cifrado OK (${encrypted.size} bytes), enviando...")
@@ -557,6 +611,10 @@ class TheFactoryPrinterImpl(
         const val TAG = "HkaPrinter"
         const val CONNECT_TIMEOUT_MS = 3000
         const val SOCKET_TIMEOUT_MS = 10000
+        const val REPORT_SOCKET_TIMEOUT_MS = 30000
+        const val REPORT_Z_SOCKET_TIMEOUT_MS = 45000
+        const val REPORT_Z_TRANSMISSION_DELAY_MS = 20_000L
+        const val REPORT_DNF_DELAY_MS = 3_000L
         const val NUL = 0
         const val ENQ = 5
         const val ACK = 6
