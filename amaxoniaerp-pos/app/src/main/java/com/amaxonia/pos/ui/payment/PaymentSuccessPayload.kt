@@ -7,5 +7,10 @@ data class PaymentSuccessPayload(
     val codFactura: String,
     val transactionId: String,
     val receiptPrintMessage: String? = null,
-    val fiscalNumber: String = ""
+    val fiscalNumber: String = "",
+    val totalBs: Double = 0.0,
+    val changeDueBs: Double = 0.0,
+    val tasa: Double = 0.0,
+    val abrMonedaSecundaria: String = "",
+    val isMultiCurrency: Boolean = false,
 )

@@ -24,14 +24,21 @@ data class CartState(
     val availableSellers: List<Seller> = emptyList(),
     val orderSuccessMessage: String? = null,
     val allowEditPrices: Boolean = false,
-    val allowDiscounts: Boolean = false
-)
+    val allowDiscounts: Boolean = false,
+    val tasa: Double = 0.0,
+    val abrMonedaSecundaria: String = "",
+    val isMultiCurrency: Boolean = false,
+) {
+    val totalBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", total * tasa) else ""
+}
 
 class CartViewModel(
     private val cartRepository: CartRepository,
     private val clientRepository: ClientRepository,
     private val localStore: com.amaxonia.pos.data.local.LocalStore,
     private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager,
+    private val cajaRepository: com.amaxonia.pos.domain.repository.CajaRepository = com.amaxonia.pos.ui.common.DependencyContainer.cajaRepository,
     private val draftInvoiceDao: DraftInvoiceDao = com.amaxonia.pos.ui.common.DependencyContainer.draftInvoiceDao
 ) : ViewModel() {
     private val _state = MutableStateFlow(CartState())
@@ -72,6 +79,24 @@ class CartViewModel(
         viewModelScope.launch {
             localStore.allowDiscountsFlow().collect { enabled ->
                 _state.update { it.copy(allowDiscounts = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            cajaRepository.activeCaja.collect { caja ->
+                val currencyConfig = caja?.currency
+                val isMultiCurrency = currencyConfig?.multiMoneda.equals("SI", ignoreCase = true)
+                val rate = if (isMultiCurrency) {
+                    currencyConfig?.tasa?.takeIf { it > 0.0 } ?: 0.0
+                } else {
+                    0.0
+                }
+                _state.update {
+                    it.copy(
+                        tasa = rate,
+                        abrMonedaSecundaria = if (isMultiCurrency) currencyConfig?.abrMonedaSecundaria ?: "" else "",
+                        isMultiCurrency = isMultiCurrency
+                    )
+                }
             }
         }
         ensureDefaultClient()

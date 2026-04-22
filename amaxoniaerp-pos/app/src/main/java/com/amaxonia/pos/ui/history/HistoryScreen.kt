@@ -403,6 +403,13 @@ private fun TransactionCard(transaction: Transaction, onClick: () -> Unit) {
                     fontSize = 16.sp,
                     color = AmaxoniaBlue
                 )
+                if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
+                    Text(
+                        text = "${transaction.abrMonedaSecundaria} ${String.format("%.2f", transaction.totalRef)}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -665,12 +672,21 @@ private fun FacturaDetalleSheetContent(
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Text(
-                            text = "${transaction.currency} ${String.format("%.2f", transaction.amount)}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = AmaxoniaBlue
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${transaction.currency} ${String.format("%.2f", transaction.amount)}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = AmaxoniaBlue
+                            )
+                            if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
+                                Text(
+                                    text = "${transaction.abrMonedaSecundaria} ${String.format("%.2f", transaction.totalRef)}",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -119,21 +119,33 @@ class FacturasRepository {
         var totalPagadas = 0
         var totalAnuladas = 0
         var moneda = "USD"
+        var abrMonedaSec: String? = null
+        var tasaGlobal: Float? = null
+
+        var ventasBrutasRef = 0.0
+        var ventasNetasRef = 0.0
+        var cancelacionesRef = 0.0
 
         for (row in rows) {
             val descripcionEstatus = row[EstatusTable.descripcion] ?: ""
             val total = row[FacturasTable.totalTotalFactura].toDouble()
             val totalGeneral = row[FacturasTable.totalizarTotalGeneral].toDouble()
+            val tasaRow = row[FacturasTable.tasa]
+            val totalRefRow = row[FacturasTable.totalRef]?.toDouble() ?: 0.0
+            val abrSecRow = row[FacturasTable.abrMonedaSecundaria]
 
             val isAnulada = descripcionEstatus.equals("Anulada", ignoreCase = true) ||
                 descripcionEstatus.equals("Anulado", ignoreCase = true)
 
             if (isAnulada) {
                 cancelaciones += total
+                cancelacionesRef += totalRefRow
                 totalAnuladas++
             } else {
                 ventasBrutas += totalGeneral
                 ventasNetas += total
+                ventasBrutasRef += totalRefRow
+                ventasNetasRef += totalRefRow
                 totalPagadas++
             }
 
@@ -141,10 +153,17 @@ class FacturasRepository {
                 val m = row[FacturasTable.abrMonedaBase]?.takeIf { it.isNotBlank() }
                 if (m != null) moneda = m
             }
+            if (abrMonedaSec.isNullOrBlank() && !abrSecRow.isNullOrBlank()) {
+                abrMonedaSec = abrSecRow
+            }
+            if (tasaGlobal == null && tasaRow != null && tasaRow > 0f) {
+                tasaGlobal = tasaRow
+            }
         }
 
         val descuentos = (ventasBrutas - ventasNetas).coerceAtLeast(0.0)
         val ticketPromedio = if (totalPagadas > 0) ventasNetas / totalPagadas else 0.0
+        val hasMultiCurrency = !abrMonedaSec.isNullOrBlank() && tasaGlobal != null && tasaGlobal > 0f
 
         FacturasResumen(
             ventasBrutas = ventasBrutas,
@@ -156,6 +175,11 @@ class FacturasRepository {
             totalFacturasAnuladas = totalAnuladas,
             ticketPromedio = ticketPromedio,
             moneda = moneda,
+            ventasBrutasRef = if (hasMultiCurrency) ventasBrutasRef else null,
+            ventasNetasRef = if (hasMultiCurrency) ventasNetasRef else null,
+            cancelacionesRef = if (hasMultiCurrency) cancelacionesRef else null,
+            ticketPromedioRef = if (hasMultiCurrency && totalPagadas > 0) ventasNetasRef / totalPagadas else null,
+            abrMonedaSecundaria = abrMonedaSec,
         )
     }
 
@@ -229,6 +253,9 @@ class FacturasRepository {
             estatus = estatusFinal,
             formaPago = formaPago,
             moneda = moneda,
+            totalRef = row[FacturasTable.totalRef]?.toDouble(),
+            tasa = row[FacturasTable.tasa],
+            abrMonedaSecundaria = row[FacturasTable.abrMonedaSecundaria],
         )
     }
 

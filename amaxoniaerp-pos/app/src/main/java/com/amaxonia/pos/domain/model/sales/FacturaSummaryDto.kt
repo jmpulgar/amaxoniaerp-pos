@@ -20,7 +20,10 @@ data class FacturaSummaryDto(
     val estatus: String,
     val formaPago: String = "",
     val moneda: String = "USD",
-    val items: Int = 0
+    val items: Int = 0,
+    val totalRef: Double? = null,
+    val tasa: Float? = null,
+    val abrMonedaSecundaria: String? = null,
 )
 
 @Serializable

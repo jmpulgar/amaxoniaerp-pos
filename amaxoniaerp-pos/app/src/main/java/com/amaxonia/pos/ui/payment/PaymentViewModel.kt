@@ -74,6 +74,7 @@ class PaymentViewModel(
     init {
         loadFormasPago()
         loadGatewayConfiguration()
+        loadCurrencyConfig()
     }
 
     fun setTotalAmount(amount: Double) {
@@ -175,6 +176,26 @@ class PaymentViewModel(
             val settings = localStore.readTheFactorySettings()
             configuredGatewayKey = settings.gatewayKey.trim()
             configuredCommerceRif = localStore.readCompanySession()?.company?.rif.orEmpty().trim()
+        }
+    }
+
+    private fun loadCurrencyConfig() {
+        viewModelScope.launch {
+            val activeCaja = cajaRepository.activeCaja.first()
+            val currencyConfig = activeCaja?.currency
+            val isMultiCurrency = currencyConfig?.multiMoneda.equals("SI", ignoreCase = true)
+            val rate = if (isMultiCurrency) {
+                currencyConfig?.tasa?.takeIf { it > 0.0 } ?: 0.0
+            } else {
+                0.0
+            }
+            _state.update {
+                it.copy(
+                    tasa = rate,
+                    abrMonedaSecundaria = if (isMultiCurrency) currencyConfig?.abrMonedaSecundaria ?: "" else "",
+                    isMultiCurrency = isMultiCurrency
+                )
+            }
         }
     }
 
@@ -569,7 +590,12 @@ class PaymentViewModel(
                 codFactura = response.codFactura,
                 transactionId = response.idFactura,
                 receiptPrintMessage = printResult?.displayMessage,
-                fiscalNumber = fiscalNumberFromPrinter ?: ""
+                fiscalNumber = fiscalNumberFromPrinter ?: "",
+                totalBs = currentState.totalAmountBs,
+                changeDueBs = currentState.changeDueBs,
+                tasa = currentState.tasa,
+                abrMonedaSecundaria = currentState.abrMonedaSecundaria,
+                isMultiCurrency = currentState.isMultiCurrency,
             )
 
             Log.d(TAG, "processPayment() → flujo completado, emitiendo successPayload (codFactura=${response.codFactura})")

@@ -18,10 +18,11 @@ data class PaymentState(
     val paymentError: String? = null,
     val showInsufficientReminder: Boolean = false,
     val receiptPrintMessage: String? = null,
-    /** Status message shown while waiting for gateway (e.g. "Esperando respuesta de pasarela...") */
     val gatewayStatusMessage: String? = null,
-    /** Set when the full payment+print flow completes; consumed by UI to navigate. */
-    val successPayload: PaymentSuccessPayload? = null
+    val successPayload: PaymentSuccessPayload? = null,
+    val tasa: Double = 0.0,
+    val abrMonedaSecundaria: String = "",
+    val isMultiCurrency: Boolean = false,
 ) {
     val totalAmountMoney: BigDecimal
         get() = Money.fromDouble(totalAmount)
@@ -72,6 +73,39 @@ data class PaymentState(
             PaymentMethod.CASH -> tenderedAmountMoney >= totalAmountMoney
             PaymentMethod.NON_CASH -> nonCashAssignedMoney >= totalAmountMoney
         }
+
+    fun toBs(amount: Double): Double {
+        if (!isMultiCurrency || tasa <= 0.0) return 0.0
+        return amount * tasa
+    }
+
+    val totalAmountBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", totalAmount * tasa) else ""
+
+    val tenderedAmountBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", tenderedAmountMoney.toDouble() * tasa) else ""
+
+    val changeDueBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", changeDue * tasa) else ""
+
+    val nonCashAssignedBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", nonCashAssignedTotal * tasa) else ""
+
+    val nonCashPendingBsText: String
+        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", nonCashPendingMoney.toDouble() * tasa) else ""
+
+    val missingCashBsText: String
+        get() {
+            if (!isMultiCurrency || tasa <= 0.0) return ""
+            val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeast(java.math.BigDecimal.ZERO)
+            return String.format("%.2f", missing.toDouble() * tasa)
+        }
+
+    val totalAmountBs: Double
+        get() = toBs(totalAmount)
+
+    val changeDueBs: Double
+        get() = toBs(changeDue)
 }
 
 internal fun BigDecimal.coerceAtLeast(min: BigDecimal): BigDecimal {

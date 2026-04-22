@@ -132,12 +132,21 @@ fun PaymentScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Total a pagar :", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    "$ ${state.totalAmountText}",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "$ ${state.totalAmountText}",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
+                        Text(
+                            "${state.abrMonedaSecundaria} ${state.totalAmountBsText}",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(2.dp))
@@ -286,6 +295,13 @@ fun CashPaymentContent(
                 Text("$ ", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(state.tenderedAmountText, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            if (state.isMultiCurrency && state.tenderedAmountBsText.isNotBlank()) {
+                Text(
+                    "${state.abrMonedaSecundaria} ${state.tenderedAmountBsText}",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             AnimatedVisibility(
                 visible = state.showInsufficientReminder && !state.isPaymentEnough,
@@ -293,7 +309,12 @@ fun CashPaymentContent(
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
             ) {
                 Text(
-                    text = "Faltan $ $missingCashAmountText para completar el pago",
+                    text = buildString {
+                        append("Faltan $ $missingCashAmountText para completar el pago")
+                        if (state.isMultiCurrency && state.missingCashBsText.isNotBlank()) {
+                            append(" (${state.abrMonedaSecundaria} ${state.missingCashBsText})")
+                        }
+                    },
                     color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
@@ -417,12 +438,22 @@ fun NonCashPaymentContent(
 
         Spacer(modifier = Modifier.height(10.dp))
         Text(
-            "Asignado: $ ${state.nonCashAssignedText}",
+            buildString {
+                append("Asignado: $ ${state.nonCashAssignedText}")
+                if (state.isMultiCurrency && state.nonCashAssignedBsText.isNotBlank()) {
+                    append(" (${state.abrMonedaSecundaria} ${state.nonCashAssignedBsText})")
+                }
+            },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "Pendiente: $ ${state.nonCashPendingText}",
+            buildString {
+                append("Pendiente: $ ${state.nonCashPendingText}")
+                if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
+                    append(" (${state.abrMonedaSecundaria} ${state.nonCashPendingBsText})")
+                }
+            },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -434,7 +465,12 @@ fun NonCashPaymentContent(
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
         ) {
             Text(
-                text = "Faltan $ ${state.nonCashPendingText} para completar el pago",
+                text = buildString {
+                    append("Faltan $ ${state.nonCashPendingText} para completar el pago")
+                    if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
+                        append(" (${state.abrMonedaSecundaria} ${state.nonCashPendingBsText})")
+                    }
+                },
                 color = MaterialTheme.colorScheme.error,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,

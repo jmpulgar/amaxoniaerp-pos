@@ -22,6 +22,9 @@ object FacturasTable : Table("factura") {
     val tipoFactura = varchar("tipo_factura", 50)
     val usuarioCreacion = varchar("usuario_creacion", 40)
     val abrMonedaBase = varchar("abr_moneda_base", 10).nullable()
+    val abrMonedaSecundaria = varchar("abr_moneda_secundaria", 10).nullable()
+    val tasa = float("tasa").nullable()
+    val totalRef = float("total_ref").nullable()
     val impresoraSerial = varchar("impresora_serial", 50).nullable()
 
     override val primaryKey = PrimaryKey(idFactura)

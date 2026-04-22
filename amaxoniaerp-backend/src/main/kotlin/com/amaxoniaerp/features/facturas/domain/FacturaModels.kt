@@ -18,6 +18,9 @@ data class FacturaSummary(
     val formaPago: String,
     val moneda: String = "USD",
     val items: Int = 0,
+    val totalRef: Double? = null,
+    val tasa: Float? = null,
+    val abrMonedaSecundaria: String? = null,
 )
 
 @Serializable
@@ -55,6 +58,11 @@ data class FacturasResumen(
     val totalFacturasAnuladas: Int,
     val ticketPromedio: Double,
     val moneda: String = "USD",
+    val ventasBrutasRef: Double? = null,
+    val ventasNetasRef: Double? = null,
+    val cancelacionesRef: Double? = null,
+    val ticketPromedioRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
 )
 
 @Serializable

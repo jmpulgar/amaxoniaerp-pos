@@ -20,6 +20,8 @@ data class Transaction(
     val formaPago: String = "",
     val paymentMethods: List<TransactionPaymentMethod> = emptyList(),
     val fiscalItems: List<TransactionFiscalItem> = emptyList(),
+    val totalRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
 )
 
 data class TransactionPaymentMethod(

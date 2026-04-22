@@ -94,6 +94,8 @@ private fun FacturaSummaryDto.toTransaction(): Transaction {
         clienteNombre = clienteNombre,
         clienteIdentificacion = clienteIdentificacion,
         formaPago = formaPago,
+        totalRef = totalRef,
+        abrMonedaSecundaria = abrMonedaSecundaria,
     )
 }
 

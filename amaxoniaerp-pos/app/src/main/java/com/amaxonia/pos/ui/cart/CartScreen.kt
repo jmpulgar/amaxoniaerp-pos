@@ -48,7 +48,8 @@ fun CartScreen(
             DependencyContainer.cartRepository,
             DependencyContainer.clientRepository,
             DependencyContainer.localStore,
-            DependencyContainer.apiConfigManager
+            DependencyContainer.apiConfigManager,
+            DependencyContainer.cajaRepository
         )
     },
     onBack: () -> Unit,
@@ -199,7 +200,12 @@ fun CartScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Total", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text("$${String.format("%.2f", state.total)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AmaxoniaBlue)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("$${String.format("%.2f", state.total)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AmaxoniaBlue)
+                                if (state.isMultiCurrency && state.totalBsText.isNotBlank()) {
+                                    Text("${state.abrMonedaSecundaria} ${state.totalBsText}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
 

@@ -63,6 +63,10 @@ fun SuccessScreen(
     val paymentMethodsLabel = payload?.paymentMethodsLabel.orEmpty()
     val codFactura = payload?.codFactura.orEmpty()
     val receiptPrintMessage = payload?.receiptPrintMessage.orEmpty()
+    val isMultiCurrency = payload?.isMultiCurrency == true
+    val abrMonedaSecundaria = payload?.abrMonedaSecundaria.orEmpty()
+    val totalBs = payload?.totalBs ?: 0.0
+    val changeDueBs = payload?.changeDueBs ?: 0.0
 
     LaunchedEffect(Unit) {
         visible = true
@@ -196,8 +200,16 @@ fun SuccessScreen(
                                         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
                                         modifier = Modifier.padding(vertical = 8.dp)
                                     )
+                                    if (isMultiCurrency && totalBs > 0.0) {
+                                        Text(
+                                            "Total: $ ${Money.format(Money.fromDouble(changeDue.coerceAtLeast(0.0)))} (${abrMonedaSecundaria} ${String.format("%.2f", totalBs)})",
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                                        )
+                                    }
                                     Text(
-                                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}",
+                                        "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}${if (isMultiCurrency && changeDueBs > 0.0) " (${abrMonedaSecundaria} ${String.format("%.2f", changeDueBs)})" else ""}",
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
