@@ -39,6 +39,9 @@ interface ProductDao {
     @Query("SELECT * FROM products ORDER BY description LIMIT :limit OFFSET :offset")
     suspend fun getPaged(limit: Int, offset: Int): List<ProductEntity>
 
+    @Query("SELECT * FROM products WHERE department = :departmentId ORDER BY description LIMIT :limit OFFSET :offset")
+    suspend fun getPagedByDepartment(departmentId: Int, limit: Int, offset: Int): List<ProductEntity>
+
     @Query(
         "SELECT * FROM products " +
             "WHERE code LIKE :query COLLATE NOCASE " +
@@ -50,6 +53,19 @@ interface ProductDao {
             "ORDER BY description LIMIT :limit OFFSET :offset"
     )
     suspend fun searchPaged(query: String, limit: Int, offset: Int): List<ProductEntity>
+
+    @Query(
+        "SELECT * FROM products " +
+            "WHERE department = :departmentId AND (" +
+            "code LIKE :query COLLATE NOCASE " +
+            "OR description LIKE :query COLLATE NOCASE " +
+            "OR reference LIKE :query COLLATE NOCASE " +
+            "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE) " +
+            "ORDER BY description LIMIT :limit OFFSET :offset"
+    )
+    suspend fun searchPagedByDepartment(query: String, departmentId: Int, limit: Int, offset: Int): List<ProductEntity>
 }
 
 @Dao

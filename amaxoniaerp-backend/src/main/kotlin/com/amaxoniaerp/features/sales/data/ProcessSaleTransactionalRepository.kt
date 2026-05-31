@@ -1,8 +1,10 @@
 package com.amaxoniaerp.features.sales.data
 
 import com.amaxoniaerp.core.time.BusinessClock
-import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTable
-import com.amaxoniaerp.features.companies.data.TasasCambioTable
+import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
+import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableVE
+import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
+import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
@@ -33,16 +35,16 @@ import java.util.UUID
 class ProcessSaleTransactionalRepository {
 
     fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
-        val preparedRequest = prepareRequestWithWarehouses(request)
-        val monetaryContext = resolveMonetaryContext(preparedRequest)
+        val preparedRequest = prepareRequestWithWarehouses(countryCode, request)
+        val monetaryContext = resolveMonetaryContext(countryCode, preparedRequest)
 
-        validateDuplicateInvoice(preparedRequest)
+        validateDuplicateInvoice(monetaryContext.countryCode, preparedRequest)
         if (monetaryContext.shouldValidateStock()) {
             validateStock(preparedRequest)
         }
 
         val invoiceId = preparedRequest.idFactura?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
-        val invoiceCode = resolveInvoiceCode(preparedRequest)
+        val invoiceCode = resolveInvoiceCode(countryCode, preparedRequest)
         val now = BusinessClock.nowForCountry(countryCode)
         val today = now.toLocalDate()
 
@@ -59,8 +61,12 @@ class ProcessSaleTransactionalRepository {
         }
 
         if (monetaryContext.multiMoneda == "SI" && monetaryContext.idTasa > 0) {
-            TasasCambioTable.update({ TasasCambioTable.id eq monetaryContext.idTasa.toLong() }) {
-                it[TasasCambioTable.facturado] = "S"
+            // Solo VE tiene el campo `facturado` en tasas_cambio
+            val tasasTableVE = TasasCambioTableFactory.forCountry(countryCode)
+            if (tasasTableVE is TasasCambioTableVE) {
+                tasasTableVE.update({ tasasTableVE.id eq monetaryContext.idTasa.toLong() }) {
+                    it[tasasTableVE.facturado] = "S"
+                }
             }
         }
 
@@ -72,8 +78,8 @@ class ProcessSaleTransactionalRepository {
         )
     }
 
-    private fun prepareRequestWithWarehouses(request: ProcessSaleRequest): ProcessSaleRequest {
-        val context = resolveWarehouseContext(request.factura.idCaja)
+    private fun prepareRequestWithWarehouses(countryCode: String, request: ProcessSaleRequest): ProcessSaleRequest {
+        val context = resolveWarehouseContext(countryCode, request.factura.idCaja)
 
         val normalizedItems = request.items.map { item ->
             val resolvedWarehouse = item.itemAlmacen.takeIf { it > 0 } ?: context.defaultWarehouseId
@@ -106,15 +112,23 @@ class ProcessSaleTransactionalRepository {
         )
     }
 
-    private fun resolveWarehouseContext(cajaId: String): WarehouseContext {
+    private fun resolveWarehouseContext(countryCode: String, cajaId: String): WarehouseContext {
+        val isVE = countryCode.equals("VE", ignoreCase = true)
+        val columns = if (isVE) {
+            listOf(SalesCajaTable.idSucursal, SalesCajaTable.codAlmacen)
+        } else {
+            listOf(SalesCajaTable.idSucursal)
+        }
         val caja = SalesCajaTable
-            .select(SalesCajaTable.idSucursal, SalesCajaTable.codAlmacen)
+            .select(columns)
             .where { SalesCajaTable.id eq cajaId }
             .limit(1)
             .firstOrNull()
             ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$cajaId")
 
-        val cajaWarehouseId = caja[SalesCajaTable.codAlmacen]?.takeIf { it > 0 }
+        val cajaWarehouseId = if (isVE) {
+            caja.getOrNull(SalesCajaTable.codAlmacen)?.takeIf { it > 0 }
+        } else null
         val cajaSucursalId = caja[SalesCajaTable.idSucursal]
         val serieSucursal = cajaSucursalId?.let { sucursalId ->
             SalesSucursalTable
@@ -126,12 +140,13 @@ class ProcessSaleTransactionalRepository {
                 ?.takeIf { it.isNotBlank() }
         }
 
-        val globalWarehouseId = ParametrosGeneralesTable
-            .select(ParametrosGeneralesTable.codAlmacen)
-            .orderBy(ParametrosGeneralesTable.codEmpresa)
+        val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
+        val globalWarehouseId = pgTable
+            .select(pgTable.codAlmacen)
+            .orderBy(pgTable.codEmpresa)
             .limit(1)
             .firstOrNull()
-            ?.get(ParametrosGeneralesTable.codAlmacen)
+            ?.get(pgTable.codAlmacen)
             ?.let { kotlin.math.abs(it) }
             ?.takeIf { it > 0 }
 
@@ -200,44 +215,50 @@ class ProcessSaleTransactionalRepository {
         val serieSucursal: String?,
     )
 
-    private fun resolveMonetaryContext(request: ProcessSaleRequest): MonetaryContext {
-        val params = ParametrosGeneralesTable
-            .select(
-                ParametrosGeneralesTable.multiMoneda,
-                ParametrosGeneralesTable.monedaBase,
-                ParametrosGeneralesTable.abrMonedaBase,
-                ParametrosGeneralesTable.monedaSecundaria,
-                ParametrosGeneralesTable.abrMonedaSecundaria,
-                ParametrosGeneralesTable.validarStock,
-                ParametrosGeneralesTable.porcentajeImpuestoPrincipal,
-                ParametrosGeneralesTable.defaultIdFormaPagoFactura,
-                ParametrosGeneralesTable.diasVencimiento,
-            )
-            .orderBy(ParametrosGeneralesTable.codEmpresa)
+    private fun resolveMonetaryContext(countryCode: String, request: ProcessSaleRequest): MonetaryContext {
+        val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
+        val params = pgTable
+            .selectAll()
+            .orderBy(pgTable.codEmpresa)
             .limit(1)
             .firstOrNull()
             ?: throw InvalidSaleRequestException("No se encontró parametros_generales")
 
-        val paramsMulti = params[ParametrosGeneralesTable.multiMoneda].equals("Si", ignoreCase = true)
+        // multiMoneda y monedaSecundaria solo existen en VE
+        val paramsMulti = if (pgTable is ParametrosGeneralesTableVE) {
+            params[pgTable.multiMoneda].equals("Si", ignoreCase = true)
+        } else {
+            false
+        }
         val multiMoneda = if (paramsMulti) "SI" else "NO"
 
-        val monedaBase = params[ParametrosGeneralesTable.monedaBase] ?: 1
-        val abrMonedaBase = params[ParametrosGeneralesTable.abrMonedaBase].take(10)
-        val monedaSecundaria = params[ParametrosGeneralesTable.monedaSecundaria]
-        val abrMonedaSecundaria = params[ParametrosGeneralesTable.abrMonedaSecundaria].take(10)
+        val monedaBase = params[pgTable.monedaBase] ?: 1
+        val abrMonedaBase = params[pgTable.abrMonedaBase].take(10)
+
+        val monedaSecundaria = if (pgTable is ParametrosGeneralesTableVE) {
+            params[pgTable.monedaSecundaria]
+        } else {
+            monedaBase
+        }
+        val abrMonedaSecundaria = if (pgTable is ParametrosGeneralesTableVE) {
+            params[pgTable.abrMonedaSecundaria].take(10)
+        } else {
+            abrMonedaBase
+        }
 
         val providedMoneda = request.moneda
         val tasaFromRequest = providedMoneda?.tasa?.takeIf { it > 0.0 }
         val idTasaFromRequest = providedMoneda?.idTasa?.takeIf { it > 0 }
 
-        val tasaRow = if (paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null)) {
-            TasasCambioTable
-                .select(TasasCambioTable.id, TasasCambioTable.tasaInversa)
+        val tasasTable = TasasCambioTableFactory.forCountry(countryCode)
+        val tasaRow = if (paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null) && tasasTable is TasasCambioTableVE) {
+            tasasTable
+                .select(tasasTable.id, tasasTable.tasaInversa)
                 .where {
-                    (TasasCambioTable.divisa eq monedaSecundaria) and
-                        (TasasCambioTable.monedabase eq monedaBase)
+                    (tasasTable.divisa eq monedaSecundaria) and
+                        (tasasTable.monedabase eq monedaBase)
                 }
-                .orderBy(TasasCambioTable.id to SortOrder.DESC)
+                .orderBy(tasasTable.id to SortOrder.DESC)
                 .limit(1)
                 .firstOrNull()
         } else {
@@ -246,7 +267,7 @@ class ProcessSaleTransactionalRepository {
 
         val tasa = if (paramsMulti) {
             tasaFromRequest
-                ?: tasaRow?.get(TasasCambioTable.tasaInversa)?.toDouble()
+                ?: tasaRow?.get(tasasTable.tasaInversa)?.toDouble()
                 ?: throw InvalidSaleRequestException("No se encontró tasa de cambio vigente")
         } else {
             1.0
@@ -254,13 +275,14 @@ class ProcessSaleTransactionalRepository {
 
         val idTasa = if (paramsMulti) {
             idTasaFromRequest
-                ?: tasaRow?.get(TasasCambioTable.id)?.toInt()
+                ?: tasaRow?.get(tasasTable.id)?.toInt()
                 ?: throw InvalidSaleRequestException("No se encontró id de tasa vigente")
         } else {
             0
         }
 
         return MonetaryContext(
+            countryCode = countryCode,
             multiMoneda = multiMoneda,
             tasa = BigDecimal.valueOf(tasa).setScale(8, RoundingMode.HALF_UP),
             idTasa = idTasa,
@@ -269,14 +291,15 @@ class ProcessSaleTransactionalRepository {
             monedaSecundaria = monedaSecundaria,
             abrMonedaSecundaria = abrMonedaSecundaria,
             totalRef = providedMoneda?.totalRef ?: request.factura.totalTotalFactura,
-            validarStock = params[ParametrosGeneralesTable.validarStock],
-            defaultTaxRate = params[ParametrosGeneralesTable.porcentajeImpuestoPrincipal].toDouble(),
-            defaultFormaPagoId = params[ParametrosGeneralesTable.defaultIdFormaPagoFactura],
-            diasVencimiento = params[ParametrosGeneralesTable.diasVencimiento],
+            validarStock = params[pgTable.validarStock],
+            defaultTaxRate = params[pgTable.porcentajeImpuestoPrincipal].toDouble(),
+            defaultFormaPagoId = params[pgTable.defaultIdFormaPagoFactura],
+            diasVencimiento = params[pgTable.diasVencimiento],
         )
     }
 
     private data class MonetaryContext(
+        val countryCode: String,
         val multiMoneda: String,
         val tasa: BigDecimal,
         val idTasa: Int,
@@ -302,20 +325,19 @@ class ProcessSaleTransactionalRepository {
         fun shouldValidateStock(): Boolean = validarStock.trim().equals("SI", ignoreCase = true)
     }
 
-    private fun validateDuplicateInvoice(request: ProcessSaleRequest) {
+    private fun validateDuplicateInvoice(countryCode: String, request: ProcessSaleRequest) {
         val idFactura = request.idFactura?.takeIf { it.isNotBlank() }
         if (idFactura == null) return
 
-        val existing = SalesFacturaTable
-            .select(SalesFacturaTable.idFactura, SalesFacturaTable.codFactura, SalesFacturaTable.codEstatus)
-            .where {
-                SalesFacturaTable.idFactura eq idFactura
-            }
+        val t = SalesFacturaTableFactory.forCountry(countryCode)
+        val existing = t
+            .select(t.idFactura, t.codFactura, t.codEstatus)
+            .where { t.idFactura eq idFactura }
             .limit(1)
             .firstOrNull()
             ?: return
 
-        val status = existing[SalesFacturaTable.codEstatus] ?: 0
+        val status = existing[t.codEstatus] ?: 0
         if (status == 2) {
             throw DuplicateInvoiceException("La factura ya existe y está procesada (cod_estatus=2)")
         }
@@ -359,7 +381,7 @@ class ProcessSaleTransactionalRepository {
         }
     }
 
-    private fun resolveInvoiceCode(request: ProcessSaleRequest): String {
+    private fun resolveInvoiceCode(countryCode: String, request: ProcessSaleRequest): String {
         val idCaja = request.factura.idCaja.trim()
         if (idCaja.isBlank()) {
             throw InvalidSaleRequestException("idCaja es obligatorio para generar cod_factura desde caja")
@@ -368,7 +390,7 @@ class ProcessSaleTransactionalRepository {
         var invoiceCode = getNextCodePreviewFromCaja(idCaja, request.factura.codigoCaja)
         var jumpedDuplicate = false
 
-        while (invoiceCodeExists(invoiceCode)) {
+        while (invoiceCodeExists(countryCode, invoiceCode)) {
             jumpedDuplicate = true
             invoiceCode = consumeAndGetNextCodeFromCaja(idCaja, request.factura.codigoCaja)
         }
@@ -380,10 +402,11 @@ class ProcessSaleTransactionalRepository {
         return invoiceCode
     }
 
-    private fun invoiceCodeExists(code: String): Boolean {
-        return SalesFacturaTable
-            .select(SalesFacturaTable.idFactura)
-            .where { SalesFacturaTable.codFactura eq code }
+    private fun invoiceCodeExists(countryCode: String, code: String): Boolean {
+        val t = SalesFacturaTableFactory.forCountry(countryCode)
+        return t
+            .select(t.idFactura)
+            .where { t.codFactura eq code }
             .limit(1)
             .any()
     }
@@ -398,7 +421,7 @@ class ProcessSaleTransactionalRepository {
 
         val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
         val correlativo = row[SalesCajaTable.facturaCorrelativo] + 1
-        return formatLegacyInvoiceCode(codigoCaja, correlativo)
+        return formatInvoiceCode(codigoCaja, correlativo)
     }
 
     private fun consumeAndGetNextCodeFromCaja(idCaja: String, fallbackCodigoCaja: String): String {
@@ -420,7 +443,7 @@ class ProcessSaleTransactionalRepository {
 
             if (updated == 1) {
                 val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
-                return formatLegacyInvoiceCode(codigoCaja, next)
+                return formatInvoiceCode(codigoCaja, next)
             }
         }
 
@@ -449,7 +472,7 @@ class ProcessSaleTransactionalRepository {
         throw InvalidSaleRequestException("No se pudo consumir correlativo de caja para id_caja=$idCaja")
     }
 
-    private fun formatLegacyInvoiceCode(codigoCaja: String, correlativo: Int): String {
+    private fun formatInvoiceCode(codigoCaja: String, correlativo: Int): String {
         if (codigoCaja.isBlank()) {
             throw InvalidSaleRequestException("codigo de caja inválido para construir cod_factura")
         }
@@ -481,67 +504,82 @@ class ProcessSaleTransactionalRepository {
         val serieSucursalValue = f.serieSucursal.take(10)
         val cajaSecuenciaValue = resolveCajaSecuenciaCodigo(f.idCajaSecuencia)
 
-        SalesFacturaTable.insert {
-            it[idFactura] = invoiceId
-            it[codFactura] = invoiceCode
-            it[codFacturaFiscal] = f.codFacturaFiscal
-            it[nroz] = f.nroz
-            it[impresoraSerial] = f.impresoraSerial
-            it[idCliente] = f.idCliente
-            it[codVendedor] = f.codVendedor
-            it[fechaFactura] = parseDateOrToday(f.fechaFactura, today)
-            it[subtotal] = subtotalBase
-            it[descuentosItemFactura] = descuentosItemsBase
-            it[montoItemsFactura] = montoItemsBase
-            it[ivaTotalFactura] = ivaTotalBase
-            it[totalTotalFactura] = totalGeneralBase
-            it[cantidadItems] = request.items.size
-            it[totalizarSubTotal] = monetaryContext.toBase(f.totalizarSubTotal)
-            it[totalizarDescuentoParcial] = monetaryContext.toBase(f.totalizarDescuentoParcial)
-            it[totalizarTotalOperacion] = monetaryContext.toBase(f.totalizarTotalOperacion)
-            it[totalizarPDescuentoGlobal] = monetaryContext.toBase(f.totalizarPDescuentoGlobal)
-            it[totalizarDescuentoGlobal] = monetaryContext.toBase(f.totalizarDescuentoGlobal)
-            it[totalizarBaseImponible] = monetaryContext.toBase(f.totalizarBaseImponible)
-            it[totalizarMontoIva] = monetaryContext.toBase(f.totalizarMontoIva)
-            it[totalizarTotalGeneral] = monetaryContext.toBase(f.totalizarTotalGeneral)
-            it[totalizarTotalRetencion] = BigDecimal.ZERO.setScale(2)
-            it[formaPago] = "contado"
-            it[codEstatus] = f.codEstatus
-            it[totalBultos] = totalBultosQty.toMoney()
-            it[fechaCreacion] = now
-            it[usuarioCreacion] = f.usuarioCreacion
-            it[tipoFactura] = "factura_pos"
-            it[modeloFactura] = "pos"
-            it[terminoPagoId] = monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: 3
-            it[facturarA] = f.facturarA
-            it[facturarARuc] = f.facturarARuc
-            it[facturarADireccion] = f.facturarADireccion
-            it[facturarATelefono] = f.facturarATelefono
-            it[validarStock] = monetaryContext.validarStock
-            it[idShop] = f.idShop
-            it[servicioPeriodo] = ""
-            it[servicioOrden] = ""
-            it[observacion] = ""
-            it[fechaVencimiento] = fechaVencimientoFactura
-            it[servicioAnio] = today.year
-            it[servicioMes] = today.monthValue.toString().padStart(2, '0')
-            it[idCajaSecuencia] = f.idCajaSecuencia
-            it[numcomContabilizado] = 0
-            it[fechaContabilizado] = today
-            it[serieSucursal] = serieSucursalValue
-            it[cajaSecuencia] = cajaSecuenciaValue
-            it[idSucursal] = f.idSucursal
-            it[idCaja] = f.idCaja
-            it[codigoCaja] = f.codigoCaja
-            it[codCliente] = f.codCliente
-            it[multiMoneda] = monetaryContext.multiMoneda
-            it[tasa] = monetaryContext.tasa.toFloat()
-            it[idTasa] = monetaryContext.idTasa
-            it[monedaBase] = monetaryContext.monedaBase
-            it[abrMonedaBase] = monetaryContext.abrMonedaBase
-            it[monedaSecundaria] = monetaryContext.monedaSecundaria
-            it[abrMonedaSecundaria] = monetaryContext.abrMonedaSecundaria
-            it[totalRef] = monetaryContext.totalRef.toFloat()
+        val facturaTable = SalesFacturaTableFactory.forCountry(monetaryContext.countryCode)
+        facturaTable.insert {
+            it[facturaTable.idFactura] = invoiceId
+            it[facturaTable.codFactura] = invoiceCode
+            it[facturaTable.codFacturaFiscal] = f.codFacturaFiscal
+            it[facturaTable.idCliente] = f.idCliente
+            it[facturaTable.codVendedor] = f.codVendedor
+            it[facturaTable.fechaFactura] = parseDateOrToday(f.fechaFactura, today)
+            it[facturaTable.subtotal] = subtotalBase
+            it[facturaTable.descuentosItemFactura] = descuentosItemsBase
+            it[facturaTable.montoItemsFactura] = montoItemsBase
+            it[facturaTable.ivaTotalFactura] = ivaTotalBase
+            it[facturaTable.totalTotalFactura] = totalGeneralBase
+            it[facturaTable.cantidadItems] = request.items.size
+            it[facturaTable.totalizarSubTotal] = monetaryContext.toBase(f.totalizarSubTotal)
+            it[facturaTable.totalizarDescuentoParcial] = monetaryContext.toBase(f.totalizarDescuentoParcial)
+            it[facturaTable.totalizarTotalOperacion] = monetaryContext.toBase(f.totalizarTotalOperacion)
+            it[facturaTable.totalizarPDescuentoGlobal] = monetaryContext.toBase(f.totalizarPDescuentoGlobal)
+            it[facturaTable.totalizarDescuentoGlobal] = monetaryContext.toBase(f.totalizarDescuentoGlobal)
+            it[facturaTable.totalizarBaseImponible] = monetaryContext.toBase(f.totalizarBaseImponible)
+            it[facturaTable.totalizarMontoIva] = monetaryContext.toBase(f.totalizarMontoIva)
+            it[facturaTable.totalizarTotalGeneral] = monetaryContext.toBase(f.totalizarTotalGeneral)
+            it[facturaTable.totalizarTotalRetencion] = BigDecimal.ZERO.setScale(2)
+            it[facturaTable.formaPago] = "contado"
+            it[facturaTable.codEstatus] = f.codEstatus
+            it[facturaTable.totalBultos] = totalBultosQty.toMoney()
+            it[facturaTable.fechaCreacion] = now
+            it[facturaTable.usuarioCreacion] = f.usuarioCreacion
+            it[facturaTable.tipoFactura] = "factura_pos"
+            it[facturaTable.modeloFactura] = "pos"
+            it[facturaTable.terminoPagoId] = monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: 3
+            it[facturaTable.facturarA] = f.facturarA
+            it[facturaTable.facturarARuc] = f.facturarARuc
+            it[facturaTable.facturarADireccion] = f.facturarADireccion
+            it[facturaTable.facturarATelefono] = f.facturarATelefono
+            it[facturaTable.validarStock] = monetaryContext.validarStock
+            it[facturaTable.idShop] = f.idShop
+            it[facturaTable.servicioPeriodo] = ""
+            it[facturaTable.servicioOrden] = ""
+            it[facturaTable.observacion] = ""
+            it[facturaTable.fechaVencimiento] = fechaVencimientoFactura
+            it[facturaTable.servicioAnio] = today.year
+            it[facturaTable.servicioMes] = today.monthValue.toString().padStart(2, '0')
+            it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia
+            it[facturaTable.numcomContabilizado] = 0
+            it[facturaTable.fechaContabilizado] = today
+            it[facturaTable.serieSucursal] = serieSucursalValue
+            it[facturaTable.cajaSecuencia] = cajaSecuenciaValue
+            it[facturaTable.idSucursal] = f.idSucursal
+            it[facturaTable.idCaja] = f.idCaja
+            it[facturaTable.codigoCaja] = f.codigoCaja
+            it[facturaTable.codCliente] = f.codCliente
+            // Campos exclusivos de Venezuela
+            if (facturaTable is SalesFacturaTableVE) {
+                it[facturaTable.nroz] = f.nroz
+                it[facturaTable.impresoraSerial] = f.impresoraSerial
+                it[facturaTable.multiMoneda] = monetaryContext.multiMoneda
+                it[facturaTable.tasa] = monetaryContext.tasa.toFloat()
+                it[facturaTable.idTasa] = monetaryContext.idTasa
+                it[facturaTable.monedaBase] = monetaryContext.monedaBase
+                it[facturaTable.abrMonedaBase] = monetaryContext.abrMonedaBase
+                it[facturaTable.monedaSecundaria] = monetaryContext.monedaSecundaria
+                it[facturaTable.abrMonedaSecundaria] = monetaryContext.abrMonedaSecundaria
+                it[facturaTable.totalRef] = monetaryContext.totalRef.toFloat()
+            } else if (facturaTable is SalesFacturaTablePA) {
+                it[facturaTable.nroz] = ""
+                it[facturaTable.impresoraSerial] = ""
+                it[facturaTable.multiMoneda] = "0"
+                it[facturaTable.tasa] = 0f
+                it[facturaTable.idTasa] = 0
+                it[facturaTable.monedaBase] = monetaryContext.monedaBase
+                it[facturaTable.abrMonedaBase] = monetaryContext.abrMonedaBase
+                it[facturaTable.monedaSecundaria] = 0
+                it[facturaTable.abrMonedaSecundaria] = ""
+                it[facturaTable.totalRef] = 0f
+            }
         }
     }
 
@@ -705,43 +743,49 @@ class ProcessSaleTransactionalRepository {
             .values
             .sum()
 
-        SalesFacturaDetalleFormaPagoTable.insert {
-            it[codFacturaDetalleFormaPago] = UUID.randomUUID().toString()
-            it[idFactura] = invoiceId
-            it[totalizarMontoCancelar] = monetaryContext.toBase(resumen.totalizarMontoCancelar)
-            it[totalizarSaldoPendiente] = monetaryContext.toBase(resumen.totalizarSaldoPendiente)
-            it[totalizarCambio] = monetaryContext.toBase(resumen.totalizarCambio)
-            it[totalizarMontoEfectivo] = monetaryContext.toBase(montoEfectivo)
-            it[optCheque] = if (montoCheque > 0.0) 1 else 0
-            it[totalizarMontoCheque] = monetaryContext.toBase(montoCheque)
-            it[totalizarNroCheque] = BigDecimal.ZERO.setScale(2)
-            it[totalizarNombreBanco] = 0
-            it[optTarjeta] = if (montoTarjeta > 0.0) 1 else 0
-            it[totalizarMontoTarjeta] = monetaryContext.toBase(montoTarjeta)
-            it[totalizarNroTarjeta] = BigDecimal.ZERO.setScale(2)
-            it[totalizarTipoTarjeta] = 0
-            it[optDeposito] = if (montoDeposito > 0.0) 1 else 0
-            it[totalizarMontoDeposito] = monetaryContext.toBase(montoDeposito)
-            it[totalizarNroDeposito] = BigDecimal.ZERO.setScale(2)
-            it[totalizarBancoDeposito] = 0
-            it[fechaVencimiento] = null
-            it[observacion] = ""
-            it[personaContacto] = ""
-            it[telefono] = ""
-            it[optOtroDocumento] = if (montoOtros > 0.0) 1 else 0
-            it[totalizarTipoOtroDocumento] = 0
-            it[totalizarMontoOtroDocumento] = monetaryContext.toBase(montoOtros)
-            it[totalizarNroOtroDocumento] = 0
-            it[totalizarBancoOtroDocumento] = 0
-            it[fechaCreacion] = now
-            it[usuarioCreacion] = request.factura.usuarioCreacion.take(60)
-            it[totalizarMontoCredito] = monetaryContext.toBase(montoCredito)
-            it[totalizarMontoDebito] = monetaryContext.toBase(montoDebito)
-            it[totalizarMontoTransferencia] = monetaryContext.toBase(montoTransferencia)
-            it[totalizarMontoCertificado] = monetaryContext.toBase(montoCertificado)
-            it[totalizarMontoCxc] = monetaryContext.toBase(montoCxc)
-            it[totalizarMontoOtros] = monetaryContext.toBase(montoOtros)
-            it[totalizarMontoDivisa] = BigDecimal.ZERO.setScale(2)
+        val fpgTable = SalesFacturaDetalleFormaPagoTableFactory.forCountry(monetaryContext.countryCode)
+        fpgTable.insert {
+            it[fpgTable.codFacturaDetalleFormaPago] = UUID.randomUUID().toString()
+            it[fpgTable.idFactura] = invoiceId
+            it[fpgTable.totalizarMontoCancelar] = monetaryContext.toBase(resumen.totalizarMontoCancelar)
+            it[fpgTable.totalizarSaldoPendiente] = monetaryContext.toBase(resumen.totalizarSaldoPendiente)
+            it[fpgTable.totalizarCambio] = monetaryContext.toBase(resumen.totalizarCambio)
+            it[fpgTable.totalizarMontoEfectivo] = monetaryContext.toBase(montoEfectivo)
+            it[fpgTable.optCheque] = if (montoCheque > 0.0) 1 else 0
+            it[fpgTable.totalizarMontoCheque] = monetaryContext.toBase(montoCheque)
+            it[fpgTable.totalizarNroCheque] = BigDecimal.ZERO.setScale(2)
+            it[fpgTable.totalizarNombreBanco] = 0
+            it[fpgTable.optTarjeta] = if (montoTarjeta > 0.0) 1 else 0
+            it[fpgTable.totalizarMontoTarjeta] = monetaryContext.toBase(montoTarjeta)
+            it[fpgTable.totalizarNroTarjeta] = BigDecimal.ZERO.setScale(2)
+            it[fpgTable.totalizarTipoTarjeta] = 0
+            it[fpgTable.optDeposito] = if (montoDeposito > 0.0) 1 else 0
+            it[fpgTable.totalizarMontoDeposito] = monetaryContext.toBase(montoDeposito)
+            it[fpgTable.totalizarNroDeposito] = BigDecimal.ZERO.setScale(2)
+            it[fpgTable.totalizarBancoDeposito] = 0
+            it[fpgTable.fechaVencimiento] = null
+            it[fpgTable.observacion] = ""
+            it[fpgTable.personaContacto] = ""
+            it[fpgTable.telefono] = ""
+            it[fpgTable.optOtroDocumento] = if (montoOtros > 0.0) 1 else 0
+            it[fpgTable.totalizarTipoOtroDocumento] = 0
+            it[fpgTable.totalizarMontoOtroDocumento] = monetaryContext.toBase(montoOtros)
+            it[fpgTable.totalizarNroOtroDocumento] = 0
+            it[fpgTable.totalizarBancoOtroDocumento] = 0
+            it[fpgTable.fechaCreacion] = now
+            it[fpgTable.usuarioCreacion] = request.factura.usuarioCreacion.take(60)
+            it[fpgTable.totalizarMontoCredito] = monetaryContext.toBase(montoCredito)
+            it[fpgTable.totalizarMontoDebito] = monetaryContext.toBase(montoDebito)
+            it[fpgTable.totalizarMontoTransferencia] = monetaryContext.toBase(montoTransferencia)
+            it[fpgTable.totalizarMontoCertificado] = monetaryContext.toBase(montoCertificado)
+            it[fpgTable.totalizarMontoCxc] = monetaryContext.toBase(montoCxc)
+            it[fpgTable.totalizarMontoOtros] = monetaryContext.toBase(montoOtros)
+            if (fpgTable is SalesFacturaDetalleFormaPagoTableVE) {
+                it[fpgTable.totalizarMontoDivisa] = BigDecimal.ZERO.setScale(2)
+            } else if (fpgTable is SalesFacturaDetalleFormaPagoTablePA) {
+                it[fpgTable.codigoRetencion] = ""
+                it[fpgTable.totalizarMontoRetencion] = BigDecimal.ZERO.setScale(2)
+            }
         }
     }
 
@@ -791,56 +835,71 @@ class ProcessSaleTransactionalRepository {
                         it[idItem] = item.idItem
                         it[codAlmacen] = item.itemAlmacen
                         it[cantidad] = requested.negate().toFloat()
+                        if (monetaryContext.countryCode.uppercase() == "PA") {
+                            it[cantidadMuestra] = BigDecimal.ZERO.setScale(4)
+                            it[minimo] = 0L
+                            it[maximo] = 0L
+                        }
                     }
                 }
             }
         }
 
-        SalesKardexTable.insert {
-            it[idTransaccion] = kardexId
-            it[tipoMovimientoAlmacen] = 2
-            it[autorizadoPor] = request.factura.usuarioCreacion
-            it[observacion] = "Salida por Ventas"
-            it[fecha] = today
-            it[usuarioCreacion] = request.factura.usuarioCreacion
-            it[fechaCreacion] = now
-            it[estado] = "Procesado"
-            it[idDocumento] = invoiceId
-            it[codProveedor] = 0
-            it[comprobante] = "FACT"
-            it[anio] = Year.from(today).value % 100
-            it[tipoCosto] = "PROM"
-            it[estatus] = 1
-            it[entregadoACodigo] = "POS"
-            it[entregadoANombre] = "VENTA"
-            it[codDocumento] = documentCode
-            it[subtipoMovimientoAlmacen] = 0
-            it[contabilizado] = 0
-            it[fechaContabilizacion] = today
-            it[usuarioContabilizacion] = ""
-            it[idAlmacenSalida] = physicalItems.first().itemAlmacen
-            it[idSucursal] = request.factura.idSucursal
-            it[validadoFecha] = today
-            it[validadoUsuario] = request.factura.usuarioCreacion.take(20)
-            it[validadoObservacion] = "Salida por Ventas"
+        val kardexTable = SalesKardexTableFactory.forCountry(monetaryContext.countryCode)
+        val kardexDetalleTable = SalesKardexDetalleTableFactory.forCountry(monetaryContext.countryCode)
+
+        kardexTable.insert {
+            it[kardexTable.idTransaccion] = kardexId
+            it[kardexTable.tipoMovimientoAlmacen] = 2
+            it[kardexTable.autorizadoPor] = request.factura.usuarioCreacion
+            it[kardexTable.observacion] = "Salida por Ventas"
+            it[kardexTable.fecha] = today
+            it[kardexTable.usuarioCreacion] = request.factura.usuarioCreacion
+            it[kardexTable.fechaCreacion] = now
+            it[kardexTable.estado] = "Procesado"
+            it[kardexTable.idDocumento] = invoiceId
+            it[kardexTable.codProveedor] = 0
+            it[kardexTable.comprobante] = "FACT"
+            it[kardexTable.anio] = Year.from(today).value % 100
+            it[kardexTable.tipoCosto] = "PROM"
+            it[kardexTable.estatus] = 1
+            it[kardexTable.entregadoACodigo] = "POS"
+            it[kardexTable.entregadoANombre] = "VENTA"
+            it[kardexTable.codDocumento] = documentCode
+            it[kardexTable.subtipoMovimientoAlmacen] = 0
+            it[kardexTable.contabilizado] = 0
+            it[kardexTable.fechaContabilizacion] = today
+            it[kardexTable.usuarioContabilizacion] = ""
+            it[kardexTable.idAlmacenSalida] = physicalItems.first().itemAlmacen
+            it[kardexTable.idSucursal] = request.factura.idSucursal
+            it[kardexTable.validadoFecha] = today
+            it[kardexTable.validadoUsuario] = request.factura.usuarioCreacion.take(20)
+            it[kardexTable.validadoObservacion] = "Salida por Ventas"
+            if (kardexTable is SalesKardexTablePA) {
+                it[kardexTable.controlaStock] = 0
+            }
         }
 
         physicalItems.forEach { item ->
-            SalesKardexDetalleTable.insert {
-                it[idTransaccionDetalle] = UUID.randomUUID().toString()
-                it[idTransaccion] = kardexId
-                it[idAlmacenEntrada] = 0
-                it[idAlmacenSalida] = item.itemAlmacen
-                it[idItem] = item.idItem
-                it[cantidad] = item.itemCantidadTotal.toFloat()
-                it[cantidadDistribuida] = 0
-                it[precio] = monetaryContext.toBase(item.itemPrecioSinIva)
-                it[cantidadMuestra] = 0
-                it[unidadBulto] = "UNIDAD"
-                it[cantidadBulto] = BigDecimal.ONE.setScale(2)
-                it[unidadEmpaque] = "UNIDAD"
-                it[cantidadTotal] = item.itemCantidadTotal.toScaledBigDecimal(2)
-                it[costo] = BigDecimal.ZERO.setScale(2)
+            kardexDetalleTable.insert {
+                it[kardexDetalleTable.idTransaccionDetalle] = UUID.randomUUID().toString()
+                it[kardexDetalleTable.idTransaccion] = kardexId
+                it[kardexDetalleTable.idAlmacenEntrada] = 0
+                it[kardexDetalleTable.idAlmacenSalida] = item.itemAlmacen
+                it[kardexDetalleTable.idItem] = item.idItem
+                it[kardexDetalleTable.cantidad] = item.itemCantidadTotal.toFloat()
+                it[kardexDetalleTable.cantidadDistribuida] = 0
+                it[kardexDetalleTable.precio] = monetaryContext.toBase(item.itemPrecioSinIva)
+                it[kardexDetalleTable.cantidadMuestra] = 0
+                it[kardexDetalleTable.unidadBulto] = "UNIDAD"
+                it[kardexDetalleTable.cantidadBulto] = BigDecimal.ONE.setScale(2)
+                it[kardexDetalleTable.unidadEmpaque] = "UNIDAD"
+                it[kardexDetalleTable.cantidadTotal] = item.itemCantidadTotal.toScaledBigDecimal(2)
+                it[kardexDetalleTable.costo] = BigDecimal.ZERO.setScale(2)
+                if (kardexDetalleTable is SalesKardexDetalleTablePA) {
+                    it[kardexDetalleTable.idCentroCosto] = 0
+                    it[kardexDetalleTable.idLoteItem] = 0
+                }
             }
         }
     }
@@ -863,53 +922,60 @@ class ProcessSaleTransactionalRepository {
         val montoTexto = totalBase.setScale(2, RoundingMode.HALF_UP).toPlainString()
         val conceptoCaja = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre, Monto: $montoTexto."
 
-        SalesCajaNuevaTable.insert {
-            it[this.cajaId] = cajaId
-            it[idTransaccion] = transactionId
-            it[fecha] = today
-            it[ingEg] = CajaIngresoEgreso.I
-            it[monto] = totalBase
-            it[comprobante] = "FACT"
-            it[comprobanteNumero] = invoiceCode
-            it[idFactura] = invoiceId
-            it[idCliente] = request.factura.idCliente
-            it[concepto] = conceptoCaja
-            it[status] = CajaStatus.Pagada
-            it[sucursalId] = request.factura.idSucursal
-            it[usuarioCreacion] = request.factura.usuarioCreacion.take(20)
-            it[fechaCreacion] = now
-            it[idCompra] = ""
-            it[idProveedor] = ""
-            it[idOrdenPago] = ""
-            it[serieSucursal] = request.factura.serieSucursal
-            it[idCajaSecuencia] = request.factura.idCajaSecuencia
-            it[idPedido] = ""
-            it[idAbono] = ""
-            it[idNotaCredito] = ""
+        val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(monetaryContext.countryCode)
+        val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(monetaryContext.countryCode)
+
+        cajaNuevaTable.insert {
+            it[cajaNuevaTable.cajaId] = cajaId
+            it[cajaNuevaTable.idTransaccion] = transactionId
+            it[cajaNuevaTable.fecha] = today
+            it[cajaNuevaTable.ingEg] = CajaIngresoEgreso.I
+            it[cajaNuevaTable.monto] = totalBase
+            it[cajaNuevaTable.comprobante] = "FACT"
+            it[cajaNuevaTable.comprobanteNumero] = invoiceCode
+            it[cajaNuevaTable.idFactura] = invoiceId
+            it[cajaNuevaTable.idCliente] = request.factura.idCliente
+            it[cajaNuevaTable.concepto] = conceptoCaja
+            it[cajaNuevaTable.status] = CajaStatus.Pagada
+            it[cajaNuevaTable.sucursalId] = request.factura.idSucursal
+            it[cajaNuevaTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+            it[cajaNuevaTable.fechaCreacion] = now
+            it[cajaNuevaTable.idCompra] = ""
+            it[cajaNuevaTable.idProveedor] = ""
+            it[cajaNuevaTable.idOrdenPago] = ""
+            it[cajaNuevaTable.serieSucursal] = request.factura.serieSucursal
+            it[cajaNuevaTable.idCajaSecuencia] = request.factura.idCajaSecuencia
+            it[cajaNuevaTable.idPedido] = ""
+            it[cajaNuevaTable.idAbono] = ""
+            it[cajaNuevaTable.idNotaCredito] = ""
         }
 
-        SalesCajaNuevaReciboTable.insert {
-            it[this.cajaReciboId] = cajaReciboId
-            it[tipoRecibo] = "ICC"
-            it[nroRecibo] = "FACT/$invoiceCode"
-            it[fecha] = today
-            it[monto] = totalBase
-            it[observacion] = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre"
-            it[codVendedor] = request.factura.codVendedor
-            it[idCliente] = request.factura.idCliente
-            it[idProveedor] = ""
-            it[usuarioCreacion] = request.factura.usuarioCreacion.take(20)
-            it[fechaCreacion] = now
-            it[status] = "AC"
-            it[contabilizado] = 0
-            it[numcomContabilizado] = 0
-            it[fechaContabilizado] = today
-            it[idFactura] = invoiceId
-            it[idPedido] = ""
-            it[idAbono] = ""
-            it[idTransaccion] = ""
-            it[nroReferencia] = ""
-            it[tipoPagoSubtipo] = 0
+        val cajaReciboTable = SalesCajaNuevaReciboTableFactory.forCountry(monetaryContext.countryCode)
+        cajaReciboTable.insert {
+            it[cajaReciboTable.cajaReciboId] = cajaReciboId
+            it[cajaReciboTable.tipoRecibo] = "ICC"
+            it[cajaReciboTable.nroRecibo] = "FACT/$invoiceCode"
+            it[cajaReciboTable.fecha] = today
+            it[cajaReciboTable.monto] = totalBase
+            it[cajaReciboTable.observacion] = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre"
+            it[cajaReciboTable.codVendedor] = request.factura.codVendedor
+            it[cajaReciboTable.idCliente] = request.factura.idCliente
+            it[cajaReciboTable.idProveedor] = ""
+            it[cajaReciboTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+            it[cajaReciboTable.fechaCreacion] = now
+            it[cajaReciboTable.status] = "AC"
+            it[cajaReciboTable.contabilizado] = 0
+            it[cajaReciboTable.numcomContabilizado] = 0
+            it[cajaReciboTable.fechaContabilizado] = today
+            it[cajaReciboTable.idFactura] = invoiceId
+            it[cajaReciboTable.idPedido] = ""
+            it[cajaReciboTable.idAbono] = ""
+            it[cajaReciboTable.idTransaccion] = ""
+            it[cajaReciboTable.nroReferencia] = ""
+            it[cajaReciboTable.tipoPagoSubtipo] = 0
+            if (cajaReciboTable is SalesCajaNuevaReciboTableVE) {
+                it[cajaReciboTable.idConsignacion] = ""
+            }
         }
 
         request.pagos.forEach { pago ->
@@ -917,30 +983,33 @@ class ProcessSaleTransactionalRepository {
             val montoPagoBase = monetaryContext.toBase(pago.monto)
             val montoRecibidoBase = monetaryContext.toBase(pago.montoRecibido)
 
-            SalesCajaNuevaDetalleTable.insert {
-                it[cajaDetalleId] = detalleId
-                it[this.cajaId] = cajaId
-                it[idFormaPago] = pago.idFormaPago
-                it[idTransaccion] = transactionId
-                it[SalesCajaNuevaDetalleTable.cajaReciboId] = cajaReciboId
-                it[monto] = montoPagoBase
-                it[montoOriginal] = BigDecimal.ZERO.setScale(2)
-                it[concepto] = null
-                it[usuarioCreacion] = request.factura.usuarioCreacion.take(20)
-                it[fechaCreacion] = now
-                it[retencionTipo] = ""
-                it[retencionPorcentaje] = ""
-                it[numero] = ""
-                it[observacion] = ""
-                it[retencionBaseCalculo] = ""
-                it[serieSucursal] = ""
-                it[cajaSecuencia] = ""
-                it[numeroControl] = ""
-                it[numeroComprobante] = ""
-                it[retencionMonto] = ""
-                it[retencionDetalleJson] = ""
-                it[montoRecibido] = montoRecibidoBase
-                it[montoMonedaPrincipal] = montoPagoBase
+            cajaNuevaDetalleTable.insert {
+                it[cajaNuevaDetalleTable.cajaDetalleId] = detalleId
+                it[cajaNuevaDetalleTable.cajaId] = cajaId
+                it[cajaNuevaDetalleTable.idFormaPago] = pago.idFormaPago
+                it[cajaNuevaDetalleTable.idTransaccion] = transactionId
+                it[cajaNuevaDetalleTable.cajaReciboId] = cajaReciboId
+                it[cajaNuevaDetalleTable.monto] = montoPagoBase
+                it[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
+                it[cajaNuevaDetalleTable.concepto] = null
+                it[cajaNuevaDetalleTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+                it[cajaNuevaDetalleTable.fechaCreacion] = now
+                it[cajaNuevaDetalleTable.retencionTipo] = ""
+                it[cajaNuevaDetalleTable.retencionPorcentaje] = ""
+                it[cajaNuevaDetalleTable.numero] = ""
+                it[cajaNuevaDetalleTable.observacion] = ""
+                it[cajaNuevaDetalleTable.retencionBaseCalculo] = ""
+                it[cajaNuevaDetalleTable.serieSucursal] = ""
+                it[cajaNuevaDetalleTable.cajaSecuencia] = ""
+                it[cajaNuevaDetalleTable.numeroControl] = ""
+                it[cajaNuevaDetalleTable.numeroComprobante] = ""
+                it[cajaNuevaDetalleTable.retencionMonto] = ""
+                it[cajaNuevaDetalleTable.retencionDetalleJson] = ""
+                // Campos exclusivos de Venezuela
+                if (cajaNuevaDetalleTable is SalesCajaNuevaDetalleTableVE) {
+                    it[cajaNuevaDetalleTable.montoRecibido] = montoRecibidoBase
+                    it[cajaNuevaDetalleTable.montoMonedaPrincipal] = montoPagoBase
+                }
             }
 
             SalesCajaNuevaDetalleFormaPagoTable.insert {

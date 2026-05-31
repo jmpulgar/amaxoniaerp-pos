@@ -34,7 +34,7 @@ class AuthService(
         val companies = if (companyCodes.isEmpty()) {
             emptyList()
         } else {
-            companyRepository.loadCompanies(companyCodes)
+            companyRepository.loadCompanies(companyCodes, countryCode)
         }
 
         // Crear token con metadata del país

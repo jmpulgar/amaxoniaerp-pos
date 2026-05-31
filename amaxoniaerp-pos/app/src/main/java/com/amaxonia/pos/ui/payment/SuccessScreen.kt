@@ -99,12 +99,12 @@ fun SuccessScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.primary
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .navigationBarsPadding(),
@@ -122,10 +122,11 @@ fun SuccessScreen(
                     visible = visible,
                     enter = fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220))
                 ) {
-                    Card(
+                    ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        shape = RoundedCornerShape(28.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
                     ) {
                         if (uiState.isLoading || payload == null) {
                             Column(
@@ -145,7 +146,7 @@ fun SuccessScreen(
                         } else {
                             Column(
                                 modifier = Modifier
-                                    .padding(24.dp)
+                                    .padding(28.dp)
                                     .graphicsLayer {
                                         scaleX = scale.value
                                         scaleY = scale.value
@@ -154,30 +155,30 @@ fun SuccessScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(80.dp)
+                                        .size(92.dp)
                                         .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(40.dp)
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(46.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(18.dp))
 
                                 Text(
-                                    "¡Transacción Exitosa!",
-                                    fontSize = 22.sp,
+                                    "Transacción exitosa",
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 Text(
                                     if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 8.dp)
                                 )
@@ -187,30 +188,30 @@ fun SuccessScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
                                         .padding(16.dp)
                                 ) {
                                     Text(
                                         "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
-                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
                                     )
                                     HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                                        modifier = Modifier.padding(vertical = 8.dp)
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        modifier = Modifier.padding(vertical = 12.dp)
                                     )
                                     if (isMultiCurrency && totalBs > 0.0) {
                                         Text(
                                             "Total: $ ${Money.format(Money.fromDouble(changeDue.coerceAtLeast(0.0)))} (${formatCurrencyLabel(abrMonedaSecundaria)} ${String.format("%.2f", totalBs)})",
-                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.align(Alignment.CenterHorizontally)
                                         )
                                     }
                                     Text(
                                         "Cambio / Vuelto: $ ${Money.format(Money.fromDouble(changeDue))}${if (isMultiCurrency && changeDueBs > 0.0) " (${formatCurrencyLabel(abrMonedaSecundaria)} ${String.format("%.2f", changeDueBs)})" else ""}",
-                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
                                     )
@@ -222,9 +223,9 @@ fun SuccessScreen(
                                     onClick = {},
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                    shape = RoundedCornerShape(4.dp)
+                                    shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.primary)
+                                    Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -256,9 +257,9 @@ fun SuccessScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary),
-                shape = RoundedCornerShape(8.dp)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR RECIBO")
             }
@@ -270,10 +271,10 @@ fun SuccessScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(8.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("SIGUIENTE ORDEN", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text("SIGUIENTE ORDEN", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         }
     }

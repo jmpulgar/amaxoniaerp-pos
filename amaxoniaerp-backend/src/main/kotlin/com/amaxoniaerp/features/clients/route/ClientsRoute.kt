@@ -100,7 +100,7 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                     )
 
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val defaultClient = clientsRepository.getDefaultClient(companyDb)
+                val defaultClient = clientsRepository.getDefaultClient(companyDb, countryCode)
                     ?: return@get call.respond(
                         HttpStatusCode.NotFound,
                         mapOf("error" to "Default client not configured")

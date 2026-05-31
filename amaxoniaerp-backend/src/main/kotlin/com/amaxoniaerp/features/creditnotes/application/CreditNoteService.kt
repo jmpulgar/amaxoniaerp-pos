@@ -18,13 +18,14 @@ class CreditNoteService(
 ) {
     suspend fun list(
         database: Database,
+        countryCode: String,
         limit: Int,
         offset: Long,
         search: String?,
         fechaInicio: LocalDate?,
         fechaFin: LocalDate?,
     ): CreditNotesListResponse = dbQuery(database) {
-        val (data, total) = repository.listCreditNotes(limit, offset, search, fechaInicio, fechaFin)
+        val (data, total) = repository.listCreditNotes(countryCode, limit, offset, search, fechaInicio, fechaFin)
         CreditNotesListResponse(data = data, total = total)
     }
 
@@ -57,9 +58,10 @@ class CreditNoteService(
 
     suspend fun confirmFiscal(
         database: Database,
+        countryCode: String,
         id: String,
         request: ConfirmCreditNoteFiscalRequest,
     ): ConfirmCreditNoteFiscalResponse = dbQuery(database) {
-        repository.confirmFiscal(id, request)
+        repository.confirmFiscal(countryCode, id, request)
     }
 }

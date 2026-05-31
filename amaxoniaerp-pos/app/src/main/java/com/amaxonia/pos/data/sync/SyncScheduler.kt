@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit
 object SyncScheduler {
     private const val PERIODIC_WORK_NAME = "catalog_sync_periodic"
     private const val MANUAL_WORK_NAME = "catalog_sync_manual"
+    private const val PENDING_INVOICES_WORK_NAME = "pending_invoice_sync"
 
     fun getManualSyncWorkInfos(context: Context) =
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(MANUAL_WORK_NAME)
@@ -41,6 +42,20 @@ object SyncScheduler {
         WorkManager.getInstance(context).enqueueUniqueWork(
             MANUAL_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun enqueuePendingInvoices(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = OneTimeWorkRequestBuilder<PendingInvoiceSyncWorker>()
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            PENDING_INVOICES_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }

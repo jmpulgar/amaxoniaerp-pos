@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class DashboardViewModel(
@@ -30,13 +32,22 @@ class DashboardViewModel(
 
     @Volatile
     private var adminDb: String = ""
+    private var searchJob: Job? = null
+
+    private companion object {
+        const val PAGE_SIZE = 40
+    }
 
     init {
         viewModelScope.launch {
+            val savedCountry = localStore.readSelectedCountry()
+            if (savedCountry != null) {
+                apiConfigManager.updateBaseUrl(savedCountry)
+            }
             val companySession = localStore.readCompanySession()
             adminDb = companySession?.company?.adminDb ?: ""
         }
-        loadProducts()
+        loadProducts(reset = true)
         loadBestSellers()
         observeCart()
         observeClient()
@@ -171,12 +182,14 @@ class DashboardViewModel(
 
     fun getProductImageUrl(photoPath: String): String {
         if (photoPath.isBlank() || adminDb.isBlank()) return ""
-        return com.amaxonia.pos.data.remote.ImageUrlHelper.productImageUrl(
+        val url = com.amaxonia.pos.data.remote.ImageUrlHelper.productImageUrl(
             baseUrl = apiConfigManager.baseUrl.value,
             countryCode = apiConfigManager.getCurrentCountryCode(),
             companyDb = adminDb,
             photoPath = photoPath
         )
+        android.util.Log.d("IMG_URL", "baseUrl=${apiConfigManager.baseUrl.value} country=${apiConfigManager.getCurrentCountryCode()} db=$adminDb path=$photoPath -> url=$url")
+        return url
     }
 
     fun getClientPhotoUrl(client: Client): String {
@@ -240,20 +253,37 @@ class DashboardViewModel(
             it.copy(
                 selectedDepartmentId = departmentId,
                 showDepartmentPicker = false,
-                selectedCategory = if (departmentId == null) "Todos los productos" else it.departments.find { d -> d.id == departmentId }?.name ?: "Todos los productos"
+                selectedCategory = if (departmentId == null) "Todos los productos" else it.departments.find { d -> d.id == departmentId }?.name ?: "Todos los productos",
+                searchQuery = it.searchQuery
             )
         }
-        loadProducts()
+        loadProducts(reset = true)
     }
 
-    private fun loadProducts() {
+    private fun loadProducts(reset: Boolean) {
         viewModelScope.launch {
             if (adminDb.isBlank()) adminDb = localStore.readCompanySession()?.company?.adminDb ?: ""
-            _state.update { it.copy(isLoading = true, error = null) }
+            val nextPage = if (reset) 1 else _state.value.page + 1
+            _state.update {
+                it.copy(
+                    isLoading = reset && it.products.isEmpty(),
+                    isLoadingMore = !reset,
+                    page = nextPage,
+                    products = if (reset) emptyList() else it.products,
+                    endOfListReached = if (reset) false else it.endOfListReached,
+                    error = null
+                )
+            }
             val departmentId = _state.value.selectedDepartmentId
-            productRepository.getAllProducts(departmentId).fold(
+            val query = _state.value.searchQuery.trim()
+            val result = if (query.isBlank()) {
+                productRepository.getAllProducts(departmentId, nextPage, PAGE_SIZE)
+            } else {
+                productRepository.searchProducts(query, departmentId, nextPage, PAGE_SIZE)
+            }
+            result.fold(
                 onSuccess = { products ->
-                    val dashboardProducts = products.take(100).mapIndexed { index, product ->
+                    val dashboardProducts = products.map { product ->
                         DashboardProduct(
                             id = product.id,
                             name = product.description,
@@ -268,8 +298,10 @@ class DashboardViewModel(
                     }
                     _state.update {
                         it.copy(
-                            products = dashboardProducts,
+                            products = if (reset) dashboardProducts else it.products + dashboardProducts,
                             isLoading = false,
+                            isLoadingMore = false,
+                            endOfListReached = products.size < PAGE_SIZE,
                             error = null
                         )
                     }
@@ -278,12 +310,19 @@ class DashboardViewModel(
                     _state.update {
                         it.copy(
                             isLoading = false,
+                            isLoadingMore = false,
                             error = exception.message ?: "Error al cargar productos"
                         )
                     }
                 }
             )
         }
+    }
+
+    fun loadMoreProducts() {
+        val current = _state.value
+        if (current.bottomSelected != 0 || current.isLoading || current.isLoadingMore || current.endOfListReached) return
+        loadProducts(reset = false)
     }
 
     // --- LÓGICA DEL CARRITO CORREGIDA ---
@@ -356,14 +395,22 @@ class DashboardViewModel(
     }
 
     fun toggleSearch() {
+        var shouldReload = false
         _state.update { s ->
             val open = !s.isSearchOpen
+            shouldReload = !open && s.searchQuery.isNotBlank()
             s.copy(isSearchOpen = open, searchQuery = if (!open) "" else s.searchQuery)
         }
+        if (shouldReload) loadProducts(reset = true)
     }
 
     fun setSearchQuery(value: String) {
         _state.update { it.copy(searchQuery = value) }
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(250)
+            loadProducts(reset = true)
+        }
     }
 
     fun toggleViewMode() {
@@ -418,7 +465,7 @@ class DashboardViewModel(
     }
 
     fun retry() {
-        loadProducts()
+        loadProducts(reset = true)
     }
 
     // Lógica para la calculadora manual

@@ -103,6 +103,8 @@ fun AppNavigation(startDestination: String) {
             DashboardScreen(
                 onLogout = {
                     scope.launch {
+                        DependencyContainer.cartRepository.clearCart()
+                        DependencyContainer.cajaRepository.clearActiveCaja()
                         DependencyContainer.authRepository.logout()
                         navigateAndClearStack("welcome")
                     }

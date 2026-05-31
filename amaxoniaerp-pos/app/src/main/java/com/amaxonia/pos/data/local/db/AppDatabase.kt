@@ -17,9 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AddressLevel2Entity::class,
         AddressLevel3Entity::class,
         ClientTypeEntity::class,
-        DraftInvoiceEntity::class
+        DraftInvoiceEntity::class,
+        PendingInvoiceEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun addressLevel3Dao(): AddressLevel3Dao
     abstract fun clientTypeDao(): ClientTypeDao
     abstract fun draftInvoiceDao(): DraftInvoiceDao
+    abstract fun pendingInvoiceDao(): PendingInvoiceDao
 
     companion object {
         @Volatile
@@ -118,6 +120,28 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS pending_invoices (" +
+                        "id TEXT NOT NULL, " +
+                        "countryCode TEXT NOT NULL, " +
+                        "payloadJson TEXT NOT NULL, " +
+                        "localInvoiceNumber TEXT NOT NULL, " +
+                        "total REAL NOT NULL, " +
+                        "clientName TEXT NOT NULL, " +
+                        "status TEXT NOT NULL, " +
+                        "retryCount INTEGER NOT NULL, " +
+                        "lastError TEXT, " +
+                        "remoteInvoiceId TEXT, " +
+                        "remoteInvoiceNumber TEXT, " +
+                        "createdAt INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL, " +
+                        "PRIMARY KEY(id)" +
+                        ")"
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
@@ -125,7 +149,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "amaxonia_pos.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                     .also { instance = it }
             }

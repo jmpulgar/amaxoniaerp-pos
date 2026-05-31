@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.facturas.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.features.auth.route.getAdminDb
+import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
@@ -30,13 +32,19 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
-                val adminDb = principal.payload.getClaim("admin_db").asString()
+                val adminDb = principal.getAdminDb()
                 if (adminDb.isNullOrBlank()) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Database not found")
                     )
                 }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
 
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
@@ -64,9 +72,10 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
 
                 val estatusList = estatusParam?.split(",")?.mapNotNull { it.toIntOrNull() }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val (facturas, total) = facturasRepository.listFacturas(
                     database = companyDb,
+                    countryCode = countryCode,
                     limit = limit,
                     offset = offset,
                     search = search,
@@ -93,7 +102,7 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
-                val adminDb = principal.payload.getClaim("admin_db").asString()
+                val adminDb = principal.getAdminDb()
                 if (adminDb.isNullOrBlank()) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
@@ -101,8 +110,14 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
-                val resumen = facturasRepository.getResumen(companyDb)
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val resumen = facturasRepository.getResumen(companyDb, countryCode)
                 call.respond(resumen)
             }
 
@@ -121,7 +136,7 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
-                val adminDb = principal.payload.getClaim("admin_db").asString()
+                val adminDb = principal.getAdminDb()
                 if (adminDb.isNullOrBlank()) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
@@ -129,14 +144,20 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
+
                 val facturaId = call.parameters["id"]
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Missing factura ID")
                     )
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
-                val detalle = facturasRepository.getFacturaDetalle(companyDb, facturaId)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val detalle = facturasRepository.getFacturaDetalle(companyDb, countryCode, facturaId)
 
                 if (detalle == null) {
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
@@ -160,13 +181,19 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                     )
                 }
 
-                val adminDb = principal.payload.getClaim("admin_db").asString()
+                val adminDb = principal.getAdminDb()
                 if (adminDb.isNullOrBlank()) {
                     return@patch call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Database not found")
                     )
                 }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@patch call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
 
                 val facturaId = call.parameters["id"]
                     ?: return@patch call.respond(
@@ -176,9 +203,9 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
 
                 val request = call.receive<ConfirmFacturaFiscalRequest>()
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 try {
-                    val response = facturasRepository.confirmFiscal(companyDb, facturaId, request)
+                    val response = facturasRepository.confirmFiscal(companyDb, countryCode, facturaId, request)
                     call.respond(response)
                 } catch (e: NoSuchElementException) {
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Factura no encontrada")))

@@ -25,16 +25,19 @@ class CatalogSyncer(
     private val addressLevel3Dao: AddressLevel3Dao,
     private val clientTypeDao: ClientTypeDao
 ) {
-    suspend fun syncAll(pageSize: Int = 1000): Result<Unit> {
+    suspend fun syncAll(pageSize: Int = 300): Result<Unit> {
         val session = localStore.readCompanySession()
             ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
         return runCatching {
-            syncCountries(session.token, pageSize)
-            syncAddressLevels(session.token, pageSize)
-            syncClientTypes(session.token, pageSize)
+            // Critical POS data first: this is enough for most offline sales flows.
             syncClients(session.token, pageSize)
             syncProducts(session.token, pageSize)
             localStore.setInitialSyncCompleted(session.company.id, true)
+
+            // Secondary catalogs keep syncing after the app can already operate.
+            syncClientTypes(session.token, pageSize)
+            syncCountries(session.token, pageSize)
+            syncAddressLevels(session.token, pageSize)
         }
     }
 

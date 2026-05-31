@@ -2,7 +2,7 @@ package com.amaxoniaerp.features.clients.data
 
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.core.time.BusinessClock
-import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTable
+import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import org.slf4j.LoggerFactory
 import com.amaxoniaerp.features.clients.domain.Client
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
@@ -137,12 +137,13 @@ class ClientsRepository {
             .singleOrNull()
     }
 
-    suspend fun getDefaultClient(database: Database): Client? = dbQuery(database) {
-        val defaultCode = ParametrosGeneralesTable
-            .select(ParametrosGeneralesTable.defaultCodClienteFactura)
-            .orderBy(ParametrosGeneralesTable.codEmpresa)
+    suspend fun getDefaultClient(database: Database, countryCode: String): Client? = dbQuery(database) {
+        val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
+        val defaultCode = parametrosTable
+            .select(parametrosTable.defaultCodClienteFactura)
+            .orderBy(parametrosTable.codEmpresa)
             .limit(1)
-            .map { it[ParametrosGeneralesTable.defaultCodClienteFactura].trim() }
+            .map { it[parametrosTable.defaultCodClienteFactura].trim() }
             .firstOrNull()
             ?.takeIf { it.isNotBlank() }
             ?: return@dbQuery null

@@ -21,14 +21,26 @@ import com.amaxoniaerp.features.items.data.ItemsRepository
 import com.amaxoniaerp.features.items.route.itemsRoutes
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.pos.posRouting
+import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
+import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
+import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaRestClient
+import com.amaxoniaerp.features.electronicinvoice.route.electronicInvoiceRoutes
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
 import com.amaxoniaerp.features.sales.route.salesRoutes
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
 
 fun Application.configureRouting() {
     install(StatusPages) {
@@ -52,7 +64,29 @@ fun Application.configureRouting() {
     val geographyRepository = GeographyRepository()
     val cajaRepository = CajaRepository()
     val formasPagoRepository = FormasPagoRepository()
-    val processSaleUseCase = ProcessSaleUseCase(ProcessSaleTransactionalRepository())
+    // Facturación Electrónica Panamá - HTTP Client + PAC + Strategy
+    val feHttpClient = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(Json {
+                encodeDefaults = false
+                ignoreUnknownKeys = true
+                prettyPrint = false
+            })
+        }
+        install(Logging) {
+            level = LogLevel.INFO
+        }
+        engine {
+            requestTimeout = 30_000
+        }
+    }
+    val feRepository = ElectronicInvoiceRepository()
+    val pacClient = TheFactoryHkaRestClient(feHttpClient)
+    val payloadBuilder = TheFactoryHkaPayloadBuilder()
+    val panamaProcessor = PanamaInvoiceProcessor(feRepository, pacClient, payloadBuilder)
+    val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor)
+
+    val processSaleUseCase = ProcessSaleUseCase(ProcessSaleTransactionalRepository(), feFactory)
     val creditNoteService = CreditNoteService(CreditNoteRepository())
 
     routing {
@@ -70,14 +104,21 @@ fun Application.configureRouting() {
         posRouting(formasPagoRepository)
         salesRoutes(processSaleUseCase)
         creditNoteRoutes(creditNoteService)
+        electronicInvoiceRoutes(feFactory)
 
-        val assetsBaseUrl = environment.config.propertyOrNull("assets.baseUrl")?.getString()
-            ?: System.getenv("ASSETS_BASE_URL")
-        val dataBasePath = environment.config.propertyOrNull("assets.dataBasePath")?.getString()
-            ?: System.getenv("DATA_BASE_PATH")
-        assetsRoutes(assetsBaseUrl = assetsBaseUrl, dataBasePath = dataBasePath)
+        val dotenv = loadDotEnv()
+        val genericAssetsUrl = loadConfigValue("ASSETS_BASE_URL", "assets.baseUrl", dotenv)
+        val veAssetsUrl = loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv)
+            ?: genericAssetsUrl
+        val paAssetsUrl = loadConfigValue("ASSETS_BASE_URL_PA", "assets.baseUrlPA", dotenv)
+            ?: genericAssetsUrl
+        val assetsBaseUrls = mutableMapOf<String, String>()
+        if (!veAssetsUrl.isNullOrBlank()) assetsBaseUrls["VE"] = veAssetsUrl.trimEnd('/')
+        if (!paAssetsUrl.isNullOrBlank()) assetsBaseUrls["PA"] = paAssetsUrl.trimEnd('/')
+        val dataBasePath = loadConfigValue("DATA_BASE_PATH", "assets.dataBasePath", dotenv)
+        assetsRoutes(assetsBaseUrls = assetsBaseUrls, dataBasePath = dataBasePath)
         
-        // Rutas legacy que aún podrían necesitar refactoring
+        // Rutas auxiliares que aún podrían necesitar refactoring
         clientsRoutes(clientsRepository)
         clientTypesRoutes(clientTypesRepository)
         facturasRoutes(facturasRepository)

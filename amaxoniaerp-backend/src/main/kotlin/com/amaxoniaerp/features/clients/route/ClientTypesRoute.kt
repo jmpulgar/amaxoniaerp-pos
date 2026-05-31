@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.clients.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.features.auth.route.getAdminDb
+import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.domain.ClientTypesListResponse
 import io.ktor.http.HttpStatusCode
@@ -29,13 +31,19 @@ fun Route.clientTypesRoutes(clientTypesRepository: ClientTypesRepository) {
                 )
             }
 
-            val adminDb = principal.payload.getClaim("admin_db").asString()
+            val adminDb = principal.getAdminDb()
             if (adminDb.isNullOrBlank()) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf("error" to "Company database not found in token")
                 )
             }
+
+            val countryCode = principal.getCountryCode()
+                ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Country code not found in token")
+                )
 
             val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
             val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
@@ -57,7 +65,7 @@ fun Route.clientTypesRoutes(clientTypesRepository: ClientTypesRepository) {
                 )
             }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+            val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
             val (types, total) = clientTypesRepository.listClientTypes(
                 database = companyDb,
                 limit = limit,

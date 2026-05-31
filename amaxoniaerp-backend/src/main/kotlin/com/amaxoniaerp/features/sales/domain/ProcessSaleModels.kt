@@ -149,4 +149,9 @@ data class ProcessSaleResponse(
     val idFactura: String,
     val codFactura: String,
     val codEstatus: Int,
+    // Campos de Facturación Electrónica (solo PA, null para VE)
+    val cufe: String? = null,
+    val qr: String? = null,
+    val fechaRecepcionDGI: String? = null,
+    val feError: String? = null,
 )

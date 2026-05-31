@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 
 class CompanyRepository(private val database: Database) {
-    suspend fun loadCompanies(companyCodes: List<Int>): List<CompanyResponse> {
+    suspend fun loadCompanies(companyCodes: List<Int>, countryCode: String): List<CompanyResponse> {
         if (companyCodes.isEmpty()) return emptyList()
 
         val companies = dbQuery(database) {
@@ -27,7 +27,7 @@ class CompanyRepository(private val database: Database) {
         }
 
         return companies.map { company ->
-            val rif = loadCompanyRifByAdminDb(company.adminDb)
+            val rif = loadCompanyRifByAdminDb(company.adminDb, countryCode)
             CompanyResponse(
                 id = company.id,
                 name = company.name,
@@ -52,15 +52,16 @@ class CompanyRepository(private val database: Database) {
             .singleOrNull()
     }
 
-    suspend fun loadCompanyRifByAdminDb(adminDb: String?): String? {
+    suspend fun loadCompanyRifByAdminDb(adminDb: String?, countryCode: String): String? {
         if (adminDb.isNullOrBlank()) return null
 
         return runCatching {
-            val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+            val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+            val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
             dbQuery(companyDb) {
-                ParametrosGeneralesTable.selectAll()
+                parametrosTable.selectAll()
                     .limit(1)
-                    .map { it[ParametrosGeneralesTable.rif] }
+                    .map { it[parametrosTable.rif] }
                     .singleOrNull()
             }
         }.getOrNull()

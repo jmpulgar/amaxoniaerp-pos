@@ -19,17 +19,20 @@ import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CurrencyConfig
 import com.amaxoniaerp.features.caja.domain.SellerSummary
-import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTable
-import com.amaxoniaerp.features.companies.data.TasasCambioTable
-import com.amaxoniaerp.features.facturas.data.EstatusTable
-import com.amaxoniaerp.features.pos.data.CajaFormaTable
-import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
+import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
+import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableVE
+import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
+import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.sales.data.CajaIngresoEgreso
 import com.amaxoniaerp.features.sales.data.CajaStatus
-import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTable
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleFormaPagoTable
-import com.amaxoniaerp.features.sales.data.SalesCajaNuevaTable
-import com.amaxoniaerp.features.sales.data.SalesFacturaTable
+import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableFactory
+import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableVE
+import com.amaxoniaerp.features.sales.data.SalesCajaNuevaTableFactory
+import com.amaxoniaerp.features.sales.data.SalesFacturaTableFactory
+import com.amaxoniaerp.features.pos.data.CajaFormaTable
+import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
+import com.amaxoniaerp.features.facturas.data.EstatusTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.slf4j.LoggerFactory
@@ -232,7 +235,14 @@ class CajaRepository {
                 val idVendedor = secuenciaRow[CajaSecuenciaTable.idVendedor]
 
                 val cajaRow = CajaTable
-                    .selectAll()
+                    .select(
+                        CajaTable.idCaja,
+                        CajaTable.codCaja,
+                        CajaTable.descripcion,
+                        CajaTable.caja,
+                        CajaTable.fondoApertura,
+                        CajaTable.impresoraModelo,
+                    )
                     .where { CajaTable.idCaja eq idCaja }
                     .limit(1)
                     .firstOrNull()
@@ -262,15 +272,17 @@ class CajaRepository {
                         )
                     }
 
-                val montosPorForma = SalesCajaNuevaDetalleTable
-                    .join(SalesCajaNuevaTable, JoinType.INNER, SalesCajaNuevaDetalleTable.cajaId, SalesCajaNuevaTable.cajaId)
-                    .select(SalesCajaNuevaDetalleTable.idFormaPago, SalesCajaNuevaDetalleTable.monto)
+                val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(countryCode)
+                val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
+                val montosPorForma = cajaNuevaDetalleTable
+                    .join(cajaNuevaTable, JoinType.INNER, cajaNuevaDetalleTable.cajaId, cajaNuevaTable.cajaId)
+                    .select(cajaNuevaDetalleTable.idFormaPago, cajaNuevaDetalleTable.monto)
                     .where {
-                        (SalesCajaNuevaTable.idCajaSecuencia eq idSecuencia) and
-                            (SalesCajaNuevaTable.status neq CajaStatus.Anulada)
+                        (cajaNuevaTable.idCajaSecuencia eq idSecuencia) and
+                            (cajaNuevaTable.status neq CajaStatus.Anulada)
                     }
-                    .groupBy { it[SalesCajaNuevaDetalleTable.idFormaPago] }
-                    .mapValues { (_, rows) -> rows.sumOf { it[SalesCajaNuevaDetalleTable.monto]?.toDouble() ?: 0.0 } }
+                    .groupBy { it[cajaNuevaDetalleTable.idFormaPago] }
+                    .mapValues { (_, rows) -> rows.sumOf { it[cajaNuevaDetalleTable.monto]?.toDouble() ?: 0.0 } }
 
                 val formasActivas = CajaFormaTable
                     .leftJoin(CajaFormaPagoTable, { idFormaPago }, { CajaFormaPagoTable.idFormaPago })
@@ -406,19 +418,20 @@ class CajaRepository {
                     .filter { it.id > 0 && !isCashSigla(it.siglas) }
                     .sumOf { it.monto }
 
-                val totalAnulado = SalesFacturaTable
-                    .select(SalesFacturaTable.totalTotalFactura)
+                val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
+                val totalAnulado = facturaTable
+                    .select(facturaTable.totalTotalFactura)
                     .where {
-                        (SalesFacturaTable.idCajaSecuencia eq idSecuencia) and
-                            (SalesFacturaTable.codEstatus eq 3)
+                        (facturaTable.idCajaSecuencia eq idSecuencia) and
+                            (facturaTable.codEstatus eq 3)
                     }
-                    .sumOf { it[SalesFacturaTable.totalTotalFactura].toDouble() }
+                    .sumOf { it[facturaTable.totalTotalFactura].toDouble() }
 
-                val facturasValidas = SalesFacturaTable
-                    .select(SalesFacturaTable.totalTotalFactura, SalesFacturaTable.codEstatus)
-                    .where { SalesFacturaTable.idCajaSecuencia eq idSecuencia }
-                    .filter { row -> (row[SalesFacturaTable.codEstatus] ?: 0) != 3 }
-                val totalVentas = facturasValidas.sumOf { it[SalesFacturaTable.totalTotalFactura].toDouble() }
+                val facturasValidas = facturaTable
+                    .select(facturaTable.totalTotalFactura, facturaTable.codEstatus)
+                    .where { facturaTable.idCajaSecuencia eq idSecuencia }
+                    .filter { row -> (row[facturaTable.codEstatus] ?: 0) != 3 }
+                val totalVentas = facturasValidas.sumOf { it[facturaTable.totalTotalFactura].toDouble() }
                 val cantidadTransacciones = facturasValidas.size
 
                 val montoEfectivoTotalCalc =
@@ -435,13 +448,13 @@ class CajaRepository {
                         totalAnulado
 
                 val verificarTemporales = if (verifyFacturasTemporales) {
-                    SalesFacturaTable
-                        .select(SalesFacturaTable.formaPago)
+                    facturaTable
+                        .select(facturaTable.formaPago)
                         .where {
-                            (SalesFacturaTable.idCajaSecuencia eq idSecuencia) and
-                                (SalesFacturaTable.codEstatus eq 1)
+                            (facturaTable.idCajaSecuencia eq idSecuencia) and
+                                (facturaTable.codEstatus eq 1)
                         }
-                        .count { row -> !row[SalesFacturaTable.formaPago].equals("credito", ignoreCase = true) }
+                        .count { row -> !row[facturaTable.formaPago].equals("credito", ignoreCase = true) }
                 } else {
                     0
                 }
@@ -527,13 +540,14 @@ class CajaRepository {
                 }
 
                 if (validateFacturasTemporales) {
-                    val temporales = SalesFacturaTable
-                        .select(SalesFacturaTable.formaPago)
+                    val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
+                    val temporales = facturaTable
+                        .select(facturaTable.formaPago)
                         .where {
-                            (SalesFacturaTable.idCajaSecuencia eq request.id) and
-                                (SalesFacturaTable.codEstatus eq 1)
+                            (facturaTable.idCajaSecuencia eq request.id) and
+                                (facturaTable.codEstatus eq 1)
                         }
-                        .count { row -> !row[SalesFacturaTable.formaPago].equals("credito", ignoreCase = true) }
+                        .count { row -> !row[facturaTable.formaPago].equals("credito", ignoreCase = true) }
 
                     if (temporales > 0) {
                         throw IllegalStateException("Existen facturas temporales pendientes por procesar")
@@ -606,14 +620,15 @@ class CajaRepository {
                 ?.get(VendedorTable.nombre)
                 ?.takeIf { it.isNotBlank() }
 
-            val facturaRows = SalesFacturaTable
+            val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
+            val facturaRows = facturaTable
                 .leftJoin(EstatusTable, { codEstatus }, { EstatusTable.codEstatus })
                 .select(
-                    SalesFacturaTable.idFactura,
-                    SalesFacturaTable.totalTotalFactura,
+                    facturaTable.idFactura,
+                    facturaTable.totalTotalFactura,
                     EstatusTable.descripcion,
                 )
-                .where { SalesFacturaTable.idCajaSecuencia eq secuencia.idCajaSecuencia }
+                .where { facturaTable.idCajaSecuencia eq secuencia.idCajaSecuencia }
                 .toList()
 
             var totalSales = 0.0
@@ -621,28 +636,29 @@ class CajaRepository {
             facturaRows.forEach { row ->
                 val statusDesc = row[EstatusTable.descripcion]
                 if (!isCancelledStatus(statusDesc)) {
-                    totalSales += row[SalesFacturaTable.totalTotalFactura].toDouble()
+                    totalSales += row[facturaTable.totalTotalFactura].toDouble()
                     transactionCount += 1
                 }
             }
 
-            val movimientos = SalesCajaNuevaTable
+            val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
+            val movimientos = cajaNuevaTable
                 .select(
-                    SalesCajaNuevaTable.ingEg,
-                    SalesCajaNuevaTable.monto,
-                    SalesCajaNuevaTable.status,
+                    cajaNuevaTable.ingEg,
+                    cajaNuevaTable.monto,
+                    cajaNuevaTable.status,
                 )
-                .where { SalesCajaNuevaTable.idCajaSecuencia eq secuencia.idCajaSecuencia }
+                .where { cajaNuevaTable.idCajaSecuencia eq secuencia.idCajaSecuencia }
                 .toList()
 
             var totalIncome = 0.0
             var totalExpense = 0.0
             var totalCancelled = 0.0
             movimientos.forEach { row ->
-                val amount = row[SalesCajaNuevaTable.monto]?.toDouble() ?: 0.0
-                when (row[SalesCajaNuevaTable.status]) {
+                val amount = row[cajaNuevaTable.monto]?.toDouble() ?: 0.0
+                when (row[cajaNuevaTable.status]) {
                     CajaStatus.Anulada -> totalCancelled += amount
-                    else -> when (row[SalesCajaNuevaTable.ingEg]) {
+                    else -> when (row[cajaNuevaTable.ingEg]) {
                         CajaIngresoEgreso.I -> totalIncome += amount
                         CajaIngresoEgreso.E -> totalExpense += amount
                         null -> Unit
@@ -663,10 +679,10 @@ class CajaRepository {
 
             val formaRows = SalesCajaNuevaDetalleFormaPagoTable
                 .join(
-                    SalesCajaNuevaTable,
+                    cajaNuevaTable,
                     JoinType.INNER,
                     onColumn = SalesCajaNuevaDetalleFormaPagoTable.cajaId,
-                    otherColumn = SalesCajaNuevaTable.cajaId,
+                    otherColumn = cajaNuevaTable.cajaId,
                 )
                 .select(
                     SalesCajaNuevaDetalleFormaPagoTable.idFormaPago,
@@ -674,8 +690,8 @@ class CajaRepository {
                     SalesCajaNuevaDetalleFormaPagoTable.monto,
                 )
                 .where {
-                    (SalesCajaNuevaTable.idCajaSecuencia eq secuencia.idCajaSecuencia) and
-                        (SalesCajaNuevaTable.status neq CajaStatus.Anulada)
+                    (cajaNuevaTable.idCajaSecuencia eq secuencia.idCajaSecuencia) and
+                        (cajaNuevaTable.status neq CajaStatus.Anulada)
                 }
                 .toList()
 
@@ -757,75 +773,90 @@ class CajaRepository {
     suspend fun getCajas(countryCode: String, dbName: String, userId: Int): List<Caja> {
         val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return dbQuery(database) {
-            val parametrosRow = ParametrosGeneralesTable
+            val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
+            val parametrosRow = parametrosTable
                 .select(
-                    ParametrosGeneralesTable.codAlmacen,
-                    ParametrosGeneralesTable.multiMoneda,
-                    ParametrosGeneralesTable.monedaBase,
-                    ParametrosGeneralesTable.abrMonedaBase,
-                    ParametrosGeneralesTable.monedaSecundaria,
-                    ParametrosGeneralesTable.abrMonedaSecundaria,
-                    ParametrosGeneralesTable.porcentajeImpuestoPrincipal,
-                    ParametrosGeneralesTable.defaultIdFormaPagoFactura,
+                    parametrosTable.codAlmacen,
+                    parametrosTable.monedaBase,
+                    parametrosTable.abrMonedaBase,
+                    parametrosTable.porcentajeImpuestoPrincipal,
+                    parametrosTable.defaultIdFormaPagoFactura,
                 )
-                .orderBy(ParametrosGeneralesTable.codEmpresa)
+                .orderBy(parametrosTable.codEmpresa)
                 .limit(1)
                 .firstOrNull()
 
             val globalDefaultWarehouse = parametrosRow
-                ?.get(ParametrosGeneralesTable.codAlmacen)
+                ?.get(parametrosTable.codAlmacen)
                 ?.let { kotlin.math.abs(it) }
                 ?.takeIf { it > 0 }
 
             val defaultTaxRate = parametrosRow
-                ?.get(ParametrosGeneralesTable.porcentajeImpuestoPrincipal)
+                ?.get(parametrosTable.porcentajeImpuestoPrincipal)
                 ?.toDouble()
                 ?: 0.0
 
             val defaultFormaPagoId = parametrosRow
-                ?.get(ParametrosGeneralesTable.defaultIdFormaPagoFactura)
+                ?.get(parametrosTable.defaultIdFormaPagoFactura)
 
-            val multiMonedaFromParams = parametrosRow
-                ?.get(ParametrosGeneralesTable.multiMoneda)
-                ?.equals("Si", ignoreCase = true)
-                ?: false
+            val multiMonedaFromParams = (parametrosTable is ParametrosGeneralesTableVE) &&
+                (parametrosRow
+                    ?.get((parametrosTable as ParametrosGeneralesTableVE).multiMoneda)
+                    ?.equals("Si", ignoreCase = true)
+                    ?: false)
 
             val monedaBase = parametrosRow
-                ?.get(ParametrosGeneralesTable.monedaBase)
+                ?.get(parametrosTable.monedaBase)
                 ?: 1
 
             val abrMonedaBase = parametrosRow
-                ?.get(ParametrosGeneralesTable.abrMonedaBase)
+                ?.get(parametrosTable.abrMonedaBase)
                 ?.takeIf { it.isNotBlank() }
                 ?: "USD"
 
-            val monedaSecundaria = parametrosRow
-                ?.get(ParametrosGeneralesTable.monedaSecundaria)
-                ?: monedaBase
+            val monedaSecundaria = if (parametrosTable is ParametrosGeneralesTableVE) {
+                parametrosRow?.get(parametrosTable.monedaSecundaria) ?: monedaBase
+            } else {
+                monedaBase
+            }
 
-            val abrMonedaSecundaria = parametrosRow
-                ?.get(ParametrosGeneralesTable.abrMonedaSecundaria)
-                ?.takeIf { it.isNotBlank() }
-                ?: abrMonedaBase
+            val abrMonedaSecundaria = if (parametrosTable is ParametrosGeneralesTableVE) {
+                parametrosRow?.get(parametrosTable.abrMonedaSecundaria)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: abrMonedaBase
+            } else {
+                abrMonedaBase
+            }
 
             val tasaActual = if (multiMonedaFromParams) {
-                TasasCambioTable
-                    .select(TasasCambioTable.id, TasasCambioTable.tasaInversa)
-                    .where {
-                        (TasasCambioTable.divisa eq monedaSecundaria) and
-                            (TasasCambioTable.monedabase eq monedaBase)
-                    }
-                    .orderBy(TasasCambioTable.id to SortOrder.DESC)
-                    .limit(1)
-                    .firstOrNull()
+                val tasasTable = TasasCambioTableFactory.forCountry(countryCode)
+                if (tasasTable is TasasCambioTableVE) {
+                    tasasTable
+                        .select(tasasTable.id, tasasTable.tasaInversa)
+                        .where {
+                            (tasasTable.divisa eq monedaSecundaria) and
+                                (tasasTable.monedabase eq monedaBase)
+                        }
+                        .orderBy(tasasTable.id to SortOrder.DESC)
+                        .limit(1)
+                        .firstOrNull()
+                } else {
+                    null
+                }
             } else {
                 null
             }
 
             val currencyConfig = CurrencyConfig(
                 multiMoneda = if (multiMonedaFromParams) "SI" else "NO",
-                tasa = tasaActual?.get(TasasCambioTable.tasaInversa)?.toDouble() ?: 1.0,
-                idTasa = tasaActual?.get(TasasCambioTable.id)?.toInt() ?: 0,
+                tasa = tasaActual?.let {
+                    val tasasTable = TasasCambioTableFactory.forCountry(countryCode) as TasasCambioTableVE
+                    it[tasasTable.tasaInversa]?.toDouble() ?: 1.0
+                } ?: 1.0,
+                idTasa = tasaActual?.let {
+                    val tasasTable = TasasCambioTableFactory.forCountry(countryCode) as TasasCambioTableVE
+                    it[tasasTable.id]?.toInt() ?: 0
+                } ?: 0,
                 monedaBase = monedaBase,
                 abrMonedaBase = abrMonedaBase,
                 monedaSecundaria = monedaSecundaria,
@@ -865,20 +896,25 @@ class CajaRepository {
 
             val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
 
+            val isVE = countryCode.equals("VE", ignoreCase = true)
+
+            val cajaColumns = CajaTable.columns
+                .filter { isVE || it != CajaTable.codAlmacen }
+
             CajaTable
                 .leftJoin(
                     otherTable = SucursalTable,
                     onColumn = { CajaTable.idSucursal },
                     otherColumn = { SucursalTable.idSucursal }
                 )
-                .selectAll()
+                .select(cajaColumns + SucursalTable.columns)
                 .map { row ->
                     val nombreSucursal = row[SucursalTable.sucursal]?.takeIf { it.isNotBlank() }
                         ?: row[SucursalTable.descripcion]?.takeIf { it.isNotBlank() }
 
                     val idCaja = row[CajaTable.idCaja]
                     val idSucursal = row[CajaTable.idSucursal]
-                    val cajaWarehouse = row[CajaTable.codAlmacen]?.takeIf { it > 0 }
+                    val cajaWarehouse = row.getOrNull(CajaTable.codAlmacen)?.takeIf { it > 0 }
                     val resolvedDefaultWarehouse = cajaWarehouse
                         ?: idSucursal?.let { defaultBySucursal[it] }
                         ?: globalDefaultWarehouse
@@ -899,7 +935,7 @@ class CajaRepository {
                         descripcion = row[CajaTable.descripcion],
                         estatus = row[CajaTable.codEstatus],
                         idSucursal = idSucursal,
-                        codAlmacen = row[CajaTable.codAlmacen],
+                        codAlmacen = row.getOrNull(CajaTable.codAlmacen),
                         defaultWarehouseId = resolvedDefaultWarehouse,
                         defaultSellerId = defaultSeller?.id,
                         defaultSellerName = defaultSeller?.nombre,

@@ -199,7 +199,7 @@ class TheFactoryPrinterImpl(
             }
         } else {
             // Fallback for legacy transactions that do not have item details.
-            val fallbackAmount = (transaction.fiscalAmountBs ?: transaction.amount).coerceAtLeast(0.01)
+            val fallbackAmount = (transaction.fiscalAmount ?: transaction.amount).coerceAtLeast(0.01)
             val priceField = formatPrinterPrice(fallbackAmount)
             val quantityField = formatPrinterQty(1.0)
             lines += " $priceField$quantityField$description"

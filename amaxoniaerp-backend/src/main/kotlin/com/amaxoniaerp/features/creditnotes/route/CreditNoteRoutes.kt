@@ -26,7 +26,8 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
         route("/api/pos/notas-credito") {
             get {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
-                val (database, _) = resolved
+                val (database, principal) = resolved
+                val countryCode = principal.getCountryCode()!!
                 try {
                     val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
                     val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
@@ -44,6 +45,7 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                     call.respond(
                         creditNoteService.list(
                             database = database,
+                            countryCode = countryCode,
                             limit = limit,
                             offset = offset,
                             search = search,
@@ -136,7 +138,8 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 
             post("/{id}/confirmacion-fiscal") {
                 val resolved = resolveCompanyDatabase(call) ?: return@post
-                val (database, _) = resolved
+                val (database, principal) = resolved
+                val countryCode = principal.getCountryCode()!!
                 val id = call.parameters["id"]
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest,
@@ -145,7 +148,7 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val request = call.receive<ConfirmCreditNoteFiscalRequest>()
 
                 try {
-                    val response = creditNoteService.confirmFiscal(database, id, request)
+                    val response = creditNoteService.confirmFiscal(database, countryCode, id, request)
                     call.respond(response)
                 } catch (e: CreditNoteValidationException) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))

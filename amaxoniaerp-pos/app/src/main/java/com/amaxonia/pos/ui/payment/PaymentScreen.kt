@@ -31,7 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
+import kotlinx.coroutines.delay
 
 private const val SECONDARY_CURRENCY_LABEL = "Bs."
 
@@ -64,6 +67,8 @@ fun PaymentScreen(
             cartRepository = DependencyContainer.cartRepository,
             salesRepository = DependencyContainer.salesRepository,
             localStore = DependencyContainer.localStore,
+            networkMonitor = DependencyContainer.networkMonitor,
+            pendingInvoiceDao = DependencyContainer.pendingInvoiceDao,
             printerFactory = DependencyContainer.printerFactory,
             rapidPayClient = DependencyContainer.theFactoryRapidPayClient
         )
@@ -77,6 +82,20 @@ fun PaymentScreen(
 
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var processingSeconds by remember { mutableStateOf(0) }
+
+    LaunchedEffect(state.isProcessingPayment) {
+        if (!state.isProcessingPayment) {
+            processingSeconds = 0
+            return@LaunchedEffect
+        }
+
+        processingSeconds = 0
+        while (true) {
+            delay(1_000)
+            processingSeconds += 1
+        }
+    }
 
     // Collect gateway intent events and launch the HKA POS app
     LaunchedEffect(Unit) {
@@ -199,14 +218,10 @@ fun PaymentScreen(
         }
 
         if (state.isProcessingPayment) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
-            }
+            ProcessingPaymentOverlay(
+                elapsedSeconds = processingSeconds,
+                statusMessage = state.gatewayStatusMessage
+            )
         }
 
         val paymentError = state.paymentError
@@ -221,6 +236,130 @@ fun PaymentScreen(
                 title = { Text("Error al cobrar") },
                 text = { Text(paymentError) }
             )
+        }
+    }
+}
+
+@Composable
+private fun ProcessingPaymentOverlay(
+    elapsedSeconds: Int,
+    statusMessage: String?
+) {
+    val estimatedSeconds = 30
+    val progress = (elapsedSeconds / estimatedSeconds.toFloat()).coerceIn(0.08f, 0.94f)
+    val secondsLeft = (estimatedSeconds - elapsedSeconds).coerceAtLeast(3)
+    val stageTitle = when {
+        elapsedSeconds < 4 -> "Preparando la factura"
+        elapsedSeconds < 10 -> "Conectando con facturación electrónica"
+        elapsedSeconds < 24 -> "Esperando autorización de la DGI"
+        else -> "Últimos segundos de validación"
+    }
+    val stageSubtitle = statusMessage?.takeIf { it.isNotBlank() } ?: when {
+        elapsedSeconds < 4 -> "Validando pago, caja e inventario..."
+        elapsedSeconds < 10 -> "Enviando el documento al proveedor fiscal..."
+        elapsedSeconds < 24 -> "TheFactory está procesando el CUFE y el QR..."
+        else -> "La respuesta está tardando un poco más de lo normal, seguimos esperando."
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.36f))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(74.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(54.dp),
+                        strokeWidth = 5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                    )
+                    Text(
+                        text = "${elapsedSeconds}s",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = "Procesando cobro",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stageTitle,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                Text(
+                    text = stageSubtitle,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = if (elapsedSeconds < estimatedSeconds) {
+                        "Tiempo estimado restante: ${secondsLeft}s"
+                    } else {
+                        "Está tomando más de lo habitual, no cierres la pantalla."
+                    },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        text = "La venta se está registrando. Evita tocar atrás o cerrar la app.",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
@@ -370,6 +509,7 @@ fun CashPaymentContent(
                         onClick = {
                             viewModel.processPayment()
                         },
+                        enabled = !state.isProcessingPayment,
                         modifier = Modifier
                             .weight(3f)
                             .fillMaxWidth()
@@ -379,12 +519,20 @@ fun CashPaymentContent(
                             containerColor = if (state.showInsufficientReminder && !state.isPaymentEnough) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Cobrar",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size((34 * warningScale).dp)
-                        )
+                        if (state.isProcessingPayment) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Cobrar",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size((34 * warningScale).dp)
+                            )
+                        }
                     }
                 }
             }
@@ -482,7 +630,7 @@ fun NonCashPaymentContent(
 
         Button(
             onClick = { viewModel.processPayment() },
-            enabled = true,
+            enabled = !state.isProcessingPayment,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -491,7 +639,17 @@ fun NonCashPaymentContent(
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Text("COBRAR", fontWeight = FontWeight.Bold)
+            if (state.isProcessingPayment) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("PROCESANDO...", fontWeight = FontWeight.Bold)
+            } else {
+                Text("COBRAR", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

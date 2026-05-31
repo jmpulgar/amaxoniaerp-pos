@@ -189,7 +189,9 @@ fun ProductItem(
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = product.description,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        onError = { android.util.Log.e("IMG_LIST", "FAIL url=$imageUrl err=${it.result.throwable?.message}") },
+                        onSuccess = { android.util.Log.d("IMG_LIST", "OK url=$imageUrl") }
                     )
                 } else {
                     Icon(Icons.Default.Inventory2, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

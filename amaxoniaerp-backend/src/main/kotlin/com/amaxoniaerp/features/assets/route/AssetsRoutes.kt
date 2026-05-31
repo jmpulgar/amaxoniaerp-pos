@@ -17,7 +17,7 @@ import java.io.File
  * Si DATA_BASE_PATH está configurado y el archivo existe, se sirve desde disco.
  */
 fun Route.assetsRoutes(
-    assetsBaseUrl: String?,
+    assetsBaseUrls: Map<String, String>,
     dataBasePath: String?
 ) {
     val log = LoggerFactory.getLogger("AssetsRoutes")
@@ -49,10 +49,12 @@ fun Route.assetsRoutes(
                 }
             }
 
-            val base = assetsBaseUrl?.trimEnd('/') ?: return@get call.respond(
-                HttpStatusCode.NotImplemented,
-                "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes"
-            )
+            val base = assetsBaseUrls[countryCode]
+                ?: assetsBaseUrls.entries.firstOrNull()?.value
+                ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes"
+                )
             val redirectUrl = "$base/$companyDb/item/$filename"
             call.respondRedirect(redirectUrl, permanent = false)
         }
@@ -80,10 +82,12 @@ fun Route.assetsRoutes(
                 }
             }
 
-            val base = assetsBaseUrl?.trimEnd('/') ?: return@get call.respond(
-                HttpStatusCode.NotImplemented,
-                "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes"
-            )
+            val base = assetsBaseUrls[countryCode]
+                ?: assetsBaseUrls.entries.firstOrNull()?.value
+                ?: return@get call.respond(
+                    HttpStatusCode.NotImplemented,
+                    "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes"
+                )
             val redirectUrl = "$base/$companyDb/cliente_foto/$idCliente/$filename"
             log.info("[CLIENTE_FOTO] redirect idCliente=$idCliente filename=$filename redirectUrl=$redirectUrl")
             call.respondRedirect(redirectUrl, permanent = false)

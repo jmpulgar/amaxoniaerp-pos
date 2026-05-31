@@ -41,6 +41,7 @@ import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
 import com.amaxonia.pos.data.remote.api.FormaPagoApiImpl
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
+import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 
 object DependencyContainer {
     private var initialized = false
@@ -86,6 +87,8 @@ object DependencyContainer {
     lateinit var creditNoteRepository: CreditNoteRepository
         private set
     lateinit var draftInvoiceDao: DraftInvoiceDao
+        private set
+    lateinit var pendingInvoiceDao: PendingInvoiceDao
         private set
 
     val printerFactory: PrinterFactory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -138,6 +141,7 @@ object DependencyContainer {
         apiTransactionRepository = _apiTransactionRepository
         clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())
         draftInvoiceDao = database.draftInvoiceDao()
+        pendingInvoiceDao = database.pendingInvoiceDao()
         catalogSyncer = CatalogSyncer(
             apiService = apiService,
             localStore = localStore,

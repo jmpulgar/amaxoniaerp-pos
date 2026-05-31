@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.geography.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.features.auth.route.getAdminDb
+import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.geography.domain.AddressLevelsListResponse
 import com.amaxoniaerp.features.geography.domain.CatalogListResponse
@@ -31,13 +33,19 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
                 )
             }
 
-            val adminDb = principal.payload.getClaim("admin_db").asString()
+            val adminDb = principal.getAdminDb()
             if (adminDb.isNullOrBlank()) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf("error" to "Company database not found in token")
                 )
             }
+
+            val countryCode = principal.getCountryCode()
+                ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Country code not found in token")
+                )
 
             val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
             val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
@@ -59,7 +67,7 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
                 )
             }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+            val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
             val (countries, total) = geographyRepository.listCatalog(
                 database = companyDb,
                 tableName = "paises",
@@ -86,13 +94,19 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
                     )
                 }
 
-                val adminDb = principal.payload.getClaim("admin_db").asString()
+                val adminDb = principal.getAdminDb()
                 if (adminDb.isNullOrBlank()) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Company database not found in token")
                     )
                 }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found in token")
+                    )
 
                 val level = call.parameters["level"]?.toIntOrNull()
                     ?: return@get call.respond(
@@ -130,7 +144,7 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
                     )
                 }
 
-                val companyDb = DatabaseManager.connectToCompanyDb(adminDb)
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val (levels, total) = geographyRepository.listAddressLevels(
                     database = companyDb,
                     tableName = tableName,

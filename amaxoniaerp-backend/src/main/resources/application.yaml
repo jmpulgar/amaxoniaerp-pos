@@ -22,4 +22,5 @@ jwt:
 # Imágenes: redirigir a este URL base si no hay archivos locales (ej. listoerp.app)
 assets:
   baseUrl: ${ASSETS_BASE_URL:https://listoerp.app/app/api/data}
+  baseUrlPA: ${ASSETS_BASE_URL_PA:https://administrativo.amaxoniaerp.com/app/api/data}
   dataBasePath: ${DATA_BASE_PATH:}

@@ -17,7 +17,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.update
 import java.time.LocalDate
@@ -27,6 +26,7 @@ import java.time.format.DateTimeFormatter
 class FacturasRepository {
     suspend fun listFacturas(
         database: Database,
+        countryCode: String,
         limit: Int,
         offset: Long,
         search: String?,
@@ -34,25 +34,26 @@ class FacturasRepository {
         fechaFin: LocalDate?,
         estatusList: List<Int>?,
     ): Pair<List<FacturaSummary>, Long> = dbQuery(database) {
-        val query = FacturasTable
-            .join(FacturasClientesTable, JoinType.LEFT, FacturasTable.idCliente, FacturasClientesTable.idCliente)
-            .join(EstatusTable, JoinType.LEFT, FacturasTable.codEstatus, EstatusTable.codEstatus)
+        val tabla = FacturasTableFactory.forCountry(countryCode)
+        val query = tabla
+            .join(FacturasClientesTable, JoinType.LEFT, tabla.idCliente, FacturasClientesTable.idCliente)
+            .join(EstatusTable, JoinType.LEFT, tabla.codEstatus, EstatusTable.codEstatus)
             .selectAll()
 
         if (fechaInicio != null && fechaFin != null) {
             val start = fechaInicio.format(DateTimeFormatter.ISO_DATE)
             val end = fechaFin.format(DateTimeFormatter.ISO_DATE)
-            query.andWhere { FacturasTable.fechaFactura.between(start, end) }
+            query.andWhere { tabla.fechaFactura.between(start, end) }
         }
 
         if (!estatusList.isNullOrEmpty()) {
-            query.andWhere { FacturasTable.codEstatus inList estatusList }
+            query.andWhere { tabla.codEstatus inList estatusList }
         }
 
         if (!search.isNullOrBlank()) {
             val term = "%$search%"
             query.andWhere {
-                (FacturasTable.codFactura like term) or
+                (tabla.codFactura like term) or
                     (FacturasClientesTable.nombre like term) or
                     (FacturasClientesTable.rif like term) or
                     (EstatusTable.descripcion like term)
@@ -60,29 +61,29 @@ class FacturasRepository {
         }
 
         val total = query.count()
-        val data = query.orderBy(FacturasTable.fechaFactura to SortOrder.DESC)
+        val data = query.orderBy(tabla.fechaFactura to SortOrder.DESC)
             .limit(limit)
             .offset(offset)
-            .map { row -> mapRowToFacturaSummary(row) }
+            .map { row -> mapRowToFacturaSummary(row, tabla, countryCode) }
 
         data to total
     }
 
     suspend fun getFacturaDetalle(
         database: Database,
+        countryCode: String,
         facturaId: String,
     ): FacturaDetalleResponse? = dbQuery(database) {
-        // Get the invoice header first
-        val factura = FacturasTable
+        val tabla = FacturasTableFactory.forCountry(countryCode)
+        val factura = tabla
             .selectAll()
-            .where { FacturasTable.idFactura eq facturaId }
+            .where { tabla.idFactura eq facturaId }
             .limit(1)
             .firstOrNull()
             ?: return@dbQuery null
 
-        val codFactura = factura[FacturasTable.codFactura]
+        val codFactura = factura[tabla.codFactura]
 
-        // Get line items
         val items = SalesFacturaDetalleTable
             .selectAll()
             .where { SalesFacturaDetalleTable.idFactura eq facturaId }
@@ -107,9 +108,11 @@ class FacturasRepository {
 
     suspend fun getResumen(
         database: Database,
+        countryCode: String,
     ): FacturasResumen = dbQuery(database) {
-        val rows = FacturasTable
-            .join(EstatusTable, JoinType.LEFT, FacturasTable.codEstatus, EstatusTable.codEstatus)
+        val tabla = FacturasTableFactory.forCountry(countryCode)
+        val rows = tabla
+            .join(EstatusTable, JoinType.LEFT, tabla.codEstatus, EstatusTable.codEstatus)
             .selectAll()
             .toList()
 
@@ -128,36 +131,48 @@ class FacturasRepository {
 
         for (row in rows) {
             val descripcionEstatus = row[EstatusTable.descripcion] ?: ""
-            val total = row[FacturasTable.totalTotalFactura].toDouble()
-            val totalGeneral = row[FacturasTable.totalizarTotalGeneral].toDouble()
-            val tasaRow = row[FacturasTable.tasa]
-            val totalRefRow = row[FacturasTable.totalRef]?.toDouble() ?: 0.0
-            val abrSecRow = row[FacturasTable.abrMonedaSecundaria]
+            val total = row[tabla.totalTotalFactura].toDouble()
+            val totalGeneral = row[tabla.totalizarTotalGeneral].toDouble()
 
             val isAnulada = descripcionEstatus.equals("Anulada", ignoreCase = true) ||
                 descripcionEstatus.equals("Anulado", ignoreCase = true)
 
-            if (isAnulada) {
-                cancelaciones += total
-                cancelacionesRef += totalRefRow
-                totalAnuladas++
-            } else {
-                ventasBrutas += totalGeneral
-                ventasNetas += total
-                ventasBrutasRef += totalRefRow
-                ventasNetasRef += totalRefRow
-                totalPagadas++
-            }
+            if (tabla is FacturasTableVE) {
+                val tasaRow = row[tabla.tasa]
+                val totalRefRow = row[tabla.totalRef]?.toDouble() ?: 0.0
+                val abrSecRow = row[tabla.abrMonedaSecundaria]
 
-            if (moneda == "USD") {
-                val m = row[FacturasTable.abrMonedaBase]?.takeIf { it.isNotBlank() }
-                if (m != null) moneda = m
-            }
-            if (abrMonedaSec.isNullOrBlank() && !abrSecRow.isNullOrBlank()) {
-                abrMonedaSec = abrSecRow
-            }
-            if (tasaGlobal == null && tasaRow != null && tasaRow > 0f) {
-                tasaGlobal = tasaRow
+                if (isAnulada) {
+                    cancelaciones += total
+                    cancelacionesRef += totalRefRow
+                    totalAnuladas++
+                } else {
+                    ventasBrutas += totalGeneral
+                    ventasNetas += total
+                    ventasBrutasRef += totalRefRow
+                    ventasNetasRef += totalRefRow
+                    totalPagadas++
+                }
+
+                if (moneda == "USD") {
+                    val m = row[tabla.abrMonedaBase]?.takeIf { it.isNotBlank() }
+                    if (m != null) moneda = m
+                }
+                if (abrMonedaSec.isNullOrBlank() && !abrSecRow.isNullOrBlank()) {
+                    abrMonedaSec = abrSecRow
+                }
+                if (tasaGlobal == null && tasaRow != null && tasaRow > 0f) {
+                    tasaGlobal = tasaRow
+                }
+            } else {
+                if (isAnulada) {
+                    cancelaciones += total
+                    totalAnuladas++
+                } else {
+                    ventasBrutas += totalGeneral
+                    ventasNetas += total
+                    totalPagadas++
+                }
             }
         }
 
@@ -185,12 +200,14 @@ class FacturasRepository {
 
     suspend fun confirmFiscal(
         database: Database,
+        countryCode: String,
         facturaId: String,
         request: ConfirmFacturaFiscalRequest,
     ): ConfirmFacturaFiscalResponse = dbQuery(database) {
-        val factura = FacturasTable
+        val tabla = FacturasTableFactory.forCountry(countryCode)
+        val factura = tabla
             .selectAll()
-            .where { FacturasTable.idFactura eq facturaId }
+            .where { tabla.idFactura eq facturaId }
             .limit(1)
             .firstOrNull()
             ?: throw NoSuchElementException("Factura no encontrada")
@@ -199,28 +216,30 @@ class FacturasRepository {
         val normalizedCodFiscal = request.codFacturaFiscal.trim()
         val normalizedSerial = request.impresoraSerial.trim()
 
-        FacturasTable.update({ FacturasTable.idFactura eq facturaId }) {
+        tabla.update({ tabla.idFactura eq facturaId }) {
             if (normalizedNumero.isNotBlank()) it[numeroDocumentoFiscal] = normalizedNumero
             if (normalizedCodFiscal.isNotBlank()) it[codFacturaFiscal] = normalizedCodFiscal
-            if (normalizedSerial.isNotBlank()) it[impresoraSerial] = normalizedSerial
+            if (tabla is FacturasTableVE && normalizedSerial.isNotBlank()) {
+                it[tabla.impresoraSerial] = normalizedSerial
+            }
         }
 
         ConfirmFacturaFiscalResponse(
             success = true,
             id = facturaId,
-            codigo = factura[FacturasTable.codFactura],
+            codigo = factura[tabla.codFactura],
             numeroDocumentoFiscal = normalizedNumero,
             codFacturaFiscal = normalizedCodFiscal,
             impresoraSerial = normalizedSerial,
         )
     }
 
-    private fun mapRowToFacturaSummary(row: ResultRow): FacturaSummary {
+    private fun mapRowToFacturaSummary(row: ResultRow, tabla: BaseFacturasTable, countryCode: String): FacturaSummary {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
 
-        val codEstatus = row[FacturasTable.codEstatus] ?: 0
-        val formaPago = row[FacturasTable.formaPago]
+        val codEstatus = row[tabla.codEstatus] ?: 0
+        val formaPago = row[tabla.formaPago]
         val descripcionEstatus = row[EstatusTable.descripcion]
 
         val estatusFinal = if (codEstatus == 1 && formaPago.equals("contado", ignoreCase = true)) {
@@ -229,33 +248,56 @@ class FacturasRepository {
             descripcionEstatus
         }
 
-        val cufe = row[FacturasTable.cufe]
-        val codFiscal = row[FacturasTable.codFacturaFiscal]
-        val codigoFiscalFinal = if (cufe.isNullOrBlank()) codFiscal else cufe
+        val codigoFiscalFinal = if (tabla is FacturasTablePA) {
+            val cufe = row[tabla.cufe]
+            val codFiscal = row[tabla.codFacturaFiscal]
+            if (cufe.isNullOrBlank()) codFiscal else cufe
+        } else {
+            row[tabla.codFacturaFiscal]
+        }
 
         val nombre = row[FacturasClientesTable.nombre]
         val apellido = row[FacturasClientesTable.apellido] ?: ""
         val nombreCompleto = "$nombre $apellido".trim().uppercase()
 
-        val moneda = row[FacturasTable.abrMonedaBase]?.takeIf { it.isNotBlank() } ?: "USD"
+        val moneda: String
+        val totalRef: Double?
+        val tasa: Float?
+        val abrMonedaSecundaria: String?
+        val fechaDgi: String?
+
+        if (tabla is FacturasTableVE) {
+            moneda = row[tabla.abrMonedaBase]?.takeIf { it.isNotBlank() } ?: "USD"
+            totalRef = row[tabla.totalRef]?.toDouble()
+            tasa = row[tabla.tasa]
+            abrMonedaSecundaria = row[tabla.abrMonedaSecundaria]
+            fechaDgi = null
+        } else {
+            val tablaPA = tabla as FacturasTablePA
+            moneda = "USD"
+            totalRef = null
+            tasa = null
+            abrMonedaSecundaria = null
+            fechaDgi = formatDateTime(row[tablaPA.fechaRecepcionDGI], dateTimeFormatter)
+        }
 
         return FacturaSummary(
-            id = row[FacturasTable.idFactura],
-            codigo = row[FacturasTable.codFactura],
+            id = row[tabla.idFactura],
+            codigo = row[tabla.codFactura],
             codigoFiscal = codigoFiscalFinal ?: "",
-            numeroDocumentoFiscal = row[FacturasTable.numeroDocumentoFiscal] ?: "",
-            fecha = formatDate(row[FacturasTable.fechaFactura], dateFormatter),
-            fechaCreacion = formatDateTime(row[FacturasTable.fechaCreacion], dateTimeFormatter),
-            fechaDgi = formatDateTime(row[FacturasTable.fechaRecepcionDGI], dateTimeFormatter),
+            numeroDocumentoFiscal = row[tabla.numeroDocumentoFiscal] ?: "",
+            fecha = formatDate(row[tabla.fechaFactura], dateFormatter),
+            fechaCreacion = formatDateTime(row[tabla.fechaCreacion], dateTimeFormatter),
+            fechaDgi = fechaDgi,
             clienteNombre = nombreCompleto,
             clienteIdentificacion = row[FacturasClientesTable.rif].uppercase(),
-            total = row[FacturasTable.totalTotalFactura].toDouble(),
+            total = row[tabla.totalTotalFactura].toDouble(),
             estatus = estatusFinal,
             formaPago = formaPago,
             moneda = moneda,
-            totalRef = row[FacturasTable.totalRef]?.toDouble(),
-            tasa = row[FacturasTable.tasa],
-            abrMonedaSecundaria = row[FacturasTable.abrMonedaSecundaria],
+            totalRef = totalRef,
+            tasa = tasa,
+            abrMonedaSecundaria = abrMonedaSecundaria,
         )
     }
 

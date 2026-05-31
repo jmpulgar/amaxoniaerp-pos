@@ -15,6 +15,12 @@ interface ProductRepository {
     suspend fun getLines(brandId: Int): Result<List<Department>>
     suspend fun getAllProducts(): Result<List<Product>>
     suspend fun getAllProducts(departmentId: Int?): Result<List<Product>>
+    suspend fun getAllProducts(departmentId: Int?, page: Int, pageSize: Int): Result<List<Product>> {
+        return getAllProducts(departmentId).map { products ->
+            val startIndex = ((page - 1).coerceAtLeast(0)) * pageSize
+            if (startIndex >= products.size) emptyList() else products.drop(startIndex).take(pageSize)
+        }
+    }
     suspend fun getAllProducts(page: Int, pageSize: Int): Result<List<Product>> {
         return getAllProducts().map { products ->
             val startIndex = ((page - 1).coerceAtLeast(0)) * pageSize
@@ -29,6 +35,9 @@ interface ProductRepository {
             val startIndex = ((page - 1).coerceAtLeast(0)) * pageSize
             if (startIndex >= products.size) emptyList() else products.drop(startIndex).take(pageSize)
         }
+    }
+    suspend fun searchProducts(query: String, departmentId: Int?, page: Int, pageSize: Int): Result<List<Product>> {
+        return searchProducts(query, page, pageSize)
     }
     suspend fun saveProduct(product: Product): Result<Unit>
     suspend fun deleteProduct(id: String): Result<Unit>

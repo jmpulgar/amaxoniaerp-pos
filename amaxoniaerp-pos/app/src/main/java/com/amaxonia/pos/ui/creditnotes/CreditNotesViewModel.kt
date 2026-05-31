@@ -342,6 +342,7 @@ class CreditNotesViewModel(
     }
 
     private suspend fun shouldProcessFiscal(): Boolean {
+        if (localStore.readSelectedCountry()?.code != "VE") return false
         val printerType = localStore.readSelectedPrinterType()
         return printerType == PrinterType.THE_FACTORY_HKA
     }

@@ -4,15 +4,20 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.db.PendingInvoiceDao
+import com.amaxonia.pos.data.local.db.PendingInvoiceEntity
 import com.amaxonia.pos.data.printer.PrinterFactory
 import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
+import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionFiscalItem
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.TransactionStatus
+import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormaPagoDetalle
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
@@ -37,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -50,6 +56,8 @@ class PaymentViewModel(
     private val cartRepository: CartRepository,
     private val salesRepository: SalesRepository,
     private val localStore: LocalStore,
+    private val networkMonitor: NetworkMonitor,
+    private val pendingInvoiceDao: PendingInvoiceDao,
     private val printerFactory: PrinterFactory,
     private val rapidPayClient: TheFactoryRapidPayClient
 ) : ViewModel() {
@@ -60,6 +68,7 @@ class PaymentViewModel(
 
     private var configuredGatewayKey: String = ""
     private var configuredCommerceRif: String = ""
+    private var countryCode: String = "VE"
 
     private val _state = MutableStateFlow(PaymentState())
     val state = _state.asStateFlow()
@@ -75,7 +84,10 @@ class PaymentViewModel(
         loadFormasPago()
         loadGatewayConfiguration()
         loadCurrencyConfig()
+        viewModelScope.launch { countryCode = localStore.readSelectedCountry()?.code ?: "VE" }
     }
+
+    private val isVenezuela: Boolean get() = countryCode == "VE"
 
     fun setTotalAmount(amount: Double) {
         val normalized = Money.toDouble(Money.fromDouble(amount))
@@ -201,6 +213,8 @@ class PaymentViewModel(
 
     fun processPayment() {
         val currentState = _state.value
+        if (currentState.isProcessingPayment) return
+
         if (!currentState.isPaymentEnough) {
             _state.update { it.copy(showInsufficientReminder = true) }
             viewModelScope.launch {
@@ -278,29 +292,38 @@ class PaymentViewModel(
                 return@launch
             }
 
-            val cajaStatus = cajaRepository.checkCajaStatus(activeCaja.idCaja).getOrElse { error ->
-                val backendMessage = error.message?.takeIf { it.isNotBlank() }
-                _state.update {
-                    it.copy(
-                        isProcessingPayment = false,
-                        paymentError = backendMessage
-                            ?: "No se pudo validar el estado de la caja. Intenta nuevamente"
-                    )
+            val isOnline = networkMonitor.isOnline()
+            val cajaSecuencia = if (isOnline) {
+                val cajaStatus = cajaRepository.checkCajaStatus(activeCaja.idCaja).getOrElse { error ->
+                    val backendMessage = error.message?.takeIf { it.isNotBlank() }
+                    _state.update {
+                        it.copy(
+                            isProcessingPayment = false,
+                            paymentError = backendMessage
+                                ?: "No se pudo validar el estado de la caja. Intenta nuevamente"
+                        )
+                    }
+                    return@launch
                 }
-                return@launch
+                cajaStatus.cajaSecuencia
+            } else {
+                cajaRepository.activeCajaSecuencia.value
             }
 
-            val cajaSecuencia = cajaStatus.cajaSecuencia
             val idCajaSecuencia = cajaSecuencia?.idCajaSecuencia
             if (idCajaSecuencia.isNullOrBlank()) {
-                _state.update {
-                    it.copy(
-                        isProcessingPayment = false,
-                        paymentError = "La caja no esta abierta o no tiene secuencia activa"
-                    )
+                if (isOnline) {
+                    _state.update {
+                        it.copy(
+                            isProcessingPayment = false,
+                            paymentError = "La caja no esta abierta o no tiene secuencia activa"
+                        )
+                    }
+                    return@launch
                 }
-                return@launch
             }
+            val resolvedCajaSecuenciaId = idCajaSecuencia ?: "OFFLINE-${activeCaja.idCaja}"
+            val resolvedSerieSucursal = cajaSecuencia?.serieSucursal ?: activeCaja.serieSucursal ?: activeCaja.serieCaja
 
             val itemWarehouse = activeCaja.defaultWarehouseId
                 ?: activeCaja.codAlmacen?.takeIf { it > 0 }
@@ -412,12 +435,16 @@ class PaymentViewModel(
                 )
             }
 
-            val gatewayResult = processGatewayPaymentsIfNeeded(
-                paymentMethods = selectedPaymentMethods,
-                selectedClient = selectedClient,
-                exchangeRate = currentRate,
-                isMultiCurrency = isMultiCurrency,
-            )
+            val gatewayResult = if (isVenezuela) {
+                processGatewayPaymentsIfNeeded(
+                    paymentMethods = selectedPaymentMethods,
+                    selectedClient = selectedClient,
+                    exchangeRate = currentRate,
+                    isMultiCurrency = isMultiCurrency,
+                )
+            } else {
+                Result.success(Unit)
+            }
             if (gatewayResult.isFailure) {
                 _state.update {
                     it.copy(
@@ -446,8 +473,8 @@ class PaymentViewModel(
                     idSucursal = activeCaja.idSucursal ?: 1,
                     idCaja = activeCaja.idCaja,
                     codigoCaja = activeCaja.codCaja.orEmpty(),
-                    idCajaSecuencia = idCajaSecuencia,
-                    serieSucursal = cajaSecuencia.serieSucursal,
+                    idCajaSecuencia = resolvedCajaSecuenciaId,
+                    serieSucursal = resolvedSerieSucursal,
                     formaPago = "contado",
                     codEstatus = 2,
                     subtotal = subtotalBruto,
@@ -468,6 +495,7 @@ class PaymentViewModel(
                     facturarARuc = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { "CF" } },
                     facturarADireccion = selectedClient.addressDetail,
                     facturarATelefono = selectedClient.phone,
+                    nroz = if (isVenezuela) "0000" else "",
                     impresoraSerial = ""
                 ),
                 items = mappedItems,
@@ -491,6 +519,103 @@ class PaymentViewModel(
                     totalRef = totalGeneral,
                 )
             )
+
+            if (!isOnline) {
+                val localId = UUID.randomUUID().toString()
+                val localInvoiceNumber = "OFF-${System.currentTimeMillis()}"
+                val formatter = DateTimeFormatter.ofPattern("hh:mm a")
+                val dateHeaderFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM yyyy")
+                val now = LocalDateTime.now()
+                val methods = payments
+                    .mapNotNull { payment ->
+                        currentState.formasPago.firstOrNull { it.idFormaPago == payment.idFormaPago }
+                            ?.descripcion
+                            ?.takeIf { it.isNotBlank() }
+                            ?: payment.tipoMovimiento
+                    }
+                    .distinct()
+                    .joinToString(" + ")
+                val fiscalAmount = resolveFiscalPrintAmount(
+                    amount = totalGeneral,
+                    exchangeRate = currentRate,
+                    isMultiCurrency = isMultiCurrency
+                )
+                val fiscalItemsForPrinter = mappedItems.map { item ->
+                    TransactionFiscalItem(
+                        description = item.itemDescripcion,
+                        quantity = item.itemCantidadTotal,
+                        unitPriceWithoutTax = resolveFiscalPrintAmount(
+                            amount = item.itemPrecioSinIva,
+                            exchangeRate = currentRate,
+                            isMultiCurrency = isMultiCurrency
+                        ),
+                        iva = item.itemPIva
+                    )
+                }
+
+                pendingInvoiceDao.insert(
+                    PendingInvoiceEntity(
+                        id = localId,
+                        countryCode = countryCode,
+                        payloadJson = AppJson.encodeToString(ProcessSaleRequestDto.serializer(), saleRequest),
+                        localInvoiceNumber = localInvoiceNumber,
+                        total = totalGeneral,
+                        clientName = "${selectedClient.firstName} ${selectedClient.lastName}".trim().ifBlank { "CONSUMIDOR FINAL" }
+                    )
+                )
+
+                val pendingTransaction = Transaction(
+                    id = localId,
+                    invoiceNumber = localInvoiceNumber,
+                    time = now.format(formatter),
+                    amount = Money.toDouble(currentState.totalAmountMoney),
+                    currency = "USD",
+                    fiscalAmount = fiscalAmount,
+                    status = TransactionStatus.PENDING,
+                    dateHeader = now.format(dateHeaderFormatter),
+                    clienteNombre = "${selectedClient.firstName} ${selectedClient.lastName}".trim(),
+                    clienteIdentificacion = selectedClient.ruc.ifBlank { selectedClient.cedula },
+                    formaPago = methods,
+                    paymentMethods = selectedPaymentMethods,
+                    fiscalItems = fiscalItemsForPrinter
+                )
+
+                transactionRepository.saveTransaction(pendingTransaction).onFailure { saveError ->
+                    _state.update {
+                        it.copy(
+                            isProcessingPayment = false,
+                            gatewayStatusMessage = null,
+                            paymentError = saveError.message
+                                ?: "La factura quedo pendiente, pero no se pudo guardar la transaccion local"
+                        )
+                    }
+                    return@launch
+                }
+
+                _state.update {
+                    it.copy(
+                        isSuccess = true,
+                        isProcessingPayment = false,
+                        paymentError = null,
+                        gatewayStatusMessage = null,
+                        receiptPrintMessage = "Factura guardada offline. Se reenviara al recuperar internet.",
+                        successPayload = PaymentSuccessPayload(
+                            changeDue = currentState.changeDue,
+                            paymentMethodsLabel = methods,
+                            codFactura = localInvoiceNumber,
+                            transactionId = localId,
+                            receiptPrintMessage = "Factura pendiente de envio",
+                            fiscalNumber = "",
+                            totalBs = currentState.totalAmountBs,
+                            changeDueBs = currentState.changeDueBs,
+                            tasa = currentState.tasa,
+                            abrMonedaSecundaria = currentState.abrMonedaSecundaria,
+                            isMultiCurrency = currentState.isMultiCurrency,
+                        )
+                    )
+                }
+                return@launch
+            }
 
             val saleResult = salesRepository.processSale(saleRequest)
             if (saleResult.isFailure) {
@@ -522,7 +647,7 @@ class PaymentViewModel(
                 .distinct()
                 .joinToString(" + ")
 
-            val fiscalAmountBs = resolveFiscalPrintAmount(
+            val fiscalAmount = resolveFiscalPrintAmount(
                 amount = totalGeneral,
                 exchangeRate = currentRate,
                 isMultiCurrency = isMultiCurrency
@@ -546,7 +671,7 @@ class PaymentViewModel(
                 time = now.format(formatter),
                 amount = Money.toDouble(currentState.totalAmountMoney),
                 currency = "USD",
-                fiscalAmountBs = fiscalAmountBs,
+                fiscalAmount = fiscalAmount,
                 status = TransactionStatus.PAID,
                 dateHeader = now.format(dateHeaderFormatter),
                 clienteNombre = "${selectedClient.firstName} ${selectedClient.lastName}".trim(),
@@ -568,10 +693,10 @@ class PaymentViewModel(
             }
 
             _state.update { it.copy(gatewayStatusMessage = "Imprimiendo factura...") }
-            val printResult = printReceiptIfConfigured(newTransaction)
+            val printResult = if (isVenezuela) printReceiptIfConfigured(newTransaction) else null
             val fiscalNumberFromPrinter = printResult?.fiscalNumber?.takeIf { it.isNotBlank() }
 
-            if (!fiscalNumberFromPrinter.isNullOrBlank()) {
+            if (isVenezuela && !fiscalNumberFromPrinter.isNullOrBlank()) {
                 Log.i(TAG, "processPayment() → número fiscal de la impresora: $fiscalNumberFromPrinter")
                 salesRepository.confirmFacturaFiscal(
                     facturaId = response.idFactura,
@@ -848,6 +973,7 @@ class PaymentViewModel(
     }
 
     private fun resolveFiscalPrintAmount(amount: Double, exchangeRate: Double, isMultiCurrency: Boolean): Double {
+        if (!isVenezuela) return Money.toDouble(Money.fromDouble(amount))
         val amountInBs = resolveGatewayAmount(
             amount = amount,
             exchangeRate = exchangeRate,

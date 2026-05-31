@@ -98,6 +98,7 @@ fun SettingsScreen(
     var isSavingTheFactorySettings by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var isCheckingStatus by remember { mutableStateOf(false) }
+    val isVE = DependencyContainer.apiConfigManager.getCurrentCountryCode() == "VE"
 
     LaunchedEffect(errorMessage) {
         val message = errorMessage ?: return@LaunchedEffect
@@ -170,16 +171,18 @@ fun SettingsScreen(
                 onSelect = { viewModel.onPrinterTypeSelected(PrinterType.NONE) }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (isVE) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            PrinterOptionCard(
-                icon = Icons.Rounded.Receipt,
-                iconTint = Color(0xFF1565C0),
-                title = "The Factory HKA (Fiscal)",
-                description = "Impresora fiscal homologada. Requiere la app The Factory HKA instalada en el dispositivo.",
-                isSelected = selectedPrinterType == PrinterType.THE_FACTORY_HKA,
-                onSelect = { viewModel.onPrinterTypeSelected(PrinterType.THE_FACTORY_HKA) }
-            )
+                PrinterOptionCard(
+                    icon = Icons.Rounded.Receipt,
+                    iconTint = Color(0xFF1565C0),
+                    title = "The Factory HKA (Fiscal)",
+                    description = "Impresora fiscal homologada. Requiere la app The Factory HKA instalada en el dispositivo.",
+                    isSelected = selectedPrinterType == PrinterType.THE_FACTORY_HKA,
+                    onSelect = { viewModel.onPrinterTypeSelected(PrinterType.THE_FACTORY_HKA) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 

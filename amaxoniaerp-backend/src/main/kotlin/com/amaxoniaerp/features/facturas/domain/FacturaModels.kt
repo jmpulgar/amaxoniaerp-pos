@@ -10,7 +10,7 @@ data class FacturaSummary(
     val numeroDocumentoFiscal: String,
     val fecha: String,
     val fechaCreacion: String = "",
-    val fechaDgi: String,
+    val fechaDgi: String? = null,
     val clienteNombre: String,
     val clienteIdentificacion: String,
     val total: Double,

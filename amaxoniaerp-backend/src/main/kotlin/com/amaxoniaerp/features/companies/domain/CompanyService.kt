@@ -44,7 +44,7 @@ class CompanyService(
         // Cargar configuración de la empresa
         val company = companyRepository.loadCompanyConfig(companyId)
             ?: throw NotFoundException("Empresa no encontrada")
-        val rif = companyRepository.loadCompanyRifByAdminDb(company.adminDb)
+        val rif = companyRepository.loadCompanyRifByAdminDb(company.adminDb, countryCode)
 
         if (!company.admisActivo) {
             throw AuthorizationException("Empresa no disponible para POS")

@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -80,6 +82,12 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     var showSellerSheet by remember { mutableStateOf(false) }
+    val productGridState = rememberLazyGridState()
+    val productListState = rememberLazyListState()
+    val isOnline by DependencyContainer.networkMonitor.isOnlineFlow.collectAsState(
+        initial = DependencyContainer.networkMonitor.isOnline()
+    )
+    var hasSeenConnectivityState by remember { mutableStateOf(false) }
     val manualSyncInfos by SyncScheduler.getManualSyncWorkInfos(context).observeAsState(emptyList())
     val isSyncRunning = manualSyncInfos.any { info ->
         info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
@@ -87,19 +95,25 @@ fun DashboardScreen(
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
-    val filteredProducts: List<DashboardProduct> = remember(state.products, state.bestSellers, state.searchQuery, state.bottomSelected) {
-        val productsToShow = if (state.bottomSelected == 1) state.bestSellers else state.products
-        val q = state.searchQuery.trim().lowercase()
-        if (q.isEmpty()) {
-            productsToShow
-        } else {
-            productsToShow.filter { p ->
-                (p.name.lowercase().contains(q)) ||
-                        (p.code?.lowercase()?.contains(q) == true) ||
-                        (p.sku?.lowercase()?.contains(q) == true) ||
-                        (p.barcode?.lowercase()?.contains(q) == true) ||
-                        (p.id.lowercase().contains(q))
-            }
+    val productsToShow: List<DashboardProduct> = if (state.bottomSelected == 1) state.bestSellers else state.products
+
+    val gridReachedBottom by remember {
+        derivedStateOf {
+            val lastVisible = productGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= productGridState.layoutInfo.totalItemsCount - 6
+        }
+    }
+
+    val listReachedBottom by remember {
+        derivedStateOf {
+            val lastVisible = productListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= productListState.layoutInfo.totalItemsCount - 6
+        }
+    }
+
+    LaunchedEffect(gridReachedBottom, listReachedBottom, state.viewMode, state.bottomSelected) {
+        if (state.bottomSelected == 0 && (gridReachedBottom || listReachedBottom)) {
+            viewModel.loadMoreProducts()
         }
     }
 
@@ -110,6 +124,29 @@ fun DashboardScreen(
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
             viewModel.dismissAutoCloseMessage()
         }
+    }
+
+    LaunchedEffect(isOnline) {
+        if (!hasSeenConnectivityState) {
+            hasSeenConnectivityState = true
+            if (!isOnline) {
+                snackbarHostState.showSnackbar(
+                    message = "Sin conexión. Puedes seguir trabajando offline.",
+                    duration = SnackbarDuration.Long
+                )
+            }
+            return@LaunchedEffect
+        }
+
+        snackbarHostState.showSnackbar(
+            message = if (isOnline) {
+                SyncScheduler.enqueuePendingInvoices(context)
+                "Conexión restaurada. Reenviando pendientes..."
+            } else {
+                "Sin conexión. Puedes seguir trabajando offline."
+            },
+            duration = SnackbarDuration.Long
+        )
     }
 
     // --- CajaSelectorSheet (replaces old AlertDialog) ---
@@ -614,27 +651,53 @@ fun DashboardScreen(
                                         }
                                     }
                                 }
-                                if (state.viewMode == ProductViewMode.GRID) {
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Fixed(2),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(bottom = 120.dp)
-                                    ) {
-                                        items(filteredProducts) { product ->
-                                            ProductCard(product = product, onAddClick = { viewModel.addToCart(product) })
+                                 if (state.viewMode == ProductViewMode.GRID) {
+                                     LazyVerticalGrid(
+                                        state = productGridState,
+                                         columns = GridCells.Fixed(2),
+                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                         verticalArrangement = Arrangement.spacedBy(12.dp),
+                                         contentPadding = PaddingValues(bottom = 120.dp)
+                                     ) {
+                                        items(productsToShow, key = { it.id }) { product ->
+                                             ProductCard(product = product, onAddClick = { viewModel.addToCart(product) })
+                                         }
+                                        if (state.isLoadingMore) {
+                                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(16.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(color = AmaxoniaBlue, modifier = Modifier.size(28.dp))
+                                                }
+                                            }
                                         }
-                                    }
-                                } else {
-                                    LazyColumn(
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(bottom = 120.dp)
-                                    ) {
-                                        items(filteredProducts) { product ->
-                                            ProductListRow(product = product, onAddClick = { viewModel.addToCart(product) })
+                                     }
+                                 } else {
+                                     LazyColumn(
+                                        state = productListState,
+                                         verticalArrangement = Arrangement.spacedBy(12.dp),
+                                         contentPadding = PaddingValues(bottom = 120.dp)
+                                     ) {
+                                        items(productsToShow, key = { it.id }) { product ->
+                                             ProductListRow(product = product, onAddClick = { viewModel.addToCart(product) })
+                                         }
+                                        if (state.isLoadingMore) {
+                                            item {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(16.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(color = AmaxoniaBlue, modifier = Modifier.size(28.dp))
+                                                }
+                                            }
                                         }
-                                    }
-                                }
+                                     }
+                                 }
                             }
                         }
                     }
@@ -719,7 +782,9 @@ fun ProductCard(
                     AsyncImage(
                         model = product.imageUrl,
                         contentDescription = product.name,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        onError = { android.util.Log.e("IMG_DASH", "FAIL url=${product.imageUrl} err=${it.result.throwable?.message}") },
+                        onSuccess = { android.util.Log.d("IMG_DASH", "OK url=${product.imageUrl}") }
                     )
                 } else {
                     Icon(

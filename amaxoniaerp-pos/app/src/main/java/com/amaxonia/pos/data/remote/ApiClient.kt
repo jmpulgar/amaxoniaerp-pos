@@ -34,9 +34,9 @@ class ApiClient(
                 .build()
             OkHttpClient.Builder()
                 .connectionSpecs(listOf(tls12Spec, ConnectionSpec.CLEARTEXT))
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .build()
         } else {
             null
@@ -52,9 +52,9 @@ class ApiClient(
                 json(AppJson)
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 10000
-                connectTimeoutMillis = 10000
-                socketTimeoutMillis = 10000
+                requestTimeoutMillis = 60_000
+                connectTimeoutMillis = 15_000
+                socketTimeoutMillis = 60_000
             }
             defaultRequest {
                 url(apiConfigManager.baseUrl.value)

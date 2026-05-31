@@ -25,6 +25,8 @@ class CajaRepositoryImpl(
     override val activeCajaName: StateFlow<String> = _activeCajaName.asStateFlow()
     private val _activeCaja = MutableStateFlow<Caja?>(null)
     override val activeCaja: StateFlow<Caja?> = _activeCaja.asStateFlow()
+    private val _activeCajaSecuencia = MutableStateFlow<com.amaxonia.pos.domain.model.caja.CajaSecuencia?>(null)
+    override val activeCajaSecuencia: StateFlow<com.amaxonia.pos.domain.model.caja.CajaSecuencia?> = _activeCajaSecuencia.asStateFlow()
 
     /** Stores the active session so we can build close-register summaries. */
     private var activeSecuencia: com.amaxonia.pos.domain.model.caja.CajaSecuencia? = null
@@ -59,6 +61,7 @@ class CajaRepositoryImpl(
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
             activeSecuencia = null
+            _activeCajaSecuencia.update { null }
         }
     }
 
@@ -70,6 +73,7 @@ class CajaRepositoryImpl(
             result.onSuccess { response ->
                 if (response.isOpen) {
                     activeSecuencia = response.cajaSecuencia
+                    _activeCajaSecuencia.update { response.cajaSecuencia }
                 }
             }
             result
@@ -85,6 +89,7 @@ class CajaRepositoryImpl(
             val result = cajaApi.openCaja(request, authHeader, companyDb)
             result.onSuccess { response ->
                 activeSecuencia = response.cajaSecuencia
+                _activeCajaSecuencia.update { response.cajaSecuencia }
             }
             result
         } catch (e: Exception) {
@@ -99,6 +104,7 @@ class CajaRepositoryImpl(
             val result = cajaApi.closeCaja(request, authHeader, companyDb)
             result.onSuccess {
                 activeSecuencia = null
+                _activeCajaSecuencia.update { null }
             }
             result
         } catch (e: Exception) {
@@ -214,6 +220,7 @@ class CajaRepositoryImpl(
         _activeCajaName.update { "Caja no seleccionada" }
         _activeCaja.update { null }
         activeSecuencia = null
+        _activeCajaSecuencia.update { null }
         localStore.clearActiveCaja()
     }
 

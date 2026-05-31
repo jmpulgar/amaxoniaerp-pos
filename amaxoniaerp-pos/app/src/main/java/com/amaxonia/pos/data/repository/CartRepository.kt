@@ -116,6 +116,8 @@ class CartRepository {
     fun clearCart() {
         _cartItems.value = emptyList()
         _selectedClient.value = null
+        _currentSeller.value = null
+        _availableSellers.value = emptyList()
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)

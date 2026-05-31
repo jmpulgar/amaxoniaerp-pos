@@ -8,7 +8,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /**
- * Parámetros JDBC comunes para MySQL (legacy: fechas 0000-00-00 convertidas a null), **sin** `serverTimezone`.
+ * Parámetros JDBC comunes para MySQL (fechas 0000-00-00 convertidas a null), **sin** `serverTimezone`.
  *
  * `serverTimezone` se añade por país en [mysqlJdbcQueryString]: con `serverTimezone=UTC` el driver MySQL 8
  * convertía `LocalDateTime` de negocio (p. ej. 19:40 Caracas) al persistir en `DATETIME` y guardaba 23:40 UTC.
@@ -136,8 +136,8 @@ object DatabaseManager {
     }
 
     /**
-     * Legacy support: Connect to company database assuming default country (VE).
-     * This is needed for legacy routes that haven't been migrated to multi-tenant yet.
+     * Fallback: Connect to company database assuming default country (VE).
+     * Use the two-parameter overload [connectToCompanyDb] when the country is known.
      */
     fun connectToCompanyDb(companyDbName: String): Database {
         return connectToCompanyDb("VE", companyDbName)
@@ -199,7 +199,7 @@ object DatabaseManager {
         return HikariDataSource(hikariConfig)
     }
     
-    // Legacy support: Master DB property that throws if accessed before init
+    // Master DB property that throws if accessed before init
     val masterDb: Database
         get() = throw UnsupportedOperationException("masterDb global is deprecated. Use getConfigDatabase(countryCode)")
 }

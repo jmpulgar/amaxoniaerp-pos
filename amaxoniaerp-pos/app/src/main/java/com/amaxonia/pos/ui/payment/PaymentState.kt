@@ -115,7 +115,9 @@ fun formatCurrencyLabel(abr: String): String {
     val normalized = abr.uppercase().replace(".", "").trim()
     return when (normalized) {
         "BS", "VES", "BSF", "BSFV", "BVES" -> "Bs."
-        else -> "Bs."
+        "USD" -> "$"
+        "PAB" -> "B/."
+        else -> "$"
     }
 }
 
