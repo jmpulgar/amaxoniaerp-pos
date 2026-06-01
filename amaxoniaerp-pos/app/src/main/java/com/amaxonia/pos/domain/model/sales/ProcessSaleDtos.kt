@@ -153,7 +153,11 @@ data class ProcessSaleResponseDto(
     val success: Boolean,
     val idFactura: String,
     val codFactura: String,
-    val codEstatus: Int
+    val codEstatus: Int,
+    val cufe: String? = null,
+    val qr: String? = null,
+    val fechaRecepcionDGI: String? = null,
+    val feError: String? = null,
 )
 
 @Serializable

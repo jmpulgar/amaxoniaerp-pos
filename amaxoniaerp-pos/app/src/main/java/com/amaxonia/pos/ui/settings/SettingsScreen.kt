@@ -85,6 +85,7 @@ fun SettingsScreen(
     }
 ) {
     val selectedPrinterType by viewModel.selectedPrinterType.collectAsState()
+    val availablePrinterTypes by viewModel.availablePrinterTypes.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val theFactorySettings by viewModel.theFactorySettings.collectAsState()
@@ -98,7 +99,8 @@ fun SettingsScreen(
     var isSavingTheFactorySettings by remember { mutableStateOf(false) }
     var isTestingConnection by remember { mutableStateOf(false) }
     var isCheckingStatus by remember { mutableStateOf(false) }
-    val isVE = DependencyContainer.apiConfigManager.getCurrentCountryCode() == "VE"
+    val isVE = PrinterType.THE_FACTORY_HKA in availablePrinterTypes
+    val isPA = PrinterType.SUNMI_V2 in availablePrinterTypes
 
     LaunchedEffect(errorMessage) {
         val message = errorMessage ?: return@LaunchedEffect
@@ -197,14 +199,16 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            PrinterOptionCard(
-                icon = Icons.Rounded.PhoneAndroid,
-                iconTint = Color(0xFF2E7D32),
-                title = "Terminal Sunmi V2",
-                description = "Impresora integrada en terminales Sunmi V2 y V2 Pro. Conexion directa sin Bluetooth.",
-                isSelected = selectedPrinterType == PrinterType.SUNMI_V2,
-                onSelect = { viewModel.onPrinterTypeSelected(PrinterType.SUNMI_V2) }
-            )
+            if (isPA) {
+                PrinterOptionCard(
+                    icon = Icons.Rounded.PhoneAndroid,
+                    iconTint = Color(0xFF2E7D32),
+                    title = "SUNMI",
+                    description = "Impresora integrada en terminales Sunmi V2 y V2 Pro. Conexion directa sin Bluetooth.",
+                    isSelected = selectedPrinterType == PrinterType.SUNMI_V2,
+                    onSelect = { viewModel.onPrinterTypeSelected(PrinterType.SUNMI_V2) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -643,13 +647,31 @@ fun SettingsScreen(
                                         return@launch
                                     }
                                 }
-                                val printer = DependencyContainer.printerFactory.getActivePrinter()
-                                if (printer == null) {
-                                    snackbarHostState.showSnackbar(
-                                        "Impresora no disponible. Verifica la conexion.",
-                                        duration = SnackbarDuration.Short
-                                    )
+                                if (selectedPrinterType == PrinterType.SUNMI_V2) {
+                                    val ticketPrinter = DependencyContainer.printerFactory.getActiveTicketPrinter()
+                                    val result = ticketPrinter?.printText("Prueba de impresión SUNMI\nAmaxonia POS")
+                                    if (result is com.amaxonia.pos.domain.model.printer.PrintResult.Success) {
+                                        snackbarHostState.showSnackbar(
+                                            "Impresion de prueba enviada correctamente",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    } else {
+                                        snackbarHostState.showSnackbar(
+                                            (result as? com.amaxonia.pos.domain.model.printer.PrintResult.Error)?.message
+                                                ?: "Impresora SUNMI no disponible",
+                                            duration = SnackbarDuration.Long
+                                        )
+                                    }
                                 } else {
+                                    val printer = DependencyContainer.printerFactory.getActivePrinter()
+                                    if (printer == null) {
+                                        snackbarHostState.showSnackbar(
+                                            "Impresora no disponible. Verifica la conexion.",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        isTestingPrint = false
+                                        return@launch
+                                    }
                                     val testTransaction = com.amaxonia.pos.domain.model.Transaction(
                                         id = "test-print",
                                         invoiceNumber = "TEST-001",

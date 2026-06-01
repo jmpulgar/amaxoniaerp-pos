@@ -166,6 +166,63 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                 }
             }
 
+            get("/{id}/print-payload") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.getAdminDb()
+                if (adminDb.isNullOrBlank()) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Database not found")
+                    )
+                }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
+
+                if (!countryCode.equals("PA", ignoreCase = true)) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "El payload de impresión SUNMI solo está disponible para Panamá")
+                    )
+                }
+
+                val facturaId = call.parameters["id"]
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Missing factura ID")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val payload = facturasRepository.getPrintPayload(
+                    database = companyDb,
+                    countryCode = countryCode,
+                    facturaId = facturaId,
+                    companyNameFallback = adminDb,
+                )
+
+                if (payload == null) {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
+                } else {
+                    call.respond(payload)
+                }
+            }
+
             patch("/{id}/confirmacion-fiscal") {
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@patch call.respond(

@@ -5,8 +5,13 @@ import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleItem
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleResponse
+import com.amaxoniaerp.features.facturas.domain.ClientePrintResponse
+import com.amaxoniaerp.features.facturas.domain.EmpresaPrintResponse
+import com.amaxoniaerp.features.facturas.domain.FacturaPrintPayloadResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaSummary
 import com.amaxoniaerp.features.facturas.domain.FacturasResumen
+import com.amaxoniaerp.features.facturas.domain.PagoPrintResponse
+import com.amaxoniaerp.features.facturas.domain.ProductoPrintResponse
 import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.JoinType
@@ -19,9 +24,12 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 class FacturasRepository {
     suspend fun listFacturas(
@@ -233,6 +241,157 @@ class FacturasRepository {
             impresoraSerial = normalizedSerial,
         )
     }
+
+    suspend fun getPrintPayload(
+        database: Database,
+        countryCode: String,
+        facturaId: String,
+        companyNameFallback: String,
+    ): FacturaPrintPayloadResponse? = dbQuery(database) {
+        val isPanama = countryCode.equals("PA", ignoreCase = true)
+        if (!isPanama) {
+            throw IllegalArgumentException("El payload de impresión fiscal solo está disponible para Panamá")
+        }
+
+        val factura = queryOne(
+            """
+            SELECT
+                f.id_factura,
+                f.cod_factura,
+                f.fechaFactura,
+                f.facturar_a,
+                f.facturar_a_ruc,
+                f.facturar_a_direccion,
+                f.facturar_a_telefono,
+                f.usuario_creacion,
+                f.subtotal,
+                f.totalizar_base_imponible,
+                f.totalizar_monto_iva,
+                f.TotalTotalFactura,
+                f.totalizar_total_general,
+                f.formapago,
+                f.cufe,
+                f.qr,
+                f.fechaRecepcionDGI,
+                pg.rif AS empresa_ruc,
+                c.descripcion AS caja_descripcion,
+                c.codigo AS caja_codigo,
+                s.sucursal AS sucursal_nombre,
+                s.descripcion AS sucursal_descripcion
+            FROM factura f
+            LEFT JOIN parametros_generales pg ON 1 = 1
+            LEFT JOIN caja c ON c.id = f.id_caja
+            LEFT JOIN sucursal s ON s.id = f.id_sucursal
+            WHERE f.id_factura = '${facturaId.sqlLiteral()}'
+            LIMIT 1
+            """.trimIndent(),
+        ) ?: return@dbQuery null
+
+        val productos = queryMany(
+            """
+            SELECT
+                _item_descripcion,
+                _item_cantidad_total,
+                _item_preciosiniva,
+                _item_montodescuento,
+                _item_piva,
+                _item_totalsiniva,
+                _item_totalconiva,
+                _item_unidad_empaque
+            FROM factura_detalle
+            WHERE id_factura = '${facturaId.sqlLiteral()}'
+            ORDER BY fecha_creacion ASC
+            """.trimIndent(),
+        ).map { row ->
+            val totalSinIva = row.decimal("_item_totalsiniva")
+            val taxRate = row.decimal("_item_piva")
+            val impuesto = totalSinIva.multiply(taxRate).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+            ProductoPrintResponse(
+                nombre = row.string("_item_descripcion"),
+                cantidad = row.decimal("_item_cantidad_total").toMoneyString(trimZeros = true),
+                unidad = row.stringOrNull("_item_unidad_empaque"),
+                precioUnitario = row.decimal("_item_preciosiniva").toMoneyString(),
+                descuento = row.decimal("_item_montodescuento").toMoneyString(),
+                impuesto = impuesto.toMoneyString(),
+                total = row.decimal("_item_totalconiva").toMoneyString(),
+            )
+        }
+
+        val subtotal = factura.decimal("subtotal")
+        val baseImponible = factura.decimal("totalizar_base_imponible")
+        val totalImpuesto = factura.decimal("totalizar_monto_iva")
+        val montoExento = (subtotal - baseImponible).coerceAtLeast(BigDecimal.ZERO)
+        val total = factura.decimal("TotalTotalFactura")
+        val cambio: BigDecimal? = null
+
+        FacturaPrintPayloadResponse(
+            facturaId = factura.string("id_factura"),
+            numeroFactura = factura.string("cod_factura"),
+            fecha = factura.stringOrNull("fechaFactura").orEmpty(),
+            empresa = EmpresaPrintResponse(
+                nombre = companyNameFallback.ifBlank { "Amaxonia ERP" },
+                ruc = factura.stringOrNull("empresa_ruc"),
+                direccion = null,
+                telefono = null,
+                tienda = factura.stringOrNull("sucursal_nombre") ?: factura.stringOrNull("sucursal_descripcion"),
+                caja = factura.stringOrNull("caja_descripcion") ?: factura.stringOrNull("caja_codigo"),
+            ),
+            cliente = ClientePrintResponse(
+                nombre = factura.stringOrNull("facturar_a").orEmpty().ifBlank { "Cliente General" },
+                documento = factura.stringOrNull("facturar_a_ruc"),
+            ),
+            vendedor = factura.stringOrNull("usuario_creacion"),
+            productos = productos,
+            subtotal = subtotal.toMoneyString(),
+            montoExento = montoExento.toMoneyString(),
+            totalImpuesto = totalImpuesto.toMoneyString(),
+            total = total.toMoneyString(),
+            pagos = listOf(
+                PagoPrintResponse(
+                    metodo = factura.stringOrNull("formapago").orEmpty().ifBlank { "PAGO" },
+                    monto = total.toMoneyString(),
+                )
+            ),
+            cambio = cambio?.toMoneyString(),
+            qrUrl = factura.stringOrNull("qr"),
+            cufe = factura.stringOrNull("cufe"),
+            fechaRecepcionDgi = factura.stringOrNull("fechaRecepcionDGI"),
+            proveedorAutorizado = "The Factory HKA Corp.",
+        )
+    }
+
+    private fun queryOne(sql: String): SqlRow? = queryMany(sql).firstOrNull()
+
+    private fun queryMany(sql: String): List<SqlRow> {
+        return TransactionManager.current().exec(sql) { rs ->
+            val meta = rs.metaData
+            val columns = (1..meta.columnCount).map { index -> meta.getColumnLabel(index) }
+            val rows = mutableListOf<SqlRow>()
+            while (rs.next()) {
+                rows += SqlRow(columns.associateWith { column -> rs.getObject(column) })
+            }
+            rows
+        } ?: emptyList()
+    }
+
+    private data class SqlRow(private val values: Map<String, Any?>) {
+        fun string(column: String): String = stringOrNull(column).orEmpty()
+        fun stringOrNull(column: String): String? = values[column]?.toString()?.takeIf { it.isNotBlank() }
+        fun decimal(column: String): BigDecimal = decimalOrNull(column) ?: BigDecimal.ZERO
+        fun decimalOrNull(column: String): BigDecimal? = when (val value = values[column]) {
+            null -> null
+            is BigDecimal -> value
+            is Number -> BigDecimal.valueOf(value.toDouble())
+            else -> value.toString().toBigDecimalOrNull()
+        }
+    }
+
+    private fun BigDecimal.toMoneyString(trimZeros: Boolean = false): String {
+        val scaled = setScale(2, RoundingMode.HALF_UP)
+        return if (trimZeros) scaled.stripTrailingZeros().toPlainString() else scaled.toPlainString()
+    }
+
+    private fun String.sqlLiteral(): String = replace("'", "''")
 
     private fun mapRowToFacturaSummary(row: ResultRow, tabla: BaseFacturasTable, countryCode: String): FacturaSummary {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")

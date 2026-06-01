@@ -7,6 +7,7 @@ import com.amaxonia.pos.data.printer.GatewayOption
 import com.amaxonia.pos.data.printer.HkaConnectionHelper
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,9 @@ class SettingsViewModel(
 
     private val _selectedPrinterType = MutableStateFlow(PrinterType.NONE)
     val selectedPrinterType = _selectedPrinterType.asStateFlow()
+
+    private val _availablePrinterTypes = MutableStateFlow<List<PrinterType>>(emptyList())
+    val availablePrinterTypes = _availablePrinterTypes.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
@@ -44,6 +48,15 @@ class SettingsViewModel(
         viewModelScope.launch {
             localStore.selectedPrinterTypeFlow().collect { printerType ->
                 _selectedPrinterType.value = printerType
+            }
+        }
+        viewModelScope.launch {
+            localStore.selectedCountryFlow().collect { country ->
+                _availablePrinterTypes.value = PrinterTypePolicy.availablePrinterTypes(country)
+                val current = _selectedPrinterType.value
+                if (!PrinterTypePolicy.isAllowed(country, current)) {
+                    runCatching { localStore.saveSelectedPrinterType(PrinterType.NONE) }
+                }
             }
         }
         viewModelScope.launch {
@@ -73,6 +86,7 @@ class SettingsViewModel(
         if (_selectedPrinterType.value == printerType) return
         viewModelScope.launch {
             runCatching {
+                PrinterTypePolicy.validate(localStore.readSelectedCountry(), printerType)
                 localStore.saveSelectedPrinterType(printerType)
             }.onFailure { throwable ->
                 _errorMessage.update {

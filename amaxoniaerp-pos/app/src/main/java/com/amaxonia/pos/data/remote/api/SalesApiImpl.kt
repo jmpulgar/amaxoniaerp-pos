@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
+import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import io.ktor.client.request.header
@@ -135,6 +136,33 @@ class SalesApiImpl(private val apiClient: ApiClient) : SalesApi {
                     throw IllegalStateException(error ?: "Error al confirmar factura fiscal")
                 }
                 throw IllegalStateException("Respuesta invalida al confirmar factura fiscal")
+            }
+
+            Result.success(parsed)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getPrintPayload(
+        authHeader: String,
+        facturaId: String
+    ): Result<FacturaPrintPayloadDto> {
+        return try {
+            val response = apiClient.httpClient.get("facturas/$facturaId/print-payload") {
+                header("Authorization", authHeader)
+            }
+
+            val responseText = response.bodyAsText()
+            val parsed = runCatching {
+                AppJson.decodeFromString(FacturaPrintPayloadDto.serializer(), responseText)
+            }.getOrElse {
+                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                if (json is JsonObject) {
+                    val error = json["error"]?.jsonPrimitive?.contentOrNull
+                    throw IllegalStateException(error ?: "Error al obtener payload de impresión")
+                }
+                throw IllegalStateException("Respuesta invalida al obtener payload de impresión")
             }
 
             Result.success(parsed)

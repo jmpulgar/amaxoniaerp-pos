@@ -4,6 +4,8 @@ import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.repository.PrinterRepository
+import com.amaxonia.pos.data.printer.sunmi.SunmiV2Printer
+import com.amaxonia.pos.domain.model.printer.TicketPrinter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +29,7 @@ class PrinterFactory(
     /** Carga bajo demanda; si la librería fiscal falla (p. ej. en Android 10), no se cierra la app. */
     @Volatile
     private var theFactoryPrinterInstance: PrinterRepository? = null
+    private var sunmiPrinterInstance: TicketPrinter? = null
 
     private fun getTheFactoryPrinterOrNull(): PrinterRepository? {
         if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
@@ -42,6 +45,19 @@ class PrinterFactory(
                 null
             }
             return theFactoryPrinterInstance
+        }
+    }
+
+    private fun getSunmiPrinterOrNull(): TicketPrinter? {
+        if (sunmiPrinterInstance != null) return sunmiPrinterInstance
+        synchronized(this) {
+            if (sunmiPrinterInstance != null) return sunmiPrinterInstance
+            sunmiPrinterInstance = try {
+                SunmiV2Printer(appContext)
+            } catch (t: Throwable) {
+                null
+            }
+            return sunmiPrinterInstance
         }
     }
 
@@ -71,6 +87,26 @@ class PrinterFactory(
             PrinterType.NONE,
             PrinterType.GENERIC_BLUETOOTH,
             PrinterType.SUNMI_V2 -> null
+        }
+    }
+
+    fun getActiveTicketPrinter(): TicketPrinter? {
+        val printerType = if (isHydrated) {
+            printerTypeState.value
+        } else {
+            runBlocking {
+                localStore.readSelectedPrinterType().also {
+                    printerTypeState.value = it
+                    isHydrated = true
+                }
+            }
+        }
+
+        return when (printerType) {
+            PrinterType.SUNMI_V2 -> getSunmiPrinterOrNull()
+            PrinterType.NONE,
+            PrinterType.THE_FACTORY_HKA,
+            PrinterType.GENERIC_BLUETOOTH -> null
         }
     }
 }

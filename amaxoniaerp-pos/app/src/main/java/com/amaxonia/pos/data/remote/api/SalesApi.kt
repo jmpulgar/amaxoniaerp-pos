@@ -4,6 +4,7 @@ import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
+import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 
@@ -30,4 +31,9 @@ interface SalesApi {
         facturaId: String,
         payload: ConfirmFacturaFiscalRequestDto
     ): Result<ConfirmFacturaFiscalResponseDto>
+
+    suspend fun getPrintPayload(
+        authHeader: String,
+        facturaId: String
+    ): Result<FacturaPrintPayloadDto>
 }

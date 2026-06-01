@@ -16,6 +16,7 @@ import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.ui.payment.PaymentSuccessPayload
 import kotlinx.coroutines.flow.Flow
@@ -184,6 +185,7 @@ class LocalStore(
     }
 
     suspend fun saveSelectedPrinterType(printerType: PrinterType) {
+        PrinterTypePolicy.validate(readSelectedCountry(), printerType)
         context.dataStore.edit { prefs ->
             prefs[selectedPrinterTypeKey] = printerType.name
         }
@@ -195,9 +197,11 @@ class LocalStore(
 
     fun selectedPrinterTypeFlow(): Flow<PrinterType> {
         return context.dataStore.data.map { prefs ->
-            prefs[selectedPrinterTypeKey]
+            val country = prefs[selectedCountryKey]?.let { ServerCountries.fromCode(it) }
+            val storedPrinter = prefs[selectedPrinterTypeKey]
                 ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
                 ?: PrinterType.NONE
+            PrinterTypePolicy.coerce(country, storedPrinter)
         }
     }
 
@@ -264,6 +268,13 @@ class LocalStore(
     suspend fun saveSelectedCountry(country: ServerCountry) {
         context.dataStore.edit { prefs ->
             prefs[selectedCountryKey] = country.code
+            val storedPrinter = prefs[selectedPrinterTypeKey]
+                ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
+                ?: PrinterType.NONE
+            val coercedPrinter = PrinterTypePolicy.coerce(country, storedPrinter)
+            if (coercedPrinter != storedPrinter) {
+                prefs[selectedPrinterTypeKey] = coercedPrinter.name
+            }
         }
     }
 

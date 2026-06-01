@@ -9,6 +9,7 @@ import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceEntity
 import com.amaxonia.pos.data.printer.PrinterFactory
+import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.data.remote.NetworkMonitor
@@ -22,6 +23,7 @@ import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormaPagoDetalle
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.SaleCurrencyDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
@@ -88,6 +90,7 @@ class PaymentViewModel(
     }
 
     private val isVenezuela: Boolean get() = countryCode == "VE"
+    private val isPanama: Boolean get() = countryCode == "PA"
 
     fun setTotalAmount(amount: Double) {
         val normalized = Money.toDouble(Money.fromDouble(amount))
@@ -698,7 +701,11 @@ class PaymentViewModel(
             }
 
             _state.update { it.copy(gatewayStatusMessage = "Imprimiendo factura...") }
-            val printResult = if (isVenezuela) printReceiptIfConfigured(newTransaction) else null
+            val printResult = when {
+                isVenezuela -> printReceiptIfConfigured(newTransaction)
+                isPanama -> printPanamaReceiptIfConfigured(response.idFactura)
+                else -> null
+            }
             val fiscalNumberFromPrinter = printResult?.fiscalNumber?.takeIf { it.isNotBlank() }
 
             if (isVenezuela && !fiscalNumberFromPrinter.isNullOrBlank()) {
@@ -773,6 +780,41 @@ class PaymentViewModel(
                 )
             }
         )
+    }
+
+    private suspend fun printPanamaReceiptIfConfigured(facturaId: String): ReceiptPrintFeedback? {
+        val selectedPrinterType = localStore.readSelectedPrinterType()
+        if (selectedPrinterType != PrinterType.SUNMI_V2) return null
+
+        val ticketPrinter = printerFactory.getActiveTicketPrinter()
+            ?: return ReceiptPrintFeedback(
+                displayMessage = "Impresora SUNMI no disponible. Puedes reintentar la impresión desde el historial.",
+                fiscalNumber = "",
+                printerSerial = "",
+            )
+
+        val payload = salesRepository.getPrintPayload(facturaId).getOrElse { throwable ->
+            return ReceiptPrintFeedback(
+                displayMessage = throwable.message ?: "No se pudo obtener el payload de impresión",
+                fiscalNumber = "",
+                printerSerial = "",
+            )
+        }
+
+        val ticket = PanamaInvoiceTicketFormatter().format(payload)
+        return when (val result = ticketPrinter.printTicket(ticket)) {
+            PrintResult.Success -> ReceiptPrintFeedback(
+                displayMessage = "Ticket SUNMI enviado correctamente",
+                fiscalNumber = payload.cufe.orEmpty(),
+                printerSerial = "SUNMI",
+            )
+
+            is PrintResult.Error -> ReceiptPrintFeedback(
+                displayMessage = result.message,
+                fiscalNumber = payload.cufe.orEmpty(),
+                printerSerial = "SUNMI",
+            )
+        }
     }
 
     private data class ReceiptPrintFeedback(
