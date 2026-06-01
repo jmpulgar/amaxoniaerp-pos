@@ -10,7 +10,9 @@ import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.repository.ProductRepository
+import com.amaxonia.pos.domain.repository.PromotionRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
+import com.amaxonia.pos.domain.usecase.ValidarAdicionPromocionUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 
 class DashboardViewModel(
     private val productRepository: ProductRepository,
+    private val promotionRepository: PromotionRepository,
     private val reportRepository: ReportRepository,
     private val cartRepository: CartRepository,
     private val cajaRepository: CajaRepository,
@@ -33,6 +36,7 @@ class DashboardViewModel(
     @Volatile
     private var adminDb: String = ""
     private var searchJob: Job? = null
+    private val validarAdicionPromocion = ValidarAdicionPromocionUseCase()
 
     private companion object {
         const val PAGE_SIZE = 40
@@ -49,6 +53,7 @@ class DashboardViewModel(
         }
         loadProducts(reset = true)
         loadBestSellers()
+        viewModelScope.launch { promotionRepository.syncPromotions() }
         observeCart()
         observeClient()
         observeSeller()
@@ -328,6 +333,62 @@ class DashboardViewModel(
     // --- LÓGICA DEL CARRITO CORREGIDA ---
 
     fun addToCart(dashboardProduct: DashboardProduct) {
+        viewModelScope.launch {
+            promotionRepository.getActivePromotionsForProduct(dashboardProduct.id).fold(
+                onSuccess = { promotions ->
+                    val validPromotions = promotions.filter { promo ->
+                        validarAdicionPromocion(promo, cartRepository.cartItems.value).isSuccess
+                    }
+                    if (validPromotions.isNotEmpty()) {
+                        _state.update {
+                            it.copy(
+                                promotionOptions = validPromotions,
+                                pendingPromotionProduct = dashboardProduct,
+                                showPromotionChoice = true,
+                                promotionMessage = null
+                            )
+                        }
+                    } else {
+                        addProductIndividual(dashboardProduct)
+                    }
+                },
+                onFailure = { addProductIndividual(dashboardProduct) }
+            )
+        }
+    }
+
+    fun addProductIndividualFromPromotionChoice() {
+        val product = _state.value.pendingPromotionProduct ?: return
+        dismissPromotionChoice()
+        addProductIndividual(product)
+    }
+
+    fun addPromotionFromChoice(promocion: com.amaxonia.pos.domain.model.Promocion) {
+        validarAdicionPromocion(promocion, cartRepository.cartItems.value).fold(
+            onSuccess = {
+                cartRepository.addPromotionToCart(promocion)
+                _state.update {
+                    it.copy(
+                        showPromotionChoice = false,
+                        pendingPromotionProduct = null,
+                        promotionOptions = emptyList(),
+                        promotionMessage = "Promoción agregada: ${promocion.nombre}"
+                    )
+                }
+            },
+            onFailure = { error -> _state.update { it.copy(promotionMessage = error.message) } }
+        )
+    }
+
+    fun dismissPromotionChoice() {
+        _state.update { it.copy(showPromotionChoice = false, pendingPromotionProduct = null, promotionOptions = emptyList()) }
+    }
+
+    fun clearPromotionMessage() {
+        _state.update { it.copy(promotionMessage = null) }
+    }
+
+    private fun addProductIndividual(dashboardProduct: DashboardProduct) {
         val product = com.amaxonia.pos.domain.model.Product(
             id = dashboardProduct.id,
             description = dashboardProduct.name,

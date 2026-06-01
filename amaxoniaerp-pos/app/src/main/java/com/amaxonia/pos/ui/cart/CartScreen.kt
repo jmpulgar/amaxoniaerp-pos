@@ -18,8 +18,11 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material3.*
 import com.amaxonia.pos.domain.model.CartItem
+import com.amaxonia.pos.domain.model.ItemCarrito
+import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -319,23 +322,34 @@ fun CartScreen(
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.items) { item ->
-                        CartItemRow(
-                            item = item,
-                            onIncrease = { viewModel.increaseQuantity(item.product.id) },
-                            onDecrease = { viewModel.decreaseQuantity(item.product.id) },
-                            onRemove = { viewModel.removeItem(item.product.id) },
-                            allowEditPrice = state.allowEditPrices,
-                            allowDiscount = state.allowDiscounts,
-                            onEditPrice = {
-                                itemToEditPrice = item
-                                priceInput = String.format("%.2f", item.unitPriceWithTax)
-                            },
-                            onEditDiscount = {
-                                itemToEditDiscount = item
-                                discountInput = String.format("%.2f", item.discountPercent)
+                    items(state.displayItems, key = { it.id }) { displayItem ->
+                        when (displayItem) {
+                            is ItemCarrito.ProductoIndividual -> {
+                                val item = displayItem.item
+                                CartItemRow(
+                                    item = item,
+                                    onIncrease = { viewModel.increaseQuantity(item.product.id) },
+                                    onDecrease = { viewModel.decreaseQuantity(item.product.id) },
+                                    onRemove = { viewModel.removeItem(item.product.id) },
+                                    allowEditPrice = state.allowEditPrices,
+                                    allowDiscount = state.allowDiscounts,
+                                    onEditPrice = {
+                                        itemToEditPrice = item
+                                        priceInput = String.format("%.2f", item.unitPriceWithTax)
+                                    },
+                                    onEditDiscount = {
+                                        itemToEditDiscount = item
+                                        discountInput = String.format("%.2f", item.discountPercent)
+                                    }
+                                )
                             }
-                        )
+                            is ItemCarrito.PromocionAgrupada -> {
+                                PromotionCartGroup(
+                                    group = displayItem,
+                                    onRemove = { viewModel.removePromotion(displayItem.promocionId) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -378,6 +392,78 @@ private fun buildInitials(name: String): String {
     val parts = name.trim().split(" ").filter { it.isNotBlank() }
     if (parts.isEmpty()) return "CL"
     return parts.take(2).joinToString(separator = "") { it.first().uppercase() }
+}
+
+@Composable
+private fun PromotionCartGroup(
+    group: ItemCarrito.PromocionAgrupada,
+    onRemove: () -> Unit
+) {
+    val accent = if (group.promocionTipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    accent,
+                                    MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.LocalOffer, contentDescription = null, tint = Color.White)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("PROMOCIÓN ${group.promocionCodigo}", color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                    Text(group.promocionNombre, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("EL PRODUCTO ESTÁ CONFORMADO POR:", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                group.items.forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .padding(horizontal = 10.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(accent))
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.product.description, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Cant. ${String.format("%.2f", item.quantityDecimal)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("$ ${String.format("%.2f", item.total)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = accent)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Total promoción", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(BigDecimalMoneyFormatter.money(group.total), fontWeight = FontWeight.ExtraBold, color = accent, fontSize = 16.sp)
+            }
+        }
+    }
 }
 
 @Composable

@@ -28,7 +28,8 @@ class CatalogSyncWorker(
             addressLevel1Dao = database.addressLevel1Dao(),
             addressLevel2Dao = database.addressLevel2Dao(),
             addressLevel3Dao = database.addressLevel3Dao(),
-            clientTypeDao = database.clientTypeDao()
+            clientTypeDao = database.clientTypeDao(),
+            promocionDao = database.promocionDao()
         )
 
         return syncer.syncAll().fold(

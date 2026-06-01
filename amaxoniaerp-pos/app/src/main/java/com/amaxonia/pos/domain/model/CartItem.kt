@@ -16,10 +16,19 @@ data class CartItem(
     val quantity: Int = 1,
     val codVendedor: Int = 0,
     val unitPriceWithTax: Double = product.prices.firstOrNull()?.pricePlusTax ?: 0.0,
+    val quantityDecimal: Double = quantity.toDouble(),
     val discountPercent: Double = 0.0,
     val hasLotConfig: Boolean = false,
     val lotAssignments: List<LotAssignment> = emptyList(),
+    val promocionId: String? = null,
+    val promocionCodigo: String = "",
+    val promocionNombre: String = "",
+    val promocionTipo: String = "",
+    val promocionGrupo: String = "",
+    val promocionDetalleId: String = "",
 ) {
+    val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
+
     val taxRate: Double
         get() = if (product.isExempt) 0.0 else product.taxRate.coerceAtLeast(0.0)
 
@@ -27,7 +36,7 @@ data class CartItem(
         get() = if (taxRate <= 0.0) unitPriceWithTax else unitPriceWithTax / (1.0 + (taxRate / 100.0))
 
     val subtotalWithoutTax: Double
-        get() = unitPriceWithoutTax * quantity
+        get() = unitPriceWithoutTax * quantityDecimal
 
     val discountAmountWithoutTax: Double
         get() = subtotalWithoutTax * (discountPercent.coerceIn(0.0, 100.0) / 100.0)

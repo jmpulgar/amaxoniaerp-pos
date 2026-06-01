@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.dashboard
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.Department
@@ -63,6 +64,10 @@ data class DashboardState(
     val bottomSelected: Int = 0,
     val error: String? = null,
     val manualEntryValue: String = "",
+    val promotionOptions: List<Promocion> = emptyList(),
+    val pendingPromotionProduct: DashboardProduct? = null,
+    val showPromotionChoice: Boolean = false,
+    val promotionMessage: String? = null,
 
     // --- AUTO-CLOSE ---
     val autoCloseMessage: String? = null

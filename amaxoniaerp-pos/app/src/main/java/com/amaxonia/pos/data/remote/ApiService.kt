@@ -8,6 +8,13 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.*
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 class ApiService(
     private val apiClient: ApiClient
@@ -131,6 +138,19 @@ class ApiService(
             url { parameters.append("limit", limit.toString()) }
         }.body<BestSellersResponse>()
         return response.data
+    }
+
+    suspend fun getPromotions(token: String): List<PromocionDto> {
+        val responseText = client.get("promociones") {
+            authHeaders(token)
+        }.bodyAsText()
+        val element = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+        val array = when (element) {
+            is JsonArray -> element
+            is JsonObject -> element.jsonObject["data"]?.jsonArray ?: JsonArray(emptyList())
+            else -> JsonArray(emptyList())
+        }
+        return AppJson.decodeFromJsonElement(ListSerializer(PromocionDto.serializer()), array)
     }
 
     suspend fun getFacturasResumen(token: String): FacturasResumenDto {

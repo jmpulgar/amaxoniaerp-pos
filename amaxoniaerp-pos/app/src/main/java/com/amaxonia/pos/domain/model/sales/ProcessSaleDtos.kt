@@ -105,6 +105,11 @@ data class SaleItemDto(
     val poseeConfiguracionLote: String = "no",
     @SerialName("_codigos_lote")
     val codigosLote: List<SaleLotDto> = emptyList(),
+    val promocionTipo: String = "",
+    val promocionCodigo: String = "",
+    val promocionNombre: String = "",
+    val promocionGrupo: String = "",
+    val promocionDetalleId: String = "",
 )
 
 @Serializable

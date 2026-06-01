@@ -1,6 +1,8 @@
 package com.amaxonia.pos.ui.navigation
 
+import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -31,12 +33,20 @@ import com.amaxonia.pos.ui.welcome.WelcomeScreen
 import com.amaxonia.pos.data.sync.SyncScheduler
 import kotlinx.coroutines.launch
 
+private const val NAV_LOG_TAG = "AppNavigation"
+
 @Composable
 fun AppNavigation(startDestination: String) {
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val cartRepository = DependencyContainer.cartRepository
+
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            Log.d(NAV_LOG_TAG, "route=${entry.destination.route}")
+        }
+    }
 
     // Navega y limpia todo el back stack de forma consistente.
     fun navigateAndClearStack(route: String) {
@@ -224,7 +234,21 @@ fun AppNavigation(startDestination: String) {
 
         composable("cart") {
             CartScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    val currentRoute = navController.currentBackStackEntry?.destination?.route
+                    val previousRoute = navController.previousBackStackEntry?.destination?.route
+                    Log.d(NAV_LOG_TAG, "cart back pressed. current=$currentRoute, previous=$previousRoute")
+
+                    if (currentRoute != "cart") {
+                        Log.w(NAV_LOG_TAG, "Ignoring stale cart back callback from route=$currentRoute")
+                        return@CartScreen
+                    }
+
+                    if (!navController.popBackStack()) {
+                        Log.w(NAV_LOG_TAG, "Cart back stack was empty; restoring dashboard")
+                        navigateAndClearStack("dashboard")
+                    }
+                },
                 onCheckout = { total ->
                     navController.navigate("payment/$total")
                 },

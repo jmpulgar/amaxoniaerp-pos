@@ -132,3 +132,36 @@ fun ClientTypeDto.toEntity(): ClientTypeEntity {
 fun ClientTypeEntity.toDomain(): ClientTypeOption {
     return ClientTypeOption(id = id, name = name)
 }
+
+fun PromocionDto.toEntity(): PromocionEntity {
+    return PromocionEntity(
+        id = id,
+        codigo = codigo,
+        inicio = inicio,
+        fin = fin,
+        nombre = promocion,
+        imagen = imagen,
+        descuentoGlobal = descuentoGlobal,
+        idItem = idItem,
+        activo = activo
+    )
+}
+
+fun PromocionDetalleDto.toEntity(promocionId: String): PromocionDetalleEntity {
+    return PromocionDetalleEntity(
+        id = idPromocionDetalle.ifBlank { "$promocionId-$idItem-$grupo" },
+        promocionId = promocionId,
+        idItem = idItem,
+        idTipoPrecio = idTipoPrecio,
+        cantidad = cantidad,
+        cantidadTotal = cantidadTotal,
+        unidadEmpaque = unidadEmpaque,
+        descuento = descuento,
+        descuentoMonto = descuentoMonto,
+        precio = precio,
+        impuesto = impuesto,
+        impuestoPorcentaje = resolvedTaxPercent,
+        importe = importe,
+        grupo = grupo
+    )
+}

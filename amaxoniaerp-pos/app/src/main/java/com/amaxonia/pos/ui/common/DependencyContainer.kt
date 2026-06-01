@@ -23,6 +23,7 @@ import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.ApiTransactionRepository
 import com.amaxonia.pos.data.repository.OfflineFirstClientRepository
 import com.amaxonia.pos.data.repository.OfflineFirstProductRepository
+import com.amaxonia.pos.data.repository.PromotionRepositoryImpl
 import com.amaxonia.pos.data.sync.CatalogSyncer
 import com.amaxonia.pos.domain.repository.AddressCatalogRepository
 import com.amaxonia.pos.domain.repository.AuthRepository
@@ -31,6 +32,7 @@ import com.amaxonia.pos.domain.repository.ClientTypeRepository
 import com.amaxonia.pos.domain.repository.CompanyRepository
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.ProductRepository
+import com.amaxonia.pos.domain.repository.PromotionRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import com.amaxonia.pos.domain.repository.CajaRepository
@@ -50,6 +52,8 @@ object DependencyContainer {
     lateinit var authRepository: AuthRepository
         private set
     lateinit var productRepository: ProductRepository
+        private set
+    lateinit var promotionRepository: PromotionRepository
         private set
     lateinit var clientRepository: ClientRepository
         private set
@@ -125,6 +129,7 @@ object DependencyContainer {
         authRepository = AuthRepositoryImpl(apiService, localStore)
         companyRepository = CachedCompanyRepository(localStore)
         productRepository = OfflineFirstProductRepository(apiService, localStore, database.productDao(), networkMonitor)
+        promotionRepository = PromotionRepositoryImpl(apiService, localStore, database.promocionDao(), database.productDao(), networkMonitor)
         reportRepository = ApiReportRepository(apiService, localStore)
         clientRepository = OfflineFirstClientRepository(apiService, localStore, database.clientDao(), networkMonitor)
         addressCatalogRepository = LocalAddressCatalogRepository(
@@ -151,7 +156,8 @@ object DependencyContainer {
             addressLevel1Dao = database.addressLevel1Dao(),
             addressLevel2Dao = database.addressLevel2Dao(),
             addressLevel3Dao = database.addressLevel3Dao(),
-            clientTypeDao = database.clientTypeDao()
+            clientTypeDao = database.clientTypeDao(),
+            promocionDao = database.promocionDao()
         )
         initialized = true
     }

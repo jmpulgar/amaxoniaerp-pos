@@ -18,9 +18,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AddressLevel3Entity::class,
         ClientTypeEntity::class,
         DraftInvoiceEntity::class,
-        PendingInvoiceEntity::class
+        PendingInvoiceEntity::class,
+        PromocionEntity::class,
+        PromocionDetalleEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -34,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun clientTypeDao(): ClientTypeDao
     abstract fun draftInvoiceDao(): DraftInvoiceDao
     abstract fun pendingInvoiceDao(): PendingInvoiceDao
+    abstract fun promocionDao(): PromocionDao
 
     companion object {
         @Volatile
@@ -142,6 +145,43 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS promociones (" +
+                        "id TEXT NOT NULL, " +
+                        "codigo TEXT NOT NULL, " +
+                        "inicio TEXT, " +
+                        "fin TEXT, " +
+                        "nombre TEXT NOT NULL, " +
+                        "imagen TEXT NOT NULL, " +
+                        "descuentoGlobal REAL NOT NULL, " +
+                        "idItem TEXT NOT NULL, " +
+                        "activo INTEGER NOT NULL, " +
+                        "PRIMARY KEY(id)" +
+                        ")"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS promocion_detalles (" +
+                        "id TEXT NOT NULL, " +
+                        "promocionId TEXT NOT NULL, " +
+                        "idItem TEXT NOT NULL, " +
+                        "idTipoPrecio TEXT NOT NULL, " +
+                        "cantidad REAL NOT NULL, " +
+                        "cantidadTotal REAL NOT NULL, " +
+                        "unidadEmpaque TEXT NOT NULL, " +
+                        "descuento REAL NOT NULL, " +
+                        "descuentoMonto REAL NOT NULL, " +
+                        "precio REAL NOT NULL, " +
+                        "impuesto REAL NOT NULL, " +
+                        "impuestoPorcentaje REAL NOT NULL, " +
+                        "importe REAL NOT NULL, " +
+                        "grupo TEXT NOT NULL, " +
+                        "PRIMARY KEY(id)" +
+                        ")"
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
@@ -149,7 +189,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "amaxonia_pos.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                     .also { instance = it }
             }

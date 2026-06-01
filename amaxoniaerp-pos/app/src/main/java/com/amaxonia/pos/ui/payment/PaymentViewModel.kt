@@ -360,7 +360,7 @@ class PaymentViewModel(
 
             val mappedItems = cartItems.map { cartItem ->
                 val itemId = cartItem.product.id.toInt()
-                val qty = cartItem.quantity.toDouble()
+                val qty = cartItem.quantityDecimal
                 val unitConIva = cartItem.unitPriceWithTax
                 val taxRate = if (cartItem.product.isExempt) {
                     0.0
@@ -400,7 +400,12 @@ class PaymentViewModel(
                             cantidad = lot.cantidad,
                             idAlmacen = lot.almacen
                         )
-                    }
+                    },
+                    promocionTipo = cartItem.promocionTipo,
+                    promocionCodigo = cartItem.promocionCodigo,
+                    promocionNombre = cartItem.promocionNombre,
+                    promocionGrupo = cartItem.promocionGrupo,
+                    promocionDetalleId = cartItem.promocionDetalleId
                 )
             }
 

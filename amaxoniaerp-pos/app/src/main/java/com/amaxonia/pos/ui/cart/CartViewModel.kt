@@ -7,6 +7,7 @@ import com.amaxonia.pos.data.local.db.DraftInvoiceEntity
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.ClientRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ import java.util.UUID
 
 data class CartState(
     val items: List<CartItem> = emptyList(),
+    val displayItems: List<ItemCarrito> = emptyList(),
     val total: Double = 0.0,
     val selectedClient: Client? = null,
     val currentSeller: Seller? = null,
@@ -106,6 +108,7 @@ class CartViewModel(
         _state.update {
             it.copy(
                 items = items,
+                displayItems = cartRepository.getDisplayItems(),
                 total = items.sumOf { item -> item.total },
                 selectedClient = client
             )
@@ -123,6 +126,8 @@ class CartViewModel(
     }
 
     fun removeItem(productId: String) = cartRepository.removeItem(productId)
+
+    fun removePromotion(promotionId: String) = cartRepository.removePromotion(promotionId)
 
     /** Recalcula lotes FEFO cuando cambia la cantidad */
     private fun refreshLotsIfNeeded(productId: String) {

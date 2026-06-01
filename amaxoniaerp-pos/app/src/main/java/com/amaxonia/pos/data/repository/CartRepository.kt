@@ -2,8 +2,10 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,8 +29,8 @@ class CartRepository {
     fun addToCart(product: Product) {
         val currentSellerId = _currentSeller.value?.id ?: 0
         _cartItems.update { currentItems ->
-            val existingIndex = currentItems.indexOfFirst { it.product.id == product.id }
-            if (existingIndex != -1) {
+                val existingIndex = currentItems.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
+                if (existingIndex != -1) {
                 val mutable = currentItems.toMutableList()
                 val existingItem = mutable[existingIndex]
                 mutable[existingIndex] = existingItem.copy(
@@ -40,6 +42,7 @@ class CartRepository {
                 currentItems + CartItem(
                     product = product,
                     quantity = 1,
+                    quantityDecimal = 1.0,
                     codVendedor = currentSellerId,
                     unitPriceWithTax = product.prices.firstOrNull()?.pricePlusTax ?: 0.0
                 )
@@ -47,24 +50,82 @@ class CartRepository {
         }
     }
 
+    fun addPromotionToCart(promocion: Promocion) {
+        val currentSellerId = _currentSeller.value?.id ?: 0
+        _cartItems.update { currentItems ->
+            if (currentItems.any { it.promocionId == promocion.id }) return@update currentItems
+            val promotionLines = promocion.detalles.map { detalle ->
+                val quantity = detalle.cantidadTotal.toDouble().takeIf { it > 0.0 } ?: detalle.cantidad.toDouble().coerceAtLeast(1.0)
+                CartItem(
+                    product = detalle.product.copy(
+                        isExempt = detalle.iva.toDouble() <= 0.0,
+                        taxRate = detalle.iva.toDouble(),
+                        prices = listOf(com.amaxonia.pos.domain.model.PriceLevel(label = "PROMO", pricePlusTax = detalle.totalConIva.toDouble() / quantity))
+                    ),
+                    quantity = quantity.toInt().coerceAtLeast(1),
+                    quantityDecimal = quantity,
+                    codVendedor = currentSellerId,
+                    unitPriceWithTax = detalle.totalConIva.toDouble() / quantity,
+                    discountPercent = detalle.descuento.toDouble(),
+                    promocionId = promocion.id,
+                    promocionCodigo = promocion.codigo,
+                    promocionNombre = promocion.nombre,
+                    promocionTipo = promocion.tipo,
+                    promocionGrupo = detalle.grupo,
+                    promocionDetalleId = detalle.id
+                )
+            }
+            currentItems + promotionLines
+        }
+    }
+
+    fun getDisplayItems(): List<ItemCarrito> {
+        val grouped = mutableListOf<ItemCarrito>()
+        val promotionIds = mutableSetOf<String>()
+        _cartItems.value.forEach { item ->
+            val promoId = item.promocionId
+            if (promoId.isNullOrBlank()) {
+                grouped.add(ItemCarrito.ProductoIndividual(item))
+            } else if (promotionIds.add(promoId)) {
+                val promoItems = _cartItems.value.filter { it.promocionId == promoId }
+                val first = promoItems.first()
+                grouped.add(
+                    ItemCarrito.PromocionAgrupada(
+                        promocionId = promoId,
+                        promocionCodigo = first.promocionCodigo,
+                        promocionNombre = first.promocionNombre,
+                        promocionTipo = first.promocionTipo,
+                        promocionGrupo = first.promocionGrupo,
+                        items = promoItems
+                    )
+                )
+            }
+        }
+        return grouped
+    }
+
     fun increaseQuantity(productId: String) {
         _cartItems.update { items ->
-            items.map { if (it.product.id == productId) it.copy(quantity = it.quantity + 1) else it }
+            items.map { if (it.product.id == productId && !it.isPromotionLine) it.copy(quantity = it.quantity + 1, quantityDecimal = it.quantity + 1.0) else it }
         }
     }
 
     fun decreaseQuantity(productId: String) {
         _cartItems.update { items ->
             items.mapNotNull {
-                if (it.product.id == productId) {
-                    if (it.quantity > 1) it.copy(quantity = it.quantity - 1) else null
+                if (it.product.id == productId && !it.isPromotionLine) {
+                    if (it.quantity > 1) it.copy(quantity = it.quantity - 1, quantityDecimal = it.quantity - 1.0) else null
                 } else it
             }
         }
     }
 
     fun removeItem(productId: String) {
-        _cartItems.update { items -> items.filter { it.product.id != productId } }
+        _cartItems.update { items -> items.filter { it.product.id != productId || it.isPromotionLine } }
+    }
+
+    fun removePromotion(promotionId: String) {
+        _cartItems.update { items -> items.filter { it.promocionId != promotionId } }
     }
 
     fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
@@ -97,7 +158,7 @@ class CartRepository {
     fun setItemHasLotConfig(productId: String, hasLotConfig: Boolean) {
         _cartItems.update { items ->
             items.map { item ->
-                if (item.product.id == productId) item.copy(hasLotConfig = hasLotConfig)
+                if (item.product.id == productId && !item.isPromotionLine) item.copy(hasLotConfig = hasLotConfig)
                 else item
             }
         }
@@ -107,7 +168,7 @@ class CartRepository {
     fun assignLots(productId: String, lots: List<LotAssignment>) {
         _cartItems.update { items ->
             items.map { item ->
-                if (item.product.id == productId) item.copy(lotAssignments = lots)
+                if (item.product.id == productId && !item.isPromotionLine) item.copy(lotAssignments = lots)
                 else item
             }
         }

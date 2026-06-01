@@ -8,6 +8,7 @@ import com.amaxonia.pos.data.local.db.ClientDao
 import com.amaxonia.pos.data.local.db.CountryDao
 import com.amaxonia.pos.data.local.db.ClientTypeDao
 import com.amaxonia.pos.data.local.db.ProductDao
+import com.amaxonia.pos.data.local.db.PromocionDao
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.local.db.toLevel1Entity
 import com.amaxonia.pos.data.local.db.toLevel2Entity
@@ -23,7 +24,8 @@ class CatalogSyncer(
     private val addressLevel1Dao: AddressLevel1Dao,
     private val addressLevel2Dao: AddressLevel2Dao,
     private val addressLevel3Dao: AddressLevel3Dao,
-    private val clientTypeDao: ClientTypeDao
+    private val clientTypeDao: ClientTypeDao,
+    private val promocionDao: PromocionDao
 ) {
     suspend fun syncAll(pageSize: Int = 300): Result<Unit> {
         val session = localStore.readCompanySession()
@@ -32,6 +34,7 @@ class CatalogSyncer(
             // Critical POS data first: this is enough for most offline sales flows.
             syncClients(session.token, pageSize)
             syncProducts(session.token, pageSize)
+            syncPromotions(session.token)
             localStore.setInitialSyncCompleted(session.company.id, true)
 
             // Secondary catalogs keep syncing after the app can already operate.
@@ -75,6 +78,16 @@ class CatalogSyncer(
             if (response.data.isEmpty()) break
             productDao.insertAll(response.data.map { it.toEntity() })
             offset += pageSize
+        }
+    }
+
+    private suspend fun syncPromotions(token: String) {
+        runCatching {
+            val promos = apiService.getPromotions(token)
+            promocionDao.clearDetalles()
+            promocionDao.clearPromociones()
+            promocionDao.insertPromociones(promos.map { it.toEntity() })
+            promocionDao.insertDetalles(promos.flatMap { promo -> promo.detalle.map { it.toEntity(promo.id) } })
         }
     }
 

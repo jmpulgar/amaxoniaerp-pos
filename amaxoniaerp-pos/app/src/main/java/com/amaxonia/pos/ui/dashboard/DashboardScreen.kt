@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.dashboard
 
+import android.util.Log
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
@@ -40,10 +41,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.R
 import com.amaxonia.pos.data.sync.SyncScheduler
+import com.amaxonia.pos.domain.model.Promocion
+import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -52,13 +56,16 @@ import com.amaxonia.pos.ui.theme.AmaxoniaBlue
 import androidx.work.WorkInfo
 import kotlinx.coroutines.launch
 
+private const val DASHBOARD_LOG_TAG = "DashboardScreen"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = injectedViewModel {
-        DashboardViewModel(
-            DependencyContainer.productRepository,
-            DependencyContainer.reportRepository,
+            DashboardViewModel(
+                DependencyContainer.productRepository,
+                DependencyContainer.promotionRepository,
+                DependencyContainer.reportRepository,
             DependencyContainer.cartRepository,
             DependencyContainer.cajaRepository,
             DependencyContainer.localStore,
@@ -95,6 +102,13 @@ fun DashboardScreen(
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
+    DisposableEffect(Unit) {
+        Log.d(DASHBOARD_LOG_TAG, "Dashboard composed")
+        onDispose {
+            Log.d(DASHBOARD_LOG_TAG, "Dashboard disposed")
+        }
+    }
+
     val productsToShow: List<DashboardProduct> = if (state.bottomSelected == 1) state.bestSellers else state.products
 
     val gridReachedBottom by remember {
@@ -124,6 +138,12 @@ fun DashboardScreen(
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
             viewModel.dismissAutoCloseMessage()
         }
+    }
+
+    LaunchedEffect(state.promotionMessage) {
+        val msg = state.promotionMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        viewModel.clearPromotionMessage()
     }
 
     LaunchedEffect(isOnline) {
@@ -172,6 +192,16 @@ fun DashboardScreen(
             selectedSellerId = state.currentSeller?.id,
             onSelect = { seller -> viewModel.selectSeller(seller.id) },
             onDismiss = { showSellerSheet = false }
+        )
+    }
+
+    if (state.showPromotionChoice && state.pendingPromotionProduct != null) {
+        PromotionChoiceSheet(
+            product = state.pendingPromotionProduct!!,
+            promotions = state.promotionOptions,
+            onAddIndividual = viewModel::addProductIndividualFromPromotionChoice,
+            onAddPromotion = viewModel::addPromotionFromChoice,
+            onDismiss = viewModel::dismissPromotionChoice
         )
     }
 
@@ -314,7 +344,27 @@ fun DashboardScreen(
     ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState) { snackbarData ->
+                    val message = snackbarData.visuals.message
+                    val isOnlineMessage = message.startsWith("Conexión restaurada")
+                    val isOfflineMessage = message.startsWith("Sin conexión")
+                    Snackbar(
+                        snackbarData = snackbarData,
+                        containerColor = when {
+                            isOnlineMessage -> Color(0xFF16A34A)
+                            isOfflineMessage -> Color(0xFFDC2626)
+                            else -> MaterialTheme.colorScheme.inverseSurface
+                        },
+                        contentColor = when {
+                            isOnlineMessage || isOfflineMessage -> Color.White
+                            else -> MaterialTheme.colorScheme.inverseOnSurface
+                        },
+                        actionColor = Color.White,
+                        shape = RoundedCornerShape(18.dp)
+                    )
+                }
+            },
             topBar = {
                 TopAppBar(
                     title = {
@@ -344,15 +394,23 @@ fun DashboardScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = { 
+                        IconButton(
+                            onClick = {
                             focusManager.clearFocus()
-                            scope.launch { 
+                            scope.launch {
                                 try {
-                                    drawerState.open() 
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
+                                    Log.d(DASHBOARD_LOG_TAG, "Drawer requested. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
+                                    if (drawerState.isClosed) {
+                                        drawerState.snapTo(DrawerValue.Open)
+                                        Log.d(DASHBOARD_LOG_TAG, "Drawer opened. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
+                                    } else {
+                                        Log.d(DASHBOARD_LOG_TAG, "Drawer open ignored. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
+                                    }
+                                } catch (throwable: Throwable) {
+                                    Log.e(DASHBOARD_LOG_TAG, "Error opening drawer. current=${drawerState.currentValue}, target=${drawerState.targetValue}", throwable)
+                                    runCatching { drawerState.close() }
                                 }
-                            } 
+                            }
                         }) {
                             Icon(Icons.Default.Menu, contentDescription = "Menu", tint = AmaxoniaBlue)
                         }
@@ -735,6 +793,158 @@ fun DashboardScreen(
 } // <--- ESTA LLAVE FALTABA, CERRANDO LA FUNCION DashboardScreen
 
 // AHORA ESTAS FUNCIONES ESTÁN FUERA, COMO DEBEN ESTAR
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PromotionChoiceSheet(
+    product: DashboardProduct,
+    promotions: List<Promocion>,
+    onAddIndividual: () -> Unit,
+    onAddPromotion: (Promocion) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 22.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
+                            )
+                    ) {
+                        Icon(Icons.Default.LocalOffer, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Este producto tiene promoción", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(product.name, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f), fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            OutlinedButton(
+                onClick = onAddIndividual,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Vender producto individual", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Text("Promociones disponibles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(promotions, key = { it.id }) { promo ->
+                    PromotionOptionCard(promo = promo, onAddPromotion = { onAddPromotion(promo) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromotionOptionCard(
+    promo: Promocion,
+    onAddPromotion: () -> Unit
+) {
+    val accent = if (promo.tipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+                    Text(
+                        text = promo.tipo,
+                        color = accent,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(promo.nombre, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text("Código ${promo.codigo}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+                Text(BigDecimalMoneyFormatter.money(promo.total), color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), shape = RoundedCornerShape(16.dp)) {
+                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    promo.detalles.take(4).forEach { detail ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "${detail.cantidadTotal.stripTrailingZeros().toPlainString()} x ${detail.productName}",
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(BigDecimalMoneyFormatter.money(detail.totalConIva), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (promo.detalles.size > 4) {
+                        Text("+${promo.detalles.size - 4} productos más", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onAddPromotion,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Agregar promoción", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
 @Composable
 private fun BottomPillItem(
