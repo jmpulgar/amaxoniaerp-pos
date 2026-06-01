@@ -139,7 +139,7 @@ object DependencyContainer {
             addressLevel3Dao = database.addressLevel3Dao()
         )
         cajaRepository = CajaRepositoryImpl(com.amaxonia.pos.data.remote.api.CajaApiImpl(apiClient), localStore)
-        formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore)
+        formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, networkMonitor)
         salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
         creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
         _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore)

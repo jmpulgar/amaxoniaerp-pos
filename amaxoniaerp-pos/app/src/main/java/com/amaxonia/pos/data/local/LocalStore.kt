@@ -14,6 +14,7 @@ import com.amaxonia.pos.data.remote.dto.ProductDto
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
+import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.ui.payment.PaymentSuccessPayload
@@ -45,6 +46,7 @@ class LocalStore(
     private val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
     private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
+    private val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
     private val lastPaymentSuccessKey = stringPreferencesKey("last_payment_success")
     private val lastPaymentSuccessTransactionIdKey = stringPreferencesKey("last_payment_success_transaction_id")
 
@@ -116,6 +118,31 @@ class LocalStore(
         context.dataStore.edit { prefs ->
             prefs.remove(activeCajaKey)
         }
+    }
+
+    suspend fun saveFormasPago(cajaId: String?, formasPago: List<FormaPago>) {
+        val session = readCompanySession() ?: return
+        val snapshot = FormasPagoSnapshot(
+            companyDb = session.company.adminDb,
+            cajaId = cajaId,
+            formasPago = formasPago
+        )
+        val json = AppJson.encodeToString(snapshot)
+        context.dataStore.edit { prefs ->
+            prefs[formasPagoKey] = json
+        }
+    }
+
+    suspend fun readFormasPago(cajaId: String?): List<FormaPago> {
+        val json = context.dataStore.data.first()[formasPagoKey] ?: return emptyList()
+        val snapshot = runCatching {
+            AppJson.decodeFromString(FormasPagoSnapshot.serializer(), json)
+        }.getOrNull() ?: return emptyList()
+
+        val session = readCompanySession()
+        val isSameCompany = session?.company?.adminDb == snapshot.companyDb
+        val isSameCaja = snapshot.cajaId == cajaId
+        return if (isSameCompany && isSameCaja) snapshot.formasPago else emptyList()
     }
 
     suspend fun isInitialSyncCompleted(companyId: Int): Boolean {
@@ -334,6 +361,13 @@ data class ActiveCajaSnapshot(
     val companyDb: String,
     val date: String,
     val caja: Caja
+)
+
+@Serializable
+data class FormasPagoSnapshot(
+    val companyDb: String,
+    val cajaId: String?,
+    val formasPago: List<FormaPago>
 )
 
 fun LoginResponse.toSnapshot(): AuthSnapshot {

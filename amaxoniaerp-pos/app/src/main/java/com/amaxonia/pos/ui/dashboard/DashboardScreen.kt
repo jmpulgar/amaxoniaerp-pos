@@ -91,10 +91,6 @@ fun DashboardScreen(
     var showSellerSheet by remember { mutableStateOf(false) }
     val productGridState = rememberLazyGridState()
     val productListState = rememberLazyListState()
-    val isOnline by DependencyContainer.networkMonitor.isOnlineFlow.collectAsState(
-        initial = DependencyContainer.networkMonitor.isOnline()
-    )
-    var hasSeenConnectivityState by remember { mutableStateOf(false) }
     val manualSyncInfos by SyncScheduler.getManualSyncWorkInfos(context).observeAsState(emptyList())
     val isSyncRunning = manualSyncInfos.any { info ->
         info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
@@ -144,29 +140,6 @@ fun DashboardScreen(
         val msg = state.promotionMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
         viewModel.clearPromotionMessage()
-    }
-
-    LaunchedEffect(isOnline) {
-        if (!hasSeenConnectivityState) {
-            hasSeenConnectivityState = true
-            if (!isOnline) {
-                snackbarHostState.showSnackbar(
-                    message = "Sin conexión. Puedes seguir trabajando offline.",
-                    duration = SnackbarDuration.Long
-                )
-            }
-            return@LaunchedEffect
-        }
-
-        snackbarHostState.showSnackbar(
-            message = if (isOnline) {
-                SyncScheduler.enqueuePendingInvoices(context)
-                "Conexión restaurada. Reenviando pendientes..."
-            } else {
-                "Sin conexión. Puedes seguir trabajando offline."
-            },
-            duration = SnackbarDuration.Long
-        )
     }
 
     // --- CajaSelectorSheet (replaces old AlertDialog) ---
