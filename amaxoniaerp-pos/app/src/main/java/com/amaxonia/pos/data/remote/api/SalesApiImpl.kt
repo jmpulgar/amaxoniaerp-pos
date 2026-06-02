@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.remote.api
 
+import android.util.Log
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
@@ -39,12 +40,15 @@ class SalesApiImpl(private val apiClient: ApiClient) : SalesApi {
             val parsed = runCatching {
                 AppJson.decodeFromString(ProcessSaleResponseDto.serializer(), responseText)
             }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                Log.e("SalesApi", "processSale failed. status=${response.status.value} body=$responseText", it)
+                val json = runCatching {
+                    AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                }.getOrNull()
                 if (json is JsonObject) {
                     val error = json["error"]?.jsonPrimitive?.contentOrNull
                     throw IllegalStateException(error ?: "No se pudo procesar la venta")
                 }
-                throw IllegalStateException("Respuesta invalida al procesar la venta")
+                throw IllegalStateException(responseText.ifBlank { "Respuesta invalida al procesar la venta" })
             }
 
             Result.success(parsed)

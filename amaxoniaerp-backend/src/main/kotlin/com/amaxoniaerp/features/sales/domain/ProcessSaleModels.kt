@@ -101,6 +101,11 @@ data class SaleItemInput(
     val esProductoFisico: Boolean = true,
     val itemCodigo: String = "",
     val itemReferencia: String = "",
+    val promocionTipo: String = "",
+    val promocionCodigo: String = "",
+    val promocionNombre: String = "",
+    val promocionGrupo: String = "",
+    val promocionDetalleId: String = "",
     @SerialName("_posee_configuracion_lote")
     val poseeConfiguracionLote: String = "no",
     @SerialName("_codigos_lote")

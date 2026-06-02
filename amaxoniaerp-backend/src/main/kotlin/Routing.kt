@@ -40,15 +40,28 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+
+private val routingLog = LoggerFactory.getLogger("Routing")
 
 fun Application.configureRouting() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            call.respondText(text = "500: ${cause.message}", status = HttpStatusCode.InternalServerError)
-            cause.printStackTrace()
+            routingLog.error(
+                "Unhandled request error. method={} path={} message={}",
+                call.request.httpMethod.value,
+                call.request.uri,
+                cause.message,
+                cause
+            )
+            call.respond(
+                HttpStatusCode.InternalServerError,
+                mapOf("error" to (cause.message ?: "Error interno del servidor"))
+            )
         }
     }
 
