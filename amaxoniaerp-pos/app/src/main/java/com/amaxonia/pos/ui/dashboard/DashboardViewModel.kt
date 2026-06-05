@@ -298,7 +298,8 @@ class DashboardViewModel(
                             imageUrl = getProductImageUrl(product.photoUrl),
                             category = product.department.ifEmpty { "General" },
                             code = product.code,
-                            barcode = product.barcode1
+                            barcode = product.barcode1,
+                            sourceProduct = product,
                         )
                     }
                     _state.update {
@@ -389,7 +390,7 @@ class DashboardViewModel(
     }
 
     private fun addProductIndividual(dashboardProduct: DashboardProduct) {
-        val product = com.amaxonia.pos.domain.model.Product(
+        val product = dashboardProduct.sourceProduct ?: com.amaxonia.pos.domain.model.Product(
             id = dashboardProduct.id,
             description = dashboardProduct.name,
             prices = listOf(com.amaxonia.pos.domain.model.PriceLevel(label = "A", pricePlusTax = dashboardProduct.price)),
@@ -420,7 +421,7 @@ class DashboardViewModel(
 
                 // Obtener cantidad total del item en el carrito
                 val cartItem = cartRepository.cartItems.value.firstOrNull { it.product.id == productId }
-                val totalQty = cartItem?.quantity ?: 0
+                val totalQty = cartItem?.quantityTotal?.toInt() ?: 0
                 if (totalQty > 0 && response.lotes.isNotEmpty()) {
                     val assignments = assignFefo(response.lotes, totalQty)
                     cartRepository.assignLots(productId, assignments)

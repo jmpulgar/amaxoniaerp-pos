@@ -88,6 +88,10 @@ fun ProductDto.toDomain(): Product {
         commissionPercent = commissionPercent ?: 0.0,
         costEuroOrigin = costEuroOrigin ?: 0.0,
         costFranco = costFranco ?: 0.0,
+        unitPackage = unitPackage.orEmpty(),
+        bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
+        portionUnit = portionUnit,
+        unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
         prices = mappedPrices
     )
 }
@@ -99,6 +103,8 @@ fun PriceDto.toDomain(): PriceLevel {
         utilityPercent = utilityPercent,
         pricePlusUtility = if (pricePlusUtility > 0.0) pricePlusUtility else price,
         pricePlusTax = pricePlusTax,
+        unitPrice = unitPrice,
+        unitPricePlusTax = unitPricePlusTax,
         discountPercent = discountPercent
     )
 }

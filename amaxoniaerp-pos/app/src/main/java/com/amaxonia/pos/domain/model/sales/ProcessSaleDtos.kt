@@ -98,6 +98,12 @@ data class SaleItemDto(
     val itemTotalConIva: Double,
     @SerialName("_item_cantidad_total")
     val itemCantidadTotal: Double,
+    @SerialName("_cantidad_bulto")
+    val cantidadBulto: Int = 1,
+    @SerialName("_unidad_empaque")
+    val unidadEmpaque: String = "UNIDAD",
+    @SerialName("_item_unidad_empaque")
+    val itemUnidadEmpaque: String = "UNIDAD",
     val esProductoFisico: Boolean = true,
     val itemCodigo: String = "",
     val itemReferencia: String = "",

@@ -79,6 +79,9 @@ class DraftInvoicesViewModel(
                     barcode1 = obj.optString("barcode1", ""),
                     taxRate = obj.optDouble("taxRate", 0.0),
                     isExempt = obj.optBoolean("isExempt", false),
+                    unitPackage = obj.optString("unitPackage", ""),
+                    bulkQuantity = obj.optDouble("bulkQuantity", 1.0).takeIf { it > 0.0 } ?: 1.0,
+                    portionUnit = obj.optString("portionUnit", "").takeIf { it.isNotBlank() },
                     prices = listOf(
                         PriceLevel(
                             label = "A",
@@ -88,9 +91,11 @@ class DraftInvoicesViewModel(
                 )
                 val qty = obj.getInt("quantity")
                 val discount = obj.optDouble("discountPercent", 0.0)
+                val unit = obj.optString("itemUnitPackage", "UNIDAD")
 
                 // Agregar al carrito con la cantidad correcta
                 cartRepository.addToCart(product)
+                cartRepository.updateItemUnit(product.id, unit)
                 repeat(qty - 1) { cartRepository.increaseQuantity(product.id) }
                 if (discount > 0.0) {
                     cartRepository.updateItemDiscount(product.id, discount)

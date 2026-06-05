@@ -27,7 +27,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 3
-        versionName = "1.0.0"
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,8 +37,8 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"https://api.listoerp.app/\""
-                // "\"http://192.168.2.10:8080/\""
+                // "\"https://api.listoerp.app/\""
+                "\"http://192.168.2.10:8080/\""
                 // "\"http://10.0.2.2:8080/\""
             )
         }

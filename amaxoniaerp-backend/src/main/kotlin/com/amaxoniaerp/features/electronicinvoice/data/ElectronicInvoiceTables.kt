@@ -82,6 +82,7 @@ object FEParametrosReadTable : Table("parametros_generales") {
     val tokenEmpresa = varchar("token_empresa", 500).nullable()
     val tokenPassword = varchar("token_password", 500).nullable()
     val direccionEnvio = varchar("direccion_envio", 500).nullable()
+    val api_thefactoryhka = varchar("api_thefactoryhka", 500).nullable()
     val tipoEmision = varchar("tipoEmision", 5).nullable()
     val destinoOperacion = varchar("destinoOperacion", 5).nullable()
     val procesoGeneracion = varchar("procesoGeneracion", 5).nullable()

@@ -31,8 +31,18 @@ data class Product(
     val commissionPercent: Double = 0.0,
     val costEuroOrigin: Double = 0.0,
     val costFranco: Double = 0.0,
+    val unitPackage: String = "",
+    val bulkQuantity: Double = 1.0,
+    val portionUnit: String? = null,
+    val unitOrPackage: String = "UNIDAD",
     val prices: List<PriceLevel> = generateDefaultPrices()
-)
+) {
+    val canSwitchUnit: Boolean
+        get() = bulkQuantity > 1.0
+
+    val packageLabel: String
+        get() = unitPackage.ifBlank { unitOrPackage.ifBlank { "EMPAQUE" } }
+}
 
 @Serializable
 data class PriceLevel(
@@ -41,6 +51,8 @@ data class PriceLevel(
     val utilityPercent: Double = 0.0,
     val pricePlusUtility: Double = 0.0,
     val pricePlusTax: Double = 0.0,
+    val unitPrice: Double = 0.0,
+    val unitPricePlusTax: Double = 0.0,
     val discountPercent: Double = 0.0
 )
 

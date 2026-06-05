@@ -289,7 +289,7 @@ class CajaRepository {
                     .leftJoin(CajaFormaPagoGrupoTable, { CajaFormaPagoTable.grupo }, { CajaFormaPagoGrupoTable.id })
                     .selectAll()
                     .where { (CajaFormaTable.idCaja eq idCaja) and (CajaFormaTable.activo eq 1) }
-                    .associateBy { it[CajaFormaPagoTable.idFormaPago] }
+                    .associateBy { it[CajaFormaTable.idFormaPago] }
 
                 val formaPagoIds = (montosPorForma.keys.filterNotNull() + formasActivas.keys).distinct()
 
@@ -300,24 +300,26 @@ class CajaRepository {
                         .leftJoin(CajaFormaPagoGrupoTable, { grupo }, { CajaFormaPagoGrupoTable.id })
                         .selectAll()
                         .where { CajaFormaPagoTable.idFormaPago inList formaPagoIds }
-                        .associateBy { it[CajaFormaPagoTable.idFormaPago] }
+                        .associateBy { it.getOrNull(CajaFormaPagoTable.idFormaPago) }
+                        .filterKeys { it != null }
+                        .mapKeys { it.key!! }
                 }
 
                 val formaPagoItems = formaPagoIds.mapNotNull { idForma ->
                     val row = formasActivas[idForma] ?: catalogoFormas[idForma] ?: return@mapNotNull null
                     CajaFormaPagoItem(
                         id = idForma,
-                        forma_pago = row[CajaFormaPagoTable.descripcion],
-                        siglas = row[CajaFormaPagoTable.siglas],
-                        grupo = row[CajaFormaPagoTable.grupo],
-                        imagen = row[CajaFormaPagoTable.imagen].takeIf { it.isNotBlank() },
-                        id_caja_tp_concepto = row[CajaFormaPagoTable.idCajaTpConcepto],
-                        tipo_moneda = row[CajaFormaPagoTable.tipoMoneda],
-                        estatus = row[CajaFormaPagoTable.activo],
-                        grupo_nombre = row[CajaFormaPagoGrupoTable.grupo],
-                        grupo_imagen = row[CajaFormaPagoGrupoTable.imagen],
-                        grupo_orden = row[CajaFormaPagoGrupoTable.orden],
-                        grupo_activo = row[CajaFormaPagoGrupoTable.activo],
+                        forma_pago = row.getOrNull(CajaFormaPagoTable.descripcion),
+                        siglas = row.getOrNull(CajaFormaPagoTable.siglas),
+                        grupo = row.getOrNull(CajaFormaPagoTable.grupo),
+                        imagen = row.getOrNull(CajaFormaPagoTable.imagen)?.takeIf { it.isNotBlank() },
+                        id_caja_tp_concepto = row.getOrNull(CajaFormaPagoTable.idCajaTpConcepto),
+                        tipo_moneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda),
+                        estatus = row.getOrNull(CajaFormaPagoTable.activo) ?: 0,
+                        grupo_nombre = row.getOrNull(CajaFormaPagoGrupoTable.grupo),
+                        grupo_imagen = row.getOrNull(CajaFormaPagoGrupoTable.imagen),
+                        grupo_orden = row.getOrNull(CajaFormaPagoGrupoTable.orden),
+                        grupo_activo = row.getOrNull(CajaFormaPagoGrupoTable.activo),
                         monto = montosPorForma[idForma] ?: 0.0,
                     )
                 }.toMutableList()

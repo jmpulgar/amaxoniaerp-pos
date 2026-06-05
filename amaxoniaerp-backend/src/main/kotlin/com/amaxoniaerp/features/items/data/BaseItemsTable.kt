@@ -79,6 +79,12 @@ abstract class BaseItemsTable(tableName: String = "item") : Table(tableName) {
     val coniva5 = decimal("coniva5", 10, 2).default(0.0.toBigDecimal())
     val descuento5 = decimal("descuento5", 10, 2).default(0.0.toBigDecimal())
 
+    val precio1Extra = decimal("precio1_extra", 10, 2).nullable()
+    val precio2Extra = decimal("precio2_extra", 10, 2).nullable()
+    val precio3Extra = decimal("precio3_extra", 10, 2).nullable()
+    val precio4Extra = decimal("precio4_extra", 10, 2).nullable()
+    val precio5Extra = decimal("precio5_extra", 10, 2).nullable()
+
     // Estado
     val estatus = varchar("estatus", 1).default("A")
     val codItemForma = integer("cod_item_forma").default(1)
@@ -102,6 +108,9 @@ abstract class BaseItemsTable(tableName: String = "item") : Table(tableName) {
     // Campos adicionales base
     val codigoFabricante = varchar("codigo_fabricante", 50).nullable()
     val unidadEmpaque = varchar("unidad_empaque", 40).nullable()
+    val cantidadBulto = decimal("cantidad_bulto", 9, 2).nullable()
+    val unidadPorcion = varchar("unidad_porcion", 15).nullable()
+    val unidadOEmpaque = varchar("unidad_o_empaque", 40).nullable()
     val cantidad = integer("cantidad").default(0)
     val tipoItem = varchar("tipo_item", 50).nullable()
     val ubicacion1 = varchar("ubicacion1", 50).nullable()

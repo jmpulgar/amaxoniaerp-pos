@@ -28,6 +28,8 @@ class CartRepository {
 
     fun addToCart(product: Product) {
         val currentSellerId = _currentSeller.value?.id ?: 0
+        val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
+        val defaultPrice = priceForUnit(product, defaultUnit)
         _cartItems.update { currentItems ->
                 val existingIndex = currentItems.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
                 if (existingIndex != -1) {
@@ -43,10 +45,24 @@ class CartRepository {
                     product = product,
                     quantity = 1,
                     quantityDecimal = 1.0,
+                    itemUnitPackage = defaultUnit,
                     codVendedor = currentSellerId,
-                    unitPriceWithTax = product.prices.firstOrNull()?.pricePlusTax ?: 0.0
+                    unitPriceWithTax = defaultPrice
                 )
             }
+        }
+    }
+
+    private fun priceForUnit(product: Product, unit: String): Double {
+        val price = product.prices.firstOrNull()
+        return if (unit == "UNIDAD" && product.bulkQuantity > 1.0) {
+            price?.unitPricePlusTax?.takeIf { it > 0.0 }
+                ?: price?.unitPrice?.takeIf { it > 0.0 }?.let { unitPrice ->
+                    if (product.isExempt || product.taxRate <= 0.0) unitPrice else unitPrice * (1.0 + product.taxRate / 100.0)
+                }
+                ?: 0.0
+        } else {
+            price?.pricePlusTax ?: 0.0
         }
     }
 
@@ -147,6 +163,22 @@ class CartRepository {
             items.map { item ->
                 if (item.product.id == productId) {
                     item.copy(discountPercent = safeDiscount)
+                } else {
+                    item
+                }
+            }
+        }
+    }
+
+    fun updateItemUnit(productId: String, unit: String) {
+        val normalizedUnit = if (unit == "UNIDAD") "UNIDAD" else "EMPAQUE"
+        _cartItems.update { items ->
+            items.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine && item.product.canSwitchUnit) {
+                    item.copy(
+                        itemUnitPackage = normalizedUnit,
+                        unitPriceWithTax = priceForUnit(item.product, normalizedUnit)
+                    )
                 } else {
                     item
                 }

@@ -35,9 +35,13 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +62,7 @@ import kotlinx.coroutines.launch
 
 private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = injectedViewModel {
@@ -97,6 +101,16 @@ fun DashboardScreen(
     }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(state.isSearchOpen) {
+        if (state.isSearchOpen) {
+            withFrameNanos { }
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     DisposableEffect(Unit) {
         Log.d(DASHBOARD_LOG_TAG, "Dashboard composed")
@@ -361,6 +375,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(50.dp)
+                                    .focusRequester(searchFocusRequester)
                             )
                         } else {
                             Text("Punto de Venta", color = AmaxoniaBlue, fontWeight = FontWeight.Bold)
@@ -389,7 +404,13 @@ fun DashboardScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.toggleSearch() }) {
+                        IconButton(onClick = {
+                            if (state.isSearchOpen) {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                            viewModel.toggleSearch()
+                        }) {
                             Icon(
                                 imageVector = if (state.isSearchOpen) Icons.Default.Close else Icons.Default.Search,
                                 contentDescription = "Buscar",

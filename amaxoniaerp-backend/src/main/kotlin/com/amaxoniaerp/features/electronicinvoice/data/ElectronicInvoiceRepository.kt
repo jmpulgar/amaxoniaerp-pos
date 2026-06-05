@@ -58,7 +58,7 @@ class ElectronicInvoiceRepository {
 
         val config = mapConfig(configRow)
 
-        logger.info("[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(8)}... direccionEnvio=${config.direccionEnvio} tipoEmision=${config.tipoEmision}")
+        logger.info("[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(8)}... api_thefactoryhka=${config.api_thefactoryhka} tipoEmision=${config.tipoEmision}")
 
         // 3. Resolver código sucursal emisor y punto facturación fiscal
         val (codigoSucursal, puntoFacturacion) = resolveCodigoSucursalYPuntoFacturacion(
@@ -172,13 +172,13 @@ class ElectronicInvoiceRepository {
             ?: throw FEConfigurationException("token_empresa no configurado en parametros_generales")
         val tokenPassword = row[FEParametrosReadTable.tokenPassword]
             ?: throw FEConfigurationException("token_password no configurado en parametros_generales")
-        val direccionEnvio = row[FEParametrosReadTable.direccionEnvio]
-            ?: throw FEConfigurationException("direccion_envio no configurado en parametros_generales")
+        val apiTheFactoryHka = row[FEParametrosReadTable.api_thefactoryhka]
+            ?: throw FEConfigurationException("api_thefactoryhka no configurado en parametros_generales")
 
         return FEConfigData(
             tokenEmpresa = tokenEmpresa,
             tokenPassword = tokenPassword,
-            direccionEnvio = direccionEnvio.trimEnd('/'),
+            api_thefactoryhka = apiTheFactoryHka.trimEnd('/'),
             tipoEmision = row[FEParametrosReadTable.tipoEmision] ?: "01",
             destinoOperacion = row[FEParametrosReadTable.destinoOperacion] ?: "1",
             procesoGeneracion = row[FEParametrosReadTable.procesoGeneracion] ?: "01",

@@ -298,7 +298,7 @@ class TheFactoryHkaPayloadBuilder {
 
                 TheFactoryHkaFormaPago(
                     formaPagoFact = formaPagoFact,
-                    descFormaPago = descripcion,
+                    descFormaPago = descripcion.takeIf { formaPagoFact == "99" },
                     valorCuotaPagada = fp.monto.formatDecimals(2),
                 )
             }

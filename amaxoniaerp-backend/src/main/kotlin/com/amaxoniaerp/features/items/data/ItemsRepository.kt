@@ -588,6 +588,10 @@ class ItemsRepository {
             costActual = row[table.costoActual].toDouble(),
             costAverage = row[table.costoPromedio].toDouble(),
             costPrevious = row[table.costoAnterior].toDouble(),
+            unitPackage = row.getOrNull(table.unidadEmpaque).orEmpty(),
+            bulkQuantity = row.getOrNull(table.cantidadBulto)?.toDouble()?.takeIf { it > 0.0 } ?: 1.0,
+            portionUnit = row.getOrNull(table.unidadPorcion),
+            unitOrPackage = row.getOrNull(table.unidadOEmpaque).orEmpty().ifBlank { "UNIDAD" },
             prices = createPriceLevels(row, table),
             gobSegment = "",
             gobFamily = ""
@@ -613,6 +617,15 @@ class ItemsRepository {
             row[table.coniva5].toDouble() > row[table.precio5].toDouble(),
         ).any { it }
         val isExempt = storedTaxRate <= 0.0 && !hasTaxInPrices
+        fun unitPriceWithTax(unitPrice: Double): Double {
+            return if (unitPrice <= 0.0 || isExempt) unitPrice else unitPrice * (1.0 + (storedTaxRate / 100.0))
+        }
+
+        val unitPrice1 = row.getOrNull(table.precio1Extra)?.toDouble() ?: 0.0
+        val unitPrice2 = row.getOrNull(table.precio2Extra)?.toDouble() ?: 0.0
+        val unitPrice3 = row.getOrNull(table.precio3Extra)?.toDouble() ?: 0.0
+        val unitPrice4 = row.getOrNull(table.precio4Extra)?.toDouble() ?: 0.0
+        val unitPrice5 = row.getOrNull(table.precio5Extra)?.toDouble() ?: 0.0
         return listOf(
             com.amaxoniaerp.features.items.domain.PriceLevel(
                 label = "A",
@@ -620,6 +633,8 @@ class ItemsRepository {
                 utilityPercent = row[table.utilidad1].toDouble(),
                 pricePlusUtility = row[table.precio1].toDouble(),
                 pricePlusTax = if (isExempt) row[table.precio1].toDouble() else row[table.coniva1].toDouble(),
+                unitPrice = unitPrice1,
+                unitPricePlusTax = unitPriceWithTax(unitPrice1),
                 discountPercent = row[table.descuento1].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
@@ -628,6 +643,8 @@ class ItemsRepository {
                 utilityPercent = row[table.utilidad2].toDouble(),
                 pricePlusUtility = row[table.precio2].toDouble(),
                 pricePlusTax = if (isExempt) row[table.precio2].toDouble() else row[table.coniva2].toDouble(),
+                unitPrice = unitPrice2,
+                unitPricePlusTax = unitPriceWithTax(unitPrice2),
                 discountPercent = row[table.descuento2].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
@@ -636,6 +653,8 @@ class ItemsRepository {
                 utilityPercent = row[table.utilidad3].toDouble(),
                 pricePlusUtility = row[table.precio3].toDouble(),
                 pricePlusTax = if (isExempt) row[table.precio3].toDouble() else row[table.coniva3].toDouble(),
+                unitPrice = unitPrice3,
+                unitPricePlusTax = unitPriceWithTax(unitPrice3),
                 discountPercent = row[table.descuento3].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
@@ -644,6 +663,8 @@ class ItemsRepository {
                 utilityPercent = row[table.utilidad4].toDouble(),
                 pricePlusUtility = row[table.precio4].toDouble(),
                 pricePlusTax = if (isExempt) row[table.precio4].toDouble() else row[table.coniva4].toDouble(),
+                unitPrice = unitPrice4,
+                unitPricePlusTax = unitPriceWithTax(unitPrice4),
                 discountPercent = row[table.descuento4].toDouble()
             ),
             com.amaxoniaerp.features.items.domain.PriceLevel(
@@ -652,6 +673,8 @@ class ItemsRepository {
                 utilityPercent = row[table.utilidad5].toDouble(),
                 pricePlusUtility = row[table.precio5].toDouble(),
                 pricePlusTax = if (isExempt) row[table.precio5].toDouble() else row[table.coniva5].toDouble(),
+                unitPrice = unitPrice5,
+                unitPricePlusTax = unitPriceWithTax(unitPrice5),
                 discountPercent = row[table.descuento5].toDouble()
             )
         )

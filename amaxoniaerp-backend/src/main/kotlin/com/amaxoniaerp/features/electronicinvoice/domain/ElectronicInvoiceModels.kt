@@ -92,7 +92,7 @@ data class InvoiceFEContext(
 data class FEConfigData(
     val tokenEmpresa: String,
     val tokenPassword: String,
-    val direccionEnvio: String,
+    val api_thefactoryhka: String,
     val tipoEmision: String,
     val destinoOperacion: String,
     val procesoGeneracion: String,

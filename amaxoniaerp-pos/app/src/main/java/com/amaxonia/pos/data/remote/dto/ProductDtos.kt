@@ -31,6 +31,10 @@ data class ProductDto(
     val commissionPercent: Double? = null,
     val costEuroOrigin: Double? = null,
     val costFranco: Double? = null,
+    val unitPackage: String? = null,
+    val bulkQuantity: Double? = null,
+    val portionUnit: String? = null,
+    val unitOrPackage: String? = null,
     val prices: List<PriceDto> = emptyList()
 )
 
@@ -41,6 +45,8 @@ data class PriceDto(
     val utilityPercent: Double = 0.0,
     val pricePlusUtility: Double = 0.0,
     val pricePlusTax: Double = 0.0,
+    val unitPrice: Double = 0.0,
+    val unitPricePlusTax: Double = 0.0,
     val discountPercent: Double = 0.0
 )
 

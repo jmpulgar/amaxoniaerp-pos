@@ -57,11 +57,11 @@ class PanamaInvoiceProcessor(
         }
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
-        logger.info("[FE] Autenticando con PAC: baseUrl=${context.config.direccionEnvio} usuario=${context.config.tokenEmpresa.take(8)}...")
+        logger.info("[FE] Autenticando con PAC: baseUrl=${context.config.api_thefactoryhka} usuario=${context.config.tokenEmpresa.take(8)}...")
         val credentials = PacCredentials(
             usuario = context.config.tokenEmpresa,
             clave = context.config.tokenPassword,
-            baseUrl = context.config.direccionEnvio,
+            baseUrl = context.config.api_thefactoryhka,
         )
 
         val token = pacClient.authenticate(credentials).getOrElse { e ->
@@ -87,7 +87,7 @@ class PanamaInvoiceProcessor(
         // ── 4. Enviar al PAC ─────────────────────────────────────────────────
         logger.info("[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} formasPago=${context.formasPago.size}")
         val pacResponse = pacClient.sendDocument(
-            baseUrl = context.config.direccionEnvio,
+            baseUrl = context.config.api_thefactoryhka,
             token = token,
             payload = payload,
         ).getOrElse { e ->

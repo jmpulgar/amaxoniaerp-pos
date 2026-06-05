@@ -33,6 +33,9 @@ import com.amaxonia.pos.ui.clients.ClientListScreen
 import com.amaxonia.pos.ui.clients.ClientSelectionScreen
 import com.amaxonia.pos.ui.company.CompanySelectionScreen
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
+import com.amaxonia.pos.domain.model.printer.PrintResult
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.creditnotes.CreditNotesScreen
 import com.amaxonia.pos.ui.dashboard.DashboardScreen
@@ -333,23 +336,40 @@ fun AppNavigation(startDestination: String) {
             SuccessScreen(
                 transactionId = backStackEntry.arguments?.getString("transactionId").orEmpty(),
                 onPrintReceipt = { trxId ->
-                    val transactionResult = DependencyContainer.transactionRepository.getTransactionById(trxId)
-                    if (transactionResult.isFailure) {
-                        Result.failure(transactionResult.exceptionOrNull() ?: IllegalStateException("No se encontro la transaccion"))
-                    } else {
-                        val printer = DependencyContainer.printerFactory.getActivePrinter()
-                        if (printer == null) {
-                            Result.failure(IllegalStateException("No hay impresora configurada"))
+                    val selectedPrinter = DependencyContainer.localStore.readSelectedPrinterType()
+                    if (selectedPrinter == PrinterType.SUNMI_V2) {
+                        val ticketPrinter = DependencyContainer.printerFactory.getActiveTicketPrinter()
+                            ?: return@SuccessScreen Result.failure(IllegalStateException("Impresora SUNMI no disponible"))
+                        val payloadResult = DependencyContainer.salesRepository.getPrintPayload(trxId)
+                        if (payloadResult.isFailure) {
+                            Result.failure(payloadResult.exceptionOrNull() ?: IllegalStateException("No se pudo obtener el payload de impresión"))
                         } else {
-                            val transaction = transactionResult.getOrThrow()
-                            printer.printReceipt(transaction).fold(
-                                onSuccess = {
-                                    Result.success("Imprimiendo recibo...")
-                                },
-                                onFailure = { error ->
-                                    Result.failure(error)
-                                }
-                            )
+                            val payload = payloadResult.getOrThrow()
+                            val ticket = PanamaInvoiceTicketFormatter().format(payload)
+                            when (val printResult = ticketPrinter.printTicket(ticket)) {
+                                PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
+                                is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))
+                            }
+                        }
+                    } else {
+                        val transactionResult = DependencyContainer.transactionRepository.getTransactionById(trxId)
+                        if (transactionResult.isFailure) {
+                            Result.failure(transactionResult.exceptionOrNull() ?: IllegalStateException("No se encontro la transaccion"))
+                        } else {
+                            val printer = DependencyContainer.printerFactory.getActivePrinter()
+                            if (printer == null) {
+                                Result.failure(IllegalStateException("No hay impresora configurada"))
+                            } else {
+                                val transaction = transactionResult.getOrThrow()
+                                printer.printReceipt(transaction).fold(
+                                    onSuccess = {
+                                        Result.success("Imprimiendo recibo...")
+                                    },
+                                    onFailure = { error ->
+                                        Result.failure(error)
+                                    }
+                                )
+                            }
                         }
                     }
                 },

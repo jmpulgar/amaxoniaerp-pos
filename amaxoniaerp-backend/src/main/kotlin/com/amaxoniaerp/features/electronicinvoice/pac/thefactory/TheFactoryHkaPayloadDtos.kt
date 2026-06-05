@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
 
 val feJson = Json {
     encodeDefaults = false
+    explicitNulls = false
     ignoreUnknownKeys = true
     prettyPrint = false
 }
@@ -151,7 +152,7 @@ data class TheFactoryHkaTotalesSubTotales(
 @Serializable
 data class TheFactoryHkaFormaPago(
     val formaPagoFact: String,
-    val descFormaPago: String,
+    val descFormaPago: String? = null,
     val valorCuotaPagada: String,
 )
 

@@ -3,12 +3,15 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="com.sunmi.peripheral.printer.permission.PRINTER" />
 
     <queries>
         <package android:name="com.thefactory.hkapos.fiscal" />
         <package android:name="com.thefactory.hkapos.fiscal.demo" />
         <package android:name="com.thefactory.hkapos.fiscal.release" />
         <package android:name="com.thefactory.hkapos.fiscal.demo.demo" />
+        <package android:name="woyou.aidlservice.jiuiv5" />
+        <package android:name="com.sunmi.peripheral.printer" />
     </queries>
     <application
         android:allowBackup="true"

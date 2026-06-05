@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.dashboard
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.seller.Seller
@@ -22,7 +23,8 @@ data class DashboardProduct(
     val category: String = "General",
     val code: String? = null,
     val sku: String? = null,
-    val barcode: String? = null
+    val barcode: String? = null,
+    val sourceProduct: Product? = null,
 )
 
 data class DashboardState(

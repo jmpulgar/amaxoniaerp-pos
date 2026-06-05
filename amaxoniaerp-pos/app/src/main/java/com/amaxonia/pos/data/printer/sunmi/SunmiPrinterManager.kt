@@ -5,6 +5,7 @@ import com.sunmi.peripheral.printer.InnerPrinterCallback
 import com.sunmi.peripheral.printer.InnerPrinterManager
 import com.sunmi.peripheral.printer.SunmiPrinterService
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 class SunmiPrinterManager(
@@ -19,26 +20,28 @@ class SunmiPrinterManager(
     suspend fun bind(): Boolean {
         printerService?.let { return true }
 
-        return suspendCancellableCoroutine { continuation ->
-            val bindCallback = object : InnerPrinterCallback() {
-                override fun onConnected(service: SunmiPrinterService) {
-                    printerService = service
-                    if (continuation.isActive) continuation.resume(true)
-                }
+        return withTimeoutOrNull(3_000) {
+            suspendCancellableCoroutine { continuation ->
+                val bindCallback = object : InnerPrinterCallback() {
+                    override fun onConnected(service: SunmiPrinterService) {
+                        printerService = service
+                        if (continuation.isActive) continuation.resume(true)
+                    }
 
-                override fun onDisconnected() {
-                    printerService = null
+                    override fun onDisconnected() {
+                        printerService = null
+                    }
                 }
+                callback = bindCallback
+
+                val bound = runCatching {
+                    InnerPrinterManager.getInstance().bindService(appContext, bindCallback)
+                }.getOrDefault(false)
+
+                if (!bound && continuation.isActive) continuation.resume(false)
+                continuation.invokeOnCancellation { unbind() }
             }
-            callback = bindCallback
-
-            val bound = runCatching {
-                InnerPrinterManager.getInstance().bindService(appContext, bindCallback)
-            }.getOrDefault(false)
-
-            if (!bound && continuation.isActive) continuation.resume(false)
-            continuation.invokeOnCancellation { unbind() }
-        }
+        } ?: false
     }
 
     fun getService(): SunmiPrinterService? = printerService

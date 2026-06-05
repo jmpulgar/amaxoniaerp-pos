@@ -39,6 +39,10 @@ data class ProductEntity(
     val isExempt: Boolean,
     val taxRate: Double,
     val costActual: Double,
+    val unitPackage: String = "",
+    val bulkQuantity: Double = 1.0,
+    val portionUnit: String? = null,
+    val unitOrPackage: String = "UNIDAD",
     val prices: List<PriceLevel>
 )
 

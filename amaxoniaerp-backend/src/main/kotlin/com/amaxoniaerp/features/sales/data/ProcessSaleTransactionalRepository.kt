@@ -624,7 +624,7 @@ class ProcessSaleTransactionalRepository {
                 it[itemPiva] = itemTaxRate.toMoney()
                 it[itemTotalSinIva] = itemTotalSinIvaBase
                 it[itemTotalConIva] = itemTotalConIvaBase
-                it[cantidadBulto] = 1
+                it[cantidadBulto] = item.cantidadBulto.coerceAtLeast(1)
                 it[gananciaItemIndividual] = itemTotalSinIvaBase
                 it[porcentajeGanancia] = BigDecimal.valueOf(100.0).setScale(2)
                 it[poseeSerial] = "NO"
@@ -632,7 +632,7 @@ class ProcessSaleTransactionalRepository {
                 it[usuarioCreacion] = usuario
                 it[fechaCreacion] = now
                 it[itemListaPrecio] = "BASE"
-                it[itemUnidadEmpaque] = "UNIDAD"
+                it[itemUnidadEmpaque] = item.itemUnidadEmpaque.take(15).ifBlank { "UNIDAD" }
                 it[itemCantidadTotal] = item.itemCantidadTotal.toScaledBigDecimal(0)
                 it[promocionTipo] = ""
                 it[promocionCodigo] = ""

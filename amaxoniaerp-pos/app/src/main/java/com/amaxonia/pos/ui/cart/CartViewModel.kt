@@ -141,7 +141,7 @@ class CartViewModel(
                 val response = apiService.getItemLots(session.token, productId)
                 if (response.poseeConfiguracionLote && response.lotes.isNotEmpty()) {
                     val currentItem = cartRepository.cartItems.value.firstOrNull { it.product.id == productId }
-                    val totalQty = currentItem?.quantity ?: 0
+                    val totalQty = currentItem?.quantityTotal?.toInt() ?: 0
                     if (totalQty > 0) {
                         val assignments = assignFefo(response.lotes, totalQty)
                         cartRepository.assignLots(productId, assignments)
@@ -184,6 +184,11 @@ class CartViewModel(
     fun updateItemDiscount(productId: String, discountPercent: Double) {
         if (!_state.value.allowDiscounts) return
         cartRepository.updateItemDiscount(productId, discountPercent)
+    }
+
+    fun updateItemUnit(productId: String, unit: String) {
+        cartRepository.updateItemUnit(productId, unit)
+        refreshLotsIfNeeded(productId)
     }
 
     fun clearCart() {
@@ -239,6 +244,10 @@ class CartViewModel(
             sb.append("\"description\":\"${item.product.description.replace("\"", "\\\"")}\",")
             sb.append("\"quantity\":${item.quantity},")
             sb.append("\"unitPriceWithTax\":${item.unitPriceWithTax},")
+            sb.append("\"itemUnitPackage\":\"${item.itemUnitPackage}\",")
+            sb.append("\"unitPackage\":\"${item.product.unitPackage.replace("\"", "\\\"")}\",")
+            sb.append("\"bulkQuantity\":${item.product.bulkQuantity},")
+            sb.append("\"portionUnit\":\"${item.product.portionUnit.orEmpty()}\",")
             sb.append("\"discountPercent\":${item.discountPercent},")
             sb.append("\"codVendedor\":${item.codVendedor},")
             sb.append("\"taxRate\":${item.product.taxRate},")

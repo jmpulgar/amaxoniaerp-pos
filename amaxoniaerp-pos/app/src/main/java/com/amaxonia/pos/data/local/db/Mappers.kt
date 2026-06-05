@@ -72,6 +72,10 @@ fun ProductDto.toEntity(): ProductEntity {
         isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
         taxRate = taxRate ?: 0.0,
         costActual = costActual ?: 0.0,
+        unitPackage = unitPackage.orEmpty(),
+        bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
+        portionUnit = portionUnit,
+        unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
         prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices()
     )
 }
@@ -89,6 +93,10 @@ fun ProductEntity.toDomain(): Product {
         isExempt = isExempt,
         taxRate = taxRate,
         costActual = costActual,
+        unitPackage = unitPackage,
+        bulkQuantity = bulkQuantity.takeIf { it > 0.0 } ?: 1.0,
+        portionUnit = portionUnit,
+        unitOrPackage = unitOrPackage.ifBlank { "UNIDAD" },
         prices = prices.ifEmpty { generateDefaultPrices() }
     )
 }

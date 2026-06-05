@@ -364,6 +364,7 @@ class PaymentViewModel(
             val mappedItems = cartItems.map { cartItem ->
                 val itemId = cartItem.product.id.toInt()
                 val qty = cartItem.quantityDecimal
+                val qtyTotal = cartItem.quantityTotal
                 val unitConIva = cartItem.unitPriceWithTax
                 val taxRate = if (cartItem.product.isExempt) {
                     0.0
@@ -391,7 +392,10 @@ class PaymentViewModel(
                     itemPIva = taxRate,
                     itemTotalSinIva = totalSinIva,
                     itemTotalConIva = totalConIva,
-                    itemCantidadTotal = qty,
+                    itemCantidadTotal = qtyTotal,
+                    cantidadBulto = cartItem.bulkQuantity.toInt().coerceAtLeast(1),
+                    unidadEmpaque = cartItem.product.packageLabel,
+                    itemUnidadEmpaque = cartItem.itemUnitPackage,
                     esProductoFisico = true,
                     itemCodigo = cartItem.product.code,
                     itemReferencia = cartItem.product.reference,
@@ -412,7 +416,7 @@ class PaymentViewModel(
                 )
             }
 
-            val subtotalBruto = mappedItems.sumOf { it.itemPrecioSinIva * it.itemCantidadTotal }
+            val subtotalBruto = mappedItems.sumOf { it.itemPrecioSinIva * it.itemCantidad }
             val totalDescuentoItems = mappedItems.sumOf { it.itemMontoDescuento }
             val subtotalNeto = mappedItems.sumOf { it.itemTotalSinIva }
             val totalGeneral = mappedItems.sumOf { it.itemTotalConIva }

@@ -340,7 +340,8 @@ fun CartScreen(
                                     onEditDiscount = {
                                         itemToEditDiscount = item
                                         discountInput = String.format("%.2f", item.discountPercent)
-                                    }
+                                    },
+                                    onUnitChange = { unit -> viewModel.updateItemUnit(item.product.id, unit) }
                                 )
                             }
                             is ItemCarrito.PromocionAgrupada -> {
@@ -475,8 +476,11 @@ fun CartItemRow(
     allowEditPrice: Boolean,
     allowDiscount: Boolean,
     onEditPrice: () -> Unit,
-    onEditDiscount: () -> Unit
+    onEditDiscount: () -> Unit,
+    onUnitChange: (String) -> Unit
 ) {
+    var unitMenuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
@@ -500,7 +504,7 @@ fun CartItemRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "$ ${String.format("%.2f", item.unitPriceWithTax)} / ud",
+                    "$ ${String.format("%.2f", item.unitPriceWithTax)} / ${item.displayUnitLabel.lowercase()}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
@@ -550,6 +554,53 @@ fun CartItemRow(
                 }
                 IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                }
+            }
+
+            if (item.product.canSwitchUnit) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Unidad:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box {
+                        AssistChip(
+                            onClick = { unitMenuExpanded = true },
+                            label = { Text(item.displayUnitLabel) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                        DropdownMenu(
+                            expanded = unitMenuExpanded,
+                            onDismissRequest = { unitMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("UNIDAD") },
+                                onClick = {
+                                    unitMenuExpanded = false
+                                    onUnitChange("UNIDAD")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(item.product.packageLabel) },
+                                onClick = {
+                                    unitMenuExpanded = false
+                                    onUnitChange("EMPAQUE")
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Total unidades: ${String.format("%.2f", item.quantityTotal)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 }
             }
 
