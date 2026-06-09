@@ -776,14 +776,26 @@ class CajaRepository {
         val database = DatabaseManager.connectToCompanyDb(countryCode, dbName)
         return dbQuery(database) {
             val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
-            val parametrosRow = parametrosTable
-                .select(
+            val parametrosRow = if (parametrosTable is ParametrosGeneralesTableVE) {
+                parametrosTable.select(
+                    parametrosTable.codAlmacen,
+                    parametrosTable.monedaBase,
+                    parametrosTable.abrMonedaBase,
+                    parametrosTable.porcentajeImpuestoPrincipal,
+                    parametrosTable.defaultIdFormaPagoFactura,
+                    parametrosTable.multiMoneda,
+                    parametrosTable.monedaSecundaria,
+                    parametrosTable.abrMonedaSecundaria,
+                )
+            } else {
+                parametrosTable.select(
                     parametrosTable.codAlmacen,
                     parametrosTable.monedaBase,
                     parametrosTable.abrMonedaBase,
                     parametrosTable.porcentajeImpuestoPrincipal,
                     parametrosTable.defaultIdFormaPagoFactura,
                 )
+            }
                 .orderBy(parametrosTable.codEmpresa)
                 .limit(1)
                 .firstOrNull()
