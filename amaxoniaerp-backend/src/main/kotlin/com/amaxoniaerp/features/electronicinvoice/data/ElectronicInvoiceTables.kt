@@ -146,6 +146,8 @@ object FEFacturaDetalleReadTable : Table("factura_detalle") {
     val idItem = integer("id_item").nullable()
     val itemDescripcion = varchar("_item_descripcion", 500)
     val itemCodigo = varchar("_item_codigo", 50)
+    val idSegmento = integer("id_segmento").nullable()
+    val idFamilia = integer("id_familia").nullable()
     val itemCantidad = decimal("_item_cantidad", 32, 3)
     val itemCantidadTotal = decimal("_item_cantidad_total", 32, 0)
     val itemPrecioSinIva = decimal("_item_preciosiniva", 20, 2)

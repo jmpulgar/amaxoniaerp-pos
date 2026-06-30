@@ -24,6 +24,18 @@ data class ClientEntity(
     val addressLevel3: String
 )
 
+@Entity(tableName = "client_sucursales")
+data class ClientSucursalEntity(
+    @PrimaryKey val sucursalId: Int,
+    val clienteCodigo: String,
+    val nombreSucursal: String,
+    val nombreContacto: String? = null,
+    val telefonoContacto: String? = null,
+    val correoContacto: String? = null,
+    val direccion: String? = null,
+    val observaciones: String? = null,
+)
+
 // ... (El resto de las entidades ProductEntity, CountryEntity, etc. déjalas igual) ...
 // Copia aquí abajo el resto de las entidades que ya tenías (ProductEntity, etc) sin cambios.
 @Entity(tableName = "products")

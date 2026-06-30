@@ -30,6 +30,8 @@ class PanamaInvoiceTicketFormatter {
                     add(TicketElement.Text("Cliente Fiscal", TicketAlign.LEFT, bold = true))
                     add(labelValue("Nombre:", cliente.nombre))
                     cliente.documento?.takeIfNotBlank()?.let { add(labelValue("RUC:", it)) }
+                    cliente.sucursal?.takeIfNotBlank()?.let { add(labelValue("Sucursal:", it)) }
+                    cliente.sucursalDireccion?.takeIfNotBlank()?.let { add(labelValue("Dir. sucursal:", it)) }
                     add(TicketElement.Divider)
                 }
 

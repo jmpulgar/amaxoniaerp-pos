@@ -2,6 +2,8 @@ package com.amaxonia.pos.ui.cart
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +35,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -230,7 +234,11 @@ fun CartScreen(
 
                             // 2. Botón PAGAR / FACTURAR
                             Button(
-                                onClick = { onCheckout(state.total) },
+                                onClick = {
+                                    if (viewModel.validateBeforeCheckout()) {
+                                        onCheckout(state.total)
+                                    }
+                                },
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue),
                                 shape = RoundedCornerShape(12.dp)
@@ -282,6 +290,35 @@ fun CartScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
+                ClientSucursalSelectorCard(
+                    sucursales = state.clientSucursales,
+                    selectedSucursal = state.selectedClientSucursal,
+                    isRequiredMissing = state.isMissingRequiredClientSucursal,
+                    onSelect = viewModel::selectClientSucursal
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            state.cartActionError?.let { message ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -341,17 +378,113 @@ fun CartScreen(
                                         itemToEditDiscount = item
                                         discountInput = String.format("%.2f", item.discountPercent)
                                     },
-                                    onUnitChange = { unit -> viewModel.updateItemUnit(item.product.id, unit) }
+                                    onUnitChange = { unit -> viewModel.updateItemUnit(item.product.id, unit) },
+                                    onQuantityChange = { quantity -> viewModel.updateItemQuantity(item.product.id, quantity) }
                                 )
                             }
                             is ItemCarrito.PromocionAgrupada -> {
                                 PromotionCartGroup(
                                     group = displayItem,
-                                    onRemove = { viewModel.removePromotion(displayItem.promocionId) }
+                                    onRemove = { viewModel.removePromotion(displayItem.promocionId) },
+                                    onQuantityChange = { times -> viewModel.updatePromotionQuantity(displayItem.promocionId, times) }
                                 )
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClientSucursalSelectorCard(
+    sucursales: List<com.amaxonia.pos.data.local.db.ClientSucursalEntity>,
+    selectedSucursal: com.amaxonia.pos.data.local.db.ClientSucursalEntity?,
+    isRequiredMissing: Boolean,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val hasMultiple = sucursales.size > 1
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isRequiredMissing) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = if (hasMultiple) "Sucursal del cliente" else "Sucursal del cliente asignada",
+                fontSize = 12.sp,
+                color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (hasMultiple) {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedSucursal?.nombreSucursal.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        isError = isRequiredMissing,
+                        placeholder = { Text("Seleccionar sucursal") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        sucursales.forEach { sucursal ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(sucursal.nombreSucursal, fontWeight = FontWeight.SemiBold)
+                                        sucursal.direccion?.takeIf { it.isNotBlank() }?.let {
+                                            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    onSelect(sucursal.sucursalId)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                if (isRequiredMissing) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Este cliente tiene varias sucursales. Selecciona una para continuar.",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 12.sp
+                    )
+                }
+            } else {
+                Text(
+                    text = selectedSucursal?.nombreSucursal ?: sucursales.firstOrNull()?.nombreSucursal.orEmpty(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface
+                )
+                selectedSucursal?.direccion?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -398,9 +531,14 @@ private fun buildInitials(name: String): String {
 @Composable
 private fun PromotionCartGroup(
     group: ItemCarrito.PromocionAgrupada,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onQuantityChange: (Int) -> Unit
 ) {
     val accent = if (group.promocionTipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    var timesText by androidx.compose.runtime.remember(group.promocionId, group.items.firstOrNull()?.promocionVeces) {
+        androidx.compose.runtime.mutableStateOf((group.items.firstOrNull()?.promocionVeces ?: 1).toString())
+    }
+    val times = timesText.toIntOrNull() ?: 0
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -463,8 +601,84 @@ private fun PromotionCartGroup(
                 Text("Total promoción", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Text(BigDecimalMoneyFormatter.money(group.total), fontWeight = FontWeight.ExtraBold, color = accent, fontSize = 16.sp)
             }
+
+            Spacer(Modifier.height(10.dp))
+            QuantityEditor(
+                quantityText = timesText,
+                onQuantityTextChange = { value ->
+                    timesText = sanitizeQuantityInput(value)
+                    timesText.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
+                },
+                onDecrease = {
+                    val next = ((timesText.toIntOrNull() ?: 1) - 1).coerceAtLeast(0)
+                    if (next == 0) onRemove() else {
+                        timesText = next.toString()
+                        onQuantityChange(next)
+                    }
+                },
+                onIncrease = {
+                    val next = ((timesText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1)
+                    timesText = next.toString()
+                    onQuantityChange(next)
+                },
+                onDone = {
+                    if (times >= 1) onQuantityChange(times)
+                },
+                isError = timesText.isNotBlank() && times < 1,
+                label = "Promociones"
+            )
         }
     }
+}
+
+@Composable
+private fun QuantityEditor(
+    quantityText: String,
+    onQuantityTextChange: (String) -> Unit,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    onDone: () -> Unit,
+    isError: Boolean,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        IconButton(
+            onClick = onDecrease,
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+        ) {
+            Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad", tint = MaterialTheme.colorScheme.primary)
+        }
+        OutlinedTextField(
+            value = quantityText,
+            onValueChange = onQuantityTextChange,
+            label = { Text(label) },
+            singleLine = true,
+            isError = isError,
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            onClick = onIncrease,
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Aumentar cantidad", tint = MaterialTheme.colorScheme.onPrimary)
+        }
+    }
+}
+
+private fun sanitizeQuantityInput(value: String): String {
+    return value.filter { it.isDigit() }.trimStart('0').ifBlank { "" }.take(5)
 }
 
 @Composable
@@ -477,9 +691,14 @@ fun CartItemRow(
     allowDiscount: Boolean,
     onEditPrice: () -> Unit,
     onEditDiscount: () -> Unit,
-    onUnitChange: (String) -> Unit
+    onUnitChange: (String) -> Unit,
+    onQuantityChange: (Int) -> Unit
 ) {
     var unitMenuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var quantityText by androidx.compose.runtime.remember(item.product.id, item.quantity) {
+        androidx.compose.runtime.mutableStateOf(item.quantity.toString())
+    }
+    val typedQuantity = quantityText.toIntOrNull() ?: 0
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -511,29 +730,6 @@ fun CartItemRow(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Controles de cantidad
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onDecrease, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        }
-                        Text(
-                            "${item.quantity}",
-                            modifier = Modifier.padding(horizontal = 6.dp),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                        IconButton(onClick = onIncrease, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 Text(
                     "$ ${String.format("%.2f", item.total)}",
                     fontWeight = FontWeight.Bold,
@@ -556,6 +752,34 @@ fun CartItemRow(
                     Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            QuantityEditor(
+                quantityText = quantityText,
+                onQuantityTextChange = { value ->
+                    quantityText = sanitizeQuantityInput(value)
+                    quantityText.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
+                },
+                onDecrease = {
+                    val next = (item.quantity - 1)
+                    if (next <= 0) {
+                        onRemove()
+                    } else {
+                        quantityText = next.toString()
+                        onDecrease()
+                    }
+                },
+                onIncrease = {
+                    val next = item.quantity + 1
+                    quantityText = next.toString()
+                    onIncrease()
+                },
+                onDone = {
+                    if (typedQuantity >= 1) onQuantityChange(typedQuantity)
+                },
+                isError = quantityText.isNotBlank() && typedQuantity < 1,
+                label = "Cantidad"
+            )
 
             if (item.product.canSwitchUnit) {
                 Spacer(modifier = Modifier.height(8.dp))

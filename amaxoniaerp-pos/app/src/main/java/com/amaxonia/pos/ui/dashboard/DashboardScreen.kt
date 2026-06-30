@@ -8,6 +8,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +47,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,7 +77,8 @@ fun DashboardScreen(
             DependencyContainer.cartRepository,
             DependencyContainer.cajaRepository,
             DependencyContainer.localStore,
-            DependencyContainer.apiConfigManager
+            DependencyContainer.apiConfigManager,
+            DependencyContainer.clientSucursalDao
         )
     },
     onLogout: () -> Unit,
@@ -182,12 +187,20 @@ fun DashboardScreen(
         )
     }
 
+    state.quantityPickerProduct?.let { product ->
+        ProductQuantitySheet(
+            product = product,
+            onConfirm = { quantity -> viewModel.confirmProductQuantity(product, quantity) },
+            onDismiss = viewModel::dismissQuantityPicker
+        )
+    }
+
     if (state.showPromotionChoice && state.pendingPromotionProduct != null) {
         PromotionChoiceSheet(
             product = state.pendingPromotionProduct!!,
             promotions = state.promotionOptions,
-            onAddIndividual = viewModel::addProductIndividualFromPromotionChoice,
-            onAddPromotion = viewModel::addPromotionFromChoice,
+            onAddIndividual = { quantity -> viewModel.addProductIndividualFromPromotionChoice(quantity) },
+            onAddPromotion = { promo, times -> viewModel.addPromotionFromChoice(promo, times) },
             onDismiss = viewModel::dismissPromotionChoice
         )
     }
@@ -502,49 +515,6 @@ fun DashboardScreen(
                     }
                 }
 
-                // --- Barra de Cliente Seleccionado ---
-                if (state.selectedClient != null) {
-                    val clientPhotoUrl = viewModel.getClientPhotoUrl(state.selectedClient!!)
-                    Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                ) {
-                                    SelectedClientAvatar(
-                                        clientPhotoUrl = clientPhotoUrl,
-                                        clientName = "${state.selectedClient!!.firstName} ${state.selectedClient!!.lastName}"
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Cliente seleccionado:",
-                                        style = TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    )
-                                    Text(
-                                        text = "${state.selectedClient!!.firstName} ${state.selectedClient!!.lastName}",
-                                        style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AmaxoniaBlue)
-                                    )
-                                }
-                            }
-                            IconButton(onClick = { viewModel.clearSelectedClient() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Quitar cliente", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-
                 // --- Contenido Principal ---
                 Box(modifier = Modifier.weight(1f)) {
                     if (state.error != null) {
@@ -712,7 +682,11 @@ fun DashboardScreen(
                                          contentPadding = PaddingValues(bottom = 120.dp)
                                      ) {
                                         items(productsToShow, key = { it.id }) { product ->
-                                             ProductCard(product = product, onAddClick = { viewModel.addToCart(product) })
+                                             ProductCard(
+                                                 product = product,
+                                                 onAddClick = { viewModel.addToCart(product) },
+                                                 onQuantityClick = { viewModel.showQuantityPicker(product) }
+                                             )
                                          }
                                         if (state.isLoadingMore) {
                                             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
@@ -734,7 +708,11 @@ fun DashboardScreen(
                                          contentPadding = PaddingValues(bottom = 120.dp)
                                      ) {
                                         items(productsToShow, key = { it.id }) { product ->
-                                             ProductListRow(product = product, onAddClick = { viewModel.addToCart(product) })
+                                             ProductListRow(
+                                                 product = product,
+                                                 onAddClick = { viewModel.addToCart(product) },
+                                                 onQuantityClick = { viewModel.showQuantityPicker(product) }
+                                             )
                                          }
                                         if (state.isLoadingMore) {
                                             item {
@@ -790,13 +768,80 @@ fun DashboardScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun ProductQuantitySheet(
+    product: DashboardProduct,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var quantityText by remember { mutableStateOf("1") }
+    val quantity = quantityText.toIntOrNull() ?: 0
+    val isValid = quantity >= 1
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("Cantidad a agregar", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            Text(product.name, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+            QuantityStepper(
+                quantityText = quantityText,
+                onQuantityTextChange = { quantityText = sanitizeQuantityInput(it) },
+                onDecrease = { quantityText = ((quantityText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
+                onIncrease = { quantityText = ((quantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
+                onDone = { if (isValid) onConfirm(quantity) },
+                isError = quantityText.isNotBlank() && !isValid,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (!isValid) {
+                Text("La cantidad minima es 1.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Cancelar")
+                }
+                Button(
+                    onClick = { if (isValid) onConfirm(quantity) },
+                    enabled = isValid,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Agregar")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun PromotionChoiceSheet(
     product: DashboardProduct,
     promotions: List<Promocion>,
-    onAddIndividual: () -> Unit,
-    onAddPromotion: (Promocion) -> Unit,
+    onAddIndividual: (Int) -> Unit,
+    onAddPromotion: (Promocion, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var individualQuantityText by remember { mutableStateOf("1") }
+    val individualQuantity = individualQuantityText.toIntOrNull() ?: 0
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         dragHandle = { BottomSheetDefaults.DragHandle() },
@@ -843,15 +888,34 @@ private fun PromotionChoiceSheet(
 
             Spacer(Modifier.height(14.dp))
 
-            OutlinedButton(
-                onClick = onAddIndividual,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Vender producto individual", fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Producto individual", fontWeight = FontWeight.Bold)
+                    QuantityStepper(
+                        quantityText = individualQuantityText,
+                        onQuantityTextChange = { individualQuantityText = sanitizeQuantityInput(it) },
+                        onDecrease = { individualQuantityText = ((individualQuantityText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
+                        onIncrease = { individualQuantityText = ((individualQuantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
+                        onDone = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
+                        isError = individualQuantityText.isNotBlank() && individualQuantity < 1,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedButton(
+                        onClick = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
+                        enabled = individualQuantity >= 1,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Vender producto individual", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -863,7 +927,7 @@ private fun PromotionChoiceSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(promotions, key = { it.id }) { promo ->
-                    PromotionOptionCard(promo = promo, onAddPromotion = { onAddPromotion(promo) })
+                    PromotionOptionCard(promo = promo, onAddPromotion = { times -> onAddPromotion(promo, times) })
                 }
             }
         }
@@ -873,9 +937,11 @@ private fun PromotionChoiceSheet(
 @Composable
 private fun PromotionOptionCard(
     promo: Promocion,
-    onAddPromotion: () -> Unit
+    onAddPromotion: (Int) -> Unit
 ) {
     val accent = if (promo.tipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    var timesText by remember { mutableStateOf("1") }
+    val times = timesText.toIntOrNull() ?: 0
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -926,15 +992,26 @@ private fun PromotionOptionCard(
             }
 
             Spacer(Modifier.height(12.dp))
+            QuantityStepper(
+                quantityText = timesText,
+                onQuantityTextChange = { timesText = sanitizeQuantityInput(it) },
+                onDecrease = { timesText = ((timesText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
+                onIncrease = { timesText = ((timesText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
+                onDone = { if (times >= 1) onAddPromotion(times) },
+                isError = timesText.isNotBlank() && times < 1,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
             Button(
-                onClick = onAddPromotion,
+                onClick = { if (times >= 1) onAddPromotion(times) },
+                enabled = times >= 1,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
             ) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Agregar promoción", fontWeight = FontWeight.Bold)
+                Text("Agregar promoción x${times.coerceAtLeast(1)}", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -963,9 +1040,59 @@ private fun BottomPillItem(
 }
 
 @Composable
+private fun QuantityStepper(
+    quantityText: String,
+    onQuantityTextChange: (String) -> Unit,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    onDone: () -> Unit,
+    isError: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        IconButton(
+            onClick = onDecrease,
+            modifier = Modifier
+                .size(44.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+        ) {
+            Icon(Icons.Default.Remove, contentDescription = "Disminuir", tint = MaterialTheme.colorScheme.primary)
+        }
+        OutlinedTextField(
+            value = quantityText,
+            onValueChange = onQuantityTextChange,
+            singleLine = true,
+            isError = isError,
+            textStyle = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            modifier = Modifier.weight(1f),
+            label = { Text("Cantidad") }
+        )
+        IconButton(
+            onClick = onIncrease,
+            modifier = Modifier
+                .size(44.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Aumentar", tint = MaterialTheme.colorScheme.onPrimary)
+        }
+    }
+}
+
+private fun sanitizeQuantityInput(value: String): String {
+    return value.filter { it.isDigit() }.trimStart('0').ifBlank { "" }.take(5)
+}
+
+@Composable
 fun ProductCard(
     product: DashboardProduct,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onQuantityClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -1032,13 +1159,23 @@ fun ProductCard(
                     color = AmaxoniaBlue,
                     fontSize = 14.sp
                 )
-                IconButton(
-                    onClick = onAddClick,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(AmaxoniaBlue, RoundedCornerShape(10.dp))
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar", tint = Color.White, modifier = Modifier.size(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onQuantityClick,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Elegir cantidad", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(
+                        onClick = onAddClick,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(AmaxoniaBlue, RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Agregar una unidad", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
@@ -1048,7 +1185,8 @@ fun ProductCard(
 @Composable
 fun ProductListRow(
     product: DashboardProduct,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onQuantityClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -1112,13 +1250,23 @@ fun ProductListRow(
                     fontSize = 14.sp
                 )
             }
-            IconButton(
-                onClick = onAddClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(AmaxoniaBlue, RoundedCornerShape(12.dp))
-            ) {
-                Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onQuantityClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Elegir cantidad", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+                IconButton(
+                    onClick = onAddClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(AmaxoniaBlue, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar una unidad", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
             }
         }
     }
@@ -1298,41 +1446,4 @@ fun ManualEntryContent(
             }
         }
     }
-}
-
-@Composable
-private fun SelectedClientAvatar(
-    clientPhotoUrl: String,
-    clientName: String,
-    modifier: Modifier = Modifier
-) {
-    val initials = buildDashboardInitials(clientName)
-    val gradient = listOf(Color(0xFF1E88E5), Color(0xFF00ACC1))
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clip(CircleShape)
-            .background(Brush.linearGradient(gradient)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (clientPhotoUrl.isBlank()) {
-            Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        } else {
-            SubcomposeAsyncImage(
-                model = clientPhotoUrl,
-                contentDescription = "Foto cliente",
-                modifier = Modifier.fillMaxSize(),
-                loading = { Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                error = { Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) }
-            )
-        }
-    }
-}
-
-private fun buildDashboardInitials(name: String): String {
-    val parts = name.trim().split(" ").filter { it.isNotBlank() }
-    if (parts.isEmpty()) return "CL"
-    return parts.take(2).joinToString(separator = "") { it.first().uppercase() }
 }

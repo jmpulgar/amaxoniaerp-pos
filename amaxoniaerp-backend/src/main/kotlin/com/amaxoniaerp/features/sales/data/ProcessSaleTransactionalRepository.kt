@@ -5,6 +5,7 @@ import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableVE
 import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
 import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
+import com.amaxoniaerp.features.clients.data.ClientSucursalTable
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
@@ -39,6 +40,7 @@ class ProcessSaleTransactionalRepository {
         val monetaryContext = resolveMonetaryContext(countryCode, preparedRequest)
 
         validateDuplicateInvoice(monetaryContext.countryCode, preparedRequest)
+        validateClientSucursalIfRequired(monetaryContext.countryCode, preparedRequest)
         if (monetaryContext.shouldValidateStock()) {
             validateStock(preparedRequest)
         }
@@ -381,6 +383,24 @@ class ProcessSaleTransactionalRepository {
         }
     }
 
+    private fun validateClientSucursalIfRequired(countryCode: String, request: ProcessSaleRequest) {
+        if (!countryCode.equals("PA", ignoreCase = true)) return
+        val clientCode = request.factura.codCliente.take(9)
+        if (clientCode.isBlank()) return
+
+        val sucursales = ClientSucursalTable
+            .select(ClientSucursalTable.sucursalId)
+            .where { ClientSucursalTable.clienteCodigo eq clientCode }
+            .map { it[ClientSucursalTable.sucursalId] }
+        if (sucursales.isEmpty()) return
+
+        val selectedSucursalId = request.factura.clienteSucursalId
+            ?: throw InvalidSaleRequestException("Debes seleccionar la sucursal del cliente")
+        if (selectedSucursalId !in sucursales) {
+            throw InvalidSaleRequestException("La sucursal seleccionada no pertenece al cliente")
+        }
+    }
+
     private fun resolveInvoiceCode(countryCode: String, request: ProcessSaleRequest): String {
         val idCaja = request.factura.idCaja.trim()
         if (idCaja.isBlank()) {
@@ -579,6 +599,7 @@ class ProcessSaleTransactionalRepository {
                 it[facturaTable.monedaSecundaria] = 0
                 it[facturaTable.abrMonedaSecundaria] = ""
                 it[facturaTable.totalRef] = 0f
+                it[facturaTable.clienteSucursalId] = f.clienteSucursalId
             }
         }
     }
@@ -599,14 +620,7 @@ class ProcessSaleTransactionalRepository {
             val itemTaxRate = item.itemPIva
             val itemTotalSinIvaBase = monetaryContext.toBase(item.itemTotalSinIva)
             val itemTotalConIvaBase = monetaryContext.toBase(item.itemTotalConIva)
-            val qty = item.itemCantidadTotal.toScaledBigDecimal(3)
-            val itemPriceSinIvaBase = if (qty.compareTo(BigDecimal.ZERO) == 0) {
-                BigDecimal.ZERO.setScale(2)
-            } else {
-                itemTotalSinIvaBase
-                    .divide(qty, 6, RoundingMode.HALF_UP)
-                    .setScale(2, RoundingMode.HALF_UP)
-            }
+            val itemPriceSinIvaBase = monetaryContext.toBase(item.itemPrecioSinIva)
 
             val detalleId = UUID.randomUUID().toString()
             detalleIds.add(detalleId)
@@ -634,16 +648,20 @@ class ProcessSaleTransactionalRepository {
                 it[itemListaPrecio] = "BASE"
                 it[itemUnidadEmpaque] = item.itemUnidadEmpaque.take(15).ifBlank { "UNIDAD" }
                 it[itemCantidadTotal] = item.itemCantidadTotal.toScaledBigDecimal(0)
-                it[promocionTipo] = ""
-                it[promocionCodigo] = ""
-                it[promocionNombre] = ""
-                it[promocionGrupo] = ""
-                it[promocionDetalleId] = ""
+                it[promocionId] = item.promocionId.take(36)
+                it[promocionTipo] = item.promocionTipo.take(20)
+                it[promocionCodigo] = item.promocionCodigo.take(15)
+                it[promocionNombre] = item.promocionNombre.take(200)
+                it[promocionGrupo] = item.promocionGrupo.take(36)
+                it[promocionDetalleId] = item.promocionDetalleId.take(36)
+                it[promocionCantidad] = item.promocionCantidad.toScaledBigDecimal(3)
                 it[grupo] = 1
                 it[descuentoAutorizacion] = ""
                 it[codVendedor] = vendedorLinea
                 it[itemCodigo] = item.itemCodigo
                 it[itemReferencia] = item.itemReferencia
+                it[idSegmento] = item.idSegmento
+                it[idFamilia] = item.idFamilia
             }
         }
         return detalleIds

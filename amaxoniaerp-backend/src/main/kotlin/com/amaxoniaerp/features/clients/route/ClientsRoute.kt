@@ -154,6 +154,46 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
                 call.respond(client)
             }
 
+            get("/{id}/sucursales") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid or missing token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.payload.getClaim("admin_db").asString()
+                if (adminDb.isNullOrBlank()) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Company database not found in token")
+                    )
+                }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Falta country_code en token"),
+                    )
+
+                val id = call.parameters["id"]
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Invalid client id")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val sucursales = clientsRepository.listClientSucursales(companyDb, countryCode, id)
+                call.respond(sucursales)
+            }
+
             post {
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@post call.respond(

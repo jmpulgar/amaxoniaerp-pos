@@ -3,6 +3,7 @@ package com.amaxoniaerp.features.electronicinvoice.pac
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
 import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
 
 /**
@@ -35,6 +36,16 @@ interface PanamaElectronicInvoiceClient {
         token: PacAuthToken,
         payload: TheFactoryHkaDocumentoWrapper,
     ): Result<PacResponse>
+
+    /**
+     * Envía el CAFE/PDF del documento autorizado por correo usando el CUFE.
+     */
+    suspend fun sendEmail(
+        baseUrl: String,
+        token: PacAuthToken,
+        cufe: String,
+        emails: List<String>,
+    ): Result<TheFactoryEnviarCorreoResponse>
 
     /**
      * Descarga el PDF/CAFE del documento autorizado usando el CUFE.

@@ -29,6 +29,8 @@ class TheFactoryHkaPayloadBuilder {
         private const val DEFAULT_PHONE = "9999-9999"
         private const val DEFAULT_EMAIL = "email@correo.com"
         private const val DEFAULT_RUC = "00000"
+        private const val DEFAULT_CPBS = "5411"
+        private const val DEFAULT_CPBS_ABREV = "54"
         private const val MIN_DESCRIPTION_LENGTH = 5
         private const val MIN_FORMA_PAGO_DESC_LENGTH = 10
 
@@ -161,6 +163,8 @@ class TheFactoryHkaPayloadBuilder {
             } else {
                 det.descripcion
             }
+            val codigoCPBS = if (esGobierno) det.codigoCPBS?.takeIf { it.isNotBlank() } else DEFAULT_CPBS
+            val codigoCPBSAbrev = if (esGobierno) det.codigoCPBSAbrev?.takeIf { it.isNotBlank() } else DEFAULT_CPBS_ABREV
 
             // Tasa ITBMS: mapear porcentaje a código catálogo
             val tasaITBMS = mapTasaITBMS(det.piva)
@@ -207,8 +211,8 @@ class TheFactoryHkaPayloadBuilder {
                 tasaISC = tasaISC,
                 valorISC = valorISC,
                 unidadMedidaCPBS = if (esGobierno) "und" else null,
-                codigoCPBS = if (esGobierno) det.codigoCPBS else null,
-                codigoCPBSAbrev = if (esGobierno) det.codigoCPBSAbrev else null,
+                codigoCPBS = codigoCPBS,
+                codigoCPBSAbrev = codigoCPBSAbrev,
                 listaItemOTI = listaOTI,
             )
         }
@@ -220,7 +224,7 @@ class TheFactoryHkaPayloadBuilder {
         val factura = ctx.factura
 
         // Formas de pago: filtrar las ignoradas y mapear al catálogo
-        val formasPago = buildFormasPago(ctx.formasPago)
+        val formasPago = buildFormasPago(ctx.formasPago, ctx.vuelto)
 
         // Bonificaciones globales
         val bonificaciones = if (factura.totalizarDescuentoGlobal > 0) {
@@ -280,14 +284,19 @@ class TheFactoryHkaPayloadBuilder {
         }
     }
 
-    private fun buildFormasPago(formasPago: List<FEFormaPagoData>): List<TheFactoryHkaFormaPago> {
-        return formasPago
+    private fun buildFormasPago(formasPago: List<FEFormaPagoData>, vuelto: Double?): List<TheFactoryHkaFormaPago> {
+        val cambio = vuelto?.takeIf { it > 0 } ?: 0.0
+        val formasPagoFiltradas = formasPago
             .filter { fp ->
                 // Ignorar siglas específicas
                 val siglas = fp.siglas?.uppercase()?.trim() ?: ""
                 siglas !in IGNORED_PAYMENT_SIGLAS
             }
-            .map { fp ->
+
+        val cashIndex = if (cambio > 0) formasPagoFiltradas.indexOfFirst { it.isCashPayment() } else -1
+
+        return formasPagoFiltradas
+            .mapIndexed { index, fp ->
                 // Mapear al catálogo The Factory (01 a 08), si no existe enviar "99"
                 val formaPagoFact = fp.formaPagoFact?.takeIf { it.isNotBlank() } ?: "99"
 
@@ -299,7 +308,7 @@ class TheFactoryHkaPayloadBuilder {
                 TheFactoryHkaFormaPago(
                     formaPagoFact = formaPagoFact,
                     descFormaPago = descripcion.takeIf { formaPagoFact == "99" },
-                    valorCuotaPagada = fp.monto.formatDecimals(2),
+                    valorCuotaPagada = (fp.monto + if (index == cashIndex) cambio else 0.0).formatDecimals(2),
                 )
             }
             .ifEmpty {
@@ -312,6 +321,11 @@ class TheFactoryHkaPayloadBuilder {
                     )
                 )
             }
+    }
+
+    private fun FEFormaPagoData.isCashPayment(): Boolean {
+        val siglas = siglas?.uppercase()?.trim()
+        return esCash || siglas in setOf("EF", "CASH", "EFECTIVO") || formaPagoFact == "02"
     }
 
     private fun buildTotalOTI(detalles: List<FEDetalleData>): List<TheFactoryHkaTotalOTI>? {

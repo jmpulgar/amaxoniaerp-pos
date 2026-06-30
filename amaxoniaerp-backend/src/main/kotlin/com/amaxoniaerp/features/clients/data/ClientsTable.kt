@@ -28,3 +28,16 @@ object ClientsTable : Table("clientes") {
 
     override val primaryKey = PrimaryKey(idCliente)
 }
+
+object ClientSucursalTable : Table("cliente_sucursal") {
+    val sucursalId = integer("sucursal_id").autoIncrement()
+    val clienteCodigo = varchar("cliente_codigo", 9)
+    val nombreSucursal = varchar("nombre_sucursal", 255)
+    val nombreContacto = varchar("nombre_contacto", 255).nullable()
+    val telefonoContacto = varchar("telefono_contacto", 50).nullable()
+    val correoContacto = varchar("correo_contacto", 255).nullable()
+    val direccion = text("direccion").nullable()
+    val observaciones = text("observaciones").nullable()
+
+    override val primaryKey = PrimaryKey(sucursalId)
+}

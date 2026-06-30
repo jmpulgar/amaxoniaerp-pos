@@ -5,6 +5,7 @@ import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import org.slf4j.LoggerFactory
 import com.amaxoniaerp.features.clients.domain.Client
+import com.amaxoniaerp.features.clients.domain.ClientSucursal
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.Op
@@ -15,6 +16,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.util.UUID
@@ -135,6 +137,33 @@ class ClientsRepository {
             .andWhere { ClientsTable.idCliente eq id }
             .map { row -> mapRowToClient(row) }
             .singleOrNull()
+    }
+
+    suspend fun listClientSucursales(database: Database, countryCode: String, clientId: String): List<ClientSucursal> = dbQuery(database) {
+        if (!countryCode.equals("PA", ignoreCase = true)) return@dbQuery emptyList()
+        val clientCode = ClientsTable
+            .select(ClientsTable.codCliente)
+            .where { ClientsTable.idCliente eq clientId }
+            .map { it[ClientsTable.codCliente].take(9) }
+            .singleOrNull()
+            ?: return@dbQuery emptyList()
+
+        ClientSucursalTable
+            .selectAll()
+            .where { ClientSucursalTable.clienteCodigo eq clientCode }
+            .orderBy(ClientSucursalTable.nombreSucursal)
+            .map { row ->
+                ClientSucursal(
+                    sucursalId = row[ClientSucursalTable.sucursalId],
+                    clienteCodigo = row[ClientSucursalTable.clienteCodigo],
+                    nombreSucursal = row[ClientSucursalTable.nombreSucursal],
+                    nombreContacto = row[ClientSucursalTable.nombreContacto],
+                    telefonoContacto = row[ClientSucursalTable.telefonoContacto],
+                    correoContacto = row[ClientSucursalTable.correoContacto],
+                    direccion = row[ClientSucursalTable.direccion],
+                    observaciones = row[ClientSucursalTable.observaciones],
+                )
+            }
     }
 
     suspend fun getDefaultClient(database: Database, countryCode: String): Client? = dbQuery(database) {

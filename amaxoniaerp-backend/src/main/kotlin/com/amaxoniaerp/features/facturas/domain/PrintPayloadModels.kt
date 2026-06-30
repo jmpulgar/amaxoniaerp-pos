@@ -37,6 +37,8 @@ data class EmpresaPrintResponse(
 data class ClientePrintResponse(
     val nombre: String,
     val documento: String? = null,
+    val sucursal: String? = null,
+    val sucursalDireccion: String? = null,
 )
 
 @Serializable

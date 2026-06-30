@@ -5,6 +5,7 @@ import com.amaxonia.pos.data.local.db.AddressLevel1Dao
 import com.amaxonia.pos.data.local.db.AddressLevel2Dao
 import com.amaxonia.pos.data.local.db.AddressLevel3Dao
 import com.amaxonia.pos.data.local.db.ClientDao
+import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.CountryDao
 import com.amaxonia.pos.data.local.db.ClientTypeDao
 import com.amaxonia.pos.data.local.db.ProductDao
@@ -19,6 +20,7 @@ class CatalogSyncer(
     private val apiService: ApiService,
     private val localStore: LocalStore,
     private val clientDao: ClientDao,
+    private val clientSucursalDao: ClientSucursalDao,
     private val productDao: ProductDao,
     private val countryDao: CountryDao,
     private val addressLevel1Dao: AddressLevel1Dao,
@@ -61,6 +63,17 @@ class CatalogSyncer(
             )
             if (response.data.isEmpty()) break
             clientDao.insertAll(response.data.map { it.toEntity() })
+            response.data.forEach { client ->
+                val id = client.id ?: return@forEach
+                val code = client.code.orEmpty().take(9)
+                runCatching {
+                    val sucursales = apiService.getClientSucursales(token, id)
+                    if (code.isNotBlank()) {
+                        clientSucursalDao.deleteByClientCode(code)
+                    }
+                    clientSucursalDao.insertAll(sucursales.map { it.toEntity() })
+                }
+            }
             offset += pageSize
         }
     }

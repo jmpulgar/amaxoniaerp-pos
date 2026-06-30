@@ -226,6 +226,12 @@ class ApiService(
         }.body()
     }
 
+    suspend fun getClientSucursales(token: String, clientId: String): List<ClientSucursalDto> {
+        return client.get("clients/$clientId/sucursales") {
+            authHeaders(token)
+        }.body()
+    }
+
     suspend fun updateClient(token: String, id: String, request: CreateClientRequest): ClientDto {
         return client.put("clients/$id") {
             authHeaders(token)

@@ -32,6 +32,27 @@ data class TheFactoryEnviarResponse(
 )
 
 /**
+ * Body del endpoint `POST /api/EnvioCorreo`.
+ */
+@Serializable
+data class TheFactoryEnviarCorreoRequest(
+    val cufe: String,
+    val correos: List<String>,
+)
+
+/**
+ * Respuesta del endpoint `POST /api/EnvioCorreo`.
+ */
+@Serializable
+data class TheFactoryEnviarCorreoResponse(
+    val codigo: String? = null,
+    val resultado: String? = null,
+    val mensaje: String? = null,
+    val validaciones: List<String> = emptyList(),
+    val cufe: String? = null,
+)
+
+/**
  * Body de autenticación para `POST /api/Autenticacion`.
  */
 @Serializable

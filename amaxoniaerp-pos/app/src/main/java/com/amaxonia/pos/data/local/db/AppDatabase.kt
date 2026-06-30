@@ -11,6 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         ClientEntity::class,
+        ClientSucursalEntity::class,
         ProductEntity::class,
         CountryEntity::class,
         AddressLevel1Entity::class,
@@ -22,12 +23,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PromocionEntity::class,
         PromocionDetalleEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun clientDao(): ClientDao
+    abstract fun clientSucursalDao(): ClientSucursalDao
     abstract fun productDao(): ProductDao
     abstract fun countryDao(): CountryDao
     abstract fun addressLevel1Dao(): AddressLevel1Dao
@@ -192,13 +194,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS client_sucursales (" +
+                        "sucursalId INTEGER NOT NULL, " +
+                        "clienteCodigo TEXT NOT NULL, " +
+                        "nombreSucursal TEXT NOT NULL, " +
+                        "nombreContacto TEXT, " +
+                        "telefonoContacto TEXT, " +
+                        "correoContacto TEXT, " +
+                        "direccion TEXT, " +
+                        "observaciones TEXT, " +
+                        "PRIMARY KEY(sucursalId)" +
+                        ")"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "amaxonia_pos.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                     .also { instance = it }
             }

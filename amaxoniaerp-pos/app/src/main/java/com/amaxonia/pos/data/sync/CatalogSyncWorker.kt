@@ -23,6 +23,7 @@ class CatalogSyncWorker(
             apiService = apiService,
             localStore = localStore,
             clientDao = database.clientDao(),
+            clientSucursalDao = database.clientSucursalDao(),
             productDao = database.productDao(),
             countryDao = database.countryDao(),
             addressLevel1Dao = database.addressLevel1Dao(),

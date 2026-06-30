@@ -46,3 +46,15 @@ data class ClientsListResponse(
     val data: List<Client>,
     val total: Long,
 )
+
+@Serializable
+data class ClientSucursal(
+    val sucursalId: Int,
+    val clienteCodigo: String,
+    val nombreSucursal: String,
+    val nombreContacto: String? = null,
+    val telefonoContacto: String? = null,
+    val correoContacto: String? = null,
+    val direccion: String? = null,
+    val observaciones: String? = null,
+)

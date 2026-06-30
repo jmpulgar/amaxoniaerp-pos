@@ -29,6 +29,21 @@ interface ClientDao {
 }
 
 @Dao
+interface ClientSucursalDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<ClientSucursalEntity>)
+
+    @Query("DELETE FROM client_sucursales WHERE clienteCodigo = :clienteCodigo")
+    suspend fun deleteByClientCode(clienteCodigo: String)
+
+    @Query("SELECT * FROM client_sucursales WHERE clienteCodigo = :clienteCodigo ORDER BY nombreSucursal")
+    suspend fun getByClientCode(clienteCodigo: String): List<ClientSucursalEntity>
+
+    @Query("SELECT * FROM client_sucursales WHERE clienteCodigo IN (:clienteCodigos) ORDER BY nombreSucursal")
+    suspend fun getByClientCodes(clienteCodigos: List<String>): List<ClientSucursalEntity>
+}
+
+@Dao
 interface ProductDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ProductEntity>)

@@ -56,6 +56,19 @@ fun ClientEntity.toDomain(): Client {
     )
 }
 
+fun ClientSucursalDto.toEntity(): ClientSucursalEntity {
+    return ClientSucursalEntity(
+        sucursalId = sucursalId,
+        clienteCodigo = clienteCodigo,
+        nombreSucursal = nombreSucursal,
+        nombreContacto = nombreContacto,
+        telefonoContacto = telefonoContacto,
+        correoContacto = correoContacto,
+        direccion = direccion,
+        observaciones = observaciones,
+    )
+}
+
 // --- KEEP THE REST OF THE MAPPERS AS IS ---
 // (Copia el resto de mappers de Productos, Countries, etc. igual que antes)
 

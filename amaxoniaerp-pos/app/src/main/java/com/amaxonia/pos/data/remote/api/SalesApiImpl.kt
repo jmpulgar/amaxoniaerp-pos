@@ -5,6 +5,7 @@ import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
+import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
@@ -167,6 +168,33 @@ class SalesApiImpl(private val apiClient: ApiClient) : SalesApi {
                     throw IllegalStateException(error ?: "Error al obtener payload de impresión")
                 }
                 throw IllegalStateException("Respuesta invalida al obtener payload de impresión")
+            }
+
+            Result.success(parsed)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun sendReceiptEmail(
+        authHeader: String,
+        facturaId: String
+    ): Result<EnviarCorreoFacturaResponseDto> {
+        return try {
+            val response = apiClient.httpClient.post("facturas/$facturaId/enviar-correo") {
+                header("Authorization", authHeader)
+            }
+
+            val responseText = response.bodyAsText()
+            val parsed = runCatching {
+                AppJson.decodeFromString(EnviarCorreoFacturaResponseDto.serializer(), responseText)
+            }.getOrElse {
+                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                if (json is JsonObject) {
+                    val error = json["error"]?.jsonPrimitive?.contentOrNull
+                    throw IllegalStateException(error ?: "Error al enviar recibo por correo")
+                }
+                throw IllegalStateException("Respuesta invalida al enviar recibo por correo")
             }
 
             Result.success(parsed)

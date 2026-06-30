@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
@@ -20,13 +21,20 @@ class CartRepository {
     private val _selectedClient = MutableStateFlow<Client?>(null)
     val selectedClient: StateFlow<Client?> = _selectedClient.asStateFlow()
 
+    private val _selectedClientSucursal = MutableStateFlow<ClientSucursalEntity?>(null)
+    val selectedClientSucursal: StateFlow<ClientSucursalEntity?> = _selectedClientSucursal.asStateFlow()
+
+    private val _clientSucursales = MutableStateFlow<List<ClientSucursalEntity>>(emptyList())
+    val clientSucursales: StateFlow<List<ClientSucursalEntity>> = _clientSucursales.asStateFlow()
+
     private val _availableSellers = MutableStateFlow<List<Seller>>(emptyList())
     val availableSellers: StateFlow<List<Seller>> = _availableSellers.asStateFlow()
 
     private val _currentSeller = MutableStateFlow<Seller?>(null)
     val currentSeller: StateFlow<Seller?> = _currentSeller.asStateFlow()
 
-    fun addToCart(product: Product) {
+    fun addToCart(product: Product, quantity: Int = 1) {
+        val safeQuantity = quantity.coerceAtLeast(1)
         val currentSellerId = _currentSeller.value?.id ?: 0
         val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
         val defaultPrice = priceForUnit(product, defaultUnit)
@@ -35,16 +43,18 @@ class CartRepository {
                 if (existingIndex != -1) {
                 val mutable = currentItems.toMutableList()
                 val existingItem = mutable[existingIndex]
+                val newQuantity = existingItem.quantity + safeQuantity
                 mutable[existingIndex] = existingItem.copy(
-                    quantity = existingItem.quantity + 1,
+                    quantity = newQuantity,
+                    quantityDecimal = newQuantity.toDouble(),
                     codVendedor = if (currentSellerId > 0) currentSellerId else existingItem.codVendedor,
                 )
                 mutable
             } else {
                 currentItems + CartItem(
                     product = product,
-                    quantity = 1,
-                    quantityDecimal = 1.0,
+                    quantity = safeQuantity,
+                    quantityDecimal = safeQuantity.toDouble(),
                     itemUnitPackage = defaultUnit,
                     codVendedor = currentSellerId,
                     unitPriceWithTax = defaultPrice
@@ -66,17 +76,21 @@ class CartRepository {
         }
     }
 
-    fun addPromotionToCart(promocion: Promocion) {
+    fun addPromotionToCart(promocion: Promocion, times: Int = 1) {
+        val safeTimes = times.coerceAtLeast(1)
         val currentSellerId = _currentSeller.value?.id ?: 0
         _cartItems.update { currentItems ->
-            if (currentItems.any { it.promocionId == promocion.id }) return@update currentItems
+            if (currentItems.any { it.promocionId == promocion.id }) {
+                return@update updatePromotionLines(currentItems, promocion.id, safeTimes, append = true)
+            }
             val promotionLines = promocion.detalles.map { detalle ->
-                val quantity = detalle.cantidadTotal.toDouble().takeIf { it > 0.0 } ?: detalle.cantidad.toDouble().coerceAtLeast(1.0)
+                val baseQuantity = detalle.cantidadTotal.toDouble().takeIf { it > 0.0 } ?: detalle.cantidad.toDouble().coerceAtLeast(1.0)
+                val quantity = baseQuantity * safeTimes
                 CartItem(
                     product = detalle.product.copy(
                         isExempt = detalle.iva.toDouble() <= 0.0,
                         taxRate = detalle.iva.toDouble(),
-                        prices = listOf(com.amaxonia.pos.domain.model.PriceLevel(label = "PROMO", pricePlusTax = detalle.totalConIva.toDouble() / quantity))
+                        prices = listOf(com.amaxonia.pos.domain.model.PriceLevel(label = "PROMO", pricePlusTax = detalle.totalConIva.toDouble() / baseQuantity))
                     ),
                     quantity = quantity.toInt().coerceAtLeast(1),
                     quantityDecimal = quantity,
@@ -88,7 +102,8 @@ class CartRepository {
                     promocionNombre = promocion.nombre,
                     promocionTipo = promocion.tipo,
                     promocionGrupo = detalle.grupo,
-                    promocionDetalleId = detalle.id
+                    promocionDetalleId = detalle.id,
+                    promocionVeces = safeTimes
                 )
             }
             currentItems + promotionLines
@@ -121,18 +136,36 @@ class CartRepository {
     }
 
     fun increaseQuantity(productId: String) {
-        _cartItems.update { items ->
-            items.map { if (it.product.id == productId && !it.isPromotionLine) it.copy(quantity = it.quantity + 1, quantityDecimal = it.quantity + 1.0) else it }
-        }
+        updateItemQuantity(productId, (_cartItems.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 0) + 1)
     }
 
     fun decreaseQuantity(productId: String) {
+        updateItemQuantity(productId, (_cartItems.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 1) - 1)
+    }
+
+    fun updateItemQuantity(productId: String, quantity: Int) {
+        if (quantity <= 0) {
+            removeItem(productId)
+            return
+        }
         _cartItems.update { items ->
-            items.mapNotNull {
-                if (it.product.id == productId && !it.isPromotionLine) {
-                    if (it.quantity > 1) it.copy(quantity = it.quantity - 1, quantityDecimal = it.quantity - 1.0) else null
-                } else it
+            items.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    item.copy(quantity = quantity, quantityDecimal = quantity.toDouble())
+                } else {
+                    item
+                }
             }
+        }
+    }
+
+    fun updatePromotionQuantity(promocionId: String, times: Int) {
+        if (times <= 0) {
+            removePromotion(promocionId)
+            return
+        }
+        _cartItems.update { items ->
+            updatePromotionLines(items, promocionId, times, append = false)
         }
     }
 
@@ -142,6 +175,27 @@ class CartRepository {
 
     fun removePromotion(promotionId: String) {
         _cartItems.update { items -> items.filter { it.promocionId != promotionId } }
+    }
+
+    private fun updatePromotionLines(
+        items: List<CartItem>,
+        promotionId: String,
+        times: Int,
+        append: Boolean
+    ): List<CartItem> {
+        val safeTimes = times.coerceAtLeast(1)
+        return items.map { item ->
+            if (item.promocionId != promotionId) return@map item
+            val currentTimes = item.promocionVeces.coerceAtLeast(1)
+            val nextTimes = if (append) currentTimes + safeTimes else safeTimes
+            val baseQuantity = item.quantityDecimal / currentTimes
+            val nextQuantity = baseQuantity * nextTimes
+            item.copy(
+                quantity = nextQuantity.toInt().coerceAtLeast(1),
+                quantityDecimal = nextQuantity,
+                promocionVeces = nextTimes
+            )
+        }
     }
 
     fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
@@ -209,6 +263,8 @@ class CartRepository {
     fun clearCart() {
         _cartItems.value = emptyList()
         _selectedClient.value = null
+        _selectedClientSucursal.value = null
+        _clientSucursales.value = emptyList()
         _currentSeller.value = null
         _availableSellers.value = emptyList()
     }
@@ -221,10 +277,27 @@ class CartRepository {
     // Nuevas funciones para manejar el cliente
     fun setClient(client: Client) {
         _selectedClient.value = client
+        _selectedClientSucursal.value = null
+        _clientSucursales.value = emptyList()
     }
 
     fun removeClient() {
         _selectedClient.value = null
+        _selectedClientSucursal.value = null
+        _clientSucursales.value = emptyList()
+    }
+
+    fun setClientSucursal(sucursal: ClientSucursalEntity?) {
+        _selectedClientSucursal.value = sucursal
+    }
+
+    fun setClientSucursales(sucursales: List<ClientSucursalEntity>) {
+        val normalized = sucursales.distinctBy { it.sucursalId }
+        _clientSucursales.value = normalized
+
+        val current = _selectedClientSucursal.value
+            ?.takeIf { selected -> normalized.any { it.sucursalId == selected.sucursalId } }
+        _selectedClientSucursal.value = current ?: normalized.singleOrNull()
     }
 
     fun setSellerContext(

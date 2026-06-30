@@ -139,7 +139,7 @@ fun Application.configureRouting() {
         // Rutas auxiliares que aún podrían necesitar refactoring
         clientsRoutes(clientsRepository)
         clientTypesRoutes(clientTypesRepository)
-        facturasRoutes(facturasRepository)
+        facturasRoutes(facturasRepository, panamaProcessor)
         geographyRoutes(geographyRepository)
     }
 }

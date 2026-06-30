@@ -27,6 +27,7 @@ data class CartItem(
     val promocionTipo: String = "",
     val promocionGrupo: String = "",
     val promocionDetalleId: String = "",
+    val promocionVeces: Int = 1,
 ) {
     val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
 

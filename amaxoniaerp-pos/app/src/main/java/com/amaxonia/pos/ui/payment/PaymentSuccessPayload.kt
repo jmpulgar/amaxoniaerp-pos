@@ -13,4 +13,5 @@ data class PaymentSuccessPayload(
     val tasa: Double = 0.0,
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
+    val feError: String? = null,
 )

@@ -68,6 +68,7 @@ data class SaleInvoiceInput(
     val facturarARuc: String = "CF",
     val facturarADireccion: String = "",
     val facturarATelefono: String = "",
+    val clienteSucursalId: Int? = null,
     val codFacturaFiscal: String = "",
     val nroz: String = "0000",
     val impresoraSerial: String = "",
@@ -107,7 +108,13 @@ data class SaleItemInput(
     val esProductoFisico: Boolean = true,
     val itemCodigo: String = "",
     val itemReferencia: String = "",
+    @SerialName("id_segmento")
+    val idSegmento: Int? = null,
+    @SerialName("id_familia")
+    val idFamilia: Int? = null,
     val promocionTipo: String = "",
+    val promocionId: String = "",
+    val promocionCantidad: Double = 0.0,
     val promocionCodigo: String = "",
     val promocionNombre: String = "",
     val promocionGrupo: String = "",

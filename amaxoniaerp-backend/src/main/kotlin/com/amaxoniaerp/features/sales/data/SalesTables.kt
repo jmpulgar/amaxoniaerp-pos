@@ -91,6 +91,7 @@ object SalesFacturaTablePA : BaseSalesFacturaTable() {
     val monedaSecundaria    = integer("moneda_secundaria")
     val abrMonedaSecundaria = varchar("abr_moneda_secundaria", 10)
     val totalRef            = float("total_ref")
+    val clienteSucursalId   = integer("cliente_sucursal_id").nullable()
 }
 
 
@@ -128,16 +129,20 @@ object SalesFacturaDetalleTable : Table("factura_detalle") {
     val itemListaPrecio = varchar("_item_lista_precio", 10)
     val itemUnidadEmpaque = varchar("_item_unidad_empaque", 15)
     val itemCantidadTotal = decimal("_item_cantidad_total", 32, 0)
+    val promocionId = varchar("promocion_id", 36)
     val promocionTipo = varchar("promocion_tipo", 20)
     val promocionCodigo = varchar("promocion_codigo", 15)
     val promocionNombre = varchar("promocion_nombre", 200)
     val promocionGrupo = varchar("promocion_grupo", 36)
     val promocionDetalleId = varchar("promocion_detalle_id", 36)
+    val promocionCantidad = decimal("promocion_cantidad", 32, 3)
     val grupo = integer("grupo")
     val descuentoAutorizacion = varchar("descuento_autorizacion", 36)
     val codVendedor = integer("cod_vendedor")
     val itemCodigo = varchar("_item_codigo", 50)
     val itemReferencia = varchar("_item_referencia", 50)
+    val idSegmento = integer("id_segmento").nullable()
+    val idFamilia = integer("id_familia").nullable()
 
     override val primaryKey = PrimaryKey(idDetalleFactura)
 }

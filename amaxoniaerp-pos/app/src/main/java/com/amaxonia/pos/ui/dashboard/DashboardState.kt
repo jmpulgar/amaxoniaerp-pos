@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.dashboard
 
+import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.Product
@@ -39,6 +40,8 @@ data class DashboardState(
 
     // --- NUEVO CAMPO ---
     val selectedClient: Client? = null,
+    val clientSucursales: List<ClientSucursalEntity> = emptyList(),
+    val selectedClientSucursal: ClientSucursalEntity? = null,
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
     val cajaPrincipalNombre: String = "Caja no seleccionada",
@@ -70,6 +73,7 @@ data class DashboardState(
     val pendingPromotionProduct: DashboardProduct? = null,
     val showPromotionChoice: Boolean = false,
     val promotionMessage: String? = null,
+    val quantityPickerProduct: DashboardProduct? = null,
 
     // --- AUTO-CLOSE ---
     val autoCloseMessage: String? = null

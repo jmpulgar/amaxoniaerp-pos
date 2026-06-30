@@ -270,6 +270,8 @@ class FacturasRepository {
                 f.TotalTotalFactura,
                 f.totalizar_total_general,
                 f.formapago,
+                cs.nombre_sucursal AS cliente_sucursal_nombre,
+                cs.direccion AS cliente_sucursal_direccion,
                 f.cufe,
                 f.qr,
                 f.fechaRecepcionDGI,
@@ -282,6 +284,7 @@ class FacturasRepository {
             LEFT JOIN parametros_generales pg ON 1 = 1
             LEFT JOIN caja c ON c.id = f.id_caja
             LEFT JOIN sucursal s ON s.id = f.id_sucursal
+            LEFT JOIN cliente_sucursal cs ON cs.sucursal_id = f.cliente_sucursal_id
             WHERE f.id_factura = '${facturaId.sqlLiteral()}'
             LIMIT 1
             """.trimIndent(),
@@ -339,6 +342,8 @@ class FacturasRepository {
             cliente = ClientePrintResponse(
                 nombre = factura.stringOrNull("facturar_a").orEmpty().ifBlank { "Cliente General" },
                 documento = factura.stringOrNull("facturar_a_ruc"),
+                sucursal = factura.stringOrNull("cliente_sucursal_nombre"),
+                sucursalDireccion = factura.stringOrNull("cliente_sucursal_direccion"),
             ),
             vendedor = factura.stringOrNull("usuario_creacion"),
             productos = productos,

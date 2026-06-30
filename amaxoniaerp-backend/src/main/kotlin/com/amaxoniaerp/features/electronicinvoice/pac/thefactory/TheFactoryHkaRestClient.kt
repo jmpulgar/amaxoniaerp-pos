@@ -134,4 +134,35 @@ class TheFactoryHkaRestClient(
             logger.error("Error descargando PDF de The Factory HKA para CUFE: {}", cufe, e)
         }
     }
+
+    override suspend fun sendEmail(
+        baseUrl: String,
+        token: PacAuthToken,
+        cufe: String,
+        emails: List<String>,
+    ): Result<TheFactoryEnviarCorreoResponse> {
+        return runCatching {
+            val url = "${baseUrl.trimEnd('/')}/api/EnvioCorreo"
+            logger.info("Enviando factura electrónica por correo desde The Factory HKA. CUFE={}", cufe.take(20))
+
+            val response: HttpResponse = httpClient.post(url) {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                setBody(TheFactoryEnviarCorreoRequest(cufe = cufe, correos = emails))
+            }
+
+            val responseText = response.bodyAsText()
+            logger.debug("Respuesta EnvioCorreo The Factory HKA [HTTP {}]: {}", response.status, responseText)
+
+            if (!response.status.isSuccess()) {
+                throw PacCommunicationException(
+                    "Error HTTP ${response.status} al enviar correo desde The Factory HKA. Body: $responseText"
+                )
+            }
+
+            response.body<TheFactoryEnviarCorreoResponse>()
+        }.onFailure { e ->
+            logger.error("Error enviando correo The Factory HKA para CUFE: {}", cufe, e)
+        }
+    }
 }

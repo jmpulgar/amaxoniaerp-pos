@@ -2,8 +2,10 @@ package com.amaxonia.pos.ui.cart
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
 import com.amaxonia.pos.data.local.db.DraftInvoiceEntity
+import com.amaxonia.pos.data.repository.getForClient
 import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
@@ -30,9 +32,17 @@ data class CartState(
     val tasa: Double = 0.0,
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
+    val isPanama: Boolean = false,
+    val clientSucursales: List<ClientSucursalEntity> = emptyList(),
+    val selectedClientSucursal: ClientSucursalEntity? = null,
+    val cartActionError: String? = null,
 ) {
     val totalBsText: String
         get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", total * tasa) else ""
+    val requiresClientSucursal: Boolean
+        get() = isPanama && selectedClient != null && clientSucursales.isNotEmpty()
+    val isMissingRequiredClientSucursal: Boolean
+        get() = requiresClientSucursal && selectedClientSucursal == null
 }
 
 class CartViewModel(
@@ -41,6 +51,7 @@ class CartViewModel(
     private val localStore: com.amaxonia.pos.data.local.LocalStore,
     private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager,
     private val cajaRepository: com.amaxonia.pos.domain.repository.CajaRepository = com.amaxonia.pos.ui.common.DependencyContainer.cajaRepository,
+    private val clientSucursalDao: com.amaxonia.pos.data.local.db.ClientSucursalDao = com.amaxonia.pos.ui.common.DependencyContainer.clientSucursalDao,
     private val draftInvoiceDao: DraftInvoiceDao = com.amaxonia.pos.ui.common.DependencyContainer.draftInvoiceDao
 ) : ViewModel() {
     private val _state = MutableStateFlow(CartState())
@@ -54,6 +65,10 @@ class CartViewModel(
             adminDb = localStore.readCompanySession()?.company?.adminDb ?: ""
         }
         viewModelScope.launch {
+            val isPanama = localStore.readSelectedCountry()?.code.equals("PA", ignoreCase = true)
+            _state.update { it.copy(isPanama = isPanama) }
+        }
+        viewModelScope.launch {
             cartRepository.cartItems.collect { items ->
                 updateState(items, cartRepository.selectedClient.value)
             }
@@ -61,6 +76,27 @@ class CartViewModel(
         viewModelScope.launch {
             cartRepository.selectedClient.collect { client ->
                 updateState(cartRepository.cartItems.value, client)
+                loadClientSucursales(client)
+            }
+        }
+        viewModelScope.launch {
+            cartRepository.clientSucursales.collect { sucursales ->
+                _state.update {
+                    it.copy(
+                        clientSucursales = sucursales,
+                        cartActionError = if (sucursales.isEmpty()) null else it.cartActionError
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            cartRepository.selectedClientSucursal.collect { sucursal ->
+                _state.update {
+                    it.copy(
+                        selectedClientSucursal = sucursal,
+                        cartActionError = if (sucursal != null) null else it.cartActionError
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -110,9 +146,21 @@ class CartViewModel(
                 items = items,
                 displayItems = cartRepository.getDisplayItems(),
                 total = items.sumOf { item -> item.total },
-                selectedClient = client
+                selectedClient = client,
+                cartActionError = if (client == null) null else it.cartActionError
             )
         }
+    }
+
+    private suspend fun loadClientSucursales(client: Client?) {
+        val isPanama = localStore.readSelectedCountry()?.code.equals("PA", ignoreCase = true)
+        _state.update { it.copy(isPanama = isPanama) }
+        if (!isPanama || client == null) {
+            cartRepository.setClientSucursales(emptyList())
+            return
+        }
+        val sucursales = clientSucursalDao.getForClient(client)
+        cartRepository.setClientSucursales(sucursales)
     }
 
     fun increaseQuantity(productId: String) {
@@ -125,9 +173,18 @@ class CartViewModel(
         refreshLotsIfNeeded(productId)
     }
 
+    fun updateItemQuantity(productId: String, quantity: Int) {
+        cartRepository.updateItemQuantity(productId, quantity)
+        refreshLotsIfNeeded(productId)
+    }
+
     fun removeItem(productId: String) = cartRepository.removeItem(productId)
 
     fun removePromotion(promotionId: String) = cartRepository.removePromotion(promotionId)
+
+    fun updatePromotionQuantity(promotionId: String, times: Int) {
+        cartRepository.updatePromotionQuantity(promotionId, times)
+    }
 
     /** Recalcula lotes FEFO cuando cambia la cantidad */
     private fun refreshLotsIfNeeded(productId: String) {
@@ -199,15 +256,26 @@ class CartViewModel(
         cartRepository.removeClient()
     }
 
+    fun selectClientSucursal(sucursalId: Int) {
+        val sucursal = _state.value.clientSucursales.firstOrNull { it.sucursalId == sucursalId }
+        cartRepository.setClientSucursal(sucursal)
+        _state.update { it.copy(cartActionError = null) }
+    }
+
     fun selectSeller(sellerId: Int) {
         val seller = cartRepository.availableSellers.value.firstOrNull { it.id == sellerId } ?: return
         cartRepository.setCurrentSeller(seller)
+    }
+
+    fun validateBeforeCheckout(): Boolean {
+        return validateClientSucursal("Selecciona la sucursal del cliente antes de cobrar.")
     }
 
     /** Guarda el carrito actual como factura pendiente/borrador local */
     fun saveDraft() {
         val items = _state.value.items
         if (items.isEmpty()) return
+        if (!validateClientSucursal("Selecciona la sucursal del cliente antes de guardar la venta.")) return
 
         viewModelScope.launch {
             val client = _state.value.selectedClient
@@ -264,6 +332,10 @@ class CartViewModel(
         _state.update { it.copy(orderSuccessMessage = null) }
     }
 
+    fun clearActionError() {
+        _state.update { it.copy(cartActionError = null) }
+    }
+
     fun getClientPhotoUrl(client: Client): String {
         if (client.id.isBlank() || adminDb.isBlank()) return ""
         val filename = client.photoFilename.takeIf { it.isNotBlank() }
@@ -283,5 +355,12 @@ class CartViewModel(
             clientRepository.getDefaultClient()
                 .onSuccess { defaultClient -> cartRepository.setClient(defaultClient) }
         }
+    }
+
+    private fun validateClientSucursal(message: String): Boolean {
+        val state = _state.value
+        if (!state.isMissingRequiredClientSucursal) return true
+        _state.update { it.copy(cartActionError = message) }
+        return false
     }
 }

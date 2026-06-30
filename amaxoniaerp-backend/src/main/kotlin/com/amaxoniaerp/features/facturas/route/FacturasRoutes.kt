@@ -3,6 +3,7 @@ package com.amaxoniaerp.features.facturas.route
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.auth.route.getAdminDb
 import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
@@ -14,7 +15,10 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.time.LocalDate
 
-fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
+fun Route.facturasRoutes(
+    facturasRepository: FacturasRepository,
+    panamaInvoiceProcessor: PanamaInvoiceProcessor,
+) {
     authenticate {
         route("/facturas") {
             get {
@@ -267,6 +271,60 @@ fun Route.facturasRoutes(facturasRepository: FacturasRepository) {
                 } catch (e: NoSuchElementException) {
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Factura no encontrada")))
                 }
+            }
+
+            post("/{id}/enviar-correo") {
+                val principal = call.principal<JWTPrincipal>()
+                    ?: return@post call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid token")
+                    )
+
+                val tokenType = principal.payload.getClaim("token_type").asString()
+                if (tokenType != "company") {
+                    return@post call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required")
+                    )
+                }
+
+                val adminDb = principal.getAdminDb()
+                if (adminDb.isNullOrBlank()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Database not found")
+                    )
+                }
+
+                val countryCode = principal.getCountryCode()
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found")
+                    )
+
+                if (!countryCode.equals("PA", ignoreCase = true)) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "El envío por correo FEL solo está disponible para Panamá")
+                    )
+                }
+
+                val facturaId = call.parameters["id"]
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Missing factura ID")
+                    )
+
+                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                panamaInvoiceProcessor.resendInvoiceEmail(companyDb, facturaId).fold(
+                    onSuccess = { call.respond(it) },
+                    onFailure = { throwable ->
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (throwable.message ?: "No se pudo enviar el correo"))
+                        )
+                    }
+                )
             }
         }
     }

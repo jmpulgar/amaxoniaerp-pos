@@ -68,6 +68,7 @@ data class SaleInvoiceDto(
     val facturarARuc: String,
     val facturarADireccion: String,
     val facturarATelefono: String,
+    val clienteSucursalId: Int? = null,
     val codFacturaFiscal: String = "",
     val nroz: String = "0000",
     val impresoraSerial: String = ""
@@ -107,11 +108,17 @@ data class SaleItemDto(
     val esProductoFisico: Boolean = true,
     val itemCodigo: String = "",
     val itemReferencia: String = "",
+    @SerialName("id_segmento")
+    val idSegmento: Int? = null,
+    @SerialName("id_familia")
+    val idFamilia: Int? = null,
     @SerialName("_posee_configuracion_lote")
     val poseeConfiguracionLote: String = "no",
     @SerialName("_codigos_lote")
     val codigosLote: List<SaleLotDto> = emptyList(),
     val promocionTipo: String = "",
+    val promocionId: String = "",
+    val promocionCantidad: Double = 0.0,
     val promocionCodigo: String = "",
     val promocionNombre: String = "",
     val promocionGrupo: String = "",
@@ -181,4 +188,13 @@ data class ConfirmFacturaFiscalResponseDto(
     val numeroDocumentoFiscal: String,
     val codFacturaFiscal: String,
     val impresoraSerial: String,
+)
+
+@Serializable
+data class EnviarCorreoFacturaResponseDto(
+    val codigo: String? = null,
+    val resultado: String? = null,
+    val mensaje: String? = null,
+    val validaciones: List<String> = emptyList(),
+    val cufe: String? = null,
 )

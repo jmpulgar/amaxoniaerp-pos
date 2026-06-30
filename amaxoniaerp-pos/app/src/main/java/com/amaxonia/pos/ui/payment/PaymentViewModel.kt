@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceEntity
 import com.amaxonia.pos.data.printer.PrinterFactory
@@ -14,6 +15,7 @@ import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.data.printer.TheFactoryRapidPayClient
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.repository.CartRepository
+import com.amaxonia.pos.data.repository.getForClient
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionFiscalItem
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
@@ -56,6 +58,7 @@ class PaymentViewModel(
     private val formaPagoRepository: FormaPagoRepository,
     private val cajaRepository: CajaRepository,
     private val cartRepository: CartRepository,
+    private val clientSucursalDao: ClientSucursalDao,
     private val salesRepository: SalesRepository,
     private val localStore: LocalStore,
     private val networkMonitor: NetworkMonitor,
@@ -252,6 +255,7 @@ class PaymentViewModel(
         viewModelScope.launch {
             val cartItems = cartRepository.cartItems.value
             val selectedClient = cartRepository.selectedClient.value
+            var selectedClientSucursal = cartRepository.selectedClientSucursal.value
             val activeCaja = cajaRepository.activeCaja.value
             if (requiresGatewayConfig) {
                 if (configuredGatewayKey.isBlank()) {
@@ -292,6 +296,16 @@ class PaymentViewModel(
 
             if (activeCaja == null) {
                 _state.update { it.copy(isProcessingPayment = false, paymentError = "Debes seleccionar una caja") }
+                return@launch
+            }
+
+            val clientSucursales = if (isPanama) clientSucursalDao.getForClient(selectedClient) else emptyList()
+            if (isPanama) {
+                cartRepository.setClientSucursales(clientSucursales)
+                selectedClientSucursal = cartRepository.selectedClientSucursal.value
+            }
+            if (clientSucursales.isNotEmpty() && selectedClientSucursal == null) {
+                _state.update { it.copy(isProcessingPayment = false, paymentError = "Debes seleccionar la sucursal del cliente") }
                 return@launch
             }
 
@@ -399,6 +413,8 @@ class PaymentViewModel(
                     esProductoFisico = true,
                     itemCodigo = cartItem.product.code,
                     itemReferencia = cartItem.product.reference,
+                    idSegmento = cartItem.product.gobSegment.toIntOrNull(),
+                    idFamilia = cartItem.product.gobFamily.toIntOrNull(),
                     poseeConfiguracionLote = if (cartItem.hasLotConfig) "si" else "no",
                     codigosLote = cartItem.lotAssignments.map { lot ->
                         com.amaxonia.pos.domain.model.sales.SaleLotDto(
@@ -409,6 +425,8 @@ class PaymentViewModel(
                         )
                     },
                     promocionTipo = cartItem.promocionTipo,
+                    promocionId = cartItem.promocionId.orEmpty(),
+                    promocionCantidad = if (cartItem.isPromotionLine) cartItem.quantityDecimal else 0.0,
                     promocionCodigo = cartItem.promocionCodigo,
                     promocionNombre = cartItem.promocionNombre,
                     promocionGrupo = cartItem.promocionGrupo,
@@ -505,8 +523,11 @@ class PaymentViewModel(
                     usuarioCreacion = usuario,
                     facturarA = "${selectedClient.firstName} ${selectedClient.lastName}".trim().ifBlank { "CONSUMIDOR FINAL" },
                     facturarARuc = selectedClient.ruc.ifBlank { selectedClient.cedula.ifBlank { "CF" } },
-                    facturarADireccion = selectedClient.addressDetail,
-                    facturarATelefono = selectedClient.phone,
+                    facturarADireccion = selectedClientSucursal?.direccion?.takeIf { it.isNotBlank() }
+                        ?: selectedClient.addressDetail,
+                    facturarATelefono = selectedClientSucursal?.telefonoContacto?.takeIf { it.isNotBlank() }
+                        ?: selectedClient.phone,
+                    clienteSucursalId = selectedClientSucursal?.sucursalId,
                     nroz = if (isVenezuela) "0000" else "",
                     impresoraSerial = ""
                 ),
@@ -737,6 +758,7 @@ class PaymentViewModel(
                 tasa = currentState.tasa,
                 abrMonedaSecundaria = currentState.abrMonedaSecundaria,
                 isMultiCurrency = currentState.isMultiCurrency,
+                feError = response.feError,
             )
 
             Log.d(TAG, "processPayment() → flujo completado, emitiendo successPayload (codFactura=${response.codFactura})")

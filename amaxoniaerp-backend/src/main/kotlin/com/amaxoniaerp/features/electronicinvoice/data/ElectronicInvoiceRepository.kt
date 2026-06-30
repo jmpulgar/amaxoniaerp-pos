@@ -165,6 +165,16 @@ class ElectronicInvoiceRepository {
         }
     }
 
+    suspend fun getInvoiceCufe(database: Database, invoiceId: String): String? = dbQuery(database) {
+        FacturasTablePA
+            .select(FacturasTablePA.cufe)
+            .where { FacturasTablePA.idFactura eq invoiceId }
+            .limit(1)
+            .firstOrNull()
+            ?.get(FacturasTablePA.cufe)
+            ?.takeIf { it.isNotBlank() }
+    }
+
     // ─── Mappers privados ────────────────────────────────────────────────────
 
     private fun mapConfig(row: ResultRow): FEConfigData {
@@ -254,9 +264,9 @@ class ElectronicInvoiceRepository {
                     codigo = row[FEFacturaDetalleReadTable.itemCodigo],
                     unidadMedida = row.getOrNull(FEUnidadEmpaquesReadTable.simbolo)
                         ?.takeIf { it.isNotBlank() } ?: "und",
-                    codigoCPBS = row.getOrNull(FEItemReadTable.idFamiliaGob)?.toString(),
-                    codigoCPBSAbrev = row.getOrNull(FEItemReadTable.idSegmentoGob)?.toString(),
-                    cantidad = row[FEFacturaDetalleReadTable.itemCantidadTotal].toDouble(),
+                    codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
+                    codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
+                    cantidad = row[FEFacturaDetalleReadTable.itemCantidad].toDouble(),
                     precioSinIva = row[FEFacturaDetalleReadTable.itemPrecioSinIva].toDouble(),
                     montoDescuento = row[FEFacturaDetalleReadTable.itemMontoDescuento].toDouble(),
                     piva = row[FEFacturaDetalleReadTable.itemPiva].toDouble(),

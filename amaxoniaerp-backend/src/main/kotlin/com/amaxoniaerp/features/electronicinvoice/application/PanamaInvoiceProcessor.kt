@@ -3,6 +3,7 @@ package com.amaxoniaerp.features.electronicinvoice.application
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.domain.*
 import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceClient
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
@@ -83,6 +84,7 @@ class PanamaInvoiceProcessor(
                 "Error construyendo documento electrónico: ${e.message}",
             )
         }
+        logPayloadDiagnostics(invoiceId, context, payload)
 
         // ── 4. Enviar al PAC ─────────────────────────────────────────────────
         logger.info("[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} formasPago=${context.formasPago.size}")
@@ -148,6 +150,18 @@ class PanamaInvoiceProcessor(
             )
         }
 
+        sendInvoiceEmailIfPossible(
+            context = context,
+            token = token,
+            cufe = pacResponse.cufe,
+        ).onFailure { e ->
+            logger.warn(
+                "FE exitosa para factura {}, pero no se pudo enviar el correo: {}",
+                invoiceId,
+                e.message,
+            )
+        }
+
         logger.info(
             "FE exitosa para factura {}. CUFE={}",
             invoiceId,
@@ -161,5 +175,100 @@ class PanamaInvoiceProcessor(
             nroProtocoloAutorizacion = pacResponse.nroProtocoloAutorizacion,
             fechaLimite = pacResponse.fechaLimite,
         )
+    }
+
+    suspend fun resendInvoiceEmail(
+        database: Database,
+        invoiceId: String,
+    ): Result<TheFactoryEnviarCorreoResponse> {
+        return runCatching {
+            val context = repository.loadInvoiceContext(database, invoiceId)
+            if (context.config.tipoFacturacion < 3) {
+                throw FEConfigurationException("La factura no usa FEL The Factory HKA")
+            }
+
+            val cufe = repository.getInvoiceCufe(database, invoiceId)
+                ?: throw FEConfigurationException("La factura no tiene CUFE generado")
+
+            val credentials = PacCredentials(
+                usuario = context.config.tokenEmpresa,
+                clave = context.config.tokenPassword,
+                baseUrl = context.config.api_thefactoryhka,
+            )
+            val token = pacClient.authenticate(credentials).getOrThrow()
+
+            sendInvoiceEmailIfPossible(context, token, cufe).getOrThrow()
+        }
+    }
+
+    private suspend fun sendInvoiceEmailIfPossible(
+        context: InvoiceFEContext,
+        token: PacAuthToken,
+        cufe: String,
+    ): Result<TheFactoryEnviarCorreoResponse> {
+        val email = context.cliente.correo?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return Result.failure(FEConfigurationException("El cliente no tiene correo configurado"))
+
+        return pacClient.sendEmail(
+            baseUrl = context.config.api_thefactoryhka,
+            token = token,
+            cufe = cufe,
+            emails = listOf(email),
+        )
+    }
+
+    private fun logPayloadDiagnostics(
+        invoiceId: String,
+        context: InvoiceFEContext,
+        payload: com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper,
+    ) {
+        val totales = payload.documento.totalesSubTotales
+        logger.info(
+            "[FE][PAYLOAD] factura={} totalFactura={} totalValorRecibido={} vuelto={} totalPrecioNeto={} totalITBMS={} totalMontoGravado={} totalTodosItems={}",
+            invoiceId,
+            totales.totalFactura,
+            totales.totalValorRecibido,
+            totales.vuelto ?: "",
+            totales.totalPrecioNeto,
+            totales.totalITBMS,
+            totales.totalMontoGravado ?: "",
+            totales.totalTodosItems,
+        )
+
+        payload.documento.listaItems.forEachIndexed { index, item ->
+            val raw = context.detalles.getOrNull(index)
+            logger.info(
+                "[FE][PAYLOAD][ITEM {}] desc='{}' codigo='{}' cantidad={} precioUnitario={} precioItem={} valorTotal={} tasaITBMS={} valorITBMS={} descuentoUnit={} CPBS={}/{} rawCantidad={} rawPrecioSinIva={} rawTotalSinIva={} rawTotalConIva={} rawDescuento={} rawPiva={}",
+                index + 1,
+                item.descripcion.take(80),
+                item.codigo,
+                item.cantidad,
+                item.precioUnitario,
+                item.precioItem,
+                item.valorTotal,
+                item.tasaITBMS,
+                item.valorITBMS,
+                item.precioUnitarioDescuento ?: "",
+                item.codigoCPBS ?: "",
+                item.codigoCPBSAbrev ?: "",
+                raw?.cantidad ?: "",
+                raw?.precioSinIva ?: "",
+                raw?.totalSinIva ?: "",
+                raw?.totalConIva ?: "",
+                raw?.montoDescuento ?: "",
+                raw?.piva ?: "",
+            )
+        }
+
+        totales.listaFormaPago.forEachIndexed { index, formaPago ->
+            logger.info(
+                "[FE][PAYLOAD][PAGO {}] formaPagoFact={} desc='{}' valorCuotaPagada={}",
+                index + 1,
+                formaPago.formaPagoFact,
+                formaPago.descFormaPago ?: "",
+                formaPago.valorCuotaPagada,
+            )
+        }
     }
 }

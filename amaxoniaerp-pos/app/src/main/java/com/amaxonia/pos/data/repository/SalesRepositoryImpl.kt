@@ -4,6 +4,7 @@ import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.remote.api.SalesApi
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
+import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
@@ -42,6 +43,16 @@ class SalesRepositoryImpl(
             val token = localStore.readCompanySession()?.token
                 ?: throw IllegalStateException("No autorizado: primero selecciona una empresa")
             salesApi.getPrintPayload(authHeader = "Bearer $token", facturaId = facturaId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto> {
+        return try {
+            val token = localStore.readCompanySession()?.token
+                ?: throw IllegalStateException("No autorizado: primero selecciona una empresa")
+            salesApi.sendReceiptEmail(authHeader = "Bearer $token", facturaId = facturaId)
         } catch (e: Exception) {
             Result.failure(e)
         }

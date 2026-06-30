@@ -3,6 +3,8 @@ package com.amaxonia.pos.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.data.repository.CartRepository
+import com.amaxonia.pos.data.repository.getForClient
+import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
@@ -28,7 +30,8 @@ class DashboardViewModel(
     private val cartRepository: CartRepository,
     private val cajaRepository: CajaRepository,
     private val localStore: com.amaxonia.pos.data.local.LocalStore,
-    private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager
+    private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager,
+    private val clientSucursalDao: ClientSucursalDao,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state.asStateFlow()
@@ -56,6 +59,7 @@ class DashboardViewModel(
         viewModelScope.launch { promotionRepository.syncPromotions() }
         observeCart()
         observeClient()
+        observeClientSucursal()
         observeSeller()
         observeCaja()
         viewModelScope.launch {
@@ -85,6 +89,19 @@ class DashboardViewModel(
                         sellers = caja.availableSellers,
                     )
                 }
+            }
+        }
+    }
+
+    private fun observeClientSucursal() {
+        viewModelScope.launch {
+            cartRepository.clientSucursales.collect { sucursales ->
+                _state.update { it.copy(clientSucursales = sucursales) }
+            }
+        }
+        viewModelScope.launch {
+            cartRepository.selectedClientSucursal.collect { sucursal ->
+                _state.update { it.copy(selectedClientSucursal = sucursal) }
             }
         }
     }
@@ -228,9 +245,32 @@ class DashboardViewModel(
     private fun observeClient() {
         viewModelScope.launch {
             cartRepository.selectedClient.collect { client ->
-                _state.update { it.copy(selectedClient = client) }
+                if (client == null) {
+                    cartRepository.setClientSucursales(emptyList())
+                    _state.update {
+                        it.copy(
+                            selectedClient = null,
+                            clientSucursales = emptyList(),
+                            selectedClientSucursal = null,
+                        )
+                    }
+                    return@collect
+                }
+                val isPanama = localStore.readSelectedCountry()?.code.equals("PA", ignoreCase = true)
+                val sucursales = if (isPanama) clientSucursalDao.getForClient(client) else emptyList()
+                cartRepository.setClientSucursales(sucursales)
+                _state.update {
+                    it.copy(
+                        selectedClient = client,
+                    )
+                }
             }
         }
+    }
+
+    fun selectClientSucursal(sucursalId: Int) {
+        val sucursal = _state.value.clientSucursales.firstOrNull { it.sucursalId == sucursalId }
+        cartRepository.setClientSucursal(sucursal)
     }
 
     fun setShowCajaSelector(show: Boolean) {
@@ -334,11 +374,17 @@ class DashboardViewModel(
     // --- LÓGICA DEL CARRITO CORREGIDA ---
 
     fun addToCart(dashboardProduct: DashboardProduct) {
+        addToCart(dashboardProduct, quantity = 1)
+    }
+
+    fun addToCart(dashboardProduct: DashboardProduct, quantity: Int) {
+        val safeQuantity = quantity.coerceAtLeast(1)
         viewModelScope.launch {
             promotionRepository.getActivePromotionsForProduct(dashboardProduct.id).fold(
                 onSuccess = { promotions ->
                     val validPromotions = promotions.filter { promo ->
-                        validarAdicionPromocion(promo, cartRepository.cartItems.value).isSuccess
+                        val cartWithoutSamePromotion = cartRepository.cartItems.value.filter { it.promocionId != promo.id }
+                        validarAdicionPromocion(promo, cartWithoutSamePromotion).isSuccess
                     }
                     if (validPromotions.isNotEmpty()) {
                         _state.update {
@@ -346,34 +392,59 @@ class DashboardViewModel(
                                 promotionOptions = validPromotions,
                                 pendingPromotionProduct = dashboardProduct,
                                 showPromotionChoice = true,
+                                quantityPickerProduct = null,
                                 promotionMessage = null
                             )
                         }
                     } else {
-                        addProductIndividual(dashboardProduct)
+                        addProductIndividual(dashboardProduct, safeQuantity)
                     }
                 },
-                onFailure = { addProductIndividual(dashboardProduct) }
+                onFailure = { addProductIndividual(dashboardProduct, safeQuantity) }
             )
         }
     }
 
-    fun addProductIndividualFromPromotionChoice() {
-        val product = _state.value.pendingPromotionProduct ?: return
-        dismissPromotionChoice()
-        addProductIndividual(product)
+    fun showQuantityPicker(product: DashboardProduct) {
+        _state.update { it.copy(quantityPickerProduct = product, promotionMessage = null) }
     }
 
-    fun addPromotionFromChoice(promocion: com.amaxonia.pos.domain.model.Promocion) {
-        validarAdicionPromocion(promocion, cartRepository.cartItems.value).fold(
+    fun dismissQuantityPicker() {
+        _state.update { it.copy(quantityPickerProduct = null) }
+    }
+
+    fun confirmProductQuantity(product: DashboardProduct, quantity: Int) {
+        if (quantity < 1) {
+            _state.update { it.copy(promotionMessage = "La cantidad minima es 1") }
+            return
+        }
+        dismissQuantityPicker()
+        addToCart(product, quantity)
+    }
+
+    fun addProductIndividualFromPromotionChoice() {
+        addProductIndividualFromPromotionChoice(quantity = 1)
+    }
+
+    fun addProductIndividualFromPromotionChoice(quantity: Int) {
+        val product = _state.value.pendingPromotionProduct ?: return
+        dismissPromotionChoice()
+        addProductIndividual(product, quantity.coerceAtLeast(1))
+    }
+
+    fun addPromotionFromChoice(promocion: com.amaxonia.pos.domain.model.Promocion, times: Int = 1) {
+        val safeTimes = times.coerceAtLeast(1)
+        val cartWithoutSamePromotion = cartRepository.cartItems.value.filter { it.promocionId != promocion.id }
+        validarAdicionPromocion(promocion, cartWithoutSamePromotion).fold(
             onSuccess = {
-                cartRepository.addPromotionToCart(promocion)
+                cartRepository.addPromotionToCart(promocion, safeTimes)
                 _state.update {
                     it.copy(
                         showPromotionChoice = false,
                         pendingPromotionProduct = null,
                         promotionOptions = emptyList(),
-                        promotionMessage = "Promoción agregada: ${promocion.nombre}"
+                        quantityPickerProduct = null,
+                        promotionMessage = "Promoción agregada: ${promocion.nombre} x$safeTimes"
                     )
                 }
             },
@@ -389,7 +460,8 @@ class DashboardViewModel(
         _state.update { it.copy(promotionMessage = null) }
     }
 
-    private fun addProductIndividual(dashboardProduct: DashboardProduct) {
+    private fun addProductIndividual(dashboardProduct: DashboardProduct, quantity: Int = 1) {
+        val safeQuantity = quantity.coerceAtLeast(1)
         val product = dashboardProduct.sourceProduct ?: com.amaxonia.pos.domain.model.Product(
             id = dashboardProduct.id,
             description = dashboardProduct.name,
@@ -400,7 +472,7 @@ class DashboardViewModel(
             code = dashboardProduct.code ?: "",
             barcode1 = dashboardProduct.barcode ?: ""
         )
-        cartRepository.addToCart(product)
+        cartRepository.addToCart(product, safeQuantity)
 
         // Consultar lotes FEFO en background y asignar automaticamente
         viewModelScope.launch {

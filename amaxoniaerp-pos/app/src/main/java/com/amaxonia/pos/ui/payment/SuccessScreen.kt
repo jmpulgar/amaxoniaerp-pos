@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ fun SuccessScreen(
     val viewModel = injectedViewModel {
         PaymentSuccessViewModel(
             localStore = DependencyContainer.localStore,
+            salesRepository = DependencyContainer.salesRepository,
             transactionId = transactionId
         )
     }
@@ -67,6 +69,8 @@ fun SuccessScreen(
     val abrMonedaSecundaria = payload?.abrMonedaSecundaria.orEmpty()
     val totalBs = payload?.totalBs ?: 0.0
     val changeDueBs = payload?.changeDueBs ?: 0.0
+    val isSendingReceiptEmail = uiState.isSendingReceiptEmail
+    val feError = payload?.feError.orEmpty()
 
     LaunchedEffect(Unit) {
         visible = true
@@ -183,6 +187,38 @@ fun SuccessScreen(
                                     modifier = Modifier.padding(top = 8.dp)
                                 )
 
+                                if (feError.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(16.dp))
+                                            .padding(14.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                "Factura creada, FEL rechazada",
+                                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                feError,
+                                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                                fontSize = 13.sp,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(24.dp))
 
                                 Column(
@@ -220,12 +256,17 @@ fun SuccessScreen(
                                 Spacer(modifier = Modifier.height(24.dp))
 
                                 Button(
-                                    onClick = {},
+                                    onClick = { viewModel.sendReceiptEmail() },
+                                    enabled = !isSendingReceiptEmail,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                     shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Text("ENVIAR RECIBO", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (isSendingReceiptEmail) "ENVIANDO..." else "ENVIAR RECIBO",
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }

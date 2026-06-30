@@ -42,6 +42,7 @@ import com.amaxonia.pos.data.repository.CajaRepositoryImpl
 import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
 import com.amaxonia.pos.data.remote.api.FormaPagoApiImpl
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
+import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 
@@ -91,6 +92,8 @@ object DependencyContainer {
     lateinit var creditNoteRepository: CreditNoteRepository
         private set
     lateinit var draftInvoiceDao: DraftInvoiceDao
+        private set
+    lateinit var clientSucursalDao: ClientSucursalDao
         private set
     lateinit var pendingInvoiceDao: PendingInvoiceDao
         private set
@@ -146,11 +149,13 @@ object DependencyContainer {
         apiTransactionRepository = _apiTransactionRepository
         clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())
         draftInvoiceDao = database.draftInvoiceDao()
+        clientSucursalDao = database.clientSucursalDao()
         pendingInvoiceDao = database.pendingInvoiceDao()
         catalogSyncer = CatalogSyncer(
             apiService = apiService,
             localStore = localStore,
             clientDao = database.clientDao(),
+            clientSucursalDao = database.clientSucursalDao(),
             productDao = database.productDao(),
             countryDao = database.countryDao(),
             addressLevel1Dao = database.addressLevel1Dao(),

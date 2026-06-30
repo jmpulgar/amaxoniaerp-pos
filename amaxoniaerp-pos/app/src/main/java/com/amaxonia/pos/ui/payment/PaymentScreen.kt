@@ -65,6 +65,7 @@ fun PaymentScreen(
             formaPagoRepository = DependencyContainer.formaPagoRepository,
             cajaRepository = DependencyContainer.cajaRepository,
             cartRepository = DependencyContainer.cartRepository,
+            clientSucursalDao = DependencyContainer.clientSucursalDao,
             salesRepository = DependencyContainer.salesRepository,
             localStore = DependencyContainer.localStore,
             networkMonitor = DependencyContainer.networkMonitor,
