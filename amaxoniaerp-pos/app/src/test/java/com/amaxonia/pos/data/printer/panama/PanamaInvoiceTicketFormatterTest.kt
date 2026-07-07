@@ -5,6 +5,7 @@ import com.amaxonia.pos.domain.model.sales.EmpresaPrintDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.PagoPrintDto
 import com.amaxonia.pos.domain.model.sales.ProductoPrintDto
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,6 +28,15 @@ class PanamaInvoiceTicketFormatterTest {
         assertTrue(text.contains("10.70"))
         assertTrue(text.contains("https://fe.dgi"))
         assertTrue(text.contains("CUFE123"))
+    }
+
+    @Test
+    fun usesCompactFiscalQrSize() {
+        val ticket = PanamaInvoiceTicketFormatter().format(payload())
+        val qr = ticket.elements.filterIsInstance<TicketElement.Qr>().single()
+
+        assertEquals("https://fe.dgi", qr.value)
+        assertEquals(3, qr.size)
     }
 
     @Test

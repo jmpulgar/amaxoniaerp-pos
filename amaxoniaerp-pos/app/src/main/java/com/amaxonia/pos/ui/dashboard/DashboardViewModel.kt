@@ -80,7 +80,12 @@ class DashboardViewModel(
                 val sucursal = caja?.sucursalNombre
                     ?.takeIf { it.isNotBlank() }
                     ?: "Sucursal"
-                _state.update { it.copy(sucursalNombre = sucursal) }
+                _state.update {
+                    it.copy(
+                        sucursalNombre = sucursal,
+                        hasActiveCaja = caja != null,
+                    )
+                }
 
                 if (caja != null) {
                     cartRepository.setSellerContext(
@@ -126,7 +131,13 @@ class DashboardViewModel(
             _state.update { it.copy(isLoadingCajas = true, showCajaSelector = keepSelectorVisible) }
             cajaRepository.getCajas().fold(
                 onSuccess = { cajas ->
-                    val shouldShowSelector = forceShowSelector || cajaRepository.activeCaja.value == null
+                    val activeCaja = cajaRepository.activeCaja.value
+                    val onlyAvailableCaja = cajas.singleOrNull()
+                    if (!forceShowSelector && activeCaja == null && onlyAvailableCaja != null) {
+                        cajaRepository.setActiveCaja(onlyAvailableCaja)
+                    }
+
+                    val shouldShowSelector = forceShowSelector || (activeCaja == null && onlyAvailableCaja == null)
                     _state.update { 
                         it.copy(
                             availableCajas = cajas,
@@ -136,9 +147,11 @@ class DashboardViewModel(
                     }
                 },
                 onFailure = { error ->
+                    val shouldShowSelector = keepSelectorVisible || cajaRepository.activeCaja.value == null
                     _state.update { 
                         it.copy(
                             isLoadingCajas = false,
+                            showCajaSelector = shouldShowSelector,
                             error = "Error al cargar cajas: ${error.message}"
                         ) 
                     }
@@ -274,7 +287,14 @@ class DashboardViewModel(
     }
 
     fun setShowCajaSelector(show: Boolean) {
-        _state.update { it.copy(showCajaSelector = show, error = null) }
+        val shouldShow = show || cajaRepository.activeCaja.value == null
+        _state.update { it.copy(showCajaSelector = shouldShow, error = null) }
+    }
+
+    fun canProceedToSale(): Boolean {
+        if (cajaRepository.activeCaja.value != null) return true
+        requestCajaForSale()
+        return false
     }
 
     fun loadDepartments() {
@@ -378,6 +398,7 @@ class DashboardViewModel(
     }
 
     fun addToCart(dashboardProduct: DashboardProduct, quantity: Int) {
+        if (!canProceedToSale()) return
         val safeQuantity = quantity.coerceAtLeast(1)
         viewModelScope.launch {
             promotionRepository.getActivePromotionsForProduct(dashboardProduct.id).fold(
@@ -406,6 +427,7 @@ class DashboardViewModel(
     }
 
     fun showQuantityPicker(product: DashboardProduct) {
+        if (!canProceedToSale()) return
         _state.update { it.copy(quantityPickerProduct = product, promotionMessage = null) }
     }
 
@@ -461,6 +483,7 @@ class DashboardViewModel(
     }
 
     private fun addProductIndividual(dashboardProduct: DashboardProduct, quantity: Int = 1) {
+        if (!canProceedToSale()) return
         val safeQuantity = quantity.coerceAtLeast(1)
         val product = dashboardProduct.sourceProduct ?: com.amaxonia.pos.domain.model.Product(
             id = dashboardProduct.id,
@@ -477,6 +500,18 @@ class DashboardViewModel(
         // Consultar lotes FEFO en background y asignar automaticamente
         viewModelScope.launch {
             refreshLotsForProduct(product.id)
+        }
+    }
+
+    private fun requestCajaForSale() {
+        _state.update {
+            it.copy(
+                showCajaSelector = true,
+                promotionMessage = "Selecciona una caja para realizar ventas"
+            )
+        }
+        if (_state.value.availableCajas.isEmpty() && !_state.value.isLoadingCajas) {
+            fetchAvailableCajas(forceShowSelector = true)
         }
     }
 

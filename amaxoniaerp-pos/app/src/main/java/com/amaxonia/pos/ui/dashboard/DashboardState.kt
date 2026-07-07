@@ -52,6 +52,7 @@ data class DashboardState(
     val availableCajas: List<Caja> = emptyList(),
     val isLoadingCajas: Boolean = false,
     val showCajaSelector: Boolean = false,
+    val hasActiveCaja: Boolean = false,
     // -------------------
 
     val selectedCategory: String = "Todos los productos",

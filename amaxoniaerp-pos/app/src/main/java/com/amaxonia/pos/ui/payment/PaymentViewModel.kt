@@ -426,7 +426,7 @@ class PaymentViewModel(
                     },
                     promocionTipo = cartItem.promocionTipo,
                     promocionId = cartItem.promocionId.orEmpty(),
-                    promocionCantidad = if (cartItem.isPromotionLine) cartItem.quantityDecimal else 0.0,
+                    promocionCantidad = if (cartItem.isPromotionLine) cartItem.promocionVeces.toDouble() else 0.0,
                     promocionCodigo = cartItem.promocionCodigo,
                     promocionNombre = cartItem.promocionNombre,
                     promocionGrupo = cartItem.promocionGrupo,

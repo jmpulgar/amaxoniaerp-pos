@@ -32,6 +32,9 @@ interface PendingInvoiceDao {
     @Query("SELECT * FROM pending_invoices WHERE status IN ('PENDING', 'FAILED') ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getPending(limit: Int = 25): List<PendingInvoiceEntity>
 
+    @Query("SELECT * FROM pending_invoices WHERE createdAt BETWEEN :fromMillis AND :toMillis ORDER BY createdAt ASC")
+    suspend fun getCreatedBetween(fromMillis: Long, toMillis: Long): List<PendingInvoiceEntity>
+
     @Query("SELECT COUNT(*) FROM pending_invoices WHERE status IN ('PENDING', 'FAILED')")
     suspend fun countPending(): Int
 

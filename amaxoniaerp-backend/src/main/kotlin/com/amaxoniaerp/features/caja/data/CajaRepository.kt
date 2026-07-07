@@ -909,6 +909,11 @@ class CajaRepository {
                 }
 
             val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
+            val userIdToken = userId.toString()
+            val assignedCajaIds = activeSellers
+                .filter { csvContains(it.codUsuarios, userIdToken) }
+                .flatMap { csvTokens(it.idCajas) }
+                .toSet()
 
             val isVE = countryCode.equals("VE", ignoreCase = true)
 
@@ -933,7 +938,6 @@ class CajaRepository {
                         ?: idSucursal?.let { defaultBySucursal[it] }
                         ?: globalDefaultWarehouse
 
-                    val userIdToken = userId.toString()
                     val sucursalToken = idSucursal?.toString()
                     val defaultSeller =
                         activeSellers.firstOrNull { csvContains(it.codUsuarios, userIdToken) }
@@ -964,12 +968,18 @@ class CajaRepository {
                         codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
                     )
                 }
+                .filter { caja -> assignedCajaIds.isEmpty() || caja.idCaja in assignedCajaIds }
         }
     }
 
     private fun csvContains(csv: String?, token: String): Boolean {
         if (csv.isNullOrBlank()) return false
         return csv.split(',').any { it.trim() == token }
+    }
+
+    private fun csvTokens(csv: String?): List<String> {
+        if (csv.isNullOrBlank()) return emptyList()
+        return csv.split(',').mapNotNull { it.trim().takeIf(String::isNotBlank) }
     }
 
     private fun resolveNextSecuenciaCode(idCaja: String): String {

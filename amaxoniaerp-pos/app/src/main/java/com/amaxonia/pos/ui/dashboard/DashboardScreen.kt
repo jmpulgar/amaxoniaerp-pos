@@ -167,11 +167,11 @@ fun DashboardScreen(
             cajas = state.availableCajas,
             isLoading = state.isLoadingCajas,
             errorMessage = state.error,
+            canDismiss = state.hasActiveCaja,
             onSelectCaja = { caja -> viewModel.selectAndOpenCaja(caja, 0.0) },
             onReload = { viewModel.fetchAvailableCajas() },
             onDismiss = {
-                // Allow dismiss only if a caja was already selected
-                if (state.cajaPrincipalNombre != "Caja no seleccionada") {
+                if (state.hasActiveCaja) {
                     viewModel.setShowCajaSelector(false)
                 }
             }
@@ -735,7 +735,11 @@ fun DashboardScreen(
                     // Botón flotante del carrito
                     if (state.cartItemCount > 0) {
                         Button(
-                            onClick = { onNavigateToCart() },
+                            onClick = {
+                                if (viewModel.canProceedToSale()) {
+                                    onNavigateToCart()
+                                }
+                            },
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue),
                             modifier = Modifier

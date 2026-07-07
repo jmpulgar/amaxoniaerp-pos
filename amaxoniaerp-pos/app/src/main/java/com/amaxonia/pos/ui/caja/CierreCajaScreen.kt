@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -77,7 +78,10 @@ fun CierreCajaScreen(
     viewModel: CierreCajaViewModel = injectedViewModel {
         CierreCajaViewModel(
             DependencyContainer.cajaRepository,
-            DependencyContainer.printerFactory
+            DependencyContainer.printerFactory,
+            DependencyContainer.localStore,
+            DependencyContainer.productRepository,
+            DependencyContainer.pendingInvoiceDao
         )
     },
     onBack: () -> Unit,
@@ -87,6 +91,7 @@ fun CierreCajaScreen(
     val isPrintingX by viewModel.isPrintingReportX.collectAsState()
     val isPrintingZ by viewModel.isPrintingReportZ.collectAsState()
     val reportMessage by viewModel.reportMessage.collectAsState()
+    val showCloseTicketPrompt by viewModel.showCloseTicketPrompt.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(reportMessage) {
@@ -94,6 +99,24 @@ fun CierreCajaScreen(
             snackbarHostState.showSnackbar(it)
             viewModel.clearReportMessage()
         }
+    }
+
+    if (showCloseTicketPrompt) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissCloseTicketPrompt,
+            title = { Text("Imprimir cierre de caja") },
+            text = { Text("La impresora configurada es Sunmi para Panamá. ¿Quieres imprimir el ticket de cierre de caja?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmClose(printTicket = true) }) {
+                    Text("Imprimir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmClose(printTicket = false) }) {
+                    Text("No imprimir")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -137,7 +160,7 @@ fun CierreCajaScreen(
                     isPrintingReportX = isPrintingX,
                     isPrintingReportZ = isPrintingZ,
                     showReportButtons = viewModel.hasActivePrinter,
-                    onConfirmClose = { viewModel.confirmClose() },
+                    onConfirmClose = { viewModel.requestClose() },
                     onPrintReportX = { viewModel.printReportX() },
                     onPrintReportZ = { viewModel.printReportZ() }
                 )
@@ -159,7 +182,7 @@ fun CierreCajaScreen(
                     message = state.message,
                     hasSummary = state.summary != null,
                     onRetry = { viewModel.loadSummary() },
-                    onRetryClose = { viewModel.confirmClose() }
+                    onRetryClose = { viewModel.requestClose() }
                 )
             }
         }

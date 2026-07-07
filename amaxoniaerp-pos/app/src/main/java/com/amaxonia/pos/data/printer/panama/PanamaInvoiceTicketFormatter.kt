@@ -60,7 +60,7 @@ class PanamaInvoiceTicketFormatter {
                 LEGAL_TEXTS.forEach { add(TicketElement.Text(it, TicketAlign.CENTER)) }
                 payload.qrUrl?.takeIfNotBlank()?.let {
                     add(TicketElement.Feed(1))
-                    add(TicketElement.Qr(it))
+                    add(TicketElement.Qr(it, size = PANAMA_QR_SIZE))
                 }
                 payload.cufe?.takeIfNotBlank()?.let { add(wrapFiscalText("CUFE: $it")) }
                 payload.fechaRecepcionDgi?.takeIfNotBlank()?.let { add(TicketElement.Text("Fecha recepción DGI: $it", TicketAlign.CENTER)) }
@@ -85,6 +85,8 @@ class PanamaInvoiceTicketFormatter {
     private fun String.takeIfNotBlank(): String? = trim().takeIf { it.isNotBlank() }
 
     private companion object {
+        const val PANAMA_QR_SIZE = 3
+
         val LEGAL_TEXTS = listOf(
             "Documento validado por proveedor autorizado calificado.",
             "Consulte su documento en el portal de la DGI."
