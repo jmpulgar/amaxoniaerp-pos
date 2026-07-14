@@ -8,7 +8,6 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import com.amaxonia.pos.R
@@ -22,8 +21,12 @@ private fun darkBrandColorScheme() =
         onPrimaryContainer = colorResource(R.color.brand_on_primary_container_dark),
         secondary = colorResource(R.color.brand_secondary_dark),
         onSecondary = colorResource(R.color.brand_on_secondary_dark),
+        secondaryContainer = colorResource(R.color.brand_secondary_container_dark),
+        onSecondaryContainer = colorResource(R.color.brand_on_secondary_container_dark),
         tertiary = colorResource(R.color.brand_accent_dark),
         onTertiary = colorResource(R.color.brand_on_accent_dark),
+        tertiaryContainer = colorResource(R.color.brand_accent_container_dark),
+        onTertiaryContainer = colorResource(R.color.brand_on_accent_container_dark),
         background = colorResource(R.color.brand_background_dark),
         onBackground = colorResource(R.color.brand_on_background_dark),
         surface = colorResource(R.color.brand_surface_dark),
@@ -32,10 +35,10 @@ private fun darkBrandColorScheme() =
         onSurfaceVariant = colorResource(R.color.brand_on_surface_variant_dark),
         outline = colorResource(R.color.brand_outline_dark),
         outlineVariant = colorResource(R.color.brand_outline_variant_dark),
-        error = ErrorRed,
-        onError = Color.White,
-        errorContainer = Color(0xFF93000A),
-        onErrorContainer = Color(0xFFFFDAD6),
+        error = colorResource(R.color.brand_error_dark),
+        onError = colorResource(R.color.brand_on_error_dark),
+        errorContainer = colorResource(R.color.brand_error_container_dark),
+        onErrorContainer = colorResource(R.color.brand_on_error_container_dark),
     )
 
 @Composable
@@ -47,8 +50,12 @@ private fun lightBrandColorScheme() =
         onPrimaryContainer = colorResource(R.color.brand_on_primary_container),
         secondary = colorResource(R.color.brand_secondary),
         onSecondary = colorResource(R.color.brand_on_secondary),
+        secondaryContainer = colorResource(R.color.brand_secondary_container),
+        onSecondaryContainer = colorResource(R.color.brand_on_secondary_container),
         tertiary = colorResource(R.color.brand_accent),
         onTertiary = colorResource(R.color.brand_on_accent),
+        tertiaryContainer = colorResource(R.color.brand_accent_container),
+        onTertiaryContainer = colorResource(R.color.brand_on_accent_container),
         background = colorResource(R.color.brand_background),
         surface = colorResource(R.color.brand_surface),
         onBackground = colorResource(R.color.brand_on_background),
@@ -57,10 +64,10 @@ private fun lightBrandColorScheme() =
         onSurfaceVariant = colorResource(R.color.brand_on_surface_variant),
         outline = colorResource(R.color.brand_outline),
         outlineVariant = colorResource(R.color.brand_outline_variant),
-        error = ErrorRed,
-        onError = Color.White,
-        errorContainer = Color(0xFFFFDAD6),
-        onErrorContainer = Color(0xFF410002),
+        error = colorResource(R.color.brand_error),
+        onError = colorResource(R.color.brand_on_error),
+        errorContainer = colorResource(R.color.brand_error_container),
+        onErrorContainer = colorResource(R.color.brand_on_error_container),
     )
 
 @Composable

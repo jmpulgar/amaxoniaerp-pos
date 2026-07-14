@@ -5,6 +5,8 @@ IFS=$'\n\t'
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+./scripts/verify-brand-resources.sh
+
 ./gradlew \
   :app:assembleAmaxoniaDebug \
   :app:assembleAmaxoniaRelease \
