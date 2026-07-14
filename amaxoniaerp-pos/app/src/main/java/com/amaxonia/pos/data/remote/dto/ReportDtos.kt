@@ -5,12 +5,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DepartmentDto(
     val id: Int,
-    val name: String
+    val name: String,
 )
 
 @Serializable
 data class DepartmentsResponse(
-    val data: List<DepartmentDto>
+    val data: List<DepartmentDto>,
 )
 
 @Serializable
@@ -19,12 +19,12 @@ data class BestSellerDto(
     val name: String,
     val price: Double,
     val salesCount: Int,
-    val photoUrl: String = ""
+    val photoUrl: String = "",
 )
 
 @Serializable
 data class BestSellersResponse(
-    val data: List<BestSellerDto>
+    val data: List<BestSellerDto>,
 )
 
 @Serializable

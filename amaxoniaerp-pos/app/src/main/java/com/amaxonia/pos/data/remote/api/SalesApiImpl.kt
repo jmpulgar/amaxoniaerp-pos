@@ -1,18 +1,19 @@
 package com.amaxonia.pos.data.remote.api
 
-import android.util.Log
+import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
-import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
+import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
-import io.ktor.client.request.header
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
@@ -25,181 +26,178 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-class SalesApiImpl(private val apiClient: ApiClient) : SalesApi {
+class SalesApiImpl(
+    private val apiClient: ApiClient,
+) : SalesApi {
     override suspend fun processSale(
         authHeader: String,
-        payload: ProcessSaleRequestDto
-    ): Result<ProcessSaleResponseDto> {
-        return try {
-            val response = apiClient.httpClient.post("api/pos/ventas/procesar") {
-                header("Authorization", authHeader)
-                contentType(ContentType.Application.Json)
-                setBody(payload)
-            }
+        payload: ProcessSaleRequestDto,
+    ): Result<ProcessSaleResponseDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.post("api/pos/ventas/procesar") {
+                    header("Authorization", authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(payload)
+                }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(ProcessSaleResponseDto.serializer(), responseText)
-            }.getOrElse {
-                Log.e("SalesApi", "processSale failed. status=${response.status.value} body=$responseText", it)
-                val json = runCatching {
-                    AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                }.getOrNull()
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "No se pudo procesar la venta")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(ProcessSaleResponseDto.serializer(), responseText)
+                }.getOrElse {
+                    SafeLog.e("SalesApi", "Sale response could not be parsed; status=${response.status.value}", it)
+                    val json =
+                        runCatching {
+                            AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                        }.getOrNull()
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "No se pudo procesar la venta")
+                    }
+                    error(responseText.ifBlank { "Respuesta invalida al procesar la venta" })
                 }
-                throw IllegalStateException(responseText.ifBlank { "Respuesta invalida al procesar la venta" })
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     override suspend fun getFacturas(
         authHeader: String,
         limit: Int,
         offset: Long,
-        search: String?
-    ): Result<FacturasListResponseDto> {
-        return try {
-            val response = apiClient.httpClient.get("facturas") {
-                header("Authorization", authHeader)
-                parameter("limit", limit)
-                parameter("offset", offset)
-                if (!search.isNullOrBlank()) {
-                    parameter("search", search)
+        search: String?,
+    ): Result<FacturasListResponseDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get("facturas") {
+                    header("Authorization", authHeader)
+                    parameter("limit", limit)
+                    parameter("offset", offset)
+                    if (!search.isNullOrBlank()) {
+                        parameter("search", search)
+                    }
                 }
-            }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(FacturasListResponseDto.serializer(), responseText)
-            }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "Error al obtener facturas")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(FacturasListResponseDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al obtener facturas")
+                    }
+                    error("Respuesta invalida al obtener facturas")
                 }
-                throw IllegalStateException("Respuesta invalida al obtener facturas")
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     override suspend fun getFacturaDetalle(
         authHeader: String,
-        facturaId: String
-    ): Result<FacturaDetalleResponseDto> {
-        return try {
-            val response = apiClient.httpClient.get("facturas/$facturaId/detalle") {
-                header("Authorization", authHeader)
-            }
+        facturaId: String,
+    ): Result<FacturaDetalleResponseDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get("facturas/$facturaId/detalle") {
+                    header("Authorization", authHeader)
+                }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(FacturaDetalleResponseDto.serializer(), responseText)
-            }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "Error al obtener detalle de factura")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(FacturaDetalleResponseDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al obtener detalle de factura")
+                    }
+                    error("Respuesta invalida al obtener detalle")
                 }
-                throw IllegalStateException("Respuesta invalida al obtener detalle")
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     override suspend fun confirmFacturaFiscal(
         authHeader: String,
         facturaId: String,
-        payload: ConfirmFacturaFiscalRequestDto
-    ): Result<ConfirmFacturaFiscalResponseDto> {
-        return try {
-            val response = apiClient.httpClient.patch("facturas/$facturaId/confirmacion-fiscal") {
-                header("Authorization", authHeader)
-                contentType(ContentType.Application.Json)
-                setBody(payload)
-            }
+        payload: ConfirmFacturaFiscalRequestDto,
+    ): Result<ConfirmFacturaFiscalResponseDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.patch("facturas/$facturaId/confirmacion-fiscal") {
+                    header("Authorization", authHeader)
+                    contentType(ContentType.Application.Json)
+                    setBody(payload)
+                }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(ConfirmFacturaFiscalResponseDto.serializer(), responseText)
-            }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "Error al confirmar factura fiscal")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(ConfirmFacturaFiscalResponseDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al confirmar factura fiscal")
+                    }
+                    error("Respuesta invalida al confirmar factura fiscal")
                 }
-                throw IllegalStateException("Respuesta invalida al confirmar factura fiscal")
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     override suspend fun getPrintPayload(
         authHeader: String,
-        facturaId: String
-    ): Result<FacturaPrintPayloadDto> {
-        return try {
-            val response = apiClient.httpClient.get("facturas/$facturaId/print-payload") {
-                header("Authorization", authHeader)
-            }
+        facturaId: String,
+    ): Result<FacturaPrintPayloadDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get("facturas/$facturaId/print-payload") {
+                    header("Authorization", authHeader)
+                }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(FacturaPrintPayloadDto.serializer(), responseText)
-            }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "Error al obtener payload de impresión")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(FacturaPrintPayloadDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al obtener payload de impresión")
+                    }
+                    error("Respuesta invalida al obtener payload de impresión")
                 }
-                throw IllegalStateException("Respuesta invalida al obtener payload de impresión")
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     override suspend fun sendReceiptEmail(
         authHeader: String,
-        facturaId: String
-    ): Result<EnviarCorreoFacturaResponseDto> {
-        return try {
-            val response = apiClient.httpClient.post("facturas/$facturaId/enviar-correo") {
-                header("Authorization", authHeader)
-            }
+        facturaId: String,
+    ): Result<EnviarCorreoFacturaResponseDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.post("facturas/$facturaId/enviar-correo") {
+                    header("Authorization", authHeader)
+                }
 
             val responseText = response.bodyAsText()
-            val parsed = runCatching {
-                AppJson.decodeFromString(EnviarCorreoFacturaResponseDto.serializer(), responseText)
-            }.getOrElse {
-                val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
-                if (json is JsonObject) {
-                    val error = json["error"]?.jsonPrimitive?.contentOrNull
-                    throw IllegalStateException(error ?: "Error al enviar recibo por correo")
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(EnviarCorreoFacturaResponseDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al enviar recibo por correo")
+                    }
+                    error("Respuesta invalida al enviar recibo por correo")
                 }
-                throw IllegalStateException("Respuesta invalida al enviar recibo por correo")
-            }
 
             Result.success(parsed)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 }

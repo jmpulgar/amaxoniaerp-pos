@@ -3,8 +3,10 @@ package com.amaxonia.pos.data.printer
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
+import com.amaxonia.pos.domain.model.printer.GatewayOption
 import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,9 +33,8 @@ import kotlin.math.roundToLong
  */
 class TheFactoryRapidPayClient(
     context: Context,
-    private val localStore: LocalStore
+    private val localStore: LocalStore,
 ) {
-
     private val appContext = context.applicationContext
     private val cryptography = MainFactory().createInstance(appContext)
 
@@ -50,32 +51,47 @@ class TheFactoryRapidPayClient(
         amount: Double,
         commandPrefix: String,
         customerIdentifier: String,
-        commerceRif: String
-    ): Result<Intent> {
-        return runCatching {
-            val command = buildSaleCommand(
-                commandPrefix = commandPrefix,
-                amount = amount,
-                customerIdentifier = customerIdentifier,
-                commerceRif = commerceRif
-            )
-            Log.d(TAG, "buildGatewayIntent() → comando: $command")
-
-            val encryptedBytes = encryptCommand(command)
-            Log.d(TAG, "buildGatewayIntent() → cifrado OK, ${encryptedBytes.size} bytes")
-
-            val targetPackage = resolveHkaPackage()
-            Log.d(TAG, "buildGatewayIntent() → paquete destino: $targetPackage")
-
+        commerceRif: String,
+    ): Result<Intent> =
+        buildGatewayLaunchPayload(amount, commandPrefix, customerIdentifier, commerceRif).map { payload ->
             Intent().apply {
-                component = ComponentName(targetPackage, TARGET_ACTIVITY)
-                putExtra(EXTRA_COMMAND, encryptedBytes)
-                putExtra(EXTRA_COLOR_BACKGROUND, COLOR_PRIMARY)
-                putExtra(EXTRA_COLOR_TEXT, COLOR_WHITE)
-                putExtra(EXTRA_MESSAGE, "Procesando pago...")
+                component = ComponentName(payload.packageName, payload.activityClassName)
+                putExtra(EXTRA_COMMAND, payload.encryptedCommand)
+                putExtra(EXTRA_COLOR_BACKGROUND, payload.backgroundColor)
+                putExtra(EXTRA_COLOR_TEXT, payload.textColor)
+                putExtra(EXTRA_MESSAGE, payload.message)
             }
         }
-    }
+
+    fun buildGatewayLaunchPayload(
+        amount: Double,
+        commandPrefix: String,
+        customerIdentifier: String,
+        commerceRif: String,
+    ): Result<GatewayLaunchPayload> =
+        runCatching {
+            val command =
+                buildSaleCommand(
+                    commandPrefix = commandPrefix,
+                    amount = amount,
+                    customerIdentifier = customerIdentifier,
+                    commerceRif = commerceRif,
+                )
+            val encryptedBytes = encryptCommand(command)
+            SafeLog.d(TAG, "Gateway command encrypted")
+
+            val targetPackage = resolveHkaPackage()
+            SafeLog.d(TAG, "Gateway application resolved")
+
+            GatewayLaunchPayload(
+                packageName = targetPackage,
+                activityClassName = TARGET_ACTIVITY,
+                encryptedCommand = encryptedBytes,
+                backgroundColor = COLOR_PRIMARY,
+                textColor = COLOR_WHITE,
+                message = "Procesando pago...",
+            )
+        }
 
     /**
      * Queries available gateway providers from the HKA device (command: K?).
@@ -83,30 +99,33 @@ class TheFactoryRapidPayClient(
      * - sends encrypted {"cmd":"K?"}
      * - expects JSON array response containing message with gateway list
      */
-    suspend fun listGateways(): Result<List<GatewayOption>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val settings = localStore.readTheFactorySettings()
-            val ip = settings.ipAddress.trim()
-            val port = settings.port.toIntOrNull()
-                ?: throw IllegalStateException("Puerto HKA invalido para consultar pasarelas")
-            require(ip.isNotBlank()) { "IP HKA requerida para consultar pasarelas" }
+    suspend fun listGateways(): Result<List<GatewayOption>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val settings = localStore.readTheFactorySettings()
+                val ip = settings.ipAddress.trim()
+                val port =
+                    settings.port.toIntOrNull()
+                        ?: error("Puerto HKA invalido para consultar pasarelas")
+                require(ip.isNotBlank()) { "IP HKA requerida para consultar pasarelas" }
 
-            val payload = JSONObject().put("cmd", "K?").toString()
-            val encrypted = encryptRawPayload(payload)
+                val payload = JSONObject().put("cmd", "K?").toString()
+                val encrypted = encryptRawPayload(payload)
 
-            val responseText = Socket().use { socket ->
-                socket.soTimeout = SOCKET_TIMEOUT_MS
-                socket.connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
-                socket.getOutputStream().apply {
-                    write(encrypted)
-                    flush()
-                }
-                readRawResponse(socket).toString(StandardCharsets.ISO_8859_1).trim()
+                val responseText =
+                    Socket().use { socket ->
+                        socket.soTimeout = SOCKET_TIMEOUT_MS
+                        socket.connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
+                        socket.getOutputStream().apply {
+                            write(encrypted)
+                            flush()
+                        }
+                        readRawResponse(socket).toString(StandardCharsets.ISO_8859_1).trim()
+                    }
+
+                parseGatewayList(responseText)
             }
-
-            parseGatewayList(responseText)
         }
-    }
 
     /**
      * Parses the result Intent extras returned by the HKA POS app via onNewIntent().
@@ -121,42 +140,43 @@ class TheFactoryRapidPayClient(
         val resultJson = intent.getStringExtra(EXTRA_RESULT_DATA)
         val message = intent.getStringExtra(EXTRA_MESSAGE)
 
-        Log.d(TAG, "parseResultIntent() → code=$code | message=$message | resultJson=${resultJson?.take(200)}")
+        SafeLog.d(TAG, "Gateway result received; hasCode=${code != null}")
 
         if (code == null) {
-            Log.w(TAG, "parseResultIntent() → sin codigo de resultado")
+            SafeLog.w(TAG, "Gateway result did not include a result code")
             return RapidPayResult(
                 approved = false,
-                message = "No se recibio respuesta de la pasarela de pago"
+                message = "No se recibio respuesta de la pasarela de pago",
             )
         }
 
         val approved = code == APPROVED_CODE
-        val displayMessage = when {
-            approved && !resultJson.isNullOrBlank() -> parseApprovedMessage(resultJson)
-            approved -> message ?: "Transaccion aprobada"
-            !message.isNullOrBlank() -> message
-            else -> "Transaccion rechazada (codigo: $code)"
-        }
+        val displayMessage =
+            when {
+                approved && !resultJson.isNullOrBlank() -> parseApprovedMessage(resultJson)
+                approved -> message ?: "Transaccion aprobada"
+                !message.isNullOrBlank() -> message
+                else -> "Transaccion rechazada (codigo: $code)"
+            }
 
         return RapidPayResult(
             approved = approved,
             message = displayMessage,
-            rawResponse = resultJson
+            rawResponse = resultJson,
         )
     }
 
-    private fun parseApprovedMessage(resultJson: String): String {
-        return try {
+    private fun parseApprovedMessage(resultJson: String): String =
+        try {
             val json = JSONObject(resultJson)
-            json.optString("message")
+            json
+                .optString("message")
                 .ifBlank { json.optString("msg") }
                 .ifBlank { json.optString("responseMessage") }
                 .ifBlank { "Transaccion aprobada" }
         } catch (_: Exception) {
             "Transaccion aprobada"
         }
-    }
 
     private fun parseGatewayList(responseText: String): List<GatewayOption> {
         if (responseText.isBlank()) return emptyList()
@@ -178,14 +198,14 @@ class TheFactoryRapidPayClient(
                         add(
                             GatewayOption(
                                 key = key,
-                                label = value.ifBlank { "Pasarela $key" }
-                            )
+                                label = value.ifBlank { "Pasarela $key" },
+                            ),
                         )
                     }
                 }
             }
         }.getOrElse {
-            Log.w(TAG, "parseGatewayList() → no se pudo parsear respuesta de pasarelas: ${it.message}")
+            SafeLog.w(TAG, "Gateway list response could not be parsed")
             emptyList()
         }
     }
@@ -193,7 +213,7 @@ class TheFactoryRapidPayClient(
     /**
      * Builds the gateway sale command string.
      *
-      * Format: prefix + 16-digit zero-padded amount in cents
+     * Format: prefix + 16-digit zero-padded amount in cents
      * Example: "KRV" + "0000000000000348" = "KRV0000000000000348" (for $3.48)
      *
      * The 16-digit amount matches the SDK format exactly
@@ -203,25 +223,28 @@ class TheFactoryRapidPayClient(
         commandPrefix: String,
         amount: Double,
         customerIdentifier: String,
-        commerceRif: String
+        commerceRif: String,
     ): String {
-        val prefix = commandPrefix.trim().ifBlank {
-            throw IllegalStateException("No hay comando de pasarela configurado para esta forma de pago")
-        }
+        val prefix =
+            commandPrefix.trim().ifBlank {
+                error("No hay comando de pasarela configurado para esta forma de pago")
+            }
         if (amount > MAX_GATEWAY_AMOUNT) {
-            throw IllegalStateException("Monto excede máximo permitido por plataforma financiera (999999999.99)")
+            error("Monto excede máximo permitido por plataforma financiera (999999999.99)")
         }
-        val amountCents = (amount.coerceAtLeast(0.01) * 100)
-            .roundToLong()
-            .toString()
-            .padStart(16, '0')
+        val amountCents =
+            (amount.coerceAtLeast(0.01) * 100)
+                .roundToLong()
+                .toString()
+                .padStart(16, '0')
 
         val customer = customerIdentifier.filter(Char::isDigit).take(9).ifBlank { "0" }
-        val commerce = commerceRif
-            .uppercase()
-            .filter { it.isLetterOrDigit() }
-            .take(11)
-            .ifBlank { throw IllegalStateException("RIF de comercio inválido. Configura parametros_generales.rif") }
+        val commerce =
+            commerceRif
+                .uppercase()
+                .filter { it.isLetterOrDigit() }
+                .take(11)
+                .ifBlank { error("RIF de comercio inválido. Configura parametros_generales.rif") }
 
         // Manual HKA V1.0.2: K{gateway}V{amount16}|{ci/rif}|{rifComercio}|
         return "$prefix$amountCents|$customer|$commerce|"
@@ -235,21 +258,18 @@ class TheFactoryRapidPayClient(
      */
     private fun encryptCommand(command: String): ByteArray {
         val jsonPayload = JSONObject().put("cmd", command).toString()
-        Log.d(TAG, "encryptCommand() → JSON: $jsonPayload")
         return encryptRawPayload(jsonPayload)
     }
 
     private fun encryptRawPayload(payload: String): ByteArray {
-        Log.d(TAG, "encryptRawPayload() → JSON: $payload")
-
         val response = cryptography.encryptString(payload)
         if (response.isError) {
-            throw IllegalStateException(
-                response.message ?: "No se pudo encriptar el comando de pasarela"
+            error(
+                response.message ?: "No se pudo encriptar el comando de pasarela",
             )
         }
         return response.bytes
-            ?: throw IllegalStateException("Respuesta de cifrado invalida")
+            ?: error("Respuesta de cifrado invalida")
     }
 
     /**
@@ -261,14 +281,14 @@ class TheFactoryRapidPayClient(
         for (pkg in HKA_PACKAGES) {
             try {
                 pm.getPackageInfo(pkg, 0)
-                Log.d(TAG, "resolveHkaPackage() → encontrado: $pkg")
+                SafeLog.d(TAG, "Compatible gateway application found")
                 return pkg
             } catch (_: Exception) {
                 // Not installed, try next
             }
         }
-        throw IllegalStateException(
-            "La aplicacion The Factory HKA POS no esta instalada en este dispositivo"
+        error(
+            "La aplicacion The Factory HKA POS no esta instalada en este dispositivo",
         )
     }
 
@@ -300,12 +320,13 @@ class TheFactoryRapidPayClient(
         private const val TARGET_ACTIVITY = "com.thefactory.hkapos.ui.main.HomeActivity"
 
         // Package names to check (in priority order)
-        private val HKA_PACKAGES = listOf(
-            "com.thefactory.hkapos.fiscal",
-            "com.thefactory.hkapos.fiscal.release",
-            "com.thefactory.hkapos.fiscal.demo",
-            "com.thefactory.hkapos.fiscal.demo.demo"
-        )
+        private val HKA_PACKAGES =
+            listOf(
+                "com.thefactory.hkapos.fiscal",
+                "com.thefactory.hkapos.fiscal.release",
+                "com.thefactory.hkapos.fiscal.demo",
+                "com.thefactory.hkapos.fiscal.demo.demo",
+            )
 
         // Intent extra keys — from SDK Constants.java
         private const val EXTRA_COMMAND = "commandRapidPay"
@@ -328,13 +349,8 @@ class TheFactoryRapidPayClient(
     }
 }
 
-data class GatewayOption(
-    val key: String,
-    val label: String
-)
-
 data class RapidPayResult(
     val approved: Boolean,
     val message: String,
-    val rawResponse: String? = null
+    val rawResponse: String? = null,
 )

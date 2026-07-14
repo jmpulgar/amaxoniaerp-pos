@@ -9,7 +9,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 class SunmiPrinterManager(
-    context: Context
+    context: Context,
 ) {
     private val appContext = context.applicationContext
 
@@ -22,21 +22,23 @@ class SunmiPrinterManager(
 
         return withTimeoutOrNull(3_000) {
             suspendCancellableCoroutine { continuation ->
-                val bindCallback = object : InnerPrinterCallback() {
-                    override fun onConnected(service: SunmiPrinterService) {
-                        printerService = service
-                        if (continuation.isActive) continuation.resume(true)
-                    }
+                val bindCallback =
+                    object : InnerPrinterCallback() {
+                        override fun onConnected(service: SunmiPrinterService) {
+                            printerService = service
+                            if (continuation.isActive) continuation.resume(true)
+                        }
 
-                    override fun onDisconnected() {
-                        printerService = null
+                        override fun onDisconnected() {
+                            printerService = null
+                        }
                     }
-                }
                 callback = bindCallback
 
-                val bound = runCatching {
-                    InnerPrinterManager.getInstance().bindService(appContext, bindCallback)
-                }.getOrDefault(false)
+                val bound =
+                    runCatching {
+                        InnerPrinterManager.getInstance().bindService(appContext, bindCallback)
+                    }.getOrDefault(false)
 
                 if (!bound && continuation.isActive) continuation.resume(false)
                 continuation.invokeOnCancellation { unbind() }

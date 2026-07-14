@@ -6,7 +6,7 @@ data class TheFactorySettings(
     val openMode: String = "",
     val gatewayKey: String = "",
     val gatewayLabel: String = "",
-    val printerSerial: String = ""
+    val printerSerial: String = "",
 ) {
     fun isConfigured(): Boolean = ipAddress.isNotBlank() && port.isNotBlank()
 }

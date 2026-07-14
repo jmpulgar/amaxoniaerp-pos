@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,58 +36,69 @@ fun SellerSelectorBottomSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp),
         ) {
             Text(
                 text = "Seleccionar vendedor",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 12.dp),
             )
 
             if (sellers.isEmpty()) {
                 Text(
                     text = "No hay vendedores activos",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier.padding(vertical = 16.dp),
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(sellers, key = { it.id }) { seller ->
                         val selected = selectedSellerId == seller.id
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onSelect(seller)
-                                    onDismiss()
-                                },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onSelect(seller)
+                                        onDismiss()
+                                    },
                             shape = RoundedCornerShape(10.dp),
-                            color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface,
+                            color =
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primary.copy(
+                                        alpha = 0.14f,
+                                    )
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
                             tonalElevation = if (selected) 1.dp else 0.dp,
                             shadowElevation = 1.dp,
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
                                     text = seller.nombre,
                                     fontSize = 15.sp,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(start = 12.dp),
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .padding(start = 12.dp),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                 )
@@ -96,7 +106,7 @@ fun SellerSelectorBottomSheet(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Seleccionado",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.primary,
                                     )
                                 }
                             }

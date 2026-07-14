@@ -8,5 +8,5 @@ data class ClientListState(
     val searchQuery: String = "",
     val endOfListReached: Boolean = false,
     val page: Int = 1,
-    val error: String? = null
+    val error: String? = null,
 )

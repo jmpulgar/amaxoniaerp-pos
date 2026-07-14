@@ -6,13 +6,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-inline fun <reified T : ViewModel> injectedViewModel(
-    noinline factory: () -> T
-): T {
-    return viewModel(factory = object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <VM : ViewModel> create(modelClass: Class<VM>): VM {
-            return factory() as VM
-        }
-    })
-}
+inline fun <reified T : ViewModel> injectedViewModel(noinline factory: () -> T): T =
+    viewModel(
+        factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <VM : ViewModel> create(modelClass: Class<VM>): VM = factory() as VM
+            },
+    )

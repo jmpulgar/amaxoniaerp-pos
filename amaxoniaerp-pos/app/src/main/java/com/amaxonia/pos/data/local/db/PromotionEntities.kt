@@ -20,7 +20,7 @@ data class PromocionEntity(
     val imagen: String,
     val descuentoGlobal: Double,
     val idItem: String,
-    val activo: Boolean
+    val activo: Boolean,
 )
 
 @Entity(tableName = "promocion_detalles")
@@ -38,13 +38,13 @@ data class PromocionDetalleEntity(
     val impuesto: Double,
     val impuestoPorcentaje: Double,
     val importe: Double,
-    val grupo: String
+    val grupo: String,
 )
 
 data class PromocionCompleta(
     @Embedded val promocion: PromocionEntity,
     @Relation(parentColumn = "id", entityColumn = "promocionId")
-    val detalles: List<PromocionDetalleEntity>
+    val detalles: List<PromocionDetalleEntity>,
 )
 
 @Dao

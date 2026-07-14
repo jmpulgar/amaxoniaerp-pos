@@ -19,9 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,15 +35,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.caja.Caja
-import com.amaxonia.pos.ui.theme.AmaxoniaBlue
+import com.amaxonia.pos.ui.theme.NeutralGray
+import com.amaxonia.pos.ui.theme.SuccessGreen
 
-private val CajaAvailable = Color(0xFF2E7D32)
-private val CajaInactive = Color(0xFF9E9E9E)
+private val CajaAvailable = SuccessGreen
+private val CajaInactive = NeutralGray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,14 +54,15 @@ fun CajaSelectorSheet(
     canDismiss: Boolean,
     onSelectCaja: (Caja) -> Unit,
     onReload: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { targetValue ->
-            canDismiss || targetValue != SheetValue.Hidden
-        }
-    )
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { targetValue ->
+                canDismiss || targetValue != SheetValue.Hidden
+            },
+        )
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -71,39 +72,40 @@ fun CajaSelectorSheet(
         },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
         ) {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
                     Text(
                         text = "Seleccionar Caja",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Elige la caja para operar",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
                 IconButton(onClick = onReload) {
                     Icon(
                         Icons.Rounded.Refresh,
                         contentDescription = "Recargar",
-                        tint = AmaxoniaBlue
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -113,51 +115,54 @@ fun CajaSelectorSheet(
             when {
                 isLoading -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = AmaxoniaBlue)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 errorMessage != null -> {
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
+                        colors =
+                            CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                            ),
                     ) {
                         Text(
                             text = errorMessage,
                             modifier = Modifier.padding(16.dp),
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
                         )
                     }
                 }
                 cajas.isEmpty() -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             "No hay cajas configuradas",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
                         )
                     }
                 }
                 else -> {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(cajas, key = { it.idCaja }) { caja ->
                             CajaCard(
                                 caja = caja,
-                                onClick = { onSelectCaja(caja) }
+                                onClick = { onSelectCaja(caja) },
                             )
                         }
                     }
@@ -170,12 +175,12 @@ fun CajaSelectorSheet(
 @Composable
 private fun CajaCard(
     caja: Caja,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val isActive = caja.estatus == 1
     val statusColor by animateColorAsState(
         targetValue = if (isActive) CajaAvailable else CajaInactive,
-        label = "cajaStatusColor"
+        label = "cajaStatusColor",
     )
 
     ElevatedCard(
@@ -183,27 +188,29 @@ private fun CajaCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Icon with status indicator
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AmaxoniaBlue.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Rounded.PointOfSale,
                     contentDescription = null,
-                    tint = AmaxoniaBlue,
-                    modifier = Modifier.size(26.dp)
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(26.dp),
                 )
             }
 
@@ -217,16 +224,16 @@ private fun CajaCard(
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "Cod: ${caja.codCaja ?: "—"}",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -235,16 +242,17 @@ private fun CajaCard(
 
             // Status badge
             Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(statusColor.copy(alpha = 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                modifier =
+                    Modifier
+                        .clip(CircleShape)
+                        .background(statusColor.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
                     text = if (isActive) "Activa" else "Inactiva",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = statusColor
+                    color = statusColor,
                 )
             }
         }

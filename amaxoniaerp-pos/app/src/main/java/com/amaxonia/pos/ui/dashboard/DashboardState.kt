@@ -1,8 +1,8 @@
 package com.amaxonia.pos.ui.dashboard
 
-import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
@@ -11,7 +11,7 @@ import com.amaxonia.pos.domain.repository.Department
 
 enum class ProductViewMode {
     GRID,
-    LIST
+    LIST,
 }
 
 data class DashboardProduct(
@@ -31,30 +31,26 @@ data class DashboardProduct(
 data class DashboardState(
     val products: List<DashboardProduct> = emptyList(),
     val bestSellers: List<DashboardProduct> = emptyList(),
-
     // --- CAMBIOS PARA EL CARRITO ---
     val cartItems: List<CartItem> = emptyList(),
     val cartTotal: Double = 0.0,
     val cartItemCount: Int = 0,
     // -------------------------------
-
     // --- NUEVO CAMPO ---
     val selectedClient: Client? = null,
-    val clientSucursales: List<ClientSucursalEntity> = emptyList(),
-    val selectedClientSucursal: ClientSucursalEntity? = null,
+    val clientSucursales: List<ClientBranch> = emptyList(),
+    val selectedClientSucursal: ClientBranch? = null,
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
     val cajaPrincipalNombre: String = "Caja no seleccionada",
     val sucursalNombre: String = "Sucursal",
     // -------------------
-
     // --- CAJA STATE ---
     val availableCajas: List<Caja> = emptyList(),
     val isLoadingCajas: Boolean = false,
     val showCajaSelector: Boolean = false,
     val hasActiveCaja: Boolean = false,
     // -------------------
-
     val selectedCategory: String = "Todos los productos",
     val departments: List<Department> = emptyList(),
     val selectedDepartmentId: Int? = null,
@@ -75,7 +71,124 @@ data class DashboardState(
     val showPromotionChoice: Boolean = false,
     val promotionMessage: String? = null,
     val quantityPickerProduct: DashboardProduct? = null,
-
     // --- AUTO-CLOSE ---
-    val autoCloseMessage: String? = null
-)
+    val autoCloseMessage: String? = null,
+) {
+    val isInitialProductLoading: Boolean
+        get() = isLoading && products.isEmpty()
+
+    val isInitialBestSellersLoading: Boolean
+        get() = isLoadingBestSellers && bottomSelected == 1 && bestSellers.isEmpty()
+}
+
+sealed interface DashboardUiAction
+
+sealed interface DashboardCajaUiAction : DashboardUiAction {
+    data class Fetch(
+        val forceShowSelector: Boolean = false,
+    ) : DashboardCajaUiAction
+
+    data class SelectAndOpen(
+        val caja: Caja,
+        val openingAmount: Double,
+    ) : DashboardCajaUiAction
+
+    data class SetSelectorVisible(
+        val show: Boolean,
+    ) : DashboardCajaUiAction
+
+    data object DismissAutoCloseMessage : DashboardCajaUiAction
+}
+
+sealed interface DashboardSaleUiAction : DashboardUiAction {
+    sealed interface Product : DashboardSaleUiAction
+
+    sealed interface Manual : DashboardSaleUiAction
+
+    sealed interface Session : DashboardSaleUiAction
+
+    data class AddProduct(
+        val product: DashboardProduct,
+        val quantity: Int = 1,
+    ) : Product
+
+    data class ShowQuantityPicker(
+        val product: DashboardProduct,
+    ) : Product
+
+    data object DismissQuantityPicker : Product
+
+    data class ConfirmProductQuantity(
+        val product: DashboardProduct,
+        val quantity: Int,
+    ) : Product
+
+    data class AddProductIndividualFromPromotionChoice(
+        val quantity: Int = 1,
+    ) : Product
+
+    data class AddPromotionFromChoice(
+        val promotion: Promocion,
+        val times: Int = 1,
+    ) : Product
+
+    data object DismissPromotionChoice : Product
+
+    data object ClearPromotionMessage : Product
+
+    data class ManualKey(
+        val key: String,
+    ) : Manual
+
+    data object ManualClear : Manual
+
+    data object ManualBackspace : Manual
+
+    data object ManualSubmit : Manual
+
+    data object StartNewOrder : Session
+
+    data class SelectSeller(
+        val sellerId: Int,
+    ) : Session
+
+    data object Checkout : DashboardSaleUiAction
+}
+
+sealed interface DashboardUiEffect {
+    data object NavigateToCart : DashboardUiEffect
+}
+
+sealed interface DashboardCatalogUiAction : DashboardUiAction {
+    sealed interface Paging : DashboardCatalogUiAction
+
+    sealed interface Search : DashboardCatalogUiAction
+
+    sealed interface View : DashboardCatalogUiAction
+
+    sealed interface Department : DashboardCatalogUiAction
+
+    data object LoadMoreProducts : Paging
+
+    data object ToggleSearch : Search
+
+    data class SetSearchQuery(
+        val value: String,
+    ) : Search
+
+    data object ToggleViewMode : View
+
+    data class SetBottomSelected(
+        val index: Int,
+    ) : View
+
+    data object Retry : Paging
+
+    data class SetDepartmentPicker(
+        val show: Boolean,
+    ) : Department
+
+    data class SelectDepartment(
+        val departmentId: Int?,
+    ) : Department
+}

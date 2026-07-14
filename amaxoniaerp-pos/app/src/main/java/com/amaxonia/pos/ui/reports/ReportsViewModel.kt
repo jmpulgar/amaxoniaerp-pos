@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ReportsViewModel(
-    private val reportRepository: ReportRepository
+    private val reportRepository: ReportRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ReportsState())
     val state: StateFlow<ReportsState> = _state.asStateFlow()
@@ -36,18 +36,23 @@ class ReportsViewModel(
             val bestSellersResult = bestSellersDeferred.await()
 
             // Partial success: show whatever data we got
-            val errorMessage = listOf(summaryResult, bestSellersResult)
-                .firstOrNull { it.isFailure }
-                ?.exceptionOrNull()?.message
+            val errorMessage =
+                listOf(summaryResult, bestSellersResult)
+                    .firstOrNull { it.isFailure }
+                    ?.exceptionOrNull()
+                    ?.message
 
             _state.update {
                 it.copy(
                     isLoading = false,
                     summary = summaryResult.getOrNull() ?: it.summary,
                     bestSellers = bestSellersResult.getOrNull() ?: it.bestSellers,
-                    error = if (summaryResult.isFailure && bestSellersResult.isFailure) {
-                        errorMessage ?: "Error al cargar datos de reportes"
-                    } else null
+                    error =
+                        if (summaryResult.isFailure && bestSellersResult.isFailure) {
+                            errorMessage ?: "Error al cargar datos de reportes"
+                        } else {
+                            null
+                        },
                 )
             }
         }

@@ -1,50 +1,122 @@
 package com.amaxonia.pos.ui.dashboard
 
-import android.util.Log
-import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.SubcomposeAsyncImageContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -52,16 +124,22 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.work.WorkInfo
+import coil.compose.AsyncImage
 import com.amaxonia.pos.R
+import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
+import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.shortName
-import com.amaxonia.pos.ui.theme.AmaxoniaBlue
-import androidx.work.WorkInfo
+import com.amaxonia.pos.ui.theme.OfflineRed
+import com.amaxonia.pos.ui.theme.OnlineGreen
+import com.amaxonia.pos.ui.theme.PosPalette
 import kotlinx.coroutines.launch
 
 private const val DASHBOARD_LOG_TAG = "DashboardScreen"
@@ -69,18 +147,34 @@ private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun DashboardScreen(
-    viewModel: DashboardViewModel = injectedViewModel {
+    viewModel: DashboardViewModel =
+        injectedViewModel {
+            val cajaCoordinator =
+                DashboardCajaCoordinator(DependencyContainer.cajaRepository, DependencyContainer.cartRepository)
             DashboardViewModel(
-                DependencyContainer.productRepository,
-                DependencyContainer.promotionRepository,
-                DependencyContainer.reportRepository,
-            DependencyContainer.cartRepository,
-            DependencyContainer.cajaRepository,
-            DependencyContainer.localStore,
-            DependencyContainer.apiConfigManager,
-            DependencyContainer.clientSucursalDao
-        )
-    },
+                catalogCoordinator =
+                    DashboardCatalogCoordinator(
+                        DependencyContainer.productRepository,
+                        DependencyContainer.reportRepository,
+                        DependencyContainer.posConfigurationRepository,
+                        DependencyContainer.serverEnvironment,
+                        DashboardProductMapper(DependencyContainer.imageUrlResolver),
+                    ),
+                cartCoordinator =
+                    DashboardCartCoordinator(
+                        DependencyContainer.promotionRepository,
+                        DependencyContainer.cartRepository,
+                        ResolveClientBranchesUseCase(
+                            DependencyContainer.posConfigurationRepository,
+                            DependencyContainer.clientBranchRepository,
+                        ),
+                        DependencyContainer.refreshCartProductLotsUseCase,
+                        cajaCoordinator,
+                        DependencyContainer.appClock,
+                    ),
+                cajaCoordinator = cajaCoordinator,
+            )
+        },
     onLogout: () -> Unit,
     onNavigateToClients: () -> Unit,
     onNavigateToProducts: () -> Unit,
@@ -91,9 +185,17 @@ fun DashboardScreen(
     onNavigateToCart: () -> Unit,
     onStartNewOrder: () -> Unit,
     onNavigateToCierreCaja: () -> Unit = {},
-    onNavigateToDraftInvoices: () -> Unit = {}
+    onNavigateToDraftInvoices: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentOnNavigateToCart by rememberUpdatedState(onNavigateToCart)
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                DashboardUiEffect.NavigateToCart -> currentOnNavigateToCart()
+            }
+        }
+    }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -101,9 +203,10 @@ fun DashboardScreen(
     val productGridState = rememberLazyGridState()
     val productListState = rememberLazyListState()
     val manualSyncInfos by SyncScheduler.getManualSyncWorkInfos(context).observeAsState(emptyList())
-    val isSyncRunning = manualSyncInfos.any { info ->
-        info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
-    }
+    val isSyncRunning =
+        manualSyncInfos.any { info ->
+            info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
+        }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -118,9 +221,9 @@ fun DashboardScreen(
     }
 
     DisposableEffect(Unit) {
-        Log.d(DASHBOARD_LOG_TAG, "Dashboard composed")
+        SafeLog.d(DASHBOARD_LOG_TAG, "Dashboard composed")
         onDispose {
-            Log.d(DASHBOARD_LOG_TAG, "Dashboard disposed")
+            SafeLog.d(DASHBOARD_LOG_TAG, "Dashboard disposed")
         }
     }
 
@@ -128,21 +231,27 @@ fun DashboardScreen(
 
     val gridReachedBottom by remember {
         derivedStateOf {
-            val lastVisible = productGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            val lastVisible =
+                productGridState.layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+                    ?.index ?: return@derivedStateOf false
             lastVisible >= productGridState.layoutInfo.totalItemsCount - 6
         }
     }
 
     val listReachedBottom by remember {
         derivedStateOf {
-            val lastVisible = productListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            val lastVisible =
+                productListState.layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+                    ?.index ?: return@derivedStateOf false
             lastVisible >= productListState.layoutInfo.totalItemsCount - 6
         }
     }
 
     LaunchedEffect(gridReachedBottom, listReachedBottom, state.viewMode, state.bottomSelected) {
         if (state.bottomSelected == 0 && (gridReachedBottom || listReachedBottom)) {
-            viewModel.loadMoreProducts()
+            viewModel.onAction(DashboardCatalogUiAction.LoadMoreProducts)
         }
     }
 
@@ -151,14 +260,14 @@ fun DashboardScreen(
     LaunchedEffect(state.autoCloseMessage) {
         state.autoCloseMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Long)
-            viewModel.dismissAutoCloseMessage()
+            viewModel.onAction(DashboardCajaUiAction.DismissAutoCloseMessage)
         }
     }
 
     LaunchedEffect(state.promotionMessage) {
         val msg = state.promotionMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
-        viewModel.clearPromotionMessage()
+        viewModel.onAction(DashboardSaleUiAction.ClearPromotionMessage)
     }
 
     // --- CajaSelectorSheet (replaces old AlertDialog) ---
@@ -168,13 +277,13 @@ fun DashboardScreen(
             isLoading = state.isLoadingCajas,
             errorMessage = state.error,
             canDismiss = state.hasActiveCaja,
-            onSelectCaja = { caja -> viewModel.selectAndOpenCaja(caja, 0.0) },
-            onReload = { viewModel.fetchAvailableCajas() },
+            onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.SelectAndOpen(caja, 0.0)) },
+            onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch()) },
             onDismiss = {
                 if (state.hasActiveCaja) {
-                    viewModel.setShowCajaSelector(false)
+                    viewModel.onAction(DashboardCajaUiAction.SetSelectorVisible(false))
                 }
-            }
+            },
         )
     }
 
@@ -182,26 +291,32 @@ fun DashboardScreen(
         SellerSelectorBottomSheet(
             sellers = state.availableSellers,
             selectedSellerId = state.currentSeller?.id,
-            onSelect = { seller -> viewModel.selectSeller(seller.id) },
-            onDismiss = { showSellerSheet = false }
+            onSelect = { seller -> viewModel.onAction(DashboardSaleUiAction.SelectSeller(seller.id)) },
+            onDismiss = { showSellerSheet = false },
         )
     }
 
     state.quantityPickerProduct?.let { product ->
         ProductQuantitySheet(
             product = product,
-            onConfirm = { quantity -> viewModel.confirmProductQuantity(product, quantity) },
-            onDismiss = viewModel::dismissQuantityPicker
+            onConfirm = { quantity ->
+                viewModel.onAction(DashboardSaleUiAction.ConfirmProductQuantity(product, quantity))
+            },
+            onDismiss = { viewModel.onAction(DashboardSaleUiAction.DismissQuantityPicker) },
         )
     }
 
-    if (state.showPromotionChoice && state.pendingPromotionProduct != null) {
+    state.pendingPromotionProduct?.takeIf { state.showPromotionChoice }?.let { product ->
         PromotionChoiceSheet(
-            product = state.pendingPromotionProduct!!,
+            product = product,
             promotions = state.promotionOptions,
-            onAddIndividual = { quantity -> viewModel.addProductIndividualFromPromotionChoice(quantity) },
-            onAddPromotion = { promo, times -> viewModel.addPromotionFromChoice(promo, times) },
-            onDismiss = viewModel::dismissPromotionChoice
+            onAddIndividual = { quantity ->
+                viewModel.onAction(DashboardSaleUiAction.AddProductIndividualFromPromotionChoice(quantity))
+            },
+            onAddPromotion = { promo, times ->
+                viewModel.onAction(DashboardSaleUiAction.AddPromotionFromChoice(promo, times))
+            },
+            onDismiss = { viewModel.onAction(DashboardSaleUiAction.DismissPromotionChoice) },
         )
     }
 
@@ -209,30 +324,31 @@ fun DashboardScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = AmaxoniaBlue,
-                drawerContentColor = Color.White,
-                modifier = Modifier.width(300.dp).fillMaxHeight()
+                drawerContainerColor = MaterialTheme.colorScheme.primary,
+                drawerContentColor = PosPalette.FixedWhite,
+                modifier = Modifier.width(300.dp).fillMaxHeight(),
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_amaxonia),
-                            contentDescription = "Logo Amaxonia",
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.White, RoundedCornerShape(8.dp))
-                                .padding(4.dp)
+                            painter = painterResource(id = R.drawable.brand_mark),
+                            contentDescription = stringResource(R.string.brand_logo_description),
+                            modifier =
+                                Modifier
+                                    .size(40.dp)
+                                    .background(PosPalette.FixedWhite, RoundedCornerShape(8.dp))
+                                    .padding(4.dp),
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Amaxonia ERP", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.brand_name), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.weight(1f))
-                        Surface(shape = RoundedCornerShape(50), color = Color.White) {
+                        Surface(shape = RoundedCornerShape(50), color = PosPalette.FixedWhite) {
                             Text(
                                 "Pro+",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = AmaxoniaBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontWeight = FontWeight.ExtraBold,
                             )
                         }
                     }
@@ -240,57 +356,59 @@ fun DashboardScreen(
                     Text(state.sucursalNombre, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
-                        color = Color.White.copy(alpha = 0.2f),
+                        color = PosPalette.FixedWhite.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            scope.launch { 
-                                drawerState.close() 
-                                viewModel.fetchAvailableCajas(forceShowSelector = true)
-                            }
-                        }
+                        modifier =
+                            Modifier.fillMaxWidth().clickable {
+                                scope.launch {
+                                    drawerState.close()
+                                    viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true))
+                                }
+                            },
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(state.cajaPrincipalNombre, color = Color.White, modifier = Modifier.weight(1f))
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Cambiar caja", tint = Color.White)
+                            Text(state.cajaPrincipalNombre, color = PosPalette.FixedWhite, modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Cambiar caja", tint = PosPalette.FixedWhite)
                         }
                     }
                 }
-                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+                HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
                 ) {
                     DrawerMenuItem(Icons.Default.People, "Clientes") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToClients() 
+                            onNavigateToClients()
                         }
                     }
                     DrawerMenuItem(Icons.Default.ShoppingBag, "Productos") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToProducts() 
+                            onNavigateToProducts()
                         }
                     }
                     DrawerMenuItem(Icons.Default.PointOfSale, "POS", isSelected = true) {
                         scope.launch { drawerState.close() }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.ListAlt, "Crear Pedido") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            viewModel.startNewOrder() // Limpia carrito
+                            viewModel.onAction(DashboardSaleUiAction.StartNewOrder)
                             onStartNewOrder() // Navega a selección de cliente
                         }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.ReceiptLong, "Historial Transacciones") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToHistory() 
+                            onNavigateToHistory()
                         }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.AssignmentReturn, "Notas de crédito") {
@@ -300,27 +418,27 @@ fun DashboardScreen(
                         }
                     }
                     DrawerMenuItem(Icons.Default.BarChart, "Reportes") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToReports() 
+                            onNavigateToReports()
                         }
                     }
                     DrawerMenuItem(Icons.Default.Description, "Facturas Pendientes") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToDraftInvoices() 
+                            onNavigateToDraftInvoices()
                         }
                     }
                     DrawerMenuItem(Icons.Default.Settings, "Configuracion POS") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToPrinterSettings() 
+                            onNavigateToPrinterSettings()
                         }
                     }
                     DrawerMenuItem(Icons.Default.Lock, "Cerrar Caja") {
-                        scope.launch { 
+                        scope.launch {
                             drawerState.close()
-                            onNavigateToCierreCaja() 
+                            onNavigateToCierreCaja()
                         }
                     }
                     DrawerMenuItem(Icons.Default.Refresh, "Actualizar datos") {
@@ -331,16 +449,21 @@ fun DashboardScreen(
                 Column(modifier = Modifier.padding(24.dp)) {
                     Button(
                         onClick = onLogout,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                        modifier = Modifier.fillMaxWidth()
+                        colors = ButtonDefaults.buttonColors(containerColor = PosPalette.FixedWhite),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = AmaxoniaBlue, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cerrar Sesión", color = AmaxoniaBlue, fontWeight = FontWeight.Bold)
+                        Text("Cerrar Sesión", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        }
+        },
     ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -351,17 +474,19 @@ fun DashboardScreen(
                     val isOfflineMessage = message.startsWith("Sin conexión")
                     Snackbar(
                         snackbarData = snackbarData,
-                        containerColor = when {
-                            isOnlineMessage -> Color(0xFF16A34A)
-                            isOfflineMessage -> Color(0xFFDC2626)
-                            else -> MaterialTheme.colorScheme.inverseSurface
-                        },
-                        contentColor = when {
-                            isOnlineMessage || isOfflineMessage -> Color.White
-                            else -> MaterialTheme.colorScheme.inverseOnSurface
-                        },
-                        actionColor = Color.White,
-                        shape = RoundedCornerShape(18.dp)
+                        containerColor =
+                            when {
+                                isOnlineMessage -> OnlineGreen
+                                isOfflineMessage -> OfflineRed
+                                else -> MaterialTheme.colorScheme.inverseSurface
+                            },
+                        contentColor =
+                            when {
+                                isOnlineMessage || isOfflineMessage -> PosPalette.FixedWhite
+                                else -> MaterialTheme.colorScheme.inverseOnSurface
+                            },
+                        actionColor = PosPalette.FixedWhite,
+                        shape = RoundedCornerShape(18.dp),
                     )
                 }
             },
@@ -371,49 +496,52 @@ fun DashboardScreen(
                         if (state.isSearchOpen) {
                             TextField(
                                 value = state.searchQuery,
-                                onValueChange = viewModel::setSearchQuery,
+                                onValueChange = { viewModel.onAction(DashboardCatalogUiAction.SetSearchQuery(it)) },
                                 placeholder = { Text("Buscar...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 singleLine = true,
-                                textStyle = TextStyle(fontSize = 16.sp, color = AmaxoniaBlue),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    focusedTextColor = AmaxoniaBlue,
-                                    unfocusedTextColor = AmaxoniaBlue,
-                                    cursorColor = AmaxoniaBlue,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                ),
+                                textStyle = TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.primary),
+                                colors =
+                                    TextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        focusedTextColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedTextColor = MaterialTheme.colorScheme.primary,
+                                        cursorColor = MaterialTheme.colorScheme.primary,
+                                        focusedIndicatorColor = PosPalette.Transparent,
+                                        unfocusedIndicatorColor = PosPalette.Transparent,
+                                    ),
                                 shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp)
-                                    .focusRequester(searchFocusRequester)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp)
+                                        .focusRequester(searchFocusRequester),
                             )
                         } else {
-                            Text("Punto de Venta", color = AmaxoniaBlue, fontWeight = FontWeight.Bold)
+                            Text("Punto de Venta", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     },
                     navigationIcon = {
                         IconButton(
                             onClick = {
-                            focusManager.clearFocus()
-                            scope.launch {
-                                try {
-                                    Log.d(DASHBOARD_LOG_TAG, "Drawer requested. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
-                                    if (drawerState.isClosed) {
-                                        drawerState.snapTo(DrawerValue.Open)
-                                        Log.d(DASHBOARD_LOG_TAG, "Drawer opened. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
-                                    } else {
-                                        Log.d(DASHBOARD_LOG_TAG, "Drawer open ignored. current=${drawerState.currentValue}, target=${drawerState.targetValue}")
+                                focusManager.clearFocus()
+                                scope.launch {
+                                    try {
+                                        SafeLog.d(DASHBOARD_LOG_TAG, "Drawer requested")
+                                        if (drawerState.isClosed) {
+                                            drawerState.snapTo(DrawerValue.Open)
+                                            SafeLog.d(DASHBOARD_LOG_TAG, "Drawer opened")
+                                        } else {
+                                            SafeLog.d(DASHBOARD_LOG_TAG, "Drawer open request ignored")
+                                        }
+                                    } catch (throwable: Throwable) {
+                                        SafeLog.e(DASHBOARD_LOG_TAG, "Unable to open drawer", throwable)
+                                        runCatching { drawerState.close() }
                                     }
-                                } catch (throwable: Throwable) {
-                                    Log.e(DASHBOARD_LOG_TAG, "Error opening drawer. current=${drawerState.currentValue}, target=${drawerState.targetValue}", throwable)
-                                    runCatching { drawerState.close() }
                                 }
-                            }
-                        }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = AmaxoniaBlue)
+                            },
+                        ) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
                         }
                     },
                     actions = {
@@ -422,94 +550,111 @@ fun DashboardScreen(
                                 focusManager.clearFocus()
                                 keyboardController?.hide()
                             }
-                            viewModel.toggleSearch()
+                            viewModel.onAction(DashboardCatalogUiAction.ToggleSearch)
                         }) {
                             Icon(
                                 imageVector = if (state.isSearchOpen) Icons.Default.Close else Icons.Default.Search,
                                 contentDescription = "Buscar",
-                                tint = AmaxoniaBlue
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                         IconButton(onClick = { /* TODO */ }) {
-                            Icon(Icons.Default.DocumentScanner, contentDescription = "Escanear código", tint = AmaxoniaBlue)
-                        }
-                        IconButton(onClick = { viewModel.toggleViewMode() }) {
                             Icon(
-                                imageVector = if (state.viewMode == ProductViewMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
+                                Icons.Default.DocumentScanner,
+                                contentDescription = "Escanear código",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        IconButton(onClick = { viewModel.onAction(DashboardCatalogUiAction.ToggleViewMode) }) {
+                            Icon(
+                                imageVector =
+                                    if (state.viewMode ==
+                                        ProductViewMode.GRID
+                                    ) {
+                                        Icons.AutoMirrored.Filled.ViewList
+                                    } else {
+                                        Icons.Default.GridView
+                                    },
                                 contentDescription = "Cambiar vista",
-                                tint = AmaxoniaBlue
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
             },
             bottomBar = {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 10.dp),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(bottom = 10.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(26.dp),
                         tonalElevation = 0.dp,
                         shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .padding(horizontal = 18.dp)
-                            .height(58.dp)
-                            .fillMaxWidth()
+                        modifier =
+                            Modifier
+                                .padding(horizontal = 18.dp)
+                                .height(58.dp)
+                                .fillMaxWidth(),
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 10.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                         ) {
                             BottomPillItem(
                                 selected = state.bottomSelected == 0,
-                                onClick = { viewModel.setBottomSelected(0) },
-                                icon = Icons.Default.GridView
+                                onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(0)) },
+                                icon = Icons.Default.GridView,
                             )
                             BottomPillItem(
                                 selected = state.bottomSelected == 1,
-                                onClick = { viewModel.setBottomSelected(1) },
-                                icon = Icons.Default.StarBorder
+                                onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(1)) },
+                                icon = Icons.Default.StarBorder,
                             )
                             BottomPillItem(
                                 selected = state.bottomSelected == 2,
-                                onClick = { viewModel.setBottomSelected(2) },
-                                icon = Icons.Default.EditNote
+                                onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(2)) },
+                                icon = Icons.Default.EditNote,
                             )
                         }
                     }
                 }
-            }
+            },
         ) { paddingValues ->
-            Column(modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+            ) {
                 if (isSyncRunning) {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CircularProgressIndicator(
-                                color = AmaxoniaBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Sincronizando datos...",
-                                style = TextStyle(fontSize = 12.sp, color = AmaxoniaBlue)
+                                style = TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.primary),
                             )
                         }
                     }
@@ -520,25 +665,25 @@ fun DashboardScreen(
                     if (state.error != null) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = state.error ?: "Error desconocido",
-                                    color = MaterialTheme.colorScheme.error
+                                    color = MaterialTheme.colorScheme.error,
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.retry() }) {
+                                Button(onClick = { viewModel.onAction(DashboardCatalogUiAction.Retry) }) {
                                     Text("Reintentar")
                                 }
                             }
                         }
-                    } else if ((state.isLoading && state.products.isEmpty()) || (state.isLoadingBestSellers && state.bottomSelected == 1 && state.bestSellers.isEmpty())) {
+                    } else if (state.isInitialProductLoading || state.isInitialBestSellersLoading) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
-                            CircularProgressIndicator(color = AmaxoniaBlue)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         }
                     } else {
                         // LOGICA PARA MOSTRAR CONTENIDO SEGUN PESTAÑA
@@ -546,92 +691,99 @@ fun DashboardScreen(
                             // PESTAÑA 3: Entrada Manual
                             ManualEntryContent(
                                 currentValue = state.manualEntryValue,
-                                onKeyClick = viewModel::onManualKey,
-                                onClearClick = viewModel::onManualClear,
-                                onBackspaceClick = viewModel::onManualBackspace,
-                                onEnterClick = viewModel::onManualSubmit
+                                onKeyClick = { viewModel.onAction(DashboardSaleUiAction.ManualKey(it)) },
+                                onClearClick = { viewModel.onAction(DashboardSaleUiAction.ManualClear) },
+                                onBackspaceClick = { viewModel.onAction(DashboardSaleUiAction.ManualBackspace) },
+                                onEnterClick = { viewModel.onAction(DashboardSaleUiAction.ManualSubmit) },
                             )
                         } else {
                             // PESTAÑAS 0 y 1: Grid o Lista de Productos
                             Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp),
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 16.dp),
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 16.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Row(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable(enabled = state.bottomSelected != 1) {
-                                                if (state.bottomSelected != 1) {
-                                                    viewModel.setShowDepartmentPicker(true)
-                                                }
-                                            }
-                                            .padding(vertical = 4.dp, horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier =
+                                            Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable(enabled = state.bottomSelected != 1) {
+                                                    if (state.bottomSelected != 1) {
+                                                        viewModel.onAction(DashboardCatalogUiAction.SetDepartmentPicker(true))
+                                                    }
+                                                }.padding(vertical = 4.dp, horizontal = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Text(
                                             text = if (state.bottomSelected == 1) "Productos Más Vendidos" else state.selectedCategory,
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = MaterialTheme.colorScheme.onSurface,
                                         )
                                         if (state.bottomSelected != 1) {
                                             Icon(
                                                 Icons.Default.KeyboardArrowDown,
                                                 contentDescription = "Cambiar Categoría",
                                                 tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.padding(start = 8.dp)
+                                                modifier = Modifier.padding(start = 8.dp),
                                             )
                                         }
                                     }
 
                                     Surface(
-                                        modifier = Modifier
-                                            .padding(start = 8.dp)
-                                            .clickable { showSellerSheet = true },
+                                        modifier =
+                                            Modifier
+                                                .padding(start = 8.dp)
+                                                .clickable { showSellerSheet = true },
                                         color = MaterialTheme.colorScheme.surface,
                                         shape = RoundedCornerShape(20.dp),
                                         shadowElevation = 1.dp,
                                     ) {
                                         Row(
-                                            modifier = Modifier
-                                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
-                                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                            modifier =
+                                                Modifier
+                                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Person,
                                                 contentDescription = "Vendedor",
-                                                tint = AmaxoniaBlue,
-                                                modifier = Modifier.size(16.dp)
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
                                             )
                                             Text(
                                                 text = state.currentSeller?.shortName() ?: "Vendedor",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.padding(start = 6.dp)
+                                                modifier = Modifier.padding(start = 6.dp),
                                             )
                                         }
                                     }
                                 }
                                 if (state.showDepartmentPicker) {
                                     ModalBottomSheet(
-                                        onDismissRequest = { viewModel.setShowDepartmentPicker(false) }
+                                        onDismissRequest = {
+                                            viewModel.onAction(DashboardCatalogUiAction.SetDepartmentPicker(false))
+                                        },
                                     ) {
                                         LazyColumn(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp)
-                                                .padding(bottom = 32.dp)
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp)
+                                                    .padding(bottom = 32.dp),
                                         ) {
                                             item {
                                                 Text(
@@ -639,95 +791,134 @@ fun DashboardScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 18.sp,
                                                     color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(vertical = 8.dp)
+                                                    modifier = Modifier.padding(vertical = 8.dp),
                                                 )
                                             }
                                             item {
                                                 Surface(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable { viewModel.selectDepartment(null) },
-                                                    color = if (state.selectedDepartmentId == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
+                                                    modifier =
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                viewModel.onAction(DashboardCatalogUiAction.SelectDepartment(null))
+                                                            },
+                                                    color =
+                                                        if (state.selectedDepartmentId ==
+                                                            null
+                                                        ) {
+                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                                        } else {
+                                                            PosPalette.Transparent
+                                                        },
                                                 ) {
                                                     Text(
                                                         "Todos",
                                                         modifier = Modifier.padding(16.dp),
-                                                        fontSize = 16.sp
+                                                        fontSize = 16.sp,
                                                     )
                                                 }
                                             }
                                             items(state.departments, key = { it.id }) { dept ->
                                                 Surface(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable { viewModel.selectDepartment(dept.id) },
-                                                    color = if (state.selectedDepartmentId == dept.id) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
+                                                    modifier =
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                viewModel.onAction(DashboardCatalogUiAction.SelectDepartment(dept.id))
+                                                            },
+                                                    color =
+                                                        if (state.selectedDepartmentId ==
+                                                            dept.id
+                                                        ) {
+                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                                        } else {
+                                                            PosPalette.Transparent
+                                                        },
                                                 ) {
                                                     Text(
                                                         dept.name,
                                                         modifier = Modifier.padding(16.dp),
-                                                        fontSize = 16.sp
+                                                        fontSize = 16.sp,
                                                     )
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                 if (state.viewMode == ProductViewMode.GRID) {
-                                     LazyVerticalGrid(
+                                if (state.viewMode == ProductViewMode.GRID) {
+                                    LazyVerticalGrid(
                                         state = productGridState,
-                                         columns = GridCells.Fixed(2),
-                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                                         contentPadding = PaddingValues(bottom = 120.dp)
-                                     ) {
+                                        columns = GridCells.Fixed(2),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(bottom = 120.dp),
+                                    ) {
                                         items(productsToShow, key = { it.id }) { product ->
-                                             ProductCard(
-                                                 product = product,
-                                                 onAddClick = { viewModel.addToCart(product) },
-                                                 onQuantityClick = { viewModel.showQuantityPicker(product) }
-                                             )
-                                         }
+                                            ProductCard(
+                                                product = product,
+                                                onAddClick = {
+                                                    viewModel.onAction(DashboardSaleUiAction.AddProduct(product))
+                                                },
+                                                onQuantityClick = {
+                                                    viewModel.onAction(DashboardSaleUiAction.ShowQuantityPicker(product))
+                                                },
+                                            )
+                                        }
                                         if (state.isLoadingMore) {
-                                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                            item(span = {
+                                                androidx.compose.foundation.lazy.grid
+                                                    .GridItemSpan(maxLineSpan)
+                                            }) {
                                                 Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(16.dp),
-                                                    contentAlignment = Alignment.Center
+                                                    modifier =
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                    contentAlignment = Alignment.Center,
                                                 ) {
-                                                    CircularProgressIndicator(color = AmaxoniaBlue, modifier = Modifier.size(28.dp))
+                                                    CircularProgressIndicator(
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(28.dp),
+                                                    )
                                                 }
                                             }
                                         }
-                                     }
-                                 } else {
-                                     LazyColumn(
+                                    }
+                                } else {
+                                    LazyColumn(
                                         state = productListState,
-                                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                                         contentPadding = PaddingValues(bottom = 120.dp)
-                                     ) {
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(bottom = 120.dp),
+                                    ) {
                                         items(productsToShow, key = { it.id }) { product ->
-                                             ProductListRow(
-                                                 product = product,
-                                                 onAddClick = { viewModel.addToCart(product) },
-                                                 onQuantityClick = { viewModel.showQuantityPicker(product) }
-                                             )
-                                         }
+                                            ProductListRow(
+                                                product = product,
+                                                onAddClick = {
+                                                    viewModel.onAction(DashboardSaleUiAction.AddProduct(product))
+                                                },
+                                                onQuantityClick = {
+                                                    viewModel.onAction(DashboardSaleUiAction.ShowQuantityPicker(product))
+                                                },
+                                            )
+                                        }
                                         if (state.isLoadingMore) {
                                             item {
                                                 Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(16.dp),
-                                                    contentAlignment = Alignment.Center
+                                                    modifier =
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                    contentAlignment = Alignment.Center,
                                                 ) {
-                                                    CircularProgressIndicator(color = AmaxoniaBlue, modifier = Modifier.size(28.dp))
+                                                    CircularProgressIndicator(
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(28.dp),
+                                                    )
                                                 }
                                             }
                                         }
-                                     }
-                                 }
+                                    }
+                                }
                             }
                         }
                     }
@@ -735,30 +926,31 @@ fun DashboardScreen(
                     // Botón flotante del carrito
                     if (state.cartItemCount > 0) {
                         Button(
-                            onClick = {
-                                if (viewModel.canProceedToSale()) {
-                                    onNavigateToCart()
-                                }
-                            },
+                            onClick = { viewModel.onAction(DashboardSaleUiAction.Checkout) },
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                                .height(56.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
+                                    .fillMaxWidth()
+                                    .height(56.dp),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.ShoppingCart, null, tint = Color.White)
+                                    Icon(Icons.Default.ShoppingCart, null, tint = PosPalette.FixedWhite)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("${state.cartItemCount} productos", color = Color.White)
+                                    Text("${state.cartItemCount} productos", color = PosPalette.FixedWhite)
                                 }
-                                Text("Total: $${String.format("%.2f", state.cartTotal)}", fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(
+                                    "Total: $${String.format(java.util.Locale.getDefault(), "%.2f", state.cartTotal)}",
+                                    fontWeight = FontWeight.Bold,
+                                    color = PosPalette.FixedWhite,
+                                )
                             }
                         }
                     }
@@ -775,7 +967,7 @@ fun DashboardScreen(
 private fun ProductQuantitySheet(
     product: DashboardProduct,
     onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var quantityText by remember { mutableStateOf("1") }
     val quantity = quantityText.toIntOrNull() ?: 0
@@ -784,15 +976,16 @@ private fun ProductQuantitySheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 18.dp)
-                .padding(bottom = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp)
+                    .padding(bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Cantidad a agregar", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
             Text(product.name, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -804,7 +997,7 @@ private fun ProductQuantitySheet(
                 onIncrease = { quantityText = ((quantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
                 onDone = { if (isValid) onConfirm(quantity) },
                 isError = quantityText.isNotBlank() && !isValid,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
 
             if (!isValid) {
@@ -815,7 +1008,7 @@ private fun ProductQuantitySheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
                 ) {
                     Text("Cancelar")
                 }
@@ -824,7 +1017,7 @@ private fun ProductQuantitySheet(
                     enabled = isValid,
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -842,50 +1035,68 @@ private fun PromotionChoiceSheet(
     promotions: List<Promocion>,
     onAddIndividual: (Int) -> Unit,
     onAddPromotion: (Promocion, Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var individualQuantityText by remember { mutableStateOf("1") }
     val individualQuantity = individualQuantityText.toIntOrNull() ?: 0
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 18.dp)
-                .padding(bottom = 22.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp)
+                    .padding(bottom = 22.dp),
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            )
+                        modifier =
+                            Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary,
+                                        ),
+                                    ),
+                                ),
                     ) {
-                        Icon(Icons.Default.LocalOffer, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center))
+                        Icon(
+                            Icons.Default.LocalOffer,
+                            contentDescription = null,
+                            tint = PosPalette.FixedWhite,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Este producto tiene promoción", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text(product.name, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f), fontSize = 13.sp)
+                        Text(
+                            "Este producto tiene promoción",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            product.name,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                            fontSize = 13.sp,
+                        )
                     }
                 }
             }
@@ -895,25 +1106,31 @@ private fun PromotionChoiceSheet(
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Producto individual", fontWeight = FontWeight.Bold)
                     QuantityStepper(
                         quantityText = individualQuantityText,
                         onQuantityTextChange = { individualQuantityText = sanitizeQuantityInput(it) },
-                        onDecrease = { individualQuantityText = ((individualQuantityText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
-                        onIncrease = { individualQuantityText = ((individualQuantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
+                        onDecrease = {
+                            individualQuantityText =
+                                ((individualQuantityText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString()
+                        },
+                        onIncrease = {
+                            individualQuantityText =
+                                ((individualQuantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString()
+                        },
                         onDone = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
                         isError = individualQuantityText.isNotBlank() && individualQuantity < 1,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedButton(
                         onClick = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
                         enabled = individualQuantity >= 1,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                     ) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -928,7 +1145,7 @@ private fun PromotionChoiceSheet(
 
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(promotions, key = { it.id }) { promo ->
                     PromotionOptionCard(promo = promo, onAddPromotion = { times -> onAddPromotion(promo, times) })
@@ -941,7 +1158,7 @@ private fun PromotionChoiceSheet(
 @Composable
 private fun PromotionOptionCard(
     promo: Promocion,
-    onAddPromotion: (Int) -> Unit
+    onAddPromotion: (Int) -> Unit,
 ) {
     val accent = if (promo.tipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
     var timesText by remember { mutableStateOf("1") }
@@ -950,7 +1167,7 @@ private fun PromotionOptionCard(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -960,7 +1177,7 @@ private fun PromotionOptionCard(
                         color = accent,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
                 Spacer(Modifier.width(8.dp))
@@ -984,9 +1201,14 @@ private fun PromotionOptionCard(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(BigDecimalMoneyFormatter.money(detail.totalConIva), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                BigDecimalMoneyFormatter.money(detail.totalConIva),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     if (promo.detalles.size > 4) {
@@ -1003,7 +1225,7 @@ private fun PromotionOptionCard(
                 onIncrease = { timesText = ((timesText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
                 onDone = { if (times >= 1) onAddPromotion(times) },
                 isError = timesText.isNotBlank() && times < 1,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(10.dp))
             Button(
@@ -1011,7 +1233,7 @@ private fun PromotionOptionCard(
                 enabled = times >= 1,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = PosPalette.FixedWhite),
             ) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -1025,18 +1247,18 @@ private fun PromotionOptionCard(
 private fun BottomPillItem(
     selected: Boolean,
     onClick: () -> Unit,
-    icon: ImageVector
+    icon: ImageVector,
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent
-    val tint = if (selected) AmaxoniaBlue else MaterialTheme.colorScheme.outline
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else PosPalette.Transparent
+    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
 
     Surface(
         color = bg,
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(18.dp),
     ) {
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(46.dp)
+            modifier = Modifier.size(46.dp),
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
         }
@@ -1051,18 +1273,19 @@ private fun QuantityStepper(
     onIncrease: () -> Unit,
     onDone: () -> Unit,
     isError: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         IconButton(
             onClick = onDecrease,
-            modifier = Modifier
-                .size(44.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
         ) {
             Icon(Icons.Default.Remove, contentDescription = "Disminuir", tint = MaterialTheme.colorScheme.primary)
         }
@@ -1075,70 +1298,75 @@ private fun QuantityStepper(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { onDone() }),
             modifier = Modifier.weight(1f),
-            label = { Text("Cantidad") }
+            label = { Text("Cantidad") },
         )
         IconButton(
             onClick = onIncrease,
-            modifier = Modifier
-                .size(44.dp)
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
         ) {
             Icon(Icons.Default.Add, contentDescription = "Aumentar", tint = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }
 
-private fun sanitizeQuantityInput(value: String): String {
-    return value.filter { it.isDigit() }.trimStart('0').ifBlank { "" }.take(5)
-}
+private fun sanitizeQuantityInput(value: String): String =
+    value
+        .filter { it.isDigit() }
+        .trimStart('0')
+        .ifBlank { "" }
+        .take(5)
 
 @Composable
 fun ProductCard(
     product: DashboardProduct,
     onAddClick: () -> Unit,
-    onQuantityClick: () -> Unit
+    onQuantityClick: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth().height(260.dp)
+        modifier = Modifier.fillMaxWidth().height(260.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
             ) {
                 if (!product.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = product.imageUrl,
                         contentDescription = product.name,
                         modifier = Modifier.fillMaxSize(),
-                        onError = { android.util.Log.e("IMG_DASH", "FAIL url=${product.imageUrl} err=${it.result.throwable?.message}") },
-                        onSuccess = { android.util.Log.d("IMG_DASH", "OK url=${product.imageUrl}") }
+                        onError = { SafeLog.w("ProductImage", "Dashboard product image load failed") },
+                        onSuccess = { SafeLog.d("ProductImage", "Dashboard product image loaded") },
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
                         tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(48.dp),
                     )
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = product.name, 
-                    fontWeight = FontWeight.Bold, 
-                    fontSize = 16.sp, 
+                    text = product.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
                 if (!product.code.isNullOrBlank()) {
                     Text(
@@ -1147,7 +1375,7 @@ fun ProductCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -1155,30 +1383,42 @@ fun ProductCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "$${String.format("%.2f", product.price)}",
+                    text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
                     fontWeight = FontWeight.Bold,
-                    color = AmaxoniaBlue,
-                    fontSize = 14.sp
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = onQuantityClick,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                        modifier =
+                            Modifier
+                                .size(34.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Elegir cantidad", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Elegir cantidad",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                     IconButton(
                         onClick = onAddClick,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .background(AmaxoniaBlue, RoundedCornerShape(10.dp))
+                        modifier =
+                            Modifier
+                                .size(34.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)),
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Agregar una unidad", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Agregar una unidad",
+                            tint = PosPalette.FixedWhite,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
             }
@@ -1190,51 +1430,53 @@ fun ProductCard(
 fun ProductListRow(
     product: DashboardProduct,
     onAddClick: () -> Unit,
-    onQuantityClick: () -> Unit
+    onQuantityClick: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
             ) {
                 if (!product.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = product.imageUrl,
                         contentDescription = product.name,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
                         tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
                     )
                 }
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = product.name, 
-                    fontWeight = FontWeight.Bold, 
-                    fontSize = 15.sp, 
+                    text = product.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
                 if (!product.code.isNullOrBlank()) {
                     Text(
@@ -1242,34 +1484,46 @@ fun ProductListRow(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 } else {
                     Spacer(Modifier.height(6.dp))
                 }
                 Text(
-                    text = "$${String.format("%.2f", product.price)}",
+                    text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
                     fontWeight = FontWeight.Bold,
-                    color = AmaxoniaBlue,
-                    fontSize = 14.sp
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 14.sp,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = onQuantityClick,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Elegir cantidad", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Elegir cantidad",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
                 IconButton(
                     onClick = onAddClick,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(AmaxoniaBlue, RoundedCornerShape(12.dp))
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar una unidad", tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Agregar una unidad",
+                        tint = PosPalette.FixedWhite,
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
         }
@@ -1281,22 +1535,23 @@ fun DrawerMenuItem(
     icon: ImageVector,
     label: String,
     isSelected: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 16.dp, horizontal = 24.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(vertical = 16.dp, horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = label, tint = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = label,
-            color = Color.White,
+            color = PosPalette.FixedWhite,
             fontSize = 16.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
         )
     }
 }
@@ -1307,25 +1562,28 @@ fun ManualEntryContent(
     onKeyClick: (String) -> Unit,
     onClearClick: () -> Unit,
     onBackspaceClick: () -> Unit,
-    onEnterClick: () -> Unit
+    onEnterClick: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Título de la sección
         Text(
             text = "Ingreso Manual",
-            style = TextStyle(
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = AmaxoniaBlue
-            ),
-            modifier = Modifier
-                .align(Alignment.Start)
-                .padding(bottom = 24.dp)
+            style =
+                TextStyle(
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                ),
+            modifier =
+                Modifier
+                    .align(Alignment.Start)
+                    .padding(bottom = 24.dp),
         )
 
         // Pantalla del precio (Visor)
@@ -1333,55 +1591,59 @@ fun ManualEntryContent(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     text = "Monto a cobrar",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (currentValue.isEmpty()) "$ 0.00" else "$ $currentValue",
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AmaxoniaBlue
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
 
         // Teclado Numérico
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .padding(bottom = 80.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(bottom = 80.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Columna Izquierda (Números)
             Column(
                 modifier = Modifier.weight(3f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                val keys = listOf(
-                    listOf("1", "2", "3"),
-                    listOf("4", "5", "6"),
-                    listOf("7", "8", "9"),
-                    listOf("C", "0", "000")
-                )
+                val keys =
+                    listOf(
+                        listOf("1", "2", "3"),
+                        listOf("4", "5", "6"),
+                        listOf("7", "8", "9"),
+                        listOf("C", "0", "000"),
+                    )
 
                 keys.forEach { row ->
                     Row(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         row.forEach { key ->
                             Button(
@@ -1391,15 +1653,16 @@ fun ManualEntryContent(
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
                             ) {
                                 Text(
                                     text = key,
                                     fontSize = if (key == "000") 20.sp else 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (key == "C") Color.Red else AmaxoniaBlue
+                                    color = if (key == "C") PosPalette.DangerRed else MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
@@ -1410,7 +1673,7 @@ fun ManualEntryContent(
             // Columna Derecha (Acciones)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Botón Borrar
                 Button(
@@ -1418,15 +1681,16 @@ fun ManualEntryContent(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Backspace,
                         contentDescription = "Borrar",
-                        tint = AmaxoniaBlue,
-                        modifier = Modifier.size(26.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(26.dp),
                     )
                 }
 
@@ -1434,17 +1698,18 @@ fun ManualEntryContent(
                 Button(
                     onClick = onEnterClick,
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    modifier = Modifier
-                        .weight(3f)
-                        .fillMaxWidth()
+                    modifier =
+                        Modifier
+                            .weight(3f)
+                            .fillMaxWidth(),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Cobrar",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        tint = PosPalette.FixedWhite,
+                        modifier = Modifier.size(32.dp),
                     )
                 }
             }

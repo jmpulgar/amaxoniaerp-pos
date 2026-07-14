@@ -4,8 +4,8 @@ import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import kotlinx.coroutines.delay
-import kotlin.random.Random
 import java.util.UUID
+import kotlin.random.Random
 
 class MockTransactionRepository : TransactionRepository {
     private val mockTransactions = mutableListOf<Transaction>()
@@ -49,31 +49,33 @@ class MockTransactionRepository : TransactionRepository {
         delay((300..1000).random().toLong())
     }
 
-    private fun shouldSimulateError(): Boolean {
-        return Random.nextFloat() < failureRate
-    }
+    private fun shouldSimulateError(): Boolean = Random.nextFloat() < failureRate
 
     private fun generateMockTransactions() {
         mockTransactions.clear()
-        val transactions = listOf(
-            createMockTransaction("320.99", "10:00 AM", "Domingo, 02 Agosto 2020"),
-            createMockTransaction("520.99", "05:00 PM", "Domingo, 02 Agosto 2020"),
-            createMockTransaction("420.99", "09:00 PM", "Domingo, 02 Agosto 2020"),
-            createMockTransaction("120.99", "11:00 AM", "Sábado, 03 Agosto 2020"),
-            createMockTransaction("520.99", "10:00 AM", "Sábado, 03 Agosto 2020"),
-            createMockTransaction("620.99", "08:00 AM", "Sábado, 03 Agosto 2020")
-        )
+        val transactions =
+            listOf(
+                createMockTransaction("320.99", "10:00 AM", "Domingo, 02 Agosto 2020"),
+                createMockTransaction("520.99", "05:00 PM", "Domingo, 02 Agosto 2020"),
+                createMockTransaction("420.99", "09:00 PM", "Domingo, 02 Agosto 2020"),
+                createMockTransaction("120.99", "11:00 AM", "Sábado, 03 Agosto 2020"),
+                createMockTransaction("520.99", "10:00 AM", "Sábado, 03 Agosto 2020"),
+                createMockTransaction("620.99", "08:00 AM", "Sábado, 03 Agosto 2020"),
+            )
         mockTransactions.addAll(transactions)
     }
 
-    private fun createMockTransaction(amount: String, time: String, date: String): Transaction {
-        return Transaction(
+    private fun createMockTransaction(
+        amount: String,
+        time: String,
+        date: String,
+    ): Transaction =
+        Transaction(
             id = UUID.randomUUID().toString(),
             invoiceNumber = "#TRX${(10000..99999).random()}",
             time = time,
             amount = amount.toDouble(),
             dateHeader = date,
-            status = TransactionStatus.PAID
+            status = TransactionStatus.PAID,
         )
-    }
 }

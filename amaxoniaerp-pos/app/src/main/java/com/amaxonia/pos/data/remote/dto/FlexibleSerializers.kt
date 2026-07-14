@@ -15,7 +15,12 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object FlexibleStringSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleString", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: String) = encoder.encodeString(value)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: String,
+    ) = encoder.encodeString(value)
+
     override fun deserialize(decoder: Decoder): String {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
         return jsonDecoder.decodeJsonElement().jsonPrimitive.content
@@ -24,7 +29,12 @@ object FlexibleStringSerializer : KSerializer<String> {
 
 object FlexibleDoubleSerializer : KSerializer<Double> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleDouble", PrimitiveKind.DOUBLE)
-    override fun serialize(encoder: Encoder, value: Double) = encoder.encodeDouble(value)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Double,
+    ) = encoder.encodeDouble(value)
+
     override fun deserialize(decoder: Decoder): Double {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeDouble()
         val primitive = jsonDecoder.decodeJsonElement().jsonPrimitive
@@ -34,7 +44,12 @@ object FlexibleDoubleSerializer : KSerializer<Double> {
 
 object FlexibleIntSerializer : KSerializer<Int> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleInt", PrimitiveKind.INT)
-    override fun serialize(encoder: Encoder, value: Int) = encoder.encodeInt(value)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Int,
+    ) = encoder.encodeInt(value)
+
     override fun deserialize(decoder: Decoder): Int {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeInt()
         val primitive = jsonDecoder.decodeJsonElement().jsonPrimitive
@@ -44,7 +59,12 @@ object FlexibleIntSerializer : KSerializer<Int> {
 
 object FlexibleBooleanSerializer : KSerializer<Boolean> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleBoolean", PrimitiveKind.BOOLEAN)
-    override fun serialize(encoder: Encoder, value: Boolean) = encoder.encodeBoolean(value)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: Boolean,
+    ) = encoder.encodeBoolean(value)
+
     override fun deserialize(decoder: Decoder): Boolean {
         val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeBoolean()
         val primitive: JsonPrimitive = jsonDecoder.decodeJsonElement().jsonPrimitive

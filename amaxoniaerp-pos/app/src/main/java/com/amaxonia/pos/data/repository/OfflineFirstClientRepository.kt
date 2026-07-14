@@ -13,12 +13,12 @@ class OfflineFirstClientRepository(
     private val apiService: ApiService,
     private val localStore: LocalStore,
     private val clientDao: ClientDao,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
 ) : ClientRepository {
-
     override suspend fun getDefaultClient(): Result<Client> {
-        val token = localStore.readCompanySession()?.token
-            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        val token =
+            localStore.readCompanySession()?.token
+                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
 
         return runCatching {
             val dto = apiService.getDefaultClient(token)
@@ -31,12 +31,17 @@ class OfflineFirstClientRepository(
         }
     }
 
-    override suspend fun getAllClients(page: Int, pageSize: Int): Result<List<Client>> {
+    override suspend fun getAllClients(
+        page: Int,
+        pageSize: Int,
+    ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         if (!networkMonitor.isOnline()) {
             val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
-            return if (cached.isNotEmpty()) Result.success(cached) else {
+            return if (cached.isNotEmpty()) {
+                Result.success(cached)
+            } else {
                 Result.failure(IllegalStateException("No hay empresa seleccionada"))
             }
         }
@@ -55,7 +60,9 @@ class OfflineFirstClientRepository(
 
     override suspend fun getClientById(id: String): Result<Client> {
         val client = clientDao.getById(id)
-        return if (client != null) Result.success(client.toDomain()) else {
+        return if (client != null) {
+            Result.success(client.toDomain())
+        } else {
             Result.failure(IllegalArgumentException("Cliente no encontrado"))
         }
     }
@@ -79,7 +86,11 @@ class OfflineFirstClientRepository(
         }
     }
 
-    override suspend fun searchClients(query: String, page: Int, pageSize: Int): Result<List<Client>> {
+    override suspend fun searchClients(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         if (!networkMonitor.isOnline()) {
@@ -101,22 +112,23 @@ class OfflineFirstClientRepository(
     }
 
     override suspend fun saveClient(client: Client): Result<Unit> {
-        val token = localStore.readCompanySession()?.token
-            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        val token =
+            localStore.readCompanySession()?.token
+                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
         val request = client.toCreateRequest()
         return runCatching {
-            val saved = if (client.id.isBlank()) {
-                apiService.createClient(token, request)
-            } else {
-                apiService.updateClient(token, client.id, request)
-            }
+            val saved =
+                if (client.id.isBlank()) {
+                    apiService.createClient(token, request)
+                } else {
+                    apiService.updateClient(token, client.id, request)
+                }
             clientDao.insertAll(listOf(saved.toEntity()))
         }
     }
 
-    override suspend fun deleteClient(id: String): Result<Unit> {
-        return Result.failure(UnsupportedOperationException("Eliminar clientes no esta implementado"))
-    }
+    override suspend fun deleteClient(id: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Eliminar clientes no esta implementado"))
 
     private fun normalizeQuery(query: String): String {
         val normalized = query.trim()

@@ -1,6 +1,6 @@
 package com.amaxonia.pos.data.printer
 
-import android.util.Log
+import com.amaxonia.pos.core.logging.SafeLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 
@@ -16,7 +16,6 @@ import kotlinx.coroutines.withTimeout
  * 5. ViewModel resumes with the result
  */
 object RapidPayBridge {
-
     private const val TAG = "RapidPayBridge"
 
     /** Timeout for waiting on HKA POS response (2 minutes — card payments can be slow). */
@@ -36,17 +35,17 @@ object RapidPayBridge {
         val deferred = CompletableDeferred<RapidPayResult>()
         pendingResult = deferred
 
-        Log.d(TAG, "awaitResult() → esperando resultado de HKA POS...")
+        SafeLog.d(TAG, "Waiting for payment gateway result")
 
         return try {
             withTimeout(RESULT_TIMEOUT_MS) {
                 deferred.await()
             }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-            Log.w(TAG, "awaitResult() → timeout esperando resultado de HKA POS")
+            SafeLog.w(TAG, "Payment gateway result timed out")
             RapidPayResult(
                 approved = false,
-                message = "Tiempo de espera agotado esperando respuesta de la pasarela de pago"
+                message = "Tiempo de espera agotado esperando respuesta de la pasarela de pago",
             )
         } finally {
             pendingResult = null
@@ -57,10 +56,10 @@ object RapidPayBridge {
      * Called by MainActivity.onNewIntent() when the HKA POS app returns.
      */
     fun deliverResult(result: RapidPayResult) {
-        Log.d(TAG, "deliverResult() → approved=${result.approved} | message=${result.message}")
+        SafeLog.d(TAG, "Payment gateway result delivered; approved=${result.approved}")
         val completed = pendingResult?.complete(result) ?: false
         if (!completed) {
-            Log.w(TAG, "deliverResult() → no hay resultado pendiente (ignorando)")
+            SafeLog.w(TAG, "Payment gateway result ignored because no request is pending")
         }
     }
 

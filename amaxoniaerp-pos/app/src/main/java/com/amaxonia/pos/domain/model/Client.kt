@@ -2,14 +2,18 @@ package com.amaxonia.pos.domain.model
 
 import java.util.UUID
 
-enum class TaxpayerType(val label: String) {
+enum class TaxpayerType(
+    val label: String,
+) {
     NATURAL("Natural"),
-    JURIDICO("Jurídico")
+    JURIDICO("Jurídico"),
 }
 
-enum class ForeignIdType(val label: String) {
+enum class ForeignIdType(
+    val label: String,
+) {
     TRIBUTARIA("Identificación Tributaria"),
-    PASAPORTE("Pasaporte")
+    PASAPORTE("Pasaporte"),
 }
 
 data class Client(
@@ -42,5 +46,5 @@ data class Client(
     val sector: String = "",
     val urbanization: String = "",
     val street: String = "",
-    val photoFilename: String = ""
+    val photoFilename: String = "",
 )

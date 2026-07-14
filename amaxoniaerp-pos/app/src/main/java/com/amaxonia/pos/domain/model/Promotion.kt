@@ -12,7 +12,7 @@ data class Promocion(
     val descuentoGlobal: BigDecimal,
     val idItem: String,
     val activo: Boolean,
-    val detalles: List<PromocionDetalle>
+    val detalles: List<PromocionDetalle>,
 ) {
     val tipo: String get() = if (detalles.size > 1) "KIT" else "ESTANDAR"
     val total: BigDecimal get() = detalles.fold(BigDecimal.ZERO) { acc, item -> acc + item.totalConIva }
@@ -37,7 +37,7 @@ data class PromocionDetalle(
     val totalConIva: BigDecimal,
     val totalSinIva: BigDecimal,
     val grupo: String,
-    val product: Product
+    val product: Product,
 )
 
 sealed interface ItemCarrito {
@@ -45,7 +45,7 @@ sealed interface ItemCarrito {
     val total: BigDecimal
 
     data class ProductoIndividual(
-        val item: CartItem
+        val item: CartItem,
     ) : ItemCarrito {
         override val id: String = item.product.id
         override val total: BigDecimal = BigDecimal.valueOf(item.total)
@@ -57,7 +57,7 @@ sealed interface ItemCarrito {
         val promocionNombre: String,
         val promocionTipo: String,
         val promocionGrupo: String,
-        val items: List<CartItem>
+        val items: List<CartItem>,
     ) : ItemCarrito {
         override val id: String = promocionId
         override val total: BigDecimal = items.fold(BigDecimal.ZERO) { acc, item -> acc + BigDecimal.valueOf(item.total) }

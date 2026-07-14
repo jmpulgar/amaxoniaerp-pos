@@ -9,22 +9,32 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 class ValidarAdicionPromocionUseCase {
-    operator fun invoke(promocion: Promocion, cartItems: List<CartItem>, now: LocalDateTime = LocalDateTime.now()): Result<Unit> {
-        if (!promocion.activo) return Result.failure(IllegalStateException("La promoción no está activa"))
+    operator fun invoke(
+        promocion: Promocion,
+        cartItems: List<CartItem>,
+        now: LocalDateTime = LocalDateTime.now(),
+    ): Result<Unit> {
         val inicio = promocion.inicio.toLocalDateTimeOrNull()
         val fin = promocion.fin.toLocalDateTimeOrNull()
-        if (inicio != null && now.isBefore(inicio)) return Result.failure(IllegalStateException("La promoción aún no ha iniciado"))
-        if (fin != null && now.isAfter(fin)) return Result.failure(IllegalStateException("La promoción ya venció"))
-        if (cartItems.any { it.promocionId == promocion.id }) {
-            return Result.failure(IllegalStateException("Esta promoción ya está en el carrito"))
-        }
-        return Result.success(Unit)
+        val failureMessage =
+            when {
+                !promocion.activo -> "La promoción no está activa"
+                inicio != null && now.isBefore(inicio) -> "La promoción aún no ha iniciado"
+                fin != null && now.isAfter(fin) -> "La promoción ya venció"
+                cartItems.any { it.promocionId == promocion.id } -> "Esta promoción ya está en el carrito"
+                else -> null
+            }
+        return failureMessage
+            ?.let { Result.failure(IllegalStateException(it)) }
+            ?: Result.success(Unit)
     }
 }
 
 object PromotionPriceCalculator {
     fun totalConIva(detalle: PromocionDetalle): BigDecimal = detalle.totalConIva.money()
+
     fun totalSinIva(detalle: PromocionDetalle): BigDecimal = (detalle.totalConIva - detalle.impuesto).money()
+
     fun iva(detalle: PromocionDetalle): BigDecimal = detalle.iva.money()
 }
 

@@ -9,35 +9,33 @@ data class ServerCountry(
     val displayName: String,
     val baseUrl: String,
     val flagEmoji: String,
-    val schemaType: SchemaType
+    val schemaType: SchemaType,
 )
 
 enum class SchemaType {
-    TYPE_A,  // Panamá
-    TYPE_B   // Venezuela
+    TYPE_A, // Panamá
+    TYPE_B, // Venezuela
 }
 
-/** Solo Venezuela y Panamá. URL base única definida en ApiConfig. */
+/** Países soportados. La capa data aporta la URL del entorno en runtime. */
 object ServerCountries {
-
-    private fun baseUrl(): String = com.amaxonia.pos.data.remote.ApiConfig.baseUrl
-
-    val AVAILABLE: List<ServerCountry> = listOf(
-        ServerCountry(
-            code = "VE",
-            displayName = "Venezuela",
-            baseUrl = baseUrl(),
-            flagEmoji = "🇻🇪",
-            schemaType = SchemaType.TYPE_B
-        ),
-        ServerCountry(
-            code = "PA",
-            displayName = "Panamá",
-            baseUrl = baseUrl(),
-            flagEmoji = "🇵🇦",
-            schemaType = SchemaType.TYPE_A
+    val AVAILABLE: List<ServerCountry> =
+        listOf(
+            ServerCountry(
+                code = "VE",
+                displayName = "Venezuela",
+                baseUrl = "",
+                flagEmoji = "🇻🇪",
+                schemaType = SchemaType.TYPE_B,
+            ),
+            ServerCountry(
+                code = "PA",
+                displayName = "Panamá",
+                baseUrl = "",
+                flagEmoji = "🇵🇦",
+                schemaType = SchemaType.TYPE_A,
+            ),
         )
-    )
 
     fun fromCode(code: String): ServerCountry? = AVAILABLE.find { it.code == code }
 

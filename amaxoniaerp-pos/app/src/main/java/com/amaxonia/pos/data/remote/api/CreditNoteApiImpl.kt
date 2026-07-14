@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.remote.api
 
+import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.domain.model.creditnote.ConfirmCreditNoteFiscalRequestDto
@@ -27,9 +28,12 @@ import kotlinx.serialization.json.jsonPrimitive
 class CreditNoteApiImpl(
     private val apiClient: ApiClient,
 ) : CreditNoteApi {
-
-    override suspend fun getCreditNotes(authHeader: String, companyDb: String, search: String?): Result<CreditNotesListResponseDto> {
-        return getRequest(
+    override suspend fun getCreditNotes(
+        authHeader: String,
+        companyDb: String,
+        search: String?,
+    ): Result<CreditNotesListResponseDto> =
+        getRequest(
             path = "api/pos/notas-credito",
             authHeader = authHeader,
             companyDb = companyDb,
@@ -37,20 +41,26 @@ class CreditNoteApiImpl(
             search = search,
             fallbackMessage = "No se pudieron cargar las notas de crédito",
         )
-    }
 
-    override suspend fun getCreditNoteDetail(authHeader: String, companyDb: String, id: String): Result<CreditNoteDetailDto> {
-        return getRequest(
+    override suspend fun getCreditNoteDetail(
+        authHeader: String,
+        companyDb: String,
+        id: String,
+    ): Result<CreditNoteDetailDto> =
+        getRequest(
             path = "api/pos/notas-credito/$id",
             authHeader = authHeader,
             companyDb = companyDb,
             serializer = CreditNoteDetailDto.serializer(),
             fallbackMessage = "No se pudo cargar la nota de crédito",
         )
-    }
 
-    override suspend fun getSourceInvoices(authHeader: String, companyDb: String, search: String?): Result<CreditNoteSourceInvoiceListResponseDto> {
-        return getRequest(
+    override suspend fun getSourceInvoices(
+        authHeader: String,
+        companyDb: String,
+        search: String?,
+    ): Result<CreditNoteSourceInvoiceListResponseDto> =
+        getRequest(
             path = "api/pos/notas-credito/facturas",
             authHeader = authHeader,
             companyDb = companyDb,
@@ -58,24 +68,26 @@ class CreditNoteApiImpl(
             search = search,
             fallbackMessage = "No se pudieron cargar las facturas elegibles",
         )
-    }
 
-    override suspend fun getSourceInvoiceDetail(authHeader: String, companyDb: String, id: String): Result<CreditNoteSourceInvoiceDetailDto> {
-        return getRequest(
+    override suspend fun getSourceInvoiceDetail(
+        authHeader: String,
+        companyDb: String,
+        id: String,
+    ): Result<CreditNoteSourceInvoiceDetailDto> =
+        getRequest(
             path = "api/pos/notas-credito/facturas/$id",
             authHeader = authHeader,
             companyDb = companyDb,
             serializer = CreditNoteSourceInvoiceDetailDto.serializer(),
             fallbackMessage = "No se pudo cargar la factura seleccionada",
         )
-    }
 
     override suspend fun createCreditNote(
         authHeader: String,
         companyDb: String,
         payload: CreateCreditNoteRequestDto,
-    ): Result<CreateCreditNoteResponseDto> {
-        return postRequest(
+    ): Result<CreateCreditNoteResponseDto> =
+        postRequest(
             path = "api/pos/notas-credito",
             authHeader = authHeader,
             companyDb = companyDb,
@@ -83,15 +95,14 @@ class CreditNoteApiImpl(
             serializer = CreateCreditNoteResponseDto.serializer(),
             fallbackMessage = "No se pudo crear la nota de crédito",
         )
-    }
 
     override suspend fun confirmFiscal(
         authHeader: String,
         companyDb: String,
         id: String,
         payload: ConfirmCreditNoteFiscalRequestDto,
-    ): Result<ConfirmCreditNoteFiscalResponseDto> {
-        return postRequest(
+    ): Result<ConfirmCreditNoteFiscalResponseDto> =
+        postRequest(
             path = "api/pos/notas-credito/$id/confirmacion-fiscal",
             authHeader = authHeader,
             companyDb = companyDb,
@@ -99,7 +110,6 @@ class CreditNoteApiImpl(
             serializer = ConfirmCreditNoteFiscalResponseDto.serializer(),
             fallbackMessage = "No se pudo confirmar la nota de crédito fiscal",
         )
-    }
 
     private suspend fun <T> getRequest(
         path: String,
@@ -108,20 +118,18 @@ class CreditNoteApiImpl(
         serializer: KSerializer<T>,
         search: String? = null,
         fallbackMessage: String,
-    ): Result<T> {
-        return try {
-            val response = apiClient.httpClient.get(path) {
-                header("Authorization", authHeader)
-                header("Company-DB", companyDb)
-                if (!search.isNullOrBlank()) {
-                    parameter("search", search)
+    ): Result<T> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get(path) {
+                    header("Authorization", authHeader)
+                    header("Company-DB", companyDb)
+                    if (!search.isNullOrBlank()) {
+                        parameter("search", search)
+                    }
                 }
-            }
             Result.success(parseResponse(response.bodyAsText(), serializer, fallbackMessage))
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     private suspend fun <T> postRequest(
         path: String,
@@ -130,32 +138,33 @@ class CreditNoteApiImpl(
         payload: Any,
         serializer: KSerializer<T>,
         fallbackMessage: String,
-    ): Result<T> {
-        return try {
-            val response = apiClient.httpClient.post(path) {
-                header("Authorization", authHeader)
-                header("Company-DB", companyDb)
-                contentType(ContentType.Application.Json)
-                setBody(payload)
-            }
+    ): Result<T> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.post(path) {
+                    header("Authorization", authHeader)
+                    header("Company-DB", companyDb)
+                    contentType(ContentType.Application.Json)
+                    setBody(payload)
+                }
             Result.success(parseResponse(response.bodyAsText(), serializer, fallbackMessage))
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
-    private fun <T> parseResponse(responseText: String, serializer: KSerializer<T>, fallbackMessage: String): T {
-        return runCatching {
+    private fun <T> parseResponse(
+        responseText: String,
+        serializer: KSerializer<T>,
+        fallbackMessage: String,
+    ): T =
+        runCatching {
             AppJson.decodeFromString(serializer, responseText)
         }.getOrElse {
             val json = runCatching { AppJson.decodeFromString(JsonElement.serializer(), responseText) }.getOrNull()
             if (json is JsonObject) {
                 val error = json["error"]?.jsonPrimitive?.contentOrNull
                 if (!error.isNullOrBlank()) {
-                    throw IllegalStateException(error)
+                    error(error)
                 }
             }
-            throw IllegalStateException(fallbackMessage)
+            error(fallbackMessage)
         }
-    }
 }

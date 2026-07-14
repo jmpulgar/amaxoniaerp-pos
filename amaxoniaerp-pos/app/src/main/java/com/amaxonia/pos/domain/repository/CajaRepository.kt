@@ -9,18 +9,29 @@ import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import kotlinx.coroutines.flow.StateFlow
 
-interface CajaRepository {
-    val activeCajaName: StateFlow<String>
+interface ActiveCajaReader {
     val activeCaja: StateFlow<Caja?>
+}
+
+interface CajaRepository : ActiveCajaReader {
+    val activeCajaName: StateFlow<String>
     val activeCajaSecuencia: StateFlow<CajaSecuencia?>
 
     suspend fun getCajas(): Result<List<Caja>>
+
     suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String>
+
     suspend fun restoreActiveCajaIfValid()
+
     suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse>
+
     suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse>
+
     suspend fun closeCaja(request: CierreCajaRequest): Result<CierreCajaResponse>
+
     suspend fun getCierreSummary(): Result<CierreCajaSummary>
+
     suspend fun setActiveCaja(caja: Caja)
+
     suspend fun clearActiveCaja()
 }

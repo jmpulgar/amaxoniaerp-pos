@@ -1,9 +1,12 @@
 package com.amaxonia.pos.domain.model
 
-enum class TransactionStatus(val label: String, val colorHex: Long) {
+enum class TransactionStatus(
+    val label: String,
+    val colorHex: Long,
+) {
     PAID("PAGADO", 0xFF1565C0),
     PENDING("PENDIENTE", 0xFFFFA000),
-    CANCELLED("ANULADO", 0xFFD32F2F)
+    CANCELLED("ANULADO", 0xFFD32F2F),
 }
 
 data class Transaction(
@@ -29,7 +32,7 @@ data class TransactionPaymentMethod(
     val sigla: String = "",
     val amount: Double = 0.0,
     val fiscalCode: String = "",
-    val gatewayCommandPrefix: String = ""
+    val gatewayCommandPrefix: String = "",
 )
 
 data class TransactionFiscalItem(

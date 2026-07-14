@@ -8,7 +8,7 @@ data class LotAssignment(
     val codigoLote: String,
     val vencimiento: String? = null,
     val cantidad: Int,
-    val almacen: Int = 0
+    val almacen: Int = 0,
 )
 
 data class CartItem(

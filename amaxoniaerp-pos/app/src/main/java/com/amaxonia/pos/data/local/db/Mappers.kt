@@ -1,13 +1,26 @@
 package com.amaxonia.pos.data.local.db
 
-import com.amaxonia.pos.data.remote.dto.*
+import com.amaxonia.pos.data.remote.dto.AddressLevelDto
+import com.amaxonia.pos.data.remote.dto.ClientDto
+import com.amaxonia.pos.data.remote.dto.ClientSucursalDto
+import com.amaxonia.pos.data.remote.dto.ClientTypeDto
+import com.amaxonia.pos.data.remote.dto.CountryDto
+import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.data.remote.dto.PromocionDetalleDto
+import com.amaxonia.pos.data.remote.dto.PromocionDto
 import com.amaxonia.pos.data.repository.toDomain
-import com.amaxonia.pos.domain.model.*
+import com.amaxonia.pos.domain.model.AddressLevel
+import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.ClientTypeOption
+import com.amaxonia.pos.domain.model.Country
+import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.model.TaxpayerType
+import com.amaxonia.pos.domain.model.generateDefaultPrices
 
 // --- CLIENT MAPPERS ---
 
-fun ClientDto.toEntity(): ClientEntity {
-    return ClientEntity(
+fun ClientDto.toEntity(): ClientEntity =
+    ClientEntity(
         id = id.orEmpty(),
         code = code.orEmpty(),
         identification = identification.orEmpty(),
@@ -24,16 +37,16 @@ fun ClientDto.toEntity(): ClientEntity {
         countryId = countryId ?: 0,
         addressLevel1 = addressLevel1.orEmpty(),
         addressLevel2 = addressLevel2.orEmpty(),
-        addressLevel3 = addressLevel3.orEmpty()
+        addressLevel3 = addressLevel3.orEmpty(),
     )
-}
 
 fun ClientEntity.toDomain(): Client {
     // FIX: Convertimos el ID numérico de la BD al Enum del Dominio
-    val mappedTaxpayerType = when(taxpayerTypeId) {
-        2 -> TaxpayerType.JURIDICO
-        else -> TaxpayerType.NATURAL
-    }
+    val mappedTaxpayerType =
+        when (taxpayerTypeId) {
+            2 -> TaxpayerType.JURIDICO
+            else -> TaxpayerType.NATURAL
+        }
 
     return Client(
         id = id,
@@ -52,12 +65,12 @@ fun ClientEntity.toDomain(): Client {
         clientTypeId = clientTypeId,
         addressLevel1 = addressLevel1,
         addressLevel2 = addressLevel2,
-        addressLevel3 = addressLevel3
+        addressLevel3 = addressLevel3,
     )
 }
 
-fun ClientSucursalDto.toEntity(): ClientSucursalEntity {
-    return ClientSucursalEntity(
+fun ClientSucursalDto.toEntity(): ClientSucursalEntity =
+    ClientSucursalEntity(
         sucursalId = sucursalId,
         clienteCodigo = clienteCodigo,
         nombreSucursal = nombreSucursal,
@@ -67,13 +80,12 @@ fun ClientSucursalDto.toEntity(): ClientSucursalEntity {
         direccion = direccion,
         observaciones = observaciones,
     )
-}
 
 // --- KEEP THE REST OF THE MAPPERS AS IS ---
 // (Copia el resto de mappers de Productos, Countries, etc. igual que antes)
 
-fun ProductDto.toEntity(): ProductEntity {
-    return ProductEntity(
+fun ProductDto.toEntity(): ProductEntity =
+    ProductEntity(
         id = id ?: code.orEmpty(),
         code = code.orEmpty(),
         description = description.orEmpty(),
@@ -89,12 +101,11 @@ fun ProductDto.toEntity(): ProductEntity {
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
-        prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices()
+        prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices(),
     )
-}
 
-fun ProductEntity.toDomain(): Product {
-    return Product(
+fun ProductEntity.toDomain(): Product =
+    Product(
         id = id,
         code = code,
         description = description,
@@ -110,52 +121,31 @@ fun ProductEntity.toDomain(): Product {
         bulkQuantity = bulkQuantity.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.ifBlank { "UNIDAD" },
-        prices = prices.ifEmpty { generateDefaultPrices() }
+        prices = prices.ifEmpty { generateDefaultPrices() },
     )
-}
 
-fun CountryDto.toEntity(): CountryEntity {
-    return CountryEntity(id = id, iso = iso, name = name)
-}
+fun CountryDto.toEntity(): CountryEntity = CountryEntity(id = id, iso = iso, name = name)
 
-fun AddressLevelDto.toLevel1Entity(): AddressLevel1Entity {
-    return AddressLevel1Entity(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevelDto.toLevel1Entity(): AddressLevel1Entity = AddressLevel1Entity(countryCode = countryCode, code = code, name = name)
 
-fun AddressLevelDto.toLevel2Entity(): AddressLevel2Entity {
-    return AddressLevel2Entity(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevelDto.toLevel2Entity(): AddressLevel2Entity = AddressLevel2Entity(countryCode = countryCode, code = code, name = name)
 
-fun AddressLevelDto.toLevel3Entity(): AddressLevel3Entity {
-    return AddressLevel3Entity(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevelDto.toLevel3Entity(): AddressLevel3Entity = AddressLevel3Entity(countryCode = countryCode, code = code, name = name)
 
-fun CountryEntity.toDomain(): Country {
-    return Country(id = id, iso = iso, name = name)
-}
+fun CountryEntity.toDomain(): Country = Country(id = id, iso = iso, name = name)
 
-fun AddressLevel1Entity.toDomain(): AddressLevel {
-    return AddressLevel(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevel1Entity.toDomain(): AddressLevel = AddressLevel(countryCode = countryCode, code = code, name = name)
 
-fun AddressLevel2Entity.toDomain(): AddressLevel {
-    return AddressLevel(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevel2Entity.toDomain(): AddressLevel = AddressLevel(countryCode = countryCode, code = code, name = name)
 
-fun AddressLevel3Entity.toDomain(): AddressLevel {
-    return AddressLevel(countryCode = countryCode, code = code, name = name)
-}
+fun AddressLevel3Entity.toDomain(): AddressLevel = AddressLevel(countryCode = countryCode, code = code, name = name)
 
-fun ClientTypeDto.toEntity(): ClientTypeEntity {
-    return ClientTypeEntity(id = id, name = name)
-}
+fun ClientTypeDto.toEntity(): ClientTypeEntity = ClientTypeEntity(id = id, name = name)
 
-fun ClientTypeEntity.toDomain(): ClientTypeOption {
-    return ClientTypeOption(id = id, name = name)
-}
+fun ClientTypeEntity.toDomain(): ClientTypeOption = ClientTypeOption(id = id, name = name)
 
-fun PromocionDto.toEntity(): PromocionEntity {
-    return PromocionEntity(
+fun PromocionDto.toEntity(): PromocionEntity =
+    PromocionEntity(
         id = id,
         codigo = codigo,
         inicio = inicio,
@@ -164,12 +154,11 @@ fun PromocionDto.toEntity(): PromocionEntity {
         imagen = imagen,
         descuentoGlobal = descuentoGlobal,
         idItem = idItem,
-        activo = activo
+        activo = activo,
     )
-}
 
-fun PromocionDetalleDto.toEntity(promocionId: String): PromocionDetalleEntity {
-    return PromocionDetalleEntity(
+fun PromocionDetalleDto.toEntity(promocionId: String): PromocionDetalleEntity =
+    PromocionDetalleEntity(
         id = idPromocionDetalle.ifBlank { "$promocionId-$idItem-$grupo" },
         promocionId = promocionId,
         idItem = idItem,
@@ -183,6 +172,5 @@ fun PromocionDetalleDto.toEntity(promocionId: String): PromocionDetalleEntity {
         impuesto = impuesto,
         impuestoPorcentaje = resolvedTaxPercent,
         importe = importe,
-        grupo = grupo
+        grupo = grupo,
     )
-}

@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Amaxonia POS</string>
+    <string name="brand_name">Amaxonia ERP</string>
+    <string name="brand_receipt_name">AMAXONIA POS</string>
+    <string name="brand_logo_description">Amaxonia</string>
+    <string name="brand_welcome_tagline">Tu punto de venta inteligente</string>
+    <string name="brand_welcome_message">Inventario, facturación y reportes\nen la palma de tu mano.</string>
+    <string name="brand_website_label">Visitar amaxoniaerp.com</string>
+    <string name="brand_website_url">https://amaxoniaerp.com</string>
+    <string name="brand_support_label">Escribir por WhatsApp</string>
+    <string name="brand_support_url">https://wa.me/50764188582</string>
+    <string name="brand_print_test_message">Prueba de impresión SUNMI\nAmaxonia POS</string>
+</resources>

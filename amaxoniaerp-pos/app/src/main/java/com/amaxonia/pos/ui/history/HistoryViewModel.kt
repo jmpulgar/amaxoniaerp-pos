@@ -2,8 +2,8 @@ package com.amaxonia.pos.ui.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.data.repository.ApiTransactionRepository
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HistoryViewModel(
-    private val transactionRepository: ApiTransactionRepository
+    private val transactionRepository: InvoiceHistoryRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(HistoryState())
     val state: StateFlow<HistoryState> = _state.asStateFlow()
@@ -33,7 +33,7 @@ class HistoryViewModel(
                         it.copy(
                             isLoading = false,
                             transactions = transactions,
-                            error = null
+                            error = null,
                         )
                     }
                 },
@@ -41,10 +41,10 @@ class HistoryViewModel(
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = exception.message ?: "Error al cargar transacciones"
+                            error = exception.message ?: "Error al cargar transacciones",
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -56,17 +56,17 @@ class HistoryViewModel(
                 showDetalleSheet = true,
                 isLoadingDetalle = true,
                 detalleItems = emptyList(),
-                detalleError = null
+                detalleError = null,
             )
         }
         viewModelScope.launch {
-            transactionRepository.getFacturaDetalle(transaction.id).fold(
+            transactionRepository.getInvoiceDetail(transaction.id).fold(
                 onSuccess = { response ->
                     _state.update {
                         it.copy(
                             isLoadingDetalle = false,
                             detalleItems = response.items,
-                            detalleError = null
+                            detalleError = null,
                         )
                     }
                 },
@@ -74,10 +74,10 @@ class HistoryViewModel(
                     _state.update {
                         it.copy(
                             isLoadingDetalle = false,
-                            detalleError = exception.message ?: "Error al cargar detalle"
+                            detalleError = exception.message ?: "Error al cargar detalle",
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -88,7 +88,7 @@ class HistoryViewModel(
                 showDetalleSheet = false,
                 selectedTransaction = null,
                 detalleItems = emptyList(),
-                detalleError = null
+                detalleError = null,
             )
         }
     }

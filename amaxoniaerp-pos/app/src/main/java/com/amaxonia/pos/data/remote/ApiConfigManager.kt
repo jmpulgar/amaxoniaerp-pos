@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * Gestiona la URL base de la API (única para todos los países) y el país seleccionado (VE/PA).
  */
 class ApiConfigManager {
-
     private val _currentCountry = MutableStateFlow<ServerCountry?>(null)
     val currentCountry: StateFlow<ServerCountry?> = _currentCountry.asStateFlow()
 
@@ -24,11 +23,10 @@ class ApiConfigManager {
         @Volatile
         private var instance: ApiConfigManager? = null
 
-        fun getInstance(): ApiConfigManager {
-            return instance ?: synchronized(this) {
+        fun getInstance(): ApiConfigManager =
+            instance ?: synchronized(this) {
                 instance ?: ApiConfigManager().also { instance = it }
             }
-        }
     }
 
     /**
@@ -37,7 +35,7 @@ class ApiConfigManager {
      */
     fun updateBaseUrl(country: ServerCountry) {
         _currentCountry.value = country
-        _baseUrl.value = country.baseUrl
+        _baseUrl.value = country.baseUrl.takeIf { it.isNotBlank() } ?: DEFAULT_BASE_URL
     }
 
     /**

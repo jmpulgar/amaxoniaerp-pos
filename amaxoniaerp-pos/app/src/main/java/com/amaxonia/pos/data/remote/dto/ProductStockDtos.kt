@@ -19,5 +19,5 @@ data class ProductWarehouseStockDto(
 data class ProductStockResponseDto(
     val itemId: Int,
     val stockTotalDisponible: Double,
-    val almacenes: List<ProductWarehouseStockDto>
+    val almacenes: List<ProductWarehouseStockDto>,
 )

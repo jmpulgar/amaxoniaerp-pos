@@ -10,10 +10,40 @@ import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceListRespo
 import com.amaxonia.pos.domain.model.creditnote.CreditNotesListResponseDto
 
 interface CreditNoteApi {
-    suspend fun getCreditNotes(authHeader: String, companyDb: String, search: String? = null): Result<CreditNotesListResponseDto>
-    suspend fun getCreditNoteDetail(authHeader: String, companyDb: String, id: String): Result<CreditNoteDetailDto>
-    suspend fun getSourceInvoices(authHeader: String, companyDb: String, search: String? = null): Result<CreditNoteSourceInvoiceListResponseDto>
-    suspend fun getSourceInvoiceDetail(authHeader: String, companyDb: String, id: String): Result<CreditNoteSourceInvoiceDetailDto>
-    suspend fun createCreditNote(authHeader: String, companyDb: String, payload: CreateCreditNoteRequestDto): Result<CreateCreditNoteResponseDto>
-    suspend fun confirmFiscal(authHeader: String, companyDb: String, id: String, payload: ConfirmCreditNoteFiscalRequestDto): Result<ConfirmCreditNoteFiscalResponseDto>
+    suspend fun getCreditNotes(
+        authHeader: String,
+        companyDb: String,
+        search: String? = null,
+    ): Result<CreditNotesListResponseDto>
+
+    suspend fun getCreditNoteDetail(
+        authHeader: String,
+        companyDb: String,
+        id: String,
+    ): Result<CreditNoteDetailDto>
+
+    suspend fun getSourceInvoices(
+        authHeader: String,
+        companyDb: String,
+        search: String? = null,
+    ): Result<CreditNoteSourceInvoiceListResponseDto>
+
+    suspend fun getSourceInvoiceDetail(
+        authHeader: String,
+        companyDb: String,
+        id: String,
+    ): Result<CreditNoteSourceInvoiceDetailDto>
+
+    suspend fun createCreditNote(
+        authHeader: String,
+        companyDb: String,
+        payload: CreateCreditNoteRequestDto,
+    ): Result<CreateCreditNoteResponseDto>
+
+    suspend fun confirmFiscal(
+        authHeader: String,
+        companyDb: String,
+        id: String,
+        payload: ConfirmCreditNoteFiscalRequestDto,
+    ): Result<ConfirmCreditNoteFiscalResponseDto>
 }

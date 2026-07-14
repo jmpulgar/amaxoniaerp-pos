@@ -29,7 +29,7 @@ data class FacturaSummaryDto(
 @Serializable
 data class FacturasListResponseDto(
     val data: List<FacturaSummaryDto>,
-    val total: Long
+    val total: Long,
 )
 
 /**

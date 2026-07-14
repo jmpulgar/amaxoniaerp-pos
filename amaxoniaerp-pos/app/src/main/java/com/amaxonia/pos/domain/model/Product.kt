@@ -35,7 +35,7 @@ data class Product(
     val bulkQuantity: Double = 1.0,
     val portionUnit: String? = null,
     val unitOrPackage: String = "UNIDAD",
-    val prices: List<PriceLevel> = generateDefaultPrices()
+    val prices: List<PriceLevel> = generateDefaultPrices(),
 ) {
     val canSwitchUnit: Boolean
         get() = bulkQuantity > 1.0
@@ -53,11 +53,10 @@ data class PriceLevel(
     val pricePlusTax: Double = 0.0,
     val unitPrice: Double = 0.0,
     val unitPricePlusTax: Double = 0.0,
-    val discountPercent: Double = 0.0
+    val discountPercent: Double = 0.0,
 )
 
-fun generateDefaultPrices(): List<PriceLevel> {
-    return listOf("A", "B", "C", "D", "E").map {
+fun generateDefaultPrices(): List<PriceLevel> =
+    listOf("A", "B", "C", "D", "E").map {
         PriceLevel(label = it)
     }
-}

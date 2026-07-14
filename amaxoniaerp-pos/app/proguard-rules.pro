@@ -1,21 +1,16 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Required for libraries that inspect annotations at runtime (Ktor and serialization metadata).
+-keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations,AnnotationDefault,InnerClasses,EnclosingMethod
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# WorkManager instantiates workers by class name. Keep names, while allowing member optimization.
+-keepnames class * extends androidx.work.ListenableWorker
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Closed-source fiscal/printer SDKs are invoked through vendor APIs and may use reflection/JNI.
+-keep class com.thefactoryhka.hkacryptolib.** { *; }
+-keep class com.sunmi.peripheral.printer.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# SLF4J supports an optional runtime binding; the app intentionally ships without one.
+-dontwarn org.slf4j.impl.StaticLoggerBinder
+
+# Keep source/line metadata for actionable obfuscated production traces.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

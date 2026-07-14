@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Banesco POS</string>
+    <string name="brand_name">Banesco POS</string>
+    <string name="brand_receipt_name">BANESCO POS</string>
+    <string name="brand_logo_description">Banesco POS</string>
+    <string name="brand_welcome_tagline">Tu punto de venta inteligente</string>
+    <string name="brand_welcome_message">Inventario, facturación y reportes\nen la palma de tu mano.</string>
+    <string name="brand_website_label">Visitar Banesco</string>
+    <string name="brand_website_url">https://www.banesco.com/</string>
+    <string name="brand_support_label">Visitar Banesco</string>
+    <string name="brand_support_url">https://www.banesco.com/</string>
+    <string name="brand_print_test_message">Prueba de impresión SUNMI\nBanesco POS</string>
+</resources>

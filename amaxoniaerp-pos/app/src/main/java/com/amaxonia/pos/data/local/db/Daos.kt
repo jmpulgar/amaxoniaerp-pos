@@ -14,7 +14,10 @@ interface ClientDao {
     suspend fun getById(id: String): ClientEntity?
 
     @Query("SELECT * FROM clients ORDER BY name, lastName LIMIT :limit OFFSET :offset")
-    suspend fun getPaged(limit: Int, offset: Int): List<ClientEntity>
+    suspend fun getPaged(
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
 
     @Query(
         "SELECT * FROM clients " +
@@ -23,9 +26,13 @@ interface ClientDao {
             "OR identification LIKE :query COLLATE NOCASE " +
             "OR phone LIKE :query COLLATE NOCASE " +
             "OR email LIKE :query COLLATE NOCASE " +
-            "ORDER BY name, lastName LIMIT :limit OFFSET :offset"
+            "ORDER BY name, lastName LIMIT :limit OFFSET :offset",
     )
-    suspend fun searchPaged(query: String, limit: Int, offset: Int): List<ClientEntity>
+    suspend fun searchPaged(
+        query: String,
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
 }
 
 @Dao
@@ -52,10 +59,17 @@ interface ProductDao {
     suspend fun getById(id: String): ProductEntity?
 
     @Query("SELECT * FROM products ORDER BY description LIMIT :limit OFFSET :offset")
-    suspend fun getPaged(limit: Int, offset: Int): List<ProductEntity>
+    suspend fun getPaged(
+        limit: Int,
+        offset: Int,
+    ): List<ProductEntity>
 
     @Query("SELECT * FROM products WHERE department = :departmentId ORDER BY description LIMIT :limit OFFSET :offset")
-    suspend fun getPagedByDepartment(departmentId: Int, limit: Int, offset: Int): List<ProductEntity>
+    suspend fun getPagedByDepartment(
+        departmentId: Int,
+        limit: Int,
+        offset: Int,
+    ): List<ProductEntity>
 
     @Query(
         "SELECT * FROM products " +
@@ -65,9 +79,13 @@ interface ProductDao {
             "OR barcode1 LIKE :query COLLATE NOCASE " +
             "OR barcode2 LIKE :query COLLATE NOCASE " +
             "OR barcode3 LIKE :query COLLATE NOCASE " +
-            "ORDER BY description LIMIT :limit OFFSET :offset"
+            "ORDER BY description LIMIT :limit OFFSET :offset",
     )
-    suspend fun searchPaged(query: String, limit: Int, offset: Int): List<ProductEntity>
+    suspend fun searchPaged(
+        query: String,
+        limit: Int,
+        offset: Int,
+    ): List<ProductEntity>
 
     @Query(
         "SELECT * FROM products " +
@@ -78,9 +96,14 @@ interface ProductDao {
             "OR barcode1 LIKE :query COLLATE NOCASE " +
             "OR barcode2 LIKE :query COLLATE NOCASE " +
             "OR barcode3 LIKE :query COLLATE NOCASE) " +
-            "ORDER BY description LIMIT :limit OFFSET :offset"
+            "ORDER BY description LIMIT :limit OFFSET :offset",
     )
-    suspend fun searchPagedByDepartment(query: String, departmentId: Int, limit: Int, offset: Int): List<ProductEntity>
+    suspend fun searchPagedByDepartment(
+        query: String,
+        departmentId: Int,
+        limit: Int,
+        offset: Int,
+    ): List<ProductEntity>
 }
 
 @Dao
@@ -109,9 +132,12 @@ interface AddressLevel2Dao {
     @Query(
         "SELECT * FROM address_level2 " +
             "WHERE countryCode = :countryCode AND code LIKE :level1Code || '%' " +
-            "ORDER BY code"
+            "ORDER BY code",
     )
-    suspend fun getByLevel1(countryCode: String, level1Code: String): List<AddressLevel2Entity>
+    suspend fun getByLevel1(
+        countryCode: String,
+        level1Code: String,
+    ): List<AddressLevel2Entity>
 }
 
 @Dao
@@ -122,9 +148,12 @@ interface AddressLevel3Dao {
     @Query(
         "SELECT * FROM address_level3 " +
             "WHERE countryCode = :countryCode AND code LIKE :level2Code || '%' " +
-            "ORDER BY code"
+            "ORDER BY code",
     )
-    suspend fun getByLevel2(countryCode: String, level2Code: String): List<AddressLevel3Entity>
+    suspend fun getByLevel2(
+        countryCode: String,
+        level2Code: String,
+    ): List<AddressLevel3Entity>
 }
 
 @Dao

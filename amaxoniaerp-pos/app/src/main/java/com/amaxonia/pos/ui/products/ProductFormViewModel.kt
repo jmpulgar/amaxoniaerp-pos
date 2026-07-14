@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
-import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ProductFormViewModel(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProductFormState())
     val state: StateFlow<ProductFormState> = _state.asStateFlow()
@@ -32,7 +31,7 @@ class ProductFormViewModel(
                                 isLoading = false,
                                 isEditMode = true,
                                 product = product,
-                                error = null
+                                error = null,
                             )
                         }
                         loadCatalogsForProduct(product)
@@ -41,10 +40,10 @@ class ProductFormViewModel(
                         _state.update {
                             it.copy(
                                 isLoading = false,
-                                error = exception.message ?: "Error al cargar el producto"
+                                error = exception.message ?: "Error al cargar el producto",
                             )
                         }
-                    }
+                    },
                 )
             }
         }
@@ -57,16 +56,17 @@ class ProductFormViewModel(
     fun onDepartmentChanged(departmentId: Int) {
         _state.update {
             it.copy(
-                product = it.product.copy(
-                    department = departmentId.toString(),
-                    section = "",
-                    family = "",
-                    subFamily = ""
-                ),
+                product =
+                    it.product.copy(
+                        department = departmentId.toString(),
+                        section = "",
+                        family = "",
+                        subFamily = "",
+                    ),
                 sections = emptyList(),
                 families = emptyList(),
                 subFamilies = emptyList(),
-                error = null
+                error = null,
             )
         }
 
@@ -77,7 +77,7 @@ class ProductFormViewModel(
                 },
                 onFailure = { exception ->
                     _state.update { it.copy(error = exception.message ?: "Error al cargar secciones") }
-                }
+                },
             )
         }
     }
@@ -85,14 +85,15 @@ class ProductFormViewModel(
     fun onSectionChanged(sectionId: Int) {
         _state.update {
             it.copy(
-                product = it.product.copy(
-                    section = sectionId.toString(),
-                    family = "",
-                    subFamily = ""
-                ),
+                product =
+                    it.product.copy(
+                        section = sectionId.toString(),
+                        family = "",
+                        subFamily = "",
+                    ),
                 families = emptyList(),
                 subFamilies = emptyList(),
-                error = null
+                error = null,
             )
         }
 
@@ -103,7 +104,7 @@ class ProductFormViewModel(
                 },
                 onFailure = { exception ->
                     _state.update { it.copy(error = exception.message ?: "Error al cargar familias") }
-                }
+                },
             )
         }
     }
@@ -111,12 +112,13 @@ class ProductFormViewModel(
     fun onFamilyChanged(familyId: Int) {
         _state.update {
             it.copy(
-                product = it.product.copy(
-                    family = familyId.toString(),
-                    subFamily = ""
-                ),
+                product =
+                    it.product.copy(
+                        family = familyId.toString(),
+                        subFamily = "",
+                    ),
                 subFamilies = emptyList(),
-                error = null
+                error = null,
             )
         }
 
@@ -127,7 +129,7 @@ class ProductFormViewModel(
                 },
                 onFailure = { exception ->
                     _state.update { it.copy(error = exception.message ?: "Error al cargar subfamilias") }
-                }
+                },
             )
         }
     }
@@ -135,12 +137,13 @@ class ProductFormViewModel(
     fun onBrandChanged(brandId: Int) {
         _state.update {
             it.copy(
-                product = it.product.copy(
-                    brand = brandId.toString(),
-                    line = ""
-                ),
+                product =
+                    it.product.copy(
+                        brand = brandId.toString(),
+                        line = "",
+                    ),
                 lines = emptyList(),
-                error = null
+                error = null,
             )
         }
 
@@ -151,7 +154,7 @@ class ProductFormViewModel(
                 },
                 onFailure = { exception ->
                     _state.update { it.copy(error = exception.message ?: "Error al cargar lineas") }
-                }
+                },
             )
         }
     }
@@ -160,28 +163,33 @@ class ProductFormViewModel(
         _state.update {
             it.copy(
                 product = it.product.copy(line = lineId.toString()),
-                error = null
+                error = null,
             )
         }
     }
 
-    fun updatePriceRow(index: Int, block: PriceLevel.() -> PriceLevel) {
+    fun updatePriceRow(
+        index: Int,
+        block: PriceLevel.() -> PriceLevel,
+    ) {
         _state.update { state ->
             val currentProduct = state.product
             val currentPrices = currentProduct.prices.toMutableList()
             var updatedRow = currentPrices[index].block()
             val cost = currentProduct.costActual
             val price = if (cost > 0) cost * (1 + (updatedRow.utilityPercent / 100)) else updatedRow.price
-            val priceWithTax = if (currentProduct.isExempt) {
-                price
-            } else {
-                price * (1 + (currentProduct.taxRate / 100))
-            }
-            updatedRow = updatedRow.copy(
-                price = price,
-                pricePlusUtility = price,
-                pricePlusTax = priceWithTax
-            )
+            val priceWithTax =
+                if (currentProduct.isExempt) {
+                    price
+                } else {
+                    price * (1 + (currentProduct.taxRate / 100))
+                }
+            updatedRow =
+                updatedRow.copy(
+                    price = price,
+                    pricePlusUtility = price,
+                    pricePlusTax = priceWithTax,
+                )
             currentPrices[index] = updatedRow
             state.copy(product = currentProduct.copy(prices = currentPrices), error = null)
         }
@@ -191,23 +199,26 @@ class ProductFormViewModel(
         _state.update { state ->
             val cost = state.product.costActual
             val taxRate = state.product.taxRate
-            val newPrices = state.product.prices.map { row ->
-                val price = if (cost > 0) {
-                    cost * (1 + (row.utilityPercent / 100))
-                } else {
-                    row.price
+            val newPrices =
+                state.product.prices.map { row ->
+                    val price =
+                        if (cost > 0) {
+                            cost * (1 + (row.utilityPercent / 100))
+                        } else {
+                            row.price
+                        }
+                    val priceWithTax =
+                        if (state.product.isExempt) {
+                            price
+                        } else {
+                            price * (1 + (taxRate / 100))
+                        }
+                    row.copy(
+                        price = price,
+                        pricePlusUtility = price,
+                        pricePlusTax = priceWithTax,
+                    )
                 }
-                val priceWithTax = if (state.product.isExempt) {
-                    price
-                } else {
-                    price * (1 + (taxRate / 100))
-                }
-                row.copy(
-                    price = price,
-                    pricePlusUtility = price,
-                    pricePlusTax = priceWithTax
-                )
-            }
             state.copy(product = state.product.copy(prices = newPrices), error = null)
         }
     }
@@ -224,10 +235,10 @@ class ProductFormViewModel(
                     _state.update {
                         it.copy(
                             isSaving = false,
-                            error = exception.message ?: "Error al guardar el producto"
+                            error = exception.message ?: "Error al guardar el producto",
                         )
                     }
-                }
+                },
             )
         }
     }
@@ -254,7 +265,7 @@ class ProductFormViewModel(
                     families = families,
                     subFamilies = subFamilies,
                     brands = brands,
-                    lines = lines
+                    lines = lines,
                 )
             }
         }

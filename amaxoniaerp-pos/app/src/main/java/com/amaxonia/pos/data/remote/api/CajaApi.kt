@@ -11,37 +11,37 @@ import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 interface CajaApi {
     suspend fun getCajas(
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<List<Caja>>
 
     suspend fun checkCajaStatus(
         cajaId: String,
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<CajaStatusResponse>
 
     suspend fun getCajaSecuencia(
         idSecuencia: String,
         verifyFacturasTemporales: Boolean,
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<CajaSecuenciaGetResponse>
 
     suspend fun getNextSecuenciaCodigo(
         idCaja: String,
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<CajaSecuenciaCodigoResponse>
 
     suspend fun openCaja(
         request: AperturaRequest,
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<CajaStatusResponse>
 
     suspend fun closeCaja(
         request: CierreCajaRequest,
         authHeader: String,
-        companyDb: String
+        companyDb: String,
     ): Result<CierreCajaResponse>
 }

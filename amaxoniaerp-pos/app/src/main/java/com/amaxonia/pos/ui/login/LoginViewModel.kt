@@ -2,109 +2,89 @@ package com.amaxonia.pos.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.data.local.LocalStore
-import com.amaxonia.pos.data.remote.ApiConfigManager
-import com.amaxonia.pos.data.remote.UnauthorizedException
-import com.amaxonia.pos.domain.model.ServerCountry
-import com.amaxonia.pos.domain.repository.AuthRepository
-import com.amaxonia.pos.ui.common.DependencyContainer
-import io.ktor.client.network.sockets.SocketTimeoutException
-import java.io.IOException
-import java.net.ConnectException
-import java.net.UnknownHostException
+import com.amaxonia.pos.domain.usecase.auth.AuthenticateUserUseCase
+import com.amaxonia.pos.domain.usecase.auth.ConfigureLoginCountryUseCase
+import com.amaxonia.pos.domain.usecase.auth.LoginCredentials
+import com.amaxonia.pos.domain.usecase.auth.LoginError
+import com.amaxonia.pos.domain.usecase.auth.LoginResult
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class LoginViewModel(
-    private val authRepository: AuthRepository,
-    private val apiConfigManager: ApiConfigManager,
-    private val localStore: LocalStore
+    private val authenticateUser: AuthenticateUserUseCase,
+    private val configureCountry: ConfigureLoginCountryUseCase,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(LoginState())
-    val state: StateFlow<LoginState> = _state.asStateFlow()
+    private val mutableState = MutableStateFlow(LoginState())
+    val state: StateFlow<LoginState> = mutableState.asStateFlow()
 
-    fun onUsernameChange(username: String) {
-        _state.update { it.copy(username = username, errorMessage = null) }
-    }
+    private val mutableEffects = MutableSharedFlow<LoginUiEffect>(extraBufferCapacity = 1)
+    val effects: SharedFlow<LoginUiEffect> = mutableEffects.asSharedFlow()
 
-    fun onPasswordChange(password: String) {
-        _state.update { it.copy(password = password, errorMessage = null) }
-    }
-
-    fun onTogglePasswordVisibility() {
-        _state.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
-    }
-
-    /**
-     * Cambia el país seleccionado y actualiza la URL base de la API
-     */
-    fun onCountryChange(country: ServerCountry) {
-        _state.update { it.copy(selectedCountry = country, errorMessage = null) }
-        apiConfigManager.updateBaseUrl(country)
-        // Recrear el cliente HTTP con la nueva URL base
-        DependencyContainer.apiClient.recreateClient()
-    }
-
-    /**
-     * Carga el país guardado o aplica el por defecto (Venezuela) y sincroniza la URL base.
-     */
-    fun loadSavedCountry() {
-        viewModelScope.launch {
-            val savedCountry = localStore.readSelectedCountry()
-            val countryToUse = savedCountry ?: _state.value.selectedCountry
-            _state.update { it.copy(selectedCountry = countryToUse) }
-            apiConfigManager.updateBaseUrl(countryToUse)
-            DependencyContainer.apiClient.recreateClient()
+    fun onAction(action: LoginUiAction) {
+        when (action) {
+            is LoginUiAction.UsernameChanged ->
+                mutableState.update { it.copy(username = action.value, errorMessage = null) }
+            is LoginUiAction.PasswordChanged ->
+                mutableState.update { it.copy(password = action.value, errorMessage = null) }
+            LoginUiAction.TogglePasswordVisibility ->
+                mutableState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
+            is LoginUiAction.CountryChanged -> {
+                mutableState.update { it.copy(selectedCountry = action.country, errorMessage = null) }
+                configureCountry.select(action.country)
+            }
+            LoginUiAction.LoadSavedCountry -> restoreCountry()
+            LoginUiAction.Submit -> submit()
         }
     }
 
-    fun onLoginClick(onLoginSuccess: () -> Unit) {
+    private fun restoreCountry() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, errorMessage = null) }
-            val username = _state.value.username
-            val password = _state.value.password
-            if (username.isBlank() || password.isBlank()) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "El usuario y la contrasena son obligatorios"
+            val restored = configureCountry.restore(mutableState.value.selectedCountry)
+            mutableState.update { it.copy(selectedCountry = restored) }
+        }
+    }
+
+    private fun submit() {
+        viewModelScope.launch {
+            mutableState.update { it.copy(isLoading = true, errorMessage = null) }
+            val current = mutableState.value
+            when (
+                val result =
+                    authenticateUser(
+                        LoginCredentials(
+                            username = current.username,
+                            password = current.password,
+                            country = current.selectedCountry,
+                        ),
                     )
+            ) {
+                is LoginResult.Success -> {
+                    mutableState.update { it.copy(isLoading = false) }
+                    mutableEffects.emit(LoginUiEffect.LoginSucceeded)
                 }
-                return@launch
-            }
-            authRepository.login(
-                username = username.trim(),
-                password = password,
-                countryCode = _state.value.selectedCountry.code
-            ).fold(
-                onSuccess = {
-                    // Guardar el país seleccionado para futuras sesiones
-                    localStore.saveSelectedCountry(_state.value.selectedCountry)
-                    _state.update { state -> state.copy(isLoading = false) }
-                    onLoginSuccess()
-                },
-                onFailure = { error ->
-                    _state.update {
+                is LoginResult.Failure ->
+                    mutableState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = mapLoginError(error)
+                            errorMessage = result.error.toUserMessage(),
                         )
                     }
-                }
-            )
+            }
         }
     }
-
-    private fun mapLoginError(error: Throwable): String = when (error) {
-        is UnauthorizedException -> "Usuario o contraseña incorrectos"
-        is UnknownHostException,
-        is ConnectException,
-        is SocketTimeoutException,
-        is java.net.SocketTimeoutException,
-        is IOException -> "No se pudo conectar al servidor. Compruebe que el backend esté en ejecución y la URL en ApiConfig."
-        else -> error.message ?: "No se pudo iniciar sesión"
-    }
 }
+
+private fun LoginError.toUserMessage(): String =
+    when (this) {
+        LoginError.MissingCredentials -> "El usuario y la contrasena son obligatorios"
+        LoginError.Unauthorized -> "Usuario o contraseña incorrectos"
+        LoginError.Connectivity ->
+            "No se pudo conectar al servidor. Compruebe que el backend esté en ejecución y la URL en ApiConfig."
+        is LoginError.Unexpected -> message ?: "No se pudo iniciar sesión"
+    }

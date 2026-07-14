@@ -1,7 +1,7 @@
 package com.amaxonia.pos.data.repository
 
-import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.ReportRepository
@@ -15,17 +15,17 @@ class ApiReportRepository(
     private val apiService: ApiService,
     private val localStore: LocalStore,
 ) : ReportRepository {
-
-    private val bestSellerColors = longArrayOf(
-        0xFF1565C0,
-        0xFF2E7D32,
-        0xFFFFA000,
-        0xFFC62828,
-        0xFF6A1B9A,
-        0xFF00838F,
-        0xFF558B2F,
-        0xFFEF6C00
-    )
+    private val bestSellerColors =
+        longArrayOf(
+            0xFF1565C0,
+            0xFF2E7D32,
+            0xFFFFA000,
+            0xFFC62828,
+            0xFF6A1B9A,
+            0xFF00838F,
+            0xFF558B2F,
+            0xFFEF6C00,
+        )
 
     override suspend fun getSummaryStats(): Result<SummaryStats> {
         val token = localStore.readCompanySession()?.token
@@ -47,7 +47,7 @@ class ApiReportRepository(
             )
         }.fold(
             onSuccess = { Result.success(it) },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 
@@ -67,12 +67,12 @@ class ApiReportRepository(
                     salesCount = dto.salesCount,
                     progress = if (maxCount > 0) dto.salesCount / maxCount else 0f,
                     colorHex = bestSellerColors[index % bestSellerColors.size],
-                    photoUrl = dto.photoUrl
+                    photoUrl = dto.photoUrl,
                 )
             }
         }.fold(
             onSuccess = { Result.success(it) },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 }

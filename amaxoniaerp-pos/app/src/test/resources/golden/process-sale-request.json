@@ -1,0 +1,81 @@
+{
+  "idFactura": "offline-id-001",
+  "factura": {
+    "idCliente": "client-1",
+    "codCliente": "C0001",
+    "codVendedor": 7,
+    "idShop": 2,
+    "idSucursal": 2,
+    "idCaja": "caja-1",
+    "codigoCaja": "CJ01",
+    "idCajaSecuencia": "seq-1",
+    "serieSucursal": "A01",
+    "formaPago": "contado",
+    "codEstatus": 2,
+    "subtotal": 10.0,
+    "descuentosItemFactura": 1.0,
+    "ivaTotalFactura": 1.44,
+    "totalTotalFactura": 10.44,
+    "montoItemsFactura": 9.0,
+    "totalizarDescuentoParcial": 1.0,
+    "totalizarBaseImponible": 9.0,
+    "totalizarMontoIva": 1.44,
+    "totalizarTotalGeneral": 10.44,
+    "usuarioCreacion": "POS",
+    "facturarA": "CLIENTE PRUEBA",
+    "facturarARuc": "TEST-ID",
+    "facturarADireccion": "DIRECCION",
+    "facturarATelefono": "0000"
+  },
+  "items": [
+    {
+      "idItem": 42,
+      "cod_vendedor": 7,
+      "_item_almacen": 3,
+      "_item_descripcion": "PRODUCTO",
+      "_item_cantidad": 2.0,
+      "_item_preciosiniva": 5.0,
+      "_item_descuento": 10.0,
+      "_item_montodescuento": 1.0,
+      "_item_piva": 16.0,
+      "_item_totalsiniva": 9.0,
+      "_item_totalconiva": 10.44,
+      "_item_cantidad_total": 2.0,
+      "itemCodigo": "P42",
+      "itemReferencia": "REF42"
+    }
+  ],
+  "impuestos": [
+    {
+      "totalizarBaseRetencion": 9.0,
+      "codImpuestoIva": 1,
+      "totalizarMontoIva2": 1.44
+    }
+  ],
+  "pagoResumen": {
+    "totalizarMontoCancelar": 10.44,
+    "totalizarMontoEfectivo": 20.0,
+    "totalizarCambio": 9.56,
+    "totalizarSaldoPendiente": 0.0,
+    "montosPorTipo": {"CASH": 10.44}
+  },
+  "pagos": [
+    {
+      "idFormaPago": 1,
+      "tipoMovimiento": "CASH",
+      "monto": 10.44,
+      "montoRecibido": 20.0,
+      "efectivoCambio": 9.56
+    }
+  ],
+  "moneda": {
+    "multi_moneda": "NO",
+    "tasa": 1.0,
+    "id_tasa": 0,
+    "moneda_base": 1,
+    "abr_moneda_base": "USD",
+    "moneda_secundaria": 1,
+    "abr_moneda_secundaria": "USD",
+    "total_ref": 10.44
+  }
+}

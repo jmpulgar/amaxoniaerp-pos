@@ -12,10 +12,8 @@ class SunmiV2Printer(
     context: Context,
     private val manager: SunmiPrinterManager = SunmiPrinterManager(context),
 ) : TicketPrinter {
-
-    override suspend fun connect(): PrintResult {
-        return if (manager.bind()) PrintResult.Success else PrintResult.Error("No se pudo conectar con la impresora SUNMI")
-    }
+    override suspend fun connect(): PrintResult =
+        if (manager.bind()) PrintResult.Success else PrintResult.Error("No se pudo conectar con la impresora SUNMI")
 
     override suspend fun disconnect() {
         manager.unbind()
@@ -26,16 +24,15 @@ class SunmiV2Printer(
         return manager.bind()
     }
 
-    override suspend fun printText(text: String): PrintResult {
-        return withService { service ->
+    override suspend fun printText(text: String): PrintResult =
+        withService { service ->
             service.printerInit(null)
             service.printText(text + "\n", null)
             service.lineWrap(2, null)
         }
-    }
 
-    override suspend fun printTicket(ticket: TicketDocument): PrintResult {
-        return withService { service ->
+    override suspend fun printTicket(ticket: TicketDocument): PrintResult =
+        withService { service ->
             service.printerInit(null)
             ticket.elements.forEach { element ->
                 when (element) {
@@ -70,7 +67,6 @@ class SunmiV2Printer(
             }
             service.lineWrap(4, null)
         }
-    }
 
     private suspend fun withService(block: (com.sunmi.peripheral.printer.SunmiPrinterService) -> Unit): PrintResult {
         val connected = manager.bind()
@@ -86,9 +82,10 @@ class SunmiV2Printer(
         }
     }
 
-    private fun TicketAlign.toSunmiAlign(): Int = when (this) {
-        TicketAlign.LEFT -> 0
-        TicketAlign.CENTER -> 1
-        TicketAlign.RIGHT -> 2
-    }
+    private fun TicketAlign.toSunmiAlign(): Int =
+        when (this) {
+            TicketAlign.LEFT -> 0
+            TicketAlign.CENTER -> 1
+            TicketAlign.RIGHT -> 2
+        }
 }

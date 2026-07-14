@@ -1,7 +1,7 @@
 package com.amaxonia.pos.data.printer
 
 import android.content.Context
-import android.util.Log
+import com.amaxonia.pos.core.logging.SafeLog
 import com.thefactoryhka.hkacryptolib.MainFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,8 +16,9 @@ import java.net.Socket
  * - testConnection  → TCPClientTest.testConnection() — plain socket connect, no encryption
  * - checkPrinterStatus → MainController.checkStatus() — sends "05" encrypted, parses PrinterStatus
  */
-class HkaConnectionHelper(context: Context) {
-
+class HkaConnectionHelper(
+    context: Context,
+) {
     private val appContext = context.applicationContext
     private val cryptography by lazy { MainFactory().createInstance(appContext) }
 
@@ -25,28 +26,31 @@ class HkaConnectionHelper(context: Context) {
      * Tests raw TCP connectivity to the HKA device.
      * Matches SDK's TCPClientTest.testConnection() — simple socket connect + latency.
      */
-    suspend fun testConnection(ip: String, port: Int): ConnectionTestResult {
-        return withContext(Dispatchers.IO) {
+    suspend fun testConnection(
+        ip: String,
+        port: Int,
+    ): ConnectionTestResult =
+        withContext(Dispatchers.IO) {
             runCatching {
                 val startTime = System.currentTimeMillis()
                 Socket().use { socket ->
                     socket.connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
                     val latency = System.currentTimeMillis() - startTime
-                    Log.d(TAG, "testConnection() → OK, latencia: ${latency}ms")
+                    SafeLog.d(TAG, "Fiscal printer connection succeeded")
                     ConnectionTestResult(success = true, latencyMs = latency)
                 }
             }.getOrElse { e ->
-                Log.e(TAG, "testConnection() → falló: ${e.message}")
+                SafeLog.e(TAG, "Fiscal printer connection failed", e)
                 ConnectionTestResult(
                     success = false,
-                    errorMessage = when (e) {
-                        is java.net.SocketTimeoutException -> "Timeout: No se pudo conectar a $ip:$port"
-                        else -> e.message ?: "Error de conexión desconocido"
-                    }
+                    errorMessage =
+                        when (e) {
+                            is java.net.SocketTimeoutException -> "Timeout: No se pudo conectar a $ip:$port"
+                            else -> e.message ?: "Error de conexión desconocido"
+                        },
                 )
             }
         }
-    }
 
     /**
      * Checks the printer status by sending command "05" encrypted.
@@ -57,8 +61,11 @@ class HkaConnectionHelper(context: Context) {
      *   3. getResponse() — reads response with byte-stripping
      *   4. PrinterStatus(bytes[0], bytes[1]) — parses status/error codes
      */
-    suspend fun checkPrinterStatus(ip: String, port: Int): PrinterStatusResult {
-        return withContext(Dispatchers.IO) {
+    suspend fun checkPrinterStatus(
+        ip: String,
+        port: Int,
+    ): PrinterStatusResult =
+        withContext(Dispatchers.IO) {
             runCatching {
                 Socket().use { socket ->
                     socket.soTimeout = SOCKET_TIMEOUT_MS
@@ -67,48 +74,44 @@ class HkaConnectionHelper(context: Context) {
                     // Encrypt and send "05" — matches SDK's checkStatus()
                     val encrypted = cryptography.encryptString("05")
                     if (encrypted.isError) {
-                        throw IllegalStateException(encrypted.message ?: "Error de cifrado")
+                        error(encrypted.message ?: "Error de cifrado")
                     }
-                    val bytes = encrypted.bytes
-                        ?: throw IllegalStateException("Cifrado devolvió bytes nulos")
+                    val bytes =
+                        encrypted.bytes
+                            ?: error("Cifrado devolvió bytes nulos")
 
                     socket.getOutputStream().apply {
                         write(bytes)
                         flush()
                     }
-                    Log.d(TAG, "checkPrinterStatus() → comando '05' enviado (${bytes.size} bytes cifrados)")
+                    SafeLog.d(TAG, "Encrypted fiscal status request sent")
 
                     // Read response with byte-stripping (matches SDK getResponse())
                     val response = readResponseWithStripping(socket)
-                    Log.d(
-                        TAG,
-                        "checkPrinterStatus() → respuesta: ${response.size} bytes, hex: ${
-                            response.take(8).joinToString(" ") { "%02X".format(it) }
-                        }"
-                    )
+                    SafeLog.d(TAG, "Fiscal status response received")
 
                     if (response.isEmpty()) {
-                        throw IllegalStateException("La impresora no respondió")
+                        error("La impresora no respondió")
                     }
 
                     if (response[0].toInt() and 0xFF == NAK) {
-                        throw IllegalStateException("La impresora respondió con NAK (error)")
+                        error("La impresora respondió con NAK (error)")
                     }
 
                     parseStatus(response)
                 }
             }.getOrElse { e ->
-                Log.e(TAG, "checkPrinterStatus() → falló: ${e.message}")
+                SafeLog.e(TAG, "Fiscal printer status request failed", e)
                 PrinterStatusResult(
                     success = false,
-                    errorMessage = when (e) {
-                        is java.net.SocketTimeoutException -> "Timeout: La impresora no respondió"
-                        else -> e.message ?: "Error desconocido al consultar estado"
-                    }
+                    errorMessage =
+                        when (e) {
+                            is java.net.SocketTimeoutException -> "Timeout: La impresora no respondió"
+                            else -> e.message ?: "Error desconocido al consultar estado"
+                        },
                 )
             }
         }
-    }
 
     /**
      * Reads response with byte-stripping, matching SDK's ResponseSocket.getResponse().
@@ -156,37 +159,39 @@ class HkaConnectionHelper(context: Context) {
         val statusHex = Integer.toHexString(statusByte)
         val errorHex = Integer.toHexString(errorByte)
 
-        val statusDescription = when (statusHex) {
-            "40" -> "Modo Entrenamiento, en Espera"
-            "41" -> "Modo Entrenamiento, en Transacción Fiscal"
-            "42" -> "Modo Entrenamiento, en Transacción No Fiscal"
-            "60" -> "Modo Fiscal, en Espera"
-            "68" -> "Modo Fiscal, MF llena, en Espera"
-            "61" -> "Modo Fiscal, en Transacción Fiscal"
-            "69" -> "Modo Fiscal, MF llena, en Transacción Fiscal"
-            "62" -> "Modo Fiscal, en Transacción No Fiscal"
-            "6a" -> "Modo Fiscal, MF llena, en Transacción No Fiscal"
-            else -> "Estado desconocido (0x$statusHex)"
-        }
+        val statusDescription =
+            when (statusHex) {
+                "40" -> "Modo Entrenamiento, en Espera"
+                "41" -> "Modo Entrenamiento, en Transacción Fiscal"
+                "42" -> "Modo Entrenamiento, en Transacción No Fiscal"
+                "60" -> "Modo Fiscal, en Espera"
+                "68" -> "Modo Fiscal, MF llena, en Espera"
+                "61" -> "Modo Fiscal, en Transacción Fiscal"
+                "69" -> "Modo Fiscal, MF llena, en Transacción Fiscal"
+                "62" -> "Modo Fiscal, en Transacción No Fiscal"
+                "6a" -> "Modo Fiscal, MF llena, en Transacción No Fiscal"
+                else -> "Estado desconocido (0x$statusHex)"
+            }
 
-        val errorDescription = when (errorHex) {
-            "40" -> "Ningún error"
-            "48" -> "Error gaveta"
-            "41" -> "Sin papel"
-            "42" -> "Error mecánico / papel"
-            "43" -> "Error mecánico y fin de papel"
-            "60" -> "Error fiscal"
-            "64" -> "Error en memoria fiscal"
-            "6c" -> "Memoria fiscal llena"
-            else -> "Error desconocido (0x$errorHex)"
-        }
+        val errorDescription =
+            when (errorHex) {
+                "40" -> "Ningún error"
+                "48" -> "Error gaveta"
+                "41" -> "Sin papel"
+                "42" -> "Error mecánico / papel"
+                "43" -> "Error mecánico y fin de papel"
+                "60" -> "Error fiscal"
+                "64" -> "Error en memoria fiscal"
+                "6c" -> "Memoria fiscal llena"
+                else -> "Error desconocido (0x$errorHex)"
+            }
 
-        Log.d(TAG, "parseStatus() → estado: $statusDescription | error: $errorDescription")
+        SafeLog.d(TAG, "Fiscal printer status parsed")
 
         return PrinterStatusResult(
             success = true,
             statusDescription = statusDescription,
-            errorDescription = errorDescription
+            errorDescription = errorDescription,
         )
     }
 
@@ -202,12 +207,12 @@ class HkaConnectionHelper(context: Context) {
 data class ConnectionTestResult(
     val success: Boolean,
     val latencyMs: Long = 0,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 data class PrinterStatusResult(
     val success: Boolean,
     val statusDescription: String = "",
     val errorDescription: String = "",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )

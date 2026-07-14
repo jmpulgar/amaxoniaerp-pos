@@ -2,28 +2,24 @@ package com.amaxonia.pos.ui.cart
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.data.local.db.ClientSucursalEntity
-import com.amaxonia.pos.data.local.db.DraftInvoiceDao
-import com.amaxonia.pos.data.local.db.DraftInvoiceEntity
-import com.amaxonia.pos.data.repository.getForClient
-import com.amaxonia.pos.data.repository.CartRepository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.seller.Seller
-import com.amaxonia.pos.domain.repository.ClientRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import java.util.UUID
 
 data class CartState(
     val items: List<CartItem> = emptyList(),
     val displayItems: List<ItemCarrito> = emptyList(),
     val total: Double = 0.0,
     val selectedClient: Client? = null,
+    val selectedClientPhotoUrl: String = "",
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
     val orderSuccessMessage: String? = null,
@@ -33,334 +29,116 @@ data class CartState(
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
     val isPanama: Boolean = false,
-    val clientSucursales: List<ClientSucursalEntity> = emptyList(),
-    val selectedClientSucursal: ClientSucursalEntity? = null,
+    val clientSucursales: List<ClientBranch> = emptyList(),
+    val selectedClientSucursal: ClientBranch? = null,
     val cartActionError: String? = null,
 ) {
     val totalBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", total * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", total * tasa) else ""
+
     val requiresClientSucursal: Boolean
         get() = isPanama && selectedClient != null && clientSucursales.isNotEmpty()
+
     val isMissingRequiredClientSucursal: Boolean
         get() = requiresClientSucursal && selectedClientSucursal == null
 }
 
-class CartViewModel(
-    private val cartRepository: CartRepository,
-    private val clientRepository: ClientRepository,
-    private val localStore: com.amaxonia.pos.data.local.LocalStore,
-    private val apiConfigManager: com.amaxonia.pos.data.remote.ApiConfigManager,
-    private val cajaRepository: com.amaxonia.pos.domain.repository.CajaRepository = com.amaxonia.pos.ui.common.DependencyContainer.cajaRepository,
-    private val clientSucursalDao: com.amaxonia.pos.data.local.db.ClientSucursalDao = com.amaxonia.pos.ui.common.DependencyContainer.clientSucursalDao,
-    private val draftInvoiceDao: DraftInvoiceDao = com.amaxonia.pos.ui.common.DependencyContainer.draftInvoiceDao
-) : ViewModel() {
-    private val _state = MutableStateFlow(CartState())
-    val state: StateFlow<CartState> = _state.asStateFlow()
+sealed interface CartUiAction {
+    data class IncreaseQuantity(
+        val productId: String,
+    ) : CartQuantityUiAction
 
-    @Volatile
-    private var adminDb: String = ""
+    data class DecreaseQuantity(
+        val productId: String,
+    ) : CartQuantityUiAction
+
+    data class UpdateItemQuantity(
+        val productId: String,
+        val quantity: Int,
+    ) : CartQuantityUiAction
+
+    data class RemoveItem(
+        val productId: String,
+    ) : CartRemovalUiAction
+
+    data class RemovePromotion(
+        val promotionId: String,
+    ) : CartRemovalUiAction
+
+    data class UpdatePromotionQuantity(
+        val promotionId: String,
+        val times: Int,
+    ) : CartRemovalUiAction
+
+    data class UpdateItemPrice(
+        val productId: String,
+        val unitPriceWithTax: Double,
+    ) : CartEditableUiAction
+
+    data class UpdateItemDiscount(
+        val productId: String,
+        val discountPercent: Double,
+    ) : CartEditableUiAction
+
+    data class UpdateItemUnit(
+        val productId: String,
+        val unit: String,
+    ) : CartQuantityUiAction
+
+    data class SelectClientBranch(
+        val branchId: Int,
+    ) : CartContextUiAction
+
+    data class SelectSeller(
+        val sellerId: Int,
+    ) : CartContextUiAction
+
+    data object ClearCart : CartContextUiAction
+
+    data object RemoveClient : CartContextUiAction
+
+    data object SaveDraft : CartUiAction
+
+    data object ClearMessage : CartUiAction
+
+    data object ClearActionError : CartUiAction
+
+    data object Checkout : CartUiAction
+}
+
+sealed interface CartItemUiAction : CartUiAction
+
+sealed interface CartQuantityUiAction : CartItemUiAction
+
+sealed interface CartRemovalUiAction : CartItemUiAction
+
+sealed interface CartEditableUiAction : CartItemUiAction
+
+sealed interface CartContextUiAction : CartUiAction
+
+sealed interface CartUiEffect {
+    data class Checkout(
+        val total: Double,
+    ) : CartUiEffect
+}
+
+class CartViewModel(
+    private val stateCoordinator: CartStateCoordinator,
+    private val configurationCoordinator: CartConfigurationCoordinator,
+    private val actionHandler: CartActionHandler,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(CartState())
+    val state: StateFlow<CartState> = mutableState.asStateFlow()
+
+    private val mutableEffects = MutableSharedFlow<CartUiEffect>(extraBufferCapacity = 1)
+    val effects: SharedFlow<CartUiEffect> = mutableEffects.asSharedFlow()
 
     init {
-        viewModelScope.launch {
-            adminDb = localStore.readCompanySession()?.company?.adminDb ?: ""
-        }
-        viewModelScope.launch {
-            val isPanama = localStore.readSelectedCountry()?.code.equals("PA", ignoreCase = true)
-            _state.update { it.copy(isPanama = isPanama) }
-        }
-        viewModelScope.launch {
-            cartRepository.cartItems.collect { items ->
-                updateState(items, cartRepository.selectedClient.value)
-            }
-        }
-        viewModelScope.launch {
-            cartRepository.selectedClient.collect { client ->
-                updateState(cartRepository.cartItems.value, client)
-                loadClientSucursales(client)
-            }
-        }
-        viewModelScope.launch {
-            cartRepository.clientSucursales.collect { sucursales ->
-                _state.update {
-                    it.copy(
-                        clientSucursales = sucursales,
-                        cartActionError = if (sucursales.isEmpty()) null else it.cartActionError
-                    )
-                }
-            }
-        }
-        viewModelScope.launch {
-            cartRepository.selectedClientSucursal.collect { sucursal ->
-                _state.update {
-                    it.copy(
-                        selectedClientSucursal = sucursal,
-                        cartActionError = if (sucursal != null) null else it.cartActionError
-                    )
-                }
-            }
-        }
-        viewModelScope.launch {
-            cartRepository.currentSeller.collect { seller ->
-                _state.update { it.copy(currentSeller = seller) }
-            }
-        }
-        viewModelScope.launch {
-            cartRepository.availableSellers.collect { sellers ->
-                _state.update { it.copy(availableSellers = sellers) }
-            }
-        }
-        viewModelScope.launch {
-            localStore.allowEditPricesFlow().collect { enabled ->
-                _state.update { it.copy(allowEditPrices = enabled) }
-            }
-        }
-        viewModelScope.launch {
-            localStore.allowDiscountsFlow().collect { enabled ->
-                _state.update { it.copy(allowDiscounts = enabled) }
-            }
-        }
-        viewModelScope.launch {
-            cajaRepository.activeCaja.collect { caja ->
-                val currencyConfig = caja?.currency
-                val isMultiCurrency = currencyConfig?.multiMoneda.equals("SI", ignoreCase = true)
-                val rate = if (isMultiCurrency) {
-                    currencyConfig?.tasa?.takeIf { it > 0.0 } ?: 0.0
-                } else {
-                    0.0
-                }
-                _state.update {
-                    it.copy(
-                        tasa = rate,
-                        abrMonedaSecundaria = if (isMultiCurrency) currencyConfig?.abrMonedaSecundaria ?: "" else "",
-                        isMultiCurrency = isMultiCurrency
-                    )
-                }
-            }
-        }
-        ensureDefaultClient()
+        stateCoordinator.start(viewModelScope, mutableState)
+        configurationCoordinator.start(viewModelScope, mutableState)
     }
 
-    private fun updateState(items: List<CartItem>, client: Client?) {
-        _state.update {
-            it.copy(
-                items = items,
-                displayItems = cartRepository.getDisplayItems(),
-                total = items.sumOf { item -> item.total },
-                selectedClient = client,
-                cartActionError = if (client == null) null else it.cartActionError
-            )
-        }
-    }
-
-    private suspend fun loadClientSucursales(client: Client?) {
-        val isPanama = localStore.readSelectedCountry()?.code.equals("PA", ignoreCase = true)
-        _state.update { it.copy(isPanama = isPanama) }
-        if (!isPanama || client == null) {
-            cartRepository.setClientSucursales(emptyList())
-            return
-        }
-        val sucursales = clientSucursalDao.getForClient(client)
-        cartRepository.setClientSucursales(sucursales)
-    }
-
-    fun increaseQuantity(productId: String) {
-        cartRepository.increaseQuantity(productId)
-        refreshLotsIfNeeded(productId)
-    }
-
-    fun decreaseQuantity(productId: String) {
-        cartRepository.decreaseQuantity(productId)
-        refreshLotsIfNeeded(productId)
-    }
-
-    fun updateItemQuantity(productId: String, quantity: Int) {
-        cartRepository.updateItemQuantity(productId, quantity)
-        refreshLotsIfNeeded(productId)
-    }
-
-    fun removeItem(productId: String) = cartRepository.removeItem(productId)
-
-    fun removePromotion(promotionId: String) = cartRepository.removePromotion(promotionId)
-
-    fun updatePromotionQuantity(promotionId: String, times: Int) {
-        cartRepository.updatePromotionQuantity(promotionId, times)
-    }
-
-    /** Recalcula lotes FEFO cuando cambia la cantidad */
-    private fun refreshLotsIfNeeded(productId: String) {
-        val item = cartRepository.cartItems.value.firstOrNull { it.product.id == productId } ?: return
-        if (!item.hasLotConfig) return
-
-        viewModelScope.launch {
-            val session = localStore.readCompanySession() ?: return@launch
-            val apiService = com.amaxonia.pos.ui.common.DependencyContainer.apiService
-            runCatching {
-                val response = apiService.getItemLots(session.token, productId)
-                if (response.poseeConfiguracionLote && response.lotes.isNotEmpty()) {
-                    val currentItem = cartRepository.cartItems.value.firstOrNull { it.product.id == productId }
-                    val totalQty = currentItem?.quantityTotal?.toInt() ?: 0
-                    if (totalQty > 0) {
-                        val assignments = assignFefo(response.lotes, totalQty)
-                        cartRepository.assignLots(productId, assignments)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun assignFefo(
-        lots: List<com.amaxonia.pos.data.remote.dto.ItemLotInfoDto>,
-        totalQty: Int
-    ): List<com.amaxonia.pos.domain.model.LotAssignment> {
-        val assignments = mutableListOf<com.amaxonia.pos.domain.model.LotAssignment>()
-        var remaining = totalQty
-        for (lot in lots) {
-            if (remaining <= 0) break
-            val take = minOf(remaining, lot.disponibilidad)
-            if (take > 0) {
-                assignments.add(
-                    com.amaxonia.pos.domain.model.LotAssignment(
-                        idLoteItem = lot.idLoteItem.toString(),
-                        codigoLote = lot.codigoLoteItem,
-                        vencimiento = lot.vencimiento,
-                        cantidad = take,
-                        almacen = lot.idAlmacen
-                    )
-                )
-                remaining -= take
-            }
-        }
-        return assignments
-    }
-
-    fun updateItemPrice(productId: String, unitPriceWithTax: Double) {
-        if (!_state.value.allowEditPrices) return
-        cartRepository.updateItemPrice(productId, unitPriceWithTax)
-    }
-
-    fun updateItemDiscount(productId: String, discountPercent: Double) {
-        if (!_state.value.allowDiscounts) return
-        cartRepository.updateItemDiscount(productId, discountPercent)
-    }
-
-    fun updateItemUnit(productId: String, unit: String) {
-        cartRepository.updateItemUnit(productId, unit)
-        refreshLotsIfNeeded(productId)
-    }
-
-    fun clearCart() {
-        cartRepository.clearCart()
-    }
-
-    fun removeClient() {
-        cartRepository.removeClient()
-    }
-
-    fun selectClientSucursal(sucursalId: Int) {
-        val sucursal = _state.value.clientSucursales.firstOrNull { it.sucursalId == sucursalId }
-        cartRepository.setClientSucursal(sucursal)
-        _state.update { it.copy(cartActionError = null) }
-    }
-
-    fun selectSeller(sellerId: Int) {
-        val seller = cartRepository.availableSellers.value.firstOrNull { it.id == sellerId } ?: return
-        cartRepository.setCurrentSeller(seller)
-    }
-
-    fun validateBeforeCheckout(): Boolean {
-        return validateClientSucursal("Selecciona la sucursal del cliente antes de cobrar.")
-    }
-
-    /** Guarda el carrito actual como factura pendiente/borrador local */
-    fun saveDraft() {
-        val items = _state.value.items
-        if (items.isEmpty()) return
-        if (!validateClientSucursal("Selecciona la sucursal del cliente antes de guardar la venta.")) return
-
-        viewModelScope.launch {
-            val client = _state.value.selectedClient
-            val seller = _state.value.currentSeller
-
-            // Serializar items como JSON simplificado
-            val itemsJson = buildDraftItemsJson(items)
-
-            val draft = DraftInvoiceEntity(
-                id = UUID.randomUUID().toString(),
-                clientId = client?.id,
-                clientFirstName = client?.firstName,
-                clientLastName = client?.lastName,
-                sellerId = seller?.id ?: 0,
-                sellerName = seller?.nombre,
-                itemsJson = itemsJson,
-                total = _state.value.total,
-                itemCount = items.sumOf { it.quantity }
-            )
-
-            draftInvoiceDao.insert(draft)
-            cartRepository.clearCart()
-            val clientLabel = if (client != null) "${client.firstName} ${client.lastName}" else "Sin cliente"
-            _state.update { it.copy(orderSuccessMessage = "Borrador guardado para $clientLabel (${items.size} productos)") }
-        }
-    }
-
-    private fun buildDraftItemsJson(items: List<CartItem>): String {
-        val sb = StringBuilder("[")
-        items.forEachIndexed { index, item ->
-            if (index > 0) sb.append(",")
-            sb.append("{")
-            sb.append("\"productId\":\"${item.product.id}\",")
-            sb.append("\"description\":\"${item.product.description.replace("\"", "\\\"")}\",")
-            sb.append("\"quantity\":${item.quantity},")
-            sb.append("\"unitPriceWithTax\":${item.unitPriceWithTax},")
-            sb.append("\"itemUnitPackage\":\"${item.itemUnitPackage}\",")
-            sb.append("\"unitPackage\":\"${item.product.unitPackage.replace("\"", "\\\"")}\",")
-            sb.append("\"bulkQuantity\":${item.product.bulkQuantity},")
-            sb.append("\"portionUnit\":\"${item.product.portionUnit.orEmpty()}\",")
-            sb.append("\"discountPercent\":${item.discountPercent},")
-            sb.append("\"codVendedor\":${item.codVendedor},")
-            sb.append("\"taxRate\":${item.product.taxRate},")
-            sb.append("\"isExempt\":${item.product.isExempt},")
-            sb.append("\"code\":\"${item.product.code}\",")
-            sb.append("\"barcode1\":\"${item.product.barcode1}\"")
-            sb.append("}")
-        }
-        sb.append("]")
-        return sb.toString()
-    }
-
-    fun clearMessage() {
-        _state.update { it.copy(orderSuccessMessage = null) }
-    }
-
-    fun clearActionError() {
-        _state.update { it.copy(cartActionError = null) }
-    }
-
-    fun getClientPhotoUrl(client: Client): String {
-        if (client.id.isBlank() || adminDb.isBlank()) return ""
-        val filename = client.photoFilename.takeIf { it.isNotBlank() }
-            ?: return ""
-        return com.amaxonia.pos.data.remote.ImageUrlHelper.clientPhotoUrl(
-            baseUrl = apiConfigManager.baseUrl.value,
-            countryCode = apiConfigManager.getCurrentCountryCode(),
-            companyDb = adminDb,
-            idCliente = client.id,
-            photoFilename = filename
-        )
-    }
-
-    private fun ensureDefaultClient() {
-        if (cartRepository.selectedClient.value != null) return
-        viewModelScope.launch {
-            clientRepository.getDefaultClient()
-                .onSuccess { defaultClient -> cartRepository.setClient(defaultClient) }
-        }
-    }
-
-    private fun validateClientSucursal(message: String): Boolean {
-        val state = _state.value
-        if (!state.isMissingRequiredClientSucursal) return true
-        _state.update { it.copy(cartActionError = message) }
-        return false
+    fun onAction(action: CartUiAction) {
+        actionHandler.onAction(action, viewModelScope, mutableState, mutableEffects)
     }
 }

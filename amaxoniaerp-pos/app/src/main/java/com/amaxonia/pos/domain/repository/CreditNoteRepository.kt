@@ -9,11 +9,26 @@ import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceListResponseDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNotesListResponseDto
 
-interface CreditNoteRepository {
+fun interface CreditNoteFiscalConfirmationRepository {
+    suspend fun confirmFiscal(
+        id: String,
+        payload: ConfirmCreditNoteFiscalRequestDto,
+    ): Result<ConfirmCreditNoteFiscalResponseDto>
+}
+
+interface CreditNoteRepository : CreditNoteFiscalConfirmationRepository {
     suspend fun getCreditNotes(search: String? = null): Result<CreditNotesListResponseDto>
+
     suspend fun getCreditNoteDetail(id: String): Result<CreditNoteDetailDto>
+
     suspend fun getSourceInvoices(search: String? = null): Result<CreditNoteSourceInvoiceListResponseDto>
+
     suspend fun getSourceInvoiceDetail(id: String): Result<CreditNoteSourceInvoiceDetailDto>
+
     suspend fun createCreditNote(payload: CreateCreditNoteRequestDto): Result<CreateCreditNoteResponseDto>
-    suspend fun confirmFiscal(id: String, payload: ConfirmCreditNoteFiscalRequestDto): Result<ConfirmCreditNoteFiscalResponseDto>
+
+    override suspend fun confirmFiscal(
+        id: String,
+        payload: ConfirmCreditNoteFiscalRequestDto,
+    ): Result<ConfirmCreditNoteFiscalResponseDto>
 }

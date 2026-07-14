@@ -35,7 +35,7 @@ data class ProductDto(
     val bulkQuantity: Double? = null,
     val portionUnit: String? = null,
     val unitOrPackage: String? = null,
-    val prices: List<PriceDto> = emptyList()
+    val prices: List<PriceDto> = emptyList(),
 )
 
 @Serializable
@@ -47,7 +47,7 @@ data class PriceDto(
     val pricePlusTax: Double = 0.0,
     val unitPrice: Double = 0.0,
     val unitPricePlusTax: Double = 0.0,
-    val discountPercent: Double = 0.0
+    val discountPercent: Double = 0.0,
 )
 
 @Serializable
@@ -56,14 +56,14 @@ data class ItemLotInfoDto(
     val codigoLoteItem: String,
     val vencimiento: String? = null,
     val disponibilidad: Int,
-    val idAlmacen: Int = 1
+    val idAlmacen: Int = 1,
 )
 
 @Serializable
 data class ItemLotsResponseDto(
     val itemId: Int,
     val poseeConfiguracionLote: Boolean,
-    val lotes: List<ItemLotInfoDto> = emptyList()
+    val lotes: List<ItemLotInfoDto> = emptyList(),
 )
 
 @Serializable
@@ -99,5 +99,5 @@ data class CreateProductRequest(
     val currentCost: Double = 0.0,
     val isTaxExempt: Boolean = false,
     val taxRate: Double = 0.0,
-    val totalStock: Int = 0
+    val totalStock: Int = 0,
 )

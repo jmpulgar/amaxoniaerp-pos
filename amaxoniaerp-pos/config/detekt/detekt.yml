@@ -1,0 +1,27 @@
+config:
+  validation: true
+  warningsAsErrors: true
+
+naming:
+  ConstructorParameterNaming:
+    # Snake case is restricted to immutable backend DTO contracts whose JSON
+    # field names cannot be changed without a coordinated API migration.
+    parameterPattern: '[a-z][A-Za-z0-9_]*'
+    privateParameterPattern: '[a-z][A-Za-z0-9_]*'
+  FunctionNaming:
+    # Compose requires PascalCase for functions that emit UI.
+    ignoreAnnotated:
+      - Composable
+
+style:
+  MagicNumber:
+    # A named value is self-documenting; numeric literals embedded in business
+    # calculations remain actionable findings.
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+  MaxLineLength:
+    # Keep one source of truth with .editorconfig/ktlint.
+    maxLineLength: 140

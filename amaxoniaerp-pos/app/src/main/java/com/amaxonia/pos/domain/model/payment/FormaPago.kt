@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class FormasPagoResponse(
     val success: Boolean,
-    val data: List<FormaPago>
+    val data: List<FormaPago>,
 )
 
 @Serializable
@@ -36,5 +36,5 @@ data class FormaPago(
     @SerialName("tipo_moneda")
     val tipoMoneda: String,
     @SerialName("id_caja")
-    val idCaja: String? = null
+    val idCaja: String? = null,
 )

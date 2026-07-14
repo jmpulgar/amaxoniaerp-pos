@@ -9,11 +9,11 @@ data class ProductWarehouseStock(
     val cantidadPrecomprometida: Double,
     val cantidadDisponible: Double,
     val stockMinimo: Double,
-    val stockMaximo: Double
+    val stockMaximo: Double,
 )
 
 data class ProductStock(
     val itemId: String,
     val stockTotalDisponible: Double,
-    val almacenes: List<ProductWarehouseStock>
+    val almacenes: List<ProductWarehouseStock>,
 )

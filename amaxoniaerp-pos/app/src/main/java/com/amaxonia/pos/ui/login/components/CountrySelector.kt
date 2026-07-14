@@ -15,12 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
-import com.amaxonia.pos.ui.theme.AmaxoniaPOSTheme
+import com.amaxonia.pos.ui.theme.PosTheme
 
 /**
  * Componente de selección de país para la pantalla de login.
@@ -31,7 +30,7 @@ fun CountrySelector(
     selectedCountry: ServerCountry,
     onCountrySelected: (ServerCountry) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val countries = remember { ServerCountries.getAvailable() }
@@ -41,36 +40,36 @@ fun CountrySelector(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
-            shape = MaterialTheme.shapes.medium
+            shape = MaterialTheme.shapes.medium,
         ) {
             Text(
                 text = "${selectedCountry.flagEmoji} ${selectedCountry.displayName}",
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = "Seleccionar país"
+                contentDescription = "Seleccionar país",
             )
         }
 
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(0.9f)
+            modifier = Modifier.fillMaxWidth(0.9f),
         ) {
             countries.forEach { country ->
                 DropdownMenuItem(
                     text = {
                         Text(
                             text = "${country.flagEmoji} ${country.displayName}",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     },
                     onClick = {
                         onCountrySelected(country)
                         expanded = false
-                    }
+                    },
                 )
             }
         }
@@ -80,10 +79,10 @@ fun CountrySelector(
 @Preview(showBackground = true)
 @Composable
 fun CountrySelectorPreview() {
-    AmaxoniaPOSTheme {
+    PosTheme {
         CountrySelector(
             selectedCountry = ServerCountries.AVAILABLE[0],
-            onCountrySelected = {}
+            onCountrySelected = {},
         )
     }
 }
@@ -91,10 +90,10 @@ fun CountrySelectorPreview() {
 @Preview(showBackground = true)
 @Composable
 fun CountrySelectorPanamaPreview() {
-    AmaxoniaPOSTheme {
+    PosTheme {
         CountrySelector(
             selectedCountry = ServerCountries.AVAILABLE[1],
-            onCountrySelected = {}
+            onCountrySelected = {},
         )
     }
 }

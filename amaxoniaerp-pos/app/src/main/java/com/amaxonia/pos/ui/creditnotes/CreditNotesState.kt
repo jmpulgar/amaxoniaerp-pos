@@ -1,7 +1,6 @@
 package com.amaxonia.pos.ui.creditnotes
 
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteSettlementTypeDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceSummaryDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSummaryDto

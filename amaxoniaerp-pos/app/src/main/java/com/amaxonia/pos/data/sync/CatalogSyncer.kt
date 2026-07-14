@@ -6,8 +6,8 @@ import com.amaxonia.pos.data.local.db.AddressLevel2Dao
 import com.amaxonia.pos.data.local.db.AddressLevel3Dao
 import com.amaxonia.pos.data.local.db.ClientDao
 import com.amaxonia.pos.data.local.db.ClientSucursalDao
-import com.amaxonia.pos.data.local.db.CountryDao
 import com.amaxonia.pos.data.local.db.ClientTypeDao
+import com.amaxonia.pos.data.local.db.CountryDao
 import com.amaxonia.pos.data.local.db.ProductDao
 import com.amaxonia.pos.data.local.db.PromocionDao
 import com.amaxonia.pos.data.local.db.toEntity
@@ -27,11 +27,12 @@ class CatalogSyncer(
     private val addressLevel2Dao: AddressLevel2Dao,
     private val addressLevel3Dao: AddressLevel3Dao,
     private val clientTypeDao: ClientTypeDao,
-    private val promocionDao: PromocionDao
-) {
-    suspend fun syncAll(pageSize: Int = 300): Result<Unit> {
-        val session = localStore.readCompanySession()
-            ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+    private val promocionDao: PromocionDao,
+) : com.amaxonia.pos.domain.repository.CatalogSynchronization {
+    override suspend fun syncAll(pageSize: Int): Result<Unit> {
+        val session =
+            localStore.readCompanySession()
+                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
         return runCatching {
             // Critical POS data first: this is enough for most offline sales flows.
             syncClients(session.token, pageSize)
@@ -46,21 +47,25 @@ class CatalogSyncer(
         }
     }
 
-    suspend fun isInitialSyncCompleted(): Boolean {
+    override suspend fun isInitialSyncCompleted(): Boolean {
         val session = localStore.readCompanySession() ?: return false
         return localStore.isInitialSyncCompleted(session.company.id)
     }
 
-    private suspend fun syncClients(token: String, pageSize: Int) {
+    private suspend fun syncClients(
+        token: String,
+        pageSize: Int,
+    ) {
         var offset = 0
         while (true) {
-            val response = apiService.getClients(
-                token = token,
-                limit = pageSize,
-                offset = offset,
-                search = null,
-                includeTotal = false
-            )
+            val response =
+                apiService.getClients(
+                    token = token,
+                    limit = pageSize,
+                    offset = offset,
+                    search = null,
+                    includeTotal = false,
+                )
             if (response.data.isEmpty()) break
             clientDao.insertAll(response.data.map { it.toEntity() })
             response.data.forEach { client ->
@@ -78,16 +83,20 @@ class CatalogSyncer(
         }
     }
 
-    private suspend fun syncProducts(token: String, pageSize: Int) {
+    private suspend fun syncProducts(
+        token: String,
+        pageSize: Int,
+    ) {
         var offset = 0
         while (true) {
-            val response = apiService.getProducts(
-                token = token,
-                limit = pageSize,
-                offset = offset,
-                search = null,
-                includeTotal = false
-            )
+            val response =
+                apiService.getProducts(
+                    token = token,
+                    limit = pageSize,
+                    offset = offset,
+                    search = null,
+                    includeTotal = false,
+                )
             if (response.data.isEmpty()) break
             productDao.insertAll(response.data.map { it.toEntity() })
             offset += pageSize
@@ -104,37 +113,49 @@ class CatalogSyncer(
         }
     }
 
-    private suspend fun syncCountries(token: String, pageSize: Int) {
+    private suspend fun syncCountries(
+        token: String,
+        pageSize: Int,
+    ) {
         var offset = 0
         while (true) {
-            val response = apiService.getCountries(
-                token = token,
-                limit = pageSize,
-                offset = offset,
-                includeTotal = false
-            )
+            val response =
+                apiService.getCountries(
+                    token = token,
+                    limit = pageSize,
+                    offset = offset,
+                    includeTotal = false,
+                )
             if (response.isEmpty()) break
             countryDao.insertAll(response.map { it.toEntity() })
             offset += pageSize
         }
     }
 
-    private suspend fun syncAddressLevels(token: String, pageSize: Int) {
+    private suspend fun syncAddressLevels(
+        token: String,
+        pageSize: Int,
+    ) {
         syncAddressLevel(token, pageSize, 1)
         syncAddressLevel(token, pageSize, 2)
         syncAddressLevel(token, pageSize, 3)
     }
 
-    private suspend fun syncAddressLevel(token: String, pageSize: Int, level: Int) {
+    private suspend fun syncAddressLevel(
+        token: String,
+        pageSize: Int,
+        level: Int,
+    ) {
         var offset = 0
         while (true) {
-            val response = apiService.getAddressLevels(
-                token = token,
-                level = level,
-                limit = pageSize,
-                offset = offset,
-                includeTotal = false
-            )
+            val response =
+                apiService.getAddressLevels(
+                    token = token,
+                    level = level,
+                    limit = pageSize,
+                    offset = offset,
+                    includeTotal = false,
+                )
             if (response.isEmpty()) break
             when (level) {
                 1 -> addressLevel1Dao.insertAll(response.map { it.toLevel1Entity() })
@@ -145,15 +166,19 @@ class CatalogSyncer(
         }
     }
 
-    private suspend fun syncClientTypes(token: String, pageSize: Int) {
+    private suspend fun syncClientTypes(
+        token: String,
+        pageSize: Int,
+    ) {
         var offset = 0
         while (true) {
-            val response = apiService.getClientTypes(
-                token = token,
-                limit = pageSize,
-                offset = offset,
-                includeTotal = false
-            )
+            val response =
+                apiService.getClientTypes(
+                    token = token,
+                    limit = pageSize,
+                    offset = offset,
+                    includeTotal = false,
+                )
             if (response.isEmpty()) break
             clientTypeDao.insertAll(response.map { it.toEntity() })
             offset += pageSize

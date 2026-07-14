@@ -1,8 +1,8 @@
 package com.amaxonia.pos.domain.model.caja
 
 import com.amaxonia.pos.domain.model.seller.Seller
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class Caja(

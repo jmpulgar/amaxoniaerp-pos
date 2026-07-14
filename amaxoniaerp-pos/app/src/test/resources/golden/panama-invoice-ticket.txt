@@ -1,0 +1,31 @@
+TEXT|CENTER|false|Comprobante Auxiliar de
+TEXT|CENTER|false|Facturación Electrónica
+FEED|1
+TEXT|CENTER|true|MI EMPRESA S.A.
+TEXT|CENTER|false|RUC: 123
+TEXT|CENTER|false|PANAMÁ
+DIVIDER
+COLUMNS|Fecha:~2026-06-01T13:45:00|14,18|LEFT,RIGHT
+COLUMNS|Factura:~F001-0001|14,18|LEFT,RIGHT
+DIVIDER
+TEXT|LEFT|true|Productos
+COLUMNS|Articulo~Cant~Monto|16,6,10|LEFT,CENTER,RIGHT
+COLUMNS|Producto A~2~10.70|16,6,10|LEFT,CENTER,RIGHT
+DIVIDER
+COLUMNS|Subtotal Items:~10.00|14,18|LEFT,RIGHT
+COLUMNS|Monto Exento:~0.00|14,18|LEFT,RIGHT
+COLUMNS|Total impuestos:~0.70|14,18|LEFT,RIGHT
+COLUMNS|TOTAL:~10.70|14,18|LEFT,RIGHT
+DIVIDER
+TEXT|LEFT|true|Métodos de pago
+COLUMNS|EFECTIVO~20.00|14,18|LEFT,RIGHT
+COLUMNS|CAMBIO~9.30|14,18|LEFT,RIGHT
+DIVIDER
+TEXT|CENTER|false|Documento validado por proveedor autorizado calificado.
+TEXT|CENTER|false|Consulte su documento en el portal de la DGI.
+FEED|1
+QR|3|https://fe.dgi
+TEXT|CENTER|false|CUFE: CUFE123
+TEXT|CENTER|false|Fecha recepción DGI: 2026-06-01T13:45:10
+TEXT|CENTER|false|Proveedor autorizado: The Factory HKA Corp.
+FEED|4

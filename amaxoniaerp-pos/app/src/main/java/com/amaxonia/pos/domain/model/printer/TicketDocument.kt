@@ -1,7 +1,7 @@
 package com.amaxonia.pos.domain.model.printer
 
 data class TicketDocument(
-    val elements: List<TicketElement>
+    val elements: List<TicketElement>,
 )
 
 sealed class TicketElement {

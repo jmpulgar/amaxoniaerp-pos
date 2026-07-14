@@ -11,14 +11,11 @@ class Converters {
     private val json: Json = AppJson
 
     @TypeConverter
-    fun pricesToJson(prices: List<PriceLevel>): String {
-        return json.encodeToString(ListSerializer(PriceLevel.serializer()), prices)
-    }
+    fun pricesToJson(prices: List<PriceLevel>): String = json.encodeToString(ListSerializer(PriceLevel.serializer()), prices)
 
     @TypeConverter
-    fun jsonToPrices(value: String): List<PriceLevel> {
-        return runCatching {
+    fun jsonToPrices(value: String): List<PriceLevel> =
+        runCatching {
             json.decodeFromString(ListSerializer(PriceLevel.serializer()), value)
         }.getOrDefault(emptyList())
-    }
 }

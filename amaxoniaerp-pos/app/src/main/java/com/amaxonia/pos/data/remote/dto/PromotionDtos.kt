@@ -20,7 +20,7 @@ data class PromocionDto(
     val idItem: String = "",
     @Serializable(with = FlexibleBooleanSerializer::class)
     val activo: Boolean = true,
-    val detalle: List<PromocionDetalleDto> = emptyList()
+    val detalle: List<PromocionDetalleDto> = emptyList(),
 )
 
 @Serializable
@@ -58,7 +58,7 @@ data class PromocionDetalleDto(
     val impuestoPorcentaje: Double = 0.0,
     @Serializable(with = FlexibleDoubleSerializer::class)
     val importe: Double = 0.0,
-    val grupo: String = ""
+    val grupo: String = "",
 ) {
     val resolvedTaxPercent: Double get() = impuestoPromocionDetalle.takeIf { it > 0.0 } ?: impuestoPorcentaje
 }

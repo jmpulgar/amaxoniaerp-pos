@@ -11,7 +11,7 @@ import com.amaxonia.pos.data.remote.ApiService
 
 class CatalogSyncWorker(
     context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val apiConfigManager = ApiConfigManager.getInstance()
@@ -19,23 +19,24 @@ class CatalogSyncWorker(
         val apiService = ApiService(apiClient)
         val localStore = LocalStore(applicationContext)
         val database = AppDatabase.getInstance(applicationContext)
-        val syncer = CatalogSyncer(
-            apiService = apiService,
-            localStore = localStore,
-            clientDao = database.clientDao(),
-            clientSucursalDao = database.clientSucursalDao(),
-            productDao = database.productDao(),
-            countryDao = database.countryDao(),
-            addressLevel1Dao = database.addressLevel1Dao(),
-            addressLevel2Dao = database.addressLevel2Dao(),
-            addressLevel3Dao = database.addressLevel3Dao(),
-            clientTypeDao = database.clientTypeDao(),
-            promocionDao = database.promocionDao()
-        )
+        val syncer =
+            CatalogSyncer(
+                apiService = apiService,
+                localStore = localStore,
+                clientDao = database.clientDao(),
+                clientSucursalDao = database.clientSucursalDao(),
+                productDao = database.productDao(),
+                countryDao = database.countryDao(),
+                addressLevel1Dao = database.addressLevel1Dao(),
+                addressLevel2Dao = database.addressLevel2Dao(),
+                addressLevel3Dao = database.addressLevel3Dao(),
+                clientTypeDao = database.clientTypeDao(),
+                promocionDao = database.promocionDao(),
+            )
 
         return syncer.syncAll().fold(
             onSuccess = { Result.success() },
-            onFailure = { Result.retry() }
+            onFailure = { Result.retry() },
         )
     }
 }

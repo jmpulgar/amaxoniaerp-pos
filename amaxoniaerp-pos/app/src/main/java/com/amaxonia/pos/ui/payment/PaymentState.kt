@@ -1,8 +1,10 @@
 package com.amaxonia.pos.ui.payment
 
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
-import java.math.BigDecimal
+import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
+import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 
 data class PaymentState(
     val totalAmount: Double = 0.0,
@@ -24,10 +26,10 @@ data class PaymentState(
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
 ) {
-    val totalAmountMoney: BigDecimal
+    val totalAmountMoney: Money
         get() = Money.fromDouble(totalAmount)
 
-    val tenderedAmountMoney: BigDecimal
+    val tenderedAmountMoney: Money
         get() = Money.parse(tenderedAmountInput)
 
     val formasPagoEfectivo: List<FormaPago>
@@ -36,16 +38,17 @@ data class PaymentState(
     val formasPagoTarjetaOtro: List<FormaPago>
         get() = formasPago.filterNot { it.siglas.equals("CASH", ignoreCase = true) }
 
-    val nonCashAssignedMoney: BigDecimal
-        get() = nonCashAmountsInput.values.fold(BigDecimal.ZERO) { acc, amount ->
-            acc + Money.parse(amount)
-        }
+    val nonCashAssignedMoney: Money
+        get() =
+            nonCashAmountsInput.values.fold(Money.ZERO) { acc, amount ->
+                acc + Money.parse(amount)
+            }
 
-    val nonCashPendingMoney: BigDecimal
-        get() = (totalAmountMoney - nonCashAssignedMoney).coerceAtLeast(BigDecimal.ZERO)
+    val nonCashPendingMoney: Money
+        get() = (totalAmountMoney - nonCashAssignedMoney).coerceAtLeastZero()
 
-    val changeDueMoney: BigDecimal
-        get() = (tenderedAmountMoney - totalAmountMoney).coerceAtLeast(BigDecimal.ZERO)
+    val changeDueMoney: Money
+        get() = (tenderedAmountMoney - totalAmountMoney).coerceAtLeastZero()
 
     val totalAmountText: String
         get() = Money.format(totalAmountMoney)
@@ -63,16 +66,17 @@ data class PaymentState(
         get() = Money.format(changeDueMoney)
 
     val nonCashAssignedTotal: Double
-        get() = Money.toDouble(nonCashAssignedMoney)
+        get() = nonCashAssignedMoney.toDouble()
 
     val changeDue: Double
-        get() = Money.toDouble(changeDueMoney)
+        get() = changeDueMoney.toDouble()
 
     val isPaymentEnough: Boolean
-        get() = when (selectedMethod) {
-            PaymentMethod.CASH -> tenderedAmountMoney >= totalAmountMoney
-            PaymentMethod.NON_CASH -> nonCashAssignedMoney >= totalAmountMoney
-        }
+        get() =
+            when (selectedMethod) {
+                PaymentMethod.CASH -> tenderedAmountMoney >= totalAmountMoney
+                PaymentMethod.NON_CASH -> nonCashAssignedMoney >= totalAmountMoney
+            }
 
     fun toBs(amount: Double): Double {
         if (!isMultiCurrency || tasa <= 0.0) return 0.0
@@ -80,25 +84,39 @@ data class PaymentState(
     }
 
     val totalAmountBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", totalAmount * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", totalAmount * tasa) else ""
 
     val tenderedAmountBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", tenderedAmountMoney.toDouble() * tasa) else ""
+        get() =
+            if (isMultiCurrency &&
+                tasa > 0.0
+            ) {
+                String.format(java.util.Locale.getDefault(), "%.2f", tenderedAmountMoney.toDouble() * tasa)
+            } else {
+                ""
+            }
 
     val changeDueBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", changeDue * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", changeDue * tasa) else ""
 
     val nonCashAssignedBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", nonCashAssignedTotal * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", nonCashAssignedTotal * tasa) else ""
 
     val nonCashPendingBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format("%.2f", nonCashPendingMoney.toDouble() * tasa) else ""
+        get() =
+            if (isMultiCurrency &&
+                tasa > 0.0
+            ) {
+                String.format(java.util.Locale.getDefault(), "%.2f", nonCashPendingMoney.toDouble() * tasa)
+            } else {
+                ""
+            }
 
     val missingCashBsText: String
         get() {
             if (!isMultiCurrency || tasa <= 0.0) return ""
-            val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeast(java.math.BigDecimal.ZERO)
-            return String.format("%.2f", missing.toDouble() * tasa)
+            val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeastZero()
+            return String.format(java.util.Locale.getDefault(), "%.2f", missing.toDouble() * tasa)
         }
 
     val totalAmountBs: Double
@@ -121,10 +139,46 @@ fun formatCurrencyLabel(abr: String): String {
     }
 }
 
-internal fun BigDecimal.coerceAtLeast(min: BigDecimal): BigDecimal {
-    return if (this < min) min else this
+enum class PaymentMethod {
+    CASH,
+    NON_CASH,
 }
 
-enum class PaymentMethod {
-    CASH, NON_CASH
+sealed interface PaymentUiAction {
+    data class SetTotalAmount(
+        val amount: Double,
+    ) : PaymentUiAction
+
+    data class KeyPadInput(
+        val key: String,
+    ) : PaymentUiAction
+
+    data object SetExactAmount : PaymentUiAction
+
+    data class SelectMethod(
+        val method: PaymentMethod,
+    ) : PaymentUiAction
+
+    data class SetExactNonCashAmount(
+        val paymentMethodId: Int,
+    ) : PaymentUiAction
+
+    data class SetNonCashAmount(
+        val paymentMethodId: Int,
+        val amount: String,
+    ) : PaymentUiAction
+
+    data object ProcessPayment : PaymentUiAction
+
+    data object ClearPaymentError : PaymentUiAction
+
+    data object ClearReceiptPrintMessage : PaymentUiAction
+
+    data object ClearSuccessPayload : PaymentUiAction
+}
+
+sealed interface PaymentUiEffect {
+    data class LaunchGateway(
+        val payload: GatewayLaunchPayload,
+    ) : PaymentUiEffect
 }

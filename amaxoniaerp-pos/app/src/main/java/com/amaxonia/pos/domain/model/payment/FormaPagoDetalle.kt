@@ -14,7 +14,7 @@ data class FormaPagoDetalle(
     @SerialName("id_banco_cuenta")
     val idBancoCuenta: Int? = null,
     @SerialName("id_banco_operacion")
-    val idBancoOperacion: Int? = null
+    val idBancoOperacion: Int? = null,
 )
 
 @Serializable
@@ -35,5 +35,5 @@ data class FormapagoDetallePayload(
     @SerialName("detalle_ABONO")
     val detalleAbono: List<Map<String, String>> = emptyList(),
     @SerialName("detalle_PT")
-    val detallePt: List<Map<String, String>> = emptyList()
+    val detallePt: List<Map<String, String>> = emptyList(),
 )

@@ -38,6 +38,8 @@ dependencies {
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
     implementation(libs.ktor.server.config.yaml)
+    // kaml es requerido por ktor-server-config-yaml en Ktor 3.x (ya no es transitivo)
+    implementation(libs.kaml)
     // Ktor HTTP Client (Facturacion Electronica Panama)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)

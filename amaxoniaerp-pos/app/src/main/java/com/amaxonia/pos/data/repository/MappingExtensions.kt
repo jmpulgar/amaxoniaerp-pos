@@ -8,11 +8,8 @@ import com.amaxonia.pos.data.remote.dto.CreateProductRequest
 import com.amaxonia.pos.data.remote.dto.PriceDto
 import com.amaxonia.pos.data.remote.dto.ProductDto
 import com.amaxonia.pos.data.remote.dto.ProductStockResponseDto
-import com.amaxonia.pos.domain.model.AuthSession
-import com.amaxonia.pos.domain.model.AuthUser
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.Company
-import com.amaxonia.pos.domain.model.CompanySession
 import com.amaxonia.pos.domain.model.CompanySummary
 import com.amaxonia.pos.domain.model.ForeignIdType
 import com.amaxonia.pos.domain.model.PriceLevel
@@ -24,42 +21,43 @@ import com.amaxonia.pos.domain.model.TaxpayerType
 import com.amaxonia.pos.domain.model.generateDefaultPrices
 import java.util.UUID
 
-private fun priceByLabel(prices: List<PriceLevel>, label: String): PriceLevel {
-    return prices.firstOrNull { it.label.equals(label, ignoreCase = true) } ?: PriceLevel(label = label)
-}
+private fun priceByLabel(
+    prices: List<PriceLevel>,
+    label: String,
+): PriceLevel =
+    prices.firstOrNull {
+        it.label.equals(label, ignoreCase = true)
+    } ?: PriceLevel(label = label)
 
 // --- Company Mappers ---
-fun CompanyDto.toDomainCompany(): Company {
-    return Company(
+fun CompanyDto.toDomainCompany(): Company =
+    Company(
         id = id.toString(),
         name = name,
         ruc = rif.orEmpty(),
-        address = ""
+        address = "",
     )
-}
 
-fun CompanyDto.toSummary(): CompanySummary {
-    return CompanySummary(id = id, name = name)
-}
+fun CompanyDto.toSummary(): CompanySummary = CompanySummary(id = id, name = name)
 
-fun CompanyDetailsDto.toSelectedCompany(): SelectedCompany {
-    return SelectedCompany(
+fun CompanyDetailsDto.toSelectedCompany(): SelectedCompany =
+    SelectedCompany(
         id = id,
         name = name,
         adminDb = adminDb,
         accountingDb = accountingDb,
         payrollDb = payrollDb,
-        rif = rif.orEmpty()
+        rif = rif.orEmpty(),
     )
-}
 
 // --- Product Mappers ---
 fun ProductDto.toDomain(): Product {
-    val mappedPrices = if (prices.isNotEmpty()) {
-        prices.map { it.toDomain() }
-    } else {
-        generateDefaultPrices()
-    }
+    val mappedPrices =
+        if (prices.isNotEmpty()) {
+            prices.map { it.toDomain() }
+        } else {
+            generateDefaultPrices()
+        }
     return Product(
         id = id ?: UUID.randomUUID().toString(),
         code = code.orEmpty(),
@@ -92,12 +90,12 @@ fun ProductDto.toDomain(): Product {
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
-        prices = mappedPrices
+        prices = mappedPrices,
     )
 }
 
-fun PriceDto.toDomain(): PriceLevel {
-    return PriceLevel(
+fun PriceDto.toDomain(): PriceLevel =
+    PriceLevel(
         label = label,
         price = price,
         utilityPercent = utilityPercent,
@@ -105,12 +103,11 @@ fun PriceDto.toDomain(): PriceLevel {
         pricePlusTax = pricePlusTax,
         unitPrice = unitPrice,
         unitPricePlusTax = unitPricePlusTax,
-        discountPercent = discountPercent
+        discountPercent = discountPercent,
     )
-}
 
-fun Product.toCreateRequest(): CreateProductRequest {
-    return CreateProductRequest(
+fun Product.toCreateRequest(): CreateProductRequest =
+    CreateProductRequest(
         code = code,
         name = description,
         description = description,
@@ -142,34 +139,33 @@ fun Product.toCreateRequest(): CreateProductRequest {
         currentCost = costActual,
         isTaxExempt = isExempt,
         taxRate = if (isExempt) 0.0 else taxRate,
-        totalStock = 0
+        totalStock = 0,
     )
-}
 
-fun ProductStockResponseDto.toDomain(): ProductStock {
-    return ProductStock(
+fun ProductStockResponseDto.toDomain(): ProductStock =
+    ProductStock(
         itemId = itemId.toString(),
         stockTotalDisponible = stockTotalDisponible,
-        almacenes = almacenes.map {
-            ProductWarehouseStock(
-                almacenId = it.almacenId,
-                almacenNombre = it.almacenNombre,
-                almacenTipo = it.almacenTipo,
-                cantidad = it.cantidad,
-                cantidadMuestra = it.cantidadMuestra,
-                cantidadPrecomprometida = it.cantidadPrecomprometida,
-                cantidadDisponible = it.cantidadDisponible,
-                stockMinimo = it.stockMinimo,
-                stockMaximo = it.stockMaximo
-            )
-        }
+        almacenes =
+            almacenes.map {
+                ProductWarehouseStock(
+                    almacenId = it.almacenId,
+                    almacenNombre = it.almacenNombre,
+                    almacenTipo = it.almacenTipo,
+                    cantidad = it.cantidad,
+                    cantidadMuestra = it.cantidadMuestra,
+                    cantidadPrecomprometida = it.cantidadPrecomprometida,
+                    cantidadDisponible = it.cantidadDisponible,
+                    stockMinimo = it.stockMinimo,
+                    stockMaximo = it.stockMaximo,
+                )
+            },
     )
-}
 
 // --- Client Mappers (CORREGIDOS) ---
 
-fun ClientDto.toDomain(): Client {
-    return Client(
+fun ClientDto.toDomain(): Client =
+    Client(
         id = id.orEmpty(),
         code = code.orEmpty(),
         ruc = identification.orEmpty(),
@@ -180,25 +176,21 @@ fun ClientDto.toDomain(): Client {
         phone = phone.orEmpty(),
         addressDetail = address.orEmpty(),
         status = status ?: true,
-
         // CORRECCIÓN 1: Usamos taxpayerTypeId (Int) que viene del backend
         taxpayerType = taxpayerTypeId.toTaxpayerType(),
-
         countryId = countryId ?: 0,
         clientTypeId = clientTypeId ?: 1,
         addressLevel1 = addressLevel1.orEmpty(),
         addressLevel2 = addressLevel2.orEmpty(),
         addressLevel3 = addressLevel3.orEmpty(),
-
         // CORRECCIÓN 2: Mapear tipo de identificación extranjera
         foreignIdType = foreignAuthTypeId.toForeignIdType(),
         foreignIdNumber = if (clientTypeId == 4) identification.orEmpty() else "",
-        photoFilename = photoFilename.orEmpty()
+        photoFilename = photoFilename.orEmpty(),
     )
-}
 
-fun Client.toCreateRequest(): CreateClientRequest {
-    return CreateClientRequest(
+fun Client.toCreateRequest(): CreateClientRequest =
+    CreateClientRequest(
         identification = if (clientTypeId == 4) foreignIdNumber else ruc.ifBlank { cedula.ifBlank { id } },
         name = firstName,
         lastName = lastName,
@@ -206,50 +198,42 @@ fun Client.toCreateRequest(): CreateClientRequest {
         phone = phone,
         email = email,
         clientTypeId = clientTypeId,
-
         // CORRECCIÓN 3: El campo ahora se llama taxpayerTypeId y espera un Int
         taxpayerTypeId = taxpayerType.toApiValue(),
-
         // CORRECCIÓN 4: Enviar el código de extranjero si aplica
         foreignAuthTypeId = if (clientTypeId == 4) foreignIdType.toApiCode() else null,
-
         countryId = countryId,
         addressLevel1 = addressLevel1,
         addressLevel2 = addressLevel2,
-        addressLevel3 = addressLevel3
+        addressLevel3 = addressLevel3,
     )
-}
 
 // --- Helpers para conversión de Tipos ---
 
 // Convierte el INT del Backend (1, 2) a Enum del App
-private fun Int?.toTaxpayerType(): TaxpayerType {
-    return when (this) {
+private fun Int?.toTaxpayerType(): TaxpayerType =
+    when (this) {
         2 -> TaxpayerType.JURIDICO
         else -> TaxpayerType.NATURAL // 1 o null es Natural
     }
-}
 
 // Convierte el Enum del App a INT para el Backend (1, 2)
-private fun TaxpayerType.toApiValue(): Int {
-    return when (this) {
+private fun TaxpayerType.toApiValue(): Int =
+    when (this) {
         TaxpayerType.NATURAL -> 1
         TaxpayerType.JURIDICO -> 2
     }
-}
 
 // Convierte String "01"/"02" a Enum
-private fun String?.toForeignIdType(): ForeignIdType {
-    return when (this) {
+private fun String?.toForeignIdType(): ForeignIdType =
+    when (this) {
         "02" -> ForeignIdType.PASAPORTE
         else -> ForeignIdType.TRIBUTARIA // "01" por defecto
     }
-}
 
 // Convierte Enum a String "01"/"02"
-private fun ForeignIdType.toApiCode(): String {
-    return when (this) {
+private fun ForeignIdType.toApiCode(): String =
+    when (this) {
         ForeignIdType.PASAPORTE -> "02"
         ForeignIdType.TRIBUTARIA -> "01"
     }
-}

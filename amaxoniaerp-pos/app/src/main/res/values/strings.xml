@@ -1,3 +1,13 @@
 <resources>
-    <string name="app_name">Amaxonia POS</string>
+    <string name="login_title">Iniciar sesión</string>
+    <string name="login_country_region">País / Región</string>
+    <string name="login_username_label">Nombre de usuario</string>
+    <string name="login_username_placeholder">Nombre de usuario</string>
+    <string name="login_password_label">Contraseña</string>
+    <string name="login_password_placeholder">8 caracteres mínimo</string>
+    <string name="login_submit">Iniciar sesión</string>
+    <string name="login_forgot_password">¿Olvidaste tu contraseña?</string>
+    <string name="navigate_back">Volver</string>
+    <string name="show_password">Mostrar contraseña</string>
+    <string name="hide_password">Ocultar contraseña</string>
 </resources>

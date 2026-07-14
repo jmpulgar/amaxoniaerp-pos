@@ -10,71 +10,78 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-
-private val DarkColorScheme = darkColorScheme(
-    primary = AmaxoniaBlueDark,
-    onPrimary = Color(0xFF00315F),
-    primaryContainer = Color(0xFF004788),
-    onPrimaryContainer = Color(0xFFD7E3FF),
-    secondary = Color(0xFFBDC7E9),
-    onSecondary = Color(0xFF27304A),
-    tertiary = Color(0xFF77D0C2),
-    onTertiary = Color(0xFF003730),
-    background = BgDark,
-    onBackground = TextPrimaryDark,
-    surface = SurfaceDark,
-    onSurface = TextPrimaryDark,
-    surfaceVariant = Color(0xFF2A3244),
-    onSurfaceVariant = TextSecondaryDark,
-    outline = Color(0xFF8891A8),
-    outlineVariant = Color(0xFF3D465D),
-    error = ErrorRed,
-    onError = Color.White,
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6)
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = AmaxoniaBlue,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFD7E3FF),
-    onPrimaryContainer = Color(0xFF001B44),
-    secondary = Color(0xFF536081),
-    onSecondary = Color.White,
-    tertiary = Color(0xFF006A60),
-    onTertiary = Color.White,
-    background = BgLightGray,
-    surface = SurfaceWhite,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
-    surfaceVariant = Color(0xFFDFE3EC),
-    onSurfaceVariant = TextSecondary,
-    outline = Color(0xFF757D91),
-    outlineVariant = Color(0xFFC1C6D0),
-    error = ErrorRed,
-    onError = Color.White,
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002)
-)
+import androidx.compose.ui.res.colorResource
+import com.amaxonia.pos.R
 
 @Composable
-fun AmaxoniaPOSTheme(
+private fun darkBrandColorScheme() =
+    darkColorScheme(
+        primary = colorResource(R.color.brand_primary_dark),
+        onPrimary = colorResource(R.color.brand_on_primary_dark),
+        primaryContainer = colorResource(R.color.brand_primary_container_dark),
+        onPrimaryContainer = colorResource(R.color.brand_on_primary_container_dark),
+        secondary = colorResource(R.color.brand_secondary_dark),
+        onSecondary = colorResource(R.color.brand_on_secondary_dark),
+        tertiary = colorResource(R.color.brand_accent_dark),
+        onTertiary = colorResource(R.color.brand_on_accent_dark),
+        background = colorResource(R.color.brand_background_dark),
+        onBackground = colorResource(R.color.brand_on_background_dark),
+        surface = colorResource(R.color.brand_surface_dark),
+        onSurface = colorResource(R.color.brand_on_surface_dark),
+        surfaceVariant = colorResource(R.color.brand_surface_variant_dark),
+        onSurfaceVariant = colorResource(R.color.brand_on_surface_variant_dark),
+        outline = colorResource(R.color.brand_outline_dark),
+        outlineVariant = colorResource(R.color.brand_outline_variant_dark),
+        error = ErrorRed,
+        onError = Color.White,
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+    )
+
+@Composable
+private fun lightBrandColorScheme() =
+    lightColorScheme(
+        primary = colorResource(R.color.brand_primary),
+        onPrimary = colorResource(R.color.brand_on_primary),
+        primaryContainer = colorResource(R.color.brand_primary_container),
+        onPrimaryContainer = colorResource(R.color.brand_on_primary_container),
+        secondary = colorResource(R.color.brand_secondary),
+        onSecondary = colorResource(R.color.brand_on_secondary),
+        tertiary = colorResource(R.color.brand_accent),
+        onTertiary = colorResource(R.color.brand_on_accent),
+        background = colorResource(R.color.brand_background),
+        surface = colorResource(R.color.brand_surface),
+        onBackground = colorResource(R.color.brand_on_background),
+        onSurface = colorResource(R.color.brand_on_surface),
+        surfaceVariant = colorResource(R.color.brand_surface_variant),
+        onSurfaceVariant = colorResource(R.color.brand_on_surface_variant),
+        outline = colorResource(R.color.brand_outline),
+        outlineVariant = colorResource(R.color.brand_outline_variant),
+        error = ErrorRed,
+        onError = Color.White,
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002),
+    )
+
+@Composable
+fun PosTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val colorScheme =
+        when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val context = LocalContext.current
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            darkTheme -> darkBrandColorScheme()
+            else -> lightBrandColorScheme()
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

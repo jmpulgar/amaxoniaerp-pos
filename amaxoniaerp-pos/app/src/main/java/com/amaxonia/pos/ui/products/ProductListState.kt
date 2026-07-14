@@ -10,5 +10,5 @@ data class ProductListState(
     val page: Int = 1,
     val endOfListReached: Boolean = false,
     val searchQuery: String = "",
-    val error: String? = null
+    val error: String? = null,
 )

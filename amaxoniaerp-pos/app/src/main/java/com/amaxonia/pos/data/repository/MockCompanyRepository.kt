@@ -6,11 +6,12 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 class MockCompanyRepository : CompanyRepository {
-    private val mockCompanies = listOf(
-        Company("1", "Amaxonia S.A.", "20555123451", "Av. Principal 123"),
-        Company("2", "Sucursal Norte", "20555987652", "Calle Los Olivos 45"),
-        Company("3", "Bodega Central", "20555678903", "Zona Industrial Mz. D")
-    )
+    private val mockCompanies =
+        listOf(
+            Company("1", "Amaxonia S.A.", "20555123451", "Av. Principal 123"),
+            Company("2", "Sucursal Norte", "20555987652", "Calle Los Olivos 45"),
+            Company("3", "Bodega Central", "20555678903", "Zona Industrial Mz. D"),
+        )
     private val failureRate = 0.1
 
     override suspend fun getAllCompanies(): Result<List<Company>> {
@@ -38,7 +39,5 @@ class MockCompanyRepository : CompanyRepository {
         delay((800..2000).random().toLong())
     }
 
-    private fun shouldSimulateError(): Boolean {
-        return Random.nextFloat() < failureRate
-    }
+    private fun shouldSimulateError(): Boolean = Random.nextFloat() < failureRate
 }

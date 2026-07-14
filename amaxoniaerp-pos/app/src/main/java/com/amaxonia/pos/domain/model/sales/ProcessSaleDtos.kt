@@ -71,7 +71,7 @@ data class SaleInvoiceDto(
     val clienteSucursalId: Int? = null,
     val codFacturaFiscal: String = "",
     val nroz: String = "0000",
-    val impresoraSerial: String = ""
+    val impresoraSerial: String = "",
 )
 
 @Serializable
@@ -140,7 +140,7 @@ data class SaleLotDto(
 data class SaleTaxDto(
     val totalizarBaseRetencion: Double,
     val codImpuestoIva: Int,
-    val totalizarMontoIva2: Double
+    val totalizarMontoIva2: Double,
 )
 
 @Serializable
@@ -149,7 +149,7 @@ data class SalePaymentSummaryDto(
     val totalizarMontoEfectivo: Double,
     val totalizarCambio: Double,
     val totalizarSaldoPendiente: Double,
-    val montosPorTipo: Map<String, Double>
+    val montosPorTipo: Map<String, Double>,
 )
 
 @Serializable
@@ -158,7 +158,7 @@ data class SalePaymentDto(
     val tipoMovimiento: String,
     val monto: Double,
     val montoRecibido: Double,
-    val efectivoCambio: Double = 0.0
+    val efectivoCambio: Double = 0.0,
 )
 
 @Serializable

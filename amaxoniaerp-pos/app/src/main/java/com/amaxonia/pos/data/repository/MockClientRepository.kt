@@ -14,7 +14,10 @@ class MockClientRepository : ClientRepository {
         generateMockClients()
     }
 
-    override suspend fun getAllClients(page: Int, pageSize: Int): Result<List<Client>> {
+    override suspend fun getAllClients(
+        page: Int,
+        pageSize: Int,
+    ): Result<List<Client>> {
         simulateNetworkDelay()
         if (shouldSimulateError()) {
             return Result.failure(Exception("Error al cargar clientes desde el servidor"))
@@ -43,8 +46,9 @@ class MockClientRepository : ClientRepository {
 
     override suspend fun getDefaultClient(): Result<Client> {
         simulateNetworkDelay()
-        val defaultClient = mockClients.firstOrNull()
-            ?: return Result.failure(Exception("No hay cliente por defecto"))
+        val defaultClient =
+            mockClients.firstOrNull()
+                ?: return Result.failure(Exception("No hay cliente por defecto"))
         return Result.success(defaultClient)
     }
 
@@ -53,28 +57,34 @@ class MockClientRepository : ClientRepository {
         if (shouldSimulateError()) {
             return Result.failure(Exception("Error en la búsqueda de clientes"))
         }
-        val filtered = mockClients.filter {
-            it.firstName.contains(query, ignoreCase = true) ||
+        val filtered =
+            mockClients.filter {
+                it.firstName.contains(query, ignoreCase = true) ||
                     it.lastName.contains(query, ignoreCase = true) ||
                     it.ruc.contains(query) ||
                     it.cedula.contains(query) ||
                     it.code.contains(query, ignoreCase = true)
-        }
+            }
         return Result.success(filtered)
     }
 
-    override suspend fun searchClients(query: String, page: Int, pageSize: Int): Result<List<Client>> {
+    override suspend fun searchClients(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): Result<List<Client>> {
         simulateNetworkDelay()
         if (shouldSimulateError()) {
             return Result.failure(Exception("Error en la bǧsqueda de clientes"))
         }
-        val filtered = mockClients.filter {
-            it.firstName.contains(query, ignoreCase = true) ||
+        val filtered =
+            mockClients.filter {
+                it.firstName.contains(query, ignoreCase = true) ||
                     it.lastName.contains(query, ignoreCase = true) ||
                     it.ruc.contains(query) ||
                     it.cedula.contains(query) ||
                     it.code.contains(query, ignoreCase = true)
-        }
+            }
         val start = (page - 1) * pageSize
         val end = (start + pageSize).coerceAtMost(filtered.size)
         if (start >= filtered.size) {
@@ -114,13 +124,11 @@ class MockClientRepository : ClientRepository {
         delay((500..2000).random().toLong())
     }
 
-    private fun shouldSimulateError(): Boolean {
-        return Random.nextFloat() < failureRate
-    }
+    private fun shouldSimulateError(): Boolean = Random.nextFloat() < failureRate
 
     private fun generateMockClients() {
         mockClients.clear()
-        (1..50).forEach { i ->
+        for (i in 1..50) {
             val typeId = if (i % 3 == 0) 2 else 1
             val taxpayer = if (typeId == 2) TaxpayerType.JURIDICO else TaxpayerType.NATURAL
             mockClients.add(
@@ -132,8 +140,8 @@ class MockClientRepository : ClientRepository {
                     taxpayerType = taxpayer,
                     ruc = if (typeId == 2) "20555$i" else "",
                     cedula = if (typeId == 1) "8-700-$i" else "",
-                    dv = "${i % 10}"
-                )
+                    dv = "${i % 10}",
+                ),
             )
         }
     }

@@ -19,5 +19,5 @@ data class BestSellerProduct(
     val salesCount: Int,
     val progress: Float,
     val colorHex: Long,
-    val photoUrl: String = ""
+    val photoUrl: String = "",
 )

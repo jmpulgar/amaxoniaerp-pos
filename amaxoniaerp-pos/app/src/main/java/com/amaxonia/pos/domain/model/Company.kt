@@ -4,5 +4,5 @@ data class Company(
     val id: String,
     val name: String,
     val ruc: String,
-    val address: String
+    val address: String,
 )

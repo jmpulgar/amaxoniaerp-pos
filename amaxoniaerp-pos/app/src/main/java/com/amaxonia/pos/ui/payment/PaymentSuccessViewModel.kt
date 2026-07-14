@@ -2,7 +2,8 @@ package com.amaxonia.pos.ui.payment
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.domain.repository.PaymentSuccessRepository
 import com.amaxonia.pos.domain.repository.SalesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,21 +14,20 @@ data class PaymentSuccessUiState(
     val isLoading: Boolean = true,
     val isSendingReceiptEmail: Boolean = false,
     val payload: PaymentSuccessPayload? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 class PaymentSuccessViewModel(
-    private val localStore: LocalStore,
+    private val paymentSuccessRepository: PaymentSuccessRepository,
     private val salesRepository: SalesRepository,
     transactionId: String,
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(PaymentSuccessUiState())
     val state = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val result = runCatching { localStore.readLastPaymentSuccess(transactionId) }
+            val result = runCatching { paymentSuccessRepository.find(transactionId) }
             result
                 .onSuccess { payload ->
                     if (payload == null) {
@@ -35,19 +35,18 @@ class PaymentSuccessViewModel(
                             it.copy(
                                 isLoading = false,
                                 payload = null,
-                                errorMessage = "No se pudo cargar la transacción del recibo"
+                                errorMessage = "No se pudo cargar la transacción del recibo",
                             )
                         }
                     } else {
                         _state.update { it.copy(isLoading = false, payload = payload, errorMessage = null) }
                     }
-                }
-                .onFailure { throwable ->
+                }.onFailure { throwable ->
                     _state.update {
                         it.copy(
                             isLoading = false,
                             payload = null,
-                            errorMessage = throwable.message ?: "Error al cargar la transacción del recibo"
+                            errorMessage = throwable.message ?: "Error al cargar la transacción del recibo",
                         )
                     }
                 }
@@ -55,29 +54,31 @@ class PaymentSuccessViewModel(
     }
 
     fun sendReceiptEmail() {
-        val facturaId = _state.value.payload?.transactionId
-            ?.takeIf { it.isNotBlank() }
-            ?: return _state.update { it.copy(errorMessage = "No hay factura para enviar") }
+        val facturaId =
+            _state.value.payload
+                ?.transactionId
+                ?.takeIf { it.isNotBlank() }
+                ?: return _state.update { it.copy(errorMessage = "No hay factura para enviar") }
 
         viewModelScope.launch {
             _state.update { it.copy(isSendingReceiptEmail = true, errorMessage = null) }
             salesRepository.sendReceiptEmail(facturaId).fold(
                 onSuccess = { response ->
-                    val message = response.mensaje
-                        ?: response.resultado
-                        ?: "Recibo enviado por correo"
+                    val message =
+                        response.mensaje
+                            ?: response.resultado
+                            ?: "Recibo enviado por correo"
                     _state.update { it.copy(isSendingReceiptEmail = false, errorMessage = message) }
                 },
                 onFailure = { throwable ->
                     _state.update {
                         it.copy(
                             isSendingReceiptEmail = false,
-                            errorMessage = throwable.message ?: "No se pudo enviar el recibo por correo"
+                            errorMessage = throwable.message ?: "No se pudo enviar el recibo por correo",
                         )
                     }
-                }
+                },
             )
         }
     }
 }
-

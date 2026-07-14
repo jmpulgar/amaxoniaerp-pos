@@ -2,11 +2,10 @@ package com.amaxonia.pos.ui.products
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.data.local.LocalStore
-import com.amaxonia.pos.data.remote.ApiConfigManager
-import com.amaxonia.pos.data.remote.ImageUrlHelper
 import com.amaxonia.pos.domain.model.ProductStock
-import com.amaxonia.pos.domain.repository.ProductRepository
+import com.amaxonia.pos.domain.repository.ImageUrlResolver
+import com.amaxonia.pos.domain.repository.ProductCatalogReader
+import com.amaxonia.pos.domain.repository.ProductSessionReader
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,9 +13,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ProductListViewModel(
-    private val productRepository: ProductRepository,
-    private val localStore: LocalStore,
-    private val apiConfigManager: ApiConfigManager
+    private val productRepository: ProductCatalogReader,
+    private val sessionReader: ProductSessionReader,
+    private val imageUrlResolver: ImageUrlResolver,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProductListState())
     val state: StateFlow<ProductListState> = _state.asStateFlow()
@@ -27,19 +26,14 @@ class ProductListViewModel(
 
     init {
         viewModelScope.launch {
-            adminDb = localStore.readCompanySession()?.company?.adminDb ?: ""
+            adminDb = sessionReader.currentAdminDatabase()
         }
         loadProducts(reset = true)
     }
 
     fun getProductImageUrl(photoPath: String): String {
         if (photoPath.isBlank() || adminDb.isBlank()) return ""
-        return ImageUrlHelper.productImageUrl(
-            baseUrl = apiConfigManager.baseUrl.value,
-            countryCode = apiConfigManager.getCurrentCountryCode(),
-            companyDb = adminDb,
-            photoPath = photoPath
-        )
+        return imageUrlResolver.product(adminDb, photoPath)
     }
 
     fun onSearchQueryChange(query: String) {
@@ -69,13 +63,13 @@ class ProductListViewModel(
                     _state.update {
                         it.copy(
                             stockByProductId = it.stockByProductId + (productId to stock),
-                            loadingStockIds = it.loadingStockIds - productId
+                            loadingStockIds = it.loadingStockIds - productId,
                         )
                     }
                 },
                 onFailure = {
                     _state.update { it.copy(loadingStockIds = it.loadingStockIds - productId) }
-                }
+                },
             )
         }
     }
@@ -90,15 +84,16 @@ class ProductListViewModel(
                     page = if (reset) 1 else it.page + 1,
                     products = if (reset) emptyList() else it.products,
                     endOfListReached = if (reset) false else it.endOfListReached,
-                    error = null
+                    error = null,
                 )
             }
             val query = _state.value.searchQuery.trim()
-            val result = if (query.isEmpty()) {
-                productRepository.getAllProducts(_state.value.page, pageSize)
-            } else {
-                productRepository.searchProducts(query, _state.value.page, pageSize)
-            }
+            val result =
+                if (query.isEmpty()) {
+                    productRepository.getAllProducts(_state.value.page, pageSize)
+                } else {
+                    productRepository.searchProducts(query, _state.value.page, pageSize)
+                }
             result.fold(
                 onSuccess = { products ->
                     val newProducts = if (reset) products else _state.value.products + products
@@ -107,7 +102,7 @@ class ProductListViewModel(
                             isLoading = false,
                             products = newProducts,
                             endOfListReached = products.size < pageSize,
-                            error = null
+                            error = null,
                         )
                     }
                     newProducts.forEach { product ->
@@ -118,10 +113,10 @@ class ProductListViewModel(
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = exception.message ?: "Error desconocido"
+                            error = exception.message ?: "Error desconocido",
                         )
                     }
-                }
+                },
             )
         }
     }

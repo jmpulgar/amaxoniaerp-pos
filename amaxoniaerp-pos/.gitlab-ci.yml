@@ -1,0 +1,58 @@
+stages:
+  - test
+  - quality
+  - release
+
+default:
+  image: ghcr.io/cirruslabs/android-sdk:36
+  before_script:
+    - chmod +x gradlew scripts/*.sh
+  cache:
+    key: "$CI_PROJECT_ID-gradle"
+    paths:
+      - .gradle/
+      - .android/
+
+unit-and-instrumented-compile:
+  stage: test
+  script:
+    - ./scripts/test-critical.sh
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - app/build/test-results/**/TEST-*.xml
+    paths:
+      - app/build/reports/tests/
+      - app/build/reports/kover/
+      - app/build/outputs/apk/androidTest/
+
+static-quality:
+  stage: quality
+  script:
+    - ./scripts/quality-check.sh
+  artifacts:
+    when: always
+    paths:
+      - app/build/reports/
+
+release-all-flavors:
+  stage: release
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  before_script:
+    - chmod +x gradlew scripts/*.sh
+    - umask 077
+    - mkdir -p .ci
+    - printf '%s' "$AMAXONIA_KEYSTORE_BASE64" | base64 --decode > .ci/release.jks
+    - export AMAXONIA_KEYSTORE_FILE="$CI_PROJECT_DIR/.ci/release.jks"
+  script:
+    - ./scripts/verify-all-flavors.sh
+    - ./scripts/verify-release.sh
+  after_script:
+    - rm -f .ci/release.jks
+  artifacts:
+    paths:
+      - app/build/outputs/apk/
+      - app/build/outputs/mapping/
+      - app/build/reports/lint-results-*.html

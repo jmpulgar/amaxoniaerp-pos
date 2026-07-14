@@ -9,5 +9,29 @@ data class LoginState(
     val password: String = "",
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
+
+sealed interface LoginUiAction {
+    data class UsernameChanged(
+        val value: String,
+    ) : LoginUiAction
+
+    data class PasswordChanged(
+        val value: String,
+    ) : LoginUiAction
+
+    data object TogglePasswordVisibility : LoginUiAction
+
+    data class CountryChanged(
+        val country: ServerCountry,
+    ) : LoginUiAction
+
+    data object LoadSavedCountry : LoginUiAction
+
+    data object Submit : LoginUiAction
+}
+
+sealed interface LoginUiEffect {
+    data object LoginSucceeded : LoginUiEffect
+}

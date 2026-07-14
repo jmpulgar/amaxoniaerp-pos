@@ -12,7 +12,13 @@ interface AuthRepository {
      * @param countryCode Código del país (VE, PA, RD, CO) para enviar al backend
      * @return Resultado con la sesión de autenticación
      */
-    suspend fun login(username: String, password: String, countryCode: String): Result<AuthSession>
+    suspend fun login(
+        username: String,
+        password: String,
+        countryCode: String,
+    ): Result<AuthSession>
+
     suspend fun selectCompany(companyId: Int): Result<CompanySession>
+
     suspend fun logout()
 }

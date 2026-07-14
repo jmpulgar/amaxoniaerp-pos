@@ -1,77 +1,97 @@
 package com.amaxonia.pos.data.printer.panama
 
-import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
+import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
+import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
 import com.amaxonia.pos.domain.model.printer.TicketAlign
 import com.amaxonia.pos.domain.model.printer.TicketDocument
 import com.amaxonia.pos.domain.model.printer.TicketElement
 import java.util.Locale
 
-class PanamaCashCloseTicketFormatter {
-    fun format(payload: PanamaCashCloseTicketPayload): TicketDocument {
-        return TicketDocument(
-            elements = buildList {
-                addCentered(payload.companyName.uppercase(), bold = true)
-                payload.companyRuc.takeIfNotBlank()?.let { addCentered("RUC: $it") }
-                payload.companyAddress.takeIfNotBlank()?.let { addCentered(it) }
-                payload.companyPhone.takeIfNotBlank()?.let { addCentered("Tel: $it") }
-                payload.sellerName.takeIfNotBlank()?.let { addCentered("Vendedor: $it") }
-                payload.cashRegisterName.takeIfNotBlank()?.let { addCentered(it) }
-                payload.branchName.takeIfNotBlank()?.let { addCentered(it) }
-                add(TicketElement.Feed(1))
+class PanamaCashCloseTicketFormatter : CashCloseTicketFormatter {
+    override val paymentLabels: List<String> = PAYMENT_LABELS
 
-                addSectionTitle("RESUMEN CIERRE DE CAJA")
-                paymentLabels.forEach { label ->
-                    addMoney(label, payload.paymentAmounts[label].orZero())
-                }
-                add(TicketElement.Divider)
-                addMoney("ENTRADAS", payload.summary.montoEfectivoEntrada)
-                addMoney("SALIDAS", payload.summary.montoEfectivoSalida)
-                addMoney("ABONOS GENERALES", payload.generalPayments)
-                add(TicketElement.Divider)
-                addMoney("TOTAL VENTAS", payload.summary.totalSales, bold = true)
-                addMoney("CIERRE ESPERADO", payload.summary.expectedClose, bold = true)
-                addMoney("MONTO CIERRE", payload.summary.montoCierre, bold = true)
-                addMoney("DIFERENCIA", payload.summary.montoDiferencia, bold = true)
-
-                addSectionTitle("PROMOCIONES VENDIDAS")
-                if (payload.promotionLines.isEmpty()) {
-                    add(TicketElement.Text("Sin promociones registradas", TicketAlign.LEFT))
-                } else {
-                    payload.promotionLines.forEach { line ->
-                        add(
-                            TicketElement.Columns(
-                                values = listOf(line.promotionName.take(24), formatQty(line.soldTimes)),
-                                widths = listOf(24, 8),
-                                aligns = listOf(TicketAlign.LEFT, TicketAlign.RIGHT),
-                            )
-                        )
-                    }
-                }
-
-                addSectionTitle("INVENTARIO DE CIERRE DE RUTA")
-                if (payload.inventoryLines.isEmpty()) {
-                    add(TicketElement.Text("Sin movimientos locales de inventario", TicketAlign.LEFT))
-                } else {
-                    payload.inventoryLines.forEach { line ->
-                        add(TicketElement.Text("${line.productCode} - ${line.productName}".take(32), TicketAlign.LEFT, bold = true))
-                        add(
-                            TicketElement.Text(
-                                "Cant. Inicial: ${formatQty(line.initialQuantity)}  |  Vendidos: ${formatQty(line.soldQuantity)}",
-                                TicketAlign.LEFT
-                            )
-                        )
-                        add(TicketElement.Text("Existencia Real: ${formatQty(line.realQuantity)}", TicketAlign.LEFT))
-                        add(TicketElement.Feed(1))
-                    }
-                }
-
-                add(TicketElement.Divider)
-                addCentered("Codigo fiscal de cierre")
-                add(TicketElement.Feed(1))
-                add(TicketElement.Qr(payload.qrPayload, size = PANAMA_CLOSE_QR_SIZE))
-                add(TicketElement.Feed(3))
-            }
+    override fun format(payload: CashCloseTicketPayload): TicketDocument =
+        TicketDocument(
+            elements =
+                buildList {
+                    addHeader(payload)
+                    addSummary(payload)
+                    addPromotions(payload)
+                    addInventory(payload)
+                    addFooter(payload)
+                },
         )
+
+    private fun MutableList<TicketElement>.addHeader(payload: CashCloseTicketPayload) {
+        addCentered(payload.companyName.uppercase(), bold = true)
+        payload.companyRuc.takeIfNotBlank()?.let { addCentered("RUC: $it") }
+        payload.companyAddress.takeIfNotBlank()?.let { addCentered(it) }
+        payload.companyPhone.takeIfNotBlank()?.let { addCentered("Tel: $it") }
+        payload.sellerName.takeIfNotBlank()?.let { addCentered("Vendedor: $it") }
+        payload.cashRegisterName.takeIfNotBlank()?.let { addCentered(it) }
+        payload.branchName.takeIfNotBlank()?.let { addCentered(it) }
+        add(TicketElement.Feed(SINGLE_FEED))
+    }
+
+    private fun MutableList<TicketElement>.addSummary(payload: CashCloseTicketPayload) {
+        addSectionTitle("RESUMEN CIERRE DE CAJA")
+        paymentLabels.forEach { label ->
+            addMoney(label, payload.paymentAmounts[label].orZero())
+        }
+        add(TicketElement.Divider)
+        addMoney("ENTRADAS", payload.summary.montoEfectivoEntrada)
+        addMoney("SALIDAS", payload.summary.montoEfectivoSalida)
+        addMoney("ABONOS GENERALES", payload.generalPayments)
+        add(TicketElement.Divider)
+        addMoney("TOTAL VENTAS", payload.summary.totalSales)
+        addMoney("CIERRE ESPERADO", payload.summary.expectedClose)
+        addMoney("MONTO CIERRE", payload.summary.montoCierre)
+        addMoney("DIFERENCIA", payload.summary.montoDiferencia)
+    }
+
+    private fun MutableList<TicketElement>.addPromotions(payload: CashCloseTicketPayload) {
+        addSectionTitle("PROMOCIONES VENDIDAS")
+        if (payload.promotionLines.isEmpty()) {
+            add(TicketElement.Text("Sin promociones registradas", TicketAlign.LEFT))
+        } else {
+            payload.promotionLines.forEach { line ->
+                add(
+                    TicketElement.Columns(
+                        values = listOf(line.promotionName.take(PROMOTION_NAME_WIDTH), formatQty(line.soldTimes)),
+                        widths = listOf(PROMOTION_NAME_WIDTH, PROMOTION_QUANTITY_WIDTH),
+                        aligns = listOf(TicketAlign.LEFT, TicketAlign.RIGHT),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun MutableList<TicketElement>.addInventory(payload: CashCloseTicketPayload) {
+        addSectionTitle("INVENTARIO DE CIERRE DE RUTA")
+        if (payload.inventoryLines.isEmpty()) {
+            add(TicketElement.Text("Sin movimientos locales de inventario", TicketAlign.LEFT))
+        } else {
+            payload.inventoryLines.forEach { line ->
+                val productLabel = "${line.productCode} - ${line.productName}".take(TICKET_LINE_WIDTH)
+                add(TicketElement.Text(productLabel, TicketAlign.LEFT, bold = true))
+                add(
+                    TicketElement.Text(
+                        "Cant. Inicial: ${formatQty(line.initialQuantity)}  |  Vendidos: ${formatQty(line.soldQuantity)}",
+                        TicketAlign.LEFT,
+                    ),
+                )
+                add(TicketElement.Text("Existencia Real: ${formatQty(line.realQuantity)}", TicketAlign.LEFT))
+                add(TicketElement.Feed(SINGLE_FEED))
+            }
+        }
+    }
+
+    private fun MutableList<TicketElement>.addFooter(payload: CashCloseTicketPayload) {
+        add(TicketElement.Divider)
+        addCentered("Codigo fiscal de cierre")
+        add(TicketElement.Feed(SINGLE_FEED))
+        add(TicketElement.Qr(payload.qrPayload, size = PANAMA_CLOSE_QR_SIZE))
+        add(TicketElement.Feed(FOOTER_FEED))
     }
 
     private fun MutableList<TicketElement>.addSectionTitle(title: String) {
@@ -80,80 +100,62 @@ class PanamaCashCloseTicketFormatter {
         add(TicketElement.Divider)
     }
 
-    private fun MutableList<TicketElement>.addCentered(value: String, bold: Boolean = false) {
+    private fun MutableList<TicketElement>.addCentered(
+        value: String,
+        bold: Boolean = false,
+    ) {
         add(TicketElement.Text(value, TicketAlign.CENTER, bold))
     }
 
-    private fun MutableList<TicketElement>.addMoney(label: String, amount: Double, bold: Boolean = false) {
+    private fun MutableList<TicketElement>.addMoney(
+        label: String,
+        amount: Double,
+    ) {
         add(
             TicketElement.Columns(
-                values = listOf(label.take(20), formatMoney(amount)),
-                widths = listOf(20, 12),
+                values = listOf(label.take(MONEY_LABEL_WIDTH), formatMoney(amount)),
+                widths = listOf(MONEY_LABEL_WIDTH, MONEY_VALUE_WIDTH),
                 aligns = listOf(TicketAlign.LEFT, TicketAlign.RIGHT),
-            )
+            ),
         )
     }
-
-    private fun formatMoney(value: Double): String {
-        return "$" + String.format(Locale.US, "%.2f", value)
-    }
-
-    private fun formatQty(value: Double): String {
-        val whole = value.toLong()
-        return if (value == whole.toDouble()) whole.toString() else String.format(Locale.US, "%.2f", value)
-    }
-
-    private fun String.takeIfNotBlank(): String? = trim().takeIf { it.isNotBlank() }
-
-    private fun Double?.orZero(): Double = this ?: 0.0
 
     companion object {
+        private const val SINGLE_FEED = 1
+        private const val FOOTER_FEED = 3
         private const val PANAMA_CLOSE_QR_SIZE = 3
+        private const val TICKET_LINE_WIDTH = 32
+        private const val PROMOTION_NAME_WIDTH = 24
+        private const val PROMOTION_QUANTITY_WIDTH = 8
+        private const val MONEY_LABEL_WIDTH = 20
+        private const val MONEY_VALUE_WIDTH = 12
 
-        val paymentLabels = listOf(
-            "EFECTIVO",
-            "ACH / IBAN",
-            "REFERENCIA",
-            "DEPOSITO",
-            "CUENTAS POR COBRAR",
-            "NOTAS DE CREDITO / DEVOLUCIONES",
-            "CERTIFICADO DE REGALO",
-            "PUNTOS",
-            "TARJETA DE DEBITO",
-            "VISA",
-            "MASTERCARD",
-            "YAPPY",
-            "ABONOS APLICADOS",
-        )
+        private val PAYMENT_LABELS =
+            listOf(
+                "EFECTIVO",
+                "ACH / IBAN",
+                "REFERENCIA",
+                "DEPOSITO",
+                "CUENTAS POR COBRAR",
+                "NOTAS DE CREDITO / DEVOLUCIONES",
+                "CERTIFICADO DE REGALO",
+                "PUNTOS",
+                "TARJETA DE DEBITO",
+                "VISA",
+                "MASTERCARD",
+                "YAPPY",
+                "ABONOS APLICADOS",
+            )
     }
 }
 
-data class PanamaCashCloseTicketPayload(
-    val companyName: String,
-    val companyRuc: String,
-    val companyAddress: String,
-    val companyPhone: String,
-    val sellerName: String,
-    val cashRegisterName: String,
-    val branchName: String,
-    val summary: CierreCajaSummary,
-    val paymentAmounts: Map<String, Double>,
-    val generalPayments: Double,
-    val promotionLines: List<CashClosePromotionLine>,
-    val inventoryLines: List<CashCloseInventoryLine>,
-    val qrPayload: String,
-)
+private fun formatMoney(value: Double): String = "$" + String.format(Locale.US, "%.2f", value)
 
-data class CashClosePromotionLine(
-    val promotionCode: String,
-    val promotionName: String,
-    val soldTimes: Double,
-)
+private fun formatQty(value: Double): String {
+    val whole = value.toLong()
+    return if (value == whole.toDouble()) whole.toString() else String.format(Locale.US, "%.2f", value)
+}
 
-data class CashCloseInventoryLine(
-    val productCode: String,
-    val productName: String,
-    val initialQuantity: Double,
-    val soldQuantity: Double,
-    val realQuantity: Double,
-)
+private fun String.takeIfNotBlank(): String? = trim().takeIf { it.isNotBlank() }
+
+private fun Double?.orZero(): Double = this ?: 0.0

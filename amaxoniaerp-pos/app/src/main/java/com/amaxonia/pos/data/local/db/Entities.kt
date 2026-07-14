@@ -16,12 +16,12 @@ data class ClientEntity(
     val phone: String,
     val email: String,
     val status: Boolean,
-    val clientTypeId: Int,       // Correcto: Int
-    val taxpayerTypeId: Int,     // CORREGIDO: Ahora es Int (antes String taxpayerType)
+    val clientTypeId: Int, // Correcto: Int
+    val taxpayerTypeId: Int, // CORREGIDO: Ahora es Int (antes String taxpayerType)
     val countryId: Int,
     val addressLevel1: String,
     val addressLevel2: String,
-    val addressLevel3: String
+    val addressLevel3: String,
 )
 
 @Entity(tableName = "client_sucursales")
@@ -55,48 +55,48 @@ data class ProductEntity(
     val bulkQuantity: Double = 1.0,
     val portionUnit: String? = null,
     val unitOrPackage: String = "UNIDAD",
-    val prices: List<PriceLevel>
+    val prices: List<PriceLevel>,
 )
 
 @Entity(tableName = "countries")
 data class CountryEntity(
     @PrimaryKey val id: Int,
     val iso: String,
-    val name: String
+    val name: String,
 )
 
 @Entity(
     tableName = "address_level1",
-    primaryKeys = ["countryCode", "code"]
+    primaryKeys = ["countryCode", "code"],
 )
 data class AddressLevel1Entity(
     val countryCode: String,
     val code: String,
-    val name: String
+    val name: String,
 )
 
 @Entity(
     tableName = "address_level2",
-    primaryKeys = ["countryCode", "code"]
+    primaryKeys = ["countryCode", "code"],
 )
 data class AddressLevel2Entity(
     val countryCode: String,
     val code: String,
-    val name: String
+    val name: String,
 )
 
 @Entity(
     tableName = "address_level3",
-    primaryKeys = ["countryCode", "code"]
+    primaryKeys = ["countryCode", "code"],
 )
 data class AddressLevel3Entity(
     val countryCode: String,
     val code: String,
-    val name: String
+    val name: String,
 )
 
 @Entity(tableName = "client_types")
 data class ClientTypeEntity(
     @PrimaryKey val id: Int,
-    val name: String
+    val name: String,
 )

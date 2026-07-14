@@ -3,7 +3,6 @@ package com.amaxonia.pos.ui.caja
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -45,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -55,7 +54,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -66,32 +64,42 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
+import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.theme.AmaxoniaBlue
+import com.amaxonia.pos.ui.theme.AccentPurple
+import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.SuccessGreen
+import com.amaxonia.pos.ui.theme.WarningOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CierreCajaScreen(
-    viewModel: CierreCajaViewModel = injectedViewModel {
-        CierreCajaViewModel(
-            DependencyContainer.cajaRepository,
-            DependencyContainer.printerFactory,
-            DependencyContainer.localStore,
-            DependencyContainer.productRepository,
-            DependencyContainer.pendingInvoiceDao
-        )
-    },
+    viewModel: CierreCajaViewModel =
+        injectedViewModel {
+            CierreCajaViewModel(
+                DependencyContainer.cajaRepository,
+                CashClosePrintingService(
+                    DependencyContainer.printerFactory,
+                    DependencyContainer.posConfigurationRepository,
+                    DependencyContainer.cashCloseTicketFormatter,
+                ),
+                DependencyContainer.posConfigurationRepository,
+                DependencyContainer.productRepository,
+                DependencyContainer.pendingSalesReader,
+                DependencyContainer.cashCloseTicketFormatter,
+            )
+        },
     onBack: () -> Unit,
-    onCloseSuccess: () -> Unit
+    onCloseSuccess: () -> Unit,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val isPrintingX by viewModel.isPrintingReportX.collectAsState()
-    val isPrintingZ by viewModel.isPrintingReportZ.collectAsState()
-    val reportMessage by viewModel.reportMessage.collectAsState()
-    val showCloseTicketPrompt by viewModel.showCloseTicketPrompt.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isPrintingX by viewModel.isPrintingReportX.collectAsStateWithLifecycle()
+    val isPrintingZ by viewModel.isPrintingReportZ.collectAsStateWithLifecycle()
+    val reportMessage by viewModel.reportMessage.collectAsStateWithLifecycle()
+    val showCloseTicketPrompt by viewModel.showCloseTicketPrompt.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(reportMessage) {
@@ -115,7 +123,7 @@ fun CierreCajaScreen(
                 TextButton(onClick = { viewModel.confirmClose(printTicket = false) }) {
                     Text("No imprimir")
                 }
-            }
+            },
         )
     }
 
@@ -128,7 +136,7 @@ fun CierreCajaScreen(
                     Text(
                         "Cierre de Caja",
                         fontWeight = FontWeight.Bold,
-                        color = AmaxoniaBlue
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 },
                 navigationIcon = {
@@ -136,54 +144,59 @@ fun CierreCajaScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
-                            tint = AmaxoniaBlue
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
-        }
+        },
     ) { padding ->
         AnimatedContent(
             targetState = uiState,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = "cierreCajaTransition",
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
         ) { state ->
             when (state) {
                 is CierreCajaUiState.Loading -> LoadingContent()
-                is CierreCajaUiState.Ready -> ReadyContent(
-                    summary = state.summary,
-                    isClosing = false,
-                    isPrintingReportX = isPrintingX,
-                    isPrintingReportZ = isPrintingZ,
-                    showReportButtons = viewModel.hasActivePrinter,
-                    onConfirmClose = { viewModel.requestClose() },
-                    onPrintReportX = { viewModel.printReportX() },
-                    onPrintReportZ = { viewModel.printReportZ() }
-                )
-                is CierreCajaUiState.Closing -> ReadyContent(
-                    summary = state.summary,
-                    isClosing = true,
-                    isPrintingReportX = false,
-                    isPrintingReportZ = false,
-                    showReportButtons = viewModel.hasActivePrinter,
-                    onConfirmClose = {},
-                    onPrintReportX = {},
-                    onPrintReportZ = {}
-                )
-                is CierreCajaUiState.Success -> SuccessContent(
-                    message = state.message,
-                    onDone = onCloseSuccess
-                )
-                is CierreCajaUiState.Error -> ErrorContent(
-                    message = state.message,
-                    hasSummary = state.summary != null,
-                    onRetry = { viewModel.loadSummary() },
-                    onRetryClose = { viewModel.requestClose() }
-                )
+                is CierreCajaUiState.Ready ->
+                    ReadyContent(
+                        summary = state.summary,
+                        isClosing = false,
+                        isPrintingReportX = isPrintingX,
+                        isPrintingReportZ = isPrintingZ,
+                        showReportButtons = viewModel.hasActivePrinter,
+                        onConfirmClose = { viewModel.requestClose() },
+                        onPrintReportX = { viewModel.printReportX() },
+                        onPrintReportZ = { viewModel.printReportZ() },
+                    )
+                is CierreCajaUiState.Closing ->
+                    ReadyContent(
+                        summary = state.summary,
+                        isClosing = true,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = viewModel.hasActivePrinter,
+                        onConfirmClose = {},
+                        onPrintReportX = {},
+                        onPrintReportZ = {},
+                    )
+                is CierreCajaUiState.Success ->
+                    SuccessContent(
+                        message = state.message,
+                        onDone = onCloseSuccess,
+                    )
+                is CierreCajaUiState.Error ->
+                    ErrorContent(
+                        message = state.message,
+                        hasSummary = state.summary != null,
+                        onRetry = { viewModel.loadSummary() },
+                        onRetryClose = { viewModel.requestClose() },
+                    )
             }
         }
     }
@@ -195,15 +208,15 @@ fun CierreCajaScreen(
 private fun LoadingContent() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = AmaxoniaBlue)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 "Cargando resumen de caja...",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 14.sp
+                fontSize = 14.sp,
             )
         }
     }
@@ -220,14 +233,15 @@ private fun ReadyContent(
     showReportButtons: Boolean,
     onConfirmClose: () -> Unit,
     onPrintReportX: () -> Unit,
-    onPrintReportZ: () -> Unit
+    onPrintReportZ: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -235,23 +249,24 @@ private fun ReadyContent(
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = AmaxoniaBlue),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Rounded.PointOfSale,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            tint = PosPalette.FixedWhite,
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -260,43 +275,43 @@ private fun ReadyContent(
                             text = summary.cajaName,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
-                            color = Color.White
+                            color = PosPalette.FixedWhite,
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp)
+                            modifier = Modifier.padding(top = 4.dp),
                         ) {
                             Icon(
                                 Icons.Rounded.Schedule,
                                 contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(14.dp)
+                                tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp),
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Abierta: ${summary.openedAt}",
                                 fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = PosPalette.FixedWhite.copy(alpha = 0.7f),
                             )
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+                HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     MiniStat(
                         label = "Monto Apertura",
                         value = formatMoney(summary.openAmount),
-                        color = Color.White
+                        color = PosPalette.FixedWhite,
                     )
                     MiniStat(
                         label = "Transacciones",
                         value = "${summary.transactionCount}",
-                        color = Color.White
+                        color = PosPalette.FixedWhite,
                     )
                 }
             }
@@ -312,16 +327,16 @@ private fun ReadyContent(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 SummaryRow(
                     icon = Icons.Rounded.ShoppingCart,
-                    iconTint = AmaxoniaBlue,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     label = "Total Ventas",
                     value = formatMoney(summary.totalSales),
-                    valueColor = AmaxoniaBlue,
-                    isBold = true
+                    valueColor = MaterialTheme.colorScheme.primary,
+                    isBold = true,
                 )
             }
         }
@@ -336,36 +351,42 @@ private fun ReadyContent(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                val lines = summary.paymentLines.ifEmpty {
-                    listOf(
-                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
-                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
-                        com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
-                    ).filter { it.amount > 0.0 }
-                }
+                val lines =
+                    summary.paymentLines.ifEmpty {
+                        listOf(
+                            com.amaxonia.pos.domain.model.caja
+                                .CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
+                            com.amaxonia.pos.domain.model.caja
+                                .CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
+                            com.amaxonia.pos.domain.model.caja
+                                .CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
+                        ).filter { it.amount > 0.0 }
+                    }
 
                 lines.forEachIndexed { index, line ->
-                    val (icon, tint) = when (line.siglas.uppercase()) {
-                        "CASH", "EF", "EFE", "EFECTIVO" -> Icons.Rounded.AttachMoney to Color(0xFF2E7D32)
-                        "TDC", "TARJETA", "PV", "POS", "DB", "DEBITO", "CR", "CREDITO" -> Icons.Rounded.CreditCard to Color(0xFF6A1B9A)
-                        else -> Icons.Rounded.AccountBalance to Color(0xFFEF6C00)
-                    }
+                    val (icon, tint) =
+                        when (line.siglas.uppercase()) {
+                            "CASH", "EF", "EFE", "EFECTIVO" -> Icons.Rounded.AttachMoney to SuccessGreen
+                            "TDC", "TARJETA", "PV", "POS", "DB", "DEBITO", "CR", "CREDITO" ->
+                                Icons.Rounded.CreditCard to AccentPurple
+                            else -> Icons.Rounded.AccountBalance to WarningOrange
+                        }
 
                     SummaryRow(
                         icon = icon,
                         iconTint = tint,
                         label = line.label,
                         value = formatMoney(line.amount),
-                        valueColor = tint
+                        valueColor = tint,
                     )
 
                     if (index < lines.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 14.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
+                            color = MaterialTheme.colorScheme.outlineVariant,
                         )
                     }
                 }
@@ -379,35 +400,36 @@ private fun ReadyContent(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Rounded.Receipt,
                         contentDescription = null,
-                        tint = Color(0xFF2E7D32),
-                        modifier = Modifier.size(22.dp)
+                        tint = SuccessGreen,
+                        modifier = Modifier.size(22.dp),
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         "Cierre Esperado",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Text(
                     formatMoney(summary.expectedClose),
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
             }
         }
@@ -417,73 +439,77 @@ private fun ReadyContent(
         if (showReportButtons) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedButton(
                     onClick = onPrintReportX,
                     enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = AmaxoniaBlue,
-                        disabledContentColor = AmaxoniaBlue.copy(alpha = 0.4f)
-                    )
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        ),
                 ) {
                     if (isPrintingReportX) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
-                            color = AmaxoniaBlue
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     } else {
                         Icon(
                             Icons.AutoMirrored.Rounded.Assignment,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
                         if (isPrintingReportX) "Imprimiendo..." else "Reporte X",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
                     )
                 }
 
                 OutlinedButton(
                     onClick = onPrintReportZ,
                     enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                        disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-                    )
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                            disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
+                        ),
                 ) {
                     if (isPrintingReportZ) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     } else {
                         Icon(
                             Icons.Rounded.Description,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
                         if (isPrintingReportZ) "Imprimiendo..." else "Reporte Z",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
                     )
                 }
             }
@@ -495,39 +521,41 @@ private fun ReadyContent(
         Button(
             onClick = onConfirmClose,
             enabled = !isClosing,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
         ) {
             if (isClosing) {
                 CircularProgressIndicator(
-                    color = Color.White,
+                    color = PosPalette.FixedWhite,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(22.dp),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     "Cerrando Caja...",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
                 )
             } else {
                 Icon(
                     Icons.Rounded.Lock,
                     contentDescription = null,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(22.dp),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     "Confirmar Cierre de Caja",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
                 )
             }
         }
@@ -539,27 +567,29 @@ private fun ReadyContent(
 @Composable
 private fun SuccessContent(
     message: String,
-    onDone: () -> Unit
+    onDone: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(SuccessGreen.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(SuccessGreen.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Rounded.CheckCircle,
                 contentDescription = null,
                 tint = SuccessGreen,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(56.dp),
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
@@ -567,22 +597,23 @@ private fun SuccessContent(
             "Caja Cerrada",
             fontWeight = FontWeight.Bold,
             fontSize = 24.sp,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             message,
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(40.dp))
         Button(
             onClick = onDone,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AmaxoniaBlue)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
         ) {
             Text("Volver al Dashboard", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
@@ -596,29 +627,31 @@ private fun ErrorContent(
     message: String,
     hasSummary: Boolean,
     onRetry: () -> Unit,
-    onRetryClose: () -> Unit
+    onRetryClose: () -> Unit,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         ElevatedCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            )
+            colors =
+                CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                ),
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = message,
                     color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 if (hasSummary) {
@@ -643,23 +676,27 @@ private fun SectionTitle(text: String) {
         text = text,
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
-        color = MaterialTheme.colorScheme.onSurface
+        color = MaterialTheme.colorScheme.onSurface,
     )
 }
 
 @Composable
-private fun MiniStat(label: String, value: String, color: Color) {
+private fun MiniStat(
+    label: String,
+    value: String,
+    color: Color,
+) {
     Column {
         Text(
             text = label,
             fontSize = 11.sp,
-            color = color.copy(alpha = 0.7f)
+            color = color.copy(alpha = 0.7f),
         )
         Text(
             text = value,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
-            color = color
+            color = color,
         )
     }
 }
@@ -671,26 +708,27 @@ private fun SummaryRow(
     label: String,
     value: String,
     valueColor: Color,
-    isBold: Boolean = false
+    isBold: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(iconTint.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(iconTint.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
             Spacer(modifier = Modifier.width(14.dp))
@@ -698,17 +736,16 @@ private fun SummaryRow(
                 text = label,
                 fontSize = 15.sp,
                 fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         Text(
             text = value,
             fontWeight = FontWeight.Bold,
             fontSize = if (isBold) 18.sp else 16.sp,
-            color = valueColor
+            color = valueColor,
         )
     }
 }
 
-private fun formatMoney(amount: Double): String =
-    "$ ${String.format("%.2f", amount)}"
+private fun formatMoney(amount: Double): String = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", amount)}"

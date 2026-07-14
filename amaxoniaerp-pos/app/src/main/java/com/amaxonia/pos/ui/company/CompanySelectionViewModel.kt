@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 class CompanySelectionViewModel(
     private val companyRepository: CompanyRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CompanySelectionState())
     val state: StateFlow<CompanySelectionState> = _state.asStateFlow()
@@ -35,7 +35,7 @@ class CompanySelectionViewModel(
                         it.copy(
                             isLoading = false,
                             companies = companies,
-                            error = null
+                            error = null,
                         )
                     }
                 },
@@ -43,15 +43,18 @@ class CompanySelectionViewModel(
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = exception.message ?: "Error al cargar empresas"
+                            error = exception.message ?: "Error al cargar empresas",
                         )
                     }
-                }
+                },
             )
         }
     }
 
-    fun selectCompany(company: Company, onCompanySelected: () -> Unit) {
+    fun selectCompany(
+        company: Company,
+        onCompanySelected: () -> Unit,
+    ) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             val companyId = company.id.toIntOrNull()
@@ -70,10 +73,10 @@ class CompanySelectionViewModel(
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = exception.message ?: "Error al seleccionar empresa"
+                            error = exception.message ?: "Error al seleccionar empresa",
                         )
                     }
-                }
+                },
             )
         }
     }

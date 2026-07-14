@@ -14,5 +14,5 @@ data class ProductFormState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isEditMode: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )

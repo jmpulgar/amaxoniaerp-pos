@@ -16,15 +16,14 @@ import java.net.URLEncoder
  *   Por eso, para rutas (photoPath) codificamos por segmentos y preservamos "/".
  */
 object ImageUrlHelper {
-
     private const val UTF8 = "UTF-8"
 
-    private fun encSegment(value: String): String =
-        URLEncoder.encode(value, UTF8).replace("+", "%20")
+    private fun encSegment(value: String): String = URLEncoder.encode(value, UTF8).replace("+", "%20")
 
     /** Encodea una ruta preservando "/" (encode por segmentos). */
     private fun encPath(path: String): String =
-        path.split("/")
+        path
+            .split("/")
             .filter { it.isNotBlank() }
             .joinToString("/") { seg -> encSegment(seg) }
 
@@ -39,7 +38,7 @@ object ImageUrlHelper {
         baseUrl: String,
         countryCode: String,
         companyDb: String,
-        photoPath: String
+        photoPath: String,
     ): String {
         if (photoPath.isBlank()) return ""
         val base = baseUrl.trimEnd('/')
@@ -60,7 +59,7 @@ object ImageUrlHelper {
         countryCode: String,
         companyDb: String,
         idCliente: String,
-        photoFilename: String
+        photoFilename: String,
     ): String {
         if (idCliente.isBlank() || photoFilename.isBlank()) return ""
         val base = baseUrl.trimEnd('/')
@@ -72,6 +71,8 @@ object ImageUrlHelper {
     /**
      * Si en BD solo tienes id_cliente, el filename suele ser "{id_cliente}_foto.jpeg".
      */
-    fun clientPhotoFilename(idCliente: String, extension: String = "jpeg"): String =
-        "${idCliente}_foto.$extension"
+    fun clientPhotoFilename(
+        idCliente: String,
+        extension: String = "jpeg",
+    ): String = "${idCliente}_foto.$extension"
 }

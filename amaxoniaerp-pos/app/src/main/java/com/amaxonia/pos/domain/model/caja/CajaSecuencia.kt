@@ -14,7 +14,7 @@ data class CajaSecuencia(
     val usuarioApertura: String,
     val usuarioCierre: String? = null,
     val serieSucursal: String,
-    val idSucursal: Int?
+    val idSucursal: Int?,
 )
 
 @Serializable
@@ -28,7 +28,7 @@ data class AperturaRequest(
     val facturaInicial: Int = 0,
     val notacreditoInicial: Int = 0,
     val devolucionInicial: Int = 0,
-    val zInicial: Int = 0
+    val zInicial: Int = 0,
 )
 
 @Serializable
@@ -78,14 +78,14 @@ data class CierreCajaResponse(
     val success: Boolean,
     val message: String,
     val id: String? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 @Serializable
 data class CajaSecuenciaGetResponse(
     val success: Boolean,
     val data: CajaSecuenciaDataDto? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 @Serializable

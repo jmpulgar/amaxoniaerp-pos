@@ -18,7 +18,7 @@ data class DraftInvoiceEntity(
     val itemsJson: String, // JSON serializado de los CartItem
     val total: Double,
     val itemCount: Int,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Dao
