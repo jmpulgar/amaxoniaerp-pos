@@ -75,10 +75,17 @@ fun WelcomeScreen(
     onRequestAccountClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    // Capas de las olas (cada flavor define sus propios tonos con buen contraste).
     val gradientStart = colorResource(R.color.brand_gradient_start)
+    val gradientMid = colorResource(R.color.brand_gradient_mid)
     val gradientEnd = colorResource(R.color.brand_gradient_end)
+    val waveBackTop = colorResource(R.color.brand_wave_back_top)
+    val waveBackBottom = colorResource(R.color.brand_wave_back_bottom)
+    val waveFrontStart = colorResource(R.color.brand_wave_front_start)
+    val waveFrontMid = colorResource(R.color.brand_wave_front_mid)
+    val waveFrontEnd = colorResource(R.color.brand_wave_front_end)
+    val waveScrim = colorResource(R.color.brand_wave_scrim)
     val taglineColor = colorResource(R.color.brand_welcome_tagline)
-    val brandPrimary = MaterialTheme.colorScheme.primary
     val websiteUrl = stringResource(R.string.brand_website_url)
     val supportUrl = stringResource(R.string.brand_support_url)
     var showContactSheet by remember { mutableStateOf(false) }
@@ -120,11 +127,11 @@ fun WelcomeScreen(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val waveY = h * 0.48f // dónde comienza la ola
-            val amplitude1 = 22f
-            val amplitude2 = 14f
+            val waveY = h * 0.46f // dónde comienza la ola
+            val amplitude1 = 26f
+            val amplitude2 = 16f
 
-            // Ola trasera (más suave)
+            // Ola trasera (más suave pero con bastante cuerpo para no perder profundidad)
             val backWave =
                 Path().apply {
                     moveTo(0f, h)
@@ -141,14 +148,14 @@ fun WelcomeScreen(
                 path = backWave,
                 brush =
                     Brush.verticalGradient(
-                        colors = listOf(gradientEnd.copy(alpha = 0.45f), brandPrimary.copy(alpha = 0.55f)),
+                        colors = listOf(waveBackTop, waveBackBottom),
                         startY = waveY - amplitude2,
                         endY = h,
                     ),
                 style = Fill,
             )
 
-            // Ola frontal (principal)
+            // Ola frontal (principal) con gradiente saturado opaco
             val frontWave =
                 Path().apply {
                     moveTo(0f, h)
@@ -165,13 +172,38 @@ fun WelcomeScreen(
                 path = frontWave,
                 brush =
                     Brush.linearGradient(
-                        colors = listOf(gradientStart, brandPrimary, gradientEnd),
+                        colors = listOf(waveFrontStart, waveFrontMid, waveFrontEnd),
                         start = Offset(0f, waveY),
                         end = Offset(w, h),
                     ),
                 style = Fill,
             )
+
+            // Scrim inferior para asegurar contraste del texto blanco sobre las olas
+            drawRect(
+                color = waveScrim,
+                topLeft = Offset(0f, waveY),
+                size = androidx.compose.ui.geometry.Size(w, h - waveY),
+            )
         }
+
+        // Refuerzo de gradiente sutil para anclar la zona de texto al color de marca
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush =
+                            Brush.verticalGradient(
+                                colors =
+                                    listOf(
+                                        gradientStart.copy(alpha = 0.0f),
+                                        gradientStart.copy(alpha = 0.0f),
+                                        gradientEnd.copy(alpha = 0.18f),
+                                    ),
+                            ),
+                    ),
+        )
 
         // ─── Contenido ──────────────────────────────────────────────
         Column(
@@ -230,7 +262,7 @@ fun WelcomeScreen(
             Text(
                 text = stringResource(R.string.brand_welcome_message),
                 style = MaterialTheme.typography.bodyLarge,
-                color = PosPalette.FixedWhite.copy(alpha = 0.80f),
+                color = PosPalette.FixedWhite,
                 textAlign = TextAlign.Center,
                 lineHeight = 22.sp,
                 modifier = Modifier.padding(horizontal = 36.dp),
@@ -287,8 +319,8 @@ fun WelcomeScreen(
                                 Brush.linearGradient(
                                     colors =
                                         listOf(
+                                            PosPalette.FixedWhite,
                                             PosPalette.FixedWhite.copy(alpha = 0.7f),
-                                            PosPalette.FixedWhite.copy(alpha = 0.3f),
                                         ),
                                 ),
                         ),
@@ -305,7 +337,7 @@ fun WelcomeScreen(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                             ),
-                        color = PosPalette.FixedWhite.copy(alpha = 0.9f),
+                        color = PosPalette.FixedWhite,
                     )
                 }
             }

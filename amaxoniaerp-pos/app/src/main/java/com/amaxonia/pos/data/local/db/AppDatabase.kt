@@ -22,8 +22,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PendingInvoiceEntity::class,
         PromocionEntity::class,
         PromocionDetalleEntity::class,
+        TransactionLogEntity::class,
     ],
-    version = 10,
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -49,6 +50,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingInvoiceDao(): PendingInvoiceDao
 
     abstract fun promocionDao(): PromocionDao
+
+    abstract fun transactionLogDao(): TransactionLogDao
 
     companion object {
         @Volatile
@@ -231,6 +234,70 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        internal val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS transaction_log (" +
+                            "clientCorrelationId TEXT NOT NULL, " +
+                            "idCaja TEXT NOT NULL, " +
+                            "idCajaSecuencia TEXT NOT NULL, " +
+                            "totalAmount REAL NOT NULL, " +
+                            "currency TEXT NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "lastError TEXT, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(clientCorrelationId)" +
+                            ")",
+                    )
+                }
+            }
+
+        internal val MIGRATION_11_12 =
+            object : Migration(11, 12) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN fiscalNumber TEXT")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN printerSerial TEXT")
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN fiscalConfirmationStatus TEXT NOT NULL DEFAULT 'PENDING'",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN fiscalConfirmationRetryCount INTEGER NOT NULL DEFAULT 0",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN fiscalConfirmationNextAttemptAt INTEGER NOT NULL DEFAULT 0",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN fiscalConfirmationLeasedUntil INTEGER NOT NULL DEFAULT 0",
+                    )
+                }
+            }
+
+        internal val MIGRATION_12_13 =
+            object : Migration(12, 13) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Gateway callback lifecycle (FASE 3). DEFAULT 'IGNORED' so
+                    // pre-existing rows are not treated as a pending callback.
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN gatewayCallbackStatus TEXT NOT NULL DEFAULT 'IGNORED'",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN gatewayCallbackRetryCount INTEGER NOT NULL DEFAULT 0",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN gatewayCallbackNextAttemptAt INTEGER NOT NULL DEFAULT 0",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE transaction_log ADD COLUMN gatewayCallbackLeasedUntil INTEGER NOT NULL DEFAULT 0",
+                    )
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN gatewayRawResponse TEXT")
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -242,6 +309,9 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_7_8,
                 MIGRATION_8_9,
                 MIGRATION_9_10,
+                MIGRATION_10_11,
+                MIGRATION_11_12,
+                MIGRATION_12_13,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -261,6 +331,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_8_9,
                         MIGRATION_9_10,
+                        MIGRATION_10_11,
+                        MIGRATION_11_12,
+                        MIGRATION_12_13,
                     ).build()
                     .also { instance = it }
             }

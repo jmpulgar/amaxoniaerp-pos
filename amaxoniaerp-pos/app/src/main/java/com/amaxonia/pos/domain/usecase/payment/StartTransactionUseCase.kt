@@ -1,0 +1,101 @@
+package com.amaxonia.pos.domain.usecase.payment
+
+import com.amaxonia.pos.data.local.db.TransactionLogDao
+import com.amaxonia.pos.data.local.db.TransactionLogEntity
+import com.amaxonia.pos.domain.system.AppClock
+import com.amaxonia.pos.domain.system.IdGenerator
+
+/**
+ * Mints the client-side correlation id (`idFactura`) exactly once per new
+ * payment operation and persists a `SENDING` row in the on-device ledger so
+ * the operation survives process death.
+ *
+ * Recovery rule: if [recoverOrStart] is invoked with a [carryOverId] that
+ * already has a row in `SENDING` status (e.g. the app crashed mid-submission
+ * and the user re-triggered the same operation), the existing correlation id
+ * is reused so the backend deduplication (HTTP 409) kicks in. If the carried
+ * id has no ledger row, or is blank, a fresh id is minted — correlation is
+ * never re-derived from carrito contents (it is one-per-operation, not
+ * one-per-carrito-similarity).
+ */
+class StartTransactionUseCase(
+    private val dao: TransactionLogDao,
+    private val idGenerator: IdGenerator,
+    private val clock: AppClock,
+) {
+    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction {
+        val now = clock.now().toEpochMilli()
+        val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }
+        return if (existing != null && existing.status == STATUS_SENDING) {
+            StartedTransaction(clientCorrelationId = existing.clientCorrelationId, resumed = true)
+        } else {
+            val id = idGenerator.nextId()
+            dao.upsert(
+                TransactionLogEntity(
+                    clientCorrelationId = id,
+                    idCaja = command.idCaja,
+                    idCajaSecuencia = command.idCajaSecuencia,
+                    totalAmount = command.totalAmount,
+                    currency = command.currency,
+                    clientName = command.clientName,
+                    status = STATUS_SENDING,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+            StartedTransaction(clientCorrelationId = id, resumed = false)
+        }
+    }
+
+    suspend fun markConfirmed(
+        clientCorrelationId: String,
+        remoteInvoiceId: String?,
+        remoteInvoiceNumber: String?,
+    ) {
+        dao.markConfirmed(
+            id = clientCorrelationId,
+            status = STATUS_CONFIRMED,
+            remoteInvoiceId = remoteInvoiceId,
+            remoteInvoiceNumber = remoteInvoiceNumber,
+        )
+    }
+
+    suspend fun markFailed(
+        clientCorrelationId: String,
+        message: String?,
+        status: String = STATUS_FAILED,
+    ) {
+        dao.markFailed(
+            id = clientCorrelationId,
+            status = status,
+            message = message,
+        )
+    }
+
+    companion object {
+        const val STATUS_SENDING = "SENDING"
+        const val STATUS_CONFIRMED = "CONFIRMED"
+        const val STATUS_FAILED = "FAILED"
+        const val STATUS_DUPLICATE = "DUPLICATE"
+    }
+}
+
+data class StartedTransaction(
+    val clientCorrelationId: String,
+    val resumed: Boolean,
+)
+
+/**
+ * Carries the fields needed to open a row in the transaction_log. The
+ * [carryOverId] is the only optional field: when present and still in SENDING
+ * status, the existing correlation id is reused; otherwise a fresh UUID is
+ * minted.
+ */
+data class StartTransactionCommand(
+    val carryOverId: String?,
+    val idCaja: String,
+    val idCajaSecuencia: String,
+    val totalAmount: Double,
+    val currency: String,
+    val clientName: String,
+)

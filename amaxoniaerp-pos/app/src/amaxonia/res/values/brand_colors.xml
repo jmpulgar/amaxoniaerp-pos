@@ -49,7 +49,17 @@
     <color name="brand_outline_dark">#8891A8</color>
     <color name="brand_outline_variant_dark">#3D465D</color>
     <color name="brand_gradient_start">#0D3A8C</color>
+    <color name="brand_gradient_mid">#1B5FCC</color>
     <color name="brand_gradient_end">#3B7BF7</color>
+
+    <!-- Wave layers (Amaxonia: tonos del gradiente azul existente, opacos). -->
+    <color name="brand_wave_back_top">#660D3A8C</color>
+    <color name="brand_wave_back_bottom">#991B5FCC</color>
+    <color name="brand_wave_front_start">#FF0D3A8C</color>
+    <color name="brand_wave_front_mid">#FF1B5FCC</color>
+    <color name="brand_wave_front_end">#FF3B7BF7</color>
+    <color name="brand_wave_scrim">#66091020</color>
+
     <color name="brand_welcome_tagline">#5A6A80</color>
     <color name="brand_splash_background">#FFFFFF</color>
 </resources>

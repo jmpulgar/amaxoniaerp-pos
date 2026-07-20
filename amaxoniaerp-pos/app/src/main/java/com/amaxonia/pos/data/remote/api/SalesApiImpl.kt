@@ -12,6 +12,7 @@ import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -29,6 +30,10 @@ import kotlinx.serialization.json.jsonPrimitive
 class SalesApiImpl(
     private val apiClient: ApiClient,
 ) : SalesApi {
+    private companion object {
+        const val HTTP_CONFLICT = 409
+    }
+
     override suspend fun processSale(
         authHeader: String,
         payload: ProcessSaleRequestDto,
@@ -42,6 +47,22 @@ class SalesApiImpl(
                 }
 
             val responseText = response.bodyAsText()
+            if (response.status.value == HTTP_CONFLICT) {
+                val correlationId = payload.idFactura.orEmpty()
+                val reason =
+                    runCatching {
+                        val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                        if (json is JsonObject) {
+                            json["error"]?.jsonPrimitive?.contentOrNull
+                        } else {
+                            null
+                        }
+                    }.getOrNull() ?: "La factura ya fue procesada en un intento anterior"
+                throw DuplicateInvoiceException(
+                    clientCorrelationId = correlationId,
+                    message = reason,
+                )
+            }
             val parsed =
                 runCatching {
                     AppJson.decodeFromString(ProcessSaleResponseDto.serializer(), responseText)

@@ -77,6 +77,7 @@ class PaymentViewModel(
             PaymentUiAction.ClearPaymentError -> _state.update { it.copy(paymentError = null) }
             PaymentUiAction.ClearReceiptPrintMessage -> _state.update { it.copy(receiptPrintMessage = null) }
             PaymentUiAction.ClearSuccessPayload -> _state.update { it.copy(successPayload = null) }
+            PaymentUiAction.DismissDuplicateInvoice -> _state.update { it.copy(duplicateInvoice = null) }
         }
     }
 
@@ -128,6 +129,18 @@ class PaymentViewModel(
 
     private fun applyPaymentResult(result: PaymentFlowResult) {
         when (result) {
+            is PaymentFlowResult.DuplicateInvoice ->
+                _state.update {
+                    it.copy(
+                        isProcessingPayment = false,
+                        gatewayStatusMessage = null,
+                        duplicateInvoice =
+                            DuplicateInvoicePrompt(
+                                clientCorrelationId = result.clientCorrelationId,
+                                reason = result.reason,
+                            ),
+                    )
+                }
             is PaymentFlowResult.Failure ->
                 _state.update {
                     it.copy(

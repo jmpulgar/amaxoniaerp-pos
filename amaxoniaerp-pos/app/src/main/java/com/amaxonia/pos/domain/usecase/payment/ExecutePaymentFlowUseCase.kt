@@ -51,6 +51,17 @@ sealed interface PaymentFlowResult {
     data class Failure(
         val message: String,
     ) : PaymentFlowResult
+
+    /**
+     * The backend rejected the submission with HTTP 409 because the same
+     * [DuplicateInvoice.clientCorrelationId] was already processed. The user
+     * must reconcile or escalate manually; the existing invoice body is not
+     * returned by the backend so the operation cannot be auto-completed.
+     */
+    data class DuplicateInvoice(
+        val clientCorrelationId: String,
+        val reason: String,
+    ) : PaymentFlowResult
 }
 
 class PaymentExecutionOperations(
@@ -72,6 +83,8 @@ class ExecutePaymentFlowUseCase(
     private val operations: PaymentExecutionOperations,
     private val prepareSale: PrepareSaleUseCase,
     private val completeSale: CompletePaymentSaleUseCase,
+    private val startTransaction: StartTransactionUseCase? = null,
+    private val gatewayCallbackLedger: GatewayCallbackLedger? = null,
 ) : PaymentFlowExecutor {
     override suspend operator fun invoke(
         input: ExecutePaymentFlowInput,
@@ -96,21 +109,75 @@ class ExecutePaymentFlowUseCase(
         sale: PreparedSale,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
-        val gatewayFailure = executeGatewayIfRequired(input, sale, onEvent)
+        val correlationId =
+            startTransaction?.recoverOrStart(
+                StartTransactionCommand(
+                    carryOverId = sale.correlationCarryOver,
+                    idCaja = sale.request.factura.idCaja,
+                    idCajaSecuencia = sale.request.factura.idCajaSecuencia,
+                    totalAmount = sale.financials.total,
+                    currency = sale.request.moneda?.abrMonedaBase ?: DEFAULT_CURRENCY,
+                    clientName = sale.client.paymentFullName(),
+                ),
+            )?.clientCorrelationId
+        val stampedSale = sale.withCorrelationId(correlationId)
+        val gatewayFailure = executeGatewayIfRequired(input, stampedSale, correlationId, onEvent)
         return if (gatewayFailure != null) {
+            correlationId?.let { startTransaction?.markFailed(it, "Gateway: ${gatewayFailure.message}") }
             gatewayFailure
         } else {
             onEvent(PaymentFlowEvent.Progress("Generando factura..."))
-            completeSale(input, sale, onEvent)
+            val result = completeSale(input, stampedSale, correlationId, onEvent)
+            markLedgerFromResult(correlationId, result)
+            result
+        }
+    }
+
+    private suspend fun markLedgerFromResult(
+        correlationId: String?,
+        result: PaymentFlowResult,
+    ) {
+        if (correlationId == null) return
+        when (result) {
+            is PaymentFlowResult.Success ->
+                startTransaction?.markConfirmed(
+                    clientCorrelationId = correlationId,
+                    remoteInvoiceId = result.payload.transactionId.takeIf { it.isNotBlank() },
+                    remoteInvoiceNumber = result.payload.codFactura.takeIf { it.isNotBlank() },
+                )
+            is PaymentFlowResult.DuplicateInvoice ->
+                startTransaction?.markFailed(
+                    clientCorrelationId = correlationId,
+                    message = result.reason,
+                    status = StartTransactionUseCase.STATUS_DUPLICATE,
+                )
+            is PaymentFlowResult.Failure ->
+                startTransaction?.markFailed(
+                    clientCorrelationId = correlationId,
+                    message = result.message,
+                )
         }
     }
 
     private suspend fun executeGatewayIfRequired(
         input: ExecutePaymentFlowInput,
         sale: PreparedSale,
+        correlationId: String?,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult.Failure? {
         if (input.countryCode != VENEZUELA_CODE) return null
+        // Persist the await BEFORE launching HKA so a process death does not
+        // silently drop the callback. The reconciler worker picks the row up
+        // after LEASE_DURATION; MainActivity.deliverResult flips it to RESOLVED.
+        if (correlationId != null) {
+            gatewayCallbackLedger?.markAwaiting(
+                correlationId = correlationId,
+                nextAttemptAt = 0L,
+            )
+            // Pin the correlationId on the in-memory bridge so MainActivity can
+            // mark RESOLVED on the matching row when the HKA Intent returns.
+            com.amaxonia.pos.data.printer.RapidPayBridge.setPendingCorrelationId(correlationId)
+        }
         val result =
             operations.executeGatewayPayment(
                 request =
@@ -125,6 +192,14 @@ class ExecutePaymentFlowUseCase(
                     onEvent(PaymentFlowEvent.LaunchGateway(payload))
                 },
             )
+        if (result.isFailure && correlationId != null) {
+            // Gateway failed before any Intent returned — clear the await so
+            // the reconciler does not flag the row as a lost callback.
+            gatewayCallbackLedger?.markResolved(
+                correlationId = correlationId,
+                responseCode = "ERROR_LOCAL",
+            )
+        }
         return result.exceptionOrNull()?.let { error ->
             operations.failure(error, "No se pudo completar el cobro en The Factory")
         }
@@ -136,14 +211,16 @@ class CompletePaymentSaleUseCase(
     private val operations: PaymentExecutionOperations,
     private val clock: AppClock,
     private val idGenerator: IdGenerator,
+    private val fiscalConfirmationLedger: PaymentFiscalConfirmationLedger? = null,
 ) {
     internal suspend operator fun invoke(
         input: ExecutePaymentFlowInput,
         sale: PreparedSale,
+        correlationId: String?,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult =
         if (sale.isOnline) {
-            processOnline(input, sale, onEvent)
+            processOnline(input, sale, correlationId, onEvent)
         } else {
             processOffline(input, sale)
         }
@@ -189,16 +266,27 @@ class CompletePaymentSaleUseCase(
     private suspend fun processOnline(
         input: ExecutePaymentFlowInput,
         sale: PreparedSale,
+        correlationId: String?,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult =
         repositories.runtime.sales.processSale(sale.request).fold(
-            onFailure = { error -> operations.failure(error, "No se pudo procesar la venta. Intenta nuevamente") },
-            onSuccess = { response -> processAcceptedOnlineSale(input, sale, response, onEvent) },
+            onFailure = { error ->
+                if (error is DuplicateInvoiceException) {
+                    PaymentFlowResult.DuplicateInvoice(
+                        clientCorrelationId = error.clientCorrelationId,
+                        reason = error.message ?: "Factura duplicada",
+                    )
+                } else {
+                    operations.failure(error, "No se pudo procesar la venta. Intenta nuevamente")
+                }
+            },
+            onSuccess = { response -> processAcceptedOnlineSale(input, sale, correlationId, response, onEvent) },
         )
 
     private suspend fun processAcceptedOnlineSale(
         input: ExecutePaymentFlowInput,
         sale: PreparedSale,
+        correlationId: String?,
         response: ProcessSaleResponseDto,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
@@ -217,43 +305,105 @@ class CompletePaymentSaleUseCase(
         return if (saveError != null) {
             operations.failure(saveError, "La venta se proceso, pero no se pudo guardar la transaccion local")
         } else {
-            finishOnlineSale(input, sale, response, transaction, onEvent)
+            val (result, outcome) =
+                finishOnlineSale(
+                    OnlineSaleRequest(input, sale, correlationId, response, transaction),
+                    onEvent,
+                )
+            outcome?.let { fiscalConfirmationLedger?.recordOutcome(it) }
+            result
         }
     }
 
+    private data class OnlineSaleRequest(
+        val input: ExecutePaymentFlowInput,
+        val sale: PreparedSale,
+        val correlationId: String?,
+        val response: ProcessSaleResponseDto,
+        val transaction: Transaction,
+    )
+
     private suspend fun finishOnlineSale(
-        input: ExecutePaymentFlowInput,
-        sale: PreparedSale,
-        response: ProcessSaleResponseDto,
-        transaction: Transaction,
+        request: OnlineSaleRequest,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
-    ): PaymentFlowResult.Success {
+    ): Pair<PaymentFlowResult.Success, FiscalConfirmationOutcome?> {
+        val input = request.input
+        val sale = request.sale
+        val response = request.response
+        val transaction = request.transaction
         onEvent(PaymentFlowEvent.Progress("Imprimiendo factura..."))
         val printResult = operations.printInvoice(input.countryCode, transaction, response.idFactura)
         val fiscalNumber = printResult?.fiscalNumber?.takeIf(String::isNotBlank).orEmpty()
-        if (input.countryCode == VENEZUELA_CODE && fiscalNumber.isNotBlank()) {
-            operations
-                .confirmFiscalDocument(
-                    invoiceId = response.idFactura,
-                    fiscalNumber = fiscalNumber,
-                    printerSerial = printResult?.printerSerial.orEmpty(),
-                ).onFailure { onEvent(PaymentFlowEvent.FiscalConfirmationFailed) }
-        }
-        return PaymentFlowResult.Success(
-            payload =
-                successPayload(
-                    input = input,
-                    sale = sale,
-                    completion =
-                        PaymentCompletion(
-                            invoiceCode = response.codFactura,
-                            transactionId = response.idFactura,
-                            printMessage = printResult?.displayMessage,
-                            fiscalNumber = fiscalNumber,
-                            fiscalError = response.feError,
-                        ),
-                ),
-            receiptPrintMessage = printResult?.displayMessage,
+        val printerSerial = printResult?.printerSerial.orEmpty()
+        val outcome =
+            buildFiscalOutcome(
+                request = request,
+                fiscalNumber = fiscalNumber,
+                printerSerial = printerSerial,
+                onEvent = onEvent,
+            )
+        val success =
+            PaymentFlowResult.Success(
+                payload =
+                    successPayload(
+                        input = input,
+                        sale = sale,
+                        completion =
+                            PaymentCompletion(
+                                invoiceCode = response.codFactura,
+                                transactionId = response.idFactura,
+                                printMessage = printResult?.displayMessage,
+                                fiscalNumber = fiscalNumber,
+                                fiscalError = response.feError,
+                            ),
+                    ),
+                receiptPrintMessage = printResult?.displayMessage,
+            )
+        return success to outcome
+    }
+
+    private suspend fun buildFiscalOutcome(
+        request: OnlineSaleRequest,
+        fiscalNumber: String,
+        printerSerial: String,
+        onEvent: suspend (PaymentFlowEvent) -> Unit,
+    ): FiscalConfirmationOutcome? {
+        val countryCode = request.input.countryCode
+        val correlationId = request.correlationId
+        val invoiceId = request.response.idFactura
+        if (countryCode != VENEZUELA_CODE || fiscalNumber.isBlank()) return null
+        val confirmation =
+            operations.confirmFiscalDocument(
+                invoiceId = invoiceId,
+                fiscalNumber = fiscalNumber,
+                printerSerial = printerSerial,
+            )
+        return confirmation.fold(
+            onFailure = { error ->
+                onEvent(PaymentFlowEvent.FiscalConfirmationFailed)
+                if (correlationId != null && invoiceId.isNotBlank()) {
+                    FiscalConfirmationOutcome.Retryable(
+                        correlationId = correlationId,
+                        remoteInvoiceId = invoiceId,
+                        fiscalNumber = fiscalNumber,
+                        printerSerial = printerSerial,
+                        failureMessage = error.message ?: "Confirmacion fiscal fallida",
+                    )
+                } else {
+                    null
+                }
+            },
+            onSuccess = {
+                if (correlationId != null) {
+                    FiscalConfirmationOutcome.Confirmed(
+                        correlationId = correlationId,
+                        fiscalNumber = fiscalNumber,
+                        printerSerial = printerSerial,
+                    )
+                } else {
+                    null
+                }
+            },
         )
     }
 

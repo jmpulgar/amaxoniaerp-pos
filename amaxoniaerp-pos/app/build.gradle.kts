@@ -77,7 +77,7 @@ android {
                 "String",
                 "BASE_URL",
                 // "\"https://api.listoerp.app/\""
-                "\"http://192.168.2.16:8080/\"",
+                "\"http://192.168.2.10:8080/\"",
                 // "\"http://10.0.2.2:8080/\""
             )
         }
@@ -138,6 +138,7 @@ detekt {
     allRules = false
     parallel = true
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/detekt-baseline.xml")
 }
 
 ktlint {

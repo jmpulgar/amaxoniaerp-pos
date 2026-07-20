@@ -24,6 +24,18 @@ object RapidPayBridge {
     @Volatile
     private var pendingResult: CompletableDeferred<RapidPayResult>? = null
 
+    @Volatile
+    private var pendingCorrelationId: String? = null
+
+    /**
+     * Pins the [correlationId] (UUID minted on-device, sent to the backend as
+     * idFactura) so [deliverResult] / MainActivity can flip the matching
+     * transaction_log row to RESOLVED when the HKA callback arrives.
+     */
+    fun setPendingCorrelationId(correlationId: String?) {
+        pendingCorrelationId = correlationId
+    }
+
     /**
      * Called by the ViewModel. Creates a new CompletableDeferred and suspends
      * until [deliverResult] is called or the timeout expires.
@@ -35,7 +47,7 @@ object RapidPayBridge {
         val deferred = CompletableDeferred<RapidPayResult>()
         pendingResult = deferred
 
-        SafeLog.d(TAG, "Waiting for payment gateway result")
+        SafeLog.d(TAG, "Waiting for payment gateway result (correlationId=$pendingCorrelationId)")
 
         return try {
             withTimeout(RESULT_TIMEOUT_MS) {
@@ -49,6 +61,7 @@ object RapidPayBridge {
             )
         } finally {
             pendingResult = null
+            pendingCorrelationId = null
         }
     }
 
@@ -62,6 +75,15 @@ object RapidPayBridge {
             SafeLog.w(TAG, "Payment gateway result ignored because no request is pending")
         }
     }
+
+    /**
+     * The correlationId (UUID/idFactura) pinned via [setPendingCorrelationId].
+     * MainActivity reads this on callback arrival so it can flip the
+     * corresponding transaction_log row to RESOLVED via the
+     * gatewayCallbackLedger. Returns null when no await is in flight or the
+     * bridge was reset by process death.
+     */
+    fun pendingCorrelationId(): String? = pendingCorrelationId
 
     /**
      * Returns true if there's a pending gateway request waiting for a result.

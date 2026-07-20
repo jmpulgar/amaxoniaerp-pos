@@ -22,6 +22,7 @@ data class PaymentState(
     val receiptPrintMessage: String? = null,
     val gatewayStatusMessage: String? = null,
     val successPayload: PaymentSuccessPayload? = null,
+    val duplicateInvoice: DuplicateInvoicePrompt? = null,
     val tasa: Double = 0.0,
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
@@ -175,6 +176,8 @@ sealed interface PaymentUiAction {
     data object ClearReceiptPrintMessage : PaymentUiAction
 
     data object ClearSuccessPayload : PaymentUiAction
+
+    data object DismissDuplicateInvoice : PaymentUiAction
 }
 
 sealed interface PaymentUiEffect {
@@ -182,3 +185,16 @@ sealed interface PaymentUiEffect {
         val payload: GatewayLaunchPayload,
     ) : PaymentUiEffect
 }
+
+/**
+ * Prompt surfaced when the backend returned HTTP 409 Conflict for a sale
+ * whose [clientCorrelationId] (`idFactura`) was already processed in a prior
+ * attempt. The backend does not return the existing invoice body, so the user
+ * must either reconcile (look up the prior invoice) or escalate to manual
+ * review. Never offers an automatic "anular" because reversing the prior
+ * invoice without operator confirmation is unsafe.
+ */
+data class DuplicateInvoicePrompt(
+    val clientCorrelationId: String,
+    val reason: String,
+)

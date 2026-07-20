@@ -14,6 +14,8 @@ kotlin {
 
 application {
     mainClass = "io.ktor.server.netty.EngineMain"
+    // Necesario para que Netty escuche en IPv4 (0.0.0.0) y sea alcanzable desde la LAN.
+    applicationDefaultJvmArgs = listOf("-Djava.net.preferIPv4Stack=true")
 }
 
 dependencies {

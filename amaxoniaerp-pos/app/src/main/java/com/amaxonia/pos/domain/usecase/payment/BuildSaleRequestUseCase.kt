@@ -11,6 +11,7 @@ import com.amaxonia.pos.domain.model.sales.SaleTaxDto
 class BuildSaleRequestUseCase {
     operator fun invoke(input: BuildSaleRequestInput): ProcessSaleRequestDto =
         ProcessSaleRequestDto(
+            idFactura = input.idFactura,
             procesar = input.procesar,
             esCobroCreditoPrevio = input.isPriorCreditCollection,
             factura = input.invoice,
@@ -25,6 +26,7 @@ class BuildSaleRequestUseCase {
 data class BuildSaleRequestInput(
     val procesar: Int = 1,
     val isPriorCreditCollection: Boolean = false,
+    val idFactura: String? = null,
     val invoice: SaleInvoiceDto,
     val items: List<SaleItemDto>,
     val taxes: List<SaleTaxDto>,

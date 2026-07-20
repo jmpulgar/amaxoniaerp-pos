@@ -84,17 +84,49 @@ class MainActivity : ComponentActivity() {
 
         SafeLog.d(TAG, "Rapid Pay result received from $source")
 
+        val correlationId = RapidPayBridge.pendingCorrelationId()
+        val responseCode = intent.getStringExtra(EXTRA_RESULT_CODE).orEmpty()
+
         if (!RapidPayBridge.hasPendingRequest()) {
             SafeLog.w(TAG, "Rapid Pay result ignored because no request is pending")
+            // The bridge is empty (process died/been killed) but we still have
+            // the callback Intent. Persist the responseCode so the
+            // GatewayCallbackWorker reconciliation can surface the row to the
+            // cashier instead of silently losing the result.
+            if (correlationId != null) {
+                markGatewayResolved(correlationId, responseCode)
+            }
             return
         }
 
         val result = DependencyContainer.theFactoryRapidPayClient.parseResultIntent(intent)
         RapidPayBridge.deliverResult(result)
+        // Flip the transaction_log row to RESOLVED regardless of approved/denied.
+        // The callback arrived — even a denied card clears the await; only a
+        // no-show stays AWAITING for the watchdog to escalate.
+        if (correlationId != null) {
+            markGatewayResolved(correlationId, responseCode)
+        }
 
         // Clear the extras so they don't get re-processed on configuration change
         intent.removeExtra(EXTRA_RESULT_CODE)
         intent.removeExtra(EXTRA_RESULT_DATA)
         intent.removeExtra(EXTRA_MESSAGE)
+    }
+
+    private fun markGatewayResolved(
+        correlationId: String,
+        responseCode: String,
+    ) {
+        runBlocking {
+            runCatching {
+                DependencyContainer.gatewayCallbackLedger.markResolved(
+                    correlationId = correlationId,
+                    responseCode = responseCode,
+                )
+            }.onFailure { error ->
+                SafeLog.w(TAG, "Failed to mark gateway resolved: ${error.message}")
+            }
+        }
     }
 }

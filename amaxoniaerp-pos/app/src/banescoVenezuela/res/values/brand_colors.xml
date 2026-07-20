@@ -1,54 +1,85 @@
+<!--
+    Paleta oficial Banesco.
+      · Azul   #003C71  (RGB 0, 60, 113)  -> primary
+      · Rojo   #E31D19  (RGB 227, 29, 25) -> secondary / error
+      · Verde  #007953  (RGB 0, 121, 83)  -> accent / gradiente
+    Los gradientes y las variantes "container/outline" derivan de estos tonos
+    para mantener jerarquía visual y accesibilidad (contraste AA sobre blanco).
+-->
 <resources>
-    <color name="brand_primary">#0C7953</color>
+    <!-- Primary = Azul Banesco #003C71 -->
+    <color name="brand_primary">#003C71</color>
     <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_dark">#E7F3EE</color>
-    <color name="brand_primary_container">#E7F3EE</color>
-    <color name="brand_on_primary_container">#086642</color>
-    <color name="brand_secondary">#001689</color>
+    <color name="brand_primary_dark">#9DB9D6</color>
+    <color name="brand_primary_container">#D6E2EF</color>
+    <color name="brand_on_primary_container">#002A52</color>
+
+    <!-- Secondary = Rojo Banesco #E31D19 -->
+    <color name="brand_secondary">#E31D19</color>
     <color name="brand_on_secondary">#FFFFFF</color>
-    <color name="brand_secondary_container">#DDE3E6</color>
-    <color name="brand_on_secondary_container">#00116B</color>
-    <color name="brand_accent">#001689</color>
+    <color name="brand_secondary_container">#FFDAD5</color>
+    <color name="brand_on_secondary_container">#410000</color>
+
+    <!-- Tertiary / Accent = Verde Banesco #007953 -->
+    <color name="brand_accent">#007953</color>
     <color name="brand_on_accent">#FFFFFF</color>
-    <color name="brand_accent_container">#E7F3EE</color>
-    <color name="brand_on_accent_container">#00116B</color>
-    <color name="brand_error">#E0271E</color>
+    <color name="brand_accent_container">#D2F1E2</color>
+    <color name="brand_on_accent_container">#003823</color>
+
+    <!-- Error (alineado al rojo corporativo) -->
+    <color name="brand_error">#E31D19</color>
     <color name="brand_on_error">#FFFFFF</color>
-    <color name="brand_error_container">#FFDAD6</color>
-    <color name="brand_on_error_container">#410002</color>
-    <color name="brand_background">#F4F6F7</color>
+    <color name="brand_error_container">#FFDAD5</color>
+    <color name="brand_on_error_container">#410000</color>
+
+    <!-- Superficies -->
+    <color name="brand_background">#F5F7F9</color>
     <color name="brand_surface">#FFFFFF</color>
-    <color name="brand_on_background">#263238</color>
-    <color name="brand_on_surface">#263238</color>
-    <color name="brand_surface_variant">#E7F3EE</color>
-    <color name="brand_on_surface_variant">#5F6B72</color>
-    <color name="brand_outline">#DDE3E6</color>
-    <color name="brand_outline_variant">#DDE3E6</color>
-    <color name="brand_on_primary_dark">#086642</color>
-    <color name="brand_primary_container_dark">#086642</color>
-    <color name="brand_on_primary_container_dark">#E7F3EE</color>
-    <color name="brand_secondary_dark">#DDE3E6</color>
-    <color name="brand_on_secondary_dark">#00116B</color>
-    <color name="brand_secondary_container_dark">#00116B</color>
-    <color name="brand_on_secondary_container_dark">#DDE3E6</color>
-    <color name="brand_accent_dark">#DDE3E6</color>
-    <color name="brand_on_accent_dark">#001689</color>
-    <color name="brand_accent_container_dark">#001689</color>
-    <color name="brand_on_accent_container_dark">#DDE3E6</color>
+    <color name="brand_on_background">#1A2A3A</color>
+    <color name="brand_on_surface">#1A2A3A</color>
+    <color name="brand_surface_variant">#E2E8EE</color>
+    <color name="brand_on_surface_variant">#44525F</color>
+    <color name="brand_outline">#B5C0CC</color>
+    <color name="brand_outline_variant">#D6DEE7</color>
+
+    <!-- Dark theme -->
+    <color name="brand_on_primary_dark">#002A52</color>
+    <color name="brand_primary_container_dark">#00467F</color>
+    <color name="brand_on_primary_container_dark">#D6E2EF</color>
+    <color name="brand_secondary_dark">#FFB4AB</color>
+    <color name="brand_on_secondary_dark">#690000</color>
+    <color name="brand_secondary_container_dark">#930006</color>
+    <color name="brand_on_secondary_container_dark">#FFDAD5</color>
+    <color name="brand_accent_dark">#7DD9B0</color>
+    <color name="brand_on_accent_dark">#003823</color>
+    <color name="brand_accent_container_dark">#005237</color>
+    <color name="brand_on_accent_container_dark">#B4F0CC</color>
     <color name="brand_error_dark">#FFB4AB</color>
-    <color name="brand_on_error_dark">#690005</color>
-    <color name="brand_error_container_dark">#93000A</color>
-    <color name="brand_on_error_container_dark">#FFDAD6</color>
-    <color name="brand_background_dark">#263238</color>
-    <color name="brand_on_background_dark">#F4F6F7</color>
-    <color name="brand_surface_dark">#263238</color>
-    <color name="brand_on_surface_dark">#F4F6F7</color>
-    <color name="brand_surface_variant_dark">#5F6B72</color>
-    <color name="brand_on_surface_variant_dark">#FFFFFF</color>
-    <color name="brand_outline_dark">#DDE3E6</color>
-    <color name="brand_outline_variant_dark">#5F6B72</color>
-    <color name="brand_gradient_start">#0C7953</color>
-    <color name="brand_gradient_end">#001689</color>
-    <color name="brand_welcome_tagline">#5F6B72</color>
+    <color name="brand_on_error_dark">#690000</color>
+    <color name="brand_error_container_dark">#930006</color>
+    <color name="brand_on_error_container_dark">#FFDAD5</color>
+    <color name="brand_background_dark">#0F1A26</color>
+    <color name="brand_on_background_dark">#E6EAEF</color>
+    <color name="brand_surface_dark">#15222F</color>
+    <color name="brand_on_surface_dark">#E6EAEF</color>
+    <color name="brand_surface_variant_dark">#2C3B49</color>
+    <color name="brand_on_surface_variant_dark">#BBC7D3</color>
+    <color name="brand_outline_dark">#8A98A6</color>
+    <color name="brand_outline_variant_dark">#3C4A57</color>
+
+    <!-- Gradiente de marca: Azul -> Verde (olas, headers, splash) -->
+    <color name="brand_gradient_start">#003C71</color>
+    <color name="brand_gradient_mid">#005C8C</color>
+    <color name="brand_gradient_end">#007953</color>
+
+    <!-- Capas específicas de las olas de bienvenida (ARGB propio por flavor). -->
+    <color name="brand_wave_back_top">#66003C71</color>
+    <color name="brand_wave_back_bottom">#99005C8C</color>
+    <color name="brand_wave_front_start">#FF003C71</color>
+    <color name="brand_wave_front_mid">#FF005C8C</color>
+    <color name="brand_wave_front_end">#FF007953</color>
+    <color name="brand_wave_scrim">#66001A33</color>
+
+    <color name="brand_welcome_tagline">#3A4A5A</color>
     <color name="brand_splash_background">#FFFFFF</color>
 </resources>

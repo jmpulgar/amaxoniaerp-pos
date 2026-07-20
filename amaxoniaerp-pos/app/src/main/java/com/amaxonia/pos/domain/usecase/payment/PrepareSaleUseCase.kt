@@ -61,7 +61,24 @@ internal data class PreparedSale(
     val request: ProcessSaleRequestDto,
     val details: PreparedSaleDetails,
     val financials: PreparedSaleFinancials,
-)
+    /**
+     * Optional correlation id carried over from a prior attempt of the same
+     * operation (e.g. after a crash/reboot). When non-null and still in
+     * SENDING state on the local ledger, StartTransactionUseCase will reuse
+     * it so the backend dedup (HTTP 409) detects the retry. Defaults to null
+     * for brand-new operations, where StartTransactionUseCase mints a fresh
+     * UUID. Never re-derived from carrito contents.
+     */
+    val correlationCarryOver: String? = null,
+) {
+    /**
+     * Returns a copy of this sale with the provided [clientCorrelationId]
+     * stamped onto the request idFactura field, used after the local ledger
+     * row has been opened.
+     */
+    fun withCorrelationId(clientCorrelationId: String?): PreparedSale =
+        copy(request = request.copy(idFactura = clientCorrelationId))
+}
 
 internal data class PreparedSaleDetails(
     val items: List<SaleItemDto>,

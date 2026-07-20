@@ -291,6 +291,38 @@ fun PaymentScreen(
                 text = { Text(paymentError) },
             )
         }
+
+        val duplicate = state.duplicateInvoice
+        if (duplicate != null) {
+            AlertDialog(
+                onDismissRequest = { viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice)
+                        onBack()
+                    }) {
+                        Text("Reconciliar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice) }) {
+                        Text("Revisión manual")
+                    }
+                },
+                title = { Text("Factura duplicada") },
+                text = {
+                    Column {
+                        Text(duplicate.reason)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Esta operación ya fue registrada en un intento anterior. " +
+                                "Verifica en el historial de facturas antes de volver a cobrar.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+            )
+        }
     }
 }
 

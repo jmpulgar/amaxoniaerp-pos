@@ -6,6 +6,7 @@ import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
+import com.amaxonia.pos.data.local.db.TransactionLogDao
 import com.amaxonia.pos.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.pos.data.printer.HkaConnectionHelper
 import com.amaxonia.pos.data.printer.HkaFiscalDeviceDiagnostics
@@ -86,12 +87,18 @@ import com.amaxonia.pos.domain.usecase.payment.ExecutePaymentFlowUseCase
 import com.amaxonia.pos.domain.usecase.payment.HandlePaymentFailureUseCase
 import com.amaxonia.pos.domain.usecase.payment.PaymentExecutionOperations
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowRepositories
+import com.amaxonia.pos.domain.usecase.payment.PaymentFiscalConfirmationLedger
+import com.amaxonia.pos.domain.usecase.payment.QueueGatewayCallbackUseCase
+import com.amaxonia.pos.domain.usecase.payment.GatewayCallbackLedger
+import com.amaxonia.pos.domain.usecase.payment.GatewayCallbackOutcome
 import com.amaxonia.pos.domain.usecase.payment.PaymentPreparationOperations
 import com.amaxonia.pos.domain.usecase.payment.PaymentRuntimeServices
 import com.amaxonia.pos.domain.usecase.payment.PaymentStateRepositories
 import com.amaxonia.pos.domain.usecase.payment.PrepareSaleUseCase
 import com.amaxonia.pos.domain.usecase.payment.PrintInvoiceUseCase
 import com.amaxonia.pos.domain.usecase.payment.QueueOfflineInvoiceUseCase
+import com.amaxonia.pos.domain.usecase.payment.QueueFiscalConfirmationUseCase
+import com.amaxonia.pos.domain.usecase.payment.StartTransactionUseCase
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 
 object DependencyContainer {
@@ -171,6 +178,18 @@ object DependencyContainer {
         private set
     lateinit var pendingSalesReader: PendingSalesReader
         private set
+    lateinit var transactionLogDao: TransactionLogDao
+        private set
+    lateinit var startTransactionUseCase: StartTransactionUseCase
+        private set
+    lateinit var queueFiscalConfirmationUseCase: QueueFiscalConfirmationUseCase
+        private set
+    lateinit var fiscalConfirmationLedger: PaymentFiscalConfirmationLedger
+        private set
+    lateinit var queueGatewayCallbackUseCase: QueueGatewayCallbackUseCase
+        private set
+    lateinit var gatewayCallbackLedger: GatewayCallbackLedger
+        private set
     val cashCloseTicketFormatter: CashCloseTicketFormatter by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         PanamaCashCloseTicketFormatter()
     }
@@ -237,7 +256,10 @@ object DependencyContainer {
                     operations = executionOperations,
                     clock = SystemAppClock(),
                     idGenerator = UuidGenerator,
+                    fiscalConfirmationLedger = fiscalConfirmationLedger,
                 ),
+            startTransaction = startTransactionUseCase,
+            gatewayCallbackLedger = gatewayCallbackLedger,
         )
     }
 
@@ -319,6 +341,61 @@ object DependencyContainer {
         clientBranchRepository = RoomClientBranchRepository(clientSucursalDao)
         pendingInvoiceDao = database.pendingInvoiceDao()
         pendingSalesReader = RoomPendingSalesReader(pendingInvoiceDao)
+        transactionLogDao = database.transactionLogDao()
+        startTransactionUseCase =
+            StartTransactionUseCase(
+                dao = transactionLogDao,
+                idGenerator = UuidGenerator,
+                clock = SystemAppClock(),
+            )
+        queueFiscalConfirmationUseCase =
+            QueueFiscalConfirmationUseCase(
+                dao = transactionLogDao,
+                clock = SystemAppClock(),
+            )
+        queueGatewayCallbackUseCase =
+            QueueGatewayCallbackUseCase(
+                dao = transactionLogDao,
+                clock = SystemAppClock(),
+            )
+        fiscalConfirmationLedger =
+            PaymentFiscalConfirmationLedger { outcome ->
+                when (outcome) {
+                    is com.amaxonia.pos.domain.usecase.payment.FiscalConfirmationOutcome.Confirmed -> {
+                        transactionLogDao.markFiscalConfirmed(
+                            id = outcome.correlationId,
+                            status = QueueFiscalConfirmationUseCase.STATUS_CONFIRMED,
+                            fiscalNumber = outcome.fiscalNumber,
+                            printerSerial = outcome.printerSerial,
+                        )
+                    }
+                    is com.amaxonia.pos.domain.usecase.payment.FiscalConfirmationOutcome.Retryable -> {
+                        queueFiscalConfirmationUseCase.enqueue(
+                            clientCorrelationId = outcome.correlationId,
+                            remoteInvoiceId = outcome.remoteInvoiceId,
+                            fiscalNumber = outcome.fiscalNumber,
+                            printerSerial = outcome.printerSerial,
+                            failureMessage = outcome.failureMessage,
+                        )
+                        com.amaxonia.pos.data.sync.SyncScheduler.enqueueFiscalConfirmations(appContext)
+                    }
+                }
+            }
+        gatewayCallbackLedger =
+            GatewayCallbackLedger { outcome ->
+                when (outcome) {
+                    is GatewayCallbackOutcome.Awaiting -> {
+                        queueGatewayCallbackUseCase.markAwaiting(outcome.correlationId)
+                        com.amaxonia.pos.data.sync.SyncScheduler.enqueueGatewayCallbacks(appContext)
+                    }
+                    is GatewayCallbackOutcome.Resolved -> {
+                        queueGatewayCallbackUseCase.markResolved(
+                            clientCorrelationId = outcome.correlationId,
+                            responseCode = outcome.responseCode,
+                        )
+                    }
+                }
+            }
         queueOfflineInvoiceUseCase =
             QueueOfflineInvoiceUseCase(
                 writer = RoomOfflineInvoiceWriter(pendingInvoiceDao),

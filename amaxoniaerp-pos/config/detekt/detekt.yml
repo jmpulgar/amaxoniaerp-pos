@@ -25,3 +25,22 @@ style:
   MaxLineLength:
     # Keep one source of truth with .editorconfig/ktlint.
     maxLineLength: 140
+
+complexity:
+  LongParameterList:
+    # Room DAOs bind a distinct SQL placeholder per parameter; grouping them
+    # into holder data classes adds boilerplate without improving readability.
+    ignoreAnnotated:
+      - Query
+      - Insert
+      - Update
+      - Delete
+  TooManyFunctions:
+    # Room @Dao interfaces are SQL verb collections — one function per
+    # statement is idiomatic and splitting them across files would break the
+    # single-ledger mental model. SyncScheduler is the single
+    # WorkManager facade for the app.
+    thresholdInInterfaces: 20
+    thresholdInClasses: 20
+    thresholdInObjects: 20
+    thresholdInFiles: 20

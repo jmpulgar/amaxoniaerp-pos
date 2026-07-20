@@ -1,0 +1,252 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:AppNavigation.kt$@Composable fun AppNavigation(startDestination: String)</ID>
+    <ID>CyclomaticComplexMethod:CajaRepositoryImpl.kt$CajaRepositoryImpl$override suspend fun getCierreSummary(): Result&lt;CierreCajaSummary&gt;</ID>
+    <ID>CyclomaticComplexMethod:CartScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CartScreen( viewModel: CartViewModel = injectedViewModel { CartViewModel( stateCoordinator = CartStateCoordinator( DependencyContainer.cartRepository, DependencyContainer.clientRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.clientBranchRepository, ResolveClientImageUrlUseCase( DependencyContainer.posConfigurationRepository, DependencyContainer.imageUrlResolver, ), ), configurationCoordinator = CartConfigurationCoordinator( DependencyContainer.posConfigurationRepository, DependencyContainer.cajaRepository, ), actionHandler = CartActionHandler( DependencyContainer.cartRepository, DependencyContainer.refreshCartProductLotsUseCase, DependencyContainer.saveDraftInvoiceUseCase, ), ) }, onBack: () -&gt; Unit, onCheckout: (Double) -&gt; Unit, onSelectClient: () -&gt; Unit, // Nuevo callback para ir a buscar cliente si no hay )</ID>
+    <ID>CyclomaticComplexMethod:CierreCajaScreen.kt$@Composable private fun ReadyContent( summary: CierreCajaSummary, isClosing: Boolean, isPrintingReportX: Boolean, isPrintingReportZ: Boolean, showReportButtons: Boolean, onConfirmClose: () -&gt; Unit, onPrintReportX: () -&gt; Unit, onPrintReportZ: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:CierreCajaViewModel.kt$CierreCajaViewModel$private fun normalizePaymentLabel( label: String, siglas: String, ): String</ID>
+    <ID>CyclomaticComplexMethod:ClientFormScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ClientFormScreen( clientId: String?, viewModel: ClientFormViewModel = injectedViewModel { ClientFormViewModel( DependencyContainer.clientRepository, DependencyContainer.addressCatalogRepository, DependencyContainer.clientFormCatalogSource, ) }, onBack: () -&gt; Unit, onSaveSuccess: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:DashboardScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class) @Composable fun DashboardScreen( viewModel: DashboardViewModel = injectedViewModel { val cajaCoordinator = DashboardCajaCoordinator(DependencyContainer.cajaRepository, DependencyContainer.cartRepository) DashboardViewModel( catalogCoordinator = DashboardCatalogCoordinator( DependencyContainer.productRepository, DependencyContainer.reportRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.serverEnvironment, DashboardProductMapper(DependencyContainer.imageUrlResolver), ), cartCoordinator = DashboardCartCoordinator( DependencyContainer.promotionRepository, DependencyContainer.cartRepository, ResolveClientBranchesUseCase( DependencyContainer.posConfigurationRepository, DependencyContainer.clientBranchRepository, ), DependencyContainer.refreshCartProductLotsUseCase, cajaCoordinator, DependencyContainer.appClock, ), cajaCoordinator = cajaCoordinator, ) }, onLogout: () -&gt; Unit, onNavigateToClients: () -&gt; Unit, onNavigateToProducts: () -&gt; Unit, onNavigateToHistory: () -&gt; Unit, onNavigateToCreditNotes: () -&gt; Unit, onNavigateToReports: () -&gt; Unit, onNavigateToPrinterSettings: () -&gt; Unit, onNavigateToCart: () -&gt; Unit, onStartNewOrder: () -&gt; Unit, onNavigateToCierreCaja: () -&gt; Unit = {}, onNavigateToDraftInvoices: () -&gt; Unit = {}, )</ID>
+    <ID>CyclomaticComplexMethod:HistoryScreen.kt$@Composable private fun FacturaDetalleSheetContent( transaction: Transaction?, items: List&lt;FacturaDetalleItemDto&gt;, isLoading: Boolean, error: String?, )</ID>
+    <ID>CyclomaticComplexMethod:HkaConnectionHelper.kt$HkaConnectionHelper$private fun parseStatus(bytes: ByteArray): PrinterStatusResult</ID>
+    <ID>CyclomaticComplexMethod:MappingExtensions.kt$fun ProductDto.toDomain(): Product</ID>
+    <ID>CyclomaticComplexMethod:PaymentScreen.kt$@Composable fun CashPaymentContent( state: PaymentState, viewModel: PaymentViewModel, )</ID>
+    <ID>CyclomaticComplexMethod:PaymentScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PaymentScreen( totalAmount: Double, onBack: () -&gt; Unit, onPaymentSuccess: (PaymentSuccessPayload) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, viewModel: SettingsViewModel = injectedViewModel { SettingsViewModel( settingsRepository = DependencyContainer.posConfigurationRepository, fiscalDiagnostics = DependencyContainer.fiscalDeviceDiagnostics, ) }, )</ID>
+    <ID>CyclomaticComplexMethod:SuccessScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SuccessScreen( transactionId: String, onPrintReceipt: suspend (String) -&gt; Result&lt;String&gt;, onNextOrder: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$private fun mapPaymentCommand(formaPago: String): String</ID>
+    <ID>LongMethod:AppNavigation.kt$@Composable fun AppNavigation(startDestination: String)</ID>
+    <ID>LongMethod:CajaRepositoryImpl.kt$CajaRepositoryImpl$override suspend fun getCierreSummary(): Result&lt;CierreCajaSummary&gt;</ID>
+    <ID>LongMethod:CajaSelectorSheet.kt$@Composable private fun CajaCard( caja: Caja, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CajaSelectorSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CajaSelectorSheet( cajas: List&lt;Caja&gt;, isLoading: Boolean, errorMessage: String?, canDismiss: Boolean, onSelectCaja: (Caja) -&gt; Unit, onReload: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CartScreen.kt$@Composable fun CartItemRow( item: com.amaxonia.pos.domain.model.CartItem, onIncrease: () -&gt; Unit, onDecrease: () -&gt; Unit, onRemove: () -&gt; Unit, allowEditPrice: Boolean, allowDiscount: Boolean, onEditPrice: () -&gt; Unit, onEditDiscount: () -&gt; Unit, onUnitChange: (String) -&gt; Unit, onQuantityChange: (Int) -&gt; Unit, )</ID>
+    <ID>LongMethod:CartScreen.kt$@Composable private fun PromotionCartGroup( group: ItemCarrito.PromocionAgrupada, onRemove: () -&gt; Unit, onQuantityChange: (Int) -&gt; Unit, )</ID>
+    <ID>LongMethod:CartScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CartScreen( viewModel: CartViewModel = injectedViewModel { CartViewModel( stateCoordinator = CartStateCoordinator( DependencyContainer.cartRepository, DependencyContainer.clientRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.clientBranchRepository, ResolveClientImageUrlUseCase( DependencyContainer.posConfigurationRepository, DependencyContainer.imageUrlResolver, ), ), configurationCoordinator = CartConfigurationCoordinator( DependencyContainer.posConfigurationRepository, DependencyContainer.cajaRepository, ), actionHandler = CartActionHandler( DependencyContainer.cartRepository, DependencyContainer.refreshCartProductLotsUseCase, DependencyContainer.saveDraftInvoiceUseCase, ), ) }, onBack: () -&gt; Unit, onCheckout: (Double) -&gt; Unit, onSelectClient: () -&gt; Unit, // Nuevo callback para ir a buscar cliente si no hay )</ID>
+    <ID>LongMethod:CartScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ClientSucursalSelectorCard( sucursales: List&lt;com.amaxonia.pos.domain.model.ClientBranch&gt;, selectedSucursal: com.amaxonia.pos.domain.model.ClientBranch?, isRequiredMissing: Boolean, onSelect: (Int) -&gt; Unit, )</ID>
+    <ID>LongMethod:CierreCajaScreen.kt$@Composable private fun ReadyContent( summary: CierreCajaSummary, isClosing: Boolean, isPrintingReportX: Boolean, isPrintingReportZ: Boolean, showReportButtons: Boolean, onConfirmClose: () -&gt; Unit, onPrintReportX: () -&gt; Unit, onPrintReportZ: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CierreCajaScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CierreCajaScreen( viewModel: CierreCajaViewModel = injectedViewModel { CierreCajaViewModel( DependencyContainer.cajaRepository, CashClosePrintingService( DependencyContainer.printerFactory, DependencyContainer.posConfigurationRepository, DependencyContainer.cashCloseTicketFormatter, ), DependencyContainer.posConfigurationRepository, DependencyContainer.productRepository, DependencyContainer.pendingSalesReader, DependencyContainer.cashCloseTicketFormatter, ) }, onBack: () -&gt; Unit, onCloseSuccess: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CierreCajaViewModel.kt$CierreCajaViewModel$fun confirmClose(printTicket: Boolean)</ID>
+    <ID>LongMethod:ClientFormScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ClientFormScreen( clientId: String?, viewModel: ClientFormViewModel = injectedViewModel { ClientFormViewModel( DependencyContainer.clientRepository, DependencyContainer.addressCatalogRepository, DependencyContainer.clientFormCatalogSource, ) }, onBack: () -&gt; Unit, onSaveSuccess: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ClientListScreen.kt$@Composable fun ClientListItem( client: Client, photoUrl: String, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ClientListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ClientListScreen( viewModel: ClientListViewModel = injectedViewModel { ClientListViewModel( DependencyContainer.clientRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.imageUrlResolver, ) }, onBack: () -&gt; Unit, onNavigateToForm: (String?) -&gt; Unit, )</ID>
+    <ID>LongMethod:ClientSelectionScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ClientSelectionScreen( viewModel: ClientListViewModel = injectedViewModel { ClientListViewModel( DependencyContainer.clientRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.imageUrlResolver, ) }, onBack: () -&gt; Unit, onClientSelected: (Client) -&gt; Unit, )</ID>
+    <ID>LongMethod:CompanySelectionScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CompanySelectionScreen( viewModel: CompanySelectionViewModel = injectedViewModel { CompanySelectionViewModel( DependencyContainer.companyRepository, DependencyContainer.authRepository, ) }, onCompanySelected: () -&gt; Unit, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@Composable private fun CreditNoteCard( note: CreditNoteSummaryDto, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@Composable private fun CreditNoteDetailSheet( detail: CreditNoteDetailDto, isSubmitting: Boolean, onProcessFiscal: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@Composable private fun InvoiceLineReadOnlyCard( line: CreditNoteSourceInvoiceLineDto, currency: String, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@Composable private fun SourceInvoiceCard( invoice: CreditNoteSourceInvoiceSummaryDto, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class) @Composable private fun CreditNoteCreateContent( state: CreditNotesState, onFechaChange: (String) -&gt; Unit, onPeriodoChange: (String) -&gt; Unit, onObservacionChange: (String) -&gt; Unit, onDevolverStockChange: (Boolean) -&gt; Unit, onGenerarAbonoChange: (Boolean) -&gt; Unit, onRefundMethodChange: (Int?) -&gt; Unit, onSubmit: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CreditNotesScreen( viewModel: CreditNotesViewModel = injectedViewModel { CreditNotesViewModel( creditNoteRepository = DependencyContainer.creditNoteRepository, cajaRepository = DependencyContainer.cajaRepository, formaPagoRepository = DependencyContainer.formaPagoRepository, processCreditNoteFiscal = ProcessCreditNoteFiscalUseCase( DependencyContainer.creditNoteRepository, DependencyContainer.printerFactory, DependencyContainer.posConfigurationRepository, ), ) }, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:CreditNotesViewModel.kt$CreditNotesViewModel$fun submitCreditNote()</ID>
+    <ID>LongMethod:DashboardScreen.kt$@Composable fun ManualEntryContent( currentValue: String, onKeyClick: (String) -&gt; Unit, onClearClick: () -&gt; Unit, onBackspaceClick: () -&gt; Unit, onEnterClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DashboardScreen.kt$@Composable fun ProductCard( product: DashboardProduct, onAddClick: () -&gt; Unit, onQuantityClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DashboardScreen.kt$@Composable fun ProductListRow( product: DashboardProduct, onAddClick: () -&gt; Unit, onQuantityClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DashboardScreen.kt$@Composable private fun PromotionOptionCard( promo: Promocion, onAddPromotion: (Int) -&gt; Unit, )</ID>
+    <ID>LongMethod:DashboardScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun PromotionChoiceSheet( product: DashboardProduct, promotions: List&lt;Promocion&gt;, onAddIndividual: (Int) -&gt; Unit, onAddPromotion: (Promocion, Int) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DashboardScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class) @Composable fun DashboardScreen( viewModel: DashboardViewModel = injectedViewModel { val cajaCoordinator = DashboardCajaCoordinator(DependencyContainer.cajaRepository, DependencyContainer.cartRepository) DashboardViewModel( catalogCoordinator = DashboardCatalogCoordinator( DependencyContainer.productRepository, DependencyContainer.reportRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.serverEnvironment, DashboardProductMapper(DependencyContainer.imageUrlResolver), ), cartCoordinator = DashboardCartCoordinator( DependencyContainer.promotionRepository, DependencyContainer.cartRepository, ResolveClientBranchesUseCase( DependencyContainer.posConfigurationRepository, DependencyContainer.clientBranchRepository, ), DependencyContainer.refreshCartProductLotsUseCase, cajaCoordinator, DependencyContainer.appClock, ), cajaCoordinator = cajaCoordinator, ) }, onLogout: () -&gt; Unit, onNavigateToClients: () -&gt; Unit, onNavigateToProducts: () -&gt; Unit, onNavigateToHistory: () -&gt; Unit, onNavigateToCreditNotes: () -&gt; Unit, onNavigateToReports: () -&gt; Unit, onNavigateToPrinterSettings: () -&gt; Unit, onNavigateToCart: () -&gt; Unit, onStartNewOrder: () -&gt; Unit, onNavigateToCierreCaja: () -&gt; Unit = {}, onNavigateToDraftInvoices: () -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:DependencyContainer.kt$DependencyContainer$fun initialize(context: Context)</ID>
+    <ID>LongMethod:DraftInvoicesScreen.kt$@Composable private fun DraftInvoiceCard( draft: DraftInvoice, onLoad: () -&gt; Unit, onDelete: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DraftInvoicesScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DraftInvoicesScreen( onBack: () -&gt; Unit, onDraftLoaded: () -&gt; Unit, // Navegar al carrito despues de cargar viewModel: DraftInvoicesViewModel = injectedViewModel { DraftInvoicesViewModel( DependencyContainer.draftInvoiceRepository, DependencyContainer.restoreDraftInvoiceUseCase, ) }, )</ID>
+    <ID>LongMethod:HistoryScreen.kt$@Composable private fun DetalleItemRow( item: FacturaDetalleItemDto, currency: String, )</ID>
+    <ID>LongMethod:HistoryScreen.kt$@Composable private fun FacturaDetalleSheetContent( transaction: Transaction?, items: List&lt;FacturaDetalleItemDto&gt;, isLoading: Boolean, error: String?, )</ID>
+    <ID>LongMethod:HistoryScreen.kt$@Composable private fun TransactionCard( transaction: Transaction, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:HistoryScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun HistoryScreen( viewModel: HistoryViewModel = injectedViewModel { HistoryViewModel(DependencyContainer.invoiceHistoryRepository) }, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:PaymentScreen.kt$@Composable fun CashPaymentContent( state: PaymentState, viewModel: PaymentViewModel, )</ID>
+    <ID>LongMethod:PaymentScreen.kt$@Composable fun NonCashPaymentContent( state: PaymentState, viewModel: PaymentViewModel, )</ID>
+    <ID>LongMethod:PaymentScreen.kt$@Composable private fun ProcessingPaymentOverlay( elapsedSeconds: Int, statusMessage: String?, )</ID>
+    <ID>LongMethod:PaymentScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PaymentScreen( totalAmount: Double, onBack: () -&gt; Unit, onPaymentSuccess: (PaymentSuccessPayload) -&gt; Unit, )</ID>
+    <ID>LongMethod:ProductFormScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProductFormScreen( productId: String?, viewModel: ProductFormViewModel = injectedViewModel { ProductFormViewModel(DependencyContainer.productRepository) }, onBack: () -&gt; Unit, onSaveSuccess: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ProductListScreen.kt$@Composable private fun ProductStockDialog( stock: ProductStock, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ProductListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ProductListScreen( viewModel: ProductListViewModel = injectedViewModel { ProductListViewModel( DependencyContainer.productRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.imageUrlResolver, ) }, onBack: () -&gt; Unit, onNavigateToForm: (String?) -&gt; Unit, )</ID>
+    <ID>LongMethod:ReportsScreen.kt$@Composable private fun BestSellersCard(bestSellers: List&lt;BestSellerProduct&gt;)</ID>
+    <ID>LongMethod:ReportsScreen.kt$@Composable private fun HeroSummaryCard(summary: SummaryStats)</ID>
+    <ID>LongMethod:ReportsScreen.kt$@Composable private fun TransactionBreakdownCard(summary: SummaryStats)</ID>
+    <ID>LongMethod:ReportsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ReportsScreen( viewModel: ReportsViewModel = injectedViewModel { ReportsViewModel(DependencyContainer.reportRepository) }, onBack: () -&gt; Unit, )</ID>
+    <ID>LongMethod:SellerSelectorBottomSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SellerSelectorBottomSheet( sellers: List&lt;Seller&gt;, selectedSellerId: Int?, onSelect: (Seller) -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@Composable private fun PrinterOptionCard( icon: ImageVector, iconTint: Color, title: String, description: String, isSelected: Boolean, onSelect: () -&gt; Unit, )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, viewModel: SettingsViewModel = injectedViewModel { SettingsViewModel( settingsRepository = DependencyContainer.posConfigurationRepository, fiscalDiagnostics = DependencyContainer.fiscalDeviceDiagnostics, ) }, )</ID>
+    <ID>LongMethod:SuccessScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SuccessScreen( transactionId: String, onPrintReceipt: suspend (String) -&gt; Result&lt;String&gt;, onNextOrder: () -&gt; Unit, )</ID>
+    <ID>LongMethod:WelcomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun WelcomeScreen( onLoginClick: () -&gt; Unit, onRequestAccountClick: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:ApiService.kt$ApiService$( token: String, limit: Int, offset: Int, search: String?, includeTotal: Boolean? = null, departmentId: Int? = null, )</ID>
+    <ID>LongParameterList:CajaSelectorSheet.kt$( cajas: List&lt;Caja&gt;, isLoading: Boolean, errorMessage: String?, canDismiss: Boolean, onSelectCaja: (Caja) -&gt; Unit, onReload: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:CartScreen.kt$( item: com.amaxonia.pos.domain.model.CartItem, onIncrease: () -&gt; Unit, onDecrease: () -&gt; Unit, onRemove: () -&gt; Unit, allowEditPrice: Boolean, allowDiscount: Boolean, onEditPrice: () -&gt; Unit, onEditDiscount: () -&gt; Unit, onUnitChange: (String) -&gt; Unit, onQuantityChange: (Int) -&gt; Unit, )</ID>
+    <ID>LongParameterList:CartScreen.kt$( quantityText: String, onQuantityTextChange: (String) -&gt; Unit, onDecrease: () -&gt; Unit, onIncrease: () -&gt; Unit, onDone: () -&gt; Unit, isError: Boolean, label: String, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:CatalogSyncer.kt$CatalogSyncer$( private val apiService: ApiService, private val localStore: LocalStore, private val clientDao: ClientDao, private val clientSucursalDao: ClientSucursalDao, private val productDao: ProductDao, private val countryDao: CountryDao, private val addressLevel1Dao: AddressLevel1Dao, private val addressLevel2Dao: AddressLevel2Dao, private val addressLevel3Dao: AddressLevel3Dao, private val clientTypeDao: ClientTypeDao, private val promocionDao: PromocionDao, )</ID>
+    <ID>LongParameterList:CierreCajaScreen.kt$( icon: ImageVector, iconTint: Color, label: String, value: String, valueColor: Color, isBold: Boolean = false, )</ID>
+    <ID>LongParameterList:CierreCajaScreen.kt$( summary: CierreCajaSummary, isClosing: Boolean, isPrintingReportX: Boolean, isPrintingReportZ: Boolean, showReportButtons: Boolean, onConfirmClose: () -&gt; Unit, onPrintReportX: () -&gt; Unit, onPrintReportZ: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:CreditNoteApiImpl.kt$CreditNoteApiImpl$( path: String, authHeader: String, companyDb: String, payload: Any, serializer: KSerializer&lt;T&gt;, fallbackMessage: String, )</ID>
+    <ID>LongParameterList:CreditNoteApiImpl.kt$CreditNoteApiImpl$( path: String, authHeader: String, companyDb: String, serializer: KSerializer&lt;T&gt;, search: String? = null, fallbackMessage: String, )</ID>
+    <ID>LongParameterList:CreditNotesScreen.kt$( state: CreditNotesState, onFechaChange: (String) -&gt; Unit, onPeriodoChange: (String) -&gt; Unit, onObservacionChange: (String) -&gt; Unit, onDevolverStockChange: (Boolean) -&gt; Unit, onGenerarAbonoChange: (Boolean) -&gt; Unit, onRefundMethodChange: (Int?) -&gt; Unit, onSubmit: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:DashboardScreen.kt$( quantityText: String, onQuantityTextChange: (String) -&gt; Unit, onDecrease: () -&gt; Unit, onIncrease: () -&gt; Unit, onDone: () -&gt; Unit, isError: Boolean, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:DashboardScreen.kt$( viewModel: DashboardViewModel = injectedViewModel { val cajaCoordinator = DashboardCajaCoordinator(DependencyContainer.cajaRepository, DependencyContainer.cartRepository) DashboardViewModel( catalogCoordinator = DashboardCatalogCoordinator( DependencyContainer.productRepository, DependencyContainer.reportRepository, DependencyContainer.posConfigurationRepository, DependencyContainer.serverEnvironment, DashboardProductMapper(DependencyContainer.imageUrlResolver), ), cartCoordinator = DashboardCartCoordinator( DependencyContainer.promotionRepository, DependencyContainer.cartRepository, ResolveClientBranchesUseCase( DependencyContainer.posConfigurationRepository, DependencyContainer.clientBranchRepository, ), DependencyContainer.refreshCartProductLotsUseCase, cajaCoordinator, DependencyContainer.appClock, ), cajaCoordinator = cajaCoordinator, ) }, onLogout: () -&gt; Unit, onNavigateToClients: () -&gt; Unit, onNavigateToProducts: () -&gt; Unit, onNavigateToHistory: () -&gt; Unit, onNavigateToCreditNotes: () -&gt; Unit, onNavigateToReports: () -&gt; Unit, onNavigateToPrinterSettings: () -&gt; Unit, onNavigateToCart: () -&gt; Unit, onStartNewOrder: () -&gt; Unit, onNavigateToCierreCaja: () -&gt; Unit = {}, onNavigateToDraftInvoices: () -&gt; Unit = {}, )</ID>
+    <ID>LongParameterList:ExecutePaymentFlowUseCaseTest.kt$ExecutePaymentFlowUseCaseTest$( countryCode: String = "PA", gatewayPayment: Boolean = false, paymentDetails: List&lt;FormaPagoDetalle&gt;? = null, methods: List&lt;FormaPago&gt;? = null, tenderedAmount: Money = Money.parse("10.00"), changeDue: Double = 0.0, )</ID>
+    <ID>LongParameterList:ProductFormScreen.kt$( label: String, price: Double, utility: Double, pricePlusUtility: Double, total: Double, onUtilityChange: (String) -&gt; Unit, )</ID>
+    <ID>LongParameterList:ProductListScreen.kt$( product: com.amaxonia.pos.domain.model.Product, imageUrl: String, stock: ProductStock?, isStockLoading: Boolean, onStockClick: () -&gt; Unit, onClick: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:SettingsScreen.kt$( icon: ImageVector, iconTint: Color, title: String, description: String, isSelected: Boolean, onSelect: () -&gt; Unit, )</ID>
+    <ID>MagicNumber:AndroidKeystoreSecureKeyValueStore.kt$AndroidKeystoreSecureKeyValueStore$256</ID>
+    <ID>MagicNumber:AndroidKeystoreSecureKeyValueStore.kt$AndroidKeystoreSecureKeyValueStore$3</ID>
+    <ID>MagicNumber:ApiClient.kt$ApiClient$15</ID>
+    <ID>MagicNumber:ApiClient.kt$ApiClient$15_000</ID>
+    <ID>MagicNumber:ApiClient.kt$ApiClient$60</ID>
+    <ID>MagicNumber:ApiClient.kt$ApiClient$60_000</ID>
+    <ID>MagicNumber:ApiReportRepository.kt$ApiReportRepository$20</ID>
+    <ID>MagicNumber:ApiService.kt$ApiService$401</ID>
+    <ID>MagicNumber:ApiTransactionRepository.kt$10</ID>
+    <ID>MagicNumber:ApiTransactionRepository.kt$11</ID>
+    <ID>MagicNumber:ApiTransactionRepository.kt$5</ID>
+    <ID>MagicNumber:CartRepository.kt$CartRepository$100.0</ID>
+    <ID>MagicNumber:CartScreen.kt$5</ID>
+    <ID>MagicNumber:CatalogSyncer.kt$CatalogSyncer$3</ID>
+    <ID>MagicNumber:CatalogSyncer.kt$CatalogSyncer$9</ID>
+    <ID>MagicNumber:CierreCajaScreen.kt$3</ID>
+    <ID>MagicNumber:ClientFormScreen.kt$0.3f</ID>
+    <ID>MagicNumber:ClientFormScreen.kt$0.7f</ID>
+    <ID>MagicNumber:ClientFormScreen.kt$3</ID>
+    <ID>MagicNumber:ClientFormScreen.kt$4</ID>
+    <ID>MagicNumber:ClientFormViewModel.kt$ClientFormViewModel$3</ID>
+    <ID>MagicNumber:ClientListScreen.kt$3</ID>
+    <ID>MagicNumber:ClientListScreen.kt$4</ID>
+    <ID>MagicNumber:CountrySelector.kt$0.9f</ID>
+    <ID>MagicNumber:DashboardScreen.kt$3f</ID>
+    <ID>MagicNumber:DashboardScreen.kt$4</ID>
+    <ID>MagicNumber:DashboardScreen.kt$5</ID>
+    <ID>MagicNumber:DashboardScreen.kt$50</ID>
+    <ID>MagicNumber:DashboardScreen.kt$6</ID>
+    <ID>MagicNumber:HistoryScreen.kt$72</ID>
+    <ID>MagicNumber:HistoryScreen.kt$8</ID>
+    <ID>MagicNumber:HkaConnectionHelper.kt$HkaConnectionHelper$0x40</ID>
+    <ID>MagicNumber:HkaConnectionHelper.kt$HkaConnectionHelper$0xFF</ID>
+    <ID>MagicNumber:HkaConnectionHelper.kt$HkaConnectionHelper$1024</ID>
+    <ID>MagicNumber:MockClientRepository.kt$MockClientRepository$3</ID>
+    <ID>MagicNumber:MockProductRepository.kt$MockProductRepository$3</ID>
+    <ID>MagicNumber:MockProductRepository.kt$MockProductRepository$4</ID>
+    <ID>MagicNumber:OfflineFirstClientFormCatalogSource.kt$OfflineFirstClientFormCatalogSource$1000</ID>
+    <ID>MagicNumber:OfflineFirstClientFormCatalogSource.kt$OfflineFirstClientFormCatalogSource$3</ID>
+    <ID>MagicNumber:PaymentScreen.kt$0.08f</ID>
+    <ID>MagicNumber:PaymentScreen.kt$0.94f</ID>
+    <ID>MagicNumber:PaymentScreen.kt$10</ID>
+    <ID>MagicNumber:PaymentScreen.kt$1_000</ID>
+    <ID>MagicNumber:PaymentScreen.kt$24</ID>
+    <ID>MagicNumber:PaymentScreen.kt$3</ID>
+    <ID>MagicNumber:PaymentScreen.kt$30</ID>
+    <ID>MagicNumber:PaymentScreen.kt$34</ID>
+    <ID>MagicNumber:PaymentScreen.kt$3f</ID>
+    <ID>MagicNumber:PaymentScreen.kt$4</ID>
+    <ID>MagicNumber:PaymentScreen.kt$50</ID>
+    <ID>MagicNumber:ProductFormScreen.kt$0.4f</ID>
+    <ID>MagicNumber:ProductFormViewModel.kt$ProductFormViewModel$100</ID>
+    <ID>MagicNumber:ReportsScreen.kt$10</ID>
+    <ID>MagicNumber:ReportsScreen.kt$9</ID>
+    <ID>MagicNumber:RoomClientBranchRepository.kt$9</ID>
+    <ID>MagicNumber:SettingsScreen.kt$50</ID>
+    <ID>MagicNumber:SettingsViewModel.kt$SettingsViewModel$10</ID>
+    <ID>MagicNumber:SuccessScreen.kt$0.85f</ID>
+    <ID>MagicNumber:SuccessScreen.kt$180</ID>
+    <ID>MagicNumber:SuccessScreen.kt$220</ID>
+    <ID>MagicNumber:SunmiPrinterManager.kt$SunmiPrinterManager$3_000</ID>
+    <ID>MagicNumber:SunmiV2Printer.kt$SunmiV2Printer$24f</ID>
+    <ID>MagicNumber:SunmiV2Printer.kt$SunmiV2Printer$28f</ID>
+    <ID>MagicNumber:SunmiV2Printer.kt$SunmiV2Printer$4</ID>
+    <ID>MagicNumber:SyncScheduler.kt$SyncScheduler$12</ID>
+    <ID>MagicNumber:SynchronizePendingInvoicesUseCase.kt$SynchronizePendingInvoicesUseCase$15</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0.001</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0.01</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0xFF</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$10</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$100</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$100.0</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$1000</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$1024</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$11</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$12</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$13</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$16</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$20.0</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$3</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$31.0</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$6</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$8</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$8.0</ID>
+    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$9</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$0.01</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$100</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$11</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$16</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$4096</ID>
+    <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$9</ID>
+    <ID>MagicNumber:ValueObjects.kt$TaxRate.Companion$4</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$0.46f</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$0.65f</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$0.8f</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$16f</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$26f</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$3</ID>
+    <ID>MagicNumber:WelcomeScreen.kt$4</ID>
+    <ID>ReturnCount:CachedCompanyRepository.kt$CachedCompanyRepository$override suspend fun getCompanyById(id: String): Result&lt;Company&gt;</ID>
+    <ID>ReturnCount:ClientListViewModel.kt$ClientListViewModel$fun getClientPhotoUrl(client: Client): String</ID>
+    <ID>ReturnCount:DefaultInvoicePrintGateway.kt$DefaultInvoicePrintGateway$private suspend fun printPanama(remoteInvoiceId: String): InvoicePrintFeedback?</ID>
+    <ID>ReturnCount:LocalStore.kt$LocalStore$private suspend fun readSecureOrMigrate( secureKey: String, legacyKey: Preferences.Key&lt;String&gt;, ): String?</ID>
+    <ID>ReturnCount:LocalStore.kt$LocalStore$suspend fun readActiveCajaForToday(): Caja?</ID>
+    <ID>ReturnCount:LocalStore.kt$LocalStore$suspend fun readFormasPago(cajaId: String?): List&lt;FormaPago&gt;</ID>
+    <ID>ReturnCount:LocalStore.kt$LocalStore$suspend fun readLastPaymentSuccess(transactionId: String): PaymentSuccessPayload?</ID>
+    <ID>ReturnCount:MainActivity.kt$MainActivity$private fun handleRapidPayResult( intent: Intent?, source: String, )</ID>
+    <ID>ReturnCount:MockClientRepository.kt$MockClientRepository$override suspend fun getAllClients( page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
+    <ID>ReturnCount:MockClientRepository.kt$MockClientRepository$override suspend fun searchClients( query: String, page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
+    <ID>ReturnCount:NetworkMonitor.kt$NetworkMonitor$override fun isOnline(): Boolean</ID>
+    <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun getAllClients( page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun searchClients( query: String, page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun searchClients(query: String): Result&lt;List&lt;Client&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts( departmentId: Int?, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts( page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts(departmentId: Int?): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getBrands(): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getDepartments(): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getFamilies(sectionId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getLines(brandId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getProductStock(id: String): Result&lt;ProductStock&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getSections(departmentId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getSubFamilies(familyId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts( query: String, departmentId: Int?, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts( query: String, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts(query: String): Result&lt;List&lt;Product&gt;&gt;</ID>
+    <ID>ReturnCount:PaymentScreen.kt$private fun decodeBase64Image(imageData: String?): ImageBitmap?</ID>
+    <ID>ReturnCount:PrinterFactory.kt$PrinterFactory$private fun getSunmiPrinterOrNull(): TicketPrinter?</ID>
+    <ID>ReturnCount:PrinterFactory.kt$PrinterFactory$private fun getTheFactoryPrinterOrNull(): PrinterRepository?</ID>
+    <ID>ReturnCount:ProductListViewModel.kt$ProductListViewModel$fun ensureStockLoaded(productId: String)</ID>
+    <ID>ReturnCount:PromotionRepositoryImpl.kt$PromotionRepositoryImpl$override suspend fun syncPromotions(): Result&lt;Unit&gt;</ID>
+    <ID>ReturnCount:SellerSelectorBottomSheet.kt$fun Seller.shortName(): String</ID>
+    <ID>ReturnCount:SettingsViewModel.kt$SettingsViewModel$suspend fun checkHkaPrinterStatus(): String</ID>
+    <ID>ReturnCount:SettingsViewModel.kt$SettingsViewModel$suspend fun loadGatewayOptions(): Result&lt;List&lt;GatewayOption&gt;&gt;</ID>
+    <ID>ReturnCount:SettingsViewModel.kt$SettingsViewModel$suspend fun testHkaConnection(): String</ID>
+    <ID>ReturnCount:SunmiV2Printer.kt$SunmiV2Printer$private suspend fun withService(block: (com.sunmi.peripheral.printer.SunmiPrinterService) -&gt; Unit): PrintResult</ID>
+    <ID>TooGenericExceptionCaught:CrashLogger.kt$CrashLogger$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DashboardScreen.kt$throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LocalStore.kt$LocalStore$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:PrinterFactory.kt$PrinterFactory$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:SunmiV2Printer.kt$SunmiV2Printer$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$e: Exception</ID>
+    <ID>TooManyFunctions:ApiService.kt$ApiService</ID>
+    <ID>TooManyFunctions:AppDatabase.kt$AppDatabase : RoomDatabase</ID>
+    <ID>TooManyFunctions:CajaRepositoryImpl.kt$CajaRepositoryImpl : CajaRepository</ID>
+    <ID>TooManyFunctions:CartRepository.kt$CartRepository</ID>
+    <ID>TooManyFunctions:CierreCajaViewModel.kt$CierreCajaViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:ClientFormViewModel.kt$ClientFormViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:CreditNotesScreen.kt$com.amaxonia.pos.ui.creditnotes.CreditNotesScreen.kt</ID>
+    <ID>TooManyFunctions:CreditNotesViewModel.kt$CreditNotesViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:DashboardScreen.kt$com.amaxonia.pos.ui.dashboard.DashboardScreen.kt</ID>
+    <ID>TooManyFunctions:LocalStore.kt$LocalStore : CountrySelectionStorePaymentSessionReader</ID>
+    <ID>TooManyFunctions:Mappers.kt$com.amaxonia.pos.data.local.db.Mappers.kt</ID>
+    <ID>TooManyFunctions:MappingExtensions.kt$com.amaxonia.pos.data.repository.MappingExtensions.kt</ID>
+    <ID>TooManyFunctions:MockProductRepository.kt$MockProductRepository : ProductRepository</ID>
+    <ID>TooManyFunctions:Money.kt$Money : Comparable</ID>
+    <ID>TooManyFunctions:OfflineFirstProductRepository.kt$OfflineFirstProductRepository : ProductRepository</ID>
+    <ID>TooManyFunctions:PaymentScreen.kt$com.amaxonia.pos.ui.payment.PaymentScreen.kt</ID>
+    <ID>TooManyFunctions:ProductFormViewModel.kt$ProductFormViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:SettingsViewModel.kt$SettingsViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl : PrinterRepository</ID>
+    <ID>TooManyFunctions:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient</ID>
+    <ID>UnusedPrivateProperty:WelcomeScreen.kt$val gradientMid = colorResource(R.color.brand_gradient_mid)</ID>
+  </CurrentIssues>
+</SmellBaseline>
