@@ -25,6 +25,7 @@ import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.CountrySelectionStore
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -171,6 +172,26 @@ class LocalStore(
     override suspend fun currentCountryCode(): String = readSelectedCountry()?.code ?: "VE"
 
     override suspend fun currentUsername(): String = readAuthSnapshot()?.user?.username ?: "POS"
+
+    override suspend fun currentTenant(): SaleTenant? =
+        readCompanySession()?.let { session ->
+            SaleTenant(
+                tenantId = SaleTenant.idFor(session.company.id),
+                companyId = session.company.id,
+                label = session.company.name,
+                adminDb = session.company.adminDb,
+                contableDb = session.company.accountingDb,
+                nominaDb = session.company.payrollDb,
+            )
+        }
+
+    /**
+     * Cheap string-only accessor used by sync workers; avoids materialising a
+     * full [SaleTenant] when all the worker needs is to know whether a row is
+     * allowed under the current session.
+     */
+    suspend fun currentTenantId(): String? =
+        readCompanySession()?.let { SaleTenant.idFor(it.company.id) }
 
     suspend fun isInitialSyncCompleted(companyId: Int): Boolean {
         val key = booleanPreferencesKey("initial_sync_completed_$companyId")

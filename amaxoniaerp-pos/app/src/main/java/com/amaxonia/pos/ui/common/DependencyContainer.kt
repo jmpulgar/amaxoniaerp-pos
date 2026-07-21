@@ -257,9 +257,11 @@ object DependencyContainer {
                     clock = SystemAppClock(),
                     idGenerator = UuidGenerator,
                     fiscalConfirmationLedger = fiscalConfirmationLedger,
+                    sessionReader = localStore,
                 ),
             startTransaction = startTransactionUseCase,
             gatewayCallbackLedger = gatewayCallbackLedger,
+            sessionReader = localStore,
         )
     }
 

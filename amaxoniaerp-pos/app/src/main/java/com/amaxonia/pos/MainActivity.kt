@@ -86,15 +86,18 @@ class MainActivity : ComponentActivity() {
 
         val correlationId = RapidPayBridge.pendingCorrelationId()
         val responseCode = intent.getStringExtra(EXTRA_RESULT_CODE).orEmpty()
+        val resultJson = intent.getStringExtra(EXTRA_RESULT_DATA)
+        val message = intent.getStringExtra(EXTRA_MESSAGE)
 
         if (!RapidPayBridge.hasPendingRequest()) {
             SafeLog.w(TAG, "Rapid Pay result ignored because no request is pending")
-            // The bridge is empty (process died/been killed) but we still have
-            // the callback Intent. Persist the responseCode so the
-            // GatewayCallbackWorker reconciliation can surface the row to the
-            // cashier instead of silently losing the result.
+            // Process died before onNewIntent — the in-memory Deferred is gone
+            // but the callback Intent still reached the ledger row. Persist
+            // the FULL HKA response (code + JSON + message) so an auditor can
+            // reconcile the sale without losing the issuer's reference
+            // (auditoría ítem 6 / HKA-002).
             if (correlationId != null) {
-                markGatewayResolved(correlationId, responseCode)
+                markGatewayResolved(correlationId, responseCode, resultJson, message)
             }
             return
         }
@@ -105,7 +108,7 @@ class MainActivity : ComponentActivity() {
         // The callback arrived — even a denied card clears the await; only a
         // no-show stays AWAITING for the watchdog to escalate.
         if (correlationId != null) {
-            markGatewayResolved(correlationId, responseCode)
+            markGatewayResolved(correlationId, responseCode, resultJson, message)
         }
 
         // Clear the extras so they don't get re-processed on configuration change
@@ -117,12 +120,16 @@ class MainActivity : ComponentActivity() {
     private fun markGatewayResolved(
         correlationId: String,
         responseCode: String,
+        rawResponse: String?,
+        message: String?,
     ) {
         runBlocking {
             runCatching {
                 DependencyContainer.gatewayCallbackLedger.markResolved(
                     correlationId = correlationId,
                     responseCode = responseCode,
+                    rawResponse = rawResponse,
+                    message = message,
                 )
             }.onFailure { error ->
                 SafeLog.w(TAG, "Failed to mark gateway resolved: ${error.message}")

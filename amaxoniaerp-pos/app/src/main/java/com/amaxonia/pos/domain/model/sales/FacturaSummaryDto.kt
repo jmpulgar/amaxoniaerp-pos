@@ -52,3 +52,19 @@ data class FacturaDetalleResponseDto(
     val codFactura: String,
     val items: List<FacturaDetalleItemDto>,
 )
+
+/**
+ * Canonical reconciliation result returned by [SalesRepository.findByCorrelationId].
+ *
+ * Auditoría ítem 2 (INT-BE-001): after an HTTP 409, the POS must converge on
+ * the existing invoice instead of leaving the cashier in a dead-end. The
+ * caller may use this to mark the local ledger row as CONFIRMED with the
+ * backend's own `idFactura` + `codFactura` and continue printing or fiscal
+ * confirmation — without a second sale being submitted.
+ */
+@Serializable
+data class ReconciledInvoice(
+    val idFactura: String,
+    val codFactura: String,
+    val codEstatus: Int = 2,
+)

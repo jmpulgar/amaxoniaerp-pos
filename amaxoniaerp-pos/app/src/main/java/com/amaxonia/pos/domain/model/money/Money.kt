@@ -36,6 +36,13 @@ class Money private constructor(
 
     fun toPlainString(): String = amount.toPlainString()
 
+    /**
+     * Canonical [BigDecimal] backing this [Money]. Read-only accessor for
+     * boundary conversions (see [MinorUnitMoney]); the scale is fixed at
+     * [SCALE] so callers receive a stable representation.
+     */
+    fun toBigDecimal(): BigDecimal = amount
+
     override fun equals(other: Any?): Boolean = other is Money && amount == other.amount && currency == other.currency
 
     override fun hashCode(): Int = 31 * amount.hashCode() + currency.hashCode()

@@ -3,6 +3,7 @@ package com.amaxonia.pos.domain.usecase.payment
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
 import com.amaxonia.pos.domain.model.sales.SalePaymentSummaryDto
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 import kotlinx.coroutines.test.runTest
@@ -12,7 +13,7 @@ import java.time.Instant
 
 class QueueOfflineInvoiceUseCaseTest {
     @Test
-    fun persistsStableIdempotencyIdentifiersBeforeReturning() =
+    fun persistsStableIdempotencyIdentifiersAndTenantBeforeReturning() =
         runTest {
             var written: OfflineInvoice? = null
             val useCase =
@@ -22,13 +23,24 @@ class QueueOfflineInvoiceUseCaseTest {
                     clock = AppClock { Instant.ofEpochMilli(123456789L) },
                 )
 
-            val result = useCase("VE", request(), 10.0, "CLIENT")
+            val tenant =
+                SaleTenant(
+                    tenantId = SaleTenant.idFor(7),
+                    companyId = 7,
+                    label = "Empresa 7",
+                    adminDb = "admin7",
+                    contableDb = "contable7",
+                    nominaDb = "nomina7",
+                )
+            val result = useCase("VE", request(), 10.0, "CLIENT", tenant)
 
             assertEquals("generated-id", result.id)
             assertEquals("OFF-123456789", result.localInvoiceNumber)
             assertEquals(result.id, result.request.idFactura)
             assertEquals(result.localInvoiceNumber, result.request.codFactura)
+            assertEquals("t$7", result.tenant.tenantId)
             assertEquals(result, written)
+            assertEquals(tenant, written?.tenant)
         }
 
     private fun request(): ProcessSaleRequestDto =

@@ -7,6 +7,13 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 
+/**
+ * Offline queue of sales that could not reach the backend. Schema v14 adds
+ * the same tenant identity columns as [TransactionLogEntity] plus the
+ * canonical total in minor-units, and a per-row lease so a single
+ * [PendingInvoiceSyncWorker] cannot double-submit a row when relaunched
+ * (auditoría ítems 3, 4, 8).
+ */
 @Entity(tableName = "pending_invoices")
 data class PendingInvoiceEntity(
     @PrimaryKey val id: String,
@@ -20,6 +27,17 @@ data class PendingInvoiceEntity(
     val lastError: String? = null,
     val remoteInvoiceId: String? = null,
     val remoteInvoiceNumber: String? = null,
+    // --- v14 (auditoría ítems 3, 4, 8) ---
+    val tenantId: String = "",
+    val tenantCompanyId: Int = 0,
+    val tenantAdminDb: String = "",
+    val tenantContableDb: String = "",
+    val tenantNominaDb: String = "",
+    val tenantLabel: String = "",
+    val totalMinor: Long = 0L,
+    val currencyCode: String = "USD",
+    /** Lease epoch-millis; 0 means "not currently claimed". See [tryClaim]. */
+    val leasedUntil: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
@@ -31,6 +49,20 @@ interface PendingInvoiceDao {
 
     @Query("SELECT * FROM pending_invoices WHERE status IN ('PENDING', 'FAILED') ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getPending(limit: Int = 25): List<PendingInvoiceEntity>
+
+    /**
+     * Pending rows for a specific tenant. Workers call this with the active
+     * session tenant so rows from another tenant are never picked up.
+     */
+    @Query(
+        "SELECT * FROM pending_invoices WHERE tenantId = :tenantId " +
+            "AND status IN ('PENDING', 'FAILED') " +
+            "ORDER BY createdAt ASC LIMIT :limit",
+    )
+    suspend fun getPendingForTenant(
+        tenantId: String,
+        limit: Int = 25,
+    ): List<PendingInvoiceEntity>
 
     @Query("SELECT * FROM pending_invoices WHERE createdAt BETWEEN :fromMillis AND :toMillis ORDER BY createdAt ASC")
     suspend fun getCreatedBetween(
@@ -84,4 +116,22 @@ interface PendingInvoiceDao {
         staleBefore: Long,
         updatedAt: Long = System.currentTimeMillis(),
     )
+
+    /**
+     * Atomic claim for the offline-upload worker (ítem 4 / CON-001). Returns
+     * the number of rows claimed (1 = success, 0 = someone else owns it).
+     * The accompanying `leasedUntil` is checked in the WHERE clause so two
+     * concurrent workers cannot both submit the same row.
+     */
+    @Query(
+        "UPDATE pending_invoices SET leasedUntil = :leasedUntil, updatedAt = :updatedAt " +
+            "WHERE id = :id AND leasedUntil <= :now",
+    )
+    suspend fun tryClaim(
+        id: String,
+        now: Long,
+        leasedUntil: Long,
+        updatedAt: Long = System.currentTimeMillis(),
+    ): Int
 }
+

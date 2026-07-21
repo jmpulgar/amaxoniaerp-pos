@@ -12,6 +12,7 @@ import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -32,6 +33,7 @@ class SalesApiImpl(
 ) : SalesApi {
     private companion object {
         const val HTTP_CONFLICT = 409
+        const val HTTP_NOT_FOUND: Int = 404
     }
 
     override suspend fun processSale(
@@ -139,6 +141,39 @@ class SalesApiImpl(
                 }
 
             Result.success(parsed)
+        }
+
+    override suspend fun findByCorrelationId(
+        authHeader: String,
+        clientCorrelationId: String,
+    ): Result<ReconciledInvoice?> =
+        catchingResult {
+            // Auditoría ítem 2 (INT-BE-001): after an HTTP 409, the POS queries
+            // the existing invoice by its canonical idFactura. A 404 means
+            // "backend has no row for this id" — surfaced as null so the
+            // caller can fall back to manual DuplicateInvoice handling.
+            val response =
+                apiClient.httpClient.get("facturas/by-id-factura/$clientCorrelationId") {
+                    header("Authorization", authHeader)
+                }
+            when (response.status.value) {
+                HTTP_NOT_FOUND -> Result.success(null)
+                else -> {
+                    val text = response.bodyAsText()
+                    val parsed =
+                        runCatching {
+                            AppJson.decodeFromString(ReconciledInvoice.serializer(), text)
+                        }.getOrElse {
+                            val json = AppJson.decodeFromString(JsonElement.serializer(), text)
+                            if (json is JsonObject) {
+                                val err = json["error"]?.jsonPrimitive?.contentOrNull
+                                error(err ?: "Respuesta invalida al reconciliar factura")
+                            }
+                            error(text.ifBlank { "Respuesta invalida al reconciliar factura" })
+                        }
+                    Result.success(parsed)
+                }
+            }
         }
 
     override suspend fun confirmFacturaFiscal(

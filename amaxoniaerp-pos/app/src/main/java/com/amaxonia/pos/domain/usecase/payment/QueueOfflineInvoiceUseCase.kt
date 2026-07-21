@@ -1,6 +1,7 @@
 package com.amaxonia.pos.domain.usecase.payment
 
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 
@@ -12,6 +13,7 @@ data class OfflineInvoice(
     val total: Double,
     val clientName: String,
     val createdAt: Long,
+    val tenant: SaleTenant,
 )
 
 fun interface OfflineInvoiceWriter {
@@ -28,6 +30,7 @@ class QueueOfflineInvoiceUseCase(
         request: ProcessSaleRequestDto,
         total: Double,
         clientName: String,
+        tenant: SaleTenant,
     ): OfflineInvoice {
         val now = clock.now().toEpochMilli()
         val id = idGenerator.nextId()
@@ -41,6 +44,7 @@ class QueueOfflineInvoiceUseCase(
                 total = total,
                 clientName = clientName,
                 createdAt = now,
+                tenant = tenant,
             )
         writer.write(invoice)
         return invoice

@@ -27,6 +27,8 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
+import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
@@ -331,9 +333,10 @@ class ExecutePaymentFlowUseCaseTest {
         val writer = CapturingOfflineWriter()
         val clock = AppClock { Instant.ofEpochMilli(1_000L) }
         val ids = IdGenerator { "flow-id" }
+        val ledger = if (options.withLedger) InMemoryTransactionLogDao() else null
         val repositories = paymentRepositories(options, cart, caja, sales, transactions)
-        val useCase = buildPaymentFlow(repositories, writer, clock, ids, options)
-        return Fixture(useCase, sales, transactions, writer)
+        val useCase = buildPaymentFlow(repositories, writer, clock, ids, options, ledger)
+        return Fixture(useCase, sales, transactions, writer, ledger)
     }
 
     private fun configuredCart(options: FixtureOptions): CartRepository {
@@ -379,12 +382,14 @@ class ExecutePaymentFlowUseCaseTest {
                 ),
         )
 
+    @Suppress("LongParameterList")
     private fun buildPaymentFlow(
         repositories: PaymentFlowRepositories,
         writer: CapturingOfflineWriter,
         clock: AppClock,
         ids: IdGenerator,
         options: FixtureOptions,
+        ledger: InMemoryTransactionLogDao? = null,
     ): ExecutePaymentFlowUseCase {
         val preparationOperations =
             PaymentPreparationOperations(
@@ -409,10 +414,13 @@ class ExecutePaymentFlowUseCaseTest {
                     assembleSale = AssemblePreparedSaleUseCase(repositories, preparationOperations),
                 ),
             operations = executionOperations,
-            completeSale = CompletePaymentSaleUseCase(repositories, executionOperations, clock, ids),
+            completeSale = CompletePaymentSaleUseCase(repositories, executionOperations, clock, ids, sessionReader = FakePaymentSession),
+            startTransaction = ledger?.let { StartTransactionUseCase(it, ids, clock) },
+            sessionReader = if (ledger != null) FakePaymentSession else null,
         )
     }
 
+    @Suppress("LongParameterList")
     private fun input(
         countryCode: String = "PA",
         gatewayPayment: Boolean = false,
@@ -420,6 +428,7 @@ class ExecutePaymentFlowUseCaseTest {
         methods: List<FormaPago>? = null,
         tenderedAmount: Money = Money.parse("10.00"),
         changeDue: Double = 0.0,
+        correlationCarryOver: String? = null,
     ): ExecutePaymentFlowInput {
         val method = paymentMethod(1, "CASH", "Efectivo")
         val details = paymentDetails ?: listOf(FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = 10.0))
@@ -444,6 +453,7 @@ class ExecutePaymentFlowUseCaseTest {
             secondaryCurrency = "",
             isMultiCurrency = false,
             availableMethods = methods ?: listOf(method),
+            correlationCarryOver = correlationCarryOver,
         )
     }
 
@@ -462,11 +472,127 @@ class ExecutePaymentFlowUseCaseTest {
         tipoMoneda = "USD",
     )
 
+    // --- Auditoría docs/auditoria-produccion-pos-2026-07-20.md — ítem 1 ---
+
+    @Test
+    fun `timeout then retry with carry-over id reuses the same idFactura and ledger row`() =
+        runTest {
+            // First attempt: backend times out (simulated as a thrown failure
+            // after the row has been opened). The ViewModel would surface the
+            // failure and remember the correlation id to carry into the retry.
+            val firstFixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        withLedger = true,
+                        processSaleFailure = IllegalStateException("timeout"),
+                    ),
+                )
+            val firstResult = firstFixture.useCase(input(countryCode = "VE")) {}
+            assertTrue(firstResult is PaymentFlowResult.Failure)
+            assertEquals("timeout", (firstResult as PaymentFlowResult.Failure).message)
+            val firstId = firstFixture.ledger!!.rows.keys.single()
+
+            // Retry: the ViewModel re-presents the same payment details, but
+            // NOW it carries the correlation id of the timed-out attempt.
+            val retryFixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        withLedger = true,
+                    ),
+                )
+            retryFixture.ledger!!.rows[firstId] =
+                firstFixture.ledger!!.rows[firstId]!!.copy(
+                    // Simulate process death: a fresh DAO instance has the
+                    // same row but the use case does NOT share the IdGenerator.
+                )
+
+            val retryResult =
+                retryFixture.useCase(input(countryCode = "VE", correlationCarryOver = firstId)) {}
+
+            // KEY ASSERTION of ítem 1: the SAME idFactura reached the backend.
+            assertTrue(retryResult is PaymentFlowResult.Success)
+            assertEquals(firstId, retryFixture.sales.request?.idFactura)
+            // And only ONE ledger row exists in the retry ledger (no second one opened).
+            assertEquals(1, retryFixture.ledger!!.rows.size)
+        }
+
+    // --- Auditoría docs/auditoria-produccion-pos-2026-07-20.md — ítem 2 ---
+
+    @Test
+    fun `HTTP 409 with reconcilable invoice converges to a single confirmed sale`() =
+        runTest {
+            // The idGenerator mints idFactura = "flow-id" deterministically.
+            val fixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        withLedger = true,
+                        processSaleDuplicateOn = "flow-id",
+                        reconciledCorrelationId = "flow-id",
+                    ),
+                )
+
+            val result = fixture.useCase(input(countryCode = "VE")) {}
+
+            // KEY ASSERTION of ítem 2: the conflict was reconciled with the
+            // backend's authoritative record instead of becoming a dead-end.
+            assertTrue("Expected Success, was $result", result is PaymentFlowResult.Success)
+            val success = result as PaymentFlowResult.Success
+            assertEquals("RECONCILED-1", success.payload.codFactura)
+            // And processSale was called exactly once (no second submission).
+            assertEquals(1, fixture.sales.processSaleCalls)
+        }
+
+    @Test
+    fun `HTTP 409 without backend exposure surfaces DuplicateInvoice instead of auto-approving`() =
+        runTest {
+            val fixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        withLedger = true,
+                        processSaleDuplicateOn = "flow-id",
+                        // reconciledCorrelationId unset -> findByCorrelationId returns null
+                    ),
+                )
+
+            val result = fixture.useCase(input(countryCode = "VE")) {}
+
+            // KEY ASSERTION of ítem 2: ambiguous conflicts never silently
+            // become approvals. The user is asked to retry or escalate.
+            assertTrue(result is PaymentFlowResult.DuplicateInvoice)
+            assertEquals("flow-id", (result as PaymentFlowResult.DuplicateInvoice).clientCorrelationId)
+        }
+
+    @Test
+    fun `HTTP 409 with unreachable reconciliation backend stays Duplicate and never auto-approves`() =
+        runTest {
+            val fixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        withLedger = true,
+                        processSaleDuplicateOn = "flow-id",
+                        reconciliationFailureId = "flow-id",
+                    ),
+                )
+
+            val result = fixture.useCase(input(countryCode = "VE")) {}
+
+            assertTrue(result is PaymentFlowResult.DuplicateInvoice)
+            val dup = result as PaymentFlowResult.DuplicateInvoice
+            assertEquals("flow-id", dup.clientCorrelationId)
+            assertEquals(1, fixture.sales.processSaleCalls)
+        }
+
     private data class Fixture(
         val useCase: ExecutePaymentFlowUseCase,
         val sales: FakeSalesRepository,
         val transactions: FakeTransactionRepository,
         val offlineWriter: CapturingOfflineWriter,
+        val ledger: InMemoryTransactionLogDao? = null,
     )
 
     private data class FixtureOptions(
@@ -491,6 +617,15 @@ class ExecutePaymentFlowUseCaseTest {
         val cajaStatusFailure: Throwable? = null,
         val branches: List<ClientBranch> =
             listOf(ClientBranch(sucursalId = 1, clienteCodigo = "C1", nombreSucursal = "Principal")),
+        /** When true, wires [StartTransactionUseCase] into the flow so the ledger can be inspected. */
+        val withLedger: Boolean = false,
+        // --- Auditoría ítem 2 (INT-BE-001) ---
+        /** If set, processSale() throws DuplicateInvoiceException for this idFactura. */
+        val processSaleDuplicateOn: String? = null,
+        /** idFactura that findByCorrelationId resolves to a reconciled invoice. */
+        val reconciledCorrelationId: String? = null,
+        /** idFactura for which findByCorrelationId fails (network unreachable). */
+        val reconciliationFailureId: String? = null,
     )
 
     private data class PreparationScenario(
@@ -527,12 +662,41 @@ class ExecutePaymentFlowUseCaseTest {
         var request: ProcessSaleRequestDto? = null
         var confirmedInvoiceId: String? = null
         var confirmation: ConfirmFacturaFiscalRequestDto? = null
+        /** Number of processSale invocations so a test can simulate a 409 on the first call only. */
+        var processSaleCalls: Int = 0
 
         override suspend fun processSale(payload: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> {
             request = payload
+            processSaleCalls += 1
+            // Auditoría ítem 2 fixture: simulate HTTP 409 whenconfigured.
+            options.processSaleDuplicateOn?.let { triggerId ->
+                if (payload.idFactura == triggerId) {
+                    return Result.failure(
+                        DuplicateInvoiceException(
+                            clientCorrelationId = triggerId,
+                            message = "Conflict: idFactura $triggerId already processed",
+                        ),
+                    )
+                }
+            }
             return options.processSaleFailure?.let(Result.Companion::failure)
                 ?: Result.success(ProcessSaleResponseDto(true, "remote-invoice", "INV-1", 2))
         }
+
+        override suspend fun findByCorrelationId(clientCorrelationId: String): Result<ReconciledInvoice?> =
+            when (clientCorrelationId) {
+                options.reconciledCorrelationId ->
+                    Result.success(
+                        ReconciledInvoice(
+                            idFactura = clientCorrelationId,
+                            codFactura = "RECONCILED-1",
+                            codEstatus = 2,
+                        ),
+                    )
+                options.reconciliationFailureId ->
+                    Result.failure(IllegalStateException("reconciliation unreachable"))
+                else -> Result.success(null)
+            }
 
         override suspend fun confirmFacturaFiscal(
             facturaId: String,
@@ -648,5 +812,15 @@ class ExecutePaymentFlowUseCaseTest {
         override suspend fun currentCountryCode(): String = "PA"
 
         override suspend fun currentUsername(): String = "tester"
+
+        override suspend fun currentTenant(): SaleTenant? =
+            SaleTenant(
+                tenantId = SaleTenant.idFor(1),
+                companyId = 1,
+                label = "Empresa 1",
+                adminDb = "admin1",
+                contableDb = "contable1",
+                nominaDb = "nomina1",
+            )
     }
 }

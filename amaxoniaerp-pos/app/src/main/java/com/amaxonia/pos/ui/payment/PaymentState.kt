@@ -85,30 +85,30 @@ data class PaymentState(
     }
 
     val totalAmountBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", totalAmount * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", totalAmount * tasa) else ""
 
     val tenderedAmountBsText: String
         get() =
             if (isMultiCurrency &&
                 tasa > 0.0
             ) {
-                String.format(java.util.Locale.getDefault(), "%.2f", tenderedAmountMoney.toDouble() * tasa)
+                String.format(java.util.Locale.US, "%.2f", tenderedAmountMoney.toDouble() * tasa)
             } else {
                 ""
             }
 
     val changeDueBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", changeDue * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", changeDue * tasa) else ""
 
     val nonCashAssignedBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", nonCashAssignedTotal * tasa) else ""
+        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", nonCashAssignedTotal * tasa) else ""
 
     val nonCashPendingBsText: String
         get() =
             if (isMultiCurrency &&
                 tasa > 0.0
             ) {
-                String.format(java.util.Locale.getDefault(), "%.2f", nonCashPendingMoney.toDouble() * tasa)
+                String.format(java.util.Locale.US, "%.2f", nonCashPendingMoney.toDouble() * tasa)
             } else {
                 ""
             }
@@ -117,7 +117,7 @@ data class PaymentState(
         get() {
             if (!isMultiCurrency || tasa <= 0.0) return ""
             val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeastZero()
-            return String.format(java.util.Locale.getDefault(), "%.2f", missing.toDouble() * tasa)
+            return String.format(java.util.Locale.US, "%.2f", missing.toDouble() * tasa)
         }
 
     val totalAmountBs: Double

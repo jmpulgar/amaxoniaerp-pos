@@ -30,10 +30,14 @@ fun interface GatewayCallbackLedger {
     suspend fun markResolved(
         correlationId: String,
         responseCode: String,
+        rawResponse: String? = null,
+        message: String? = null,
     ) = recordOutcome(
         GatewayCallbackOutcome.Resolved(
             correlationId = correlationId,
             responseCode = responseCode,
+            rawResponse = rawResponse,
+            message = message,
         ),
     )
 }
@@ -51,12 +55,21 @@ sealed interface GatewayCallbackOutcome {
     ) : GatewayCallbackOutcome
 
     /**
-     * Emitted once MainActivity receives the HKA callback Intent. The
-     * [responseCode] is the short `codeRapidPay` extra — never the
-     * encrypted command, never the card number.
+     * Emitted once MainActivity receives the HKA callback Intent.
+     *
+     * - [responseCode]: short `codeRapidPay` extra ("200"/"400"). Always
+     *   present. NEVER an encrypted command or card number.
+     * - [rawResponse]: full JSON returned in `resultRapidPay`, kept verbatim
+     *   for audit + reconciliation. May be null when HKA sends only the
+     *   short code. Redacted of any card data upstream in
+     *   `TheFactoryRapidPayClient.parseResultIntent`.
+     * - [message]: user-facing message (`messageRapidPay` or extracted from
+     *   the JSON). May be null.
      */
     data class Resolved(
         val correlationId: String,
         val responseCode: String,
+        val rawResponse: String? = null,
+        val message: String? = null,
     ) : GatewayCallbackOutcome
 }

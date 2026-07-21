@@ -244,6 +244,10 @@ class AssemblePreparedSaleUseCase(
                     selectedMethods = input.paymentDetails.transactionMethods,
                 ),
             financials = PreparedSaleFinancials(totals.total, configuration.rate, configuration.isMultiCurrency),
+            // Propagate the durable carry-over id (auditoría ítem 1) so a
+            // retry after a timeout/crash reuses the same idFactura and the
+            // backend dedup kicks in. null for brand-new operations.
+            correlationCarryOver = input.correlationCarryOver,
         )
     }
 

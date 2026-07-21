@@ -43,10 +43,20 @@ class PendingInvoiceSyncWorker(
                     dao.recoverInterrupted(staleBeforeEpochMillis, nowEpochMillis)
                 }
 
-                override suspend fun pending(): List<PendingInvoiceRecord> =
-                    dao.getPending().map { invoice ->
-                        PendingInvoiceRecord(invoice.id, invoice.localInvoiceNumber, invoice.payloadJson)
+                override suspend fun pending(tenantId: String?): List<PendingInvoiceRecord> =
+                    if (tenantId == null) {
+                        emptyList()
+                    } else {
+                        dao.getPendingForTenant(tenantId).map { invoice ->
+                            PendingInvoiceRecord(invoice.id, invoice.localInvoiceNumber, invoice.payloadJson)
+                        }
                     }
+
+                override suspend fun tryClaim(
+                    id: String,
+                    now: Long,
+                    leasedUntil: Long,
+                ): Int = dao.tryClaim(id, now, leasedUntil)
 
                 override suspend fun markSending(
                     id: String,
@@ -96,7 +106,7 @@ class PendingInvoiceSyncWorker(
                 clock = SystemAppClock(),
             )
 
-        return when (useCase()) {
+        return when (useCase(localStore.currentTenantId())) {
             PendingInvoiceSyncResult.Success -> Result.success()
             PendingInvoiceSyncResult.Retry -> Result.retry()
         }

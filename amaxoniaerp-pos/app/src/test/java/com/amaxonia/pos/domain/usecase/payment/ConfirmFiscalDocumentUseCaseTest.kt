@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.repository.SalesRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -54,6 +55,8 @@ class ConfirmFiscalDocumentUseCaseTest {
         }
 
         override suspend fun processSale(payload: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> = unused()
+
+        override suspend fun findByCorrelationId(clientCorrelationId: String): Result<ReconciledInvoice?> = unused()
 
         override suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto> = unused()
 

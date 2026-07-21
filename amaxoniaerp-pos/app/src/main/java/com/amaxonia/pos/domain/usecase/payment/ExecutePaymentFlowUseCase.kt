@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.payment.GatewayPaymentRequest
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 import java.time.LocalDateTime
@@ -28,6 +29,18 @@ data class ExecutePaymentFlowInput(
     val secondaryCurrency: String,
     val isMultiCurrency: Boolean,
     val availableMethods: List<FormaPago>,
+    /**
+     * Canonical `idFactura` persisted in a PRIOR attempt of the same
+     * operation (e.g. after a timeout/crash). When non-null and the row is
+     * still in `SENDING` state on the local ledger,
+     * [StartTransactionUseCase.recoverOrStart] reuses it so the backend
+     * dedup (HTTP 409) detects the retry and the sale converges to a single
+     * invoice. Required for auditoría ítem 1 — "timeout + restart + retry
+     * never create another sale nor another id".
+     *
+     * null/blank for brand-new operations → fresh UUID is minted.
+     */
+    val correlationCarryOver: String? = null,
 )
 
 sealed interface PaymentFlowEvent {
@@ -85,6 +98,7 @@ class ExecutePaymentFlowUseCase(
     private val completeSale: CompletePaymentSaleUseCase,
     private val startTransaction: StartTransactionUseCase? = null,
     private val gatewayCallbackLedger: GatewayCallbackLedger? = null,
+    private val sessionReader: PaymentSessionReader? = null,
 ) : PaymentFlowExecutor {
     override suspend operator fun invoke(
         input: ExecutePaymentFlowInput,
@@ -109,6 +123,7 @@ class ExecutePaymentFlowUseCase(
         sale: PreparedSale,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
+        val tenant = sessionReader?.currentTenant()
         val correlationId =
             startTransaction?.recoverOrStart(
                 StartTransactionCommand(
@@ -118,6 +133,7 @@ class ExecutePaymentFlowUseCase(
                     totalAmount = sale.financials.total,
                     currency = sale.request.moneda?.abrMonedaBase ?: DEFAULT_CURRENCY,
                     clientName = sale.client.paymentFullName(),
+                    tenant = tenant,
                 ),
             )?.clientCorrelationId
         val stampedSale = sale.withCorrelationId(correlationId)
@@ -212,6 +228,7 @@ class CompletePaymentSaleUseCase(
     private val clock: AppClock,
     private val idGenerator: IdGenerator,
     private val fiscalConfirmationLedger: PaymentFiscalConfirmationLedger? = null,
+    private val sessionReader: PaymentSessionReader? = null,
 ) {
     internal suspend operator fun invoke(
         input: ExecutePaymentFlowInput,
@@ -225,16 +242,21 @@ class CompletePaymentSaleUseCase(
             processOffline(input, sale)
         }
 
+    @Suppress("ReturnCount")
     private suspend fun processOffline(
         input: ExecutePaymentFlowInput,
         sale: PreparedSale,
     ): PaymentFlowResult {
+        val tenant =
+            sessionReader?.currentTenant()
+                ?: return operations.failure(IllegalStateException("No hay sesión activa"), "Sin sesión de empresa activa")
         val queued =
             operations.queueOfflineInvoice(
                 countryCode = input.countryCode,
                 request = sale.request,
                 total = sale.financials.total,
                 clientName = sale.client.paymentDisplayName(),
+                tenant = tenant,
             )
         val transaction =
             createTransaction(
@@ -272,16 +294,57 @@ class CompletePaymentSaleUseCase(
         repositories.runtime.sales.processSale(sale.request).fold(
             onFailure = { error ->
                 if (error is DuplicateInvoiceException) {
-                    PaymentFlowResult.DuplicateInvoice(
-                        clientCorrelationId = error.clientCorrelationId,
-                        reason = error.message ?: "Factura duplicada",
-                    )
+                    // Auditoría ítem 2 (INT-BE-001). The backend told us this
+                    // idFactura already exists; try to fetch the existing
+                    // invoice so the sale converges to a single terminal state
+                    // instead of leaving the cashier in a dead-end. If the
+                    // reconciliation lookup fails or returns nothing, fall
+                    // back to the explicit DuplicateInvoice result so the user
+                    // either retries later or escalates manually.
+                    reconcileDuplicate(error.clientCorrelationId, input, sale, correlationId, onEvent)
                 } else {
                     operations.failure(error, "No se pudo procesar la venta. Intenta nuevamente")
                 }
             },
             onSuccess = { response -> processAcceptedOnlineSale(input, sale, correlationId, response, onEvent) },
         )
+
+    private suspend fun reconcileDuplicate(
+        clientCorrelationId: String,
+        input: ExecutePaymentFlowInput,
+        sale: PreparedSale,
+        correlationId: String?,
+        onEvent: suspend (PaymentFlowEvent) -> Unit,
+    ): PaymentFlowResult {
+        val lookup = repositories.runtime.sales.findByCorrelationId(clientCorrelationId)
+        val reconciled = lookup.getOrNull()
+        if (lookup.isFailure || reconciled == null) {
+            // The conflict could not be auto-reconciled: surface the
+            // explicit DuplicateInvoice state so the user is not silently
+            // promoted to an approval. NEVER allow an ambiguous 409 to
+            // become Success without a real invoice reference.
+            return PaymentFlowResult.DuplicateInvoice(
+                clientCorrelationId = clientCorrelationId,
+                reason =
+                    if (lookup.isFailure) {
+                        "Factura duplicada y no se pudo reconciliar con el backend"
+                    } else {
+                        "Factura duplicada: el backend ya la procesó pero no la expone para reconciliación"
+                    },
+            )
+        }
+        // We have the backend's authoritative record: converge to a Success
+        // built from the reconciled reference, marking the local ledger as
+        // CONFIRMED so retries against the same idFactura are inert.
+        val synthetic =
+            ProcessSaleResponseDto(
+                success = true,
+                idFactura = reconciled.idFactura,
+                codFactura = reconciled.codFactura,
+                codEstatus = reconciled.codEstatus,
+            )
+        return processAcceptedOnlineSale(input, sale, correlationId, synthetic, onEvent)
+    }
 
     private suspend fun processAcceptedOnlineSale(
         input: ExecutePaymentFlowInput,

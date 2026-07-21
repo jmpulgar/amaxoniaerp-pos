@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.repository.SalesRepository
 
 class SalesRepositoryImpl(
@@ -21,6 +22,14 @@ class SalesRepositoryImpl(
                 localStore.readCompanySession()?.token
                     ?: error("No autorizado: primero selecciona una empresa")
             salesApi.processSale(authHeader = "Bearer $token", payload = payload)
+        }
+
+    override suspend fun findByCorrelationId(clientCorrelationId: String): Result<ReconciledInvoice?> =
+        catchingResult {
+            val token =
+                localStore.readCompanySession()?.token
+                    ?: error("No autorizado: primero selecciona una empresa")
+            salesApi.findByCorrelationId(authHeader = "Bearer $token", clientCorrelationId = clientCorrelationId)
         }
 
     override suspend fun confirmFacturaFiscal(

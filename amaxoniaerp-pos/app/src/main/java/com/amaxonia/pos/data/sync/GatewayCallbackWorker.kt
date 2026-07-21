@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.TransactionLogDao
 import com.amaxonia.pos.data.local.db.TransactionLogEntity
@@ -34,13 +35,14 @@ class GatewayCallbackWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        val localStore = LocalStore(applicationContext)
         val dao = AppDatabase.getInstance(applicationContext).transactionLogDao()
         val now = SystemAppClock().now().toEpochMilli()
+        val activeTenant = localStore.currentTenantId()
         val pending =
-            dao.findGatewayReconcilable(
-                now = now,
-                limit = BATCH_LIMIT,
-            )
+            activeTenant?.let { tenantId ->
+                dao.findGatewayReconcilableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
+            } ?: emptyList()
 
         if (pending.isEmpty()) {
             SafeLog.d(TAG, "No gateway callbacks awaiting reconciliation")

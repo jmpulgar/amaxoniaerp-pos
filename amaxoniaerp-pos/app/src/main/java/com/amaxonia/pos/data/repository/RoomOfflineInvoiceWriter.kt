@@ -21,6 +21,9 @@ class RoomOfflineInvoiceWriter(
                 clientName = invoice.clientName,
                 createdAt = invoice.createdAt,
                 updatedAt = invoice.createdAt,
+                tenantId = invoice.tenant.tenantId,
+                tenantCompanyId = invoice.tenant.companyId,
+                tenantLabel = invoice.tenant.label,
             ),
         )
     }

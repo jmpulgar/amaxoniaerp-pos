@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 
 interface SalesApi {
     suspend fun processSale(
@@ -26,6 +27,16 @@ interface SalesApi {
         authHeader: String,
         facturaId: String,
     ): Result<FacturaDetalleResponseDto>
+
+    /**
+     * Resolves an existing invoice by its canonical `idFactura`. Returns the
+     * invoice when found, `null` when the backend has no row for that id, or a
+     * failure when the backend is unreachable (auditoría ítem 2).
+     */
+    suspend fun findByCorrelationId(
+        authHeader: String,
+        clientCorrelationId: String,
+    ): Result<ReconciledInvoice?>
 
     suspend fun confirmFacturaFiscal(
         authHeader: String,

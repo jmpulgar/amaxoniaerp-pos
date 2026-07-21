@@ -38,11 +38,15 @@ class QueueGatewayCallbackUseCase(
     suspend fun markResolved(
         clientCorrelationId: String,
         responseCode: String,
+        rawResponse: String? = null,
+        message: String? = null,
     ) {
         dao.markGatewayResolved(
             id = clientCorrelationId,
             status = STATUS_RESOLVED,
-            rawResponse = responseCode,
+            resultCode = responseCode,
+            rawResponse = rawResponse,
+            message = message,
         )
     }
 

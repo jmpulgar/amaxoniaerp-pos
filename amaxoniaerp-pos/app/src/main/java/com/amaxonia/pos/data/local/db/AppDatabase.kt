@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-
+import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
 @Database(
     entities = [
         ClientEntity::class,
@@ -24,10 +24,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PromocionDetalleEntity::class,
         TransactionLogEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
-@TypeConverters(Converters::class)
+@TypeConverters(Converters::class, FiscalStateConverter::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun clientDao(): ClientDao
 
@@ -298,6 +298,98 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * Auditoría docs/auditoria-produccion-pos-2026-07-20.md — single
+         * foundation migration for ítems 1, 3, 4, 5, 8.
+         *
+         * Adds to `transaction_log` and `pending_invoices`:
+         *  - Tenant identity columns (canonical `tenantId` + informative
+         *    `tenantCompanyId` + snapshot DBs/label).
+         *  - Canonical total in minor-units (`totalAmountMinor`/`totalMinor`)
+         *    and `currencyCode`, alongside the legacy `Double` columns kept
+         *    readable during the ítem-8 migration window.
+         *  - Explicit fiscal lifecycle ([FiscalState]) on `transaction_log`,
+         *    backfilled from the legacy `fiscalConfirmationStatus`.
+         *  - Sub-second `LEASED_UNTIL` column on `pending_invoices` for atomic
+         *    worker claims (ítem 4).
+         *  - Index on `tenantId` for both tables so the worker tenant filter
+         *    is index-backed.
+         *
+         * Defaults are intentionally neutral/empty so the migration is
+         * idempotent and never aborts the batch. Pre-existing rows are
+         * tagged `tenantId=''` which `SaleTenant.UNKNOWN_TENANT_ID` would
+         * normally reject, but the worker treats '' as "needs attribution"
+         * and leaves such rows pending until they gain a tenantId.
+         *
+         * Backfill of `totalAmountMinor` uses SQLite round-to-int on the
+         * legacy Double. Values that would overflow Int64 are extraordinarily
+         * unlikely at the POS scale (|total| > 92 trillion USD) but the
+         * conversion is still guarded at runtime by `MinorUnitMoney.fromBigDecimalAsMinor`.
+         */
+        internal val MIGRATION_13_14 =
+            object : Migration(13, 14) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // transaction_log: tenant identity (ítem 3)
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantCompanyId INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantAdminDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantContableDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantNominaDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantLabel TEXT NOT NULL DEFAULT ''")
+
+                    // transaction_log: canonical total in minor-units (ítem 8)
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN totalAmountMinor INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN currencyCode TEXT NOT NULL DEFAULT 'USD'")
+
+                    // transaction_log: explicit fiscal lifecycle (ítem 5).
+                    // DEFAULT NOT_APPLICABLE; dinheiro cobrado fiscais pendentes
+                    // sao corrigidos abaixo pelo backfill a partir do estado legado.
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN fiscalState TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'")
+
+                    // Backfill totalAmountMinor from legacy Double. ROUND(x*100)
+                    // em SQLite usa round-half-away-from-zero, proximo o bastante
+                    // do HALF_EVEN para valores POS de 2 decimais; a guarda de
+                    // precisão em runtime rejeita perdas materiais.
+                    db.execSQL(
+                        "UPDATE transaction_log SET totalAmountMinor = CAST(ROUND(totalAmount * 100.0) AS INTEGER), " +
+                            "currencyCode = IFNULL(currency, 'USD') " +
+                            "WHERE totalAmountMinor = 0",
+                    )
+
+                    // Backfill fiscalState from legacy fiscalConfirmationStatus.
+                    // pequeno CASE manual: PENDING/RETRYABLE_PENDING -> PRINTED_PENDING_CONFIRM
+                    db.execSQL(
+                        "UPDATE transaction_log SET fiscalState = CASE " +
+                            "WHEN fiscalConfirmationStatus IN ('PENDING','RETRYABLE_PENDING','IN_FLIGHT') THEN 'PRINTED_PENDING_CONFIRM' " +
+                            "WHEN fiscalConfirmationStatus = 'CONFIRMED' THEN 'CONFIRMED' " +
+                            "WHEN fiscalConfirmationStatus = 'TERMINAL_FAILED' THEN 'FAILED' " +
+                            "ELSE 'NOT_APPLICABLE' END",
+                    )
+                    
+                    // Gateway callback extras (Item 6)
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN gatewayResultCode TEXT")
+                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN gatewayResultMessage TEXT")
+
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_log_tenantId ON transaction_log(tenantId)")
+
+                    // pending_invoices: tenant identity + canonical total + lease
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantCompanyId INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantAdminDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantContableDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantNominaDb TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantLabel TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN totalMinor INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN currencyCode TEXT NOT NULL DEFAULT 'USD'")
+                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN leasedUntil INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL(
+                        "UPDATE pending_invoices SET totalMinor = CAST(ROUND(total * 100.0) AS INTEGER), " +
+                            "currencyCode = 'USD' WHERE totalMinor = 0",
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_invoices_tenantId ON pending_invoices(tenantId)")
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -312,6 +404,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_10_11,
                 MIGRATION_11_12,
                 MIGRATION_12_13,
+                MIGRATION_13_14,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -334,6 +427,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
+                        MIGRATION_13_14,
                     ).build()
                     .also { instance = it }
             }

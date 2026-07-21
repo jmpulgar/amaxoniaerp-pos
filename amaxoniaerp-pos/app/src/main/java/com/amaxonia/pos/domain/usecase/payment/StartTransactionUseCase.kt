@@ -2,6 +2,7 @@ package com.amaxonia.pos.domain.usecase.payment
 
 import com.amaxonia.pos.data.local.db.TransactionLogDao
 import com.amaxonia.pos.data.local.db.TransactionLogEntity
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 
@@ -17,18 +18,32 @@ import com.amaxonia.pos.domain.system.IdGenerator
  * id has no ledger row, or is blank, a fresh id is minted — correlation is
  * never re-derived from carrito contents (it is one-per-operation, not
  * one-per-carrito-similarity).
+ *
+ * Tenant rule (auditoría ítem 3 / TEN-001): every newly-opened row is stamped
+ * with the active [SaleTenant]. Workers querying via the tenant-scoped DAO
+ * methods will only ever see rows they are allowed to process; a row of an
+ * inactive tenant stays pending until that tenant's session resumes. If
+ * [tenant] is null (no company session active), the use case refuses to open
+ * a row because the row could otherwise be later processed under the wrong
+ * tenant.
  */
 class StartTransactionUseCase(
     private val dao: TransactionLogDao,
     private val idGenerator: IdGenerator,
     private val clock: AppClock,
 ) {
-    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction {
+    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {
         val now = clock.now().toEpochMilli()
         val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }
-        return if (existing != null && existing.status == STATUS_SENDING) {
-            StartedTransaction(clientCorrelationId = existing.clientCorrelationId, resumed = true)
+        // If the carry-over id resolves to a row owned by a DIFFERENT tenant,
+        // refuse to resume it: that would mix two operations under one id.
+        val resumable =
+            existing?.takeIf { it.status == STATUS_SENDING }
+                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
+        return if (resumable != null) {
+            StartedTransaction(clientCorrelationId = resumable.clientCorrelationId, resumed = true)
         } else {
+            val tenant = command.tenant ?: return null
             val id = idGenerator.nextId()
             dao.upsert(
                 TransactionLogEntity(
@@ -39,6 +54,12 @@ class StartTransactionUseCase(
                     currency = command.currency,
                     clientName = command.clientName,
                     status = STATUS_SENDING,
+                    tenantId = tenant.tenantId,
+                    tenantCompanyId = tenant.companyId,
+                    tenantAdminDb = tenant.adminDb,
+                    tenantContableDb = tenant.contableDb,
+                    tenantNominaDb = tenant.nominaDb,
+                    tenantLabel = tenant.label,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -89,7 +110,7 @@ data class StartedTransaction(
  * Carries the fields needed to open a row in the transaction_log. The
  * [carryOverId] is the only optional field: when present and still in SENDING
  * status, the existing correlation id is reused; otherwise a fresh UUID is
- * minted.
+ * minted. [tenant] is REQUIRED for new rows and the row is refused if absent.
  */
 data class StartTransactionCommand(
     val carryOverId: String?,
@@ -98,4 +119,5 @@ data class StartTransactionCommand(
     val totalAmount: Double,
     val currency: String,
     val clientName: String,
+    val tenant: SaleTenant?,
 )
