@@ -90,6 +90,12 @@ class FiscalConfirmationWorker(
                     printerSerial = entry.printerSerial,
                 )
                 SafeLog.i(TAG, "Fiscal confirmation succeeded for ${entry.clientCorrelationId}")
+                // Auditoría ítem 10 (OBS-001)
+                com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                    event = com.amaxonia.pos.core.telemetry.SaleEvent.FISCAL_CONFIRMED,
+                    idFactura = entry.clientCorrelationId,
+                    "fiscalNumber" to (entry.fiscalNumber.orEmpty()),
+                )
                 false
             }
             nextRetry >= QueueFiscalConfirmationUseCase.MAX_RETRIES -> {
@@ -99,6 +105,13 @@ class FiscalConfirmationWorker(
                     message = message,
                 )
                 SafeLog.w(TAG, "Fiscal confirmation terminal failure for ${entry.clientCorrelationId}: $message")
+                // Auditoría ítem 10 (OBS-001): operator-facing alert.
+                com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                    event = com.amaxonia.pos.core.telemetry.SaleEvent.FISCAL_FAILED,
+                    idFactura = entry.clientCorrelationId,
+                    "retryCount" to nextRetry,
+                    "reason" to message,
+                )
                 false
             }
             else -> {

@@ -258,6 +258,247 @@ class AppDatabaseMigrationInstrumentedTest {
                 arrayOf(table),
             ).use { cursor -> cursor.moveToFirst() }
 
+    /**
+     * Parametric migration regression for the four flagged legacy start
+     * versions (auditoria fase 0 / front-prep). Each variant seeds rows
+     * representative of a legacy install, then asserts the v14 invariants
+     * (tenant defaults, minor-units backfill, fiscal state mapping, indexes)
+     * hold after the chain runs.
+     *
+     * Idempotency: never uses fallbackToDestructiveMigration. Each start
+     * version is materialized through the SAME migration chain that ships
+     * in production.
+     */
+    @Test
+    fun migrationV10ToV14PreservesSeedsAndBackfillsV14Columns() {
+        // v10 schema: no transaction_log table yet. The migration chain
+        // creates it in v11, extends it through v12/v13, then backfills
+        // with the v14 columns. We assert a single synthetic offline sale
+        // inserted post-v11 survives with the canonical fields.
+        runLegacyToV14Scenario(
+            scenarioName = "v10-to-v14",
+            startVersion = 10,
+            seedAtV11 = { db ->
+                db.execSQL(
+                    "INSERT INTO transaction_log (clientCorrelationId, idCaja, idCajaSecuencia, " +
+                        "totalAmount, currency, clientName, status, remoteInvoiceId, remoteInvoiceNumber, " +
+                        "lastError, createdAt, updatedAt) VALUES " +
+                        "('v10-log','caja','seq','100.00','USD','CLIENT','SENDING',NULL,NULL,NULL,1,1)",
+                )
+            },
+            expectedClientCorrelationId = "v10-log",
+            expectedTotalAmountMinor = 10_000,
+        )
+    }
+
+    @Test
+    fun migrationV11ToV14BackfillsMinorAndFiscalStateFromLegacyColumns() {
+        runLegacyToV14Scenario(
+            scenarioName = "v11-to-v14",
+            startVersion = 11,
+            seedAtV11 = { db ->
+                db.execSQL(
+                    "INSERT INTO transaction_log (clientCorrelationId, idCaja, idCajaSecuencia, " +
+                        "totalAmount, currency, clientName, status, remoteInvoiceId, remoteInvoiceNumber, " +
+                        "lastError, createdAt, updatedAt) VALUES " +
+                        "('v11-log','caja','seq','50.10','USD','CLIENT','CONFIRMED','rid','100',NULL,1,1)",
+                )
+            },
+            expectedClientCorrelationId = "v11-log",
+            expectedTotalAmountMinor = 5_010,
+            expectedRemoteInvoiceId = "rid",
+        )
+    }
+
+    @Test
+    fun migrationV12ToV14BackfillsFiscalStateFromFiscalConfirmationStatus() {
+        runLegacyToV14Scenario(
+            scenarioName = "v12-to-v14",
+            startVersion = 12,
+            seedAtV12 = { db ->
+                db.execSQL(
+                    "INSERT INTO transaction_log (clientCorrelationId, idCaja, idCajaSecuencia, totalAmount, " +
+                        "currency, clientName, status, remoteInvoiceId, remoteInvoiceNumber, lastError, " +
+                        "fiscalNumber, printerSerial, fiscalConfirmationStatus, fiscalConfirmationRetryCount, " +
+                        "fiscalConfirmationNextAttemptAt, fiscalConfirmationLeasedUntil, createdAt, updatedAt) " +
+                        "VALUES ('v12-log','caja','seq','75.00','USD','CLIENT','CONFIRMED','rid','100',NULL," +
+                        "'FISC-001','PRN-001','CONFIRMED',0,0,0,1,1)",
+                )
+            },
+            expectedClientCorrelationId = "v12-log",
+            expectedTotalAmountMinor = 7_500,
+            expectedFiscalState = "CONFIRMED",
+        )
+    }
+
+    @Test
+    fun migrationV13ToV14BackfillsGatewaySnapshotAndLeaseColumns() {
+        runLegacyToV14Scenario(
+            scenarioName = "v13-to-v14",
+            startVersion = 13,
+            seedAtV13 = { db ->
+                db.execSQL(
+                    "INSERT INTO transaction_log (clientCorrelationId, idCaja, idCajaSecuencia, totalAmount, " +
+                        "currency, clientName, status, remoteInvoiceId, remoteInvoiceNumber, lastError, " +
+                        "fiscalNumber, printerSerial, fiscalConfirmationStatus, fiscalConfirmationRetryCount, " +
+                        "fiscalConfirmationNextAttemptAt, fiscalConfirmationLeasedUntil, " +
+                        "gatewayCallbackStatus, gatewayCallbackRetryCount, gatewayCallbackNextAttemptAt, " +
+                        "gatewayCallbackLeasedUntil, gatewayRawResponse, createdAt, updatedAt) VALUES " +
+                        "('v13-log','caja','seq','12.34','VES','CLIENT','CONFIRMED','rid','100',NULL," +
+                        "'FISC','PRN','CONFIRMED',0,0,0,'RESOLVED',1,2,3,'{\"code\":\"00\"}',1,1)",
+                )
+                db.execSQL(
+                    "INSERT INTO pending_invoices (id, countryCode, payloadJson, localInvoiceNumber, " +
+                        "total, clientName, status, retryCount, lastError, createdAt, updatedAt) VALUES " +
+                        "('v13-pending','VE','{}','INV-1','9.99','CLIENT','PENDING',0,NULL,1,1)",
+                )
+            },
+            expectedClientCorrelationId = "v13-log",
+            expectedTotalAmountMinor = 1_234,
+            expectedCurrencyCode = "VES",
+            expectedGatewayRawResponse = "{\"code\":\"00\"}",
+            expectedPendingInvoiceId = "v13-pending",
+            expectedPendingTotalMinor = 999,
+        )
+    }
+
+    /**
+     * Helper that materializes a DB at [startVersion], applies the shipped
+     * migration chain up to 14, lets the caller seed rows at the latest
+     * schema the chain reaches BEFORE the canonical v14 backfill, then runs
+     * the full v14 invariants.
+     */
+    private fun runLegacyToV14Scenario(
+        scenarioName: String,
+        startVersion: Int,
+        seedAtV11: ((SupportSQLiteDatabase) -> Unit)? = null,
+        seedAtV12: ((SupportSQLiteDatabase) -> Unit)? = null,
+        seedAtV13: ((SupportSQLiteDatabase) -> Unit)? = null,
+        expectedClientCorrelationId: String,
+        expectedTotalAmountMinor: Int,
+        expectedCurrencyCode: String = "USD",
+        expectedFiscalState: String = "NOT_APPLICABLE",
+        expectedGatewayRawResponse: String? = null,
+        expectedRemoteInvoiceId: String? = null,
+        expectedPendingInvoiceId: String? = null,
+        expectedPendingTotalMinor: Int? = null,
+    ) {
+        val name = "scenario-$scenarioName-${System.nanoTime()}.db"
+        databaseNames += name
+        createDatabaseAtVersion(name, startVersion)
+
+        // Move the DB forward through every migration up to 13 manually so
+        // the seed matches the legacy schema the customer actually had. We
+        // intentionally pass a hot SupportSQLiteOpenHelper that does nothing
+        // on upgrade (we call .migrate(db) ourselves).
+        val pre14Db =
+            FrameworkSQLiteOpenHelperFactory()
+                .create(
+                    SupportSQLiteOpenHelper.Configuration
+                        .builder(context)
+                        .name(name)
+                        .callback(
+                            object : SupportSQLiteOpenHelper.Callback(13) {
+                                override fun onCreate(db: SupportSQLiteDatabase) = Unit
+                                override fun onUpgrade(
+                                    db: SupportSQLiteDatabase,
+                                    oldVersion: Int,
+                                    newVersion: Int,
+                                ) = Unit
+                            },
+                        ).build(),
+                ).writableDatabase
+        AppDatabase.ALL_MIGRATIONS
+            .filter { it.startVersion in startVersion until CURRENT_VERSION }
+            .sortedBy { it.startVersion }
+            .forEach { migration -> migration.migrate(pre14Db) }
+        when {
+            seedAtV13 != null -> seedAtV13(pre14Db)
+            seedAtV12 != null -> seedAtV12(pre14Db)
+            seedAtV11 != null -> seedAtV11(pre14Db)
+        }
+        pre14Db.close()
+
+        val database =
+            Room
+                .databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(*AppDatabase.ALL_MIGRATIONS)
+                .build()
+        try {
+            val db = database.openHelper.writableDatabase
+            db.query(
+                "SELECT tenantId, totalAmountMinor, currencyCode, fiscalState, gatewayRawResponse, remoteInvoiceId " +
+                    "FROM transaction_log WHERE clientCorrelationId = ?",
+                arrayOf(expectedClientCorrelationId),
+            ).use { cursor ->
+                assertTrue("$scenarioName: seed row missing after migration", cursor.moveToFirst())
+                assertEquals("$scenarioName: tenantId must default to ''", "", cursor.getString(0))
+                assertEquals(
+                    "$scenarioName: totalAmountMinor backfill",
+                    expectedTotalAmountMinor,
+                    cursor.getInt(1),
+                )
+                assertEquals(
+                    "$scenarioName: currencyCode",
+                    expectedCurrencyCode,
+                    cursor.getString(2),
+                )
+                assertEquals(
+                    "$scenarioName: fiscalState mapping",
+                    expectedFiscalState,
+                    cursor.getString(3),
+                )
+                if (expectedGatewayRawResponse != null) {
+                    assertEquals(
+                        "$scenarioName: gatewayRawResponse preserved",
+                        expectedGatewayRawResponse,
+                        cursor.getString(4),
+                    )
+                }
+                if (expectedRemoteInvoiceId != null) {
+                    assertEquals(
+                        "$scenarioName: remoteInvoiceId preserved",
+                        expectedRemoteInvoiceId,
+                        cursor.getString(5),
+                    )
+                }
+            }
+
+            if (expectedPendingInvoiceId != null) {
+                db.query(
+                    "SELECT tenantId, totalMinor, leasedUntil FROM pending_invoices WHERE id = ?",
+                    arrayOf(expectedPendingInvoiceId),
+                ).use { cursor ->
+                    assertTrue("$scenarioName: pending_invoice missing", cursor.moveToFirst())
+                    assertEquals("", cursor.getString(0))
+                    assertEquals(
+                        "$scenarioName: pending totalMinor backfill",
+                        expectedPendingTotalMinor,
+                        cursor.getInt(1),
+                    )
+                    assertEquals(
+                        "$scenarioName: leasedUntil default",
+                        0,
+                        cursor.getInt(2),
+                    )
+                }
+            }
+
+            assertTrue(
+                "$scenarioName: index_transaction_log_tenantId missing",
+                indexExists(db, "index_transaction_log_tenantId"),
+            )
+            assertTrue(
+                "$scenarioName: index_pending_invoices_tenantId missing",
+                indexExists(db, "index_pending_invoices_tenantId"),
+            )
+            assertV14TransactionLogColumnsExist(db)
+            assertV14PendingInvoicesColumnsExist(db)
+        } finally {
+            database.close()
+        }
+    }
+
     private companion object {
         const val CURRENT_VERSION = 14
     }

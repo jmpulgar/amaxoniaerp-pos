@@ -78,6 +78,13 @@ class GatewayCallbackWorker(
                 message = "Reconciliacion manual requerida: callback de pasarela no recibido",
             )
             SafeLog.w(TAG, "Gateway callback terminal for ${entry.clientCorrelationId} after $nextRetry cycles")
+            // Auditoría ítem 10 (OBS-001): the callback never arrived; this
+            // is an operator-facing alert that requires manual reconciliation.
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.GATEWAY_TERMINAL,
+                idFactura = entry.clientCorrelationId,
+                "retryCount" to nextRetry,
+            )
             false
         } else {
             val delay = QueueGatewayCallbackUseCase.nextAttempt(nextRetry)

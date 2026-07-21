@@ -45,6 +45,23 @@ class StartTransactionUseCase(
         } else {
             val tenant = command.tenant ?: return null
             val id = idGenerator.nextId()
+            // Auditoría ítem 10 (OBS-001): emit the structured sale-started
+            // event before any network or printer call so every observable
+            // flow has a unique correlated id.
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,
+                idFactura = id,
+                "tenant" to tenant.tenantId,
+                "total" to command.totalAmount,
+                "currency" to command.currency,
+            )
+            // Auditoría ítem 8 (MONEY-001): persist the canonical total in
+            // minor-units via BigDecimal. The legacy `totalAmount` Double is
+            // still written for the migration window but is no longer the
+            // source of truth for money calculations.
+            val totalMinor =
+                com.amaxonia.pos.domain.model.money.MinorUnitMoney
+                    .fromDoubleAsMinor(command.totalAmount)
             dao.upsert(
                 TransactionLogEntity(
                     clientCorrelationId = id,
@@ -60,6 +77,7 @@ class StartTransactionUseCase(
                     tenantContableDb = tenant.contableDb,
                     tenantNominaDb = tenant.nominaDb,
                     tenantLabel = tenant.label,
+                    totalAmountMinor = totalMinor,
                     createdAt = now,
                     updatedAt = now,
                 ),

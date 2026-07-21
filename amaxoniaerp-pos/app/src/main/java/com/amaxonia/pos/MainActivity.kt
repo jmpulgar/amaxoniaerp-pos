@@ -98,6 +98,15 @@ class MainActivity : ComponentActivity() {
             // (auditoría ítem 6 / HKA-002).
             if (correlationId != null) {
                 markGatewayResolved(correlationId, responseCode, resultJson, message)
+                // Auditoría ítem 10 (OBS-001): the callback arrived after the
+                // in-memory bridge was reset by process death/recreate. This
+                // is a late callback: it lands on disk but is not delivered
+                // to any coroutine.
+                com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                    event = com.amaxonia.pos.core.telemetry.SaleEvent.GATEWAY_LATE_CALLBACK,
+                    idFactura = correlationId,
+                    "responseCode" to responseCode,
+                )
             }
             return
         }
@@ -109,6 +118,16 @@ class MainActivity : ComponentActivity() {
         // no-show stays AWAITING for the watchdog to escalate.
         if (correlationId != null) {
             markGatewayResolved(correlationId, responseCode, resultJson, message)
+            // Auditoría ítem 10 (OBS-001). We can detect a duplicate
+            // callback cheaply: the bridge clears pendingResult after the
+            // first delivery (RapidPayBridge.awaitResult finally block), so a
+            // non-null correlationId landing here twice means HKA retried.
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.GATEWAY_RESOLVED,
+                idFactura = correlationId,
+                "approved" to result.approved,
+                "responseCode" to responseCode,
+            )
         }
 
         // Clear the extras so they don't get re-processed on configuration change

@@ -69,18 +69,18 @@ class HkaPaymentGateway(
 
     private fun requiresGateway(method: TransactionPaymentMethod): Boolean = method.gatewayCommandPrefix == EXTERNAL_GATEWAY_MARKER
 
-    private fun resolveAmount(
+    internal fun resolveAmount(
         amount: Double,
         exchangeRate: Double,
         isMultiCurrency: Boolean,
-    ): Double {
-        val normalizedAmount = amount.coerceAtLeast(0.0)
-        if (!isMultiCurrency) return normalizedAmount
-        val normalizedRate =
-            exchangeRate.takeIf { it > 0.0 }
-                ?: error("No se encontro una tasa valida para enviar el cobro a la pasarela")
-        return normalizedAmount * normalizedRate
-    }
+    ): Double =
+        // Auditoría ítem 8 (MONEY-001): delegate to the stateless helper so
+        // the rounding rule is centralized and unit-tested in pure JVM.
+        GatewayCurrencyConversion.apply(
+            amount = amount,
+            exchangeRate = exchangeRate,
+            isMultiCurrency = isMultiCurrency,
+        )
 
     private data class Configuration(
         val gatewayKey: String,

@@ -84,47 +84,53 @@ data class PaymentState(
         return amount * tasa
     }
 
+    /**
+     * Multi-currency conversion performed entirely in [Money] (BigDecimal)
+     * so no `Double` arithmetic leaks into monetary calculations
+     * (auditoría ítem 8 / MONEY-001). The legacy [tasa] field is kept as
+     * the source of truth for the rate; only this boundary translates it
+     * into a [BigDecimal] multiplier with the currency's canonical scale.
+     */
+    private fun toBsMoney(amount: Money): Money {
+        if (!isMultiCurrency || tasa <= 0.0) return Money.ZERO
+        val rate = java.math.BigDecimal.valueOf(tasa)
+        return amount.times(rate)
+    }
+
+    private fun formatBs(amount: Money): String {
+        if (!isMultiCurrency || tasa <= 0.0) return ""
+        val rate = java.math.BigDecimal.valueOf(tasa)
+        val converted = amount.toBigDecimal().multiply(rate).setScale(Money.SCALE, Money.ROUNDING_MODE)
+        return String.format(java.util.Locale.US, "%.2f", converted)
+    }
+
     val totalAmountBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", totalAmount * tasa) else ""
+        get() = formatBs(totalAmountMoney)
 
     val tenderedAmountBsText: String
-        get() =
-            if (isMultiCurrency &&
-                tasa > 0.0
-            ) {
-                String.format(java.util.Locale.US, "%.2f", tenderedAmountMoney.toDouble() * tasa)
-            } else {
-                ""
-            }
+        get() = formatBs(tenderedAmountMoney)
 
     val changeDueBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", changeDue * tasa) else ""
+        get() = formatBs(changeDueMoney)
 
     val nonCashAssignedBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.US, "%.2f", nonCashAssignedTotal * tasa) else ""
+        get() = formatBs(nonCashAssignedMoney)
 
     val nonCashPendingBsText: String
-        get() =
-            if (isMultiCurrency &&
-                tasa > 0.0
-            ) {
-                String.format(java.util.Locale.US, "%.2f", nonCashPendingMoney.toDouble() * tasa)
-            } else {
-                ""
-            }
+        get() = formatBs(nonCashPendingMoney)
 
     val missingCashBsText: String
         get() {
             if (!isMultiCurrency || tasa <= 0.0) return ""
             val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeastZero()
-            return String.format(java.util.Locale.US, "%.2f", missing.toDouble() * tasa)
+            return formatBs(missing)
         }
 
     val totalAmountBs: Double
-        get() = toBs(totalAmount)
+        get() = toBsMoney(totalAmountMoney).toDouble()
 
     val changeDueBs: Double
-        get() = toBs(changeDue)
+        get() = toBsMoney(changeDueMoney).toDouble()
 
     val monedaSecundariaLabel: String
         get() = formatCurrencyLabel(abrMonedaSecundaria)

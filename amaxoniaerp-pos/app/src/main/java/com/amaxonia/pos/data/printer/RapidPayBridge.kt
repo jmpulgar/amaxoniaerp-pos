@@ -89,4 +89,17 @@ object RapidPayBridge {
      * Returns true if there's a pending gateway request waiting for a result.
      */
     fun hasPendingRequest(): Boolean = pendingResult?.isActive == true
+
+    /**
+     * Test-only reset that clears the in-memory singleton. We expose it as
+     * `internal` so unit tests can neutralize ordering-dependent state
+     * without reflecting into the singleton. Never called from production
+     * code — every awaits cleans up its own state in `finally`.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun cancelForTest() {
+        pendingResult?.cancel()
+        pendingResult = null
+        pendingCorrelationId = null
+    }
 }

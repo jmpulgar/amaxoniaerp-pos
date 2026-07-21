@@ -193,6 +193,12 @@ class ExecutePaymentFlowUseCase(
             // Pin the correlationId on the in-memory bridge so MainActivity can
             // mark RESOLVED on the matching row when the HKA Intent returns.
             com.amaxonia.pos.data.printer.RapidPayBridge.setPendingCorrelationId(correlationId)
+            // Auditoría ítem 10 (OBS-001): emit the structured gateway event
+            // correlated by idFactura so the pilot log is observable.
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.GATEWAY_AWAITING,
+                idFactura = correlationId,
+            )
         }
         val result =
             operations.executeGatewayPayment(
@@ -303,6 +309,14 @@ class CompletePaymentSaleUseCase(
                     // either retries later or escalates manually.
                     reconcileDuplicate(error.clientCorrelationId, input, sale, correlationId, onEvent)
                 } else {
+                    // Auditoría ítem 10 (OBS-001): generic backend rejection —
+                    // the cashier will see the friendly toast, but the pilot
+                    // log captures the correlation id and the error class.
+                    com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                        event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_REJECTED_BACKEND,
+                        idFactura = correlationId ?: sale.request.idFactura.orEmpty(),
+                        "error" to (error::class.simpleName ?: error::class.java.simpleName),
+                    )
                     operations.failure(error, "No se pudo procesar la venta. Intenta nuevamente")
                 }
             },
@@ -318,11 +332,18 @@ class CompletePaymentSaleUseCase(
     ): PaymentFlowResult {
         val lookup = repositories.runtime.sales.findByCorrelationId(clientCorrelationId)
         val reconciled = lookup.getOrNull()
+        // Auditoría ítem 10 (OBS-001): both branches below represent
+        // money-touching ambiguous/duplicate events the pilot must observe.
         if (lookup.isFailure || reconciled == null) {
             // The conflict could not be auto-reconciled: surface the
             // explicit DuplicateInvoice state so the user is not silently
             // promoted to an approval. NEVER allow an ambiguous 409 to
             // become Success without a real invoice reference.
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_AMBIGUOUS,
+                idFactura = clientCorrelationId,
+                "reason" to "unreconciled_409",
+            )
             return PaymentFlowResult.DuplicateInvoice(
                 clientCorrelationId = clientCorrelationId,
                 reason =
@@ -333,6 +354,11 @@ class CompletePaymentSaleUseCase(
                     },
             )
         }
+        com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+            event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_DUPLICATE,
+            idFactura = reconciled.idFactura,
+            "resolved" to true,
+        )
         // We have the backend's authoritative record: converge to a Success
         // built from the reconciled reference, marking the local ledger as
         // CONFIRMED so retries against the same idFactura are inert.
@@ -398,6 +424,19 @@ class CompletePaymentSaleUseCase(
         val printResult = operations.printInvoice(input.countryCode, transaction, response.idFactura)
         val fiscalNumber = printResult?.fiscalNumber?.takeIf(String::isNotBlank).orEmpty()
         val printerSerial = printResult?.printerSerial.orEmpty()
+        // Auditoría ítem 10 (OBS-001): observe both the sale confirmation
+        // and the fiscal print event with their canonical idFactura.
+        com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+            event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_CONFIRMED,
+            idFactura = response.idFactura,
+        )
+        if (fiscalNumber.isNotBlank()) {
+            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+                event = com.amaxonia.pos.core.telemetry.SaleEvent.FISCAL_PRINTED,
+                idFactura = response.idFactura,
+                "fiscalNumber" to fiscalNumber,
+            )
+        }
         val outcome =
             buildFiscalOutcome(
                 request = request,

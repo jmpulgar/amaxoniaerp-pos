@@ -58,7 +58,12 @@ class MoneyCharacterizationTest {
                 abrMonedaSecundaria = "VES",
             )
 
-        assertEquals("365.37", state.totalAmountBsText)
+        // 10.01 * 36.5 = 365.365. Banker's rounding (HALF_EVEN, the canonical
+        // mode used by Money) rounds to the nearest even digit — 365.36 —
+        // rather than the previous `%.2f` HALF_UP which produced 365.37.
+        // This is the money-safe locale-stable behaviour mandated by
+        // auditoría ítem 8 (MONEY-001).
+        assertEquals("365.36", state.totalAmountBsText)
         assertEquals("364.64", state.changeDueBsText)
         assertEquals("Bs.", state.monedaSecundariaLabel)
     }

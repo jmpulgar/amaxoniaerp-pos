@@ -116,6 +116,13 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // `Log.d/i/w/e` y otras llamadas android.* en código de producción
+        // (RapidPayBridge/SafeLog) devuelven valores por defecto en lugar de
+        // lanzar RuntimeException("not mocked") en JVM, sin alterar su
+        // comportamiento en dispositivo. Equivalente java a Robolectric
+        // pero sin dependencia adicional — ver
+        // https://developer.android.com/r/studio-ui/build/not-mocked.
+        unitTests.isReturnDefaultValues = true
     }
 
     applicationVariants.all {
