@@ -22,9 +22,14 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Pos"
-        android:usesCleartextTraffic="false"
-        tools:ignore="UnusedAttribute">
+        android:theme="@style/Theme.Pos">
+        <!--
+            `usesCleartextTraffic` intentionally omitted: with targetSdk=36 and a
+            `networkSecurityConfig` referenced, Android ignores this attribute on
+            <application>. Effective cleartext policy is owned by
+            `src/main/res/xml/network_security_config.xml` (release: denied) and
+            `src/debug/res/xml/network_security_config.xml` (debug: permitted).
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -24,7 +24,7 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         PromocionDetalleEntity::class,
         TransactionLogEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -325,67 +325,265 @@ abstract class AppDatabase : RoomDatabase() {
          * legacy Double. Values that would overflow Int64 are extraordinarily
          * unlikely at the POS scale (|total| > 92 trillion USD) but the
          * conversion is still guarded at runtime by `MinorUnitMoney.fromBigDecimalAsMinor`.
+         *
+         * IMPORTANT: This migration uses TABLE REBUILDS (`CREATE new → INSERT
+         * SELECT → DROP old → RENAME`) instead of `ALTER TABLE ... ADD COLUMN
+         * ... DEFAULT` for all tenant/minor-unit/lease columns. Reason: Room
+         * validates the post-migration schema byte-for-byte against the
+         * exported `14.json`, and our Kotlin entities declare these columns
+         * WITHOUT `@ColumnInfo(defaultValue=...)`, so Room expects the SQLite
+         * columns to have NO `DEFAULT` clause. SQLite forbids `ADD COLUMN
+         * NOT NULL` without a DEFAULT on a table containing rows, so the only
+         * way to satisfy both Room and SQLite is to recreate the table.
+         * This also lets us seed the backfilled columns (totalAmountMinor,
+         * fiscalState, currencyCode) atomically in the same INSERT statement.
          */
         internal val MIGRATION_13_14 =
             object : Migration(13, 14) {
                 override fun migrate(db: SupportSQLiteDatabase) {
-                    // transaction_log: tenant identity (ítem 3)
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantId TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantCompanyId INTEGER NOT NULL DEFAULT 0")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantAdminDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantContableDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantNominaDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN tenantLabel TEXT NOT NULL DEFAULT ''")
-
-                    // transaction_log: canonical total in minor-units (ítem 8)
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN totalAmountMinor INTEGER NOT NULL DEFAULT 0")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN currencyCode TEXT NOT NULL DEFAULT 'USD'")
-
-                    // transaction_log: explicit fiscal lifecycle (ítem 5).
-                    // DEFAULT NOT_APPLICABLE; dinheiro cobrado fiscais pendentes
-                    // sao corrigidos abaixo pelo backfill a partir do estado legado.
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN fiscalState TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'")
-
-                    // Backfill totalAmountMinor from legacy Double. ROUND(x*100)
-                    // em SQLite usa round-half-away-from-zero, proximo o bastante
-                    // do HALF_EVEN para valores POS de 2 decimais; a guarda de
-                    // precisão em runtime rejeita perdas materiais.
+                    // ============================================================
+                    // transaction_log: full rebuild adding tenant identity,
+                    // canonical total, fiscal lifecycle and gateway extras.
+                    // ============================================================
                     db.execSQL(
-                        "UPDATE transaction_log SET totalAmountMinor = CAST(ROUND(totalAmount * 100.0) AS INTEGER), " +
-                            "currencyCode = IFNULL(currency, 'USD') " +
-                            "WHERE totalAmountMinor = 0",
+                        "CREATE TABLE IF NOT EXISTS transaction_log_new (" +
+                            "clientCorrelationId TEXT NOT NULL, " +
+                            "idCaja TEXT NOT NULL, " +
+                            "idCajaSecuencia TEXT NOT NULL, " +
+                            "totalAmount REAL NOT NULL, " +
+                            "currency TEXT NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "lastError TEXT, " +
+                            "fiscalNumber TEXT, " +
+                            "printerSerial TEXT, " +
+                            "fiscalConfirmationStatus TEXT NOT NULL, " +
+                            "fiscalConfirmationRetryCount INTEGER NOT NULL, " +
+                            "fiscalConfirmationNextAttemptAt INTEGER NOT NULL, " +
+                            "fiscalConfirmationLeasedUntil INTEGER NOT NULL, " +
+                            "gatewayCallbackStatus TEXT NOT NULL, " +
+                            "gatewayCallbackRetryCount INTEGER NOT NULL, " +
+                            "gatewayCallbackNextAttemptAt INTEGER NOT NULL, " +
+                            "gatewayCallbackLeasedUntil INTEGER NOT NULL, " +
+                            "gatewayRawResponse TEXT, " +
+                            "gatewayResultCode TEXT, " +
+                            "gatewayResultMessage TEXT, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "tenantCompanyId INTEGER NOT NULL, " +
+                            "tenantAdminDb TEXT NOT NULL, " +
+                            "tenantContableDb TEXT NOT NULL, " +
+                            "tenantNominaDb TEXT NOT NULL, " +
+                            "tenantLabel TEXT NOT NULL, " +
+                            "totalAmountMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "fiscalState TEXT NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(clientCorrelationId))",
                     )
-
-                    // Backfill fiscalState from legacy fiscalConfirmationStatus.
-                    // pequeno CASE manual: PENDING/RETRYABLE_PENDING -> PRINTED_PENDING_CONFIRM
+                    // Seed minor-unit total from legacy Double (round-half-away-from-zero
+                    // is close enough to HALF_EVEN at 2-decimal POS scale) and
+                    // backfill fiscalState from the legacy fiscal confirm status.
                     db.execSQL(
-                        "UPDATE transaction_log SET fiscalState = CASE " +
+                        "INSERT INTO transaction_log_new (" +
+                            "clientCorrelationId, idCaja, idCajaSecuencia, totalAmount, currency, " +
+                            "clientName, status, remoteInvoiceId, remoteInvoiceNumber, lastError, " +
+                            "fiscalNumber, printerSerial, fiscalConfirmationStatus, " +
+                            "fiscalConfirmationRetryCount, fiscalConfirmationNextAttemptAt, " +
+                            "fiscalConfirmationLeasedUntil, gatewayCallbackStatus, " +
+                            "gatewayCallbackRetryCount, gatewayCallbackNextAttemptAt, " +
+                            "gatewayCallbackLeasedUntil, gatewayRawResponse, gatewayResultCode, " +
+                            "gatewayResultMessage, tenantId, tenantCompanyId, tenantAdminDb, " +
+                            "tenantContableDb, tenantNominaDb, tenantLabel, totalAmountMinor, " +
+                            "currencyCode, fiscalState, createdAt, updatedAt) " +
+                            "SELECT " +
+                            "clientCorrelationId, idCaja, idCajaSecuencia, totalAmount, currency, " +
+                            "clientName, status, remoteInvoiceId, remoteInvoiceNumber, lastError, " +
+                            "fiscalNumber, printerSerial, fiscalConfirmationStatus, " +
+                            "fiscalConfirmationRetryCount, fiscalConfirmationNextAttemptAt, " +
+                            "fiscalConfirmationLeasedUntil, gatewayCallbackStatus, " +
+                            "gatewayCallbackRetryCount, gatewayCallbackNextAttemptAt, " +
+                            "gatewayCallbackLeasedUntil, gatewayRawResponse, NULL, NULL, " +
+                            // tenant identity: empty/0 — workers tag rows as they go.
+                            "'', 0, '', '', '', '', " +
+                            // Canonical total from legacy Double cents.
+                            "CAST(ROUND(totalAmount * 100.0) AS INTEGER), " +
+                            "IFNULL(currency, 'USD'), " +
+                            // fiscalState backfill from legacy status enum.
+                            "CASE " +
                             "WHEN fiscalConfirmationStatus IN ('PENDING','RETRYABLE_PENDING','IN_FLIGHT') THEN 'PRINTED_PENDING_CONFIRM' " +
                             "WHEN fiscalConfirmationStatus = 'CONFIRMED' THEN 'CONFIRMED' " +
                             "WHEN fiscalConfirmationStatus = 'TERMINAL_FAILED' THEN 'FAILED' " +
-                            "ELSE 'NOT_APPLICABLE' END",
+                            "ELSE 'NOT_APPLICABLE' END, " +
+                            "createdAt, updatedAt " +
+                            "FROM transaction_log",
                     )
-                    
-                    // Gateway callback extras (Item 6)
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN gatewayResultCode TEXT")
-                    db.execSQL("ALTER TABLE transaction_log ADD COLUMN gatewayResultMessage TEXT")
-
+                    db.execSQL("DROP TABLE transaction_log")
+                    db.execSQL("ALTER TABLE transaction_log_new RENAME TO transaction_log")
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_log_tenantId ON transaction_log(tenantId)")
 
-                    // pending_invoices: tenant identity + canonical total + lease
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantId TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantCompanyId INTEGER NOT NULL DEFAULT 0")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantAdminDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantContableDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantNominaDb TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN tenantLabel TEXT NOT NULL DEFAULT ''")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN totalMinor INTEGER NOT NULL DEFAULT 0")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN currencyCode TEXT NOT NULL DEFAULT 'USD'")
-                    db.execSQL("ALTER TABLE pending_invoices ADD COLUMN leasedUntil INTEGER NOT NULL DEFAULT 0")
+                    // ============================================================
+                    // pending_invoices: full rebuild adding tenant identity,
+                    // canonical total and per-row lease.
+                    // ============================================================
                     db.execSQL(
-                        "UPDATE pending_invoices SET totalMinor = CAST(ROUND(total * 100.0) AS INTEGER), " +
-                            "currencyCode = 'USD' WHERE totalMinor = 0",
+                        "CREATE TABLE IF NOT EXISTS pending_invoices_new (" +
+                            "id TEXT NOT NULL, " +
+                            "countryCode TEXT NOT NULL, " +
+                            "payloadJson TEXT NOT NULL, " +
+                            "localInvoiceNumber TEXT NOT NULL, " +
+                            "total REAL NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "retryCount INTEGER NOT NULL, " +
+                            "lastError TEXT, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "tenantCompanyId INTEGER NOT NULL, " +
+                            "tenantAdminDb TEXT NOT NULL, " +
+                            "tenantContableDb TEXT NOT NULL, " +
+                            "tenantNominaDb TEXT NOT NULL, " +
+                            "tenantLabel TEXT NOT NULL, " +
+                            "totalMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "leasedUntil INTEGER NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(id))",
                     )
+                    db.execSQL(
+                        "INSERT INTO pending_invoices_new (" +
+                            "id, countryCode, payloadJson, localInvoiceNumber, total, clientName, " +
+                            "status, retryCount, lastError, remoteInvoiceId, remoteInvoiceNumber, " +
+                            "tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, " +
+                            "tenantLabel, totalMinor, currencyCode, leasedUntil, createdAt, updatedAt) " +
+                            "SELECT " +
+                            "id, countryCode, payloadJson, localInvoiceNumber, total, clientName, " +
+                            "status, retryCount, lastError, remoteInvoiceId, remoteInvoiceNumber, " +
+                            "'', 0, '', '', '', '', " +
+                            "CAST(ROUND(total * 100.0) AS INTEGER), 'USD', 0, " +
+                            "createdAt, updatedAt " +
+                            "FROM pending_invoices",
+                    )
+                    db.execSQL("DROP TABLE pending_invoices")
+                    db.execSQL("ALTER TABLE pending_invoices_new RENAME TO pending_invoices")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_invoices_tenantId ON pending_invoices(tenantId)")
+                }
+            }
+
+        /**
+         * Recovery migration for installations that already applied the LITE
+         * `MIGRATION_13_14` whose columns ended up with unwanted `DEFAULT ''`
+         * / `DEFAULT 0` clauses in `tenantId`, `tenantAdminDb`, `tenantLabel`,
+         * `totalMinor`, `leasedUntil`, etc. Room's schema validator rejects
+         * those because the Kotlin entities declare no `@ColumnInfo(defaultValue)`
+         * and expect columns with NO default.
+         *
+         * Strategy: table rebuild to the exact `createSql` of schema 14 (and,
+         * because v14 == v15 in terms of columns, to v15 as well). Data is
+         * preserved verbatim via INSERT...SELECT; the only change is that
+         * the rebuilt columns no longer carry a DEFAULT clause.
+         */
+        internal val MIGRATION_14_15 =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Rebuild transaction_log stripping DEFAULT clauses.
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS transaction_log_v15 (" +
+                            "clientCorrelationId TEXT NOT NULL, " +
+                            "idCaja TEXT NOT NULL, " +
+                            "idCajaSecuencia TEXT NOT NULL, " +
+                            "totalAmount REAL NOT NULL, " +
+                            "currency TEXT NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "lastError TEXT, " +
+                            "fiscalNumber TEXT, " +
+                            "printerSerial TEXT, " +
+                            "fiscalConfirmationStatus TEXT NOT NULL, " +
+                            "fiscalConfirmationRetryCount INTEGER NOT NULL, " +
+                            "fiscalConfirmationNextAttemptAt INTEGER NOT NULL, " +
+                            "fiscalConfirmationLeasedUntil INTEGER NOT NULL, " +
+                            "gatewayCallbackStatus TEXT NOT NULL, " +
+                            "gatewayCallbackRetryCount INTEGER NOT NULL, " +
+                            "gatewayCallbackNextAttemptAt INTEGER NOT NULL, " +
+                            "gatewayCallbackLeasedUntil INTEGER NOT NULL, " +
+                            "gatewayRawResponse TEXT, " +
+                            "gatewayResultCode TEXT, " +
+                            "gatewayResultMessage TEXT, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "tenantCompanyId INTEGER NOT NULL, " +
+                            "tenantAdminDb TEXT NOT NULL, " +
+                            "tenantContableDb TEXT NOT NULL, " +
+                            "tenantNominaDb TEXT NOT NULL, " +
+                            "tenantLabel TEXT NOT NULL, " +
+                            "totalAmountMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "fiscalState TEXT NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(clientCorrelationId))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO transaction_log_v15 SELECT " +
+                            "clientCorrelationId, idCaja, idCajaSecuencia, totalAmount, currency, " +
+                            "clientName, status, remoteInvoiceId, remoteInvoiceNumber, lastError, " +
+                            "fiscalNumber, printerSerial, fiscalConfirmationStatus, " +
+                            "fiscalConfirmationRetryCount, fiscalConfirmationNextAttemptAt, " +
+                            "fiscalConfirmationLeasedUntil, gatewayCallbackStatus, " +
+                            "gatewayCallbackRetryCount, gatewayCallbackNextAttemptAt, " +
+                            "gatewayCallbackLeasedUntil, gatewayRawResponse, gatewayResultCode, " +
+                            "gatewayResultMessage, tenantId, tenantCompanyId, tenantAdminDb, " +
+                            "tenantContableDb, tenantNominaDb, tenantLabel, totalAmountMinor, " +
+                            "currencyCode, fiscalState, createdAt, updatedAt " +
+                            "FROM transaction_log",
+                    )
+                    db.execSQL("DROP TABLE transaction_log")
+                    db.execSQL("ALTER TABLE transaction_log_v15 RENAME TO transaction_log")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_transaction_log_tenantId ON transaction_log(tenantId)")
+
+                    // Rebuild pending_invoices stripping DEFAULT clauses.
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS pending_invoices_v15 (" +
+                            "id TEXT NOT NULL, " +
+                            "countryCode TEXT NOT NULL, " +
+                            "payloadJson TEXT NOT NULL, " +
+                            "localInvoiceNumber TEXT NOT NULL, " +
+                            "total REAL NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "retryCount INTEGER NOT NULL, " +
+                            "lastError TEXT, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "tenantCompanyId INTEGER NOT NULL, " +
+                            "tenantAdminDb TEXT NOT NULL, " +
+                            "tenantContableDb TEXT NOT NULL, " +
+                            "tenantNominaDb TEXT NOT NULL, " +
+                            "tenantLabel TEXT NOT NULL, " +
+                            "totalMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "leasedUntil INTEGER NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(id))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO pending_invoices_v15 SELECT " +
+                            "id, countryCode, payloadJson, localInvoiceNumber, total, clientName, " +
+                            "status, retryCount, lastError, remoteInvoiceId, remoteInvoiceNumber, " +
+                            "tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, " +
+                            "tenantLabel, totalMinor, currencyCode, leasedUntil, createdAt, updatedAt " +
+                            "FROM pending_invoices",
+                    )
+                    db.execSQL("DROP TABLE pending_invoices")
+                    db.execSQL("ALTER TABLE pending_invoices_v15 RENAME TO pending_invoices")
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_invoices_tenantId ON pending_invoices(tenantId)")
                 }
             }
@@ -405,6 +603,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_11_12,
                 MIGRATION_12_13,
                 MIGRATION_13_14,
+                MIGRATION_14_15,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -428,6 +627,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12,
                         MIGRATION_12_13,
                         MIGRATION_13_14,
+                        MIGRATION_14_15,
                     ).build()
                     .also { instance = it }
             }

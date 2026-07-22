@@ -1,7 +1,15 @@
 <resources>
     <color name="brand_primary">#1B5FCC</color>
     <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_dark">#A8C8FF</color>
+    <!--
+        Primary en dark mode intencionalmente igual al light mode: el pastel
+        Material por defecto (#A8C8FF) destiñe toda la identidad de marca en
+        botones, switches y AppBar cuando el telefono esta en dark theme.
+        Mantener brand_primary_dark == brand_primary preserva el azul Amaxonia
+        en cualquier modo del sistema. onPrimary_dark sigue blanco (#00315F
+        tenia contraste insuficiente sobre #1B5FCC segun contraste WCAG).
+    -->
+    <color name="brand_primary_dark">#1B5FCC</color>
     <color name="brand_primary_container">#D7E3FF</color>
     <color name="brand_on_primary_container">#001B44</color>
     <color name="brand_secondary">#536081</color>
@@ -25,7 +33,8 @@
     <color name="brand_on_surface_variant">#646E84</color>
     <color name="brand_outline">#757D91</color>
     <color name="brand_outline_variant">#C1C6D0</color>
-    <color name="brand_on_primary_dark">#00315F</color>
+    <!-- onPrimary_dark blanco: coincide con onPrimary light y da contraste WCAG AAA sobre el nuevo brand_primary_dark=#1B5FCC. -->
+    <color name="brand_on_primary_dark">#FFFFFF</color>
     <color name="brand_primary_container_dark">#004788</color>
     <color name="brand_on_primary_container_dark">#D7E3FF</color>
     <color name="brand_secondary_dark">#BDC7E9</color>

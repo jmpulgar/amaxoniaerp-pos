@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "buildAmaxoniaDebugApk",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				":app:assembleAmaxoniaDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
