@@ -39,6 +39,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.application.hooks.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -97,6 +98,10 @@ fun Application.configureRouting() {
             requestTimeout = 30_000
         }
     }
+    environment.monitor.subscribe(ApplicationStopped) {
+        feHttpClient.close()
+    }
+
     val feRepository = ElectronicInvoiceRepository()
     val pacClient = TheFactoryHkaRestClient(feHttpClient)
     val payloadBuilder = TheFactoryHkaPayloadBuilder()
