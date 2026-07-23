@@ -42,15 +42,16 @@ class CashClosePrintingService(
     }
 
     suspend fun shouldOfferCloseTicket(): Boolean =
-        contextReader.currentCountryCode().equals(PANAMA_CODE, ignoreCase = true) &&
+        contextReader.currentCountryCode().uppercase() in SUNMI_TICKET_COUNTRIES &&
             contextReader.selectedPrinterType() == PrinterType.SUNMI_V2 &&
             printerProvider.getActiveTicketPrinter() != null
 
     suspend fun printCloseTicket(payload: CashCloseTicketPayload): CashClosePrintOutcome {
         val printer =
             printerProvider.getActiveTicketPrinter()
-                ?: return CashClosePrintOutcome.Message("Cierre realizado, pero no hay impresora SUNMI disponible")
-        return when (val result = printer.printTicket(ticketFormatter.format(payload))) {
+                ?: return CashClosePrintOutcome.Message("Cierre realizado, pero no hay impresora de tickets disponible")
+        val countryCode = contextReader.currentCountryCode()
+        return when (val result = printer.printTicket(ticketFormatter.format(payload, countryCode))) {
             PrintResult.Success -> CashClosePrintOutcome.Message("Ticket de cierre impreso correctamente")
             is PrintResult.Error ->
                 CashClosePrintOutcome.Message("Cierre realizado, pero no se pudo imprimir: ${result.message}")
@@ -58,6 +59,6 @@ class CashClosePrintingService(
     }
 
     private companion object {
-        const val PANAMA_CODE = "PA"
+        val SUNMI_TICKET_COUNTRIES = setOf("PA", "VE")
     }
 }

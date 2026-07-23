@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.PagoPrintDto
 import com.amaxonia.pos.domain.model.sales.ProductoPrintDto
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -38,6 +39,8 @@ class PanamaInvoiceTicketFormatterTest {
         assertTrue(text.contains("10.70"))
         assertTrue(text.contains("https://fe.dgi"))
         assertTrue(text.contains("CUFE123"))
+        assertTrue(text.contains("0000003500"))
+        assertTrue(text.contains("PROTOCOLO-123"))
     }
 
     @Test
@@ -56,6 +59,28 @@ class PanamaInvoiceTicketFormatterTest {
         assertTrue(ticket.elements.isNotEmpty())
     }
 
+    @Test
+    fun formatsSunmiTicketForVenezuelaWithoutPanamaLegalCopy() {
+        val ticket = PanamaInvoiceTicketFormatter().format(payload(), "VE")
+        val text =
+            ticket.elements
+                .joinToString("\n") { element ->
+                    when (element) {
+                        is TicketElement.Text -> element.value
+                        is TicketElement.Columns -> element.values.joinToString(" ")
+                        else -> ""
+                    }
+                }
+
+        assertTrue(text.contains("RIF: 123"))
+        assertTrue(text.contains("Total IVA:"))
+        assertFalse(text.contains("Total Impuesto:"))
+        assertFalse(text.contains("DGI"))
+        assertFalse(text.contains("Factura de Operación Interna"))
+        assertFalse(text.contains("Proveedor Autorizado"))
+        assertTrue(ticket.elements.none { it is TicketElement.Qr })
+    }
+
     private fun payload(): FacturaPrintPayloadDto =
         FacturaPrintPayloadDto(
             facturaId = "1",
@@ -66,18 +91,36 @@ class PanamaInvoiceTicketFormatterTest {
             vendedor = null,
             productos =
                 listOf(
-                    ProductoPrintDto("Producto A", "2", "UND", "5.00", "0.00", "0.70", "10.70"),
+                    ProductoPrintDto(
+                        nombre = "Producto A",
+                        cantidad = "2",
+                        unidad = "UND",
+                        precioUnitario = "5.00",
+                        descuento = "0.00",
+                        impuesto = "0.70",
+                        total = "10.70",
+                        codigo = "P0001",
+                        tasaImpuesto = "7",
+                    ),
                 ),
             subtotal = "10.00",
             montoExento = "0.00",
             totalImpuesto = "0.70",
             total = "10.70",
-            pagos = listOf(PagoPrintDto("EFECTIVO", "20.00")),
+            pagos =
+                listOf(
+                    PagoPrintDto("EFECTIVO", "5.70"),
+                    PagoPrintDto("YAPPY", "5.00"),
+                ),
             cambio = "9.30",
             qrUrl = "https://fe.dgi",
             cufe = "CUFE123",
             fechaRecepcionDgi = "2026-06-01T13:45:10",
             proveedorAutorizado = "The Factory HKA Corp.",
+            numeroDocumentoFiscal = "0000003500",
+            puntoFacturacionFiscal = "777",
+            codigoSucursal = "6666",
+            protocoloAutorizacion = "PROTOCOLO-123",
         )
 
     private fun serialize(element: TicketElement): String =

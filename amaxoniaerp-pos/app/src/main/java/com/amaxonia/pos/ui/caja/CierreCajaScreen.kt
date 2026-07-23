@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
-import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AccentPurple
@@ -81,15 +80,8 @@ fun CierreCajaScreen(
         injectedViewModel {
             CierreCajaViewModel(
                 DependencyContainer.cajaRepository,
-                CashClosePrintingService(
-                    DependencyContainer.printerFactory,
-                    DependencyContainer.posConfigurationRepository,
-                    DependencyContainer.cashCloseTicketFormatter,
-                ),
-                DependencyContainer.posConfigurationRepository,
-                DependencyContainer.productRepository,
-                DependencyContainer.pendingSalesReader,
-                DependencyContainer.cashCloseTicketFormatter,
+                DependencyContainer.cashClosePrintingService,
+                DependencyContainer.cashCloseTicketPayloadBuilder,
             )
         },
     onBack: () -> Unit,
@@ -113,7 +105,7 @@ fun CierreCajaScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissCloseTicketPrompt,
             title = { Text("Imprimir cierre de caja") },
-            text = { Text("La impresora configurada es Sunmi para Panamá. ¿Quieres imprimir el ticket de cierre de caja?") },
+            text = { Text("¿Deseas imprimir el ticket con el resumen del cierre de caja?") },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmClose(printTicket = true) }) {
                     Text("Imprimir")

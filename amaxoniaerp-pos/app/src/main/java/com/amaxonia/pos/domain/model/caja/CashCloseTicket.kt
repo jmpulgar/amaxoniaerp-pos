@@ -6,6 +6,11 @@ interface CashCloseTicketFormatter {
     val paymentLabels: List<String>
 
     fun format(payload: CashCloseTicketPayload): TicketDocument
+
+    fun format(
+        payload: CashCloseTicketPayload,
+        countryCode: String,
+    ): TicketDocument = format(payload)
 }
 
 data class CashCloseTicketPayload(

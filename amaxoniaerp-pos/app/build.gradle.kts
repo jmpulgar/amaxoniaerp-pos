@@ -69,6 +69,11 @@ android {
             // Provisional: reemplazar por el applicationId oficial de Banesco cuando esté disponible.
             applicationId = "com.amaxonia.pos.banesco"
         }
+
+        create("listoerp") {
+            dimension = "brand"
+            applicationId = "com.amaxonia.pos.listoerp"
+        }
     }
 
     buildTypes {

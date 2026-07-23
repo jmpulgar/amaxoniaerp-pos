@@ -181,6 +181,16 @@ data class CajaSecuenciaData(
     val forma_pago_devolucion: List<CajaFormaPagoDevolucionItem> = emptyList(),
     val total_anulado: Double = 0.0,
     val verificar_facturas_temporales: Int = 0,
+    val inventario: List<CajaInventarioItem> = emptyList(),
+)
+
+@Serializable
+data class CajaInventarioItem(
+    val codigo: String,
+    val descripcion: String,
+    val existencia_inicial: Double,
+    val cantidad_vendida: Double,
+    val existencia_disponible: Double,
 )
 
 @Serializable

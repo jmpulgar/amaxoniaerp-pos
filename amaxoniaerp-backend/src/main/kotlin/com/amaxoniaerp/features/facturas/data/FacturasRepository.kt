@@ -249,15 +249,47 @@ class FacturasRepository {
         companyNameFallback: String,
     ): FacturaPrintPayloadResponse? = dbQuery(database) {
         val isPanama = countryCode.equals("PA", ignoreCase = true)
-        if (!isPanama) {
-            throw IllegalArgumentException("El payload de impresión fiscal solo está disponible para Panamá")
+        val isVenezuela = countryCode.equals("VE", ignoreCase = true)
+        if (!isPanama && !isVenezuela) {
+            throw IllegalArgumentException("El payload de impresión solo está disponible para Panamá y Venezuela")
         }
+        val countrySpecificFields =
+            if (isPanama) {
+                """
+                cs.nombre_sucursal AS cliente_sucursal_nombre,
+                cs.direccion AS cliente_sucursal_direccion,
+                f.cufe,
+                f.qr,
+                f.fechaRecepcionDGI,
+                f.puntoFacturacionFiscal,
+                f.nroProtocoloAutorizacion,
+                s.codigo_sucursal_emisor AS sucursal_codigo,
+                """.trimIndent()
+            } else {
+                """
+                NULL AS cliente_sucursal_nombre,
+                NULL AS cliente_sucursal_direccion,
+                NULL AS cufe,
+                NULL AS qr,
+                NULL AS fechaRecepcionDGI,
+                NULL AS puntoFacturacionFiscal,
+                NULL AS nroProtocoloAutorizacion,
+                NULL AS sucursal_codigo,
+                """.trimIndent()
+            }
+        val clientBranchJoin =
+            if (isPanama) {
+                "LEFT JOIN cliente_sucursal cs ON cs.sucursal_id = f.cliente_sucursal_id"
+            } else {
+                ""
+            }
 
         val factura = queryOne(
             """
             SELECT
                 f.id_factura,
                 f.cod_factura,
+                f.numeroDocumentoFiscal,
                 f.fechaFactura,
                 f.facturar_a,
                 f.facturar_a_ruc,
@@ -270,11 +302,7 @@ class FacturasRepository {
                 f.TotalTotalFactura,
                 f.totalizar_total_general,
                 f.formapago,
-                cs.nombre_sucursal AS cliente_sucursal_nombre,
-                cs.direccion AS cliente_sucursal_direccion,
-                f.cufe,
-                f.qr,
-                f.fechaRecepcionDGI,
+                $countrySpecificFields
                 pg.rif AS empresa_ruc,
                 c.descripcion AS caja_descripcion,
                 c.codigo AS caja_codigo,
@@ -284,7 +312,7 @@ class FacturasRepository {
             LEFT JOIN parametros_generales pg ON 1 = 1
             LEFT JOIN caja c ON c.id = f.id_caja
             LEFT JOIN sucursal s ON s.id = f.id_sucursal
-            LEFT JOIN cliente_sucursal cs ON cs.sucursal_id = f.cliente_sucursal_id
+            $clientBranchJoin
             WHERE f.id_factura = '${facturaId.sqlLiteral()}'
             LIMIT 1
             """.trimIndent(),
@@ -294,6 +322,7 @@ class FacturasRepository {
             """
             SELECT
                 _item_descripcion,
+                _item_codigo,
                 _item_cantidad_total,
                 _item_preciosiniva,
                 _item_montodescuento,
@@ -317,6 +346,8 @@ class FacturasRepository {
                 descuento = row.decimal("_item_montodescuento").toMoneyString(),
                 impuesto = impuesto.toMoneyString(),
                 total = row.decimal("_item_totalconiva").toMoneyString(),
+                codigo = row.stringOrNull("_item_codigo"),
+                tasaImpuesto = taxRate.toMoneyString(trimZeros = true),
             )
         }
 
@@ -325,7 +356,41 @@ class FacturasRepository {
         val totalImpuesto = factura.decimal("totalizar_monto_iva")
         val montoExento = (subtotal - baseImponible).coerceAtLeast(BigDecimal.ZERO)
         val total = factura.decimal("TotalTotalFactura")
-        val cambio: BigDecimal? = null
+        val pagos =
+            queryMany(
+                """
+                SELECT
+                    cfp.descripcion AS metodo,
+                    cnd.monto
+                FROM caja_nueva cn
+                INNER JOIN caja_nueva_detalle cnd ON cnd.caja_id = cn.caja_id
+                LEFT JOIN caja_forma_pago cfp ON cfp.id_forma_pago = cnd.id_forma_pago
+                WHERE cn.id_factura = '${facturaId.sqlLiteral()}'
+                  AND cnd.monto > 0
+                ORDER BY cnd.caja_detalle_id ASC
+                """.trimIndent(),
+            ).map { row ->
+                PagoPrintResponse(
+                    metodo = row.stringOrNull("metodo").orEmpty().ifBlank { "PAGO" },
+                    monto = row.decimal("monto").toMoneyString(),
+                )
+            }.ifEmpty {
+                listOf(
+                    PagoPrintResponse(
+                        metodo = factura.stringOrNull("formapago").orEmpty().ifBlank { "PAGO" },
+                        monto = total.toMoneyString(),
+                    ),
+                )
+            }
+        val cambio =
+            queryOne(
+                """
+                SELECT totalizar_cambio
+                FROM factura_detalle_formapago
+                WHERE id_factura = '${facturaId.sqlLiteral()}'
+                LIMIT 1
+                """.trimIndent(),
+            )?.decimalOrNull("totalizar_cambio")
 
         FacturaPrintPayloadResponse(
             facturaId = factura.string("id_factura"),
@@ -351,17 +416,16 @@ class FacturasRepository {
             montoExento = montoExento.toMoneyString(),
             totalImpuesto = totalImpuesto.toMoneyString(),
             total = total.toMoneyString(),
-            pagos = listOf(
-                PagoPrintResponse(
-                    metodo = factura.stringOrNull("formapago").orEmpty().ifBlank { "PAGO" },
-                    monto = total.toMoneyString(),
-                )
-            ),
+            pagos = pagos,
             cambio = cambio?.toMoneyString(),
             qrUrl = factura.stringOrNull("qr"),
             cufe = factura.stringOrNull("cufe"),
             fechaRecepcionDgi = factura.stringOrNull("fechaRecepcionDGI"),
-            proveedorAutorizado = "The Factory HKA Corp.",
+            proveedorAutorizado = if (isPanama) "The Factory HKA Corp." else null,
+            numeroDocumentoFiscal = factura.stringOrNull("numeroDocumentoFiscal"),
+            puntoFacturacionFiscal = factura.stringOrNull("puntoFacturacionFiscal"),
+            codigoSucursal = factura.stringOrNull("sucursal_codigo"),
+            protocoloAutorizacion = factura.stringOrNull("nroProtocoloAutorizacion"),
         )
     }
 

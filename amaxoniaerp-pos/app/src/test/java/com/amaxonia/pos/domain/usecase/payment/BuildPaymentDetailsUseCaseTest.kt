@@ -55,6 +55,31 @@ class BuildPaymentDetailsUseCaseTest {
     }
 
     @Test
+    fun `mixed payment keeps cash and every non cash allocation`() {
+        val cash = paymentMethod(id = 1, sigla = "CASH", description = "Efectivo", fiscalCode = "101")
+        val card = paymentMethod(id = 2, sigla = "TDD", description = "Tarjeta débito", fiscalCode = "102")
+        val transfer = paymentMethod(id = 3, sigla = "TR", description = "Transferencia", fiscalCode = "104")
+
+        val result =
+            useCase(
+                BuildPaymentDetailsInput(
+                    isCash = false,
+                    totalAmount = Money.parse("10.00"),
+                    cashTenderedAmount = Money.parse("2.25"),
+                    cashMethods = listOf(cash),
+                    nonCashMethods = listOf(card, transfer),
+                    allMethods = listOf(cash, card, transfer),
+                    nonCashAmountsInput = mapOf(2 to "3.25", 3 to "4.50"),
+                ),
+            )
+
+        assertEquals(listOf(2.25, 3.25, 4.5), result.payload.detalle.map { it.monto })
+        assertEquals(2.25, result.payload.totalizarMontoEfectivo, 0.0)
+        assertEquals(7.75, result.payload.totalizarMontoOtros, 0.0)
+        assertEquals(listOf("101", "102", "104"), result.transactionMethods.map { it.fiscalCode })
+    }
+
+    @Test
     fun `fiscal aliases preserve every legacy payment mapping`() {
         val mappings =
             listOf(

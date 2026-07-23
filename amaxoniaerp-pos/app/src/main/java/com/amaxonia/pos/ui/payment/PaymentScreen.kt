@@ -490,7 +490,7 @@ fun CashPaymentContent(
 ) {
     val missingCashAmountText =
         Money.format(
-            (state.totalAmountMoney - state.tenderedAmountMoney)
+            (state.totalAmountMoney - state.assignedAmountMoney)
                 .coerceAtLeastZero(),
         )
 
@@ -540,6 +540,13 @@ fun CashPaymentContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (state.nonCashAssignedMoney > Money.ZERO) {
+                Text(
+                    "Otras formas: $ ${state.nonCashAssignedText}",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             AnimatedVisibility(
                 visible = state.showInsufficientReminder && !state.isPaymentEnough,
@@ -574,7 +581,7 @@ fun CashPaymentContent(
                     listOf("1", "2", "3"),
                     listOf("4", "5", "6"),
                     listOf("7", "8", "9"),
-                    listOf("C", "0", "00"),
+                    listOf("C", "0", "."),
                 )
 
             Row(modifier = Modifier.fillMaxWidth().height(350.dp)) {

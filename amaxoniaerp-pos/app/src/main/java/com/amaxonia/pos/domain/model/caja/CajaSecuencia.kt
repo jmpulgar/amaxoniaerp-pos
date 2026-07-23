@@ -112,6 +112,16 @@ data class CajaSecuenciaDataDto(
     val vendedor: String? = null,
     val forma_pago: List<CajaFormaPagoLineaDto> = emptyList(),
     val verificar_facturas_temporales: Int = 0,
+    val inventario: List<CajaInventarioLineaDto> = emptyList(),
+)
+
+@Serializable
+data class CajaInventarioLineaDto(
+    val codigo: String,
+    val descripcion: String,
+    val existencia_inicial: Double,
+    val cantidad_vendida: Double,
+    val existencia_disponible: Double,
 )
 
 @Serializable
@@ -151,6 +161,7 @@ data class CierreCajaSummary(
     val detalle: List<CierreCajaDetalleItem> = emptyList(),
     val detalleFormaPago: List<CierreCajaFormaPagoItem> = emptyList(),
     val paymentLines: List<CierreCajaPaymentLine> = emptyList(),
+    val inventoryLines: List<CashCloseInventoryLine> = emptyList(),
 )
 
 data class CierreCajaPaymentLine(

@@ -21,6 +21,10 @@ data class FacturaPrintPayloadResponse(
     val cufe: String? = null,
     val fechaRecepcionDgi: String? = null,
     val proveedorAutorizado: String? = null,
+    val numeroDocumentoFiscal: String? = null,
+    val puntoFacturacionFiscal: String? = null,
+    val codigoSucursal: String? = null,
+    val protocoloAutorizacion: String? = null,
 )
 
 @Serializable
@@ -39,6 +43,8 @@ data class ClientePrintResponse(
     val documento: String? = null,
     val sucursal: String? = null,
     val sucursalDireccion: String? = null,
+    val digitoVerificador: String? = null,
+    val tipoReceptor: String? = null,
 )
 
 @Serializable
@@ -50,6 +56,8 @@ data class ProductoPrintResponse(
     val descuento: String,
     val impuesto: String,
     val total: String,
+    val codigo: String? = null,
+    val tasaImpuesto: String? = null,
 )
 
 @Serializable

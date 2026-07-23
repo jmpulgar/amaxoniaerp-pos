@@ -4,6 +4,9 @@ import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
+import com.amaxonia.pos.domain.usecase.caja.CashClosePrintOutcome
+import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
+import com.amaxonia.pos.domain.usecase.caja.CashCloseTicketPayloadBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -12,6 +15,8 @@ import kotlinx.coroutines.launch
 class DashboardCajaCoordinator(
     private val cajaRepository: CajaRepository,
     private val cartRepository: CartRepository,
+    private val cashClosePrinting: CashClosePrintingService,
+    private val ticketPayloadBuilder: CashCloseTicketPayloadBuilder,
 ) : DashboardSaleGate {
     fun start(
         scope: CoroutineScope,
@@ -87,6 +92,13 @@ class DashboardCajaCoordinator(
     ) {
         scope.launch {
             state.update { it.copy(isLoadingCajas = true) }
+            val closedSequenceId =
+                cajaRepository
+                    .checkCajaStatus(caja.idCaja)
+                    .getOrNull()
+                    ?.takeIf { it.isOpen }
+                    ?.cajaSecuencia
+                    ?.idCajaSecuencia
             val sequence =
                 cajaRepository.getNextSecuenciaCodigo(caja.idCaja).getOrElse { error ->
                     state.update {
@@ -113,12 +125,78 @@ class DashboardCajaCoordinator(
             cajaRepository.openCaja(request).fold(
                 onSuccess = {
                     cajaRepository.setActiveCaja(caja)
-                    state.update { it.copy(isLoadingCajas = false, showCajaSelector = false) }
+                    val ticketOffer = closedSequenceId?.let { buildAutomaticCloseTicketOffer(caja, it) }
+                    state.update {
+                        it.copy(
+                            isLoadingCajas = false,
+                            showCajaSelector = false,
+                            automaticCloseTicketOffer = ticketOffer,
+                        )
+                    }
                 },
                 onFailure = { error ->
                     state.update { it.copy(isLoadingCajas = false, error = "Error al abrir caja: ${error.message}") }
                 },
             )
+        }
+    }
+
+    private suspend fun buildAutomaticCloseTicketOffer(
+        caja: Caja,
+        sequenceId: String,
+    ): AutomaticCloseTicketOffer =
+        cajaRepository
+            .getCierreSummaryForSequence(caja, sequenceId)
+            .fold(
+                onSuccess = { summary ->
+                    runCatching { ticketPayloadBuilder.build(summary, caja) }
+                        .fold(
+                            onSuccess = { AutomaticCloseTicketOffer(payload = it) },
+                            onFailure = {
+                                AutomaticCloseTicketOffer(
+                                    payload = null,
+                                    unavailableReason = "No se pudo preparar el ticket: ${it.message}",
+                                )
+                            },
+                        )
+                },
+                onFailure = {
+                    AutomaticCloseTicketOffer(
+                        payload = null,
+                        unavailableReason = "No se pudo cargar el resumen del cierre automático: ${it.message}",
+                    )
+                },
+            )
+
+    private fun printAutomaticCloseTicket(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
+        val offer = state.value.automaticCloseTicketOffer ?: return
+        val payload = offer.payload
+        if (payload == null) {
+            state.update {
+                it.copy(
+                    automaticCloseTicketOffer = null,
+                    autoCloseMessage = offer.unavailableReason ?: "No se pudo preparar el ticket de cierre",
+                )
+            }
+            return
+        }
+        scope.launch {
+            state.update { it.copy(isPrintingAutomaticCloseTicket = true) }
+            val message =
+                when (val outcome = cashClosePrinting.printCloseTicket(payload)) {
+                    CashClosePrintOutcome.NoPrinter -> "No hay una impresora disponible para el ticket de cierre"
+                    is CashClosePrintOutcome.Message -> outcome.value
+                }
+            state.update {
+                it.copy(
+                    automaticCloseTicketOffer = null,
+                    isPrintingAutomaticCloseTicket = false,
+                    autoCloseMessage = message,
+                )
+            }
         }
     }
 
@@ -140,6 +218,9 @@ class DashboardCajaCoordinator(
             is DashboardCajaUiAction.SelectAndOpen -> selectAndOpen(scope, state, action.caja, action.openingAmount)
             is DashboardCajaUiAction.SetSelectorVisible -> setSelectorVisible(state, action.show)
             DashboardCajaUiAction.DismissAutoCloseMessage -> state.update { it.copy(autoCloseMessage = null) }
+            DashboardCajaUiAction.PrintAutomaticCloseTicket -> printAutomaticCloseTicket(scope, state)
+            DashboardCajaUiAction.DismissAutomaticCloseTicket ->
+                state.update { it.copy(automaticCloseTicketOffer = null) }
         }
     }
 

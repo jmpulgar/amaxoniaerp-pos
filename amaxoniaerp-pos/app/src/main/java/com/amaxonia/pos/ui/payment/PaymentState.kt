@@ -45,11 +45,14 @@ data class PaymentState(
                 acc + Money.parse(amount)
             }
 
+    val assignedAmountMoney: Money
+        get() = tenderedAmountMoney + nonCashAssignedMoney
+
     val nonCashPendingMoney: Money
-        get() = (totalAmountMoney - nonCashAssignedMoney).coerceAtLeastZero()
+        get() = (totalAmountMoney - assignedAmountMoney).coerceAtLeastZero()
 
     val changeDueMoney: Money
-        get() = (tenderedAmountMoney - totalAmountMoney).coerceAtLeastZero()
+        get() = (assignedAmountMoney - totalAmountMoney).coerceAtLeastZero()
 
     val totalAmountText: String
         get() = Money.format(totalAmountMoney)
@@ -73,11 +76,7 @@ data class PaymentState(
         get() = changeDueMoney.toDouble()
 
     val isPaymentEnough: Boolean
-        get() =
-            when (selectedMethod) {
-                PaymentMethod.CASH -> tenderedAmountMoney >= totalAmountMoney
-                PaymentMethod.NON_CASH -> nonCashAssignedMoney >= totalAmountMoney
-            }
+        get() = assignedAmountMoney >= totalAmountMoney
 
     fun toBs(amount: Double): Double {
         if (!isMultiCurrency || tasa <= 0.0) return 0.0
@@ -122,7 +121,7 @@ data class PaymentState(
     val missingCashBsText: String
         get() {
             if (!isMultiCurrency || tasa <= 0.0) return ""
-            val missing = (totalAmountMoney - tenderedAmountMoney).coerceAtLeastZero()
+            val missing = (totalAmountMoney - assignedAmountMoney).coerceAtLeastZero()
             return formatBs(missing)
         }
 

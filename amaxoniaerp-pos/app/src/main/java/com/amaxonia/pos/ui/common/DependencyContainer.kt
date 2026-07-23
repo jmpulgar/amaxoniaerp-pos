@@ -45,6 +45,7 @@ import com.amaxonia.pos.data.repository.RoomOfflineInvoiceWriter
 import com.amaxonia.pos.data.repository.RoomPendingSalesReader
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.sync.CatalogSyncer
+import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
 import com.amaxonia.pos.domain.model.printer.FiscalDeviceDiagnostics
@@ -72,6 +73,8 @@ import com.amaxonia.pos.domain.repository.ServerEnvironment
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import com.amaxonia.pos.domain.system.SystemAppClock
 import com.amaxonia.pos.domain.system.UuidGenerator
+import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
+import com.amaxonia.pos.domain.usecase.caja.CashCloseTicketPayloadBuilder
 import com.amaxonia.pos.domain.usecase.cart.RefreshCartProductLotsUseCase
 import com.amaxonia.pos.domain.usecase.cart.SaveDraftInvoiceUseCase
 import com.amaxonia.pos.domain.usecase.drafts.RestoreDraftInvoiceUseCase
@@ -84,20 +87,20 @@ import com.amaxonia.pos.domain.usecase.payment.CompletePaymentSaleUseCase
 import com.amaxonia.pos.domain.usecase.payment.ConfirmFiscalDocumentUseCase
 import com.amaxonia.pos.domain.usecase.payment.ExecuteGatewayPaymentUseCase
 import com.amaxonia.pos.domain.usecase.payment.ExecutePaymentFlowUseCase
-import com.amaxonia.pos.domain.usecase.payment.HandlePaymentFailureUseCase
-import com.amaxonia.pos.domain.usecase.payment.PaymentExecutionOperations
-import com.amaxonia.pos.domain.usecase.payment.PaymentFlowRepositories
-import com.amaxonia.pos.domain.usecase.payment.PaymentFiscalConfirmationLedger
-import com.amaxonia.pos.domain.usecase.payment.QueueGatewayCallbackUseCase
 import com.amaxonia.pos.domain.usecase.payment.GatewayCallbackLedger
 import com.amaxonia.pos.domain.usecase.payment.GatewayCallbackOutcome
+import com.amaxonia.pos.domain.usecase.payment.HandlePaymentFailureUseCase
+import com.amaxonia.pos.domain.usecase.payment.PaymentExecutionOperations
+import com.amaxonia.pos.domain.usecase.payment.PaymentFiscalConfirmationLedger
+import com.amaxonia.pos.domain.usecase.payment.PaymentFlowRepositories
 import com.amaxonia.pos.domain.usecase.payment.PaymentPreparationOperations
 import com.amaxonia.pos.domain.usecase.payment.PaymentRuntimeServices
 import com.amaxonia.pos.domain.usecase.payment.PaymentStateRepositories
 import com.amaxonia.pos.domain.usecase.payment.PrepareSaleUseCase
 import com.amaxonia.pos.domain.usecase.payment.PrintInvoiceUseCase
-import com.amaxonia.pos.domain.usecase.payment.QueueOfflineInvoiceUseCase
 import com.amaxonia.pos.domain.usecase.payment.QueueFiscalConfirmationUseCase
+import com.amaxonia.pos.domain.usecase.payment.QueueGatewayCallbackUseCase
+import com.amaxonia.pos.domain.usecase.payment.QueueOfflineInvoiceUseCase
 import com.amaxonia.pos.domain.usecase.payment.StartTransactionUseCase
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 
@@ -192,6 +195,21 @@ object DependencyContainer {
         private set
     val cashCloseTicketFormatter: CashCloseTicketFormatter by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         PanamaCashCloseTicketFormatter()
+    }
+    val cashCloseTicketPayloadBuilder: CashCloseTicketPayloadBuilder by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        CashCloseTicketPayloadBuilder(
+            posConfigurationRepository,
+            productRepository,
+            pendingSalesReader,
+            cashCloseTicketFormatter,
+        )
+    }
+    val cashClosePrintingService: CashClosePrintingService by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        CashClosePrintingService(
+            printerFactory,
+            posConfigurationRepository,
+            cashCloseTicketFormatter,
+        )
     }
     lateinit var queueOfflineInvoiceUseCase: QueueOfflineInvoiceUseCase
         private set
@@ -379,7 +397,7 @@ object DependencyContainer {
                             printerSerial = outcome.printerSerial,
                             failureMessage = outcome.failureMessage,
                         )
-                        com.amaxonia.pos.data.sync.SyncScheduler.enqueueFiscalConfirmations(appContext)
+                        SyncScheduler.enqueueFiscalConfirmations(appContext)
                     }
                 }
             }
@@ -388,7 +406,7 @@ object DependencyContainer {
                 when (outcome) {
                     is GatewayCallbackOutcome.Awaiting -> {
                         queueGatewayCallbackUseCase.markAwaiting(outcome.correlationId)
-                        com.amaxonia.pos.data.sync.SyncScheduler.enqueueGatewayCallbacks(appContext)
+                        SyncScheduler.enqueueGatewayCallbacks(appContext)
                     }
                     is GatewayCallbackOutcome.Resolved -> {
                         queueGatewayCallbackUseCase.markResolved(

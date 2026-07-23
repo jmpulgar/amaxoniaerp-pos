@@ -32,12 +32,12 @@ class CashClosePrintingServiceTest {
         }
 
     @Test
-    fun `close ticket offer requires Panama Sunmi and active ticket printer`() =
+    fun `close ticket offer supports Panama and Venezuela with Sunmi`() =
         runTest {
             val ticketPrinter = RecordingTicketPrinter()
 
             assertTrue(service(ticketPrinter = ticketPrinter).shouldOfferCloseTicket())
-            assertFalse(service(country = "VE", ticketPrinter = ticketPrinter).shouldOfferCloseTicket())
+            assertTrue(service(country = "VE", ticketPrinter = ticketPrinter).shouldOfferCloseTicket())
             assertFalse(service(ticketPrinter = null).shouldOfferCloseTicket())
         }
 

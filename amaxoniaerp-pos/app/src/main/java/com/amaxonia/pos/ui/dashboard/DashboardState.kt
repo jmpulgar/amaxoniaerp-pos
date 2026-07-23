@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.Department
 
@@ -13,6 +14,11 @@ enum class ProductViewMode {
     GRID,
     LIST,
 }
+
+data class AutomaticCloseTicketOffer(
+    val payload: CashCloseTicketPayload?,
+    val unavailableReason: String? = null,
+)
 
 data class DashboardProduct(
     val id: String,
@@ -73,6 +79,8 @@ data class DashboardState(
     val quantityPickerProduct: DashboardProduct? = null,
     // --- AUTO-CLOSE ---
     val autoCloseMessage: String? = null,
+    val automaticCloseTicketOffer: AutomaticCloseTicketOffer? = null,
+    val isPrintingAutomaticCloseTicket: Boolean = false,
 ) {
     val isInitialProductLoading: Boolean
         get() = isLoading && products.isEmpty()
@@ -98,6 +106,10 @@ sealed interface DashboardCajaUiAction : DashboardUiAction {
     ) : DashboardCajaUiAction
 
     data object DismissAutoCloseMessage : DashboardCajaUiAction
+
+    data object PrintAutomaticCloseTicket : DashboardCajaUiAction
+
+    data object DismissAutomaticCloseTicket : DashboardCajaUiAction
 }
 
 sealed interface DashboardSaleUiAction : DashboardUiAction {

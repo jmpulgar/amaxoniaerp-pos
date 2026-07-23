@@ -31,6 +31,12 @@ interface CajaRepository : ActiveCajaReader {
 
     suspend fun getCierreSummary(): Result<CierreCajaSummary>
 
+    suspend fun getCierreSummaryForSequence(
+        caja: Caja,
+        sequenceId: String,
+    ): Result<CierreCajaSummary> =
+        Result.failure(UnsupportedOperationException("El repositorio no permite consultar cierres por secuencia"))
+
     suspend fun setActiveCaja(caja: Caja)
 
     suspend fun clearActiveCaja()

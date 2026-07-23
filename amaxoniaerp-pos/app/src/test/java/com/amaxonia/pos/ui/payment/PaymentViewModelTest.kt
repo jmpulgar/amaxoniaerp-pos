@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
+import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -75,6 +76,52 @@ class PaymentViewModelTest {
             assertFalse(viewModel.state.value.isProcessingPayment)
         }
 
+    @Test
+    fun `cash keypad accepts decimal amounts`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel = viewModel(caja = null, methods = Result.success(listOf(method(1, 1))))
+            runCurrent()
+
+            viewModel.onAction(PaymentUiAction.KeyPadInput("."))
+            viewModel.onAction(PaymentUiAction.KeyPadInput("2"))
+            viewModel.onAction(PaymentUiAction.KeyPadInput("5"))
+
+            assertEquals("0.25", viewModel.state.value.tenderedAmountInput)
+            assertEquals(0.25, viewModel.state.value.tenderedAmountMoney.toDouble(), 0.0)
+        }
+
+    @Test
+    fun `cash and multiple other methods are processed as one payment`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var capturedAmounts = emptyList<Double>()
+            val methods =
+                listOf(
+                    method(1, 1, "CASH"),
+                    method(2, 2, "TDD"),
+                    method(3, 3, "TR"),
+                )
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(methods),
+                    executor =
+                        PaymentFlowExecutor { input, _ ->
+                            capturedAmounts = input.paymentDetails.payload.detalle.map { it.monto }
+                            PaymentFlowResult.Failure("test stop")
+                        },
+                )
+            runCurrent()
+
+            viewModel.onAction(PaymentUiAction.SetTotalAmount(10.0))
+            listOf("2", ".", "2", "5").forEach { viewModel.onAction(PaymentUiAction.KeyPadInput(it)) }
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "3.25"))
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(3, "4.50"))
+            viewModel.onAction(PaymentUiAction.ProcessPayment)
+            advanceUntilIdle()
+
+            assertEquals(listOf(2.25, 3.25, 4.5), capturedAmounts)
+        }
+
     private fun viewModel(
         caja: Caja?,
         methods: Result<List<FormaPago>>,
@@ -104,7 +151,8 @@ class PaymentViewModelTest {
     private fun method(
         id: Int,
         order: Int,
-    ) = FormaPago(id, siglas = "CASH", activo = 1, pos = 1, grupo = 1, orden = order, tipoMoneda = "BASE")
+        siglas: String = "CASH",
+    ) = FormaPago(id, siglas = siglas, activo = 1, pos = 1, grupo = 1, orden = order, tipoMoneda = "BASE")
 
     private fun caja(currency: CurrencyConfig?) =
         Caja(

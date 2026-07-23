@@ -51,13 +51,31 @@ class PaymentViewModel(
             }
             is PaymentUiAction.KeyPadInput -> _state.update { state -> state.withKeyPadInput(action.key) }
             PaymentUiAction.SetExactAmount ->
-                _state.update { it.copy(tenderedAmountInput = it.totalAmountText, showInsufficientReminder = false) }
+                _state.update {
+                    val remaining = (it.totalAmountMoney - it.nonCashAssignedMoney).coerceAtLeastZero()
+                    it.copy(tenderedAmountInput = Money.format(remaining), showInsufficientReminder = false)
+                }
             is PaymentUiAction.SelectMethod ->
                 _state.update { it.copy(selectedMethod = action.method, showInsufficientReminder = false) }
             is PaymentUiAction.SetExactNonCashAmount ->
                 _state.update { current ->
+                    val assignedToOtherMethods =
+                        current.nonCashAmountsInput
+                            .filterKeys { it != action.paymentMethodId }
+                            .values
+                            .fold(Money.ZERO) { accumulated, amount -> accumulated + Money.parse(amount) }
+                    val remaining =
+                        (current.totalAmountMoney - current.tenderedAmountMoney - assignedToOtherMethods)
+                            .coerceAtLeastZero()
                     current.copy(
-                        nonCashAmountsInput = mapOf(action.paymentMethodId to current.totalAmountText),
+                        nonCashAmountsInput =
+                            current.nonCashAmountsInput.toMutableMap().apply {
+                                if (remaining > Money.ZERO) {
+                                    put(action.paymentMethodId, Money.format(remaining))
+                                } else {
+                                    remove(action.paymentMethodId)
+                                }
+                            },
                         showInsufficientReminder = false,
                     )
                 }
@@ -92,6 +110,7 @@ class PaymentViewModel(
                         BuildPaymentDetailsInput(
                             isCash = currentState.selectedMethod == PaymentMethod.CASH,
                             totalAmount = currentState.totalAmountMoney,
+                            cashTenderedAmount = currentState.tenderedAmountMoney,
                             cashMethods = currentState.formasPagoEfectivo,
                             nonCashMethods = currentState.formasPagoTarjetaOtro,
                             allMethods = currentState.formasPago,

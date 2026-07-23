@@ -15,6 +15,7 @@ import com.amaxoniaerp.features.caja.domain.CajaDetalleAperturaItem
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoTotal
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoDevolucionItem
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoItem
+import com.amaxoniaerp.features.caja.domain.CajaInventarioItem
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CurrencyConfig
@@ -29,7 +30,9 @@ import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleFormaPagoTable
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableFactory
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableVE
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaTableFactory
+import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
 import com.amaxoniaerp.features.sales.data.SalesFacturaTableFactory
+import com.amaxoniaerp.features.sales.data.SalesStockTable
 import com.amaxoniaerp.features.pos.data.CajaFormaTable
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.amaxoniaerp.features.facturas.data.EstatusTable
@@ -430,11 +433,51 @@ class CajaRepository {
                     .sumOf { it[facturaTable.totalTotalFactura].toDouble() }
 
                 val facturasValidas = facturaTable
-                    .select(facturaTable.totalTotalFactura, facturaTable.codEstatus)
+                    .select(facturaTable.idFactura, facturaTable.totalTotalFactura, facturaTable.codEstatus)
                     .where { facturaTable.idCajaSecuencia eq idSecuencia }
                     .filter { row -> (row[facturaTable.codEstatus] ?: 0) != 3 }
                 val totalVentas = facturasValidas.sumOf { it[facturaTable.totalTotalFactura].toDouble() }
                 val cantidadTransacciones = facturasValidas.size
+                val facturaIds = facturasValidas.map { it[facturaTable.idFactura] }
+                val detalleVentas =
+                    if (facturaIds.isEmpty()) {
+                        emptyList()
+                    } else {
+                        SalesFacturaDetalleTable
+                            .select(
+                                SalesFacturaDetalleTable.idItem,
+                                SalesFacturaDetalleTable.itemCodigo,
+                                SalesFacturaDetalleTable.itemDescripcion,
+                                SalesFacturaDetalleTable.itemCantidadTotal,
+                            ).where { SalesFacturaDetalleTable.idFactura inList facturaIds }
+                            .toList()
+                    }
+                val itemIds = detalleVentas.map { it[SalesFacturaDetalleTable.idItem] }.distinct()
+                val stockDisponible =
+                    if (itemIds.isEmpty()) {
+                        emptyMap()
+                    } else {
+                        SalesStockTable
+                            .select(SalesStockTable.idItem, SalesStockTable.cantidad)
+                            .where { SalesStockTable.idItem inList itemIds }
+                            .groupBy { it[SalesStockTable.idItem] }
+                            .mapValues { (_, rows) -> rows.sumOf { it[SalesStockTable.cantidad].toDouble() } }
+                    }
+                val inventario =
+                    detalleVentas
+                        .groupBy { it[SalesFacturaDetalleTable.idItem] }
+                        .map { (itemId, rows) ->
+                            val first = rows.first()
+                            val sold = rows.sumOf { it[SalesFacturaDetalleTable.itemCantidadTotal].toDouble() }
+                            val available = stockDisponible[itemId] ?: 0.0
+                            CajaInventarioItem(
+                                codigo = first[SalesFacturaDetalleTable.itemCodigo].ifBlank { itemId.toString() },
+                                descripcion = first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
+                                existencia_inicial = available + sold,
+                                cantidad_vendida = sold,
+                                existencia_disponible = available,
+                            )
+                        }.sortedBy { it.descripcion }
 
                 val montoEfectivoTotalCalc =
                     secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble() +
@@ -507,6 +550,7 @@ class CajaRepository {
                     forma_pago_devolucion = formaPagoDevolucion,
                     total_anulado = totalAnulado,
                     verificar_facturas_temporales = verificarTemporales,
+                    inventario = inventario,
                 )
             }
         }

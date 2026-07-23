@@ -354,7 +354,12 @@ fun AppNavigation(startDestination: String) {
                                 )
                             } else {
                                 val payload = payloadResult.getOrThrow()
-                                val ticket = PanamaInvoiceTicketFormatter().format(payload)
+                                val countryCode =
+                                    DependencyContainer.localStore
+                                        .readSelectedCountry()
+                                        ?.code
+                                        .orEmpty()
+                                val ticket = PanamaInvoiceTicketFormatter().format(payload, countryCode)
                                 when (val printResult = ticketPrinter.printTicket(ticket)) {
                                     PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
                                     is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))

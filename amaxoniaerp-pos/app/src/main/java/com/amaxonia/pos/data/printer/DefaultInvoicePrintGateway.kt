@@ -20,8 +20,13 @@ class DefaultInvoicePrintGateway(
         remoteInvoiceId: String,
     ): InvoicePrintFeedback? =
         when (countryCode) {
-            "VE" -> printFiscal(transaction)
-            "PA" -> printPanama(remoteInvoiceId)
+            VENEZUELA_CODE ->
+                when (localStore.readSelectedPrinterType()) {
+                    PrinterType.THE_FACTORY_HKA -> printFiscal(transaction)
+                    PrinterType.SUNMI_V2 -> printSunmi(remoteInvoiceId, countryCode)
+                    else -> null
+                }
+            PANAMA_CODE -> printSunmi(remoteInvoiceId, countryCode)
             else -> null
         }
 
@@ -33,7 +38,10 @@ class DefaultInvoicePrintGateway(
         )
     }
 
-    private suspend fun printPanama(remoteInvoiceId: String): InvoicePrintFeedback? {
+    private suspend fun printSunmi(
+        remoteInvoiceId: String,
+        countryCode: String,
+    ): InvoicePrintFeedback? {
         if (localStore.readSelectedPrinterType() != PrinterType.SUNMI_V2) return null
         val printer =
             printerFactory.getActiveTicketPrinter()
@@ -46,9 +54,14 @@ class DefaultInvoicePrintGateway(
             salesRepository.getPrintPayload(remoteInvoiceId).getOrElse { error ->
                 return InvoicePrintFeedback(error.message ?: "No se pudo obtener el payload de impresión", "", "")
             }
-        return when (val result = printer.printTicket(PanamaInvoiceTicketFormatter().format(payload))) {
+        return when (val result = printer.printTicket(PanamaInvoiceTicketFormatter().format(payload, countryCode))) {
             PrintResult.Success -> InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
             is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
         }
+    }
+
+    private companion object {
+        const val PANAMA_CODE = "PA"
+        const val VENEZUELA_CODE = "VE"
     }
 }

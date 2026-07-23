@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
 data class BuildPaymentDetailsInput(
     val isCash: Boolean,
     val totalAmount: Money,
+    val cashTenderedAmount: Money = Money.ZERO,
     val cashMethods: List<FormaPago>,
     val nonCashMethods: List<FormaPago>,
     val allMethods: List<FormaPago>,
@@ -23,16 +24,30 @@ data class PaymentDetails(
 
 class BuildPaymentDetailsUseCase {
     operator fun invoke(input: BuildPaymentDetailsInput): PaymentDetails {
-        val detail = if (input.isCash) buildCashDetail(input) else buildNonCashDetail(input)
+        val nonCashDetail = buildNonCashDetail(input)
+        val nonCashTotal =
+            nonCashDetail.fold(Money.ZERO) { accumulated, detail ->
+                accumulated + Money.fromDouble(detail.monto)
+            }
+        val detail = buildCashDetail(input, nonCashTotal) + nonCashDetail
         return PaymentDetails(
             payload = buildPayload(detail),
             transactionMethods = detail.mapNotNull { it.toTransactionMethod(input.allMethods) },
         )
     }
 
-    private fun buildCashDetail(input: BuildPaymentDetailsInput): List<FormaPagoDetalle> {
+    private fun buildCashDetail(
+        input: BuildPaymentDetailsInput,
+        nonCashTotal: Money,
+    ): List<FormaPagoDetalle> {
         val method = input.cashMethods.firstOrNull() ?: return emptyList()
-        return listOf(method.toDetail(input.totalAmount.toDouble()))
+        val tendered =
+            input.cashTenderedAmount.takeIf { it > Money.ZERO }
+                ?: input.totalAmount.takeIf { input.isCash }
+                ?: Money.ZERO
+        val remaining = (input.totalAmount - nonCashTotal).coerceAtLeastZero()
+        val applied = if (tendered > remaining) remaining else tendered
+        return if (applied > Money.ZERO) listOf(method.toDetail(applied.toDouble())) else emptyList()
     }
 
     private fun buildNonCashDetail(input: BuildPaymentDetailsInput): List<FormaPagoDetalle> =

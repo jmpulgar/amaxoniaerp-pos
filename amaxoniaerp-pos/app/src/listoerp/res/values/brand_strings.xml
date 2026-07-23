@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">ListoERP POS</string>
+    <string name="brand_name">ListoERP Express</string>
+    <string name="brand_receipt_name">LISTOERP POS</string>
+    <string name="brand_logo_description">ListoERP Express</string>
+    <string name="brand_welcome_tagline">Tu negocio listo para avanzar</string>
+    <string name="brand_welcome_message">Inventario, facturación y reportes\nen la palma de tu mano.</string>
+    <string name="brand_website_label">Visitar ListoERP</string>
+    <string name="brand_website_url">https://listoerp.app</string>
+    <string name="brand_support_label">Soporte ListoERP</string>
+    <string name="brand_support_url">https://listoerp.app</string>
+    <string name="brand_print_test_message">Prueba de impresión SUNMI\nListoERP POS</string>
+</resources>

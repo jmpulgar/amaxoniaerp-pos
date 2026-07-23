@@ -1,31 +1,44 @@
-TEXT|CENTER|false|Comprobante Auxiliar de
-TEXT|CENTER|false|Facturación Electrónica
-FEED|1
+TEXT|CENTER|true|DGI
+TEXT|CENTER|false|Comprobante Auxiliar de Factura
+TEXT|CENTER|false|Electrónica
 TEXT|CENTER|true|MI EMPRESA S.A.
 TEXT|CENTER|false|RUC: 123
-TEXT|CENTER|false|PANAMÁ
-DIVIDER
-COLUMNS|Fecha:~2026-06-01T13:45:00|14,18|LEFT,RIGHT
+TEXT|CENTER|false|Factura de Operación Interna
+FEED|1
+COLUMNS|Fecha:~2026-06-01|14,18|LEFT,RIGHT
+COLUMNS|Hora:~13:45:00|14,18|LEFT,RIGHT
+COLUMNS|Pto. Fact: 777~Suc.: 6666|16,16|LEFT,RIGHT
 COLUMNS|Factura:~F001-0001|14,18|LEFT,RIGHT
+COLUMNS|N. Doc Fiscal:~0000003500|14,18|LEFT,RIGHT
 DIVIDER
-TEXT|LEFT|true|Productos
-COLUMNS|Articulo~Cant~Monto|16,6,10|LEFT,CENTER,RIGHT
-COLUMNS|Producto A~2~10.70|16,6,10|LEFT,CENTER,RIGHT
+COLUMNS|Código~Cant~Und~Valor~Importe|8,4,5,7,8|LEFT,CENTER,CENTER,RIGHT,RIGHT
+TEXT|LEFT|true|Producto A (7%)
+COLUMNS|P0001~2~UND~5.00~10.70|8,4,5,7,8|LEFT,CENTER,CENTER,RIGHT,RIGHT
+COLUMNS|PROMO:~0.00|14,18|LEFT,RIGHT
 DIVIDER
 COLUMNS|Subtotal Items:~10.00|14,18|LEFT,RIGHT
 COLUMNS|Monto Exento:~0.00|14,18|LEFT,RIGHT
-COLUMNS|Total impuestos:~0.70|14,18|LEFT,RIGHT
-COLUMNS|TOTAL:~10.70|14,18|LEFT,RIGHT
+COLUMNS|Total Impuesto:~0.70|14,18|LEFT,RIGHT
+COLUMNS|Total:~10.70|14,18|LEFT,RIGHT
 DIVIDER
-TEXT|LEFT|true|Métodos de pago
-COLUMNS|EFECTIVO~20.00|14,18|LEFT,RIGHT
+TEXT|LEFT|true|MÉTODOS DE PAGO:
+TEXT|LEFT|false|................................
+COLUMNS|EFECTIVO~5.70|14,18|LEFT,RIGHT
+COLUMNS|YAPPY~5.00|14,18|LEFT,RIGHT
+TEXT|LEFT|false|................................
 COLUMNS|CAMBIO~9.30|14,18|LEFT,RIGHT
 DIVIDER
-TEXT|CENTER|false|Documento validado por proveedor autorizado calificado.
-TEXT|CENTER|false|Consulte su documento en el portal de la DGI.
+TEXT|CENTER|false|Consulte por la clave de acceso en:
+TEXT|CENTER|false|https://dgi-fep.mef.gob.pa/Consultas/FacturasPorCUFE
+TEXT|CENTER|false|CUFE123
 FEED|1
 QR|3|https://fe.dgi
-TEXT|CENTER|false|CUFE: CUFE123
-TEXT|CENTER|false|Fecha recepción DGI: 2026-06-01T13:45:10
-TEXT|CENTER|false|Proveedor autorizado: The Factory HKA Corp.
+TEXT|CENTER|false|CAFE de emisión previa, transmisión a la
+TEXT|CENTER|false|DIRECCIÓN GENERAL DE INGRESOS hasta
+TEXT|CENTER|false|2026-06-01T13:45:10
+TEXT|CENTER|false|Protocolo de autorización:
+TEXT|CENTER|false|PROTOCOLO-123
+DIVIDER
+TEXT|CENTER|false|Documento validado por The Factory HKA Corp.,
+TEXT|CENTER|false|Proveedor Autorizado Calificado.
 FEED|4

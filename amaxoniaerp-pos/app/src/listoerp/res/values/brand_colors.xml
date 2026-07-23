@@ -1,0 +1,70 @@
+<resources>
+    <!-- Paleta ListoERP basada en el naranja corporativo #FF613F. -->
+    <color name="brand_primary">#FF613F</color>
+    <color name="brand_on_primary">#2B0902</color>
+    <color name="brand_primary_dark">#FF613F</color>
+    <color name="brand_primary_container">#FFDAD1</color>
+    <color name="brand_on_primary_container">#3B0900</color>
+
+    <color name="brand_secondary">#8C4A3B</color>
+    <color name="brand_on_secondary">#FFFFFF</color>
+    <color name="brand_secondary_container">#FFDAD1</color>
+    <color name="brand_on_secondary_container">#3A0B04</color>
+
+    <color name="brand_accent">#835500</color>
+    <color name="brand_on_accent">#FFFFFF</color>
+    <color name="brand_accent_container">#FFDEA5</color>
+    <color name="brand_on_accent_container">#2A1800</color>
+
+    <color name="brand_error">#BA1A1A</color>
+    <color name="brand_on_error">#FFFFFF</color>
+    <color name="brand_error_container">#FFDAD6</color>
+    <color name="brand_on_error_container">#410002</color>
+
+    <color name="brand_background">#FFF8F6</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_on_background">#281814</color>
+    <color name="brand_on_surface">#281814</color>
+    <color name="brand_surface_variant">#F5DED8</color>
+    <color name="brand_on_surface_variant">#5B403A</color>
+    <color name="brand_outline">#8E7069</color>
+    <color name="brand_outline_variant">#E3BFB7</color>
+
+    <color name="brand_on_primary_dark">#2B0902</color>
+    <color name="brand_primary_container_dark">#7E210E</color>
+    <color name="brand_on_primary_container_dark">#FFDAD1</color>
+    <color name="brand_secondary_dark">#FFB4A3</color>
+    <color name="brand_on_secondary_dark">#552016</color>
+    <color name="brand_secondary_container_dark">#703629</color>
+    <color name="brand_on_secondary_container_dark">#FFDAD1</color>
+    <color name="brand_accent_dark">#F9BD58</color>
+    <color name="brand_on_accent_dark">#452B00</color>
+    <color name="brand_accent_container_dark">#624000</color>
+    <color name="brand_on_accent_container_dark">#FFDEA5</color>
+    <color name="brand_error_dark">#FFB4AB</color>
+    <color name="brand_on_error_dark">#690005</color>
+    <color name="brand_error_container_dark">#93000A</color>
+    <color name="brand_on_error_container_dark">#FFDAD6</color>
+    <color name="brand_background_dark">#1B110F</color>
+    <color name="brand_on_background_dark">#F5DDD7</color>
+    <color name="brand_surface_dark">#241815</color>
+    <color name="brand_on_surface_dark">#F5DDD7</color>
+    <color name="brand_surface_variant_dark">#4A332E</color>
+    <color name="brand_on_surface_variant_dark">#D8C2BC</color>
+    <color name="brand_outline_dark">#A99089</color>
+    <color name="brand_outline_variant_dark">#5B403A</color>
+
+    <color name="brand_gradient_start">#B72B11</color>
+    <color name="brand_gradient_mid">#FF613F</color>
+    <color name="brand_gradient_end">#FF9D3F</color>
+
+    <color name="brand_wave_back_top">#66B72B11</color>
+    <color name="brand_wave_back_bottom">#99FF613F</color>
+    <color name="brand_wave_front_start">#FFB72B11</color>
+    <color name="brand_wave_front_mid">#FFFF613F</color>
+    <color name="brand_wave_front_end">#FFFF9D3F</color>
+    <color name="brand_wave_scrim">#66281008</color>
+
+    <color name="brand_welcome_tagline">#70483E</color>
+    <color name="brand_splash_background">#FFFFFF</color>
+</resources>

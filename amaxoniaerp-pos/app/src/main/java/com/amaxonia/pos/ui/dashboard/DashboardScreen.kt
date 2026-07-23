@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -88,6 +89,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -150,7 +152,12 @@ fun DashboardScreen(
     viewModel: DashboardViewModel =
         injectedViewModel {
             val cajaCoordinator =
-                DashboardCajaCoordinator(DependencyContainer.cajaRepository, DependencyContainer.cartRepository)
+                DashboardCajaCoordinator(
+                    DependencyContainer.cajaRepository,
+                    DependencyContainer.cartRepository,
+                    DependencyContainer.cashClosePrintingService,
+                    DependencyContainer.cashCloseTicketPayloadBuilder,
+                )
             DashboardViewModel(
                 catalogCoordinator =
                     DashboardCatalogCoordinator(
@@ -268,6 +275,48 @@ fun DashboardScreen(
         val msg = state.promotionMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
         viewModel.onAction(DashboardSaleUiAction.ClearPromotionMessage)
+    }
+
+    state.automaticCloseTicketOffer?.let { offer ->
+        val canPrint = offer.payload != null
+        AlertDialog(
+            onDismissRequest = {
+                if (!state.isPrintingAutomaticCloseTicket) {
+                    viewModel.onAction(DashboardCajaUiAction.DismissAutomaticCloseTicket)
+                }
+            },
+            title = { Text("Imprimir cierre de caja") },
+            text = {
+                Text(
+                    offer.unavailableReason
+                        ?: "La caja anterior se cerró automáticamente. ¿Deseas imprimir el ticket con el resumen del cierre?",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onAction(DashboardCajaUiAction.PrintAutomaticCloseTicket) },
+                    enabled = !state.isPrintingAutomaticCloseTicket,
+                ) {
+                    Text(
+                        when {
+                            state.isPrintingAutomaticCloseTicket -> "Imprimiendo..."
+                            canPrint -> "Imprimir"
+                            else -> "Entendido"
+                        },
+                    )
+                }
+            },
+            dismissButton = {
+                if (canPrint) {
+                    TextButton(
+                        onClick = { viewModel.onAction(DashboardCajaUiAction.DismissAutomaticCloseTicket) },
+                        enabled = !state.isPrintingAutomaticCloseTicket,
+                    ) {
+                        Text("No imprimir")
+                    }
+                }
+            },
+        )
     }
 
     // --- CajaSelectorSheet (replaces old AlertDialog) ---

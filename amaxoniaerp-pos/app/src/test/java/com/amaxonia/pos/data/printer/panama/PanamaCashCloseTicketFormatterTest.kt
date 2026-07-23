@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import com.amaxonia.pos.domain.model.printer.TicketElement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -17,6 +18,18 @@ class PanamaCashCloseTicketFormatterTest {
         val expected = File(uri).readText().trimEnd()
 
         assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `Venezuela cash close uses RIF label`() {
+        val text =
+            PanamaCashCloseTicketFormatter()
+                .format(payload(), "VE")
+                .elements
+                .filterIsInstance<TicketElement.Text>()
+                .joinToString("\n") { it.value }
+
+        assertTrue(text.contains("RIF: RUC-1"))
     }
 
     private fun payload(): CashCloseTicketPayload =
