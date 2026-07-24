@@ -795,6 +795,8 @@ class ExecutePaymentFlowUseCaseTest {
 
         override suspend fun clearActiveCaja() = Unit
 
+        override suspend fun markSequenceClosed() = Unit
+
         private fun sequence() =
             CajaSecuencia(
                 idCajaSecuencia = "sequence",

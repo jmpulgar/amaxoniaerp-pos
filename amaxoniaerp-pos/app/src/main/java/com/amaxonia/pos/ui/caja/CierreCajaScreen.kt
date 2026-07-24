@@ -86,6 +86,7 @@ fun CierreCajaScreen(
         },
     onBack: () -> Unit,
     onCloseSuccess: () -> Unit,
+    onOpenNewCaja: () -> Unit = onCloseSuccess,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isPrintingX by viewModel.isPrintingReportX.collectAsStateWithLifecycle()
@@ -181,6 +182,7 @@ fun CierreCajaScreen(
                     SuccessContent(
                         message = state.message,
                         onDone = onCloseSuccess,
+                        onOpenNewCaja = onOpenNewCaja,
                     )
                 is CierreCajaUiState.Error ->
                     ErrorContent(
@@ -560,6 +562,7 @@ private fun ReadyContent(
 private fun SuccessContent(
     message: String,
     onDone: () -> Unit,
+    onOpenNewCaja: () -> Unit,
 ) {
     Column(
         modifier =
@@ -599,13 +602,26 @@ private fun SuccessContent(
         )
         Spacer(modifier = Modifier.height(40.dp))
         Button(
+            onClick = onOpenNewCaja,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+        ) {
+            Icon(Icons.Rounded.PointOfSale, contentDescription = null, tint = PosPalette.FixedWhite)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Aperturar nueva caja", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = PosPalette.FixedWhite)
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(
             onClick = onDone,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
         ) {
             Text("Volver al Dashboard", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }

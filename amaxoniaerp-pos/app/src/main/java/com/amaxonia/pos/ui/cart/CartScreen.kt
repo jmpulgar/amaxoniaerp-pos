@@ -1,6 +1,7 @@
 package com.amaxonia.pos.ui.cart
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -45,10 +45,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -79,11 +81,14 @@ import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
+import com.amaxonia.pos.ui.common.components.CartEmptyState
+import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.payment.formatCurrencyLabel
-import com.amaxonia.pos.ui.theme.CartGradientEnd
-import com.amaxonia.pos.ui.theme.CartGradientStart
+import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
+import com.amaxonia.pos.ui.theme.PosTextStyles
+import com.amaxonia.pos.ui.theme.cartBrandGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -267,25 +272,25 @@ fun CartScreen(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 16.dp,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    shape = PosExtraShapes.BottomBarTop,
                 ) {
                     Column(modifier = Modifier.padding(24.dp).navigationBarsPadding()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom,
                         ) {
-                            Text("Total", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text("Total", style = MaterialTheme.typography.titleMedium)
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     "$${String.format(java.util.Locale.getDefault(), "%.2f", state.total)}",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    style = PosTextStyles.totalDisplay,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 if (state.isMultiCurrency && state.totalBsText.isNotBlank()) {
                                     Text(
                                         "${formatCurrencyLabel(state.abrMonedaSecundaria)} ${state.totalBsText}",
-                                        fontSize = 13.sp,
+                                        style = PosTextStyles.amountSecondary,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -296,12 +301,11 @@ fun CartScreen(
                         // Botones de Acción
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             // 1. Boton GUARDAR BORRADOR (factura pendiente local)
-                            Button(
+                            OutlinedButton(
                                 onClick = { viewModel.onAction(CartUiAction.SaveDraft) },
-                                modifier = Modifier.weight(1f).height(50.dp),
+                                modifier = Modifier.weight(1f).height(56.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.small,
                             ) {
                                 Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -311,11 +315,15 @@ fun CartScreen(
                             // 2. Botón PAGAR / FACTURAR
                             Button(
                                 onClick = { viewModel.onAction(CartUiAction.Checkout) },
-                                modifier = Modifier.weight(1f).height(50.dp),
+                                modifier = Modifier.weight(1f).height(56.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.small,
                             ) {
-                                Text("Cobrar")
+                                Text(
+                                    "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", state.total)}",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }
@@ -324,14 +332,20 @@ fun CartScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            // SECCIÓN CLIENTE
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth().clickable { onSelectClient() },
+            // SECCIÓN CLIENTE + VENDEDOR (panel consolidado)
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectClient() }
+                            .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val selectedClient = state.selectedClient
@@ -363,49 +377,15 @@ fun CartScreen(
                         Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
-                ClientSucursalSelectorCard(
-                    sucursales = state.clientSucursales,
-                    selectedSucursal = state.selectedClientSucursal,
-                    isRequiredMissing = state.isMissingRequiredClientSucursal,
-                    onSelect = { branchId -> viewModel.onAction(CartUiAction.SelectClientBranch(branchId)) },
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            state.cartActionError?.let { message ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = state.availableSellers.isNotEmpty()) { showSellerSheet = true },
-            ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = state.availableSellers.isNotEmpty()) { showSellerSheet = true }
+                            .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
@@ -435,9 +415,38 @@ fun CartScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
+                ClientSucursalSelectorCard(
+                    sucursales = state.clientSucursales,
+                    selectedSucursal = state.selectedClientSucursal,
+                    isRequiredMissing = state.isMissingRequiredClientSucursal,
+                    onSelect = { branchId -> viewModel.onAction(CartUiAction.SelectClientBranch(branchId)) },
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            state.cartActionError?.let { message ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             if (state.items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("El carrito está vacío", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CartEmptyState()
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -501,7 +510,7 @@ private fun ClientSucursalSelectorCard(
     val hasMultiple = sucursales.size > 1
 
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -593,7 +602,7 @@ private fun ClientAvatar(
     modifier: Modifier = Modifier,
 ) {
     val initials = buildInitials(clientName)
-    val gradient = listOf(CartGradientStart, CartGradientEnd)
+    val gradient = cartBrandGradient()
 
     Box(
         modifier =
@@ -636,7 +645,7 @@ private fun PromotionCartGroup(
     }
     val times = timesText.toIntOrNull() ?: 0
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -647,7 +656,7 @@ private fun PromotionCartGroup(
                     modifier =
                         Modifier
                             .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(MaterialTheme.shapes.medium)
                             .background(
                                 Brush.linearGradient(
                                     listOf(
@@ -689,7 +698,7 @@ private fun PromotionCartGroup(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(MaterialTheme.shapes.medium)
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                                 .padding(horizontal = 10.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -727,7 +736,7 @@ private fun PromotionCartGroup(
             }
 
             Spacer(Modifier.height(10.dp))
-            QuantityEditor(
+            QuantityStepper(
                 quantityText = timesText,
                 onQuantityTextChange = { value ->
                     timesText = sanitizeQuantityInput(value)
@@ -757,55 +766,6 @@ private fun PromotionCartGroup(
     }
 }
 
-@Composable
-private fun QuantityEditor(
-    quantityText: String,
-    onQuantityTextChange: (String) -> Unit,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-    onDone: () -> Unit,
-    isError: Boolean,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        IconButton(
-            onClick = onDecrease,
-            modifier =
-                Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(10.dp)),
-        ) {
-            Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad", tint = MaterialTheme.colorScheme.primary)
-        }
-        OutlinedTextField(
-            value = quantityText,
-            onValueChange = onQuantityTextChange,
-            label = { Text(label) },
-            singleLine = true,
-            isError = isError,
-            textStyle =
-                androidx.compose.ui.text
-                    .TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onDone() }),
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(
-            onClick = onIncrease,
-            modifier =
-                Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Aumentar cantidad", tint = MaterialTheme.colorScheme.onPrimary)
-        }
-    }
-}
 
 private fun sanitizeQuantityInput(value: String): String =
     value
@@ -835,7 +795,9 @@ fun CartItemRow(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
             // Descripcion completa (hasta 2 lineas)
@@ -869,9 +831,8 @@ fun CartItemRow(
 
                 Text(
                     "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
-                    fontWeight = FontWeight.Bold,
+                    style = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 14.sp,
                 )
 
                 // Acciones compactas
@@ -906,7 +867,7 @@ fun CartItemRow(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            QuantityEditor(
+            QuantityStepper(
                 quantityText = quantityText,
                 onQuantityTextChange = { value ->
                     quantityText = sanitizeQuantityInput(value)

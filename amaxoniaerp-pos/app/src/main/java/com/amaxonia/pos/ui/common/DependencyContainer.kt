@@ -108,6 +108,23 @@ object DependencyContainer {
     private var initialized = false
     private lateinit var appContext: Context
 
+    /**
+     * Evento one-shot para pedir que el Dashboard abra el diálogo de apertura de
+     * caja al recibir el foco (p. ej. tras cerrar caja y pulsar "Aperturar nueva
+     * caja"). El Dashboard lo consume con [consumeAperturaRequest].
+     */
+    private val _pendingAperturaRequest = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val pendingAperturaRequest: kotlinx.coroutines.flow.StateFlow<Boolean>
+        get() = _pendingAperturaRequest
+
+    fun requestAperturaOnDashboard() {
+        _pendingAperturaRequest.value = true
+    }
+
+    fun consumeAperturaRequest() {
+        _pendingAperturaRequest.value = false
+    }
+
     lateinit var authRepository: AuthRepository
         private set
     lateinit var productRepository: ProductRepository

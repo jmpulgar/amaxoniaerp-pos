@@ -40,4 +40,13 @@ interface CajaRepository : ActiveCajaReader {
     suspend fun setActiveCaja(caja: Caja)
 
     suspend fun clearActiveCaja()
+
+    /**
+     * Marca la secuencia como cerrada conservando la caja seleccionada.
+     *
+     * A diferencia de [clearActiveCaja], mantiene [activeCaja]/[activeCajaName]
+     * para que, tras un cierre, la app sepa qué caja re-aperturar y el dashboard
+     * quede en estado "pendiente de apertura" en lugar de "sin caja".
+     */
+    suspend fun markSequenceClosed()
 }

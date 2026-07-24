@@ -1,6 +1,8 @@
 package com.amaxonia.pos
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,10 +10,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import com.amaxonia.pos.core.device.DeviceClass
+import com.amaxonia.pos.core.device.deviceClassFor
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.LocalDeviceClass
+import com.amaxonia.pos.ui.common.rememberDeviceClass
 import com.amaxonia.pos.ui.navigation.AppNavigation
 import com.amaxonia.pos.ui.theme.PosTheme
 import kotlinx.coroutines.runBlocking
@@ -28,6 +35,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyOrientationLock()
         if (BuildConfig.DEBUG) CrashLogger.setup(this)
         DependencyContainer.initialize(applicationContext)
         enableEdgeToEdge()
@@ -50,11 +58,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PosTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    AppNavigation(startDestination = startDestination)
+                CompositionLocalProvider(LocalDeviceClass provides rememberDeviceClass()) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        AppNavigation(startDestination = startDestination)
+                    }
                 }
             }
         }
@@ -69,6 +79,25 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         SafeLog.d(TAG, "Rapid Pay result intent received")
         handleRapidPayResult(intent, source = "onNewIntent")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyOrientationLock()
+    }
+
+    /**
+     * Phones (and physical SUNMI terminals, which are small-screened) lock to portrait.
+     * Tablets rotate freely. Re-applied on config changes to handle foldables/DeX resizing
+     * across the tablet breakpoint.
+     */
+    private fun applyOrientationLock() {
+        val smallestScreenWidthDp = resources.configuration.smallestScreenWidthDp
+        requestedOrientation =
+            when (deviceClassFor(smallestScreenWidthDp)) {
+                DeviceClass.PHONE -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                DeviceClass.TABLET -> ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+            }
     }
 
     /**

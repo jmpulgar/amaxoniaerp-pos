@@ -249,7 +249,9 @@ private fun CajaCard(
                         .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
-                    text = if (isActive) "Activa" else "Inactiva",
+                    // `estatus` es la configuración de la caja, no si tiene secuencia
+                    // abierta; usamos "Disponible" para no sugerir que ya está abierta.
+                    text = if (isActive) "Disponible" else "Inactiva",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = statusColor,

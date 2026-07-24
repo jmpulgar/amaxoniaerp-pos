@@ -139,7 +139,10 @@ class CierreCajaViewModel(
                     if (printTicket) {
                         printCloseTicket(summary)
                     }
-                    cajaRepository.clearActiveCaja()
+                    // Conservamos la caja seleccionada (solo cerramos la secuencia) para
+                    // que el Dashboard quede en "pendiente de apertura" y se pueda ofrecer
+                    // aperturar una nueva sin dejar un hueco donde no se puede facturar.
+                    cajaRepository.markSequenceClosed()
                     _uiState.value =
                         CierreCajaUiState.Success(
                             message = response.message,

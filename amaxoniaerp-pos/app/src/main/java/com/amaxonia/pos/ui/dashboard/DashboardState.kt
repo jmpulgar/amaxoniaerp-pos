@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.Department
@@ -56,6 +57,9 @@ data class DashboardState(
     val isLoadingCajas: Boolean = false,
     val showCajaSelector: Boolean = false,
     val hasActiveCaja: Boolean = false,
+    val cajaSession: CajaSessionStatus = CajaSessionStatus.VERIFICANDO,
+    val showAperturaPrompt: Boolean = false,
+    val aperturaCandidate: Caja? = null,
     // -------------------
     val selectedCategory: String = "Todos los productos",
     val departments: List<Department> = emptyList(),
@@ -104,6 +108,22 @@ sealed interface DashboardCajaUiAction : DashboardUiAction {
     data class SetSelectorVisible(
         val show: Boolean,
     ) : DashboardCajaUiAction
+
+    /** Solicita mostrar el diálogo de apertura para la [caja] indicada. */
+    data class RequestApertura(
+        val caja: Caja,
+    ) : DashboardCajaUiAction
+
+    /** Solicita aperturar la caja actualmente seleccionada (CTA del banner de estado). */
+    data object RequestAperturaActive : DashboardCajaUiAction
+
+    /** Confirma la apertura de la [caja] con el [openingAmount] indicado. */
+    data class ConfirmApertura(
+        val caja: Caja,
+        val openingAmount: Double,
+    ) : DashboardCajaUiAction
+
+    data object DismissApertura : DashboardCajaUiAction
 
     data object DismissAutoCloseMessage : DashboardCajaUiAction
 

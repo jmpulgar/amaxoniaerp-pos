@@ -67,9 +67,15 @@ class CajaRepositoryImpl(
             val companyDb = getCompanyDb()
             val result = cajaApi.checkCajaStatus(cajaId, authHeader, companyDb)
             result.onSuccess { response ->
-                if (response.isOpen) {
+                if (response.isOpen && response.cajaSecuencia != null) {
                     activeSecuencia = response.cajaSecuencia
                     _activeCajaSecuencia.update { response.cajaSecuencia }
+                } else {
+                    // El backend indica que la caja no tiene secuencia abierta:
+                    // limpiamos la secuencia para que el estado refleje la realidad
+                    // (pendiente de apertura) y no se permita facturar.
+                    activeSecuencia = null
+                    _activeCajaSecuencia.update { null }
                 }
             }
             result
@@ -227,6 +233,13 @@ class CajaRepositoryImpl(
         activeSecuencia = null
         _activeCajaSecuencia.update { null }
         localStore.clearActiveCaja()
+    }
+
+    override suspend fun markSequenceClosed() {
+        // Conserva la caja seleccionada (memoria y almacenamiento local) y solo
+        // descarta la secuencia, dejando el estado en "pendiente de apertura".
+        activeSecuencia = null
+        _activeCajaSecuencia.update { null }
     }
 
     private suspend fun getAuthHeader(): String {

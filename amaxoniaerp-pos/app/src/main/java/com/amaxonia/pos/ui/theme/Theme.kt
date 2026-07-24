@@ -89,6 +89,7 @@ fun PosTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = PosShapes,
         content = content,
     )
 }

@@ -208,6 +208,11 @@ fun AppNavigation(startDestination: String) {
                     onCloseSuccess = {
                         navigateAndClearStack("dashboard")
                     },
+                    onOpenNewCaja = {
+                        // Pide al Dashboard abrir el diálogo de apertura al recibir foco.
+                        DependencyContainer.requestAperturaOnDashboard()
+                        navigateAndClearStack("dashboard")
+                    },
                 )
             }
 
@@ -325,6 +330,10 @@ fun AppNavigation(startDestination: String) {
                                 popUpTo("dashboard") { inclusive = false }
                             }
                         }
+                    },
+                    onNavigateToApertura = {
+                        DependencyContainer.requestAperturaOnDashboard()
+                        navigateAndClearStack("dashboard")
                     },
                 )
             }

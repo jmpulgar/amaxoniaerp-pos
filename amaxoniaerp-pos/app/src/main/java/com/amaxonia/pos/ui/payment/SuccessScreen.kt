@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,9 +21,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -55,10 +56,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.LocalDeviceClass
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.common.isLandscape
+import com.amaxonia.pos.ui.theme.PosTextStyles
 import kotlinx.coroutines.launch
+
+private const val RING_INITIAL_SCALE = 0.6f
+private const val RING_INITIAL_ALPHA = 0.5f
+private const val RING_TARGET_SCALE = 1.6f
+private const val RING_ANIMATION_DURATION_MS = 600
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +91,8 @@ fun SuccessScreen(
 
     var visible by remember { mutableStateOf(false) }
     val scale = remember { Animatable(0.85f) }
+    val ringScale = remember { Animatable(RING_INITIAL_SCALE) }
+    val ringAlpha = remember { Animatable(RING_INITIAL_ALPHA) }
     var isPrinting by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -104,6 +116,17 @@ fun SuccessScreen(
         )
     }
 
+    LaunchedEffect(Unit) {
+        ringScale.animateTo(
+            RING_TARGET_SCALE,
+            animationSpec = tween(durationMillis = RING_ANIMATION_DURATION_MS, easing = FastOutSlowInEasing),
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        ringAlpha.animateTo(0f, animationSpec = tween(durationMillis = RING_ANIMATION_DURATION_MS))
+    }
+
     LaunchedEffect(uiState.errorMessage) {
         val msg = uiState.errorMessage
         if (!msg.isNullOrBlank()) {
@@ -125,16 +148,19 @@ fun SuccessScreen(
         }
     }
 
+    val isTabletLandscape = LocalDeviceClass.current == DeviceClass.TABLET && isLandscape()
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.TopCenter) {
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxHeight()
+                    .then(if (isTabletLandscape) Modifier.widthIn(max = 480.dp) else Modifier.fillMaxWidth())
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(paddingValues)
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -154,7 +180,7 @@ fun SuccessScreen(
                 ) {
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(28.dp),
+                        shape = MaterialTheme.shapes.extraLarge,
                         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
                     ) {
@@ -185,27 +211,38 @@ fun SuccessScreen(
                                         },
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(92.dp)
-                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(46.dp),
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .size(92.dp)
+                                                .graphicsLayer {
+                                                    scaleX = ringScale.value
+                                                    scaleY = ringScale.value
+                                                    alpha = ringAlpha.value
+                                                }.background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                                     )
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .size(92.dp)
+                                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(46.dp),
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(18.dp))
 
                                 Text(
                                     "Transacción exitosa",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.headlineSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
 
@@ -222,7 +259,7 @@ fun SuccessScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(16.dp))
+                                                .background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.medium)
                                                 .padding(14.dp),
                                         verticalAlignment = Alignment.Top,
                                     ) {
@@ -255,14 +292,14 @@ fun SuccessScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large)
                                             .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     Text(
                                         "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
                                         color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.align(Alignment.CenterHorizontally),
                                     )
                                     HorizontalDivider(
                                         color = MaterialTheme.colorScheme.outlineVariant,
@@ -275,25 +312,30 @@ fun SuccessScreen(
                                             )} (${formatCurrencyLabel(
                                                 abrMonedaSecundaria,
                                             )} ${String.format(java.util.Locale.getDefault(), "%.2f", totalBs)})",
+                                            style = PosTextStyles.amountSecondary,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.align(Alignment.CenterHorizontally),
                                         )
+                                        Spacer(modifier = Modifier.height(8.dp))
                                     }
                                     Text(
-                                        "Cambio / Vuelto: $ ${Money.format(
-                                            Money.fromDouble(changeDue),
-                                        )}${if (isMultiCurrency && changeDueBs > 0.0) {
-                                            " (${formatCurrencyLabel(
-                                                abrMonedaSecundaria,
-                                            )} ${String.format(java.util.Locale.getDefault(), "%.2f", changeDueBs)})"
-                                        } else {
-                                            ""
-                                        }}",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                                        "Cambio / Vuelto",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    Text(
+                                        "$ ${Money.format(Money.fromDouble(changeDue))}",
+                                        style = PosTextStyles.totalDisplay,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    if (isMultiCurrency && changeDueBs > 0.0) {
+                                        Text(
+                                            "${formatCurrencyLabel(abrMonedaSecundaria)} ${
+                                                String.format(java.util.Locale.getDefault(), "%.2f", changeDueBs)
+                                            }",
+                                            style = PosTextStyles.amountSecondary,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(24.dp))
@@ -303,7 +345,7 @@ fun SuccessScreen(
                                     enabled = !isSendingReceiptEmail,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                 ) {
                                     Text(
                                         if (isSendingReceiptEmail) "ENVIANDO..." else "ENVIAR RECIBO",
@@ -345,7 +387,7 @@ fun SuccessScreen(
                         .height(50.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(16.dp),
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR RECIBO")
             }
@@ -357,12 +399,13 @@ fun SuccessScreen(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(16.dp),
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Text("SIGUIENTE ORDEN", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
+        }
         }
     }
 }

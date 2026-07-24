@@ -1,6 +1,9 @@
 package com.amaxonia.pos.ui.theme
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
+import com.amaxonia.pos.R
 
 val ErrorRed = Color(0xFFBA1A1A)
 val SuccessGreen = Color(0xFF2E7D32)
@@ -18,8 +21,6 @@ val ConfirmedContent = Color(0xFF1B5E20)
 val PendingContainer = Color(0xFFFFF3E0)
 val PendingContent = Color(0xFFE65100)
 val ReportOrange = Color(0xFFFF9800)
-val CartGradientStart = Color(0xFF1E88E5)
-val CartGradientEnd = Color(0xFF00ACC1)
 
 val PaymentMethodColors =
     listOf(
@@ -30,3 +31,36 @@ val PaymentMethodColors =
         SuccessGreen,
         StrongErrorRed,
     )
+
+/** Semantic grouping over the raw status colors above, so new screens reference meaning, not hex. */
+object PosStatusColors {
+    val success = SuccessGreen
+    val warning = WarningOrange
+    val info = InfoBlue
+    val neutral = NeutralGray
+    val online = OnlineGreen
+    val offline = OfflineRed
+    val confirmedContainer = ConfirmedContainer
+    val confirmedContent = ConfirmedContent
+    val pendingContainer = PendingContainer
+    val pendingContent = PendingContent
+}
+
+/**
+ * Brand-aware replacement for the old hardcoded CartGradientStart/End (which never varied
+ * by white-label flavor). Reads the same brand_gradient_* resources every flavor already defines.
+ */
+@Composable
+fun cartBrandGradient(): List<Color> =
+    listOf(
+        colorResource(R.color.brand_gradient_start),
+        colorResource(R.color.brand_gradient_mid),
+        colorResource(R.color.brand_gradient_end),
+    )
+
+/** Stable per-payment-method color, centralized so tiles/rows/reports agree on the same mapping. */
+fun paymentMethodColor(sigla: String?): Color {
+    val palette = PaymentMethodColors
+    val index = (sigla?.hashCode() ?: 0).let { if (it < 0) -it else it } % palette.size
+    return palette[index]
+}

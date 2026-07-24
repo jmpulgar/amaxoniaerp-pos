@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -133,15 +133,26 @@ import com.amaxonia.pos.R
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.Promocion
+import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
+import com.amaxonia.pos.ui.common.components.CategoryChipRow
+import com.amaxonia.pos.ui.common.components.PosMoneyInput
+import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.shortName
+import com.amaxonia.pos.ui.theme.InfoBlue
+import com.amaxonia.pos.ui.theme.NeutralGray
 import com.amaxonia.pos.ui.theme.OfflineRed
 import com.amaxonia.pos.ui.theme.OnlineGreen
+import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
+import com.amaxonia.pos.ui.theme.PosTextStyles
+import com.amaxonia.pos.ui.theme.SuccessGreen
+import com.amaxonia.pos.ui.theme.WarningOrange
 import kotlinx.coroutines.launch
 
 private const val DASHBOARD_LOG_TAG = "DashboardScreen"
@@ -157,6 +168,7 @@ fun DashboardScreen(
                     DependencyContainer.cartRepository,
                     DependencyContainer.cashClosePrintingService,
                     DependencyContainer.cashCloseTicketPayloadBuilder,
+                    DependencyContainer.networkMonitor,
                 )
             DashboardViewModel(
                 catalogCoordinator =
@@ -201,6 +213,15 @@ fun DashboardScreen(
             when (effect) {
                 DashboardUiEffect.NavigateToCart -> currentOnNavigateToCart()
             }
+        }
+    }
+    // Abre el diálogo de apertura cuando se solicita desde otra pantalla
+    // (p. ej. "Aperturar nueva caja" tras el cierre).
+    val pendingApertura by DependencyContainer.pendingAperturaRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingApertura) {
+        if (pendingApertura) {
+            viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive)
+            DependencyContainer.consumeAperturaRequest()
         }
     }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -326,13 +347,22 @@ fun DashboardScreen(
             isLoading = state.isLoadingCajas,
             errorMessage = state.error,
             canDismiss = state.hasActiveCaja,
-            onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.SelectAndOpen(caja, 0.0)) },
+            onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.RequestApertura(caja)) },
             onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch()) },
             onDismiss = {
                 if (state.hasActiveCaja) {
                     viewModel.onAction(DashboardCajaUiAction.SetSelectorVisible(false))
                 }
             },
+        )
+    }
+
+    state.aperturaCandidate?.takeIf { state.showAperturaPrompt }?.let { caja ->
+        AperturaCajaDialog(
+            caja = caja,
+            isLoading = state.isLoadingCajas,
+            onConfirm = { amount -> viewModel.onAction(DashboardCajaUiAction.ConfirmApertura(caja, amount)) },
+            onDismiss = { viewModel.onAction(DashboardCajaUiAction.DismissApertura) },
         )
     }
 
@@ -385,13 +415,13 @@ fun DashboardScreen(
                             modifier =
                                 Modifier
                                     .size(40.dp)
-                                    .background(PosPalette.FixedWhite, RoundedCornerShape(8.dp))
+                                    .background(PosPalette.FixedWhite, MaterialTheme.shapes.small)
                                     .padding(4.dp),
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(stringResource(R.string.brand_name), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.weight(1f))
-                        Surface(shape = RoundedCornerShape(50), color = PosPalette.FixedWhite) {
+                        Surface(shape = PosExtraShapes.Pill, color = PosPalette.FixedWhite) {
                             Text(
                                 "Pro+",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -406,7 +436,7 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
                         color = PosPalette.FixedWhite.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.small,
                         modifier =
                             Modifier.fillMaxWidth().clickable {
                                 scope.launch {
@@ -535,7 +565,7 @@ fun DashboardScreen(
                                 else -> MaterialTheme.colorScheme.inverseOnSurface
                             },
                         actionColor = PosPalette.FixedWhite,
-                        shape = RoundedCornerShape(18.dp),
+                        shape = MaterialTheme.shapes.medium,
                     )
                 }
             },
@@ -559,7 +589,7 @@ fun DashboardScreen(
                                         focusedIndicatorColor = PosPalette.Transparent,
                                         unfocusedIndicatorColor = PosPalette.Transparent,
                                     ),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
@@ -643,7 +673,7 @@ fun DashboardScreen(
                 ) {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(26.dp),
+                        shape = PosExtraShapes.NavPill,
                         tonalElevation = 0.dp,
                         shadowElevation = 8.dp,
                         modifier =
@@ -709,6 +739,13 @@ fun DashboardScreen(
                     }
                 }
 
+                CajaStatusBanner(
+                    session = state.cajaSession,
+                    cajaName = state.cajaPrincipalNombre,
+                    onAperturar = { viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive) },
+                    onSeleccionar = { viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true)) },
+                )
+
                 // --- Contenido Principal ---
                 Box(modifier = Modifier.weight(1f)) {
                     if (state.error != null) {
@@ -757,36 +794,25 @@ fun DashboardScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .padding(bottom = 16.dp),
+                                            .padding(bottom = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Row(
-                                        modifier =
-                                            Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable(enabled = state.bottomSelected != 1) {
-                                                    if (state.bottomSelected != 1) {
-                                                        viewModel.onAction(DashboardCatalogUiAction.SetDepartmentPicker(true))
-                                                    }
-                                                }.padding(vertical = 4.dp, horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
+                                    if (state.bottomSelected == 1) {
                                         Text(
-                                            text = if (state.bottomSelected == 1) "Productos Más Vendidos" else state.selectedCategory,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            text = "Productos Más Vendidos",
+                                            style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f),
                                         )
-                                        if (state.bottomSelected != 1) {
-                                            Icon(
-                                                Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "Cambiar Categoría",
-                                                tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.padding(start = 8.dp),
-                                            )
-                                        }
+                                    } else {
+                                        CategoryChipRow(
+                                            departments = state.departments,
+                                            selectedDepartmentId = state.selectedDepartmentId,
+                                            onSelect = { id -> viewModel.onAction(DashboardCatalogUiAction.SelectDepartment(id)) },
+                                            onMoreClick = { viewModel.onAction(DashboardCatalogUiAction.SetDepartmentPicker(true)) },
+                                            modifier = Modifier.weight(1f),
+                                        )
                                     }
 
                                     Surface(
@@ -795,13 +821,13 @@ fun DashboardScreen(
                                                 .padding(start = 8.dp)
                                                 .clickable { showSellerSheet = true },
                                         color = MaterialTheme.colorScheme.surface,
-                                        shape = RoundedCornerShape(20.dp),
+                                        shape = PosExtraShapes.Pill,
                                         shadowElevation = 1.dp,
                                     ) {
                                         Row(
                                             modifier =
                                                 Modifier
-                                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))
+                                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PosExtraShapes.Pill)
                                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
@@ -897,7 +923,7 @@ fun DashboardScreen(
                                 if (state.viewMode == ProductViewMode.GRID) {
                                     LazyVerticalGrid(
                                         state = productGridState,
-                                        columns = GridCells.Fixed(2),
+                                        columns = GridCells.Adaptive(minSize = 160.dp),
                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         verticalArrangement = Arrangement.spacedBy(12.dp),
                                         contentPadding = PaddingValues(bottom = 120.dp),
@@ -976,7 +1002,7 @@ fun DashboardScreen(
                     if (state.cartItemCount > 0) {
                         Button(
                             onClick = { viewModel.onAction(DashboardSaleUiAction.Checkout) },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = MaterialTheme.shapes.medium,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier =
                                 Modifier
@@ -1057,7 +1083,7 @@ private fun ProductQuantitySheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text("Cancelar")
                 }
@@ -1065,7 +1091,7 @@ private fun ProductQuantitySheet(
                     onClick = { if (isValid) onConfirm(quantity) },
                     enabled = isValid,
                     modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1102,7 +1128,7 @@ private fun PromotionChoiceSheet(
                     .padding(bottom = 22.dp),
         ) {
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1114,7 +1140,7 @@ private fun PromotionChoiceSheet(
                         modifier =
                             Modifier
                                 .size(48.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(MaterialTheme.shapes.medium)
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
@@ -1153,7 +1179,7 @@ private fun PromotionChoiceSheet(
             Spacer(Modifier.height(14.dp))
 
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1178,7 +1204,7 @@ private fun PromotionChoiceSheet(
                         onClick = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
                         enabled = individualQuantity >= 1,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                     ) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1213,14 +1239,14 @@ private fun PromotionOptionCard(
     var timesText by remember { mutableStateOf("1") }
     val times = timesText.toIntOrNull() ?: 0
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+                Surface(color = accent.copy(alpha = 0.12f), shape = PosExtraShapes.Pill) {
                     Text(
                         text = promo.tipo,
                         color = accent,
@@ -1238,7 +1264,7 @@ private fun PromotionOptionCard(
             }
 
             Spacer(Modifier.height(10.dp))
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), shape = RoundedCornerShape(16.dp)) {
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), shape = MaterialTheme.shapes.medium) {
                 Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     promo.detalles.take(4).forEach { detail ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1281,7 +1307,7 @@ private fun PromotionOptionCard(
                 onClick = { if (times >= 1) onAddPromotion(times) },
                 enabled = times >= 1,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = PosPalette.FixedWhite),
             ) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1303,60 +1329,13 @@ private fun BottomPillItem(
 
     Surface(
         color = bg,
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
     ) {
         IconButton(
             onClick = onClick,
             modifier = Modifier.size(46.dp),
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
-        }
-    }
-}
-
-@Composable
-private fun QuantityStepper(
-    quantityText: String,
-    onQuantityTextChange: (String) -> Unit,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-    onDone: () -> Unit,
-    isError: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        IconButton(
-            onClick = onDecrease,
-            modifier =
-                Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
-        ) {
-            Icon(Icons.Default.Remove, contentDescription = "Disminuir", tint = MaterialTheme.colorScheme.primary)
-        }
-        OutlinedTextField(
-            value = quantityText,
-            onValueChange = onQuantityTextChange,
-            singleLine = true,
-            isError = isError,
-            textStyle = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onDone() }),
-            modifier = Modifier.weight(1f),
-            label = { Text("Cantidad") },
-        )
-        IconButton(
-            onClick = onIncrease,
-            modifier =
-                Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Aumentar", tint = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }
@@ -1375,9 +1354,10 @@ fun ProductCard(
     onQuantityClick: () -> Unit,
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth().height(260.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
@@ -1386,7 +1366,7 @@ fun ProductCard(
                     Modifier
                         .fillMaxWidth()
                         .height(110.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1411,8 +1391,7 @@ fun ProductCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = product.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -1420,7 +1399,7 @@ fun ProductCard(
                 if (!product.code.isNullOrBlank()) {
                     Text(
                         text = "Ref: ${product.code}",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),
                         maxLines = 1,
@@ -1436,17 +1415,16 @@ fun ProductCard(
             ) {
                 Text(
                     text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                    fontWeight = FontWeight.Bold,
+                    style = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 14.sp,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = onQuantityClick,
                         modifier =
                             Modifier
-                                .size(34.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
+                                .size(44.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
                     ) {
                         Icon(
                             Icons.Default.Edit,
@@ -1459,8 +1437,8 @@ fun ProductCard(
                         onClick = onAddClick,
                         modifier =
                             Modifier
-                                .size(34.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)),
+                                .size(44.dp)
+                                .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
                     ) {
                         Icon(
                             Icons.Default.Add,
@@ -1482,9 +1460,10 @@ fun ProductListRow(
     onQuantityClick: () -> Unit,
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -1498,7 +1477,7 @@ fun ProductListRow(
                 modifier =
                     Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1521,8 +1500,7 @@ fun ProductListRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = product.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -1530,7 +1508,7 @@ fun ProductListRow(
                 if (!product.code.isNullOrBlank()) {
                     Text(
                         text = "Ref: ${product.code}",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -1540,9 +1518,8 @@ fun ProductListRow(
                 }
                 Text(
                     text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                    fontWeight = FontWeight.Bold,
+                    style = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 14.sp,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1550,8 +1527,8 @@ fun ProductListRow(
                     onClick = onQuantityClick,
                     modifier =
                         Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
+                            .size(44.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
                 ) {
                     Icon(
                         Icons.Default.Edit,
@@ -1564,8 +1541,8 @@ fun ProductListRow(
                     onClick = onAddClick,
                     modifier =
                         Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                            .size(44.dp)
+                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
                 ) {
                     Icon(
                         Icons.Default.Add,
@@ -1637,7 +1614,7 @@ fun ManualEntryContent(
 
         // Pantalla del precio (Visor)
         Card(
-            shape = RoundedCornerShape(12.dp),
+            shape = MaterialTheme.shapes.small,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier =
@@ -1699,7 +1676,7 @@ fun ManualEntryContent(
                                 onClick = {
                                     if (key == "C") onClearClick() else onKeyClick(key)
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = MaterialTheme.shapes.small,
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                                 modifier =
@@ -1727,7 +1704,7 @@ fun ManualEntryContent(
                 // Botón Borrar
                 Button(
                     onClick = onBackspaceClick,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     modifier =
@@ -1746,7 +1723,7 @@ fun ManualEntryContent(
                 // Botón ENTER
                 Button(
                     onClick = onEnterClick,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     modifier =
@@ -1764,4 +1741,179 @@ fun ManualEntryContent(
             }
         }
     }
+}
+
+/**
+ * Banner persistente que comunica el estado de la caja (abierta / pendiente /
+ * sin caja / verificando) con color e ícono, y ofrece la acción correspondiente.
+ */
+/**
+ * Caja status banner with an urgency hierarchy: the happy path (ABIERTA) stays quiet so it
+ * doesn't dominate the screen, while a caja needing attention (PENDIENTE_APERTURA) is prominent
+ * with a filled action button.
+ */
+@Composable
+private fun CajaStatusBanner(
+    session: CajaSessionStatus,
+    cajaName: String,
+    onAperturar: () -> Unit,
+    onSeleccionar: () -> Unit,
+) {
+    when (session) {
+        CajaSessionStatus.ABIERTA ->
+            CajaStatusBannerLow(
+                accent = SuccessGreen,
+                icon = Icons.Default.CheckCircle,
+                text = if (cajaName.isBlank()) "Caja abierta" else "Caja abierta · $cajaName",
+            )
+        CajaSessionStatus.PENDIENTE_APERTURA ->
+            CajaStatusBannerProminent(
+                accent = WarningOrange,
+                icon = Icons.Default.Lock,
+                title = "Caja cerrada · pendiente de apertura",
+                subtitle = "Apertura $cajaName para poder facturar",
+                actionLabel = "Aperturar",
+                onAction = onAperturar,
+            )
+        CajaSessionStatus.SIN_CAJA ->
+            CajaStatusBannerProminent(
+                accent = NeutralGray,
+                icon = Icons.Default.PointOfSale,
+                title = "Sin caja seleccionada",
+                subtitle = "Selecciona una caja para comenzar a vender",
+                actionLabel = "Seleccionar",
+                onAction = onSeleccionar,
+            )
+        CajaSessionStatus.VERIFICANDO ->
+            CajaStatusBannerLoading(accent = InfoBlue)
+    }
+}
+
+@Composable
+private fun CajaStatusBannerLow(
+    accent: androidx.compose.ui.graphics.Color,
+    icon: ImageVector,
+    text: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.width(3.dp).height(14.dp).background(accent, MaterialTheme.shapes.extraSmall))
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CajaStatusBannerLoading(accent: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(accent.copy(alpha = 0.08f))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            "Verificando caja…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CajaStatusBannerProminent(
+    accent: androidx.compose.ui.graphics.Color,
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(accent.copy(alpha = 0.14f))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = accent, style = MaterialTheme.typography.titleSmall)
+            Text(
+                subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Button(
+            onClick = onAction,
+            shape = MaterialTheme.shapes.small,
+            colors = ButtonDefaults.buttonColors(containerColor = accent),
+        ) {
+            Text(actionLabel, color = PosPalette.FixedWhite, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/**
+ * Diálogo de confirmación de apertura de caja con monto de efectivo opcional.
+ */
+@Composable
+private fun AperturaCajaDialog(
+    caja: Caja,
+    isLoading: Boolean,
+    onConfirm: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var amount by remember { mutableStateOf(0.0) }
+    val cajaLabel = caja.caja ?: caja.descripcion ?: "seleccionada"
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("Aperturar caja") },
+        text = {
+            Column {
+                Text(
+                    "¿Deseas aperturar la caja \"$cajaLabel\"? Necesitas una caja abierta para poder facturar.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                PosMoneyInput(
+                    label = "Monto de efectivo de apertura (opcional)",
+                    value = amount,
+                    onValueChange = { amount = it },
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(amount) }, enabled = !isLoading) {
+                Text(if (isLoading) "Aperturando…" else "Aperturar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancelar") }
+        },
+    )
 }
