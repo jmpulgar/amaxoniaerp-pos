@@ -50,8 +50,8 @@ android {
         applicationId = "com.amaxonia.pos"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 6
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

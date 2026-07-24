@@ -199,13 +199,6 @@ fun Route.facturasRoutes(
                         mapOf("error" to "Country code not found")
                     )
 
-                if (!countryCode.equals("PA", ignoreCase = true)) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "El payload de impresión SUNMI solo está disponible para Panamá")
-                    )
-                }
-
                 val facturaId = call.parameters["id"]
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
@@ -213,12 +206,24 @@ fun Route.facturasRoutes(
                     )
 
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val payload = facturasRepository.getPrintPayload(
-                    database = companyDb,
-                    countryCode = countryCode,
-                    facturaId = facturaId,
-                    companyNameFallback = adminDb,
-                )
+                // El repositorio valida internamente los países soportados (PA/VE) y
+                // omite los campos fiscales propios de Panamá cuando corresponde.
+                // No bloquear el país aquí: si la configuración del POS permite el
+                // driver/payload, debe aceptarse a lo largo de toda la cadena.
+                val payload =
+                    try {
+                        facturasRepository.getPrintPayload(
+                            database = companyDb,
+                            countryCode = countryCode,
+                            facturaId = facturaId,
+                            companyNameFallback = adminDb,
+                        )
+                    } catch (e: IllegalArgumentException) {
+                        return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (e.message ?: "Payload de impresión no disponible")),
+                        )
+                    }
 
                 if (payload == null) {
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
