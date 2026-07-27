@@ -20,16 +20,19 @@ import com.amaxonia.pos.data.remote.ApiServerEnvironment
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.RemoteImageUrlResolver
+import com.amaxonia.pos.data.remote.api.AreasApiImpl
 import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
 import com.amaxonia.pos.data.remote.api.FormaPagoApiImpl
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
 import com.amaxonia.pos.data.repository.ApiReportRepository
 import com.amaxonia.pos.data.repository.ApiTransactionRepository
+import com.amaxonia.pos.data.repository.AreaRepositoryImpl
 import com.amaxonia.pos.data.repository.AuthRepositoryImpl
 import com.amaxonia.pos.data.repository.CachedCompanyRepository
 import com.amaxonia.pos.data.repository.CajaRepositoryImpl
 import com.amaxonia.pos.data.repository.CreditNoteRepositoryImpl
 import com.amaxonia.pos.data.repository.FormaPagoRepositoryImpl
+import com.amaxonia.pos.data.repository.InMemorySelectedTableHolder
 import com.amaxonia.pos.data.repository.JsonDraftInvoiceRestorer
 import com.amaxonia.pos.data.repository.LocalAddressCatalogRepository
 import com.amaxonia.pos.data.repository.LocalClientTypeRepository
@@ -50,6 +53,7 @@ import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
 import com.amaxonia.pos.domain.model.printer.FiscalDeviceDiagnostics
 import com.amaxonia.pos.domain.repository.AddressCatalogRepository
+import com.amaxonia.pos.domain.repository.AreaRepository
 import com.amaxonia.pos.domain.repository.AuthRepository
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
@@ -69,6 +73,7 @@ import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.PromotionRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.SalesRepository
+import com.amaxonia.pos.domain.repository.SelectedTableHolder
 import com.amaxonia.pos.domain.repository.ServerEnvironment
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import com.amaxonia.pos.domain.system.SystemAppClock
@@ -125,6 +130,23 @@ object DependencyContainer {
         _pendingAperturaRequest.value = false
     }
 
+    /**
+     * Evento one-shot equivalente al de apertura, para que "Áreas y mesas" pueda pedir al
+     * Dashboard que abra el selector de caja cuando todavía no hay una caja activa (sin caja no
+     * hay sucursal y por tanto no hay áreas que mostrar).
+     */
+    private val _pendingCajaSelectorRequest = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val pendingCajaSelectorRequest: kotlinx.coroutines.flow.StateFlow<Boolean>
+        get() = _pendingCajaSelectorRequest
+
+    fun requestCajaSelectorOnDashboard() {
+        _pendingCajaSelectorRequest.value = true
+    }
+
+    fun consumeCajaSelectorRequest() {
+        _pendingCajaSelectorRequest.value = false
+    }
+
     lateinit var authRepository: AuthRepository
         private set
     lateinit var productRepository: ProductRepository
@@ -176,6 +198,11 @@ object DependencyContainer {
         private set
     lateinit var formaPagoRepository: FormaPagoRepository
         private set
+    lateinit var areaRepository: AreaRepository
+        private set
+
+    /** Selección de mesa en memoria; no persiste ni escribe en el backend. */
+    val selectedTableHolder: SelectedTableHolder = InMemorySelectedTableHolder()
     lateinit var salesRepository: SalesRepository
         private set
     lateinit var creditNoteRepository: CreditNoteRepository
@@ -359,6 +386,7 @@ object DependencyContainer {
                 localStore,
             )
         formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, networkMonitor)
+        areaRepository = AreaRepositoryImpl(AreasApiImpl(apiClient), localStore, localStore, networkMonitor)
         salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
         creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
         _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore)

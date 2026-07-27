@@ -19,6 +19,8 @@ import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.geography.route.geographyRoutes
 import com.amaxoniaerp.features.items.data.ItemsRepository
 import com.amaxoniaerp.features.items.route.itemsRoutes
+import com.amaxoniaerp.features.mesas.data.MesasRepository
+import com.amaxoniaerp.features.mesas.mesasRouting
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.pos.posRouting
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
@@ -81,6 +83,7 @@ fun Application.configureRouting() {
     val cajaRepository = CajaRepository()
     val formasPagoRepository = FormasPagoRepository()
     val promotionsRepository = PromotionsRepository()
+    val mesasRepository = MesasRepository()
     // Facturación Electrónica Panamá - HTTP Client + PAC + Strategy
     val feHttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -124,6 +127,7 @@ fun Application.configureRouting() {
         itemsRoutes(itemsRepository)
         cajaRouting(cajaRepository)
         posRouting(formasPagoRepository)
+        mesasRouting(mesasRepository)
         promotionsRoutes(promotionsRepository)
         salesRoutes(processSaleUseCase)
         creditNoteRoutes(creditNoteService)

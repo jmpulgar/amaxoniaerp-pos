@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(command -v rg && rg -n \"no está abierta|secuencia activa|no tiene secuencia\" /mnt/d/PROGRAMMING/Kotlin/Amaxonia --no-ignore -g '*.kt' 2>/dev/null | head; echo \"EXIT: done\")",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Bash(cd amaxoniaerp-backend *)",
+      "Bash(find *)"
     ]
   }
 }

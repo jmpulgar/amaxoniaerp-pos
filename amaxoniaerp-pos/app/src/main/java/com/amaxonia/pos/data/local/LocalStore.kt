@@ -18,13 +18,19 @@ import com.amaxonia.pos.data.remote.dto.ProductDto
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.mesas.Area
+import com.amaxonia.pos.domain.model.mesas.AreasResult
+import com.amaxonia.pos.domain.model.mesas.Mesa
+import com.amaxonia.pos.domain.model.mesas.MesasResult
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
+import com.amaxonia.pos.domain.repository.CompanyTokenReader
 import com.amaxonia.pos.domain.repository.CountrySelectionStore
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
+import com.amaxonia.pos.domain.repository.SalonConfigCache
 import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +49,9 @@ class LocalStore(
     context: Context,
     private val secureStore: SecureKeyValueStore = AndroidKeystoreSecureKeyValueStore(context),
 ) : CountrySelectionStore,
-    PaymentSessionReader {
+    PaymentSessionReader,
+    SalonConfigCache,
+    CompanyTokenReader {
     private val dataStore = context.applicationContext.dataStore
     private val secureWriter = VerifiedSecureValueWriter(secureStore)
     private val authSnapshotKey = stringPreferencesKey("auth_snapshot")
@@ -62,6 +70,8 @@ class LocalStore(
     private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
     private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
     private val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
+    private val areasKey = stringPreferencesKey("areas_snapshot")
+    private val mesasKey = stringPreferencesKey("mesas_snapshot")
     private val lastPaymentSuccessKey = stringPreferencesKey("last_payment_success")
     private val lastPaymentSuccessTransactionIdKey = stringPreferencesKey("last_payment_success_transaction_id")
 
@@ -96,6 +106,10 @@ class LocalStore(
             prefs.remove(authSnapshotKey)
             prefs.remove(companySessionKey)
             prefs.remove(activeCajaKey)
+            // La configuración de salón es por sucursal: al cerrar sesión debe desaparecer para
+            // que un login distinto nunca vea áreas ni mesas de la sesión anterior.
+            prefs.remove(areasKey)
+            prefs.remove(mesasKey)
         }
     }
 
@@ -168,6 +182,123 @@ class LocalStore(
         val isSameCaja = snapshot.cajaId == cajaId
         return if (isSameCompany && isSameCaja) snapshot.formasPago else emptyList()
     }
+
+    // ============ ÁREAS Y MESAS (configuración de salón) ============
+
+    override suspend fun companyToken(): String? = readCompanySession()?.token
+
+    /**
+     * Guarda las áreas de una caja reemplazando por completo el snapshot anterior, de modo que
+     * un área desactivada en el administrativo deje de aparecer tras refrescar.
+     *
+     * Además poda las mesas cacheadas de áreas que ya no existen, para que no queden mesas
+     * huérfanas accesibles offline.
+     */
+    override suspend fun cacheAreas(
+        cajaId: String,
+        sucursalId: Int,
+        areas: List<Area>,
+    ) {
+        val session = readCompanySession() ?: return
+        val snapshot =
+            AreasSnapshot(
+                companyDb = session.company.adminDb,
+                cajaId = cajaId,
+                sucursalId = sucursalId,
+                areas = areas,
+            )
+        val validAreaIds = areas.map { it.id }.toSet()
+        dataStore.edit { prefs ->
+            prefs[areasKey] = AppJson.encodeToString(snapshot)
+            val cached = prefs[mesasKey]?.let { decodeMesasSnapshot(it) }
+            if (cached != null) {
+                prefs[mesasKey] =
+                    AppJson.encodeToString(
+                        cached.copy(plansByArea = cached.plansByArea.filterKeys { it in validAreaIds }),
+                    )
+            }
+        }
+    }
+
+    /** Devuelve el snapshot solo si coincide la empresa y la caja; si no, no hay caché válida. */
+    override suspend fun readCachedAreas(cajaId: String): AreasResult? {
+        val companyDb = readCompanySession()?.company?.adminDb
+        val snapshot =
+            dataStore.data
+                .first()[areasKey]
+                ?.let { decodeAreasSnapshot(it) }
+                ?.takeIf { it.companyDb == companyDb && it.cajaId == cajaId }
+
+        return snapshot?.let {
+            AreasResult(sucursalId = it.sucursalId, areas = it.areas, fromCache = true)
+        }
+    }
+
+    override suspend fun cacheMesas(
+        cajaId: String,
+        areaId: Int,
+        lienzo: com.amaxonia.pos.domain.model.mesas.Lienzo,
+        imagenUrl: String?,
+        mesas: List<Mesa>,
+    ) {
+        val session = readCompanySession() ?: return
+        val companyDb = session.company.adminDb
+        dataStore.edit { prefs ->
+            val current = prefs[mesasKey]?.let { decodeMesasSnapshot(it) }
+            // Si cambió la empresa o la caja se descarta lo anterior en bloque.
+            val base =
+                current?.takeIf { it.companyDb == companyDb && it.cajaId == cajaId }
+                    ?: MesasSnapshot(companyDb = companyDb, cajaId = cajaId, plansByArea = emptyMap())
+            prefs[mesasKey] =
+                AppJson.encodeToString(
+                    base.copy(
+                        plansByArea =
+                            base.plansByArea +
+                                (
+                                    areaId to
+                                        AreaPlan(
+                                            lienzo = lienzo,
+                                            imagenUrl = imagenUrl,
+                                            mesas = mesas,
+                                        )
+                                ),
+                    ),
+                )
+        }
+    }
+
+    override suspend fun readCachedMesas(
+        cajaId: String,
+        areaId: Int,
+    ): MesasResult? {
+        val companyDb = readCompanySession()?.company?.adminDb
+        val plan =
+            dataStore.data
+                .first()[mesasKey]
+                ?.let { decodeMesasSnapshot(it) }
+                ?.takeIf { it.companyDb == companyDb && it.cajaId == cajaId }
+                ?.plansByArea
+                ?.get(areaId)
+                ?: return null
+
+        return MesasResult(
+            areaId = areaId,
+            lienzo = plan.lienzo,
+            imagenUrl = plan.imagenUrl,
+            mesas = plan.mesas,
+            fromCache = true,
+        )
+    }
+
+    private fun decodeAreasSnapshot(json: String): AreasSnapshot? =
+        runCatching { AppJson.decodeFromString(AreasSnapshot.serializer(), json) }
+            .onFailure { SafeLog.e(TAG, "Stored areas snapshot is invalid", it) }
+            .getOrNull()
+
+    private fun decodeMesasSnapshot(json: String): MesasSnapshot? =
+        runCatching { AppJson.decodeFromString(MesasSnapshot.serializer(), json) }
+            .onFailure { SafeLog.e(TAG, "Stored mesas snapshot is invalid", it) }
+            .getOrNull()
 
     override suspend fun currentCountryCode(): String = readSelectedCountry()?.code ?: "VE"
 
@@ -486,6 +617,49 @@ data class FormasPagoSnapshot(
     val cajaId: String?,
     val formasPago: List<FormaPago>,
 )
+
+/**
+ * Última configuración válida de áreas descargada. Se indexa por `cajaId` (no por sucursal)
+ * porque la caja es lo que el POS conoce antes de pedir datos, y determina la sucursal 1:1.
+ * `sucursalId` se guarda solo para mostrarlo y auditar coherencia.
+ */
+@Serializable
+data class AreasSnapshot(
+    val companyDb: String,
+    val cajaId: String,
+    val sucursalId: Int,
+    val areas: List<Area>,
+)
+
+/**
+ * Plan de mesas de un área cacheado: dimensiones del lienzo, URL del dibujo de fondo (lo que
+ * el administrativo configuró) y la geometría de las mesas. Se guarda como unidad atómica
+ * porque el lienzo/imagen pertenecen al área, no a cada mesa.
+ */
+@Serializable
+data class AreaPlan(
+    val lienzo: com.amaxonia.pos.domain.model.mesas.Lienzo = com.amaxonia.pos.domain.model.mesas.Lienzo(),
+    val imagenUrl: String? = null,
+    val mesas: List<Mesa> = emptyList(),
+)
+
+@Serializable
+data class MesasSnapshot(
+    val companyDb: String,
+    val cajaId: String,
+    val plansByArea: Map<Int, AreaPlan> = emptyMap(),
+) {
+    /**
+     * Compatibilidad con snapshots anteriores a la fase del plano: si el JSON viejo trae
+     * `mesasByArea`, [NullableUrlSerializer]/kotlinx lo ignoran (AppJson.ignoreUnknownKeys =
+     * true) y aquí reconstruemos el campo con defaults seguros para no perder las mesas.
+     *
+     * En la práctica un usuario con snapshot viejo verá, al refrescar, el plano rellenarse
+     * con lienzo e imagen nuevos; si entra offline antes de refrescar, aún podrá seleccionar.
+     */
+    val mesasByArea: Map<Int, List<Mesa>>
+        get() = plansByArea.mapValues { it.value.mesas }
+}
 
 fun LoginResponse.toSnapshot(): AuthSnapshot =
     AuthSnapshot(

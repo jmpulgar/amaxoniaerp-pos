@@ -1,0 +1,271 @@
+package com.amaxonia.pos.ui.mesas
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.domain.model.mesas.Lienzo
+import com.amaxonia.pos.domain.model.mesas.Mesa
+import com.amaxonia.pos.domain.model.mesas.SalonForma
+import com.amaxonia.pos.domain.model.mesas.SalonGeometry
+import com.amaxonia.pos.domain.model.mesas.ViewportCanvas
+import com.amaxonia.pos.domain.model.mesas.hitTestTranslated
+import kotlin.math.max
+
+private const val TAG = "SalonPlan"
+private const val MIN_ZOOM = 0.5f
+private const val MAX_ZOOM = 4f
+private const val INITIAL_ZOOM = 1f
+
+/**
+ * Plano visual del área con zoom y desplazamiento (solo lectura).
+ *
+ * - Escala el lienzo lógico (2000x1200) al tamaño del área visible conservando la relación de
+ *   aspecto (mínimo de los factores de ancho y alto).
+ * - Aplica zoom/pan gestual encima del escalado base sin deformar.
+ * - Pinta cada [Mesa] con su forma y rotación alrededor del centro.
+ * - Resalta la mesa seleccionada con borde primario.
+ * - Si hay [imagenUrl] la pinta como fondo con Coil; si falla o no existe, se muestra un
+ *   fondo neutro y el plano sigue siendo funcional.
+ *
+ * No se mueven ni se editan mesas: los gestos solo afectan a la cámara del plano.
+ */
+@Composable
+fun SalonPlan(
+    mesas: List<Mesa>,
+    lienzo: Lienzo,
+    imagenUrl: String?,
+    selectedMesaId: Int?,
+    onMesaClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var scale by remember { mutableFloatStateOf(INITIAL_ZOOM) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
+    val surface = MaterialTheme.colorScheme.surface
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val outline = MaterialTheme.colorScheme.outline
+
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .clip(MaterialTheme.shapes.medium)
+                .background(surfaceVariant)
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                        offsetX += pan.x
+                        offsetY += pan.y
+                    }
+                },
+    ) {
+        // Fondo del plano: lo pinta Coil si la URL es válida. Si falla o no existe el fondo
+        // neutro (surfaceVariant) del Box ya está pintado y el plano sigue operativo.
+        if (!imagenUrl.isNullOrBlank()) {
+            SubcomposeAsyncImage(
+                model = imagenUrl,
+                contentDescription = "Fondo del plano del área",
+                modifier = Modifier.fillMaxSize(),
+                loading = { /* el fondo neutro ya está visible debajo */ },
+                error = {
+                    SafeLog.w(TAG, "No se pudo cargar el fondo del plano: $imagenUrl")
+                },
+                success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
+            )
+        }
+
+        PlanoCanvas(
+            mesas = mesas,
+            lienzo = lienzo,
+            scale = scale,
+            offsetX = offsetX,
+            offsetY = offsetY,
+            selectedMesaId = selectedMesaId,
+            onMesaClick = onMesaClick,
+            primary = primary,
+            primaryContainer = primaryContainer,
+            surface = surface,
+            outline = outline,
+            onPrimaryContainer = onPrimaryContainer,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        if (scale != INITIAL_ZOOM || offsetX != 0f || offsetY != 0f) {
+            IconButton(
+                onClick = {
+                    scale = INITIAL_ZOOM
+                    offsetX = 0f
+                    offsetY = 0f
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Restore,
+                    contentDescription = "Reiniciar zoom",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanoCanvas(
+    mesas: List<Mesa>,
+    lienzo: Lienzo,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    selectedMesaId: Int?,
+    onMesaClick: (Int) -> Unit,
+    primary: Color,
+    primaryContainer: Color,
+    surface: Color,
+    outline: Color,
+    onPrimaryContainer: Color,
+    modifier: Modifier,
+) {
+    Canvas(
+        modifier =
+            modifier
+                .pointerInput(mesas, lienzo, scale, offsetX, offsetY) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            val viewport =
+                                ViewportCanvas(
+                                    width = size.width.toFloat().coerceAtLeast(1f),
+                                    height = size.height.toFloat().coerceAtLeast(1f),
+                                )
+                            val hit =
+                                SalonGeometry.hitTestTranslated(
+                                    mesas = mesas,
+                                    lienzo = lienzo,
+                                    viewport = viewport,
+                                    extraScale = scale,
+                                    offsetX = offsetX,
+                                    offsetY = offsetY,
+                                    xPx = offset.x,
+                                    yPx = offset.y,
+                                ) ?: return@detectTapGestures
+                            onMesaClick(hit.id)
+                        },
+                    )
+                },
+    ) {
+        val viewport = ViewportCanvas(size.width.coerceAtLeast(1f), size.height.coerceAtLeast(1f))
+        val baseScale = SalonGeometry.escalaProporcional(lienzo, viewport).coerceAtLeast(0f)
+
+        translate(left = offsetX, top = offsetY) {
+            scale(baseScale * scale, pivot = Offset.Zero) {
+                mesas.forEach { mesa ->
+                    val isSelected = mesa.id == selectedMesaId
+                    val forma = SalonForma.fromRaw(mesa.forma)
+                    val width = mesa.ancho.toFloat().coerceAtLeast(1f)
+                    val height = mesa.alto.toFloat().coerceAtLeast(1f)
+                    val cx = (mesa.posicionX + mesa.ancho / 2.0).toFloat()
+                    val cy = (mesa.posicionY + mesa.alto / 2.0).toFloat()
+                    drawMesaShape(
+                        forma = forma,
+                        cx = cx,
+                        cy = cy,
+                        width = width,
+                        height = height,
+                        rotDeg = mesa.rotacion.toFloat(),
+                        fill = if (isSelected) primaryContainer else surface,
+                        borderColor = if (isSelected) primary else outline,
+                        borderWidth = if (isSelected) 8f else 3f,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Pinta el contorno + relleno de una mesa según su forma, rotada alrededor del centro (cx,cy).
+ * Se invoca ya dentro de un bloque `scale(...)` del canvas, así que las medidas están en
+ * espacio lógico (px del lienzo 2000x1200).
+ */
+private fun DrawScope.drawMesaShape(
+    forma: SalonForma,
+    cx: Float,
+    cy: Float,
+    width: Float,
+    height: Float,
+    rotDeg: Float,
+    fill: Color,
+    borderColor: Color,
+    borderWidth: Float,
+) {
+    val w = max(width, 1f)
+    val h = max(height, 1f)
+    val left = cx - w / 2f
+    val top = cy - h / 2f
+    val topLeft = Offset(left, top)
+    val size_ = Size(w, h)
+    val stroke = Stroke(width = borderWidth)
+
+    if (rotDeg % 360f == 0f) {
+        drawForma(forma, fill, borderColor, stroke, topLeft, size_)
+    } else {
+        rotate(degrees = rotDeg, pivot = Offset(cx, cy)) {
+            drawForma(forma, fill, borderColor, stroke, topLeft, size_)
+        }
+    }
+}
+
+private fun DrawScope.drawForma(
+    forma: SalonForma,
+    fill: Color,
+    borderColor: Color,
+    stroke: Stroke,
+    topLeft: Offset,
+    size_: Size,
+) {
+    when (forma) {
+        SalonForma.RECTANGULAR, SalonForma.CUADRADA -> {
+            drawRect(color = fill, topLeft = topLeft, size = size_)
+            drawRect(color = borderColor, topLeft = topLeft, size = size_, style = stroke)
+        }
+        SalonForma.REDONDA -> {
+            drawOval(color = fill, topLeft = topLeft, size = size_)
+            drawOval(color = borderColor, topLeft = topLeft, size = size_, style = stroke)
+        }
+    }
+}

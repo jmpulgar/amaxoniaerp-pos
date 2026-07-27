@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -205,6 +206,7 @@ fun DashboardScreen(
     onStartNewOrder: () -> Unit,
     onNavigateToCierreCaja: () -> Unit = {},
     onNavigateToDraftInvoices: () -> Unit = {},
+    onNavigateToAreasMesas: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentOnNavigateToCart by rememberUpdatedState(onNavigateToCart)
@@ -222,6 +224,14 @@ fun DashboardScreen(
         if (pendingApertura) {
             viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive)
             DependencyContainer.consumeAperturaRequest()
+        }
+    }
+    // Abre el selector de caja cuando otra pantalla lo solicita (p. ej. "Áreas y mesas" sin caja).
+    val pendingCajaSelector by DependencyContainer.pendingCajaSelectorRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingCajaSelector) {
+        if (pendingCajaSelector) {
+            viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true))
+            DependencyContainer.consumeCajaSelectorRequest()
         }
     }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -476,6 +486,12 @@ fun DashboardScreen(
                     }
                     DrawerMenuItem(Icons.Default.PointOfSale, "POS", isSelected = true) {
                         scope.launch { drawerState.close() }
+                    }
+                    DrawerMenuItem(Icons.Default.TableRestaurant, "Áreas y mesas") {
+                        scope.launch {
+                            drawerState.close()
+                            onNavigateToAreasMesas()
+                        }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.ListAlt, "Crear Pedido") {
                         scope.launch {

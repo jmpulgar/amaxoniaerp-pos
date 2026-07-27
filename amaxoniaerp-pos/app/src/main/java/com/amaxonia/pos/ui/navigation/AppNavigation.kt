@@ -42,6 +42,7 @@ import com.amaxonia.pos.ui.dashboard.DashboardScreen
 import com.amaxonia.pos.ui.drafts.DraftInvoicesScreen
 import com.amaxonia.pos.ui.history.HistoryScreen
 import com.amaxonia.pos.ui.login.LoginScreen
+import com.amaxonia.pos.ui.mesas.AreasMesasScreen
 import com.amaxonia.pos.ui.payment.PaymentScreen
 import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
@@ -183,6 +184,23 @@ fun AppNavigation(startDestination: String) {
                     onStartNewOrder = { navigateFromDrawer("client_selection_mode") },
                     onNavigateToCierreCaja = { navigateFromDrawer("cierre_caja") },
                     onNavigateToDraftInvoices = { navigateFromDrawer("draft_invoices") },
+                    onNavigateToAreasMesas = { navigateFromDrawer("areas_mesas") },
+                )
+            }
+
+            composable("areas_mesas") {
+                AreasMesasScreen(
+                    onBack = { navController.popBackStack() },
+                    onSelectCaja = {
+                        // Sin caja no hay sucursal: se reutiliza el selector de caja del Dashboard.
+                        DependencyContainer.requestCajaSelectorOnDashboard()
+                        navigateAndClearStack("dashboard")
+                    },
+                    // TODO(fase 2): aquí engancha la apertura operativa de mesa. En esta fase
+                    // seleccionar una mesa no abre venta ni crea ningún registro.
+                    onTableConfirmed = { mesa ->
+                        SafeLog.d(NAV_LOG_TAG, "Mesa seleccionada sin apertura operativa: ${mesa.id}")
+                    },
                 )
             }
 
