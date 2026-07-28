@@ -290,7 +290,13 @@ class SynchronizePendingInvoicesUseCaseTest {
             id: String,
             now: Long,
             leasedUntil: Long,
-        ): Int = if (id in claimedAlready) 0 else { claimedAlready += id; 1 }
+        ): Int =
+            if (id in claimedAlready) {
+                0
+            } else {
+                claimedAlready += id
+                1
+            }
 
         override suspend fun markSending(
             id: String,

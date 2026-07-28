@@ -10,13 +10,13 @@ import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.MesasResult
 import com.amaxonia.pos.domain.model.mesas.SelectedTable
 import com.amaxonia.pos.domain.model.mesas.SesionMesa
-import com.amaxonia.pos.ui.mesas.SalonViewMode
 import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.AreaRepository
 import com.amaxonia.pos.domain.repository.ConnectivityStatus
 import com.amaxonia.pos.domain.repository.SelectedTableHolder
 import com.amaxonia.pos.domain.repository.SesionMesaRepository
 import com.amaxonia.pos.test.MainDispatcherRule
+import com.amaxonia.pos.ui.mesas.SalonViewMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -358,7 +358,12 @@ class AreasMesasViewModelTest {
             val viewModel = viewModel(FakeAreaRepository(), holder = holder)
             advanceUntilIdle()
             viewModel.onMesaSelected(10)
-            assertEquals(10, holder.selectedTable.value?.mesa?.id)
+            assertEquals(
+                10,
+                holder.selectedTable.value
+                    ?.mesa
+                    ?.id,
+            )
 
             viewModel.onAreaSelected(2)
             advanceUntilIdle()
@@ -377,15 +382,21 @@ class AreasMesasViewModelTest {
             val viewModel =
                 AreasMesasViewModel(
                     areaRepository = repository,
-                    activeCajaReader = object : ActiveCajaReader {
-                        override val activeCaja: StateFlow<Caja?> = cajaFlow
-                    },
+                    activeCajaReader =
+                        object : ActiveCajaReader {
+                            override val activeCaja: StateFlow<Caja?> = cajaFlow
+                        },
                     connectivity = ConnectivityStatus { true },
                     selectedTableHolder = holder,
                 )
             advanceUntilIdle()
             viewModel.onMesaSelected(10)
-            assertEquals(10, holder.selectedTable.value?.mesa?.id)
+            assertEquals(
+                10,
+                holder.selectedTable.value
+                    ?.mesa
+                    ?.id,
+            )
 
             // Nueva caja en otra sucursal.
             cajaFlow.value = activeCaja().copy(idCaja = "caja-otra", idSucursal = 9)
@@ -651,9 +662,10 @@ class AreasMesasViewModelTest {
             val viewModel =
                 AreasMesasViewModel(
                     areaRepository = repository,
-                    activeCajaReader = object : ActiveCajaReader {
-                        override val activeCaja: StateFlow<Caja?> = cajaFlow
-                    },
+                    activeCajaReader =
+                        object : ActiveCajaReader {
+                            override val activeCaja: StateFlow<Caja?> = cajaFlow
+                        },
                     connectivity = ConnectivityStatus { true },
                     selectedTableHolder = RecordingSelectedTableHolder(),
                     sesionMesaRepository = sesion,
@@ -664,7 +676,10 @@ class AreasMesasViewModelTest {
             cajaFlow.value = activeCaja().copy(idCaja = "caja-otra", idSucursal = 9)
             advanceUntilIdle()
 
-            assertTrue(viewModel.state.value.estadosMesas.isEmpty())
+            assertTrue(
+                viewModel.state.value.estadosMesas
+                    .isEmpty(),
+            )
         }
 
     @Test
@@ -714,8 +729,10 @@ class AreasMesasViewModelTest {
         val cerrarCalls = mutableListOf<Triple<String, Int, Int>>() // caja, mesa, sesion
         val cancelarCalls = mutableListOf<Triple<String, Int, Int>>() // caja, mesa, sesion
 
-        override suspend fun getEstados(cajaId: String, areaId: Int): Result<List<EstadoMesaResponse>> =
-            Result.success(estados)
+        override suspend fun getEstados(
+            cajaId: String,
+            areaId: Int,
+        ): Result<List<EstadoMesaResponse>> = Result.success(estados)
 
         override suspend fun abrir(
             cajaId: String,
@@ -910,7 +927,8 @@ class AreasMesasViewModelTest {
             forma = "rectangular",
         )
 
-        /** Mesa con geometría completa para probar el plano visual. */
+        /** Mesa con geometría completa; parámetros nombrados explicitan cada dimensión. */
+        @Suppress("LongParameterList")
         fun mesaConPlano(
             id: Int,
             areaId: Int,

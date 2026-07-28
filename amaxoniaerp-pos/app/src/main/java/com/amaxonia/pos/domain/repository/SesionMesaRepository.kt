@@ -1,7 +1,7 @@
 package com.amaxonia.pos.domain.repository
 
-import com.amaxonia.pos.domain.model.mesas.SesionMesa
 import com.amaxonia.pos.domain.model.mesas.EstadoMesaResponse
+import com.amaxonia.pos.domain.model.mesas.SesionMesa
 
 /**
  * Sesiones operativas de mesa. Solo vías de escritura/habilitación para esta fase:

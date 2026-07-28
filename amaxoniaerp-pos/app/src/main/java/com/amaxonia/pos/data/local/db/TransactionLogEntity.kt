@@ -73,7 +73,6 @@ data class TransactionLogEntity(
      * from the JSON body. Redacted of any card data upstream.
      */
     val gatewayResultMessage: String? = null,
-    // --- v14 (auditoría ítems 1, 3, 5, 8) ---
     /** Canonical `t$<companyId>` key. Workers resolve ownership by this column only. */
     val tenantId: String = "",
     /** Raw company id. Informative; never used to route. */

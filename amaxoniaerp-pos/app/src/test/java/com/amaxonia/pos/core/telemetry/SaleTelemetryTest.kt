@@ -1,19 +1,12 @@
 package com.amaxonia.pos.core.telemetry
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -101,7 +94,12 @@ class SaleTelemetryTest {
         }
         val seqs =
             received
-                .map { p -> p.second.substringAfter("seq=").substringBefore(' ').toLong() }
+                .map { p ->
+                    p.second
+                        .substringAfter("seq=")
+                        .substringBefore(' ')
+                        .toLong()
+                }
         assertEquals(5, seqs.size)
         seqs.zipWithNext { a, b -> a < b }.forEach { isIncreasing -> assertTrue("seq must be strictly increasing", isIncreasing) }
     }
@@ -222,9 +220,7 @@ class SaleTelemetryTest {
                 override fun emit(
                     event: SaleEvent,
                     payload: String,
-                ) {
-                    throw OutOfMemoryError("simulated heap exhaustion")
-                }
+                ): Unit = throw OutOfMemoryError("simulated heap exhaustion")
             }
         SaleTelemetry.sink = oomSink
         SaleTelemetry.record(SaleEvent.SALE_CONFIRMED, "id-oom")
@@ -275,7 +271,8 @@ class SaleTelemetryTest {
         // Theerchant extensibility: a third-party alert policy can escalate
         // additional routine events without touching production code.
         val escalateEverything =
-            com.amaxonia.pos.core.telemetry.AlertPolicy { true }
+            com.amaxonia.pos.core.telemetry
+                .AlertPolicy { true }
         SaleTelemetry.alerting = escalateEverything
         SaleTelemetry.record(SaleEvent.SALE_CONFIRMED, "id-all")
         assertEquals("custom policy must drive the alert path", 1, alertReceived.size)

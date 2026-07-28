@@ -98,6 +98,7 @@ class AppDatabaseMigrationInstrumentedTest {
                         .callback(
                             object : SupportSQLiteOpenHelper.Callback(CURRENT_VERSION - 1) {
                                 override fun onCreate(db: SupportSQLiteDatabase) = Unit
+
                                 override fun onUpgrade(
                                     db: SupportSQLiteDatabase,
                                     oldVersion: Int,
@@ -128,26 +129,28 @@ class AppDatabaseMigrationInstrumentedTest {
                 .build()
         try {
             val db = database.openHelper.writableDatabase
-            db.query(
-                "SELECT tenantId, totalAmountMinor, currencyCode, fiscalState FROM transaction_log WHERE clientCorrelationId = 'tlog-1'",
-            ).use { cursor ->
-                assertTrue("tlog-1 missing after 13→14 migration", cursor.moveToFirst())
-                assertEquals("", cursor.getString(0))
-                // ROUND(10.50 * 100.0) AS INTEGER = 1050
-                assertEquals(1050, cursor.getInt(1))
-                assertEquals("USD", cursor.getString(2))
-                // 'PENDING' was mapped to PRINTED_PENDING_CONFIRM (fase-0 spec §11.4)
-                assertEquals("PRINTED_PENDING_CONFIRM", cursor.getString(3))
-            }
-            db.query(
-                "SELECT tenantId, totalMinor, leasedUntil FROM pending_invoices WHERE id = 'inv-1'",
-            ).use { cursor ->
-                assertTrue("inv-1 missing after 13→14 migration", cursor.moveToFirst())
-                assertEquals("", cursor.getString(0))
-                // ROUND(5.25 * 100.0) AS INTEGER = 525
-                assertEquals(525, cursor.getInt(1))
-                assertEquals(0, cursor.getInt(2))
-            }
+            db
+                .query(
+                    "SELECT tenantId, totalAmountMinor, currencyCode, fiscalState FROM transaction_log WHERE clientCorrelationId = 'tlog-1'",
+                ).use { cursor ->
+                    assertTrue("tlog-1 missing after 13→14 migration", cursor.moveToFirst())
+                    assertEquals("", cursor.getString(0))
+                    // ROUND(10.50 * 100.0) AS INTEGER = 1050
+                    assertEquals(1050, cursor.getInt(1))
+                    assertEquals("USD", cursor.getString(2))
+                    // 'PENDING' was mapped to PRINTED_PENDING_CONFIRM (fase-0 spec §11.4)
+                    assertEquals("PRINTED_PENDING_CONFIRM", cursor.getString(3))
+                }
+            db
+                .query(
+                    "SELECT tenantId, totalMinor, leasedUntil FROM pending_invoices WHERE id = 'inv-1'",
+                ).use { cursor ->
+                    assertTrue("inv-1 missing after 13→14 migration", cursor.moveToFirst())
+                    assertEquals("", cursor.getString(0))
+                    // ROUND(5.25 * 100.0) AS INTEGER = 525
+                    assertEquals(525, cursor.getInt(1))
+                    assertEquals(0, cursor.getInt(2))
+                }
             assertTrue(
                 "index_transaction_log_tenantId missing",
                 indexExists(db, "index_transaction_log_tenantId"),
@@ -162,16 +165,22 @@ class AppDatabaseMigrationInstrumentedTest {
     }
 
     private fun assertV14TransactionLogColumnsExist(db: SupportSQLiteDatabase) {
-        db.query("SELECT tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, tenantLabel, totalAmountMinor, currencyCode, fiscalState, gatewayResultCode, gatewayResultMessage FROM transaction_log LIMIT 0").use { cursor ->
-            // Column resolution happens at compile time; just ensure it runs.
-            cursor.columnCount
-        }
+        db
+            .query(
+                "SELECT tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, tenantLabel, totalAmountMinor, currencyCode, fiscalState, gatewayResultCode, gatewayResultMessage FROM transaction_log LIMIT 0",
+            ).use { cursor ->
+                // Column resolution happens at compile time; just ensure it runs.
+                cursor.columnCount
+            }
     }
 
     private fun assertV14PendingInvoicesColumnsExist(db: SupportSQLiteDatabase) {
-        db.query("SELECT tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, tenantLabel, totalMinor, currencyCode, leasedUntil FROM pending_invoices LIMIT 0").use { cursor ->
-            cursor.columnCount
-        }
+        db
+            .query(
+                "SELECT tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, tenantLabel, totalMinor, currencyCode, leasedUntil FROM pending_invoices LIMIT 0",
+            ).use { cursor ->
+                cursor.columnCount
+            }
     }
 
     private fun indexExists(
@@ -400,6 +409,7 @@ class AppDatabaseMigrationInstrumentedTest {
                         .callback(
                             object : SupportSQLiteOpenHelper.Callback(13) {
                                 override fun onCreate(db: SupportSQLiteDatabase) = Unit
+
                                 override fun onUpgrade(
                                     db: SupportSQLiteDatabase,
                                     oldVersion: Int,
@@ -426,62 +436,64 @@ class AppDatabaseMigrationInstrumentedTest {
                 .build()
         try {
             val db = database.openHelper.writableDatabase
-            db.query(
-                "SELECT tenantId, totalAmountMinor, currencyCode, fiscalState, gatewayRawResponse, remoteInvoiceId " +
-                    "FROM transaction_log WHERE clientCorrelationId = ?",
-                arrayOf(expectedClientCorrelationId),
-            ).use { cursor ->
-                assertTrue("$scenarioName: seed row missing after migration", cursor.moveToFirst())
-                assertEquals("$scenarioName: tenantId must default to ''", "", cursor.getString(0))
-                assertEquals(
-                    "$scenarioName: totalAmountMinor backfill",
-                    expectedTotalAmountMinor,
-                    cursor.getInt(1),
-                )
-                assertEquals(
-                    "$scenarioName: currencyCode",
-                    expectedCurrencyCode,
-                    cursor.getString(2),
-                )
-                assertEquals(
-                    "$scenarioName: fiscalState mapping",
-                    expectedFiscalState,
-                    cursor.getString(3),
-                )
-                if (expectedGatewayRawResponse != null) {
-                    assertEquals(
-                        "$scenarioName: gatewayRawResponse preserved",
-                        expectedGatewayRawResponse,
-                        cursor.getString(4),
-                    )
-                }
-                if (expectedRemoteInvoiceId != null) {
-                    assertEquals(
-                        "$scenarioName: remoteInvoiceId preserved",
-                        expectedRemoteInvoiceId,
-                        cursor.getString(5),
-                    )
-                }
-            }
-
-            if (expectedPendingInvoiceId != null) {
-                db.query(
-                    "SELECT tenantId, totalMinor, leasedUntil FROM pending_invoices WHERE id = ?",
-                    arrayOf(expectedPendingInvoiceId),
+            db
+                .query(
+                    "SELECT tenantId, totalAmountMinor, currencyCode, fiscalState, gatewayRawResponse, remoteInvoiceId " +
+                        "FROM transaction_log WHERE clientCorrelationId = ?",
+                    arrayOf(expectedClientCorrelationId),
                 ).use { cursor ->
-                    assertTrue("$scenarioName: pending_invoice missing", cursor.moveToFirst())
-                    assertEquals("", cursor.getString(0))
+                    assertTrue("$scenarioName: seed row missing after migration", cursor.moveToFirst())
+                    assertEquals("$scenarioName: tenantId must default to ''", "", cursor.getString(0))
                     assertEquals(
-                        "$scenarioName: pending totalMinor backfill",
-                        expectedPendingTotalMinor,
+                        "$scenarioName: totalAmountMinor backfill",
+                        expectedTotalAmountMinor,
                         cursor.getInt(1),
                     )
                     assertEquals(
-                        "$scenarioName: leasedUntil default",
-                        0,
-                        cursor.getInt(2),
+                        "$scenarioName: currencyCode",
+                        expectedCurrencyCode,
+                        cursor.getString(2),
                     )
+                    assertEquals(
+                        "$scenarioName: fiscalState mapping",
+                        expectedFiscalState,
+                        cursor.getString(3),
+                    )
+                    if (expectedGatewayRawResponse != null) {
+                        assertEquals(
+                            "$scenarioName: gatewayRawResponse preserved",
+                            expectedGatewayRawResponse,
+                            cursor.getString(4),
+                        )
+                    }
+                    if (expectedRemoteInvoiceId != null) {
+                        assertEquals(
+                            "$scenarioName: remoteInvoiceId preserved",
+                            expectedRemoteInvoiceId,
+                            cursor.getString(5),
+                        )
+                    }
                 }
+
+            if (expectedPendingInvoiceId != null) {
+                db
+                    .query(
+                        "SELECT tenantId, totalMinor, leasedUntil FROM pending_invoices WHERE id = ?",
+                        arrayOf(expectedPendingInvoiceId),
+                    ).use { cursor ->
+                        assertTrue("$scenarioName: pending_invoice missing", cursor.moveToFirst())
+                        assertEquals("", cursor.getString(0))
+                        assertEquals(
+                            "$scenarioName: pending totalMinor backfill",
+                            expectedPendingTotalMinor,
+                            cursor.getInt(1),
+                        )
+                        assertEquals(
+                            "$scenarioName: leasedUntil default",
+                            0,
+                            cursor.getInt(2),
+                        )
+                    }
             }
 
             assertTrue(

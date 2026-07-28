@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.sp
  * editor (previously two near-identical private composables).
  */
 @Composable
+// Callbacks separados preservan API Compose compartida sin alterar interacción.
+@Suppress("LongParameterList")
 fun QuantityStepper(
     quantityText: String,
     onQuantityTextChange: (String) -> Unit,

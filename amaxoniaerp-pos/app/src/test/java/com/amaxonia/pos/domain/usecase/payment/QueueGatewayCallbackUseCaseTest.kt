@@ -15,7 +15,9 @@ import java.time.Instant
  * Fake [AppClock] returning a fixed instant, so the watchdog/lease timing in
  * these tests is deterministic without pulling in a mocking framework.
  */
-private class FakeAppClock(private val instant: Instant) : AppClock {
+private class FakeAppClock(
+    private val instant: Instant,
+) : AppClock {
     override fun now(): Instant = instant
 }
 
@@ -50,176 +52,189 @@ class QueueGatewayCallbackUseCaseTest {
     }
 
     @Test
-    fun `markAwaiting persists the row as AWAITING before the Intent is launched`() = runTest {
-        seedRow("sale-1")
+    fun `markAwaiting persists the row as AWAITING before the Intent is launched`() =
+        runTest {
+            seedRow("sale-1")
 
-        useCase.markAwaiting("sale-1")
+            useCase.markAwaiting("sale-1")
 
-        val row = dao.findById("sale-1")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_AWAITING, row.gatewayCallbackStatus)
-    }
-
-    @Test
-    fun `markResolved on a legit approval flips AWAITING to RESOLVED and keeps full HKA response`() = runTest {
-        seedRow("sale-2")
-        useCase.markAwaiting("sale-2")
-
-        useCase.markResolved(
-            clientCorrelationId = "sale-2",
-            responseCode = "200",
-            rawResponse = """{"message":"Aprobada","approvalCode":"APP-9"}""",
-            message = "Aprobada",
-        )
-
-        val row = dao.findById("sale-2")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
-        assertEquals("200", row.gatewayResultCode)
-        assertEquals("""{"message":"Aprobada","approvalCode":"APP-9"}""", row.gatewayRawResponse)
-        assertEquals("Aprobada", row.gatewayResultMessage)
-        assertEquals(0L, row.gatewayCallbackNextAttemptAt)
-        assertEquals(0L, row.gatewayCallbackLeasedUntil)
-    }
+            val row = dao.findById("sale-1")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_AWAITING, row.gatewayCallbackStatus)
+        }
 
     @Test
-    fun `markResolved on a rejection still flips to RESOLVED with the rejection message`() = runTest {
-        seedRow("sale-3")
-        useCase.markAwaiting("sale-3")
+    fun `markResolved on a legit approval flips AWAITING to RESOLVED and keeps full HKA response`() =
+        runTest {
+            seedRow("sale-2")
+            useCase.markAwaiting("sale-2")
 
-        useCase.markResolved(
-            clientCorrelationId = "sale-3",
-            responseCode = "400",
-            rawResponse = null,
-            message = "Tarjeta rechazada",
-        )
+            useCase.markResolved(
+                clientCorrelationId = "sale-2",
+                responseCode = "200",
+                rawResponse = """{"message":"Aprobada","approvalCode":"APP-9"}""",
+                message = "Aprobada",
+            )
 
-        val row = dao.findById("sale-3")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
-        assertEquals("400", row.gatewayResultCode)
-        assertEquals("Tarjeta rechazada", row.gatewayResultMessage)
-        assertNull(row.gatewayRawResponse)
-    }
+            val row = dao.findById("sale-2")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
+            assertEquals("200", row.gatewayResultCode)
+            assertEquals("""{"message":"Aprobada","approvalCode":"APP-9"}""", row.gatewayRawResponse)
+            assertEquals("Aprobada", row.gatewayResultMessage)
+            assertEquals(0L, row.gatewayCallbackNextAttemptAt)
+            assertEquals(0L, row.gatewayCallbackLeasedUntil)
+        }
+
+    @Test
+    fun `markResolved on a rejection still flips to RESOLVED with the rejection message`() =
+        runTest {
+            seedRow("sale-3")
+            useCase.markAwaiting("sale-3")
+
+            useCase.markResolved(
+                clientCorrelationId = "sale-3",
+                responseCode = "400",
+                rawResponse = null,
+                message = "Tarjeta rechazada",
+            )
+
+            val row = dao.findById("sale-3")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
+            assertEquals("400", row.gatewayResultCode)
+            assertEquals("Tarjeta rechazada", row.gatewayResultMessage)
+            assertNull(row.gatewayRawResponse)
+        }
 
     // --- Idempotency: duplicate callback (HKA-001) -------------------------
 
     @Test
-    fun `duplicate markResolved is idempotent - status does not revert and audit fields refresh`() = runTest {
-        seedRow("sale-4")
-        useCase.markAwaiting("sale-4")
-        useCase.markResolved("sale-4", responseCode = "200", rawResponse = """{"a":1}""", message = "Aprobada")
+    fun `duplicate markResolved is idempotent - status does not revert and audit fields refresh`() =
+        runTest {
+            seedRow("sale-4")
+            useCase.markAwaiting("sale-4")
+            useCase.markResolved("sale-4", responseCode = "200", rawResponse = """{"a":1}""", message = "Aprobada")
 
-        // A second Intent with the same extras arrives (e.g. HKA retried delivery)
-        useCase.markResolved("sale-4", responseCode = "200", rawResponse = """{"a":1}""", message = "Aprobada")
+            // A second Intent with the same extras arrives (e.g. HKA retried delivery)
+            useCase.markResolved("sale-4", responseCode = "200", rawResponse = """{"a":1}""", message = "Aprobada")
 
-        val row = dao.findById("sale-4")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
-        assertEquals("200", row.gatewayResultCode)
-        assertEquals("""{"a":1}""", row.gatewayRawResponse)
-    }
+            val row = dao.findById("sale-4")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
+            assertEquals("200", row.gatewayResultCode)
+            assertEquals("""{"a":1}""", row.gatewayRawResponse)
+        }
 
     @Test
-    fun `markResolved after TERMINAL_AWAITING keeps terminal status but preserves audit data`() = runTest {
-        seedRow("sale-5")
-        useCase.markAwaiting("sale-5")
-        // Watchdog already escalated to terminal before the late callback arrived
-        dao.markGatewayTerminal(
-            id = "sale-5",
-            status = QueueGatewayCallbackUseCase.STATUS_TERMINAL_AWAITING,
-            rawResponse = null,
-            message = "Reconciliacion manual requerida",
-        )
+    fun `markResolved after TERMINAL_AWAITING keeps terminal status but preserves audit data`() =
+        runTest {
+            seedRow("sale-5")
+            useCase.markAwaiting("sale-5")
+            // Watchdog already escalated to terminal before the late callback arrived
+            dao.markGatewayTerminal(
+                id = "sale-5",
+                status = QueueGatewayCallbackUseCase.STATUS_TERMINAL_AWAITING,
+                rawResponse = null,
+                message = "Reconciliacion manual requerida",
+            )
 
-        // The legitimate HKA callback finally arrives (e.g. after process death)
-        useCase.markResolved(
-            clientCorrelationId = "sale-5",
-            responseCode = "200",
-            rawResponse = """{"approvalCode":"APP-LATE"}""",
-            message = "Aprobada (tardia)",
-        )
+            // The legitimate HKA callback finally arrives (e.g. after process death)
+            useCase.markResolved(
+                clientCorrelationId = "sale-5",
+                responseCode = "200",
+                rawResponse = """{"approvalCode":"APP-LATE"}""",
+                message = "Aprobada (tardia)",
+            )
 
-        val row = dao.findById("sale-5")!!
-        // Status MUST NOT silently resurrect the sale
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_TERMINAL_AWAITING, row.gatewayCallbackStatus)
-        // But the full HKA response MUST be on disk for manual reconciliation
-        assertEquals("200", row.gatewayResultCode)
-        assertEquals("""{"approvalCode":"APP-LATE"}""", row.gatewayRawResponse)
-        assertEquals("Aprobada (tardia)", row.gatewayResultMessage)
-    }
+            val row = dao.findById("sale-5")!!
+            // Status MUST NOT silently resurrect the sale
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_TERMINAL_AWAITING, row.gatewayCallbackStatus)
+            // But the full HKA response MUST be on disk for manual reconciliation
+            assertEquals("200", row.gatewayResultCode)
+            assertEquals("""{"approvalCode":"APP-LATE"}""", row.gatewayRawResponse)
+            assertEquals("Aprobada (tardia)", row.gatewayResultMessage)
+        }
 
     // --- Process death / no pending request (HKA-002) ----------------------
 
     @Test
-    fun `markResolved for an unknown correlationId produces no effect`() = runTest {
-        useCase.markResolved(
-            clientCorrelationId = "never-started",
-            responseCode = "200",
-            rawResponse = """{"x":1}""",
-            message = "Aprobada",
-        )
+    fun `markResolved for an unknown correlationId produces no effect`() =
+        runTest {
+            useCase.markResolved(
+                clientCorrelationId = "never-started",
+                responseCode = "200",
+                rawResponse = """{"x":1}""",
+                message = "Aprobada",
+            )
 
-        assertNull(dao.findById("never-started"))
-    }
+            assertNull(dao.findById("never-started"))
+        }
 
     @Test
-    fun `late callback after simulated process death still lands on the row`() = runTest {
-        seedRow("sale-6")
-        useCase.markAwaiting("sale-6")
-        // Simulate process death: the in-memory RapidPayBridge pendingResult is
-        // gone (handled in MainActivity). The callback Intent still reaches the
-        // ledger row, which is the durable source of truth.
-        useCase.markResolved(
-            clientCorrelationId = "sale-6",
-            responseCode = "200",
-            rawResponse = """{"approvalCode":"APP-RECOVERED"}""",
-            message = "Aprobada",
-        )
+    fun `late callback after simulated process death still lands on the row`() =
+        runTest {
+            seedRow("sale-6")
+            useCase.markAwaiting("sale-6")
+            // Simulate process death: the in-memory RapidPayBridge pendingResult is
+            // gone (handled in MainActivity). The callback Intent still reaches the
+            // ledger row, which is the durable source of truth.
+            useCase.markResolved(
+                clientCorrelationId = "sale-6",
+                responseCode = "200",
+                rawResponse = """{"approvalCode":"APP-RECOVERED"}""",
+                message = "Aprobada",
+            )
 
-        val row = dao.findById("sale-6")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
-        assertNotNull(row.gatewayRawResponse)
-    }
+            val row = dao.findById("sale-6")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_RESOLVED, row.gatewayCallbackStatus)
+            assertNotNull(row.gatewayRawResponse)
+        }
 
     // --- Watchdog reconciliation -------------------------------------------
 
     @Test
-    fun `watchdog finds rows whose lease has expired`() = runTest {
-        seedRow("sale-7")
-        useCase.markAwaiting("sale-7")
+    fun `watchdog finds rows whose lease has expired`() =
+        runTest {
+            seedRow("sale-7")
+            useCase.markAwaiting("sale-7")
 
-        val eligibleAtExpiry = dao.findGatewayReconcilable(now = nowMs + 99_999L)
-        assertTrue(eligibleAtExpiry.any { it.clientCorrelationId == "sale-7" })
-    }
-
-    @Test
-    fun `watchdog marks retriable after first expiry`() = runTest {
-        seedRow("sale-8")
-        useCase.markAwaiting("sale-8")
-
-        dao.markGatewayRetriable(
-            id = "sale-8",
-            status = QueueGatewayCallbackUseCase.STATUS_RETRYABLE_AWAITING,
-            nextAttemptAt = nowMs + QueueGatewayCallbackUseCase.nextAttempt(1),
-            rawResponse = null,
-            message = null,
-        )
-
-        val row = dao.findById("sale-8")!!
-        assertEquals(QueueGatewayCallbackUseCase.STATUS_RETRYABLE_AWAITING, row.gatewayCallbackStatus)
-        assertEquals(1, row.gatewayCallbackRetryCount)
-    }
+            val eligibleAtExpiry = dao.findGatewayReconcilable(now = nowMs + 99_999L)
+            assertTrue(eligibleAtExpiry.any { it.clientCorrelationId == "sale-7" })
+        }
 
     @Test
-    fun `reconcilable rows are tenant scoped`() = runTest {
-        seedRow("sale-9", tenantId = "tenant-A")
-        useCase.markAwaiting("sale-9")
+    fun `watchdog marks retriable after first expiry`() =
+        runTest {
+            seedRow("sale-8")
+            useCase.markAwaiting("sale-8")
 
-        val scopedToA = dao.findGatewayReconcilableForTenant("tenant-A", now = nowMs)
-        val scopedToB = dao.findGatewayReconcilableForTenant("tenant-B", now = nowMs)
+            dao.markGatewayRetriable(
+                id = "sale-8",
+                status = QueueGatewayCallbackUseCase.STATUS_RETRYABLE_AWAITING,
+                nextAttemptAt = nowMs + QueueGatewayCallbackUseCase.nextAttempt(1),
+                rawResponse = null,
+                message = null,
+            )
 
-        assertTrue(scopedToA.any { it.clientCorrelationId == "sale-9" })
-        assertTrue(scopedToB.none { it.clientCorrelationId == "sale-9" })
-    }
+            val row = dao.findById("sale-8")!!
+            assertEquals(QueueGatewayCallbackUseCase.STATUS_RETRYABLE_AWAITING, row.gatewayCallbackStatus)
+            assertEquals(1, row.gatewayCallbackRetryCount)
+        }
 
-    private fun seedRow(id: String, tenantId: String = "") {
+    @Test
+    fun `reconcilable rows are tenant scoped`() =
+        runTest {
+            seedRow("sale-9", tenantId = "tenant-A")
+            useCase.markAwaiting("sale-9")
+
+            val scopedToA = dao.findGatewayReconcilableForTenant("tenant-A", now = nowMs)
+            val scopedToB = dao.findGatewayReconcilableForTenant("tenant-B", now = nowMs)
+
+            assertTrue(scopedToA.any { it.clientCorrelationId == "sale-9" })
+            assertTrue(scopedToB.none { it.clientCorrelationId == "sale-9" })
+        }
+
+    private fun seedRow(
+        id: String,
+        tenantId: String = "",
+    ) {
         val entity =
             TransactionLogEntity(
                 clientCorrelationId = id,

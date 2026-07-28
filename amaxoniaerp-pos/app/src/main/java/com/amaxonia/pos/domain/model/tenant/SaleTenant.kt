@@ -29,8 +29,7 @@ data class SaleTenant(
     val contableDb: String,
     val nominaDb: String,
 ) {
-    fun matches(activeTenantId: String?): Boolean =
-        activeTenantId != null && activeTenantId == tenantId
+    fun matches(activeTenantId: String?): Boolean = activeTenantId != null && activeTenantId == tenantId
 
     companion object {
         /**

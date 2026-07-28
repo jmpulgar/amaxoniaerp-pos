@@ -30,23 +30,24 @@ class CalculateSaleTotalsUseCase {
 
         val subtotalGross =
             items
-                .fold(zero) { acc, it -> acc + bd(it.itemPrecioSinIva).multiply(bd(it.itemCantidad)) }
+                .fold(zero) { acc, item -> acc + bd(item.itemPrecioSinIva).multiply(bd(item.itemCantidad)) }
                 .setScale(scale, mode)
-        val itemDiscounts = items.fold(zero) { acc, it -> acc + bd(it.itemMontoDescuento) }.setScale(scale, mode)
-        val subtotalNet = items.fold(zero) { acc, it -> acc + bd(it.itemTotalSinIva) }.setScale(scale, mode)
-        val total = items.fold(zero) { acc, it -> acc + bd(it.itemTotalConIva) }.setScale(scale, mode)
+        val itemDiscounts = items.fold(zero) { acc, item -> acc + bd(item.itemMontoDescuento) }.setScale(scale, mode)
+        val subtotalNet = items.fold(zero) { acc, item -> acc + bd(item.itemTotalSinIva) }.setScale(scale, mode)
+        val total = items.fold(zero) { acc, item -> acc + bd(item.itemTotalConIva) }.setScale(scale, mode)
         val tax = (total - subtotalNet).setScale(scale, mode)
 
         val taxLines =
             items
                 .groupBy { it.itemPIva }
-                .filterKeys { it > 0.0 }
+                .filterKeys { taxRate -> taxRate > 0.0 }
                 .map { (_, lines) ->
-                    val base = lines.fold(zero) { acc, it -> acc + bd(it.itemTotalSinIva) }.setScale(scale, mode)
+                    val base = lines.fold(zero) { acc, item -> acc + bd(item.itemTotalSinIva) }.setScale(scale, mode)
                     val taxAmount =
                         lines
-                            .fold(zero) { acc, it -> acc + (bd(it.itemTotalConIva) - bd(it.itemTotalSinIva)) }
-                            .setScale(scale, mode)
+                            .fold(zero) { acc, item ->
+                                acc + (bd(item.itemTotalConIva) - bd(item.itemTotalSinIva))
+                            }.setScale(scale, mode)
                     SaleTaxDto(
                         totalizarBaseRetencion = base.toDouble(),
                         codImpuestoIva = 1,

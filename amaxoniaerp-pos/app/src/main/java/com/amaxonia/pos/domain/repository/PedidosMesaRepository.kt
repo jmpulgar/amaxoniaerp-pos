@@ -39,6 +39,8 @@ interface PedidosMesaRepository {
         request: EnviarComandaRequest = EnviarComandaRequest(),
     ): Result<List<PedidoMesa>>
 
+    // Firma conserva contrato público usado por ambos sabores y adaptadores existentes.
+    @Suppress("LongParameterList")
     suspend fun cambiarEstado(
         cajaId: String,
         areaId: Int,

@@ -30,7 +30,10 @@ import kotlinx.coroutines.launch
  * Reglas de estado:
  * - La transición inválida o de pedidos finales se rechaza y muestra el mensaje del backend.
  * - El envío requiere sesión activa y que haya items pendientes (carrito o backend).
+ *
+ * Dependencias explícitas preservan construcción productiva y dobles de prueba existentes.
  */
+@Suppress("LongParameterList")
 class ComandaViewModel(
     private val areaId: Int,
     private val mesaId: Int,
@@ -69,7 +72,16 @@ class ComandaViewModel(
             if (!skipSpinner) _state.update { it.copy(isLoading = true, error = null) }
             val result = pedidosMesaRepository.listar(cajaId, areaId, mesaId, sesionId, estado = null)
             result.fold(
-                onSuccess = { pedidos -> _state.update { it.copy(isLoading = false, error = null, pendientes = pedidos.pendientes(), enviados = pedidos.enviados()) } },
+                onSuccess = { pedidos ->
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            error = null,
+                            pendientes = pedidos.pendientes(),
+                            enviados = pedidos.enviados(),
+                        )
+                    }
+                },
                 onFailure = { e -> _state.update { it.copy(isLoading = false, error = e.message ?: "Error al consultar pedidos") } },
             )
         }
@@ -83,7 +95,9 @@ class ComandaViewModel(
      *     ENVIADA con `enviarComanda(pedidoIds)`.
      *
      * El carrito compartido se limpia al final para que el próximo inicio en blanco.
+     * Flujo secuencial preserva recuperación tras éxito parcial entre dos llamadas remotas.
      */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
     fun enviarComanda() {
         val cajaId = activeCajaReader.activeCaja.value?.idCaja
         if (cajaId.isNullOrBlank()) {
@@ -106,7 +120,9 @@ class ComandaViewModel(
         viewModelScope.launch {
             val caja = activeCajaReader.activeCaja.value
             val sellerId =
-                cartRepository.currentSeller.value?.id?.takeIf { it > 0 }
+                cartRepository.currentSeller.value
+                    ?.id
+                    ?.takeIf { it > 0 }
                     ?: caja?.defaultSellerId?.takeIf { it > 0 }
                     ?: caja?.availableSellers?.firstOrNull()?.id
                     ?: DEFAULT_SELLER_ID
@@ -131,10 +147,18 @@ class ComandaViewModel(
                         areaId = areaId,
                         mesaId = mesaId,
                         sesionId = sesionId,
-                        request = com.amaxonia.pos.domain.model.mesas.CrearPedidoMesaRequest(items = items, enviarInmediato = true),
+                        request =
+                            com.amaxonia.pos.domain.model.mesas
+                                .CrearPedidoMesaRequest(items = items, enviarInmediato = true),
                     )
                 if (crearResult.isFailure) {
-                    _state.update { it.copy(isSending = false, error = crearResult.exceptionOrNull()?.message ?: "No se pudieron crear los items") }
+                    _state.update {
+                        it.copy(
+                            isSending = false,
+                            error =
+                                crearResult.exceptionOrNull()?.message ?: "No se pudieron crear los items",
+                        )
+                    }
                     return@launch
                 }
                 creadosNuevos = crearResult.getOrThrow()
@@ -189,19 +213,25 @@ class ComandaViewModel(
         nuevoEstado: String,
     ) {
         val cajaId = activeCajaReader.activeCaja.value?.idCaja
-        if (cajaId.isNullOrBlank()) {
-            _state.update { it.copy(error = "No hay caja activa") }
-            return
+        val actual =
+            _state.value.enviados
+                .firstOrNull { it.id == pedidoId }
+                ?.estado
+        when {
+            cajaId.isNullOrBlank() -> _state.update { it.copy(error = "No hay caja activa") }
+            actual != null && EstadoPedidoMesa.FINALES.contains(actual) ->
+                _state.update { it.copy(error = "El pedido ya está finalizado ($actual)") }
+            !connectivity.isOnline() ->
+                _state.update { it.copy(error = "Sin conexión: no se puede cambiar el estado") }
+            else -> cambiarEstadoRemoto(cajaId, pedidoId, nuevoEstado)
         }
-        val actual = _state.value.enviados.firstOrNull { it.id == pedidoId }?.estado
-        if (actual != null && EstadoPedidoMesa.FINALES.contains(actual)) {
-            _state.update { it.copy(error = "El pedido ya está finalizado ($actual)") }
-            return
-        }
-        if (!connectivity.isOnline()) {
-            _state.update { it.copy(error = "Sin conexión: no se puede cambiar el estado") }
-            return
-        }
+    }
+
+    private fun cambiarEstadoRemoto(
+        cajaId: String,
+        pedidoId: Int,
+        nuevoEstado: String,
+    ) {
         viewModelScope.launch {
             _state.update { it.copy(error = null) }
             val result =

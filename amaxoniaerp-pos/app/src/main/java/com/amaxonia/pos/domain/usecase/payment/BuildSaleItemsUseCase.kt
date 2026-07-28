@@ -78,15 +78,7 @@ class BuildSaleItemsUseCase {
             idSegmento = product.gobSegment.toIntOrNull(),
             idFamilia = product.gobFamily.toIntOrNull(),
             poseeConfiguracionLote = if (hasLotConfig) "si" else "no",
-            codigosLote =
-                lotAssignments.map { lot ->
-                    SaleLotDto(
-                        idLoteItem = lot.idLoteItem.toIntOrNull() ?: 0,
-                        codigoLoteItem = lot.codigoLote,
-                        cantidad = lot.cantidad,
-                        idAlmacen = lot.almacen,
-                    )
-                },
+            codigosLote = toSaleLots(),
             promocionTipo = promocionTipo,
             promocionId = promocionId.orEmpty(),
             promocionCantidad = if (isPromotionLine) promocionVeces.toDouble() else 0.0,
@@ -96,6 +88,16 @@ class BuildSaleItemsUseCase {
             promocionDetalleId = promocionDetalleId,
         )
     }
+
+    private fun CartItem.toSaleLots(): List<SaleLotDto> =
+        lotAssignments.map { lot ->
+            SaleLotDto(
+                idLoteItem = lot.idLoteItem.toIntOrNull() ?: 0,
+                codigoLoteItem = lot.codigoLote,
+                cantidad = lot.cantidad,
+                idAlmacen = lot.almacen,
+            )
+        }
 
     private companion object {
         // Tax percentage division needs extra precision to avoid rounding

@@ -8,8 +8,8 @@ import com.amaxonia.pos.core.telemetry.SaleEvent
 import com.amaxonia.pos.core.telemetry.SaleTelemetry
 import com.amaxonia.pos.core.telemetry.TelemetrySink
 import com.amaxonia.pos.ui.common.DependencyContainer
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,53 +62,55 @@ class RapidPayCallbackInstrumentedTest {
     }
 
     @Test
-    fun legitimateCallbackDeliversApprovedResultToAwaiter() = runTest {
-        RapidPayBridge.setPendingCorrelationId("corr-legit")
-        val awaiter = async { RapidPayBridge.awaitResult() }
-        delay(1)
+    fun legitimateCallbackDeliversApprovedResultToAwaiter() =
+        runTest {
+            RapidPayBridge.setPendingCorrelationId("corr-legit")
+            val awaiter = async { RapidPayBridge.awaitResult() }
+            delay(1)
 
-        // HKA returns code='00' (approved) in its Intent extras.
-        val intent =
-            Intent(context, MainActivity::class.java).apply {
-                putExtra("codeRapidPay", "00")
-                putExtra("resultRapidPay", """{"reference":"ref-1"}""")
-                putExtra("messageRapidPay", "APROBADO")
-            }
+            // HKA returns code='00' (approved) in its Intent extras.
+            val intent =
+                Intent(context, MainActivity::class.java).apply {
+                    putExtra("codeRapidPay", "00")
+                    putExtra("resultRapidPay", """{"reference":"ref-1"}""")
+                    putExtra("messageRapidPay", "APROBADO")
+                }
 
-        // The Activity parses the Intent and delivers to the bridge — same
-        // code path MainActivity.handleRapidPayResult uses.
-        val result = client.parseResultIntent(intent)
-        RapidPayBridge.deliverResult(result)
+            // The Activity parses the Intent and delivers to the bridge — same
+            // code path MainActivity.handleRapidPayResult uses.
+            val result = client.parseResultIntent(intent)
+            RapidPayBridge.deliverResult(result)
 
-        val awaited = awaiter.await()
-        assertTrue("legitimate approved code must surface as approved", awaited.approved)
-    }
+            val awaited = awaiter.await()
+            assertTrue("legitimate approved code must surface as approved", awaited.approved)
+        }
 
     @Test
-    fun duplicateCallbackDeliveredTwiceIsANoOpTheSecondTime() = runTest {
-        // Simulate the duplicate HKA Intent case: HKA sometimes re-launches our
-        // Activity with the same Intent extras twice (e.g. on screen rotation
-        // inside the HKA app, or because the user backed out and re-tapped).
-        // The second delivery MUST NOT replace the first result the UI already
-        // consumed — that would let an attacker double-charge by replaying an
-        // approved Intent.
-        RapidPayBridge.setPendingCorrelationId("corr-dup")
-        val awaiter = async { RapidPayBridge.awaitResult() }
-        delay(1)
+    fun duplicateCallbackDeliveredTwiceIsANoOpTheSecondTime() =
+        runTest {
+            // Simulate the duplicate HKA Intent case: HKA sometimes re-launches our
+            // Activity with the same Intent extras twice (e.g. on screen rotation
+            // inside the HKA app, or because the user backed out and re-tapped).
+            // The second delivery MUST NOT replace the first result the UI already
+            // consumed — that would let an attacker double-charge by replaying an
+            // approved Intent.
+            RapidPayBridge.setPendingCorrelationId("corr-dup")
+            val awaiter = async { RapidPayBridge.awaitResult() }
+            delay(1)
 
-        val firstIntent = hkaIntent(code = "00", json = """{"reference":"ref-dup"}""", message = "OK")
-        val firstResult = client.parseResultIntent(firstIntent)
-        RapidPayBridge.deliverResult(firstResult)
+            val firstIntent = hkaIntent(code = "00", json = """{"reference":"ref-dup"}""", message = "OK")
+            val firstResult = client.parseResultIntent(firstIntent)
+            RapidPayBridge.deliverResult(firstResult)
 
-        val awaited = awaiter.await()
-        assertTrue(awaited.approved)
+            val awaited = awaiter.await()
+            assertTrue(awaited.approved)
 
-        // Second Intent arrives after the await completed — must be a no-op.
-        val secondIntent = hkaIntent(code = "01", json = """{"reference":"ref-spoof"}""", message = "FAKE")
-        RapidPayBridge.deliverResult(client.parseResultIntent(secondIntent))
+            // Second Intent arrives after the await completed — must be a no-op.
+            val secondIntent = hkaIntent(code = "01", json = """{"reference":"ref-spoof"}""", message = "FAKE")
+            RapidPayBridge.deliverResult(client.parseResultIntent(secondIntent))
 
-        assertFalse("second delivery must NOT register a new pendingResult", RapidPayBridge.hasPendingRequest())
-    }
+            assertFalse("second delivery must NOT register a new pendingResult", RapidPayBridge.hasPendingRequest())
+        }
 
     @Test
     fun lateCallbackWithoutAwaiterDoesNotCrashAndLeavesNoPendingState() {
@@ -124,73 +126,76 @@ class RapidPayCallbackInstrumentedTest {
     }
 
     @Test
-    fun callbackArrivesWithNoPinnedCorrelationIdReturnsNullAndNeverOverwrites() = runTest {
-        // UR-004 isolation: when the bridge has no pinned correlationId it
-        // MUST return null — MainActivity uses this signal to skip the
-        // ledger update entirely instead of inventing or correlating one
-        // against an unrelated row.
-        assertNull(RapidPayBridge.pendingCorrelationId())
+    fun callbackArrivesWithNoPinnedCorrelationIdReturnsNullAndNeverOverwrites() =
+        runTest {
+            // UR-004 isolation: when the bridge has no pinned correlationId it
+            // MUST return null — MainActivity uses this signal to skip the
+            // ledger update entirely instead of inventing or correlating one
+            // against an unrelated row.
+            assertNull(RapidPayBridge.pendingCorrelationId())
 
-        val orphanIntent = hkaIntent(code = "00", json = """{"reference":"ref-orphan"}""", message = "ORPHAN")
-        RapidPayBridge.deliverResult(client.parseResultIntent(orphanIntent))
+            val orphanIntent = hkaIntent(code = "00", json = """{"reference":"ref-orphan"}""", message = "ORPHAN")
+            RapidPayBridge.deliverResult(client.parseResultIntent(orphanIntent))
 
-        assertNull(
-            "no correlation must remain set after a callback with no pin",
-            RapidPayBridge.pendingCorrelationId(),
-        )
-    }
-
-    @Test
-    fun activityRecreationReceivesTheSameIntentAndDeliversOnce() = runTest {
-        // launchMode="singleTask": if the Activity is re-launched with the
-        // same Intent extras after a configuration change, onNewIntent (or
-        // onCreate if the process was killed) re-delivers it. We assert
-        // that re-parsing the same Intent yields the SAME RapidPayResult
-        // (deterministic parsing) so the ledger row idempotency holds.
-        val intent = hkaIntent(code = "00", json = """{"reference":"ref-rt"}""", message = "RECREATE")
-        val first = client.parseResultIntent(intent)
-        val second = client.parseResultIntent(intent)
-        assertEquals(
-            "parseResultIntent must be deterministic across Activity recreations",
-            first,
-            second,
-        )
-    }
-
-    @Test
-    fun telemetryEmitsLateCallbackEventWhenBridgeHasNoAwaiter() = runTest {
-        // Capture telemetry: when deliverResult() runs on no pending request
-        // and a correlationId IS pinned (process death case), the GATEWAY_
-        // LATE_CALLBACK event must be recordable so the operator can see it
-        // in the pilot dashboard. We assert the SaleTelemetry contract
-        // explicitly: the default sink receives the event with the right id.
-        val seen = AtomicReference<Pair<SaleEvent, String>?>(null)
-        val originalSink = SaleTelemetry.sink
-        val spySink =
-            TelemetrySink { event, payload ->
-                if (event == SaleEvent.GATEWAY_LATE_CALLBACK) {
-                    seen.set(event to payload)
-                }
-            }
-        SaleTelemetry.sink = spySink
-        try {
-            // Production path: MainActivity realizes !hasPendingRequest() and
-            // emits GATEWAY_LATE_CALLBACK. We simulate the exact call site.
-            SaleTelemetry.record(
-                event = SaleEvent.GATEWAY_LATE_CALLBACK,
-                idFactura = "corr-spy",
-                "responseCode" to "09",
+            assertNull(
+                "no correlation must remain set after a callback with no pin",
+                RapidPayBridge.pendingCorrelationId(),
             )
-            val recorded = seen.get()
-            assertTrue("GATEWAY_LATE_CALLBACK must reach the sink", recorded != null)
-            assertTrue(
-                "payload must include the correlationId",
-                recorded!!.second.contains("idFactura=corr-spy"),
-            )
-        } finally {
-            SaleTelemetry.sink = originalSink
         }
-    }
+
+    @Test
+    fun activityRecreationReceivesTheSameIntentAndDeliversOnce() =
+        runTest {
+            // launchMode="singleTask": if the Activity is re-launched with the
+            // same Intent extras after a configuration change, onNewIntent (or
+            // onCreate if the process was killed) re-delivers it. We assert
+            // that re-parsing the same Intent yields the SAME RapidPayResult
+            // (deterministic parsing) so the ledger row idempotency holds.
+            val intent = hkaIntent(code = "00", json = """{"reference":"ref-rt"}""", message = "RECREATE")
+            val first = client.parseResultIntent(intent)
+            val second = client.parseResultIntent(intent)
+            assertEquals(
+                "parseResultIntent must be deterministic across Activity recreations",
+                first,
+                second,
+            )
+        }
+
+    @Test
+    fun telemetryEmitsLateCallbackEventWhenBridgeHasNoAwaiter() =
+        runTest {
+            // Capture telemetry: when deliverResult() runs on no pending request
+            // and a correlationId IS pinned (process death case), the GATEWAY_
+            // LATE_CALLBACK event must be recordable so the operator can see it
+            // in the pilot dashboard. We assert the SaleTelemetry contract
+            // explicitly: the default sink receives the event with the right id.
+            val seen = AtomicReference<Pair<SaleEvent, String>?>(null)
+            val originalSink = SaleTelemetry.sink
+            val spySink =
+                TelemetrySink { event, payload ->
+                    if (event == SaleEvent.GATEWAY_LATE_CALLBACK) {
+                        seen.set(event to payload)
+                    }
+                }
+            SaleTelemetry.sink = spySink
+            try {
+                // Production path: MainActivity realizes !hasPendingRequest() and
+                // emits GATEWAY_LATE_CALLBACK. We simulate the exact call site.
+                SaleTelemetry.record(
+                    event = SaleEvent.GATEWAY_LATE_CALLBACK,
+                    idFactura = "corr-spy",
+                    "responseCode" to "09",
+                )
+                val recorded = seen.get()
+                assertTrue("GATEWAY_LATE_CALLBACK must reach the sink", recorded != null)
+                assertTrue(
+                    "payload must include the correlationId",
+                    recorded!!.second.contains("idFactura=corr-spy"),
+                )
+            } finally {
+                SaleTelemetry.sink = originalSink
+            }
+        }
 
     private fun hkaIntent(
         code: String,

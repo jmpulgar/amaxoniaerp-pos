@@ -48,7 +48,9 @@ enum class FiscalState {
      * Fiscal pipeline failed terminally (printer hardware gone, voucher
      * rejected, MAX_RETRIES exhausted). Requires manual reconciliation.
      */
-    FAILED;
+    FAILED,
+
+    ;
 
     companion object {
         /**

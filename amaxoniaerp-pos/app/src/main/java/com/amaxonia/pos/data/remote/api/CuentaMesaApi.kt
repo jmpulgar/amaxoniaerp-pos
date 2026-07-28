@@ -29,6 +29,8 @@ interface CuentaMesaApi {
         authHeader: String,
     ): Result<CuentasMesaListResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun obtener(
         cajaId: String,
         areaId: Int,
@@ -38,6 +40,8 @@ interface CuentaMesaApi {
         authHeader: String,
     ): Result<CrearCuentaResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun crear(
         cajaId: String,
         areaId: Int,
@@ -47,6 +51,8 @@ interface CuentaMesaApi {
         authHeader: String,
     ): Result<CrearCuentaResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun cancelar(
         cajaId: String,
         areaId: Int,
@@ -56,6 +62,8 @@ interface CuentaMesaApi {
         authHeader: String,
     ): Result<CrearCuentaResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun marcarFacturada(
         cajaId: String,
         areaId: Int,

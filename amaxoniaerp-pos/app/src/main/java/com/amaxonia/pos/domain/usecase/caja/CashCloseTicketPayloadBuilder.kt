@@ -84,21 +84,13 @@ class CashCloseTicketPayloadBuilder(
                 .replace("Ó", "O")
                 .replace("Ú", "U")
                 .replace("Á", "A")
-        return when {
-            value.contains("YAPPY") -> "YAPPY"
-            value.contains("MASTER") -> "MASTERCARD"
-            value.contains("VISA") -> "VISA"
-            value.contains("ACH") || value.contains("IBAN") -> "ACH / IBAN"
-            value.contains("REFER") -> "REFERENCIA"
-            value.contains("DEPOS") -> "DEPOSITO"
-            value.contains("CUENTA") || value.contains("COBRAR") || value.contains("CXC") -> "CUENTAS POR COBRAR"
-            value.contains("NOTA") || value.contains("DEVOL") -> "NOTAS DE CREDITO / DEVOLUCIONES"
-            value.contains("CERTIFIC") || value.contains("REGALO") -> "CERTIFICADO DE REGALO"
-            value.contains("PUNTO") -> "PUNTOS"
-            value.contains("DEBIT") || value.contains("TDD") -> "TARJETA DE DEBITO"
-            value.contains("ABONO") -> "ABONOS APLICADOS"
-            value.contains("CASH") || value.contains("EFECT") || value == "EF" || value == "EFE" -> "EFECTIVO"
-            else -> "REFERENCIA"
+        return if (value in EXACT_CASH_CODES) {
+            "EFECTIVO"
+        } else {
+            PAYMENT_LABEL_RULES
+                .firstOrNull { (tokens, _) -> tokens.any(value::contains) }
+                ?.second
+                ?: "REFERENCIA"
         }
     }
 
@@ -173,6 +165,23 @@ class CashCloseTicketPayloadBuilder(
     private fun formatQrAmount(value: Double): String = String.format(Locale.US, "%.2f", value)
 
     private companion object {
+        val PAYMENT_LABEL_RULES =
+            listOf(
+                setOf("YAPPY") to "YAPPY",
+                setOf("MASTER") to "MASTERCARD",
+                setOf("VISA") to "VISA",
+                setOf("ACH", "IBAN") to "ACH / IBAN",
+                setOf("REFER") to "REFERENCIA",
+                setOf("DEPOS") to "DEPOSITO",
+                setOf("CUENTA", "COBRAR", "CXC") to "CUENTAS POR COBRAR",
+                setOf("NOTA", "DEVOL") to "NOTAS DE CREDITO / DEVOLUCIONES",
+                setOf("CERTIFIC", "REGALO") to "CERTIFICADO DE REGALO",
+                setOf("PUNTO") to "PUNTOS",
+                setOf("DEBIT", "TDD") to "TARJETA DE DEBITO",
+                setOf("ABONO") to "ABONOS APLICADOS",
+                setOf("CASH", "EFECT") to "EFECTIVO",
+            )
+        val EXACT_CASH_CODES = setOf("EF", "EFE")
         val DATE_TIME_FORMATTERS =
             listOf(
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),

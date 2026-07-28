@@ -87,7 +87,12 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.KeyPadInput("5"))
 
             assertEquals("0.25", viewModel.state.value.tenderedAmountInput)
-            assertEquals(0.25, viewModel.state.value.tenderedAmountMoney.toDouble(), 0.0)
+            assertEquals(
+                0.25,
+                viewModel.state.value.tenderedAmountMoney
+                    .toDouble(),
+                0.0,
+            )
         }
 
     @Test
@@ -106,7 +111,9 @@ class PaymentViewModelTest {
                     methods = Result.success(methods),
                     executor =
                         PaymentFlowExecutor { input, _ ->
-                            capturedAmounts = input.paymentDetails.payload.detalle.map { it.monto }
+                            capturedAmounts =
+                                input.paymentDetails.payload.detalle
+                                    .map { it.monto }
                             PaymentFlowResult.Failure("test stop")
                         },
                 )

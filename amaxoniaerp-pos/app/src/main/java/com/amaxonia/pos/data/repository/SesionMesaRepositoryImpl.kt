@@ -6,8 +6,8 @@ import com.amaxonia.pos.domain.model.mesas.AbrirSesionRequest
 import com.amaxonia.pos.domain.model.mesas.EstadoMesaResponse
 import com.amaxonia.pos.domain.model.mesas.SesionMesa
 import com.amaxonia.pos.domain.repository.CompanyTokenReader
-import com.amaxonia.pos.domain.repository.SessionConfigurationException
 import com.amaxonia.pos.domain.repository.SesionMesaRepository
+import com.amaxonia.pos.domain.repository.SessionConfigurationException
 
 /**
  * Puerta de enlace al SesionMesa API. No cachea en disco: los estados de mesa son relativos
@@ -39,16 +39,17 @@ class SesionMesaRepositoryImpl(
     ): Result<SesionMesa> =
         catchingResult {
             val authHeader = getAuthHeader()
-            api.abrir(
-                cajaId = cajaId,
-                areaId = areaId,
-                mesaId = mesaId,
-                request = AbrirSesionRequest(cantidadPersonas = cantidadPersonas),
-                authHeader = authHeader,
-            ).mapCatching { response ->
-                if (!response.success) error(response.error ?: "No se pudo abrir la sesión")
-                response.sesion
-            }
+            api
+                .abrir(
+                    cajaId = cajaId,
+                    areaId = areaId,
+                    mesaId = mesaId,
+                    request = AbrirSesionRequest(cantidadPersonas = cantidadPersonas),
+                    authHeader = authHeader,
+                ).mapCatching { response ->
+                    if (!response.success) error(response.error ?: "No se pudo abrir la sesión")
+                    response.sesion
+                }
         }
 
     override suspend fun getSesionActiva(

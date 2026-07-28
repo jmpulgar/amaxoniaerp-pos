@@ -56,7 +56,9 @@ interface CuentaMesaRepository {
 
     /**
      * Compatibilidad para clientes anteriores al contexto `cuenta_mesa` de procesar venta.
+     * Firma conserva contrato público usado por ambos sabores y adaptadores existentes.
      */
+    @Suppress("LongParameterList")
     suspend fun marcarFacturada(
         cajaId: String,
         areaId: Int,

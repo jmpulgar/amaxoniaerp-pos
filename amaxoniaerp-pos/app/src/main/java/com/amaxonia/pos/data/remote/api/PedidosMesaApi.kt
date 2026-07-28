@@ -21,6 +21,8 @@ import com.amaxonia.pos.domain.model.mesas.PedidosMesaListResponse
  * errores del backend (`{"error": "..."}`) se traducen a `Result.failure` con ese mensaje.
  */
 interface PedidosMesaApi {
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun listar(
         cajaId: String,
         areaId: Int,
@@ -30,6 +32,8 @@ interface PedidosMesaApi {
         authHeader: String,
     ): Result<PedidosMesaListResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun crear(
         cajaId: String,
         areaId: Int,
@@ -39,6 +43,8 @@ interface PedidosMesaApi {
         authHeader: String,
     ): Result<PedidoMesaCreadoResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun enviarComanda(
         cajaId: String,
         areaId: Int,
@@ -48,6 +54,8 @@ interface PedidosMesaApi {
         authHeader: String,
     ): Result<EnviarComandaResponse>
 
+    // Firma refleja parámetros HTTP separados; agruparlos cambiaría contrato del adaptador.
+    @Suppress("LongParameterList")
     suspend fun cambiarEstado(
         cajaId: String,
         areaId: Int,

@@ -161,6 +161,9 @@ class MinorUnitMoneyTest {
     fun `custom rounding mode HALF_UP still respects materiality threshold`() {
         // The threshold is independent of mode — it gates on raw residue, not
         // on rounding direction.
-        assertEquals(690L, MinorUnitMoney.fromBigDecimalAsMinor(BigDecimal("6.8999999999999995"), roundingMode = java.math.RoundingMode.HALF_UP))
+        assertEquals(
+            690L,
+            MinorUnitMoney.fromBigDecimalAsMinor(BigDecimal("6.8999999999999995"), roundingMode = java.math.RoundingMode.HALF_UP),
+        )
     }
 }

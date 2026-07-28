@@ -2,9 +2,9 @@ package com.amaxonia.pos.data.remote.api
 
 import com.amaxonia.pos.domain.model.mesas.AbrirSesionRequest
 import com.amaxonia.pos.domain.model.mesas.AbrirSesionResponse
+import com.amaxonia.pos.domain.model.mesas.EstadosMesasResponse
 import com.amaxonia.pos.domain.model.mesas.SesionActivaResponse
 import com.amaxonia.pos.domain.model.mesas.SesionMutacionResponse
-import com.amaxonia.pos.domain.model.mesas.EstadosMesasResponse
 
 /**
  * Sesiones operativas de mesa para el POS. Endpoints asociados al área `{areaId}` y a la mesa

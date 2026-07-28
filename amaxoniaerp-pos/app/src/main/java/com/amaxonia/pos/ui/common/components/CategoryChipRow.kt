@@ -24,6 +24,8 @@ import com.amaxonia.pos.ui.theme.PosExtraShapes
  * the full list is shown since a side rail scrolls comfortably on its own.
  */
 @Composable
+// Parámetros mantienen API Compose compartida por diseños horizontal y vertical.
+@Suppress("LongParameterList")
 fun CategoryChipRow(
     departments: List<Department>,
     selectedDepartmentId: Int?,

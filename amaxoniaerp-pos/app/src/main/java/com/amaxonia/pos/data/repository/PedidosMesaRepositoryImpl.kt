@@ -74,18 +74,19 @@ class PedidosMesaRepositoryImpl(
     ): Result<PedidoMesa> =
         catchingResult {
             val authHeader = getAuthHeader()
-            api.cambiarEstado(
-                cajaId = cajaId,
-                areaId = areaId,
-                mesaId = mesaId,
-                sesionId = sesionId,
-                pedidoId = pedidoId,
-                request = CambiarEstadoPedidoRequest(estado = estado),
-                authHeader = authHeader,
-            ).mapCatching { response ->
-                if (!response.success) error(response.error ?: "No se pudo cambiar el estado del pedido")
-                response.data
-            }
+            api
+                .cambiarEstado(
+                    cajaId = cajaId,
+                    areaId = areaId,
+                    mesaId = mesaId,
+                    sesionId = sesionId,
+                    pedidoId = pedidoId,
+                    request = CambiarEstadoPedidoRequest(estado = estado),
+                    authHeader = authHeader,
+                ).mapCatching { response ->
+                    if (!response.success) error(response.error ?: "No se pudo cambiar el estado del pedido")
+                    response.data
+                }
         }
 
     private suspend fun getAuthHeader(): String {

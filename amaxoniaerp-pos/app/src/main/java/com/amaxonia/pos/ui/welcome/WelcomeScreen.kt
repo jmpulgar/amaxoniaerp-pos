@@ -183,7 +183,9 @@ fun WelcomeScreen(
             drawRect(
                 color = waveScrim,
                 topLeft = Offset(0f, waveY),
-                size = androidx.compose.ui.geometry.Size(w, h - waveY),
+                size =
+                    androidx.compose.ui.geometry
+                        .Size(w, h - waveY),
             )
         }
 

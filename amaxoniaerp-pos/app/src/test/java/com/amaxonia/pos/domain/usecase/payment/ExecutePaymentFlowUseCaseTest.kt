@@ -27,9 +27,9 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
-import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.model.seller.Seller
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.PaymentGateway
@@ -491,7 +491,10 @@ class ExecutePaymentFlowUseCaseTest {
             val firstResult = firstFixture.useCase(input(countryCode = "VE")) {}
             assertTrue(firstResult is PaymentFlowResult.Failure)
             assertEquals("timeout", (firstResult as PaymentFlowResult.Failure).message)
-            val firstId = firstFixture.ledger!!.rows.keys.single()
+            val firstId =
+                firstFixture.ledger!!
+                    .rows.keys
+                    .single()
 
             // Retry: the ViewModel re-presents the same payment details, but
             // NOW it carries the correlation id of the timed-out attempt.
@@ -621,7 +624,6 @@ class ExecutePaymentFlowUseCaseTest {
             listOf(ClientBranch(sucursalId = 1, clienteCodigo = "C1", nombreSucursal = "Principal")),
         /** When true, wires [StartTransactionUseCase] into the flow so the ledger can be inspected. */
         val withLedger: Boolean = false,
-        // --- Auditoría ítem 2 (INT-BE-001) ---
         /** If set, processSale() throws DuplicateInvoiceException for this idFactura. */
         val processSaleDuplicateOn: String? = null,
         /** idFactura that findByCorrelationId resolves to a reconciled invoice. */
@@ -666,6 +668,7 @@ class ExecutePaymentFlowUseCaseTest {
         var request: ProcessSaleRequestDto? = null
         var confirmedInvoiceId: String? = null
         var confirmation: ConfirmFacturaFiscalRequestDto? = null
+
         /** Number of processSale invocations so a test can simulate a 409 on the first call only. */
         var processSaleCalls: Int = 0
 

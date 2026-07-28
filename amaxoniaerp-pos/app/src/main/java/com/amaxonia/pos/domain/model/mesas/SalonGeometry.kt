@@ -55,6 +55,9 @@ data class ViewportCanvas(
  * - La rotación se aplica alrededor del **centro** de la mesa en el espacio lógico.
  */
 object SalonGeometry {
+    private const val HALF_TURN_DEGREES = 180f
+    private const val ROTATION_EPSILON = 0.01f
+
     /**
      * Ancho lógico de referencia del administrativo: 2000.
      */
@@ -69,8 +72,7 @@ object SalonGeometry {
      * Versión segura del lienzo lógico para cálculos: si el backend envía valores inválidos
      * se cae a los defaults contractuales.
      */
-    fun lienzoLogico(lienzo: Lienzo): Pair<Float, Float> =
-        lienzo.anchoEfectivo.toFloat() to lienzo.altoEfectivo.toFloat()
+    fun lienzoLogico(lienzo: Lienzo): Pair<Float, Float> = lienzo.anchoEfectivo.toFloat() to lienzo.altoEfectivo.toFloat()
 
     /**
      * Factor de escala proporcional entre un lienzo lógico y un [ViewportCanvas].
@@ -144,7 +146,7 @@ object SalonGeometry {
      * rotación no empuja la mesa fuera del lienzo.
      */
     fun boundingBox(g: MesaGraphics): Pair<Pair<Float, Float>, Pair<Float, Float>> {
-        if (abs(g.rotacionGrados % 180f) < 0.01f) {
+        if (abs(g.rotacionGrados % HALF_TURN_DEGREES) < ROTATION_EPSILON) {
             // Sin rotación efectiva: la caja axial es la propia geometría.
             return (g.left to g.top) to (g.left + g.width to g.top + g.height)
         }
@@ -190,17 +192,25 @@ fun SalonGeometry.hitTestTranslated(
     mesas: List<Mesa>,
     lienzo: Lienzo,
     viewport: ViewportCanvas,
-    extraScale: Float,
-    offsetX: Float,
-    offsetY: Float,
-    xPx: Float,
-    yPx: Float,
+    transform: ViewportTransform,
+    point: ViewportPoint,
 ): Mesa? {
-    val safeExtraScale = if (extraScale == 0f) 1f else extraScale
-    val localX = (xPx - offsetX) / safeExtraScale
-    val localY = (yPx - offsetY) / safeExtraScale
+    val safeExtraScale = if (transform.extraScale == 0f) 1f else transform.extraScale
+    val localX = (point.x - transform.offsetX) / safeExtraScale
+    val localY = (point.y - transform.offsetY) / safeExtraScale
     return SalonGeometry.hitTest(mesas, lienzo, viewport, localX, localY)
 }
+
+data class ViewportPoint(
+    val x: Float,
+    val y: Float,
+)
+
+data class ViewportTransform(
+    val extraScale: Float,
+    val offsetX: Float,
+    val offsetY: Float,
+)
 
 /**
  * Detección de distribución inválida del plano de mesas de un área.
@@ -228,11 +238,11 @@ object SalonDistribucion {
         mesas: List<Mesa>,
         lienzo: Lienzo,
     ): Boolean {
-        if (mesas.isEmpty()) return false
         val conGeometria = mesas.filter { it.ancho > UMBRAL_GEOMETRIA && it.alto > UMBRAL_GEOMETRIA }
-        if (conGeometria.isEmpty()) return false
-        if (estanApiladasEnOrigen(conGeometria)) return false
-        return !todasFueraDelLienzo(conGeometria, lienzo)
+        return mesas.isNotEmpty() &&
+            conGeometria.isNotEmpty() &&
+            !estanApiladasEnOrigen(conGeometria) &&
+            !todasFueraDelLienzo(conGeometria, lienzo)
     }
 
     /**
@@ -240,16 +250,14 @@ object SalonDistribucion {
      * para áreas configuradas sin plano gráfico.
      */
     private fun estanApiladasEnOrigen(mesas: List<Mesa>): Boolean {
-        if (mesas.size < 2) return false
         val todasEnOrigen = mesas.all { abs(it.posicionX) < UMBRAL_GEOMETRIA && abs(it.posicionY) < UMBRAL_GEOMETRIA }
-        if (!todasEnOrigen) return false
         val primera = mesas.first()
         val mismoTamano =
             mesas.all {
                 abs(it.ancho - primera.ancho) < UMBRAL_GEOMETRIA &&
                     abs(it.alto - primera.alto) < UMBRAL_GEOMETRIA
             }
-        return mismoTamano
+        return mesas.size >= 2 && todasEnOrigen && mismoTamano
     }
 
     /**

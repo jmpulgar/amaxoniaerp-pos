@@ -43,9 +43,6 @@ data class AreasMesasState(
      * [SalonViewMode.PLANO] no se ofrece y se cae automáticamente a [SalonViewMode.LISTA].
      */
     val hasDistribucionValida: Boolean = false,
-
-    // ---------------- Sesión operativa ----------------
-
     /**
      * Mapa de `mesaId` -> estado operativo (uno de [EstadoMesaOperativo]).
      *
@@ -54,19 +51,15 @@ data class AreasMesasState(
      * defecto y nunca inferir ocupación de otros campos.
      */
     val estadosMesas: Map<Int, String> = emptyMap(),
-
     /**
      * Sesión activa recuperada al pulsar una mesa ocupada, viva solo en memoria de la pantalla.
      * No se persiste: tras navegar fuera se pierde y se recomienda recuperarla de nuevo al volver.
      */
     val activeSesion: SesionMesa? = null,
-
     /** Carga/mutación de sesión en curso (apertura, recuperación, cierre, cancelación). */
     val isLoadingSesion: Boolean = false,
-
     /** Mensaje de error operación de sesión a mostrar como snackbar/dialog. Se limpia al reintentar. */
     val sesionError: String? = null,
-
     /** `true` mientras pide `estados` (lo muestra como estado de carga en plano y lista). */
     val isLoadingEstados: Boolean = false,
 ) {
@@ -101,12 +94,10 @@ data class AreasMesasState(
      * La UI debe distinguir "no hidratado" (`estadosMesas.isEmpty()`) de "todas disponibles":
      * en el primer caso no debería mostrar baliza de estado todavía.
      */
-    fun estadoOperativo(mesaId: Int): String =
-        estadosMesas[mesaId] ?: EstadoMesaOperativo.DISPONIBLE
+    fun estadoOperativo(mesaId: Int): String = estadosMesas[mesaId] ?: EstadoMesaOperativo.DISPONIBLE
 
     /** `true` si la mesa está ocupada por una sesión activa (requiere `estadosMesas` cargados). */
-    fun isOcupada(mesaId: Int): Boolean =
-        estadosMesas[mesaId] == EstadoMesaOperativo.OCUPADA
+    fun isOcupada(mesaId: Int): Boolean = estadosMesas[mesaId] == EstadoMesaOperativo.OCUPADA
 
     /** `true` cuando `estadosMesas` ya trajo datos para el área actual. */
     val hasEstadosHidratados: Boolean get() = estadosMesas.isNotEmpty()

@@ -106,14 +106,13 @@ class CajaRepositoryImpl(
         }
 
     override suspend fun getCierreSummary(): Result<CierreCajaSummary> {
-        val caja =
-            _activeCaja.value
-                ?: return Result.failure(IllegalStateException("No hay caja activa"))
-
-        val sequenceId =
-            checkCajaStatus(caja.idCaja).getOrNull()?.cajaSecuencia?.idCajaSecuencia
-                ?: return Result.failure(IllegalStateException("No hay una secuencia de caja abierta"))
-        return loadCierreSummary(caja, sequenceId, verifyPendingInvoices = true)
+        val caja = _activeCaja.value
+        val sequenceId = caja?.let { checkCajaStatus(it.idCaja).getOrNull()?.cajaSecuencia?.idCajaSecuencia }
+        return when {
+            caja == null -> Result.failure(IllegalStateException("No hay caja activa"))
+            sequenceId == null -> Result.failure(IllegalStateException("No hay una secuencia de caja abierta"))
+            else -> loadCierreSummary(caja, sequenceId, verifyPendingInvoices = true)
+        }
     }
 
     override suspend fun getCierreSummaryForSequence(
@@ -121,6 +120,8 @@ class CajaRepositoryImpl(
         sequenceId: String,
     ): Result<CierreCajaSummary> = loadCierreSummary(caja, sequenceId, verifyPendingInvoices = false)
 
+    // Mapeo atómico conserva correspondencia exacta del DTO de cierre.
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private suspend fun loadCierreSummary(
         caja: Caja,
         sequenceId: String,

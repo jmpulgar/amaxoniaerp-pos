@@ -59,45 +59,53 @@ class PaymentViewModel(
                 }
             is PaymentUiAction.SelectMethod ->
                 _state.update { it.copy(selectedMethod = action.method, showInsufficientReminder = false) }
-            is PaymentUiAction.SetExactNonCashAmount ->
-                _state.update { current ->
-                    val assignedToOtherMethods =
-                        current.nonCashAmountsInput
-                            .filterKeys { it != action.paymentMethodId }
-                            .values
-                            .fold(Money.ZERO) { accumulated, amount -> accumulated + Money.parse(amount) }
-                    val remaining =
-                        (current.totalAmountMoney - current.tenderedAmountMoney - assignedToOtherMethods)
-                            .coerceAtLeastZero()
-                    current.copy(
-                        nonCashAmountsInput =
-                            current.nonCashAmountsInput.toMutableMap().apply {
-                                if (remaining > Money.ZERO) {
-                                    put(action.paymentMethodId, Money.format(remaining))
-                                } else {
-                                    remove(action.paymentMethodId)
-                                }
-                            },
-                        showInsufficientReminder = false,
-                    )
-                }
-            is PaymentUiAction.SetNonCashAmount -> {
-                val normalized = Money.normalizeInput(action.amount)
-                _state.update { current ->
-                    current.copy(
-                        nonCashAmountsInput =
-                            current.nonCashAmountsInput.toMutableMap().apply {
-                                if (normalized.isBlank()) remove(action.paymentMethodId) else put(action.paymentMethodId, normalized)
-                            },
-                        showInsufficientReminder = false,
-                    )
-                }
-            }
+            is PaymentUiAction.SetExactNonCashAmount -> setExactNonCashAmount(action.paymentMethodId)
+            is PaymentUiAction.SetNonCashAmount -> setNonCashAmount(action.paymentMethodId, action.amount)
             PaymentUiAction.ProcessPayment -> processPayment()
             PaymentUiAction.ClearPaymentError -> _state.update { it.copy(paymentError = null) }
             PaymentUiAction.ClearReceiptPrintMessage -> _state.update { it.copy(receiptPrintMessage = null) }
             PaymentUiAction.ClearSuccessPayload -> _state.update { it.copy(successPayload = null) }
             PaymentUiAction.DismissDuplicateInvoice -> _state.update { it.copy(duplicateInvoice = null) }
+        }
+    }
+
+    private fun setExactNonCashAmount(paymentMethodId: Int) {
+        _state.update { current ->
+            val assignedToOtherMethods =
+                current.nonCashAmountsInput
+                    .filterKeys { it != paymentMethodId }
+                    .values
+                    .fold(Money.ZERO) { accumulated, amount -> accumulated + Money.parse(amount) }
+            val remaining =
+                (current.totalAmountMoney - current.tenderedAmountMoney - assignedToOtherMethods)
+                    .coerceAtLeastZero()
+            current.copy(
+                nonCashAmountsInput =
+                    current.nonCashAmountsInput.toMutableMap().apply {
+                        if (remaining > Money.ZERO) {
+                            put(paymentMethodId, Money.format(remaining))
+                        } else {
+                            remove(paymentMethodId)
+                        }
+                    },
+                showInsufficientReminder = false,
+            )
+        }
+    }
+
+    private fun setNonCashAmount(
+        paymentMethodId: Int,
+        amount: String,
+    ) {
+        val normalized = Money.normalizeInput(amount)
+        _state.update { current ->
+            current.copy(
+                nonCashAmountsInput =
+                    current.nonCashAmountsInput.toMutableMap().apply {
+                        if (normalized.isBlank()) remove(paymentMethodId) else put(paymentMethodId, normalized)
+                    },
+                showInsufficientReminder = false,
+            )
         }
     }
 

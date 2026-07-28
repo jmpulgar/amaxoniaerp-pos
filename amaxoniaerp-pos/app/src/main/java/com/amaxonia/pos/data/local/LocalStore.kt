@@ -27,11 +27,11 @@ import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.CompanyTokenReader
 import com.amaxonia.pos.domain.repository.CountrySelectionStore
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.repository.SalonConfigCache
-import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -321,8 +321,7 @@ class LocalStore(
      * full [SaleTenant] when all the worker needs is to know whether a row is
      * allowed under the current session.
      */
-    suspend fun currentTenantId(): String? =
-        readCompanySession()?.let { SaleTenant.idFor(it.company.id) }
+    suspend fun currentTenantId(): String? = readCompanySession()?.let { SaleTenant.idFor(it.company.id) }
 
     suspend fun isInitialSyncCompleted(companyId: Int): Boolean {
         val key = booleanPreferencesKey("initial_sync_completed_$companyId")
@@ -638,7 +637,9 @@ data class AreasSnapshot(
  */
 @Serializable
 data class AreaPlan(
-    val lienzo: com.amaxonia.pos.domain.model.mesas.Lienzo = com.amaxonia.pos.domain.model.mesas.Lienzo(),
+    val lienzo: com.amaxonia.pos.domain.model.mesas.Lienzo =
+        com.amaxonia.pos.domain.model.mesas
+            .Lienzo(),
     val imagenUrl: String? = null,
     val mesas: List<Mesa> = emptyList(),
 )

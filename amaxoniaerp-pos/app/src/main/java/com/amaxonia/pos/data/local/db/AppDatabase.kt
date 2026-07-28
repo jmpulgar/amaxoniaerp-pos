@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
+
 @Database(
     entities = [
         ClientEntity::class,
@@ -340,6 +341,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         internal val MIGRATION_13_14 =
             object : Migration(13, 14) {
+                // Secuencia SQL debe permanecer indivisible y auditable para migración Room.
+                @Suppress("LongMethod")
                 override fun migrate(db: SupportSQLiteDatabase) {
                     // ============================================================
                     // transaction_log: full rebuild adding tenant identity,
@@ -489,6 +492,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         internal val MIGRATION_14_15 =
             object : Migration(14, 15) {
+                // Secuencia SQL debe permanecer indivisible y auditable para migración Room.
+                @Suppress("LongMethod")
                 override fun migrate(db: SupportSQLiteDatabase) {
                     // Rebuild transaction_log stripping DEFAULT clauses.
                     db.execSQL(

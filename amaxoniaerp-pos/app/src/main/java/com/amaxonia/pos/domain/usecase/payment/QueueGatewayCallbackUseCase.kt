@@ -24,9 +24,7 @@ class QueueGatewayCallbackUseCase(
     private val dao: TransactionLogDao,
     private val clock: AppClock,
 ) {
-    suspend fun markAwaiting(
-        clientCorrelationId: String,
-    ) {
+    suspend fun markAwaiting(clientCorrelationId: String) {
         val now = clock.now().toEpochMilli()
         dao.markGatewayAwaiting(
             id = clientCorrelationId,

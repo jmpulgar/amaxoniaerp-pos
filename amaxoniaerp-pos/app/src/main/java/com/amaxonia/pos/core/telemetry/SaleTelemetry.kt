@@ -68,7 +68,9 @@ object SaleTelemetry {
                 // Escalated line so an external collector can pick up only alerts.
                 sink.emitAlert(event, payload)
             }
-        } catch (@Suppress("TooGenericExceptionCaught", "SwallowedException") re: RuntimeException) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught", "SwallowedException") re: RuntimeException,
+        ) {
             // Intentionally not rethrown: telemetry must never break a sale.
             // Swallow silently; sinks must be self-diagnosing via their own
             // channel. We deliberately avoid SafeLog here — it may be the
@@ -97,7 +99,9 @@ object SaleTelemetry {
  * flow through [SaleTelemetry.record] and the [AlertPolicy] — never
  * invent free-form strings at call sites.
  */
-enum class SaleEvent(val code: String) {
+enum class SaleEvent(
+    val code: String,
+) {
     SALE_STARTED("sale.started"),
     SALE_CONFIRMED("sale.confirmed"),
     SALE_REJECTED_BACKEND("sale.rejected.backend"),

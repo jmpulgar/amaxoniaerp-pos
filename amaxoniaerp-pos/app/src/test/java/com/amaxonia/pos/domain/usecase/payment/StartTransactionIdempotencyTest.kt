@@ -131,30 +131,30 @@ class StartTransactionIdempotencyTest {
         carryOverId: String?,
         tenantValue: SaleTenant? = tenant(),
         preferredId: String? = null,
-    ) =
-        StartTransactionCommand(
-            carryOverId = carryOverId,
-            preferredId = preferredId,
-            idCaja = "caja",
-            idCajaSecuencia = "OFFLINE-caja",
-            totalAmount = 10.0,
-            currency = "USD",
-            clientName = "Cliente",
-            tenant = tenantValue,
-        )
+    ) = StartTransactionCommand(
+        carryOverId = carryOverId,
+        preferredId = preferredId,
+        idCaja = "caja",
+        idCajaSecuencia = "OFFLINE-caja",
+        totalAmount = 10.0,
+        currency = "USD",
+        clientName = "Cliente",
+        tenant = tenantValue,
+    )
 }
 
 class StartTransactionTenantIsolationTest {
     @Test
-    fun `command without tenant returns null and never opens a row`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        val useCase = StartTransactionUseCase(dao, IdGenerator { "should-not-be-used" }, AppClock { Instant.ofEpochMilli(1L) })
+    fun `command without tenant returns null and never opens a row`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            val useCase = StartTransactionUseCase(dao, IdGenerator { "should-not-be-used" }, AppClock { Instant.ofEpochMilli(1L) })
 
-        val started = useCase.recoverOrStart(command(carryOverId = null, tenantValue = null))
+            val started = useCase.recoverOrStart(command(carryOverId = null, tenantValue = null))
 
-        assertNull(started)
-        assertTrue(dao.rows.isEmpty())
-    }
+            assertNull(started)
+            assertTrue(dao.rows.isEmpty())
+        }
 
     @Test
     fun `carry over id owned by a different tenant mints a fresh id and never resumes the borrowed row`() =
@@ -188,14 +188,16 @@ class StartTransactionTenantIsolationTest {
             nominaDb = "nomina$companyId",
         )
 
-    private fun command(carryOverId: String?, tenantValue: SaleTenant?) =
-        StartTransactionCommand(
-            carryOverId = carryOverId,
-            idCaja = "caja",
-            idCajaSecuencia = "OFFLINE-caja",
-            totalAmount = 10.0,
-            currency = "USD",
-            clientName = "Cliente",
-            tenant = tenantValue,
-        )
+    private fun command(
+        carryOverId: String?,
+        tenantValue: SaleTenant?,
+    ) = StartTransactionCommand(
+        carryOverId = carryOverId,
+        idCaja = "caja",
+        idCajaSecuencia = "OFFLINE-caja",
+        totalAmount = 10.0,
+        currency = "USD",
+        clientName = "Cliente",
+        tenant = tenantValue,
+    )
 }

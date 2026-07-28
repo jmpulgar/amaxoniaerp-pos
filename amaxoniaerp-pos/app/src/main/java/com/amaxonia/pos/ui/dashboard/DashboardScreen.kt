@@ -29,8 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
@@ -58,7 +56,6 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -82,7 +79,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
@@ -122,8 +118,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -160,6 +154,8 @@ private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
+// Raíz Compose conserva navegación y estado local; dividirla alteraría alcance de remember/effects.
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 fun DashboardScreen(
     viewModel: DashboardViewModel =
         injectedViewModel {
@@ -1760,10 +1756,6 @@ fun ManualEntryContent(
 }
 
 /**
- * Banner persistente que comunica el estado de la caja (abierta / pendiente /
- * sin caja / verificando) con color e ícono, y ofrece la acción correspondiente.
- */
-/**
  * Caja status banner with an urgency hierarchy: the happy path (ABIERTA) stays quiet so it
  * doesn't dominate the screen, while a caja needing attention (PENDIENTE_APERTURA) is prominent
  * with a filled action button.
@@ -1854,6 +1846,8 @@ private fun CajaStatusBannerLoading(accent: androidx.compose.ui.graphics.Color) 
 }
 
 @Composable
+// Firma mantiene contenido y acción explícitos del banner reutilizado.
+@Suppress("LongParameterList")
 private fun CajaStatusBannerProminent(
     accent: androidx.compose.ui.graphics.Color,
     icon: ImageVector,

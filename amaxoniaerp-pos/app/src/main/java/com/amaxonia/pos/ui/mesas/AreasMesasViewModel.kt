@@ -29,7 +29,10 @@ import kotlinx.coroutines.launch
  *
  * El plano visual reacciona al contrato de mesas: cuando el área trae [Lienzo] y mesas con
  * geometría válida, se ofrece el modo plano; si no, se cae a la vista de lista.
+ *
+ * Agrupa acciones de una sola pantalla; separar clase duplicaría estado y jobs.
  */
+@Suppress("TooManyFunctions")
 class AreasMesasViewModel(
     private val areaRepository: AreaRepository,
     private val activeCajaReader: ActiveCajaReader,
@@ -141,6 +144,7 @@ class AreasMesasViewModel(
      * persistir nada.
      */
     private var lastCajaId: String? = null
+
     private fun observeCaja() {
         viewModelScope.launch {
             activeCajaReader.activeCaja.collect { caja ->
@@ -249,6 +253,8 @@ class AreasMesasViewModel(
         reselectArea: Int?,
     ): Area? = areas.firstOrNull { it.id == reselectArea } ?: areas.firstOrNull()
 
+    // Actualización atómica mantiene selección, geometría y respuesta tardía en un solo bloque.
+    @Suppress("LongMethod")
     private fun loadMesas(areaId: Int) {
         val cajaId = activeCajaReader.activeCaja.value?.idCaja
         if (cajaId.isNullOrBlank()) return
@@ -338,7 +344,9 @@ class AreasMesasViewModel(
      * vacío, lo que la UI interpreta como "no hidratado".
      *
      * Se llama automáticamente al terminar `loadMesas` con éxito y desde `onRefreshEstados`.
+     * Salidas tempranas son precondiciones sin efectos antes de lanzar coroutine.
      */
+    @Suppress("ReturnCount")
     fun onRefreshEstados() {
         val areaId = _state.value.selectedAreaId ?: return
         val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
@@ -370,7 +378,9 @@ class AreasMesasViewModel(
      * confirmar y mostrar motivo.
      *
      * En éxito, actualiza `estadosMesas[mesaId] = OCUPADA` y deja la sesión como `activeSesion`.
+     * Salidas tempranas preservan validaciones y evitan llamadas remotas inválidas.
      */
+    @Suppress("ReturnCount")
     fun onAbrirSesion(
         mesaId: Int,
         cantidadPersonas: Int,
@@ -415,7 +425,9 @@ class AreasMesasViewModel(
      * Recupera la sesión activa de una mesa (al pulsar mesa ocupada). En éxito la deja en
      * `activeSesion`. Si no hay sesión (la ocupación del cluster caducó), refresca estados para
      * corregir el `estadosMesas` y mostrar la mesa como disponible.
+     * Salidas tempranas son precondiciones sin efectos antes de lanzar coroutine.
      */
+    @Suppress("ReturnCount")
     fun onRecuperarSesionActiva(mesaId: Int) {
         val areaId = _state.value.selectedAreaId ?: return
         val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
@@ -463,6 +475,8 @@ class AreasMesasViewModel(
 
     private enum class MutacionSesion { CERRAR, CANCELAR }
 
+    // Salidas tempranas son precondiciones sin efectos antes de mutar sesión remota.
+    @Suppress("ReturnCount")
     private fun mutarSesion(
         mesaId: Int,
         sesionId: Int,

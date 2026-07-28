@@ -11,6 +11,8 @@ import org.junit.Test
 class SalonDistribucionTest {
     private val lienzo = Lienzo(2000, 1200)
 
+    // Parámetros nombrados hacen explícita cada dimensión de fixtures geométricos.
+    @Suppress("LongParameterList")
     private fun mesa(
         id: Int,
         posicionX: Double = 0.0,

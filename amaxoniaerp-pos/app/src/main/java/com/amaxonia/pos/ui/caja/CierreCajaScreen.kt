@@ -75,6 +75,8 @@ import com.amaxonia.pos.ui.theme.WarningOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// Raíz Compose conserva alcance de diálogo, snackbar y transición de estados.
+@Suppress("LongMethod")
 fun CierreCajaScreen(
     viewModel: CierreCajaViewModel =
         injectedViewModel {
@@ -559,6 +561,8 @@ private fun ReadyContent(
 // ---------- Success ----------
 
 @Composable
+// Composable cohesivo y lineal; extraer fragmentos no reduce estado ni riesgo.
+@Suppress("LongMethod")
 private fun SuccessContent(
     message: String,
     onDone: () -> Unit,

@@ -47,10 +47,11 @@ class FiscalConfirmationWorker(
         val now = SystemAppClock().now().toEpochMilli()
         val activeTenant = localStore.currentTenantId()
         val pending =
-            (activeTenant?.let { tenantId ->
-                dao.findFiscalConfirmableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
-            } ?: emptyList())
-                .filter { it.remoteInvoiceId != null }
+            (
+                activeTenant?.let { tenantId ->
+                    dao.findFiscalConfirmableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
+                } ?: emptyList()
+            ).filter { it.remoteInvoiceId != null }
 
         if (pending.isEmpty()) {
             SafeLog.d(TAG, "No fiscal confirmations pending")

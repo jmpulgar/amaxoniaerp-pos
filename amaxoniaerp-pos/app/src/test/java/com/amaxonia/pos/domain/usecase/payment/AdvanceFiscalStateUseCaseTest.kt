@@ -10,91 +10,98 @@ import java.time.Instant
 
 class AdvanceFiscalStateUseCaseTest {
     @Test
-    fun `PENDING_PRINT advances to PRINTED_PENDING_CONFIRM after printer OK`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.PENDING_PRINT)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+    fun `PENDING_PRINT advances to PRINTED_PENDING_CONFIRM after printer OK`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.PENDING_PRINT)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
 
-        val affected = useCase.markPrinted("id-1")
+            val affected = useCase.markPrinted("id-1")
 
-        assertEquals(1, affected)
-        assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-1").fiscalState)
-    }
-
-    @Test
-    fun `markPrinted is idempotent when already printed and stays put`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.PRINTED_PENDING_CONFIRM)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
-
-        val affected = useCase.markPrinted("id-1")
-
-        // 0 affected: the row was already past PENDING_PRINT.
-        assertEquals(0, affected)
-        assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-1").fiscalState)
-    }
+            assertEquals(1, affected)
+            assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-1").fiscalState)
+        }
 
     @Test
-    fun `markConfirmed from PRINTED_PENDING_CONFIRM is the happy path`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.PRINTED_PENDING_CONFIRM)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+    fun `markPrinted is idempotent when already printed and stays put`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.PRINTED_PENDING_CONFIRM)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
 
-        val affected = useCase.markConfirmed("id-1")
+            val affected = useCase.markPrinted("id-1")
 
-        assertEquals(1, affected)
-        assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
-    }
-
-    @Test
-    fun `markConfirmed skips the printer step when backend confirms without printer feedback`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.PENDING_PRINT)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
-
-        val affected = useCase.markConfirmed("id-1")
-
-        assertEquals(1, affected)
-        assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
-    }
+            // 0 affected: the row was already past PENDING_PRINT.
+            assertEquals(0, affected)
+            assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-1").fiscalState)
+        }
 
     @Test
-    fun `markConfirmed on an already CONFIRMED row is a no-op`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.CONFIRMED)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+    fun `markConfirmed from PRINTED_PENDING_CONFIRM is the happy path`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.PRINTED_PENDING_CONFIRM)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
 
-        val affected = useCase.markConfirmed("id-1")
+            val affected = useCase.markConfirmed("id-1")
 
-        assertEquals(0, affected)
-        assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
-    }
-
-    @Test
-    fun `markFailed cannot overwrite CONFIRMED`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.CONFIRMED)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
-
-        val affected = useCase.markFailed("id-1")
-
-        assertEquals(0, affected)
-        assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
-    }
+            assertEquals(1, affected)
+            assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
+        }
 
     @Test
-    fun `markNotApplicable only works from PENDING_PRINT`() = runTest {
-        val dao = InMemoryTransactionLogDao()
-        seed(dao, "id-1", FiscalState.PENDING_PRINT)
-        seed(dao, "id-2", FiscalState.PRINTED_PENDING_CONFIRM)
-        val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+    fun `markConfirmed skips the printer step when backend confirms without printer feedback`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.PENDING_PRINT)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
 
-        assertEquals(1, useCase.markNotApplicable("id-1"))
-        assertEquals(0, useCase.markNotApplicable("id-2"))
+            val affected = useCase.markConfirmed("id-1")
 
-        assertEquals(FiscalState.NOT_APPLICABLE, dao.rows.row("id-1").fiscalState)
-        assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-2").fiscalState)
-    }
+            assertEquals(1, affected)
+            assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
+        }
+
+    @Test
+    fun `markConfirmed on an already CONFIRMED row is a no-op`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.CONFIRMED)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+
+            val affected = useCase.markConfirmed("id-1")
+
+            assertEquals(0, affected)
+            assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
+        }
+
+    @Test
+    fun `markFailed cannot overwrite CONFIRMED`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.CONFIRMED)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+
+            val affected = useCase.markFailed("id-1")
+
+            assertEquals(0, affected)
+            assertEquals(FiscalState.CONFIRMED, dao.rows.row("id-1").fiscalState)
+        }
+
+    @Test
+    fun `markNotApplicable only works from PENDING_PRINT`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            seed(dao, "id-1", FiscalState.PENDING_PRINT)
+            seed(dao, "id-2", FiscalState.PRINTED_PENDING_CONFIRM)
+            val useCase = AdvanceFiscalStateUseCase(dao, fixedClock())
+
+            assertEquals(1, useCase.markNotApplicable("id-1"))
+            assertEquals(0, useCase.markNotApplicable("id-2"))
+
+            assertEquals(FiscalState.NOT_APPLICABLE, dao.rows.row("id-1").fiscalState)
+            assertEquals(FiscalState.PRINTED_PENDING_CONFIRM, dao.rows.row("id-2").fiscalState)
+        }
 
     private fun fixedClock(): AppClock = AppClock { Instant.ofEpochMilli(1_000L) }
 

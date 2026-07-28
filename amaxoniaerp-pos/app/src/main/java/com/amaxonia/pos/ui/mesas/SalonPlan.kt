@@ -53,6 +53,8 @@ import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.SalonForma
 import com.amaxonia.pos.domain.model.mesas.SalonGeometry
 import com.amaxonia.pos.domain.model.mesas.ViewportCanvas
+import com.amaxonia.pos.domain.model.mesas.ViewportPoint
+import com.amaxonia.pos.domain.model.mesas.ViewportTransform
 import com.amaxonia.pos.domain.model.mesas.hitTestTranslated
 import kotlin.math.max
 import kotlin.math.min
@@ -259,11 +261,8 @@ private fun PlanoCanvas(
                                     mesas = mesas,
                                     lienzo = lienzo,
                                     viewport = viewport,
-                                    extraScale = scale,
-                                    offsetX = offsetX,
-                                    offsetY = offsetY,
-                                    xPx = offset.x,
-                                    yPx = offset.y,
+                                    transform = ViewportTransform(scale, offsetX, offsetY),
+                                    point = ViewportPoint(offset.x, offset.y),
                                 ) ?: return@detectTapGestures
                             onMesaClick(hit.id)
                         },

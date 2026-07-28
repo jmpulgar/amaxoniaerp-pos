@@ -88,7 +88,9 @@ class CalculateSaleTotalsUseCaseTest {
     fun `price times quantity rollup is exact`() {
         val result =
             useCase(
-                List(3) { item(LineValues(priceWithoutTax = 2.50, quantity = 4.0, discount = 0.0, taxRate = 0.0, net = 10.00, total = 10.00)) },
+                List(
+                    3,
+                ) { item(LineValues(priceWithoutTax = 2.50, quantity = 4.0, discount = 0.0, taxRate = 0.0, net = 10.00, total = 10.00)) },
             )
         // subtotalGross = sum of precio * cantidad = 10.00 * 3 = 30.00
         assertEquals(30.00, result.subtotalGross, 0.0)

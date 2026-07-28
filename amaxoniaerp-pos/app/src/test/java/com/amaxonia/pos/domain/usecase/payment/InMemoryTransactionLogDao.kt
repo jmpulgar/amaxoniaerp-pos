@@ -35,13 +35,14 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
         remoteInvoiceNumber: String?,
         updatedAt: Long,
     ) {
-        rows[id] = rows[id]!!.copy(
-            status = status,
-            remoteInvoiceId = remoteInvoiceId,
-            remoteInvoiceNumber = remoteInvoiceNumber,
-            lastError = null,
-            updatedAt = updatedAt,
-        )
+        rows[id] =
+            rows[id]!!.copy(
+                status = status,
+                remoteInvoiceId = remoteInvoiceId,
+                remoteInvoiceNumber = remoteInvoiceNumber,
+                lastError = null,
+                updatedAt = updatedAt,
+            )
     }
 
     override suspend fun markFailed(
@@ -53,20 +54,25 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
         rows[id] = rows[id]!!.copy(status = status, lastError = message, updatedAt = updatedAt)
     }
 
-    override suspend fun listUnfinished(): List<TransactionLogEntity> =
-        rows.values.filter { it.status in listOf("SENDING", "PENDING") }
+    override suspend fun listUnfinished(): List<TransactionLogEntity> = rows.values.filter { it.status in listOf("SENDING", "PENDING") }
 
-    override suspend fun findFiscalConfirmable(now: Long, limit: Int): List<TransactionLogEntity> =
+    override suspend fun findFiscalConfirmable(
+        now: Long,
+        limit: Int,
+    ): List<TransactionLogEntity> =
         rows.values
             .filter {
                 it.fiscalConfirmationStatus in listOf("PENDING", "RETRYABLE_PENDING") &&
                     it.fiscalConfirmationNextAttemptAt <= now &&
                     it.fiscalConfirmationLeasedUntil <= now
-            }
-            .sortedBy { it.fiscalConfirmationNextAttemptAt }
+            }.sortedBy { it.fiscalConfirmationNextAttemptAt }
             .take(limit)
 
-    override suspend fun leaseFiscal(id: String, leasedUntil: Long, updatedAt: Long) {
+    override suspend fun leaseFiscal(
+        id: String,
+        leasedUntil: Long,
+        updatedAt: Long,
+    ) {
         rows[id] = rows[id]!!.copy(fiscalConfirmationLeasedUntil = leasedUntil, updatedAt = updatedAt)
     }
 
@@ -125,7 +131,12 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
             )
     }
 
-    override suspend fun markGatewayAwaiting(id: String, status: String, nextAttemptAt: Long, updatedAt: Long) {
+    override suspend fun markGatewayAwaiting(
+        id: String,
+        status: String,
+        nextAttemptAt: Long,
+        updatedAt: Long,
+    ) {
         rows[id] =
             rows[id]!!.copy(
                 gatewayCallbackStatus = status,
@@ -134,7 +145,11 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
             )
     }
 
-    override suspend fun leaseGateway(id: String, leasedUntil: Long, updatedAt: Long) {
+    override suspend fun leaseGateway(
+        id: String,
+        leasedUntil: Long,
+        updatedAt: Long,
+    ) {
         rows[id] = rows[id]!!.copy(gatewayCallbackLeasedUntil = leasedUntil, updatedAt = updatedAt)
     }
 
@@ -202,30 +217,43 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
             )
     }
 
-    override suspend fun findGatewayReconcilable(now: Long, limit: Int): List<TransactionLogEntity> =
+    override suspend fun findGatewayReconcilable(
+        now: Long,
+        limit: Int,
+    ): List<TransactionLogEntity> =
         rows.values
             .filter {
                 it.gatewayCallbackStatus in listOf("AWAITING", "RETRYABLE_AWAITING") &&
                     it.gatewayCallbackNextAttemptAt <= now &&
                     it.gatewayCallbackLeasedUntil <= now
-            }
-            .sortedBy { it.gatewayCallbackNextAttemptAt }
+            }.sortedBy { it.gatewayCallbackNextAttemptAt }
             .take(limit)
 
     // --- v14 additions (tenant-aware queries + atomic claims) ---
 
-    override suspend fun findFiscalConfirmableForTenant(tenantId: String, now: Long, limit: Int): List<TransactionLogEntity> =
-        findFiscalConfirmable(now, limit).filter { it.tenantId == tenantId }
+    override suspend fun findFiscalConfirmableForTenant(
+        tenantId: String,
+        now: Long,
+        limit: Int,
+    ): List<TransactionLogEntity> = findFiscalConfirmable(now, limit).filter { it.tenantId == tenantId }
 
-    override suspend fun findGatewayReconcilableForTenant(tenantId: String, now: Long, limit: Int): List<TransactionLogEntity> =
-        findGatewayReconcilable(now, limit).filter { it.tenantId == tenantId }
+    override suspend fun findGatewayReconcilableForTenant(
+        tenantId: String,
+        now: Long,
+        limit: Int,
+    ): List<TransactionLogEntity> = findGatewayReconcilable(now, limit).filter { it.tenantId == tenantId }
 
     /**
      * Atomic CAS — only flips the lease when the current lease has expired.
      * Returns 1 on success (mirrors Room's affected-row count).
      */
     @Suppress("ReturnCount")
-    override suspend fun tryClaimFiscal(id: String, now: Long, leasedUntil: Long, updatedAt: Long): Int {
+    override suspend fun tryClaimFiscal(
+        id: String,
+        now: Long,
+        leasedUntil: Long,
+        updatedAt: Long,
+    ): Int {
         val current = rows[id] ?: return 0
         if (current.fiscalConfirmationLeasedUntil > now) return 0
         rows[id] = current.copy(fiscalConfirmationLeasedUntil = leasedUntil, updatedAt = updatedAt)
@@ -233,7 +261,12 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
     }
 
     @Suppress("ReturnCount")
-    override suspend fun tryClaimGateway(id: String, now: Long, leasedUntil: Long, updatedAt: Long): Int {
+    override suspend fun tryClaimGateway(
+        id: String,
+        now: Long,
+        leasedUntil: Long,
+        updatedAt: Long,
+    ): Int {
         val current = rows[id] ?: return 0
         if (current.gatewayCallbackLeasedUntil > now) return 0
         rows[id] = current.copy(gatewayCallbackLeasedUntil = leasedUntil, updatedAt = updatedAt)

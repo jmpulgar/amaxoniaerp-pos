@@ -134,4 +134,3 @@ interface PendingInvoiceDao {
         updatedAt: Long = System.currentTimeMillis(),
     ): Int
 }
-

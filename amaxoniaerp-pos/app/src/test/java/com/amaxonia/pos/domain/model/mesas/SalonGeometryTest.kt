@@ -205,11 +205,8 @@ class SalonGeometryTest {
                     mesas = listOf(mesa),
                     lienzo = lienzo,
                     viewport = viewport,
-                    extraScale = 2f,
-                    offsetX = 50f,
-                    offsetY = -30f,
-                    xPx = 150f,
-                    yPx = 70f,
+                    transform = ViewportTransform(2f, 50f, -30f),
+                    point = ViewportPoint(150f, 70f),
                 )
             }
         assertEquals(1, hit?.id)

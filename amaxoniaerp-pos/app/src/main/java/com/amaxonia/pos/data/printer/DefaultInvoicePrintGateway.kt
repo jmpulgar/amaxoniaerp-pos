@@ -42,21 +42,28 @@ class DefaultInvoicePrintGateway(
         remoteInvoiceId: String,
         countryCode: String,
     ): InvoicePrintFeedback? {
-        if (localStore.readSelectedPrinterType() != PrinterType.SUNMI_V2) return null
-        val printer =
-            printerFactory.getActiveTicketPrinter()
-                ?: return InvoicePrintFeedback(
+        val printer = printerFactory.getActiveTicketPrinter()
+        return when {
+            localStore.readSelectedPrinterType() != PrinterType.SUNMI_V2 -> null
+            printer == null ->
+                InvoicePrintFeedback(
                     "Impresora SUNMI no disponible. Puedes reintentar la impresión desde el historial.",
                     "",
                     "",
                 )
-        val payload =
-            salesRepository.getPrintPayload(remoteInvoiceId).getOrElse { error ->
-                return InvoicePrintFeedback(error.message ?: "No se pudo obtener el payload de impresión", "", "")
-            }
-        return when (val result = printer.printTicket(PanamaInvoiceTicketFormatter().format(payload, countryCode))) {
-            PrintResult.Success -> InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
-            is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
+            else ->
+                salesRepository.getPrintPayload(remoteInvoiceId).fold(
+                    onSuccess = { payload ->
+                        when (val result = printer.printTicket(PanamaInvoiceTicketFormatter().format(payload, countryCode))) {
+                            PrintResult.Success ->
+                                InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
+                            is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
+                        }
+                    },
+                    onFailure = { error ->
+                        InvoicePrintFeedback(error.message ?: "No se pudo obtener el payload de impresión", "", "")
+                    },
+                )
         }
     }
 

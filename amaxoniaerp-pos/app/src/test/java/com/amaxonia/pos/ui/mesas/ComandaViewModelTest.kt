@@ -80,8 +80,18 @@ class ComandaViewModelTest {
             advanceUntilIdle()
 
             assertEquals(1, pedidosRepository.crearCalls.size)
-            assertEquals(true, pedidosRepository.crearCalls.first().request.enviarInmediato)
-            assertEquals(listOf(11), pedidosRepository.enviarCalls.first().request.pedidoIds)
+            assertEquals(
+                true,
+                pedidosRepository.crearCalls
+                    .first()
+                    .request.enviarInmediato,
+            )
+            assertEquals(
+                listOf(11),
+                pedidosRepository.enviarCalls
+                    .first()
+                    .request.pedidoIds,
+            )
             assertTrue(cartRepository.cartItems.value.isEmpty())
             assertFalse(vm.state.value.isSending)
             assertNotNull(vm.state.value.info)

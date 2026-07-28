@@ -83,6 +83,8 @@ fun KeypadKey(
  * "insufficient amount" reminder) are passed via [extraContent].
  */
 @Composable
+// Parámetros mantienen slot Compose y opciones usadas por pantallas existentes.
+@Suppress("LongParameterList")
 fun KeypadDisplay(
     label: String,
     amountText: String,
