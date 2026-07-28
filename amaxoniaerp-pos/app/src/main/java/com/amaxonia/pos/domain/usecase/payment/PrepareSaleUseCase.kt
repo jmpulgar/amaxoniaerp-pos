@@ -77,7 +77,9 @@ internal data class PreparedSale(
      * row has been opened.
      */
     fun withCorrelationId(clientCorrelationId: String?): PreparedSale =
-        copy(request = request.copy(idFactura = clientCorrelationId))
+        copy(
+            request = request.copy(idFactura = clientCorrelationId),
+        )
 }
 
 internal data class PreparedSaleDetails(
@@ -99,7 +101,7 @@ class PrepareSaleUseCase(
     private val assembleSale: AssemblePreparedSaleUseCase,
 ) {
     internal suspend operator fun invoke(input: ExecutePaymentFlowInput): SalePreparation {
-        val base = loadBaseContext()
+        val base = loadBaseContext(input)
         return when (base) {
             is PreparationStep.Failure -> SalePreparation.Failure(base.message)
             is PreparationStep.Success -> prepareWithBranch(input, base.value)
@@ -119,16 +121,17 @@ class PrepareSaleUseCase(
         input: ExecutePaymentFlowInput,
         context: BranchedSaleContext,
     ): SalePreparation =
-        when (val ready = resolveSaleReadiness(context)) {
+        when (val ready = resolveSaleReadiness(input, context)) {
             is PreparationStep.Failure -> SalePreparation.Failure(ready.message)
             is PreparationStep.Success -> SalePreparation.Success(assembleSale(input, ready.value))
         }
 
-    private fun loadBaseContext(): PreparationStep<BaseSaleContext> {
+    private fun loadBaseContext(input: ExecutePaymentFlowInput): PreparationStep<BaseSaleContext> {
         val cartItems = repositories.state.cart.cartItems.value
         val client = repositories.state.cart.selectedClient.value
         val caja = repositories.state.caja.activeCaja.value
-        val validation = operations.validatePayment.validateSaleContext(cartItems.size, client != null, caja != null)
+        val itemCount = input.saleItemsOverride?.size ?: cartItems.size
+        val validation = operations.validatePayment.validateSaleContext(itemCount, client != null, caja != null)
         return when {
             validation != null -> PreparationStep.Failure(validation.message)
             client == null || caja == null -> PreparationStep.Failure("No se pudo preparar la venta")
@@ -158,8 +161,14 @@ class PrepareSaleUseCase(
         }
     }
 
-    private suspend fun resolveSaleReadiness(context: BranchedSaleContext): PreparationStep<ReadySaleContext> {
+    private suspend fun resolveSaleReadiness(
+        input: ExecutePaymentFlowInput,
+        context: BranchedSaleContext,
+    ): PreparationStep<ReadySaleContext> {
         val isOnline = repositories.runtime.connectivity.isOnline()
+        if (!isOnline && input.cuentaMesa != null) {
+            return PreparationStep.Failure("Las cuentas de mesa requieren conexión para confirmar saldos en forma atómica")
+        }
         val sequenceResult =
             if (isOnline) {
                 repositories.state.caja
@@ -218,7 +227,7 @@ class AssemblePreparedSaleUseCase(
     ): PreparedSale {
         val base = ready.branched.base
         val configuration = resolveConfiguration(base.caja)
-        val items = buildItems(base, configuration)
+        val items = input.saleItemsOverride ?: buildItems(base, configuration)
         val totals = operations.calculateSaleTotals(items)
         val payments = buildPayments(input)
         val request =
@@ -235,7 +244,7 @@ class AssemblePreparedSaleUseCase(
         return PreparedSale(
             isOnline = ready.isOnline,
             client = base.client,
-            request = request,
+            request = request.copy(cuentaMesa = input.cuentaMesa),
             details =
                 PreparedSaleDetails(
                     items = items,

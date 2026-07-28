@@ -26,12 +26,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.domain.model.mesas.EstadoMesaOperativo
 import com.amaxonia.pos.domain.model.mesas.Lienzo
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.SalonForma
@@ -66,6 +68,8 @@ fun SalonPlan(
     selectedMesaId: Int?,
     onMesaClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** MesaId -> estado operativo (DISPONIBLE/OCUPADA). Vacío = no hidratado. */
+    estadosByMesaId: Map<Int, String> = emptyMap(),
 ) {
     var scale by remember { mutableFloatStateOf(INITIAL_ZOOM) }
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -77,6 +81,10 @@ fun SalonPlan(
     val surface = MaterialTheme.colorScheme.surface
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     val outline = MaterialTheme.colorScheme.outline
+    // Colores para "Ocupada": tertiaryContainer (amarillo cálido) para distinguirla de la
+    // seleccionada (primary). DISPONIBLE usa surface + outline, como antes.
+    val ocupadaFill = MaterialTheme.colorScheme.tertiaryContainer
+    val ocupadaBorder = MaterialTheme.colorScheme.tertiary
 
     Box(
         modifier =
@@ -120,6 +128,9 @@ fun SalonPlan(
             surface = surface,
             outline = outline,
             onPrimaryContainer = onPrimaryContainer,
+            ocupadaFill = ocupadaFill,
+            ocupadaBorder = ocupadaBorder,
+            estadosByMesaId = estadosByMesaId,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -159,6 +170,9 @@ private fun PlanoCanvas(
     surface: Color,
     outline: Color,
     onPrimaryContainer: Color,
+    ocupadaFill: Color,
+    ocupadaBorder: Color,
+    estadosByMesaId: Map<Int, String>,
     modifier: Modifier,
 ) {
     Canvas(
@@ -195,11 +209,30 @@ private fun PlanoCanvas(
             scale(baseScale * scale, pivot = Offset.Zero) {
                 mesas.forEach { mesa ->
                     val isSelected = mesa.id == selectedMesaId
+                    val isOcupada = estadosByMesaId[mesa.id] == EstadoMesaOperativo.OCUPADA
                     val forma = SalonForma.fromRaw(mesa.forma)
                     val width = mesa.ancho.toFloat().coerceAtLeast(1f)
                     val height = mesa.alto.toFloat().coerceAtLeast(1f)
                     val cx = (mesa.posicionX + mesa.ancho / 2.0).toFloat()
                     val cy = (mesa.posicionY + mesa.alto / 2.0).toFloat()
+                    val fill =
+                        when {
+                            isSelected -> primaryContainer
+                            isOcupada -> ocupadaFill
+                            else -> surface
+                        }
+                    val borderColor =
+                        when {
+                            isSelected -> primary
+                            isOcupada -> ocupadaBorder
+                            else -> outline
+                        }
+                    val borderWidth =
+                        when {
+                            isSelected -> 8f
+                            isOcupada -> 6f
+                            else -> 3f
+                        }
                     drawMesaShape(
                         forma = forma,
                         cx = cx,
@@ -207,9 +240,9 @@ private fun PlanoCanvas(
                         width = width,
                         height = height,
                         rotDeg = mesa.rotacion.toFloat(),
-                        fill = if (isSelected) primaryContainer else surface,
-                        borderColor = if (isSelected) primary else outline,
-                        borderWidth = if (isSelected) 8f else 3f,
+                        fill = fill,
+                        borderColor = borderColor,
+                        borderWidth = borderWidth,
                     )
                 }
             }

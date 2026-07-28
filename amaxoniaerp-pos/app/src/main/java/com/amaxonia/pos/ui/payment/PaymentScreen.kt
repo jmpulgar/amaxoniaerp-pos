@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -118,6 +117,7 @@ fun PaymentScreen(
                 validatePayment = DependencyContainer.validatePaymentUseCase,
                 buildPaymentDetails = DependencyContainer.buildPaymentDetailsUseCase,
                 executePaymentFlow = DependencyContainer.executePaymentFlowUseCase,
+                tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
             )
         }
 
@@ -126,7 +126,6 @@ fun PaymentScreen(
     LaunchedEffect(totalAmount) {
         viewModel.onAction(PaymentUiAction.SetTotalAmount(totalAmount))
     }
-
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var processingSeconds by remember { mutableIntStateOf(0) }
@@ -841,4 +840,3 @@ private fun fallbackIconForSigla(sigla: String?) =
         "TR", "DB", "CK", "BANK" -> Icons.Default.AccountBalance
         else -> Icons.Default.Wallet
     }
-

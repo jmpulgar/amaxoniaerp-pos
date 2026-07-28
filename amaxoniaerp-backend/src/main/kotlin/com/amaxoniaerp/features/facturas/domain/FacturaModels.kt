@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.facturas.domain
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class FacturaSummary(
@@ -27,6 +28,16 @@ data class FacturaSummary(
 data class FacturasListResponse(
     val data: List<FacturaSummary>,
     val total: Long,
+)
+
+/** Respuesta canónica para reconciliar un reintento idempotente de venta. */
+@Serializable
+data class FacturaReconciliadaResponse(
+    val idFactura: String,
+    val codFactura: String,
+    val codEstatus: Int,
+    @SerialName("sesion_mesa_cerrada")
+    val sesionMesaCerrada: Boolean = false,
 )
 
 @Serializable

@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.amaxonia.pos.domain.model.mesas.Area
+import com.amaxonia.pos.domain.model.mesas.EstadoMesaOperativo
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosStatusColors
@@ -95,26 +96,36 @@ fun MesaCard(
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Uno de [EstadoMesaOperativo] o `null` para "no hidratado". */
+    estadoOperativo: String? = null,
 ) {
+    val isOcupada = estadoOperativo == EstadoMesaOperativo.OCUPADA
+    val containerColor =
+        when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isOcupada -> MaterialTheme.colorScheme.tertiaryContainer
+            else -> MaterialTheme.colorScheme.surface
+        }
+    val contentColor =
+        when {
+            isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+            isOcupada -> MaterialTheme.colorScheme.onTertiaryContainer
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+    val borderColor =
+        when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isOcupada -> MaterialTheme.colorScheme.tertiary
+            else -> null
+        }
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = MESA_CARD_MIN_HEIGHT),
         shape = MaterialTheme.shapes.medium,
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    if (isSelected) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-            ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         border =
-            if (isSelected) {
-                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-            } else {
-                CardDefaults.outlinedCardBorder()
-            },
+            borderColor?.let { BorderStroke(2.dp, it) }
+                ?: CardDefaults.outlinedCardBorder(),
     ) {
         Column(
             modifier = Modifier.padding(14.dp).fillMaxSize(),
@@ -126,41 +137,73 @@ fun MesaCard(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color =
-                    if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
+                color = contentColor,
             )
-            mesa.displayCode?.let { code -> MesaSubtitle(text = code) }
-            MesaCapacityRow(capacidad = mesa.capacidad)
+            mesa.displayCode?.let { code -> MesaSubtitle(text = code, colorOverride = contentColor) }
+            MesaCapacityRow(capacidad = mesa.capacidad, contentColor = contentColor)
             mesa.forma?.let { forma -> MesaShapeTag(forma = forma) }
+            if (estadoOperativo != null) {
+                MesaStatusChip(estado = estadoOperativo, isOcupada = isOcupada)
+            }
         }
     }
 }
 
 @Composable
-private fun MesaSubtitle(text: String) {
+private fun MesaSubtitle(
+    text: String,
+    colorOverride: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = colorOverride,
         maxLines = 1,
     )
 }
 
 @Composable
-private fun MesaCapacityRow(capacidad: Int) {
+private fun MesaCapacityRow(
+    capacidad: Int,
+    contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = Icons.Default.People,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (contentColor == MaterialTheme.colorScheme.onSurface) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                contentColor
+            },
         )
         Spacer(modifier = Modifier.width(4.dp))
-        MesaSubtitle(text = "Capacidad: $capacidad")
+        MesaSubtitle(text = "Capacidad: $capacidad", colorOverride = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Chip pequeño con el estado operativo: "Disponible" (verde) o "Ocupada" (ámbar/tertiary). */
+@Composable
+private fun MesaStatusChip(
+    estado: String,
+    isOcupada: Boolean,
+) {
+    val label = if (isOcupada) "Ocupada" else "Disponible"
+    val (bg, fg) =
+        if (isOcupada) {
+            MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        }
+    Surface(shape = PosExtraShapes.Pill, color = bg) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = fg,
+            maxLines = 1,
+        )
     }
 }
 

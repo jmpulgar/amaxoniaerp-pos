@@ -15,4 +15,5 @@ data class PaymentSuccessPayload(
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
     val feError: String? = null,
+    val tableSessionClosed: Boolean = false,
 )

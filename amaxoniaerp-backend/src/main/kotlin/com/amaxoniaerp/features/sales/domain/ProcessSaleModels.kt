@@ -15,6 +15,22 @@ data class ProcessSaleRequest(
     val pagoResumen: SalePaymentSummaryInput,
     val pagos: List<SalePaymentInput> = emptyList(),
     val moneda: SaleCurrencyInput? = null,
+    @SerialName("cuenta_mesa")
+    val cuentaMesa: CuentaMesaVentaInput? = null,
+)
+
+/**
+ * Vincula una venta normal del POS con una cuenta de mesa ya reservada.
+ *
+ * Se procesa dentro de la misma transacción que crea la factura; por ello nunca puede quedar
+ * una factura confirmada sin que se registren también las cantidades facturadas de la mesa.
+ */
+@Serializable
+data class CuentaMesaVentaInput(
+    @SerialName("area_id") val areaId: Int,
+    @SerialName("mesa_id") val mesaId: Int,
+    @SerialName("sesion_mesa_id") val sesionMesaId: Int,
+    @SerialName("cuenta_mesa_id") val cuentaMesaId: Int,
 )
 
 @Serializable
@@ -172,4 +188,6 @@ data class ProcessSaleResponse(
     val qr: String? = null,
     val fechaRecepcionDGI: String? = null,
     val feError: String? = null,
+    @SerialName("sesion_mesa_cerrada")
+    val sesionMesaCerrada: Boolean = false,
 )

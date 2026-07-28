@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.mesas
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.model.mesas.Area
+import com.amaxonia.pos.domain.model.mesas.EstadoMesaOperativo
 import com.amaxonia.pos.domain.model.mesas.Lienzo
 import com.amaxonia.pos.domain.model.mesas.SalonDistribucion
 import com.amaxonia.pos.domain.model.mesas.SelectedTable
@@ -10,6 +11,7 @@ import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.AreaRepository
 import com.amaxonia.pos.domain.repository.ConnectivityStatus
 import com.amaxonia.pos.domain.repository.SelectedTableHolder
+import com.amaxonia.pos.domain.repository.SesionMesaRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +35,7 @@ class AreasMesasViewModel(
     private val activeCajaReader: ActiveCajaReader,
     private val connectivity: ConnectivityStatus,
     private val selectedTableHolder: SelectedTableHolder,
+    private val sesionMesaRepository: SesionMesaRepository? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AreasMesasState())
     val state: StateFlow<AreasMesasState> = _state.asStateFlow()
@@ -47,9 +50,10 @@ class AreasMesasViewModel(
         loadAreas()
     }
 
-    /** Refresco manual desde la barra superior. */
+    /** Refresco manual desde la barra superior: recarga áreas y, al final, estados. */
     fun onRefresh() {
         loadAreas(reselectArea = _state.value.selectedAreaId)
+        onRefreshEstados()
     }
 
     fun onRetryAreas() {
@@ -81,6 +85,9 @@ class AreasMesasViewModel(
                 imagenUrl = null,
                 hasDistribucionValida = false,
                 viewMode = SalonViewMode.PLANO,
+                estadosMesas = emptyMap(),
+                activeSesion = null,
+                sesionError = null,
             )
         }
         loadMesas(areaId)
@@ -148,6 +155,9 @@ class AreasMesasViewModel(
                             lienzo = Lienzo(),
                             imagenUrl = null,
                             hasDistribucionValida = false,
+                            estadosMesas = emptyMap(),
+                            activeSesion = null,
+                            sesionError = null,
                         )
                     }
                 }
@@ -299,6 +309,10 @@ class AreasMesasViewModel(
                                 )
                             }
                         }
+                        // Tras cargar las mesas con éxito, hidratamos los estados operativos para
+                        // pintar disponibles/ocupadas. Falla silenciosamente: sin estados la UI
+                        // simplemente no muestra la baliza.
+                        onRefreshEstados()
                     },
                     onFailure = { error ->
                         _state.update { current ->
@@ -314,5 +328,187 @@ class AreasMesasViewModel(
                     },
                 )
             }
+    }
+
+    // ---------------- Sesión operativa (fase 2) ----------------
+
+    /**
+     * Solicita los estados operativos de las mesas del área actual. No bloquea: si
+     * `sesionMesaRepository` no está inyectado (legacy), no hace nada y deja `estadosMesas`
+     * vacío, lo que la UI interpreta como "no hidratado".
+     *
+     * Se llama automáticamente al terminar `loadMesas` con éxito y desde `onRefreshEstados`.
+     */
+    fun onRefreshEstados() {
+        val areaId = _state.value.selectedAreaId ?: return
+        val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
+        val repo = sesionMesaRepository ?: return
+        if (_state.value.isLoadingEstados) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingEstados = true, sesionError = null) }
+            repo.getEstados(cajaId, areaId).fold(
+                onSuccess = { estados ->
+                    val mapa = estados.associate { it.mesaId to it.estado }
+                    _state.update {
+                        it.copy(isLoadingEstados = false, estadosMesas = mapa, sesionError = null)
+                    }
+                },
+                onFailure = { e ->
+                    // No propagar el fallo como error de pantalla: solo dejamos sin estados.
+                    _state.update {
+                        it.copy(isLoadingEstados = false, estadosMesas = emptyMap())
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * Apertura de sesión. Llamado desde la UI tras pedir `cantidad_personas`. Sobre una mesa
+     * marcada como OCUPADA en `estadosMesas` no se ejecuta: la UI debe deshabilitar el botón
+     * confirmar y mostrar motivo.
+     *
+     * En éxito, actualiza `estadosMesas[mesaId] = OCUPADA` y deja la sesión como `activeSesion`.
+     */
+    fun onAbrirSesion(
+        mesaId: Int,
+        cantidadPersonas: Int,
+    ) {
+        val state = _state.value
+        val areaId = state.selectedAreaId ?: return
+        val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
+        val repo = sesionMesaRepository ?: return
+        if (state.isLoadingSesion) return
+        if (cantidadPersonas < 1) {
+            _state.update { it.copy(sesionError = "Cantidad de personas inválida") }
+            return
+        }
+        if (state.estadosMesas[mesaId] == EstadoMesaOperativo.OCUPADA) {
+            _state.update { it.copy(sesionError = "La mesa ya tiene una sesión abierta") }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingSesion = true, sesionError = null) }
+            repo.abrir(cajaId, areaId, mesaId, cantidadPersonas).fold(
+                onSuccess = { sesion ->
+                    _state.update {
+                        it.copy(
+                            isLoadingSesion = false,
+                            activeSesion = sesion,
+                            sesionError = null,
+                            estadosMesas = it.estadosMesas + (mesaId to EstadoMesaOperativo.OCUPADA),
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(isLoadingSesion = false, sesionError = e.message ?: "No se pudo abrir la sesión")
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * Recupera la sesión activa de una mesa (al pulsar mesa ocupada). En éxito la deja en
+     * `activeSesion`. Si no hay sesión (la ocupación del cluster caducó), refresca estados para
+     * corregir el `estadosMesas` y mostrar la mesa como disponible.
+     */
+    fun onRecuperarSesionActiva(mesaId: Int) {
+        val areaId = _state.value.selectedAreaId ?: return
+        val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
+        val repo = sesionMesaRepository ?: return
+        if (_state.value.isLoadingSesion) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingSesion = true, sesionError = null) }
+            repo.getSesionActiva(cajaId, areaId, mesaId).fold(
+                onSuccess = { sesion ->
+                    _state.update {
+                        it.copy(
+                            isLoadingSesion = false,
+                            activeSesion = sesion,
+                            sesionError = null,
+                            estadosMesas =
+                                if (sesion == null) {
+                                    it.estadosMesas - mesaId
+                                } else {
+                                    it.estadosMesas + (mesaId to EstadoMesaOperativo.OCUPADA)
+                                },
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(isLoadingSesion = false, sesionError = e.message ?: "No se pudo recuperar la sesión")
+                    }
+                },
+            )
+        }
+    }
+
+    /** Cierra (deja histórico CERRADA) la sesión activa de la mesa indicada. */
+    fun onCerrarSesion(
+        mesaId: Int,
+        sesionId: Int,
+    ) = mutarSesion(mesaId, sesionId, mutacion = MutacionSesion.CERRAR)
+
+    /** Cancela (elimina el registro) la sesión activa, vacía, de la mesa indicada. */
+    fun onCancelarSesion(
+        mesaId: Int,
+        sesionId: Int,
+    ) = mutarSesion(mesaId, sesionId, mutacion = MutacionSesion.CANCELAR)
+
+    private enum class MutacionSesion { CERRAR, CANCELAR }
+
+    private fun mutarSesion(
+        mesaId: Int,
+        sesionId: Int,
+        mutacion: MutacionSesion,
+    ) {
+        val areaId = _state.value.selectedAreaId ?: return
+        val cajaId = activeCajaReader.activeCaja.value?.idCaja ?: return
+        val repo = sesionMesaRepository ?: return
+        if (_state.value.isLoadingSesion) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingSesion = true, sesionError = null) }
+            val result =
+                when (mutacion) {
+                    MutacionSesion.CERRAR -> repo.cerrar(cajaId, areaId, mesaId, sesionId)
+                    MutacionSesion.CANCELAR -> repo.cancelar(cajaId, areaId, mesaId, sesionId)
+                }
+            result.fold(
+                onSuccess = { sesion ->
+                    _state.update {
+                        it.copy(
+                            isLoadingSesion = false,
+                            activeSesion = null,
+                            sesionError = null,
+                            estadosMesas = it.estadosMesas + (mesaId to EstadoMesaOperativo.DISPONIBLE),
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(
+                            isLoadingSesion = false,
+                            sesionError =
+                                e.message ?: when (mutacion) {
+                                    MutacionSesion.CERRAR -> "No se pudo cerrar la sesión"
+                                    MutacionSesion.CANCELAR -> "No se pudo cancelar la sesión"
+                                },
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    /** Limpia el último mensaje de error de sesión (desde un snackbar "Descartar"). */
+    fun onDismissSesionError() {
+        _state.update { it.copy(sesionError = null) }
     }
 }

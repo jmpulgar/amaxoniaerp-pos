@@ -4,6 +4,7 @@ import com.amaxonia.pos.data.remote.api.AreasApi
 import com.amaxonia.pos.domain.model.mesas.Area
 import com.amaxonia.pos.domain.model.mesas.AreasResponse
 import com.amaxonia.pos.domain.model.mesas.AreasResult
+import com.amaxonia.pos.domain.model.mesas.Lienzo
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.MesasResponse
 import com.amaxonia.pos.domain.model.mesas.MesasResult
@@ -106,7 +107,13 @@ class AreaRepositoryImplTest {
             val result = repository.getMesas(CAJA_A, areaId = 1).getOrThrow()
 
             assertEquals(listOf(10), result.mesas.map { it.id })
-            assertEquals(Triple(CAJA_A, 1, listOf(10)), cache.savedMesas?.let { Triple(it.cajaId, it.areaId, it.mesas.map { m -> m.id }) })
+            // El plan incluye lienzo e imagen; ya llegan en la respuesta y se persisten.
+            assertEquals(LIENZO, result.lienzo)
+            assertEquals(IMAGEN_URL, result.imagenUrl)
+            assertEquals(
+                Triple(CAJA_A, 1, listOf(10)),
+                cache.savedMesas?.let { Triple(it.cajaId, it.areaId, it.mesas.map { m -> m.id }) },
+            )
         }
 
     @Test
@@ -114,7 +121,11 @@ class AreaRepositoryImplTest {
         runTest {
             val cache =
                 FakeSalonConfigCache(
-                    cachedMesas = mapOf((CAJA_A to 1) to MesasResult(1, listOf(mesa(10, 1)), fromCache = true)),
+                    cachedMesas =
+                        mapOf(
+                            (CAJA_A to 1) to
+                                MesasResult(1, LIENZO, IMAGEN_URL, listOf(mesa(10, 1)), fromCache = true),
+                        ),
                 )
             val repository = repository(cache = cache, online = false)
 
@@ -161,7 +172,8 @@ class AreaRepositoryImplTest {
 
     private class FakeAreasApi(
         private val areasResponse: AreasResponse = AreasResponse(success = true, sucursalId = 7, data = AREAS),
-        private val mesasResponse: MesasResponse = MesasResponse(success = true, areaId = 1, data = listOf(mesa(10, 1))),
+        private val mesasResponse: MesasResponse =
+            MesasResponse(success = true, areaId = 1, lienzo = LIENZO, imagenUrl = IMAGEN_URL, data = listOf(mesa(10, 1))),
         private val areasError: Throwable? = null,
     ) : AreasApi {
         var areaCalls: Int = 0
@@ -196,6 +208,8 @@ class AreaRepositoryImplTest {
         data class SavedMesas(
             val cajaId: String,
             val areaId: Int,
+            val lienzo: Lienzo,
+            val imagenUrl: String?,
             val mesas: List<Mesa>,
         )
 
@@ -222,15 +236,19 @@ class AreaRepositoryImplTest {
         override suspend fun cacheMesas(
             cajaId: String,
             areaId: Int,
+            lienzo: Lienzo,
+            imagenUrl: String?,
             mesas: List<Mesa>,
         ) {
-            savedMesas = SavedMesas(cajaId, areaId, mesas)
+            savedMesas = SavedMesas(cajaId, areaId, lienzo, imagenUrl, mesas)
         }
     }
 
     private companion object {
         const val CAJA_A = "caja-a"
         const val CAJA_B = "caja-b"
+        val LIENZO = Lienzo(2000, 1200)
+        const val IMAGEN_URL = "https://cdn.amaxonia.com/areas/1.jpg"
 
         val AREAS =
             listOf(

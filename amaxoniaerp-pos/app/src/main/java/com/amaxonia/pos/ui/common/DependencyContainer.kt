@@ -22,8 +22,11 @@ import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.RemoteImageUrlResolver
 import com.amaxonia.pos.data.remote.api.AreasApiImpl
 import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
+import com.amaxonia.pos.data.remote.api.CuentaMesaApiImpl
 import com.amaxonia.pos.data.remote.api.FormaPagoApiImpl
+import com.amaxonia.pos.data.remote.api.PedidosMesaApiImpl
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
+import com.amaxonia.pos.data.remote.api.SesionMesaApiImpl
 import com.amaxonia.pos.data.repository.ApiReportRepository
 import com.amaxonia.pos.data.repository.ApiTransactionRepository
 import com.amaxonia.pos.data.repository.AreaRepositoryImpl
@@ -31,6 +34,7 @@ import com.amaxonia.pos.data.repository.AuthRepositoryImpl
 import com.amaxonia.pos.data.repository.CachedCompanyRepository
 import com.amaxonia.pos.data.repository.CajaRepositoryImpl
 import com.amaxonia.pos.data.repository.CreditNoteRepositoryImpl
+import com.amaxonia.pos.data.repository.CuentaMesaRepositoryImpl
 import com.amaxonia.pos.data.repository.FormaPagoRepositoryImpl
 import com.amaxonia.pos.data.repository.InMemorySelectedTableHolder
 import com.amaxonia.pos.data.repository.JsonDraftInvoiceRestorer
@@ -40,6 +44,7 @@ import com.amaxonia.pos.data.repository.LocalPosConfigurationRepository
 import com.amaxonia.pos.data.repository.OfflineFirstClientFormCatalogSource
 import com.amaxonia.pos.data.repository.OfflineFirstClientRepository
 import com.amaxonia.pos.data.repository.OfflineFirstProductRepository
+import com.amaxonia.pos.data.repository.PedidosMesaRepositoryImpl
 import com.amaxonia.pos.data.repository.PromotionRepositoryImpl
 import com.amaxonia.pos.data.repository.RemoteProductLotRepository
 import com.amaxonia.pos.data.repository.RoomClientBranchRepository
@@ -47,6 +52,7 @@ import com.amaxonia.pos.data.repository.RoomDraftInvoiceRepository
 import com.amaxonia.pos.data.repository.RoomOfflineInvoiceWriter
 import com.amaxonia.pos.data.repository.RoomPendingSalesReader
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
+import com.amaxonia.pos.data.repository.SesionMesaRepositoryImpl
 import com.amaxonia.pos.data.sync.CatalogSyncer
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.ServerCountries
@@ -63,10 +69,13 @@ import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.ClientTypeRepository
 import com.amaxonia.pos.domain.repository.CompanyRepository
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
+import com.amaxonia.pos.domain.repository.CuentaMesaRepository
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.ImageUrlResolver
+import com.amaxonia.pos.domain.repository.InMemoryTableAccountPaymentHolder
 import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
+import com.amaxonia.pos.domain.repository.PedidosMesaRepository
 import com.amaxonia.pos.domain.repository.PendingSalesReader
 import com.amaxonia.pos.domain.repository.ProductLotRepository
 import com.amaxonia.pos.domain.repository.ProductRepository
@@ -75,6 +84,8 @@ import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.repository.SelectedTableHolder
 import com.amaxonia.pos.domain.repository.ServerEnvironment
+import com.amaxonia.pos.domain.repository.SesionMesaRepository
+import com.amaxonia.pos.domain.repository.TableAccountPaymentHolder
 import com.amaxonia.pos.domain.repository.TransactionRepository
 import com.amaxonia.pos.domain.system.SystemAppClock
 import com.amaxonia.pos.domain.system.UuidGenerator
@@ -200,9 +211,20 @@ object DependencyContainer {
         private set
     lateinit var areaRepository: AreaRepository
         private set
+    lateinit var sesionMesaRepository: SesionMesaRepository
+        private set
+    lateinit var pedidosMesaRepository: PedidosMesaRepository
+        private set
+    lateinit var cuentaMesaRepository: CuentaMesaRepository
+        private set
 
     /** Selección de mesa en memoria; no persiste ni escribe en el backend. */
     val selectedTableHolder: SelectedTableHolder = InMemorySelectedTableHolder()
+
+    /** Cuenta concreta que atraviesa el flujo estándar de pago/facturación. */
+    val tableAccountPaymentHolder: TableAccountPaymentHolder =
+        InMemoryTableAccountPaymentHolder()
+
     lateinit var salesRepository: SalesRepository
         private set
     lateinit var creditNoteRepository: CreditNoteRepository
@@ -387,6 +409,9 @@ object DependencyContainer {
             )
         formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, networkMonitor)
         areaRepository = AreaRepositoryImpl(AreasApiImpl(apiClient), localStore, localStore, networkMonitor)
+        sesionMesaRepository = SesionMesaRepositoryImpl(SesionMesaApiImpl(apiClient), localStore)
+        pedidosMesaRepository = PedidosMesaRepositoryImpl(PedidosMesaApiImpl(apiClient), localStore)
+        cuentaMesaRepository = CuentaMesaRepositoryImpl(CuentaMesaApiImpl(apiClient), localStore)
         salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
         creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
         _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore)

@@ -1,18 +1,12 @@
 package com.amaxoniaerp.features.mesas
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.domain.AreasListResponse
-import com.amaxoniaerp.features.mesas.domain.CajaScopeResult
-import com.amaxoniaerp.features.mesas.domain.CajaSucursalScope
 import com.amaxoniaerp.features.mesas.domain.MesasListResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -114,81 +108,6 @@ fun Route.mesasRouting(mesasRepository: MesasRepository) {
 
 private const val AREA_NOT_FOUND = "Área no encontrada"
 
-private data class PosCompanyContext(
-    val countryCode: String,
-    val adminDb: String,
-    val userId: Int,
-)
-
-/**
- * Misma regla que el resto de `/api/pos`: token de empresa y `admin_db`/`country_code` tomados
- * del JWT firmado, nunca del cliente.
- */
-private suspend fun ApplicationCall.resolvePosContext(): PosCompanyContext? {
-    val principal =
-        principal<JWTPrincipal>()
-            ?: run {
-                respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                return null
-            }
-
-    if (principal.payload.getClaim("token_type").asString() != "company") {
-        respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-        return null
-    }
-
-    val countryCode =
-        principal.getCountryCode()
-            ?: run {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-                return null
-            }
-
-    val adminDb =
-        principal.getAdminDb()?.takeIf { it.isNotBlank() }
-            ?: run {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
-                return null
-            }
-
-    val userId =
-        principal.payload.getClaim("user_id").asInt()
-            ?: run {
-                respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido: falta user_id"))
-                return null
-            }
-
-    return PosCompanyContext(countryCode = countryCode, adminDb = adminDb, userId = userId)
-}
-
-private suspend fun ApplicationCall.requireCajaId(): String? =
-    request.queryParameters["cajaId"]?.takeIf { it.isNotBlank() }
-        ?: run {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "El parámetro cajaId es requerido"))
-            null
-        }
-
-private suspend fun ApplicationCall.resolveScopeOrRespond(
-    mesasRepository: MesasRepository,
-    database: org.jetbrains.exposed.sql.Database,
-    ctx: PosCompanyContext,
-    cajaId: String,
-): CajaSucursalScope? =
-    when (val result = mesasRepository.resolveCajaScope(database, ctx.userId, cajaId)) {
-        is CajaScopeResult.Allowed -> result.scope
-        CajaScopeResult.CajaNotFound -> {
-            respond(HttpStatusCode.NotFound, mapOf("error" to "Caja no encontrada"))
-            null
-        }
-        CajaScopeResult.AccessDenied -> {
-            respond(HttpStatusCode.Forbidden, mapOf("error" to "La caja no pertenece al usuario"))
-            null
-        }
-        CajaScopeResult.SucursalNotAssigned -> {
-            respond(
-                HttpStatusCode.Conflict,
-                mapOf("error" to "La caja activa no tiene una sucursal asignada"),
-            )
-            null
-        }
-    }
+// resolvePosContext, requireCajaId y resolveScopeOrRespond viven en PosRoutingCommon.kt
+// y son `internal` para compartirlos con SesionMesaRouting sin duplicar las reglas
+// de autenticación, derivación de sucursal y acceso a caja.

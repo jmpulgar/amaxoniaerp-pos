@@ -91,6 +91,28 @@ class StartTransactionIdempotencyTest {
             assertEquals(2, dao.rows.size)
         }
 
+    @Test
+    fun `preferred table account id already confirmed is preserved without reopening ledger row`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            val canonical = "mesa-7-cuenta-3"
+            val first = StartTransactionUseCase(dao, ids("unused"), fixedClock())
+            first.recoverOrStart(command(carryOverId = canonical, preferredId = canonical))
+            dao.rows[canonical] =
+                dao.rows.row(canonical).copy(status = StartTransactionUseCase.STATUS_CONFIRMED)
+            val retry = StartTransactionUseCase(dao, ids("must-not-be-used"), fixedClock())
+
+            val started =
+                requireNotNull(
+                    retry.recoverOrStart(command(carryOverId = canonical, preferredId = canonical)),
+                )
+
+            assertEquals(canonical, started.clientCorrelationId)
+            assertTrue(started.resumed)
+            assertEquals(StartTransactionUseCase.STATUS_CONFIRMED, dao.rows.row(canonical).status)
+            assertEquals(1, dao.rows.size)
+        }
+
     private fun ids(value: String): IdGenerator = IdGenerator { value }
 
     private fun fixedClock(): AppClock = AppClock { Instant.ofEpochMilli(1_000L) }
@@ -105,9 +127,14 @@ class StartTransactionIdempotencyTest {
             nominaDb = "nomina$companyId",
         )
 
-    private fun command(carryOverId: String?, tenantValue: SaleTenant? = tenant()) =
+    private fun command(
+        carryOverId: String?,
+        tenantValue: SaleTenant? = tenant(),
+        preferredId: String? = null,
+    ) =
         StartTransactionCommand(
             carryOverId = carryOverId,
+            preferredId = preferredId,
             idCaja = "caja",
             idCajaSecuencia = "OFFLINE-caja",
             totalAmount = 10.0,

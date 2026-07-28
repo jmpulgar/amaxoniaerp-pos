@@ -125,6 +125,46 @@ fun Route.facturasRoutes(
                 call.respond(resumen)
             }
 
+            get("/by-id-factura/{idFactura}") {
+                val principal =
+                    call.principal<JWTPrincipal>()
+                        ?: return@get call.respond(
+                            HttpStatusCode.Unauthorized,
+                            mapOf("error" to "Invalid token"),
+                        )
+                if (principal.payload.getClaim("token_type").asString() != "company") {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Company token required"),
+                    )
+                }
+                val adminDb =
+                    principal.getAdminDb()?.takeIf(String::isNotBlank)
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Database not found"),
+                        )
+                val countryCode =
+                    principal.getCountryCode()
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Country code not found"),
+                        )
+                val idFactura =
+                    call.parameters["idFactura"]?.takeIf(String::isNotBlank)
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Missing idFactura"),
+                        )
+                val database = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
+                val factura = facturasRepository.findByCorrelationId(database, countryCode, idFactura)
+                if (factura == null) {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
+                } else {
+                    call.respond(factura)
+                }
+            }
+
             get("/{id}/detalle") {
                 val principal = call.principal<JWTPrincipal>()
                     ?: return@get call.respond(

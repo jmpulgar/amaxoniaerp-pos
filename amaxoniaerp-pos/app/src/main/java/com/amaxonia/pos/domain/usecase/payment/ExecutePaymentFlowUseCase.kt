@@ -9,7 +9,9 @@ import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.payment.GatewayPaymentRequest
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.domain.model.sales.CuentaMesaVentaDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
+import com.amaxonia.pos.domain.model.sales.SaleItemDto
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
@@ -41,6 +43,9 @@ data class ExecutePaymentFlowInput(
      * null/blank for brand-new operations → fresh UUID is minted.
      */
     val correlationCarryOver: String? = null,
+    val preferredCorrelationId: String? = null,
+    val saleItemsOverride: List<SaleItemDto>? = null,
+    val cuentaMesa: CuentaMesaVentaDto? = null,
 )
 
 sealed interface PaymentFlowEvent {
@@ -68,8 +73,8 @@ sealed interface PaymentFlowResult {
     /**
      * The backend rejected the submission with HTTP 409 because the same
      * [DuplicateInvoice.clientCorrelationId] was already processed. The user
-     * must reconcile or escalate manually; the existing invoice body is not
-     * returned by the backend so the operation cannot be auto-completed.
+     * is reconciled through the canonical invoice lookup. This result remains
+     * for the ambiguous case where that lookup is unavailable.
      */
     data class DuplicateInvoice(
         val clientCorrelationId: String,
@@ -123,23 +128,28 @@ class ExecutePaymentFlowUseCase(
         sale: PreparedSale,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
-        val tenant = sessionReader?.currentTenant()
+        val tenant =
+            sessionReader
+                ?.currentTenant()
         val correlationId =
-            startTransaction?.recoverOrStart(
-                StartTransactionCommand(
-                    carryOverId = sale.correlationCarryOver,
-                    idCaja = sale.request.factura.idCaja,
-                    idCajaSecuencia = sale.request.factura.idCajaSecuencia,
-                    totalAmount = sale.financials.total,
-                    currency = sale.request.moneda?.abrMonedaBase ?: DEFAULT_CURRENCY,
-                    clientName = sale.client.paymentFullName(),
-                    tenant = tenant,
-                ),
-            )?.clientCorrelationId
+            startTransaction
+                ?.recoverOrStart(
+                    StartTransactionCommand(
+                        carryOverId = sale.correlationCarryOver,
+                        preferredId = input.preferredCorrelationId,
+                        idCaja = sale.request.factura.idCaja,
+                        idCajaSecuencia = sale.request.factura.idCajaSecuencia,
+                        totalAmount = sale.financials.total,
+                        currency = sale.request.moneda?.abrMonedaBase ?: DEFAULT_CURRENCY,
+                        clientName = sale.client.paymentFullName(),
+                        tenant = tenant,
+                    ),
+                )?.clientCorrelationId
         val stampedSale = sale.withCorrelationId(correlationId)
         val gatewayFailure = executeGatewayIfRequired(input, stampedSale, correlationId, onEvent)
         return if (gatewayFailure != null) {
-            correlationId?.let { startTransaction?.markFailed(it, "Gateway: ${gatewayFailure.message}") }
+            correlationId
+                ?.let { startTransaction?.markFailed(it, "Gateway: ${gatewayFailure.message}") }
             gatewayFailure
         } else {
             onEvent(PaymentFlowEvent.Progress("Generando factura..."))
@@ -192,7 +202,8 @@ class ExecutePaymentFlowUseCase(
             )
             // Pin the correlationId on the in-memory bridge so MainActivity can
             // mark RESOLVED on the matching row when the HKA Intent returns.
-            com.amaxonia.pos.data.printer.RapidPayBridge.setPendingCorrelationId(correlationId)
+            com.amaxonia.pos.data.printer.RapidPayBridge
+                .setPendingCorrelationId(correlationId)
             // Auditoría ítem 10 (OBS-001): emit the structured gateway event
             // correlated by idFactura so the pilot log is observable.
             com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
@@ -368,6 +379,7 @@ class CompletePaymentSaleUseCase(
                 idFactura = reconciled.idFactura,
                 codFactura = reconciled.codFactura,
                 codEstatus = reconciled.codEstatus,
+                sesionMesaCerrada = reconciled.sesionMesaCerrada,
             )
         return processAcceptedOnlineSale(input, sale, correlationId, synthetic, onEvent)
     }
@@ -457,6 +469,7 @@ class CompletePaymentSaleUseCase(
                                 printMessage = printResult?.displayMessage,
                                 fiscalNumber = fiscalNumber,
                                 fiscalError = response.feError,
+                                tableSessionClosed = response.sesionMesaCerrada,
                             ),
                     ),
                 receiptPrintMessage = printResult?.displayMessage,
@@ -572,6 +585,7 @@ class CompletePaymentSaleUseCase(
             abrMonedaSecundaria = input.secondaryCurrency,
             isMultiCurrency = input.isMultiCurrency,
             feError = completion.fiscalError,
+            tableSessionClosed = completion.tableSessionClosed,
         )
 
     private fun fiscalPrintAmount(
@@ -606,6 +620,7 @@ private data class PaymentCompletion(
     val printMessage: String?,
     val fiscalNumber: String = "",
     val fiscalError: String? = null,
+    val tableSessionClosed: Boolean = false,
 )
 
 private const val VENEZUELA_CODE = "VE"

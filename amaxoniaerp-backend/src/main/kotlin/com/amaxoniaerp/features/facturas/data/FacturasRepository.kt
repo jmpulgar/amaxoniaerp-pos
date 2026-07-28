@@ -5,6 +5,7 @@ import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleItem
 import com.amaxoniaerp.features.facturas.domain.FacturaDetalleResponse
+import com.amaxoniaerp.features.facturas.domain.FacturaReconciliadaResponse
 import com.amaxoniaerp.features.facturas.domain.ClientePrintResponse
 import com.amaxoniaerp.features.facturas.domain.EmpresaPrintResponse
 import com.amaxoniaerp.features.facturas.domain.FacturaPrintPayloadResponse
@@ -13,6 +14,9 @@ import com.amaxoniaerp.features.facturas.domain.FacturasResumen
 import com.amaxoniaerp.features.facturas.domain.PagoPrintResponse
 import com.amaxoniaerp.features.facturas.domain.ProductoPrintResponse
 import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
+import com.amaxoniaerp.features.mesas.data.CuentaMesaTable
+import com.amaxoniaerp.features.mesas.data.SesionMesaTable
+import com.amaxoniaerp.features.mesas.domain.EstadoSesionMesa
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
@@ -32,6 +36,39 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 class FacturasRepository {
+    suspend fun findByCorrelationId(
+        database: Database,
+        countryCode: String,
+        idFactura: String,
+    ): FacturaReconciliadaResponse? = dbQuery(database) {
+        val tabla = FacturasTableFactory.forCountry(countryCode)
+        val factura =
+            tabla
+                .selectAll()
+                .where { tabla.idFactura eq idFactura }
+                .limit(1)
+                .singleOrNull()
+                ?: return@dbQuery null
+        val sesionCerrada =
+            CuentaMesaTable
+                .join(
+                    SesionMesaTable,
+                    JoinType.INNER,
+                    additionalConstraint = { CuentaMesaTable.sesionMesaId eq SesionMesaTable.id },
+                )
+                .select(SesionMesaTable.estado)
+                .where { CuentaMesaTable.idFactura eq idFactura }
+                .limit(1)
+                .singleOrNull()
+                ?.get(SesionMesaTable.estado) == EstadoSesionMesa.CERRADA_PAGADA.codigo
+        FacturaReconciliadaResponse(
+            idFactura = factura[tabla.idFactura],
+            codFactura = factura[tabla.codFactura],
+            codEstatus = factura[tabla.codEstatus] ?: 0,
+            sesionMesaCerrada = sesionCerrada,
+        )
+    }
+
     suspend fun listFacturas(
         database: Database,
         countryCode: String,

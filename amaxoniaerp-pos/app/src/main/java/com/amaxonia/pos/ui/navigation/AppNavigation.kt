@@ -30,8 +30,10 @@ import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.repository.TableAccountPayment
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.cart.CartScreen
+import com.amaxonia.pos.ui.cart.CartViewModel
 import com.amaxonia.pos.ui.clients.ClientFormScreen
 import com.amaxonia.pos.ui.clients.ClientListScreen
 import com.amaxonia.pos.ui.clients.ClientSelectionScreen
@@ -43,6 +45,10 @@ import com.amaxonia.pos.ui.drafts.DraftInvoicesScreen
 import com.amaxonia.pos.ui.history.HistoryScreen
 import com.amaxonia.pos.ui.login.LoginScreen
 import com.amaxonia.pos.ui.mesas.AreasMesasScreen
+import com.amaxonia.pos.ui.mesas.ComandaScreen
+import com.amaxonia.pos.ui.mesas.ComandaViewModel
+import com.amaxonia.pos.ui.mesas.CuentaMesaScreen
+import com.amaxonia.pos.ui.mesas.CuentaMesaViewModel
 import com.amaxonia.pos.ui.payment.PaymentScreen
 import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
@@ -196,10 +202,122 @@ fun AppNavigation(startDestination: String) {
                         DependencyContainer.requestCajaSelectorOnDashboard()
                         navigateAndClearStack("dashboard")
                     },
-                    // TODO(fase 2): aquí engancha la apertura operativa de mesa. En esta fase
-                    // seleccionar una mesa no abre venta ni crea ningún registro.
+                    // Fase 3 - Comanda: al tener sesión activa para la mesa, navegamos a la
+                    // pantalla de comanda/pedido. La sesión se acaba de abrir o ya existía.
                     onTableConfirmed = { mesa ->
-                        SafeLog.d(NAV_LOG_TAG, "Mesa seleccionada sin apertura operativa: ${mesa.id}")
+                        SafeLog.d(
+                            NAV_LOG_TAG,
+                            "Sesión ya gestionada en pantalla; mesa ${mesa.id} lista para comanda",
+                        )
+                    },
+                    onComenzarPedido = { mesa, sesionId ->
+                        navController.navigate("comanda/${mesa.areaId}/${mesa.id}/$sesionId")
+                    },
+                )
+            }
+
+            composable(
+                "comanda/{areaId}/{mesaId}/{sesionId}",
+                arguments =
+                    listOf(
+                        navArgument("areaId") { type = NavType.IntType },
+                        navArgument("mesaId") { type = NavType.IntType },
+                        navArgument("sesionId") { type = NavType.IntType },
+                    ),
+            ) { entry ->
+                val areaId = entry.arguments?.getInt("areaId") ?: return@composable
+                val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
+                val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
+                val selected = DependencyContainer.selectedTableHolder.selectedTable.value
+                val mesaNombre = selected?.mesa?.displayName ?: "Mesa $mesaId"
+                val comandaViewModel =
+                    remember {
+                        ComandaViewModel(
+                            areaId = areaId,
+                            mesaId = mesaId,
+                            sesionId = sesionId,
+                            pedidosMesaRepository = DependencyContainer.pedidosMesaRepository,
+                            cartRepository = DependencyContainer.cartRepository,
+                            activeCajaReader = DependencyContainer.cajaRepository,
+                            connectivity = DependencyContainer.networkMonitor,
+                        )
+                    }
+                val cartViewModel =
+                    remember {
+                        CartViewModel(
+                            stateCoordinator =
+                                com.amaxonia.pos.ui.cart.CartStateCoordinator(
+                                    DependencyContainer.cartRepository,
+                                    DependencyContainer.clientRepository,
+                                    DependencyContainer.posConfigurationRepository,
+                                    DependencyContainer.clientBranchRepository,
+                                    com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase(
+                                        DependencyContainer.posConfigurationRepository,
+                                        DependencyContainer.imageUrlResolver,
+                                    ),
+                                ),
+                            configurationCoordinator =
+                                com.amaxonia.pos.ui.cart.CartConfigurationCoordinator(
+                                    DependencyContainer.posConfigurationRepository,
+                                    DependencyContainer.cajaRepository,
+                                ),
+                            actionHandler =
+                                com.amaxonia.pos.ui.cart.CartActionHandler(
+                                    DependencyContainer.cartRepository,
+                                    DependencyContainer.refreshCartProductLotsUseCase,
+                                    DependencyContainer.saveDraftInvoiceUseCase,
+                                ),
+                        )
+                    }
+                ComandaScreen(
+                    mesaNombre = mesaNombre,
+                    sesionId = sesionId,
+                    viewModel = comandaViewModel,
+                    cartViewModel = cartViewModel,
+                    onBack = { navController.popBackStack() },
+                    onCuenta = {
+                        navController.navigate("cuenta_mesa/$areaId/$mesaId/$sesionId")
+                    },
+                )
+            }
+
+            composable(
+                "cuenta_mesa/{areaId}/{mesaId}/{sesionId}",
+                arguments =
+                    listOf(
+                        navArgument("areaId") { type = NavType.IntType },
+                        navArgument("mesaId") { type = NavType.IntType },
+                        navArgument("sesionId") { type = NavType.IntType },
+                    ),
+            ) { entry ->
+                val areaId = entry.arguments?.getInt("areaId") ?: return@composable
+                val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
+                val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
+                val selected = DependencyContainer.selectedTableHolder.selectedTable.value
+                val client by cartRepository.selectedClient.collectAsStateWithLifecycle()
+                val cuentaViewModel =
+                    remember(areaId, mesaId, sesionId) {
+                        CuentaMesaViewModel(
+                            areaId = areaId,
+                            mesaId = mesaId,
+                            sesionId = sesionId,
+                            cuentasRepository = DependencyContainer.cuentaMesaRepository,
+                            pedidosRepository = DependencyContainer.pedidosMesaRepository,
+                            activeCajaReader = DependencyContainer.cajaRepository,
+                        )
+                    }
+                CuentaMesaScreen(
+                    mesaNombre = selected?.mesa?.displayName ?: "Mesa $mesaId",
+                    clientName =
+                        client?.let { "${it.firstName} ${it.lastName}".trim().ifBlank { it.code } },
+                    viewModel = cuentaViewModel,
+                    onBack = { navController.popBackStack() },
+                    onSelectClient = { navController.navigate("client_selection_mode") },
+                    onPay = { cuenta ->
+                        DependencyContainer.tableAccountPaymentHolder.select(
+                            TableAccountPayment(areaId, mesaId, sesionId, cuenta),
+                        )
+                        navController.navigate("payment/${cuenta.total}")
                     },
                 )
             }
@@ -343,6 +461,11 @@ fun AppNavigation(startDestination: String) {
                     onBack = { navController.popBackStack() },
                     onPaymentSuccess = { payload ->
                         scope.launch {
+                            DependencyContainer.tableAccountPaymentHolder.clear()
+                            if (payload.tableSessionClosed) {
+                                DependencyContainer.selectedTableHolder.clear()
+                                DependencyContainer.cartRepository.clearCart()
+                            }
                             DependencyContainer.localStore.saveLastPaymentSuccess(payload)
                             navController.navigate("payment_success/${payload.transactionId}") {
                                 popUpTo("dashboard") { inclusive = false }

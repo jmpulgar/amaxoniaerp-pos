@@ -15,6 +15,16 @@ data class ProcessSaleRequestDto(
     val pagoResumen: SalePaymentSummaryDto,
     val pagos: List<SalePaymentDto>,
     val moneda: SaleCurrencyDto? = null,
+    @SerialName("cuenta_mesa")
+    val cuentaMesa: CuentaMesaVentaDto? = null,
+)
+
+@Serializable
+data class CuentaMesaVentaDto(
+    @SerialName("area_id") val areaId: Int,
+    @SerialName("mesa_id") val mesaId: Int,
+    @SerialName("sesion_mesa_id") val sesionMesaId: Int,
+    @SerialName("cuenta_mesa_id") val cuentaMesaId: Int,
 )
 
 @Serializable
@@ -171,6 +181,8 @@ data class ProcessSaleResponseDto(
     val qr: String? = null,
     val fechaRecepcionDGI: String? = null,
     val feError: String? = null,
+    @SerialName("sesion_mesa_cerrada")
+    val sesionMesaCerrada: Boolean = false,
 )
 
 @Serializable

@@ -18,6 +18,27 @@ class CartRepository {
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
+    /**
+     * Sesión de mesa en la que se enmarca el carrito cuando se opera desde la pantalla de
+     * comanda. `null` cuando el carrito es "libre" (apertura directa de venta sin mesa).
+     *
+     * El carrito físico NO se duplica: el POS lo usa en ambos flujos (venta directa y comanda
+     * de mesa). El ViewModel de comanda lee `cartItems` para mostrar los pendientes y los
+     * persiste como pedidos contra esta sesión; para luego pasarlos a ENVIADA usa
+     * `pedidosMesaRepository.enviarComanda`. Al salir de la comanda, el ViewModel invoca
+     * [unbindSesionMesa] para que el siguiente carrito arranque limpio.
+     */
+    private val _sesionMesaId = MutableStateFlow<Int?>(null)
+    val sesionMesaId: StateFlow<Int?> = _sesionMesaId.asStateFlow()
+
+    fun bindSesionMesa(sesionId: Int) {
+        _sesionMesaId.value = sesionId
+    }
+
+    fun unbindSesionMesa() {
+        _sesionMesaId.value = null
+    }
+
     // Nuevo: Estado del cliente seleccionado para la transacción actual
     private val _selectedClient = MutableStateFlow<Client?>(null)
     val selectedClient: StateFlow<Client?> = _selectedClient.asStateFlow()

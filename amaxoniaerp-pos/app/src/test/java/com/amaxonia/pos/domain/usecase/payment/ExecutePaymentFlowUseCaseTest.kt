@@ -531,6 +531,7 @@ class ExecutePaymentFlowUseCaseTest {
                         withLedger = true,
                         processSaleDuplicateOn = "flow-id",
                         reconciledCorrelationId = "flow-id",
+                        reconciledTableSessionClosed = true,
                     ),
                 )
 
@@ -541,6 +542,7 @@ class ExecutePaymentFlowUseCaseTest {
             assertTrue("Expected Success, was $result", result is PaymentFlowResult.Success)
             val success = result as PaymentFlowResult.Success
             assertEquals("RECONCILED-1", success.payload.codFactura)
+            assertTrue(success.payload.tableSessionClosed)
             // And processSale was called exactly once (no second submission).
             assertEquals(1, fixture.sales.processSaleCalls)
         }
@@ -624,6 +626,8 @@ class ExecutePaymentFlowUseCaseTest {
         val processSaleDuplicateOn: String? = null,
         /** idFactura that findByCorrelationId resolves to a reconciled invoice. */
         val reconciledCorrelationId: String? = null,
+        /** Whether the reconciled invoice atomically closed its table session. */
+        val reconciledTableSessionClosed: Boolean = false,
         /** idFactura for which findByCorrelationId fails (network unreachable). */
         val reconciliationFailureId: String? = null,
     )
@@ -691,6 +695,7 @@ class ExecutePaymentFlowUseCaseTest {
                             idFactura = clientCorrelationId,
                             codFactura = "RECONCILED-1",
                             codEstatus = 2,
+                            sesionMesaCerrada = options.reconciledTableSessionClosed,
                         ),
                     )
                 options.reconciliationFailureId ->

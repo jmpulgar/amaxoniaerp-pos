@@ -19,8 +19,14 @@ import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.geography.route.geographyRoutes
 import com.amaxoniaerp.features.items.data.ItemsRepository
 import com.amaxoniaerp.features.items.route.itemsRoutes
+import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.MesasRepository
+import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
+import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
+import com.amaxoniaerp.features.mesas.cuentaMesaRouting
 import com.amaxoniaerp.features.mesas.mesasRouting
+import com.amaxoniaerp.features.mesas.pedidoMesaRouting
+import com.amaxoniaerp.features.mesas.sesionMesaRouting
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.pos.posRouting
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
@@ -111,7 +117,6 @@ fun Application.configureRouting() {
     val panamaProcessor = PanamaInvoiceProcessor(feRepository, pacClient, payloadBuilder)
     val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor)
 
-    val processSaleUseCase = ProcessSaleUseCase(ProcessSaleTransactionalRepository(), feFactory)
     val creditNoteService = CreditNoteService(CreditNoteRepository())
 
     routing {
@@ -128,6 +133,20 @@ fun Application.configureRouting() {
         cajaRouting(cajaRepository)
         posRouting(formasPagoRepository)
         mesasRouting(mesasRepository)
+
+        // PedidoMesaRepository se inicializa primero: SesionMesaRepository lo usa como
+        // lookup de operaciones para decidir si la sesión se puede cerrar/cancelar.
+        val pedidoMesaRepository = PedidoMesaRepository()
+        val sesionMesaRepository = SesionMesaRepository(pedidoMesaRepository::tieneOperaciones)
+        // CuentaMesaRepository depende de ambos: sesion (para transiciones ABIERTA ->
+        // CUENTA_SOLICITADA -> CERRADA_PAGADA) y pedidos (para saldos facturables).
+        val cuentaMesaRepository = CuentaMesaRepository(sesionMesaRepository, pedidoMesaRepository)
+        val processSaleUseCase =
+            ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feFactory)
+        sesionMesaRouting(mesasRepository, sesionMesaRepository)
+        pedidoMesaRouting(pedidoMesaRepository)
+        cuentaMesaRouting(cuentaMesaRepository, sesionMesaRepository, mesasRepository)
+
         promotionsRoutes(promotionsRepository)
         salesRoutes(processSaleUseCase)
         creditNoteRoutes(creditNoteService)

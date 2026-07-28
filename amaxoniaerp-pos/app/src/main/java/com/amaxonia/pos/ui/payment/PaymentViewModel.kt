@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.money.Money
+import com.amaxonia.pos.domain.repository.TableAccountPaymentReader
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsInput
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
 import com.amaxonia.pos.domain.usecase.payment.ExecutePaymentFlowInput
@@ -29,6 +30,7 @@ class PaymentViewModel(
     private val validatePayment: ValidatePaymentUseCase,
     private val buildPaymentDetails: BuildPaymentDetailsUseCase,
     private val executePaymentFlow: PaymentFlowExecutor,
+    private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
 
@@ -237,8 +239,9 @@ class PaymentViewModel(
     private fun PaymentState.toExecutionInput(
         countryCode: String,
         details: com.amaxonia.pos.domain.usecase.payment.PaymentDetails,
-    ): ExecutePaymentFlowInput =
-        ExecutePaymentFlowInput(
+    ): ExecutePaymentFlowInput {
+        val tablePayment = tableAccountPaymentReader?.current?.value
+        return ExecutePaymentFlowInput(
             countryCode = countryCode,
             paymentDetails = details,
             totalAmount = totalAmountMoney,
@@ -250,7 +253,12 @@ class PaymentViewModel(
             secondaryCurrency = abrMonedaSecundaria,
             isMultiCurrency = isMultiCurrency,
             availableMethods = formasPago,
+            preferredCorrelationId = tablePayment?.correlationId,
+            correlationCarryOver = tablePayment?.correlationId,
+            saleItemsOverride = tablePayment?.saleItems,
+            cuentaMesa = tablePayment?.saleContext,
         )
+    }
 
     private fun PaymentState.withKeyPadInput(key: String): PaymentState =
         when (key) {

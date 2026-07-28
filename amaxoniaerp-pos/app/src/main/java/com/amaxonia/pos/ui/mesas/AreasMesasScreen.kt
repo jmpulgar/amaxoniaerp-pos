@@ -1,6 +1,8 @@
 package com.amaxonia.pos.ui.mesas
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,18 +25,26 @@ import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -68,14 +78,37 @@ fun AreasMesasScreen(
                 DependencyContainer.cajaRepository,
                 DependencyContainer.networkMonitor,
                 DependencyContainer.selectedTableHolder,
+                DependencyContainer.sesionMesaRepository,
             )
         },
     onBack: () -> Unit,
     onSelectCaja: () -> Unit,
     onTableConfirmed: (Mesa) -> Unit = {},
+    /**
+     * Fase 3 - Comanda: dispara la navegación a la pantalla de comanda cuando ya existe una
+     * sesión activa para la mesa (sea porque se acaba de abrir o porque se recuperó).
+     */
+    onComenzarPedido: (mesa: Mesa, sesionId: Int) -> Unit = { _, _ -> },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val columns = if (rememberDeviceClass() == DeviceClass.TABLET) TABLET_GRID_COLUMNS else PHONE_GRID_COLUMNS
+
+    // Mesa pendiente de apertura: se abre el dialog de "cantidad de personas" primero; solo al
+    // confirmar se invoca `viewModel.onAbrirSesion(mesaId, cantidad)`. Si la mesa ya estaba
+    // ocupada (según `estadosMesas`), en lugar del dialog pedimos la sesión activa para mostrarla.
+    var pendingApertura by remember { mutableStateOf<Mesa?>(null) }
+
+    // Fase 3 - Comanda: cuando se obtiene/recupera sesión para `pendingApertura`, disparamos
+    // la navegación a la pantalla de comanda. Si la sesión llegó por otro camino (ej. otra caja),
+    // el botón Continuar ya la navega directamente en onConfirm.
+    LaunchedEffect(state.activeSesion?.id, pendingApertura?.id) {
+        val sesion = state.activeSesion ?: return@LaunchedEffect
+        val mesaPendiente = pendingApertura ?: return@LaunchedEffect
+        if (sesion.mesaId == mesaPendiente.id && sesion.estado == "ABIERTA") {
+            pendingApertura = null
+            onComenzarPedido(mesaPendiente, sesion.id)
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -96,7 +129,14 @@ fun AreasMesasScreen(
                     mesaName = mesa.displayName,
                     areaName = state.selectedArea?.displayName.orEmpty(),
                     onClear = viewModel::onClearSelection,
-                    onConfirm = { onTableConfirmed(mesa) },
+                    onConfirm = {
+                        val sesion = state.activeSesion
+                        if (sesion != null && sesion.mesaId == mesa.id && sesion.estado == "ABIERTA") {
+                            onComenzarPedido(mesa, sesion.id)
+                        } else {
+                            abrirORecuperarSesion(mesa, state, viewModel) { pendingApertura = it }
+                        }
+                    },
                 )
             }
         },
@@ -119,6 +159,65 @@ fun AreasMesasScreen(
                 onSelectCaja = onSelectCaja,
             )
         }
+    }
+
+    // Snackbar de error de sesión (apertura/cierre/cancelación/recuperación). Se descarta desde
+    // el ViewModel con `onDismissSesionError`.
+    state.sesionError?.let { mensaje ->
+        SnackbarHost(
+            hostState = remember { SnackbarHostState() },
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Snackbar(
+                action = {
+                    TextButton(onClick = viewModel::onDismissSesionError) { Text("Cerrar") }
+                },
+            ) { Text(mensaje) }
+        }
+    }
+
+    // Loader superpuesto durante apertura/cierre/recuperación.
+    if (state.isLoadingSesion) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+    }
+
+    // Modal de "cantidad de personas" antes de abrir la sesión.
+    pendingApertura?.let { mesa ->
+        CantidadPersonasDialog(
+            mesaLabel = "${mesa.displayName}${mesa.displayCode?.let { " · $it" }.orEmpty()}",
+            onConfirm = { cantidad ->
+                viewModel.onAbrirSesion(mesa.id, cantidad)
+                pendingApertura = null
+            },
+            onDismiss = { pendingApertura = null },
+        )
+    }
+}
+
+/**
+ * Decide qué hacer al pulsar "Continuar" en la barra de la mesa seleccionada:
+ * - Si la mesa ya está ocupada: recupera y muestra la sesión activa (en fases siguientes abrirá
+ *   la comanda).
+ * - Si está disponible o no hay datos hidratados: pide cantidad de personas y abre sesión.
+ */
+private fun abrirORecuperarSesion(
+    mesa: Mesa,
+    state: AreasMesasState,
+    viewModel: AreasMesasViewModel,
+    setPending: (Mesa?) -> Unit,
+) {
+    if (state.hasEstadosHidratados && state.isOcupada(mesa.id)) {
+        viewModel.onRecuperarSesionActiva(mesa.id)
+    } else {
+        setPending(mesa)
     }
 }
 
@@ -284,6 +383,7 @@ private fun MesasContent(
                 imagenUrl = state.imagenUrl,
                 selectedMesaId = state.selectedMesaId,
                 onMesaClick = onMesaClick,
+                estadosByMesaId = state.estadosMesas,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -302,6 +402,7 @@ private fun MesasContent(
                     MesaCard(
                         mesa = mesa,
                         isSelected = mesa.id == state.selectedMesaId,
+                        estadoOperativo = if (state.hasEstadosHidratados) state.estadoOperativo(mesa.id) else null,
                         onClick = { onMesaClick(mesa.id) },
                     )
                 }
@@ -339,4 +440,21 @@ private fun SelectedMesaBar(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     maxLines = 1,
-                    overflow = TextOverflow.Elli
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (areaName.isNotBlank()) {
+                    Text(
+                        text = areaName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            TextButton(onClick = onClear) { Text("Quitar") }
+            Spacer(modifier = Modifier.width(4.dp))
+            Button(onClick = onConfirm) { Text("Continuar") }
+        }
+    }
+}

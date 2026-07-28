@@ -1,5 +1,6 @@
 package com.amaxonia.pos.domain.model.sales
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -67,4 +68,6 @@ data class ReconciledInvoice(
     val idFactura: String,
     val codFactura: String,
     val codEstatus: Int = 2,
+    @SerialName("sesion_mesa_cerrada")
+    val sesionMesaCerrada: Boolean = false,
 )

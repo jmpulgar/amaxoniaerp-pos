@@ -14,6 +14,7 @@ import com.amaxoniaerp.features.items.data.ItemLoteTable
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
 import com.amaxoniaerp.features.sales.domain.SaleItemInput
+import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
@@ -33,7 +34,9 @@ import java.time.Year
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-class ProcessSaleTransactionalRepository {
+class ProcessSaleTransactionalRepository(
+    private val cuentaMesaRepository: CuentaMesaRepository? = null,
+) {
 
     fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
         val preparedRequest = prepareRequestWithWarehouses(countryCode, request)
@@ -46,6 +49,13 @@ class ProcessSaleTransactionalRepository {
         }
 
         val invoiceId = preparedRequest.idFactura?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+        val cuentaValidada =
+            preparedRequest.cuentaMesa?.let { context ->
+                val repository =
+                    cuentaMesaRepository
+                        ?: throw InvalidSaleRequestException("La integración de cuenta de mesa no está configurada")
+                repository.validarVentaEnTransaccion(context, preparedRequest, invoiceId)
+            }
         val invoiceCode = resolveInvoiceCode(countryCode, preparedRequest)
         val now = BusinessClock.nowForCountry(countryCode)
         val today = now.toLocalDate()
@@ -72,11 +82,17 @@ class ProcessSaleTransactionalRepository {
             }
         }
 
+        val sesionMesaCerrada =
+            cuentaValidada?.let {
+                checkNotNull(cuentaMesaRepository).confirmarVentaEnTransaccion(it, invoiceId, invoiceCode)
+            } ?: false
+
         return ProcessSaleResponse(
             success = true,
             idFactura = invoiceId,
             codFactura = invoiceCode,
             codEstatus = preparedRequest.factura.codEstatus,
+            sesionMesaCerrada = sesionMesaCerrada,
         )
     }
 

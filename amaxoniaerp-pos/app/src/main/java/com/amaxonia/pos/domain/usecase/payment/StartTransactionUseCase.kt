@@ -38,13 +38,20 @@ class StartTransactionUseCase(
         // If the carry-over id resolves to a row owned by a DIFFERENT tenant,
         // refuse to resume it: that would mix two operations under one id.
         val resumable =
-            existing?.takeIf { it.status == STATUS_SENDING }
+            existing
+                ?.takeIf { it.status == STATUS_SENDING }
                 ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
-        return if (resumable != null) {
-            StartedTransaction(clientCorrelationId = resumable.clientCorrelationId, resumed = true)
+        val completedPreferred =
+            existing
+                ?.takeIf { it.clientCorrelationId == command.preferredId }
+                ?.takeIf { it.status == STATUS_CONFIRMED || it.status == STATUS_DUPLICATE }
+                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
+        return if (resumable != null || completedPreferred != null) {
+            val recovered = resumable ?: completedPreferred!!
+            StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
         } else {
             val tenant = command.tenant ?: return null
-            val id = idGenerator.nextId()
+            val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()
             // Auditoría ítem 10 (OBS-001): emit the structured sale-started
             // event before any network or printer call so every observable
             // flow has a unique correlated id.
@@ -132,6 +139,8 @@ data class StartedTransaction(
  */
 data class StartTransactionCommand(
     val carryOverId: String?,
+    /** Canonical id for a newly-created operation whose aggregate already owns an id (mesa). */
+    val preferredId: String? = null,
     val idCaja: String,
     val idCajaSecuencia: String,
     val totalAmount: Double,
