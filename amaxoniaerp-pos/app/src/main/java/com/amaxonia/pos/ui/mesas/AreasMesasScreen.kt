@@ -1,3 +1,11 @@
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LongParameterList",
+    "MagicNumber",
+    "UnusedParameter",
+)
+
 package com.amaxonia.pos.ui.mesas
 
 import androidx.compose.foundation.background
@@ -25,18 +33,21 @@ import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -92,6 +103,7 @@ fun AreasMesasScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val columns = if (rememberDeviceClass() == DeviceClass.TABLET) TABLET_GRID_COLUMNS else PHONE_GRID_COLUMNS
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Mesa pendiente de apertura: se abre el dialog de "cantidad de personas" primero; solo al
     // confirmar se invoca `viewModel.onAbrirSesion(mesaId, cantidad)`. Si la mesa ya estaba
@@ -110,8 +122,15 @@ fun AreasMesasScreen(
         }
     }
 
+    LaunchedEffect(state.sesionError) {
+        val message = state.sesionError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message = message, actionLabel = "Cerrar")
+        viewModel.onDismissSesionError()
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             AreasMesasTopBar(
                 branchName = state.sucursalNombre,
@@ -161,21 +180,6 @@ fun AreasMesasScreen(
         }
     }
 
-    // Snackbar de error de sesión (apertura/cierre/cancelación/recuperación). Se descarta desde
-    // el ViewModel con `onDismissSesionError`.
-    state.sesionError?.let { mensaje ->
-        SnackbarHost(
-            hostState = remember { SnackbarHostState() },
-            modifier = Modifier.padding(16.dp),
-        ) {
-            Snackbar(
-                action = {
-                    TextButton(onClick = viewModel::onDismissSesionError) { Text("Cerrar") }
-                },
-            ) { Text(mensaje) }
-        }
-    }
-
     // Loader superpuesto durante apertura/cierre/recuperación.
     if (state.isLoadingSesion) {
         Box(
@@ -185,7 +189,31 @@ fun AreasMesasScreen(
                     .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator()
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                    Column {
+                        Text(
+                            text = "Preparando la mesa",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Espera un momento…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -265,7 +293,7 @@ private fun AreasMesasTopBar(
             // válida; el ViewModel ya ignora el cambio en caso contrario, pero el botón se
             // deshabilita para reflejar el estado al usuario.
             if (canShowPlano) {
-                IconButton(onClick = {
+                FilledTonalIconButton(onClick = {
                     onViewModeChanged(
                         if (viewMode == SalonViewMode.PLANO) SalonViewMode.LISTA else SalonViewMode.PLANO,
                     )
@@ -283,7 +311,6 @@ private fun AreasMesasTopBar(
                             } else {
                                 "Ver como plano"
                             },
-                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -343,6 +370,13 @@ private fun AreasMesasBody(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(modifier = Modifier.height(12.dp))
+            MesaStateLegend(
+                totalMesas = state.mesas.size,
+                estados = state.estadosMesas.values,
+                isLoading = state.isLoadingEstados,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             MesasContent(
                 state = state,
                 columns = columns,
@@ -394,7 +428,7 @@ private fun MesasContent(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 16.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -421,40 +455,66 @@ private fun SelectedMesaBar(
     onClear: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 8.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 10.dp,
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.TableRestaurant,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "$mesaName seleccionada",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (areaName.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.TableRestaurant,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = areaName,
+                        text = mesaName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = areaName.ifBlank { "Mesa seleccionada" },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            TextButton(onClick = onClear) { Text("Quitar") }
-            Spacer(modifier = Modifier.width(4.dp))
-            Button(onClick = onConfirm) { Text("Continuar") }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onClear,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Cambiar mesa")
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1.4f),
+                ) {
+                    Text("Continuar")
+                }
+            }
         }
     }
 }

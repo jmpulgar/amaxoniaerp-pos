@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +25,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,12 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.LocalDeviceClass
+import com.amaxonia.pos.ui.common.components.PosFeedbackCard
+import com.amaxonia.pos.ui.common.components.PosStatusBadge
+import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.isLandscape
 import com.amaxonia.pos.ui.theme.PosTextStyles
@@ -107,6 +113,7 @@ fun SuccessScreen(
     val changeDueBs = payload?.changeDueBs ?: 0.0
     val isSendingReceiptEmail = uiState.isSendingReceiptEmail
     val feError = payload?.feError.orEmpty()
+    val tableSessionClosed = payload?.tableSessionClosed == true
 
     LaunchedEffect(Unit) {
         visible = true
@@ -143,7 +150,7 @@ fun SuccessScreen(
     BackHandler(enabled = true) {
         scope.launch {
             snackbarHostState.showSnackbar(
-                message = "Usa SIGUIENTE ORDEN para finalizar y limpiar el estado de venta",
+                message = "Usa Nueva orden para finalizar y limpiar el estado de venta",
             )
         }
     }
@@ -155,257 +162,295 @@ fun SuccessScreen(
         containerColor = MaterialTheme.colorScheme.background,
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.TopCenter) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .then(if (isTabletLandscape) Modifier.widthIn(max = 480.dp) else Modifier.fillMaxWidth())
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
             Column(
                 modifier =
                     Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
+                        .fillMaxHeight()
+                        .then(if (isTabletLandscape) Modifier.widthIn(max = 560.dp) else Modifier.fillMaxWidth())
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
             ) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter = fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
                     ) {
-                        if (uiState.isLoading || payload == null) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .padding(24.dp)
-                                        .fillMaxWidth()
-                                        .graphicsLayer {
-                                            scaleX = scale.value
-                                            scaleY = scale.value
-                                        },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("Cargando detalle del recibo...", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        } else {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .padding(28.dp)
-                                        .graphicsLayer {
-                                            scaleX = scale.value
-                                            scaleY = scale.value
-                                        },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .size(92.dp)
-                                                .graphicsLayer {
-                                                    scaleX = ringScale.value
-                                                    scaleY = ringScale.value
-                                                    alpha = ringAlpha.value
-                                                }.background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                                    )
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .size(92.dp)
-                                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.size(46.dp),
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(18.dp))
-
-                                Text(
-                                    "Transacción exitosa",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-
-                                Text(
-                                    if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
-
-                                if (feError.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Row(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.medium)
-                                                .padding(14.dp),
-                                        verticalAlignment = Alignment.Top,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                "Factura creada, FEL rechazada",
-                                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                                fontWeight = FontWeight.Bold,
-                                            )
-                                            Text(
-                                                feError,
-                                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                                fontSize = 13.sp,
-                                                modifier = Modifier.padding(top = 4.dp),
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(24.dp))
-
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+                        ) {
+                            if (uiState.isLoading || payload == null) {
                                 Column(
                                     modifier =
                                         Modifier
+                                            .padding(24.dp)
                                             .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large)
-                                            .padding(16.dp),
+                                            .graphicsLayer {
+                                                scaleX = scale.value
+                                                scaleY = scale.value
+                                            },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        "Metodo de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                    HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.outlineVariant,
-                                        modifier = Modifier.padding(vertical = 12.dp),
-                                    )
-                                    if (isMultiCurrency && totalBs > 0.0) {
-                                        Text(
-                                            "Total: $ ${Money.format(
-                                                Money.fromDouble(changeDue.coerceAtLeast(0.0)),
-                                            )} (${formatCurrencyLabel(
-                                                abrMonedaSecundaria,
-                                            )} ${String.format(java.util.Locale.getDefault(), "%.2f", totalBs)})",
-                                            style = PosTextStyles.amountSecondary,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
-                                    Text(
-                                        "Cambio / Vuelto",
-                                        style = MaterialTheme.typography.labelLarge,
+                                        "Confirmando factura y cierre…",
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                }
+                            } else {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .padding(28.dp)
+                                            .graphicsLayer {
+                                                scaleX = scale.value
+                                                scaleY = scale.value
+                                            },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .size(92.dp)
+                                                    .graphicsLayer {
+                                                        scaleX = ringScale.value
+                                                        scaleY = ringScale.value
+                                                        alpha = ringAlpha.value
+                                                    }.background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                        )
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .size(92.dp)
+                                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(46.dp),
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(18.dp))
+
                                     Text(
-                                        "$ ${Money.format(Money.fromDouble(changeDue))}",
-                                        style = PosTextStyles.totalDisplay,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        "Pago confirmado",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                     )
-                                    if (isMultiCurrency && changeDueBs > 0.0) {
-                                        Text(
-                                            "${formatCurrencyLabel(abrMonedaSecundaria)} ${
-                                                String.format(java.util.Locale.getDefault(), "%.2f", changeDueBs)
-                                            }",
-                                            style = PosTextStyles.amountSecondary,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                    Text(
+                                        if (codFactura.isBlank()) "Factura generada correctamente" else "Factura: $codFactura",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
+
+                                    if (feError.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        PosFeedbackCard(
+                                            title = "Factura creada, confirmación fiscal pendiente",
+                                            message = feError,
+                                            tone = PosVisualTone.Warning,
                                         )
                                     }
-                                }
 
-                                Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(18.dp))
 
-                                Button(
-                                    onClick = { viewModel.sendReceiptEmail() },
-                                    enabled = !isSendingReceiptEmail,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                    shape = MaterialTheme.shapes.medium,
-                                ) {
-                                    Text(
-                                        if (isSendingReceiptEmail) "ENVIANDO..." else "ENVIAR RECIBO",
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        fontWeight = FontWeight.Bold,
+                                    CompletionStatus(
+                                        codFactura = codFactura,
+                                        hasFiscalError = feError.isNotBlank(),
+                                        tableSessionClosed = tableSessionClosed,
                                     )
+
+                                    Spacer(modifier = Modifier.height(18.dp))
+
+                                    Column(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large)
+                                                .padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            "Método de pago: ${paymentMethodsLabel.ifBlank { "N/A" }}",
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            modifier = Modifier.padding(vertical = 12.dp),
+                                        )
+                                        if (isMultiCurrency && totalBs > 0.0) {
+                                            Text(
+                                                "Total en ${formatCurrencyLabel(abrMonedaSecundaria)} " +
+                                                    String.format(java.util.Locale.getDefault(), "%.2f", totalBs),
+                                                style = PosTextStyles.amountSecondary,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                        }
+                                        Text(
+                                            "Cambio / Vuelto",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            "$ ${Money.format(Money.fromDouble(changeDue))}",
+                                            style = PosTextStyles.totalDisplay,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        if (isMultiCurrency && changeDueBs > 0.0) {
+                                            Text(
+                                                "${formatCurrencyLabel(abrMonedaSecundaria)} ${
+                                                    String.format(java.util.Locale.getDefault(), "%.2f", changeDueBs)
+                                                }",
+                                                style = PosTextStyles.amountSecondary,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(24.dp))
+
+                                    Button(
+                                        onClick = { viewModel.sendReceiptEmail() },
+                                        enabled = !isSendingReceiptEmail,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                        shape = MaterialTheme.shapes.medium,
+                                    ) {
+                                        Icon(Icons.Default.Email, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            if (isSendingReceiptEmail) "Enviando…" else "Enviar recibo",
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedButton(
-                onClick = {
-                    if (transactionId.isBlank()) {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("No hay transaccion para imprimir")
-                        }
-                        return@OutlinedButton
-                    }
-                    scope.launch {
-                        isPrinting = true
-                        val result = onPrintReceipt(transactionId)
-                        val feedback =
-                            result.getOrElse { error ->
-                                error.message ?: "No se pudo imprimir el recibo"
+                OutlinedButton(
+                    onClick = {
+                        if (transactionId.isBlank()) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("No hay transaccion para imprimir")
                             }
-                        snackbarHostState.showSnackbar(feedback)
-                        isPrinting = false
-                    }
+                            return@OutlinedButton
+                        }
+                        scope.launch {
+                            isPrinting = true
+                            val result = onPrintReceipt(transactionId)
+                            val feedback =
+                                result.getOrElse { error ->
+                                    error.message ?: "No se pudo imprimir el recibo"
+                                }
+                            snackbarHostState.showSnackbar(feedback)
+                            isPrinting = false
+                        }
+                    },
+                    enabled = !isPrinting,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Default.Print, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isPrinting) "Imprimiendo…" else "Imprimir recibo")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onNextOrder,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text("Nueva orden", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompletionStatus(
+    codFactura: String,
+    hasFiscalError: Boolean,
+    tableSessionClosed: Boolean,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large)
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "Resumen del cierre",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        PosStatusBadge(
+            label = "Pago aprobado",
+            tone = PosVisualTone.Success,
+            icon = Icons.Default.Check,
+        )
+        PosStatusBadge(
+            label =
+                when {
+                    hasFiscalError -> "Confirmación fiscal pendiente"
+                    codFactura.isBlank() -> "Factura registrada"
+                    else -> "Factura $codFactura confirmada"
                 },
-                enabled = !isPrinting,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR RECIBO")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = onNextOrder,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text("SIGUIENTE ORDEN", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-            }
-        }
-        }
+            tone = if (hasFiscalError) PosVisualTone.Warning else PosVisualTone.Success,
+            icon = if (hasFiscalError) Icons.Default.Warning else Icons.AutoMirrored.Filled.ReceiptLong,
+        )
+        PosStatusBadge(
+            label = if (tableSessionClosed) "Mesa cerrada y disponible" else "Mesa con saldo o consumo pendiente",
+            tone = if (tableSessionClosed) PosVisualTone.Success else PosVisualTone.Info,
+            icon = Icons.Default.TableRestaurant,
+        )
     }
 }

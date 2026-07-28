@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "LongMethod", "MagicNumber")
+
 package com.amaxonia.pos.ui.payment
 
 import android.content.ActivityNotFoundException
@@ -21,12 +23,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CreditCard
@@ -41,6 +46,7 @@ import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,6 +93,10 @@ import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.LocalDeviceClass
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
+import com.amaxonia.pos.ui.common.components.PosEmptyState
+import com.amaxonia.pos.ui.common.components.PosFeedbackCard
+import com.amaxonia.pos.ui.common.components.PosLoadingState
+import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.isLandscape
 import com.amaxonia.pos.ui.theme.PosPalette
@@ -182,15 +192,27 @@ fun PaymentScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text("Método de Pago", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "Cobro",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "Selecciona cómo pagar",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
             )
@@ -199,36 +221,16 @@ fun PaymentScreen(
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxHeight()
                     .padding(padding)
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(MaterialTheme.colorScheme.background)
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth(),
         ) {
-            // Total a Pagar — hero
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(20.dp),
-            ) {
-                Text(
-                    "Total a pagar",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row {
-                    Text("$ ", style = PosTextStyles.totalDisplay, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text(state.totalAmountText, style = PosTextStyles.totalDisplay, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
-                    Text(
-                        "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
-                        style = PosTextStyles.amountSecondary,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
+            PaymentTotalCard(
+                state = state,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
 
             // Selector Efectivo / Tarjeta
             SingleChoiceSegmentedButtonRow(
@@ -238,41 +240,53 @@ fun PaymentScreen(
                     selected = state.selectedMethod == PaymentMethod.CASH,
                     onClick = { viewModel.onAction(PaymentUiAction.SelectMethod(PaymentMethod.CASH)) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {
+                        Icon(Icons.Default.Wallet, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
                     label = { Text("Efectivo") },
                 )
                 SegmentedButton(
                     selected = state.selectedMethod == PaymentMethod.NON_CASH,
                     onClick = { viewModel.onAction(PaymentUiAction.SelectMethod(PaymentMethod.NON_CASH)) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {
+                        Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
                     label = { Text("Tarjeta / Otro") },
                 )
             }
 
             if (state.isLoadingFormasPago) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
+                PosLoadingState(
+                    message = "Cargando formas de pago…",
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else if (state.formasPagoError != null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 14.sp,
-                    )
-                }
+                PosFeedbackCard(
+                    title = "Formas de pago no disponibles",
+                    message = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
+                    tone = PosVisualTone.Error,
+                    modifier = Modifier.padding(16.dp),
+                )
             } else if (state.selectedMethod == PaymentMethod.CASH) {
                 if (state.formasPagoEfectivo.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
-                    }
+                    PosEmptyState(
+                        icon = Icons.Default.Wallet,
+                        title = "Efectivo no disponible",
+                        message = "Esta caja no tiene una forma de pago en efectivo configurada.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     CashPaymentContent(state, viewModel)
                 }
             } else {
                 if (state.formasPagoTarjetaOtro.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("¡No disponible!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
-                    }
+                    PosEmptyState(
+                        icon = Icons.Default.CreditCard,
+                        title = "Otros medios no disponibles",
+                        message = "No hay tarjetas u otras formas de pago configuradas para esta caja.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     NonCashPaymentContent(state, viewModel)
                 }
@@ -349,6 +363,54 @@ fun PaymentScreen(
                     }
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun PaymentTotalCard(
+    state: PaymentState,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null)
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Total a pagar",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    "$ ${state.totalAmountText}",
+                    style = PosTextStyles.totalDisplay,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
+                    Text(
+                        "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
+                        style = PosTextStyles.amountSecondary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
         }
     }
 }
@@ -603,12 +665,19 @@ fun CashPaymentContent(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Cobrar",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size((34 * warningScale).dp),
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size((28 * warningScale).dp),
+                    )
+                    Text(
+                        text = "COBRAR",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
         }
     }
@@ -652,9 +721,9 @@ fun NonCashPaymentContent(
     ) {
         Text(
             "Formas disponibles",
-            fontSize = 16.sp,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -677,26 +746,35 @@ fun NonCashPaymentContent(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            buildString {
-                append("Asignado: $ ${state.nonCashAssignedText}")
-                if (state.isMultiCurrency && state.nonCashAssignedBsText.isNotBlank()) {
-                    append(" ($SECONDARY_CURRENCY_LABEL ${state.nonCashAssignedBsText})")
-                }
-            },
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            buildString {
-                append("Pendiente: $ ${state.nonCashPendingText}")
-                if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
-                    append(" ($SECONDARY_CURRENCY_LABEL ${state.nonCashPendingBsText})")
-                }
-            },
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PaymentSummaryLine(
+                    label = "Asignado",
+                    value = "$ ${state.nonCashAssignedText}",
+                    secondary =
+                        state.nonCashAssignedBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                    emphasized = state.isPaymentEnough,
+                )
+                PaymentSummaryLine(
+                    label = "Pendiente",
+                    value = "$ ${state.nonCashPendingText}",
+                    secondary =
+                        state.nonCashPendingBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                    emphasized = !state.isPaymentEnough,
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
         AnimatedVisibility(
@@ -728,9 +806,20 @@ fun NonCashPaymentContent(
                     .height(52.dp),
             colors =
                 ButtonDefaults.buttonColors(
-                    containerColor = if (state.isPaymentEnough) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    containerColor =
+                        if (state.isPaymentEnough) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        },
+                    contentColor =
+                        if (state.isPaymentEnough) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        },
                 ),
-            shape = MaterialTheme.shapes.small,
+            shape = MaterialTheme.shapes.medium,
         ) {
             if (state.isProcessingPayment) {
                 CircularProgressIndicator(
@@ -754,38 +843,85 @@ fun NonCashRow(
     onValueChange: (String) -> Unit,
     onUseExactAmount: () -> Unit,
 ) {
-    Row(
+    Card(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-                .padding(12.dp)
                 .clickable(onClick = onUseExactAmount),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder(),
     ) {
-        PaymentMethodIcon(forma = forma)
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                forma.descripcion ?: "Forma de pago",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                forma.siglas ?: "",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PaymentMethodIcon(forma = forma)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        forma.descripcion ?: "Forma de pago",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        forma.siglas ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = onUseExactAmount) {
+                    Text("Usar pendiente")
+                }
+            }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text("Monto asignado") },
+                prefix = { Text("$ ") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            prefix = { Text("$ ") },
-            singleLine = true,
-            modifier = Modifier.width(140.dp),
+    }
+}
+
+@Composable
+private fun PaymentSummaryLine(
+    label: String,
+    value: String,
+    secondary: String?,
+    emphasized: Boolean,
+) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+                color =
+                    if (emphasized) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
+            secondary?.let {
+                Text(
+                    text = it,
+                    style = PosTextStyles.amountSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

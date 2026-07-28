@@ -1,3 +1,10 @@
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LongParameterList",
+    "MagicNumber",
+)
+
 package com.amaxonia.pos.ui.mesas
 
 import androidx.compose.foundation.Canvas
@@ -6,12 +13,16 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PanToolAlt
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -28,7 +39,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
@@ -41,6 +55,7 @@ import com.amaxonia.pos.domain.model.mesas.SalonGeometry
 import com.amaxonia.pos.domain.model.mesas.ViewportCanvas
 import com.amaxonia.pos.domain.model.mesas.hitTestTranslated
 import kotlin.math.max
+import kotlin.math.min
 
 private const val TAG = "SalonPlan"
 private const val MIN_ZOOM = 0.5f
@@ -77,7 +92,6 @@ fun SalonPlan(
 
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
     val primary = MaterialTheme.colorScheme.primary
-    val onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
     val surface = MaterialTheme.colorScheme.surface
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     val outline = MaterialTheme.colorScheme.outline
@@ -85,6 +99,9 @@ fun SalonPlan(
     // seleccionada (primary). DISPONIBLE usa surface + outline, como antes.
     val ocupadaFill = MaterialTheme.colorScheme.tertiaryContainer
     val ocupadaBorder = MaterialTheme.colorScheme.tertiary
+    val cuentaFill = MaterialTheme.colorScheme.errorContainer
+    val cuentaBorder = MaterialTheme.colorScheme.error
+    val labelColor = MaterialTheme.colorScheme.onSurface
 
     Box(
         modifier =
@@ -127,30 +144,79 @@ fun SalonPlan(
             primaryContainer = primaryContainer,
             surface = surface,
             outline = outline,
-            onPrimaryContainer = onPrimaryContainer,
             ocupadaFill = ocupadaFill,
             ocupadaBorder = ocupadaBorder,
+            cuentaFill = cuentaFill,
+            cuentaBorder = cuentaBorder,
+            labelColor = labelColor,
             estadosByMesaId = estadosByMesaId,
             modifier = Modifier.fillMaxSize(),
         )
 
+        Surface(
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .padding(8.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            shadowElevation = 2.dp,
+        ) {
+            MesaStateLegend(
+                totalMesas = mesas.size,
+                estados = estadosByMesaId.values,
+                isLoading = false,
+                modifier = Modifier.padding(8.dp),
+            )
+        }
+
+        Surface(
+            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f),
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PanToolAlt,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text(
+                    text = "Arrastra para mover · pellizca para ampliar",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
         if (scale != INITIAL_ZOOM || offsetX != 0f || offsetY != 0f) {
-            IconButton(
-                onClick = {
-                    scale = INITIAL_ZOOM
-                    offsetX = 0f
-                    offsetY = 0f
-                },
+            Surface(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp),
+                        .padding(top = 72.dp, end = 10.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 3.dp,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Restore,
-                    contentDescription = "Reiniciar zoom",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                IconButton(
+                    onClick = {
+                        scale = INITIAL_ZOOM
+                        offsetX = 0f
+                        offsetY = 0f
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Restore,
+                        contentDescription = "Reiniciar zoom",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
@@ -169,9 +235,11 @@ private fun PlanoCanvas(
     primaryContainer: Color,
     surface: Color,
     outline: Color,
-    onPrimaryContainer: Color,
     ocupadaFill: Color,
     ocupadaBorder: Color,
+    cuentaFill: Color,
+    cuentaBorder: Color,
+    labelColor: Color,
     estadosByMesaId: Map<Int, String>,
     modifier: Modifier,
 ) {
@@ -210,6 +278,7 @@ private fun PlanoCanvas(
                 mesas.forEach { mesa ->
                     val isSelected = mesa.id == selectedMesaId
                     val isOcupada = estadosByMesaId[mesa.id] == EstadoMesaOperativo.OCUPADA
+                    val isCuentaSolicitada = estadosByMesaId[mesa.id] == ESTADO_CUENTA_SOLICITADA
                     val forma = SalonForma.fromRaw(mesa.forma)
                     val width = mesa.ancho.toFloat().coerceAtLeast(1f)
                     val height = mesa.alto.toFloat().coerceAtLeast(1f)
@@ -218,18 +287,21 @@ private fun PlanoCanvas(
                     val fill =
                         when {
                             isSelected -> primaryContainer
+                            isCuentaSolicitada -> cuentaFill
                             isOcupada -> ocupadaFill
                             else -> surface
                         }
                     val borderColor =
                         when {
                             isSelected -> primary
+                            isCuentaSolicitada -> cuentaBorder
                             isOcupada -> ocupadaBorder
                             else -> outline
                         }
                     val borderWidth =
                         when {
                             isSelected -> 8f
+                            isCuentaSolicitada -> 6f
                             isOcupada -> 6f
                             else -> 3f
                         }
@@ -243,6 +315,8 @@ private fun PlanoCanvas(
                         fill = fill,
                         borderColor = borderColor,
                         borderWidth = borderWidth,
+                        label = mesa.displayCode ?: mesa.displayName,
+                        labelColor = labelColor,
                     )
                 }
             }
@@ -265,22 +339,46 @@ private fun DrawScope.drawMesaShape(
     fill: Color,
     borderColor: Color,
     borderWidth: Float,
+    label: String,
+    labelColor: Color,
 ) {
     val w = max(width, 1f)
     val h = max(height, 1f)
     val left = cx - w / 2f
     val top = cy - h / 2f
     val topLeft = Offset(left, top)
-    val size_ = Size(w, h)
+    val shapeSize = Size(w, h)
     val stroke = Stroke(width = borderWidth)
 
     if (rotDeg % 360f == 0f) {
-        drawForma(forma, fill, borderColor, stroke, topLeft, size_)
+        drawForma(forma, fill, borderColor, stroke, topLeft, shapeSize)
+        drawMesaLabel(label, cx, cy, w, h, labelColor)
     } else {
         rotate(degrees = rotDeg, pivot = Offset(cx, cy)) {
-            drawForma(forma, fill, borderColor, stroke, topLeft, size_)
+            drawForma(forma, fill, borderColor, stroke, topLeft, shapeSize)
+            drawMesaLabel(label, cx, cy, w, h, labelColor)
         }
     }
+}
+
+private fun DrawScope.drawMesaLabel(
+    label: String,
+    cx: Float,
+    cy: Float,
+    width: Float,
+    height: Float,
+    color: Color,
+) {
+    val safeLabel = label.take(12)
+    val paint =
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = android.graphics.Paint.Align.CENTER
+            textSize = (min(width, height) * 0.24f).coerceIn(16f, 52f)
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            this.color = color.toArgb()
+        }
+    val baseline = cy - (paint.ascent() + paint.descent()) / 2f
+    drawContext.canvas.nativeCanvas.drawText(safeLabel, cx, baseline, paint)
 }
 
 private fun DrawScope.drawForma(
@@ -289,16 +387,16 @@ private fun DrawScope.drawForma(
     borderColor: Color,
     stroke: Stroke,
     topLeft: Offset,
-    size_: Size,
+    shapeSize: Size,
 ) {
     when (forma) {
         SalonForma.RECTANGULAR, SalonForma.CUADRADA -> {
-            drawRect(color = fill, topLeft = topLeft, size = size_)
-            drawRect(color = borderColor, topLeft = topLeft, size = size_, style = stroke)
+            drawRect(color = fill, topLeft = topLeft, size = shapeSize)
+            drawRect(color = borderColor, topLeft = topLeft, size = shapeSize, style = stroke)
         }
         SalonForma.REDONDA -> {
-            drawOval(color = fill, topLeft = topLeft, size = size_)
-            drawOval(color = borderColor, topLeft = topLeft, size = size_, style = stroke)
+            drawOval(color = fill, topLeft = topLeft, size = shapeSize)
+            drawOval(color = borderColor, topLeft = topLeft, size = shapeSize, style = stroke)
         }
     }
 }

@@ -1,16 +1,16 @@
+@file:Suppress("CyclomaticComplexMethod", "LongMethod")
+
 package com.amaxonia.pos.ui.mesas
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,38 +18,45 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Deck
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.TableRestaurant
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.amaxonia.pos.domain.model.mesas.Area
 import com.amaxonia.pos.domain.model.mesas.EstadoMesaOperativo
 import com.amaxonia.pos.domain.model.mesas.Mesa
+import com.amaxonia.pos.ui.common.components.PosEmptyState
+import com.amaxonia.pos.ui.common.components.PosFeedbackCard
+import com.amaxonia.pos.ui.common.components.PosLoadingState
+import com.amaxonia.pos.ui.common.components.PosStatusBadge
+import com.amaxonia.pos.ui.common.components.PosVisualAction
+import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosStatusColors
 import com.amaxonia.pos.ui.theme.PosTheme
+
+internal const val ESTADO_CUENTA_SOLICITADA = "CUENTA_SOLICITADA"
 
 /**
  * Selector horizontal de áreas. En teléfono es la forma más cómoda de cambiar de área sin
@@ -73,14 +80,82 @@ fun AreaChipRow(
                 selected = area.id == selectedAreaId,
                 enabled = enabled,
                 onClick = { onSelect(area.id) },
+                modifier = Modifier.heightIn(min = 48.dp),
                 shape = PosExtraShapes.Pill,
-                label = { Text(text = area.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon =
+                    if (area.id == selectedAreaId) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                label = {
+                    Text(
+                        text = "${area.displayName} · ${area.cantidadMesasActivas}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 colors =
                     FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
             )
+        }
+    }
+}
+
+@Composable
+fun MesaStateLegend(
+    totalMesas: Int,
+    estados: Collection<String>,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val cuentaSolicitada = estados.count { it == ESTADO_CUENTA_SOLICITADA }
+    val ocupadas = estados.count { it == EstadoMesaOperativo.OCUPADA }
+    val disponibles = (totalMesas - ocupadas - cuentaSolicitada).coerceAtLeast(0)
+    val suffix: (Int) -> String = { count -> if (estados.isEmpty()) "" else " · $count" }
+
+    LazyRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 2.dp),
+    ) {
+        item {
+            PosStatusBadge(
+                label = "Disponible${suffix(disponibles)}",
+                tone = PosVisualTone.Success,
+                icon = Icons.Default.CheckCircle,
+            )
+        }
+        item {
+            PosStatusBadge(
+                label = "Ocupada${suffix(ocupadas)}",
+                tone = PosVisualTone.Warning,
+                icon = Icons.Default.TableRestaurant,
+            )
+        }
+        item {
+            PosStatusBadge(
+                label = "Cuenta solicitada${suffix(cuentaSolicitada)}",
+                tone = PosVisualTone.Error,
+                icon = Icons.AutoMirrored.Filled.ReceiptLong,
+            )
+        }
+        if (isLoading) {
+            item {
+                PosStatusBadge(
+                    label = "Actualizando",
+                    tone = PosVisualTone.Info,
+                )
+            }
         }
     }
 }
@@ -100,50 +175,66 @@ fun MesaCard(
     estadoOperativo: String? = null,
 ) {
     val isOcupada = estadoOperativo == EstadoMesaOperativo.OCUPADA
-    val containerColor =
+    val isCuentaSolicitada = estadoOperativo == ESTADO_CUENTA_SOLICITADA
+    val targetContainerColor =
         when {
             isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isCuentaSolicitada -> MaterialTheme.colorScheme.errorContainer
             isOcupada -> MaterialTheme.colorScheme.tertiaryContainer
             else -> MaterialTheme.colorScheme.surface
         }
-    val contentColor =
+    val targetContentColor =
         when {
             isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+            isCuentaSolicitada -> MaterialTheme.colorScheme.onErrorContainer
             isOcupada -> MaterialTheme.colorScheme.onTertiaryContainer
             else -> MaterialTheme.colorScheme.onSurface
         }
+    val containerColor by animateColorAsState(targetContainerColor, label = "mesaContainer")
+    val contentColor by animateColorAsState(targetContentColor, label = "mesaContent")
     val borderColor =
         when {
             isSelected -> MaterialTheme.colorScheme.primary
+            isCuentaSolicitada -> MaterialTheme.colorScheme.error
             isOcupada -> MaterialTheme.colorScheme.tertiary
-            else -> null
+            else -> MaterialTheme.colorScheme.outlineVariant
         }
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = MESA_CARD_MIN_HEIGHT),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        border =
-            borderColor?.let { BorderStroke(2.dp, it) }
-                ?: CardDefaults.outlinedCardBorder(),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = if (isSelected) 4.dp else 0.dp,
+            ),
     ) {
         Column(
-            modifier = Modifier.padding(14.dp).fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(16.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = mesa.displayName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = contentColor,
-            )
-            mesa.displayCode?.let { code -> MesaSubtitle(text = code, colorOverride = contentColor) }
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = mesa.displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = contentColor,
+                    )
+                    mesa.displayCode?.let { code ->
+                        MesaSubtitle(text = code, colorOverride = contentColor)
+                    }
+                }
+                if (estadoOperativo != null) {
+                    MesaStatusChip(estado = estadoOperativo)
+                }
+            }
             MesaCapacityRow(capacidad = mesa.capacidad, contentColor = contentColor)
-            mesa.forma?.let { forma -> MesaShapeTag(forma = forma) }
-            if (estadoOperativo != null) {
-                MesaStatusChip(estado = estadoOperativo, isOcupada = isOcupada)
+            mesa.forma?.let { forma ->
+                MesaShapeTag(forma = forma, contentColor = contentColor)
             }
         }
     }
@@ -172,49 +263,47 @@ private fun MesaCapacityRow(
             imageVector = Icons.Default.People,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = if (contentColor == MaterialTheme.colorScheme.onSurface) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                contentColor
-            },
+            tint =
+                if (contentColor == MaterialTheme.colorScheme.onSurface) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    contentColor
+                },
         )
         Spacer(modifier = Modifier.width(4.dp))
         MesaSubtitle(text = "Capacidad: $capacidad", colorOverride = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-/** Chip pequeño con el estado operativo: "Disponible" (verde) o "Ocupada" (ámbar/tertiary). */
+/** Estado operativo con icono y texto; el color nunca es la única señal visual. */
 @Composable
-private fun MesaStatusChip(
-    estado: String,
-    isOcupada: Boolean,
-) {
-    val label = if (isOcupada) "Ocupada" else "Disponible"
-    val (bg, fg) =
-        if (isOcupada) {
-            MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+private fun MesaStatusChip(estado: String) {
+    val visual =
+        when (estado) {
+            ESTADO_CUENTA_SOLICITADA ->
+                Triple("Cuenta", PosVisualTone.Error, Icons.AutoMirrored.Filled.ReceiptLong)
+            EstadoMesaOperativo.OCUPADA ->
+                Triple("Ocupada", PosVisualTone.Warning, Icons.Default.TableRestaurant)
+            else ->
+                Triple("Disponible", PosVisualTone.Success, Icons.Default.CheckCircle)
         }
-    Surface(shape = PosExtraShapes.Pill, color = bg) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = fg,
-            maxLines = 1,
-        )
-    }
+    PosStatusBadge(label = visual.first, tone = visual.second, icon = visual.third)
 }
 
 @Composable
-private fun MesaShapeTag(forma: String) {
-    Surface(shape = PosExtraShapes.Pill, color = MaterialTheme.colorScheme.surfaceVariant) {
+private fun MesaShapeTag(
+    forma: String,
+    contentColor: androidx.compose.ui.graphics.Color,
+) {
+    Surface(
+        shape = PosExtraShapes.Pill,
+        color = contentColor.copy(alpha = 0.08f),
+    ) {
         Text(
             text = forma,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = contentColor,
             maxLines = 1,
         )
     }
@@ -229,44 +318,13 @@ fun MesasInfoState(
     modifier: Modifier = Modifier,
     action: InfoAction? = null,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(72.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.extraLarge),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp),
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        action?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = it.onClick) { Text(it.label) }
-        }
-    }
+    PosEmptyState(
+        icon = icon,
+        title = title,
+        message = message,
+        modifier = modifier,
+        action = action?.let { PosVisualAction(label = it.label, onClick = it.onClick) },
+    )
 }
 
 /** Error con reintento explícito, para áreas y para mesas por separado. */
@@ -276,31 +334,13 @@ fun MesasErrorState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.ErrorOutline,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = message,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedButton(onClick = onRetry) { Text("Reintentar") }
-        }
-    }
+    PosFeedbackCard(
+        title = "No pudimos cargar la información",
+        message = message,
+        tone = PosVisualTone.Error,
+        modifier = modifier,
+        action = PosVisualAction(label = "Reintentar", onClick = onRetry),
+    )
 }
 
 /** Aviso de que lo mostrado es la última configuración descargada, no datos frescos. */
@@ -333,12 +373,10 @@ fun OfflineConfigBanner(modifier: Modifier = Modifier) {
 
 @Composable
 fun MesasLoadingState(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
+    PosLoadingState(message = "Cargando áreas y mesas…", modifier = modifier)
 }
 
-private val MESA_CARD_MIN_HEIGHT = 104.dp
+private val MESA_CARD_MIN_HEIGHT = 136.dp
 
 @Preview(showBackground = true, backgroundColor = 0xFFF5F5F5)
 @Composable

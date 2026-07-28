@@ -1,24 +1,38 @@
+@file:Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LongParameterList",
+    "UnusedParameter",
+)
+
 package com.amaxonia.pos.ui.mesas
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.LocalDining
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RoomService
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,15 +44,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +61,12 @@ import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.mesas.EstadoPedidoMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 import com.amaxonia.pos.ui.cart.CartViewModel
+import com.amaxonia.pos.ui.common.components.PosFeedbackCard
+import com.amaxonia.pos.ui.common.components.PosLoadingState
+import com.amaxonia.pos.ui.common.components.PosSectionHeader
+import com.amaxonia.pos.ui.common.components.PosStatusBadge
+import com.amaxonia.pos.ui.common.components.PosVisualAction
+import com.amaxonia.pos.ui.common.components.PosVisualTone
 
 /**
  * Pantalla de comanda de una sesión de mesa. Muestra dos secciones:
@@ -81,7 +100,20 @@ fun ComandaScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Comanda · $mesaNombre") },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Comanda",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = mesaNombre,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = {
                         viewModel.onSalir()
@@ -91,8 +123,14 @@ fun ComandaScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onCuenta) {
-                        Icon(Icons.Filled.Receipt, contentDescription = "Cuenta")
+                    TextButton(onClick = onCuenta) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Text("Cuenta")
                     }
                 },
                 colors =
@@ -122,121 +160,133 @@ private fun ComandaBody(
     onReintentar: () -> Unit,
     contentPadding: PaddingValues,
 ) {
-    Box(
+    LazyColumn(
         modifier =
             Modifier
                 .fillMaxSize()
                 .padding(contentPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Section pendientes: items nuevos del carrito + pedidos PENDIENTE del backend.
+        item {
+            ComandaStatusSummary(
+                pendientes = cartLinesPendientes.size + state.pendientes.size,
+                enviados = state.enviados,
+            )
+        }
+        val mensaje = state.error ?: state.info
+        if (mensaje != null) {
             item {
-                SectionHeader(
-                    title = "Pendientes de enviar",
-                    subtitle = "${cartLinesPendientes.size + state.pendientes.size} líneas",
-                    icon = Icons.Filled.Receipt,
-                )
-            }
-            if (state.isLoading && state.pendientes.isEmpty() && cartLinesPendientes.isEmpty()) {
-                item { LoadingRow("Cargando pedidos…") }
-            }
-            if (cartLinesPendientes.isEmpty() && state.pendientes.isEmpty()) {
-                item { EmptyHint("No hay líneas pendientes. Agrega productos para visualizarlos aquí.") }
-            }
-            items(cartLinesPendientes, key = { "cart-${it.id}" }) { display ->
-                LineRowCarrito(display)
-            }
-            items(state.pendientes, key = { "pend-${it.id}" }) { pedido ->
-                LineRowPedido(pedido, onCambiarEstado = null)
-            }
-            if (cartLinesPendientes.isNotEmpty() || state.pendientes.isNotEmpty()) {
-                item {
-                    Button(
-                        onClick = onEnviarComanda,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.isSending,
-                    ) {
-                        if (state.isSending) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                            Spacer(Modifier.size(8.dp))
+                PosFeedbackCard(
+                    title = if (state.error != null) "No pudimos actualizar la comanda" else "Comanda actualizada",
+                    message = mensaje,
+                    tone = if (state.error != null) PosVisualTone.Error else PosVisualTone.Success,
+                    action =
+                        if (state.error != null) {
+                            PosVisualAction(label = "Reintentar", onClick = onReintentar)
                         } else {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                        }
-                        Text(if (state.isSending) "Enviando…" else "Enviar comanda")
-                    }
-                }
-            }
-
-            // Section enviados: solo líneas que ya salieron de cocina (o del pos) salvo canceladas.
-            item {
-                SectionHeader(
-                    title = "Enviados a cocina",
-                    subtitle = "${state.enviados.size} líneas",
-                    icon = Icons.Filled.LocalDining,
+                            null
+                        },
                 )
             }
-            if (state.enviados.isEmpty()) {
-                item { EmptyHint("Aún no se ha enviado ninguna comanda.") }
-            } else {
-                items(state.enviados, key = { "env-${it.id}" }) { pedido ->
-                    LineRowPedido(pedido, onCambiarEstado = onCambiarEstado)
+        }
+        // Section pendientes: items nuevos del carrito + pedidos PENDIENTE del backend.
+        item {
+            PosSectionHeader(
+                title = "Pendientes de enviar",
+                subtitle = "${cartLinesPendientes.size + state.pendientes.size} productos aún editables",
+                icon = Icons.Filled.Receipt,
+            )
+        }
+        if (state.isLoading && state.pendientes.isEmpty() && cartLinesPendientes.isEmpty()) {
+            item { PosLoadingState("Cargando productos de la comanda…") }
+        }
+        if (cartLinesPendientes.isEmpty() && state.pendientes.isEmpty()) {
+            item {
+                EmptyHint(
+                    title = "Todo está enviado",
+                    text = "Los nuevos productos que agregues aparecerán aquí antes de enviarlos.",
+                )
+            }
+        }
+        items(cartLinesPendientes, key = { "cart-${it.id}" }) { display ->
+            LineRowCarrito(display)
+        }
+        items(state.pendientes, key = { "pend-${it.id}" }) { pedido ->
+            LineRowPedido(pedido, onCambiarEstado = null)
+        }
+        if (cartLinesPendientes.isNotEmpty() || state.pendientes.isNotEmpty()) {
+            item {
+                Button(
+                    onClick = onEnviarComanda,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                    enabled = !state.isSending,
+                ) {
+                    if (state.isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Spacer(Modifier.size(8.dp))
+                    } else {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                    }
+                    Text(if (state.isSending) "Enviando a cocina…" else "Enviar comanda a cocina")
                 }
             }
         }
 
-        // Banner de error/info fijo al pie sin tapar la lista.
-        val mensaje = state.error ?: state.info
-        if (mensaje != null) {
-            Surface(
-                color =
-                    if (state.error != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(8.dp),
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-            ) {
-                Text(
-                    text = mensaje,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color =
-                        if (state.error != null) {
-                            MaterialTheme.colorScheme.onErrorContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        },
+        // Section enviados: solo líneas que ya salieron de cocina (o del pos) salvo canceladas.
+        item {
+            PosSectionHeader(
+                title = "Seguimiento",
+                subtitle = "${state.enviados.size} productos enviados",
+                icon = Icons.Filled.LocalDining,
+            )
+        }
+        if (state.enviados.isEmpty()) {
+            item {
+                EmptyHint(
+                    title = "Sin productos en cocina",
+                    text = "Envía la comanda para comenzar el seguimiento de preparación.",
                 )
+            }
+        } else {
+            items(state.enviados, key = { "env-${it.id}" }) { pedido ->
+                LineRowPedido(pedido, onCambiarEstado = onCambiarEstado)
             }
         }
     }
 }
 
 @Composable
-private fun SectionHeader(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun ComandaStatusSummary(
+    pendientes: Int,
+    enviados: List<PedidoMesa>,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 2.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.fillMaxWidth())
-        Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        item {
+            PedidoStatusBadge(EstadoPedidoMesa.PENDIENTE, count = pendientes)
+        }
+        listOf(
+            EstadoPedidoMesa.ENVIADA,
+            EstadoPedidoMesa.EN_PREPARACION,
+            EstadoPedidoMesa.LISTA,
+            EstadoPedidoMesa.ENTREGADA,
+        ).forEach { estado ->
+            item {
+                PedidoStatusBadge(
+                    estado = estado,
+                    count = enviados.count { it.estado == estado },
+                )
+            }
+        }
     }
 }
 
@@ -257,29 +307,39 @@ private fun LineRowCarrito(display: ItemCarrito) {
     val total = display.total
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder(),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text(
                     descripcion,
-                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                BadgeEstado(EstadoPedidoMesa.PENDIENTE)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PosStatusBadge(
+                    label = "Cantidad $cantidad",
+                    tone = PosVisualTone.Neutral,
+                    icon = Icons.Default.Restaurant,
+                )
+                Spacer(Modifier.weight(1f))
                 Text(
-                    "Cant. $cantidad · $${"%.2f".format(total)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "$ ${"%.2f".format(total)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
-            BadgeEstado(EstadoPedidoMesa.PENDIENTE)
         }
     }
 }
@@ -293,53 +353,66 @@ private fun LineRowPedido(
     val cancelado = pedido.estado == EstadoPedidoMesa.CANCELADA
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
         colors =
             CardDefaults.cardColors(
                 containerColor =
                     if (finalizado) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
             ),
+        border = CardDefaults.outlinedCardBorder(),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text(
                     pedido.itemDescripcion.ifBlank { "Producto ${pedido.productoId}" },
-                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (cancelado) TextDecoration.LineThrough else TextDecoration.None,
                 )
-                Text(
-                    "Cant. ${pedido.itemCantidad} · $${"%.2f".format(pedido.itemTotalConIva)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                BadgeEstado(pedido.estado)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PosStatusBadge(
+                    label = "Cantidad ${pedido.itemCantidad}",
+                    tone = PosVisualTone.Neutral,
+                    icon = Icons.Default.Restaurant,
                 )
-                pedido.comandaSecuencia?.let {
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        "Comanda #$it",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        "$ ${"%.2f".format(pedido.itemTotalConIva)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    pedido.comandaSecuencia?.let {
+                        Text(
+                            "Comanda #$it",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
-            BadgeEstado(pedido.estado)
-        }
-        if (onCambiarEstado != null && !finalizado) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
+            if (onCambiarEstado != null && !finalizado) {
+                val siguiente = siguienteEstadoDe(pedido.estado)
                 OutlinedButton(
-                    onClick = { onCambiarEstado(pedido.id, siguienteEstadoDe(pedido.estado)) },
+                    onClick = { onCambiarEstado(pedido.id, siguiente) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
-                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.size(4.dp))
-                    Text("A ${siguienteEstadoDe(pedido.estado)}")
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(actionLabelFor(siguiente))
                 }
             }
         }
@@ -348,42 +421,52 @@ private fun LineRowPedido(
 
 @Composable
 private fun BadgeEstado(estado: String) {
-    val color =
-        when (estado) {
-            EstadoPedidoMesa.PENDIENTE -> Color(0xFFE0E7FF)
-            EstadoPedidoMesa.ENVIADA -> Color(0xFFFEF3C7)
-            EstadoPedidoMesa.EN_PREPARACION -> Color(0xFFFFEDD5)
-            EstadoPedidoMesa.LISTA -> Color(0xFFDCFCE7)
-            EstadoPedidoMesa.ENTREGADA -> Color(0xFFE5E7EB)
-            EstadoPedidoMesa.CANCELADA -> Color(0xFFFEE2E2)
-            else -> Color(0xFFE5E7EB)
-        }
-    Surface(color = color, shape = RoundedCornerShape(6.dp)) {
-        Text(
-            text = estado.replace('_', ' '),
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = Color(0xFF1F2937),
-        )
-    }
+    PedidoStatusBadge(estado = estado)
 }
 
 @Composable
-private fun EmptyHint(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 6.dp),
+private fun PedidoStatusBadge(
+    estado: String,
+    count: Int? = null,
+) {
+    val visual =
+        when (estado) {
+            EstadoPedidoMesa.PENDIENTE ->
+                Triple("Pendiente", PosVisualTone.Info, Icons.Default.Schedule)
+            EstadoPedidoMesa.ENVIADA ->
+                Triple("Enviada", PosVisualTone.Pending, Icons.AutoMirrored.Filled.Send)
+            EstadoPedidoMesa.EN_PREPARACION ->
+                Triple("En preparación", PosVisualTone.Warning, Icons.Default.HourglassTop)
+            EstadoPedidoMesa.LISTA ->
+                Triple("Lista", PosVisualTone.Success, Icons.Default.CheckCircle)
+            EstadoPedidoMesa.ENTREGADA ->
+                Triple("Entregada", PosVisualTone.Neutral, Icons.Default.RoomService)
+            EstadoPedidoMesa.CANCELADA ->
+                Triple("Cancelada", PosVisualTone.Error, Icons.Default.Cancel)
+            else ->
+                Triple(
+                    estado.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                    PosVisualTone.Neutral,
+                    Icons.Default.Schedule,
+                )
+        }
+    PosStatusBadge(
+        label = if (count == null) visual.first else "${visual.first} · $count",
+        tone = visual.second,
+        icon = visual.third,
     )
 }
 
 @Composable
-private fun LoadingRow(text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
+private fun EmptyHint(
+    title: String,
+    text: String,
+) {
+    PosFeedbackCard(
+        title = title,
+        message = text,
+        tone = PosVisualTone.Neutral,
+    )
 }
 
 /**
@@ -397,4 +480,13 @@ private fun siguienteEstadoDe(estado: String): String =
         EstadoPedidoMesa.EN_PREPARACION -> EstadoPedidoMesa.LISTA
         EstadoPedidoMesa.LISTA -> EstadoPedidoMesa.ENTREGADA
         else -> EstadoPedidoMesa.ENTREGADA
+    }
+
+private fun actionLabelFor(estado: String): String =
+    when (estado) {
+        EstadoPedidoMesa.ENVIADA -> "Marcar como enviada"
+        EstadoPedidoMesa.EN_PREPARACION -> "Marcar en preparación"
+        EstadoPedidoMesa.LISTA -> "Marcar como lista"
+        EstadoPedidoMesa.ENTREGADA -> "Marcar como entregada"
+        else -> "Actualizar estado"
     }
