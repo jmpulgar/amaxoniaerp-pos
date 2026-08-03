@@ -305,9 +305,15 @@ class DashboardCajaCoordinator(
             is DashboardCajaUiAction.SelectAndOpen -> selectAndOpen(scope, state, action.caja, action.openingAmount)
             is DashboardCajaUiAction.SetSelectorVisible -> setSelectorVisible(state, action.show)
             is DashboardCajaUiAction.RequestApertura -> requestApertura(state, action.caja)
-            DashboardCajaUiAction.RequestAperturaActive ->
-                cajaRepository.activeCaja.value?.let { requestApertura(state, it) }
-                    ?: setSelectorVisible(state, true)
+            DashboardCajaUiAction.RequestAperturaActive -> {
+                val activeCaja = cajaRepository.activeCaja.value ?: state.value.availableCajas.singleOrNull()
+                if (activeCaja != null) {
+                    scope.launch { cajaRepository.setActiveCaja(activeCaja) }
+                    requestApertura(state, activeCaja)
+                } else {
+                    setSelectorVisible(state, true)
+                }
+            }
             is DashboardCajaUiAction.ConfirmApertura -> confirmApertura(scope, state, action.caja, action.openingAmount)
             DashboardCajaUiAction.DismissApertura -> dismissApertura(state)
             DashboardCajaUiAction.DismissAutoCloseMessage -> state.update { it.copy(autoCloseMessage = null) }
@@ -333,8 +339,9 @@ class DashboardCajaCoordinator(
                 false
             }
             CajaSessionStatus.PENDIENTE_APERTURA -> {
-                val caja = cajaRepository.activeCaja.value
+                val caja = cajaRepository.activeCaja.value ?: state.value.availableCajas.singleOrNull()
                 if (caja != null) {
+                    scope.launch { cajaRepository.setActiveCaja(caja) }
                     requestApertura(state, caja)
                 } else {
                     setSelectorVisible(state, true)
@@ -342,14 +349,21 @@ class DashboardCajaCoordinator(
                 false
             }
             CajaSessionStatus.SIN_CAJA -> {
-                state.update {
-                    it.copy(
-                        showCajaSelector = true,
-                        promotionMessage = "Selecciona una caja para realizar ventas",
-                    )
-                }
-                if (state.value.availableCajas.isEmpty() && !state.value.isLoadingCajas) {
-                    fetch(scope, state, forceShowSelector = true)
+                val available = state.value.availableCajas
+                val singleCaja = available.singleOrNull()
+                if (singleCaja != null) {
+                    scope.launch { cajaRepository.setActiveCaja(singleCaja) }
+                    requestApertura(state, singleCaja)
+                } else {
+                    state.update {
+                        it.copy(
+                            showCajaSelector = true,
+                            promotionMessage = "No tienes una caja abierta. Selecciona una caja para aperturar.",
+                        )
+                    }
+                    if (available.isEmpty() && !state.value.isLoadingCajas) {
+                        fetch(scope, state, forceShowSelector = true)
+                    }
                 }
                 false
             }

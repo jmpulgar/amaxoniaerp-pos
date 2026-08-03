@@ -593,7 +593,7 @@ private fun SuccessContent(
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            "Caja Cerrada",
+            "Caja Cerrada Exitosamente",
             fontWeight = FontWeight.Bold,
             fontSize = 24.sp,
             color = MaterialTheme.colorScheme.onSurface,
@@ -603,8 +603,17 @@ private fun SuccessContent(
             message,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            "Acabaste de cerrar la caja, ¿deseas abrir una nueva?",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = onOpenNewCaja,
             modifier =
@@ -616,7 +625,7 @@ private fun SuccessContent(
         ) {
             Icon(Icons.Rounded.PointOfSale, contentDescription = null, tint = PosPalette.FixedWhite)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Aperturar nueva caja", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = PosPalette.FixedWhite)
+            Text("Abrir caja ahora", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = PosPalette.FixedWhite)
         }
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedButton(

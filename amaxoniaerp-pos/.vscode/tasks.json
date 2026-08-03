@@ -10,6 +10,45 @@
 			],
 			"isBackground": false,
 			"problemMatcher": []
+		},
+		{
+			"label": "buildAmaxoniaReleaseApk",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				":app:assembleAmaxoniaRelease"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "buildBanescoVenezuelaReleaseApk",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				":app:assembleBanescoVenezuelaRelease"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "buildListoerpReleaseApk",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				":app:assembleListoerpRelease"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "buildAllBrandsReleaseApk",
+			"dependsOn": [
+				"buildAmaxoniaReleaseApk",
+				"buildBanescoVenezuelaReleaseApk",
+				"buildListoerpReleaseApk"
+			],
+			"dependsOrder": "parallel"
 		}
 	]
 }
