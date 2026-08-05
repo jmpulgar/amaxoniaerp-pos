@@ -127,6 +127,7 @@ fun PaymentScreen(
                 validatePayment = DependencyContainer.validatePaymentUseCase,
                 buildPaymentDetails = DependencyContainer.buildPaymentDetailsUseCase,
                 executePaymentFlow = DependencyContainer.executePaymentFlowUseCase,
+                posSettings = DependencyContainer.posConfigurationRepository,
                 tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
             )
         }

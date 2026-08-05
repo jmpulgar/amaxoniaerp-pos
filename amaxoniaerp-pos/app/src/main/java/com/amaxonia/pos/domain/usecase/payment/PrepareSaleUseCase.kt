@@ -239,6 +239,9 @@ class AssemblePreparedSaleUseCase(
                     paymentSummary = buildPaymentSummary(input, totals, payments),
                     payments = payments,
                     currency = buildCurrency(base.caja, configuration, totals.total),
+                    // FASE 1.1: propagar la selección de impresora persistida en
+                    // Settings para que el backend decida HKA20 vs digital (Venezuela).
+                    printerType = input.printerType,
                 ),
             )
         return PreparedSale(

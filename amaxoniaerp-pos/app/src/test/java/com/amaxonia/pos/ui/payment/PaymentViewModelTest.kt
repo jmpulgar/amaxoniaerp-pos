@@ -1,11 +1,15 @@
 package com.amaxonia.pos.ui.payment
 
+import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CurrencyConfig
 import com.amaxonia.pos.domain.model.payment.FormaPago
+import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.PaymentCountryReader
+import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
@@ -14,7 +18,9 @@ import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -146,12 +152,26 @@ class PaymentViewModelTest {
             object : PaymentCountryReader {
                 override suspend fun currentCountryCode(): String = "VE"
             }
+        val fakeSettings =
+            object : PosSettingsRepository {
+                override val selectedPrinterType: Flow<PrinterType> = flowOf(PrinterType.THE_FACTORY_HKA)
+                override val selectedCountry: Flow<ServerCountry?> = flowOf(null)
+                override val factorySettings: Flow<TheFactorySettings> = flowOf(TheFactorySettings())
+                override val allowEditPrices: Flow<Boolean> = flowOf(true)
+                override val allowDiscounts: Flow<Boolean> = flowOf(true)
+                override suspend fun currentCountry(): ServerCountry? = null
+                override suspend fun savePrinterType(printerType: PrinterType) = Unit
+                override suspend fun saveFactorySettings(settings: TheFactorySettings) = Unit
+                override suspend fun saveAllowEditPrices(enabled: Boolean) = Unit
+                override suspend fun saveAllowDiscounts(enabled: Boolean) = Unit
+            }
         return PaymentViewModel(
             loadPaymentContext = LoadPaymentContextUseCase(cajaReader, methodRepository),
             loadPaymentCountry = LoadPaymentCountryUseCase(countryReader),
             validatePayment = ValidatePaymentUseCase(),
             buildPaymentDetails = BuildPaymentDetailsUseCase(),
             executePaymentFlow = executor,
+            posSettings = fakeSettings,
         )
     }
 

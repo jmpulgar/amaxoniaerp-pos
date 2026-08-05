@@ -34,11 +34,25 @@ import java.time.Year
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-class ProcessSaleTransactionalRepository(
+/**
+ * Repositorio transaccional de procesamiento de ventas.
+ *
+ * **FASE 1.1 — Brief item 8 (deuda técnica anotada):** esta clase se mantiene
+ * `open` únicamente para que los tests de `ProcessSaleUseCaseSelectionTest`
+ * puedan inyectar fakes (`FakeSaleRepo`, `DuplicateAwareSaleRepo`) sin tocar la
+ * DB real. La opción preferida por el brief sería extraer un puerto
+ * `interface SaleProcessor { fun process(...): ProcessSaleResponse }` y dejar
+ * esta clase final, pero esa refactorización queda fuera del alcance de FASE 1.1
+ * (el brief prohíbe refactor general).
+ *
+ * Cuando se aborde, mover estos overrides a una clase propia de tests y cerrar
+ * esta clase.
+ */
+open class ProcessSaleTransactionalRepository(
     private val cuentaMesaRepository: CuentaMesaRepository? = null,
 ) {
 
-    fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
+    open fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
         val preparedRequest = prepareRequestWithWarehouses(countryCode, request)
         val monetaryContext = resolveMonetaryContext(countryCode, preparedRequest)
 

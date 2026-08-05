@@ -1,5 +1,6 @@
 package com.amaxonia.pos.domain.usecase.payment
 
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.SaleCurrencyDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
@@ -20,6 +21,10 @@ class BuildSaleRequestUseCase {
             pagoResumen = input.paymentSummary,
             pagos = input.payments,
             moneda = input.currency,
+            // FASE 1.1: la selección HKA20 es la única fuente de verdad para que el
+            // backend omita la facturación digital Venezuela. Se calcula aquí a
+            // partir de la configuración de impresora persistida en Settings.
+            useHka20 = input.printerType == PrinterType.THE_FACTORY_HKA,
         )
 }
 
@@ -33,4 +38,10 @@ data class BuildSaleRequestInput(
     val paymentSummary: SalePaymentSummaryDto,
     val payments: List<SalePaymentDto>,
     val currency: SaleCurrencyDto,
+    /**
+     * Impresora fiscal seleccionada en Settings por el usuario. Única fuente de verdad
+     * para que el backend decida entre HKA20 físico (Venezuela) o facturación digital.
+     */
+    val printerType: PrinterType = PrinterType.NONE,
 )
+

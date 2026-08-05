@@ -17,6 +17,23 @@ data class ProcessSaleRequestDto(
     val moneda: SaleCurrencyDto? = null,
     @SerialName("cuenta_mesa")
     val cuentaMesa: CuentaMesaVentaDto? = null,
+    /**
+     * Indica explícitamente al backend que esta venta debe facturarse con la impresora
+     * fiscal HKA20 física del POS (Venezuela) y, por tanto, el backend NO debe ejecutar
+     * la facturación digital Venezuela vía PAC The Factory HKA.
+     *
+     * La **única** fuente de verdad es la configuración de impresora seleccionada por el
+     * usuario en Settings: `PrinterType.THE_FACTORY_HKA`. El campo se calcula en
+     * [com.amaxonia.pos.domain.usecase.payment.BuildSaleRequestUseCase] como:
+     *
+     * ```
+     * useHka20 = selectedPrinterType == PrinterType.THE_FACTORY_HKA
+     * ```
+     *
+     * No debe poder setearse desde otro estado ni deducirse en el backend desde la DB.
+     * Para otros países el campo se ignora completamente.
+     */
+    val useHka20: Boolean = false,
 )
 
 @Serializable
@@ -181,6 +198,20 @@ data class ProcessSaleResponseDto(
     val qr: String? = null,
     val fechaRecepcionDGI: String? = null,
     val feError: String? = null,
+    /**
+     * FASE 2.2/2.3 — Venezuela digital.
+     *
+     * Número de documento fiscal (correlativo VE) retornado por el PAC
+     * The Factory HKA y persistido en `factura`. Se propaga tanto en la
+     * emisión exitosa como en reintentos (`AlreadyIssued`).
+     *
+     * **Importante:** solo se propaga cuando el flujo FE digital termina
+     * sano. En HKA-20 (impresora fiscal física del POS) o en fallas se
+     * mantiene `null` — jamás se inventan valores.
+     */
+    val numeroDocumentoFiscal: String? = null,
+    /** FASE 2.2/2.3 — Venezuela digital: número de control HKA persistido. */
+    val numeroControlThka: String? = null,
     @SerialName("sesion_mesa_cerrada")
     val sesionMesaCerrada: Boolean = false,
 )

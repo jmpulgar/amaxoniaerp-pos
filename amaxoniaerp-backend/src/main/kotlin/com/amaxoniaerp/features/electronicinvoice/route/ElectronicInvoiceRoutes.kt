@@ -93,6 +93,35 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
                                 "message" to "Facturación electrónica no aplica para ${result.country}",
                             ))
                         }
+
+                        is ElectronicInvoiceResult.UnsupportedDocumentType -> {
+                            call.respond(HttpStatusCode.OK, mapOf(
+                                "success" to true,
+                                "message" to "Tipo de documento '${result.tipoDocumento}' no implementado en ${result.country} (FASE 1)",
+                            ))
+                        }
+
+                        is ElectronicInvoiceResult.AlreadyIssued -> {
+                            call.respond(HttpStatusCode.OK, mapOf(
+                                "success" to true,
+                                "message" to "La factura ya posee numeración fiscal (${result.numeroDocumentoFiscal})",
+                                "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
+                                "numeroControl" to (result.numeroControl ?: ""),
+                            ))
+                        }
+
+                        is ElectronicInvoiceResult.Uncertain -> {
+                            // Resultado incierto: el PAC pudo haber creado el
+                            // documento. No se puede afirmar fallo ni éxito.
+                            call.respond(HttpStatusCode.Conflict, mapOf(
+                                "success" to false,
+                                "codigo" to result.codigo,
+                                "mensaje" to result.mensaje,
+                                "incierta" to true,
+                                "transaccionId" to (result.transaccionId ?: ""),
+                                "action" to "Requiere conciliación manual",
+                            ))
+                        }
                     }
                 } catch (e: Exception) {
                     log.error("Error procesando FE para factura {}", invoiceId, e)

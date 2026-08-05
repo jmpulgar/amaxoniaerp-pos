@@ -27,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
+import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.PrinterType
@@ -509,7 +510,18 @@ fun AppNavigation(startDestination: String) {
                                         .readSelectedCountry()
                                         ?.code
                                         .orEmpty()
-                                val ticket = PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                                // FASE 2 (Punto 3) — Selector por país en reimpresión SUNMI_V2.
+                                //   - VE → VenezuelaInvoiceTicketFormatter (factura digital HKA, 40 cols)
+                                //   - PA → PanamaInvoiceTicketFormatter (CAFE/DGI/QR)
+                                //   - OTRO → se conserva el formatter por defecto que tenía el sistema
+                                //            antes de esta integración (PanamaInvoiceTicketFormatter),
+                                //            para NO romper países distintos de VE/PA.
+                                val ticket =
+                                    when (countryCode.uppercase()) {
+                                        "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
+                                        "PA" -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                                        else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                                    }
                                 when (val printResult = ticketPrinter.printTicket(ticket)) {
                                     PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
                                     is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))

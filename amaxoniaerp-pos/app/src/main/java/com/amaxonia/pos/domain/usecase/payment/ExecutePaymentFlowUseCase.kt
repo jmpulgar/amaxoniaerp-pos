@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.payment.GatewayPaymentRequest
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.sales.CuentaMesaVentaDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.SaleItemDto
@@ -46,6 +47,12 @@ data class ExecutePaymentFlowInput(
     val preferredCorrelationId: String? = null,
     val saleItemsOverride: List<SaleItemDto>? = null,
     val cuentaMesa: CuentaMesaVentaDto? = null,
+    /**
+     * Configuración de impresora seleccionada por el usuario en Settings (única
+     * fuente de verdad para HKA20 vs facturación digital en Venezuela).
+     * Se propaga hasta el backend como `ProcessSaleRequestDto.useHka20`.
+     */
+    val printerType: PrinterType = PrinterType.NONE,
 )
 
 sealed interface PaymentFlowEvent {

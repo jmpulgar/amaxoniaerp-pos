@@ -17,6 +17,22 @@ data class ProcessSaleRequest(
     val moneda: SaleCurrencyInput? = null,
     @SerialName("cuenta_mesa")
     val cuentaMesa: CuentaMesaVentaInput? = null,
+    /**
+     * Indica explícitamente, **por venta**, que el cajero va a utilizar la impresora
+     * fiscal HKA20 física en el POS (Venezuela). La fuente de verdad nunca se deduce
+     * de la base de datos ni de `parametros_generales`; la decide el frontend a partir
+     * de la configuración de impresora seleccionada por el usuario.
+     *
+     * Regla backend (Venezuela):
+     *   - `useHka20 == true`  → omitir la facturación digital Venezuela (no llamar al
+     *     PAC). El POS continúa con su flujo HKA20 físico existente.
+     *   - `useHka20 == false` → ejecutar la facturación digital Venezuela.
+     *   - `useHka20 == null`  → compatibilidad con clientes antiguos que aún no envían
+     *     el campo; se trata igual que `false` (facturación digital por defecto).
+     *
+     * En cualquier país distinto de VE el campo se ignora y se conserva el flujo actual.
+     */
+    val useHka20: Boolean? = null,
 )
 
 /**
@@ -183,10 +199,15 @@ data class ProcessSaleResponse(
     val idFactura: String,
     val codFactura: String,
     val codEstatus: Int,
-    // Campos de Facturación Electrónica (solo PA, null para VE)
+    // Campos de Facturación Electrónica Panamá (CUFE/QR/DGI). null en VE.
     val cufe: String? = null,
     val qr: String? = null,
     val fechaRecepcionDGI: String? = null,
+    // Campos fiscales Venezuela (FASE 2). null en PA / cuando no hay FE.
+    // No se inventan: se toman EXCLUSIVAMENTE de lo persistido en `factura`
+    // tras una emisión exitosa o un AlreadyIssued. En HKA-20 quedan null.
+    val numeroDocumentoFiscal: String? = null,
+    val numeroControlThka: String? = null,
     val feError: String? = null,
     @SerialName("sesion_mesa_cerrada")
     val sesionMesaCerrada: Boolean = false,

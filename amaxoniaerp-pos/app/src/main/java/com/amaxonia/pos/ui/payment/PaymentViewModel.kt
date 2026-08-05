@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.money.Money
+import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import com.amaxonia.pos.domain.repository.TableAccountPaymentReader
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsInput
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -30,6 +33,7 @@ class PaymentViewModel(
     private val validatePayment: ValidatePaymentUseCase,
     private val buildPaymentDetails: BuildPaymentDetailsUseCase,
     private val executePaymentFlow: PaymentFlowExecutor,
+    private val posSettings: PosSettingsRepository,
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
@@ -244,11 +248,15 @@ class PaymentViewModel(
         }
     }
 
-    private fun PaymentState.toExecutionInput(
+    private suspend fun PaymentState.toExecutionInput(
         countryCode: String,
         details: com.amaxonia.pos.domain.usecase.payment.PaymentDetails,
     ): ExecutePaymentFlowInput {
         val tablePayment = tableAccountPaymentReader?.current?.value
+        // FASE 1.1: la selección de impresora persistida en Settings es la única
+        // fuente de verdad para que el backend sepa si la venta debe ir por HKA20
+        // físico (Venezuela) o por facturación digital.
+        val printerType = posSettings.selectedPrinterType.first()
         return ExecutePaymentFlowInput(
             countryCode = countryCode,
             paymentDetails = details,
@@ -265,6 +273,7 @@ class PaymentViewModel(
             correlationCarryOver = tablePayment?.correlationId,
             saleItemsOverride = tablePayment?.saleItems,
             cuentaMesa = tablePayment?.saleContext,
+            printerType = printerType,
         )
     }
 

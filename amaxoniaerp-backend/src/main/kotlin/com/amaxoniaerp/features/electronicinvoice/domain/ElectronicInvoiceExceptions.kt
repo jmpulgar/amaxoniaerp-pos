@@ -26,3 +26,14 @@ class FEConfigurationException(message: String) :
 /** La factura no existe o no está en estado válido para envío FE. */
 class FEInvoiceNotFoundException(message: String) :
     RuntimeException(message)
+
+/**
+ * Respuesta del PAC Venezuela cuyo resultado NO es concluyente (timeout,
+ * JSON inválido, HTTP 5xx pre-emisión). El número fiscal PUEDE haberse creado
+ * en el PAC pero no tenemos prueba local. No se persiste nada inventado.
+ */
+class VEUncertainResponseException(
+    val codigo: String,
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)

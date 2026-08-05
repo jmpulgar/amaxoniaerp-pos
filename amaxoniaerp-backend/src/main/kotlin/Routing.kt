@@ -34,8 +34,12 @@ import com.amaxoniaerp.features.promotions.route.promotionsRoutes
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
+import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
+import com.amaxoniaerp.features.electronicinvoice.domain.VenezuelaInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaRestClient
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaPayloadBuilder
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaRestClient
 import com.amaxoniaerp.features.electronicinvoice.route.electronicInvoiceRoutes
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
@@ -115,7 +119,19 @@ fun Application.configureRouting() {
     val pacClient = TheFactoryHkaRestClient(feHttpClient)
     val payloadBuilder = TheFactoryHkaPayloadBuilder()
     val panamaProcessor = PanamaInvoiceProcessor(feRepository, pacClient, payloadBuilder)
-    val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor)
+
+    // Facturación Electrónica Venezuela (The Factory HKA FE).
+    // Activate cuando parametros_generales.tipo_facturacion == 5; usa el mismo
+    // HttpClient (con TLS+timeouts+hostname verification ya configurados).
+    val veRepository = VenezuelaElectronicInvoiceRepository()
+    val veHkaClient = VenezuelaHkaRestClient(feHttpClient)
+    val vePayloadBuilder = VenezuelaHkaPayloadBuilder()
+    val venezuelaProcessor = VenezuelaInvoiceStrategy(
+        repository = veRepository,
+        hkaClient = veHkaClient,
+        payloadBuilder = vePayloadBuilder,
+    )
+    val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor, venezuelaProcessor)
 
     val creditNoteService = CreditNoteService(CreditNoteRepository())
 

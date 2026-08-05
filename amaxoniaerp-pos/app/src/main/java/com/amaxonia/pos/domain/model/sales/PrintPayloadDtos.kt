@@ -25,6 +25,36 @@ data class FacturaPrintPayloadDto(
     val puntoFacturacionFiscal: String? = null,
     val codigoSucursal: String? = null,
     val protocoloAutorizacion: String? = null,
+    /**
+     * FASE 2.3b — Venezuela digital.
+     *
+     * Número de control HKA persistido en `factura.numero_control_thka` tras
+     * emisión exitosa por The Factory HKA. Solo aplica a Venezuela; en Panamá
+     * se mantiene `null`.
+     */
+    val numeroControlThka: String? = null,
+    /**
+     * FASE 2.3b — Venezuela: adicional al IVA (IGTF) cuando el pago es en
+     * divisa extranjera. Se imprime únicamente si el tenant lo aplica y el
+     * monto es > 0.
+     */
+    val igtfMonto: String? = null,
+    /** Base imponible sobre la que se calcula el IGTF (monto en divisa). */
+    val igtfBaseImponible: String? = null,
+    /** Tasa del IGTF (porcentaje), p.ej. "3.0". */
+    val igtfTasa: String? = null,
+    /**
+     * Venezuela multimoneda: tasa de cambio referencia (USD→Bs) usada para
+     * mostrar el total equivalente en bolívares. Solo se imprime si está
+     * presente y el pago está en divisa.
+     */
+    val tasaCambioBs: String? = null,
+    /** Abreviatura de la moneda base (p.ej. "Bs"). Defaults implícitos en null. */
+    val abrMonedaBase: String? = null,
+    /** Abreviatura de la moneda secundaria (p.ej. "USD"). */
+    val abrMonedaSecundaria: String? = null,
+    /** Total convertido a la moneda secundaria (divisa), si aplica. */
+    val totalDivisa: String? = null,
 )
 
 @Serializable

@@ -10,14 +10,30 @@ import kotlinx.serialization.Serializable
  */
 sealed class ElectronicInvoiceResult {
 
-    /** El PAC aceptó el documento y retornó un CUFE válido. */
+    /**
+     * El PAC aceptó el documento.
+     *
+     * **FASE 2 (corrección Punto 1):** los campos繁荣 PA y VE están separados:
+     * - Panamá usa `cufe`, `qr`, `fechaRecepcionDGI`, `nroProtocoloAutorizacion`;
+     * - Venezuela usa `numeroDocumentoFiscal`, `numeroControlThka` provenientes
+     *   de `resultado.numeroDocumento` / `resultado.numeroControl` del PAC HKA.
+     *
+     * Cada país persiste y expone **solo sus propios campos**. NUNCA se usan
+     * `cufe`/`qr` como transporte temporal para VE ni viceversa.
+     */
     @Serializable
     data class Success(
-        val cufe: String,
+        // ─── Panamá (CAFE/DGI): intactos - FASE 2 Punto 6 ──────────────
+        val cufe: String? = null,
         val qr: String? = null,
         val fechaRecepcionDGI: String? = null,
         val nroProtocoloAutorizacion: String? = null,
         val fechaLimite: String? = null,
+        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─
+        /** `resultado.numeroDocumento` retornado por HKA VE. Null en PA. */
+        val numeroDocumentoFiscal: String? = null,
+        /** `resultado.numeroControl` retornado por HKA VE. Null en PA. */
+        val numeroControlThka: String? = null,
     ) : ElectronicInvoiceResult()
 
     /** El PAC rechazó el documento o hubo un error de comunicación. */
@@ -27,10 +43,49 @@ sealed class ElectronicInvoiceResult {
         val mensaje: String,
     ) : ElectronicInvoiceResult()
 
-    /** La facturación electrónica no aplica para este país (ej. Venezuela). */
+    /** La facturación electrónica no aplica para este país (ej. sin PAC). */
     @Serializable
     data class NotApplicable(
         val country: String,
+    ) : ElectronicInvoiceResult()
+
+    /**
+     * El tipo de documento no está soportado por la implementación actual.
+     *
+     * FASE 1: solo se emite tipoDocumento "01" (factura). Notas de crédito / débito
+     * y demás tipos retornan este resultado SIN llamar al PAC.
+     */
+    @Serializable
+    data class UnsupportedDocumentType(
+        val country: String,
+        val tipoDocumento: String,
+    ) : ElectronicInvoiceResult()
+
+    /**
+     * La factura ya contiene un número fiscal persistido (idempotencia).
+     *
+     * Se retorna SIN llamar al PAC cuando la factura recargada de la DB ya tiene
+     * número fiscal / número de control válidos.
+     */
+    @Serializable
+    data class AlreadyIssued(
+        val country: String,
+        val numeroDocumentoFiscal: String,
+        val numeroControl: String? = null,
+    ) : ElectronicInvoiceResult()
+
+    /**
+     * Resultado incierto. Se produce ante timeout o respuesta ambigua del PAC:
+     * el documento PUEDE haber sido creado por el PAC, pero no se recibió
+     * confirmación. NO se persiste ningún número inventado, NO se marca como
+     * exitoso. El proceso superior decide el siguiente paso (humano / reintento).
+     */
+    @Serializable
+    data class Uncertain(
+        val country: String,
+        val codigo: String,
+        val mensaje: String,
+        val transaccionId: String? = null,
     ) : ElectronicInvoiceResult()
 }
 

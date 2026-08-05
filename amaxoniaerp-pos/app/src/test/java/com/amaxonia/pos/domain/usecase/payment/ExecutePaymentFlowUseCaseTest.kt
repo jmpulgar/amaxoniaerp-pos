@@ -21,6 +21,7 @@ import com.amaxonia.pos.domain.model.payment.FormaPagoDetalle
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
 import com.amaxonia.pos.domain.model.payment.GatewayApproval
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
@@ -429,6 +430,7 @@ class ExecutePaymentFlowUseCaseTest {
         tenderedAmount: Money = Money.parse("10.00"),
         changeDue: Double = 0.0,
         correlationCarryOver: String? = null,
+        printerType: PrinterType = PrinterType.NONE,
     ): ExecutePaymentFlowInput {
         val method = paymentMethod(1, "CASH", "Efectivo")
         val details = paymentDetails ?: listOf(FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = 10.0))
@@ -454,6 +456,7 @@ class ExecutePaymentFlowUseCaseTest {
             isMultiCurrency = false,
             availableMethods = methods ?: listOf(method),
             correlationCarryOver = correlationCarryOver,
+            printerType = printerType,
         )
     }
 
@@ -590,6 +593,63 @@ class ExecutePaymentFlowUseCaseTest {
             val dup = result as PaymentFlowResult.DuplicateInvoice
             assertEquals("flow-id", dup.clientCorrelationId)
             assertEquals(1, fixture.sales.processSaleCalls)
+        }
+
+    @Test
+    fun `Venezuela HKA-20 printerType attributes useHka20 to backend and uses fiscal print`() =
+        runTest {
+            val fixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        printFeedback = InvoicePrintFeedback("Impreso HKA20", "FISCAL-9", "SERIAL-2"),
+                    ),
+                )
+            val events = mutableListOf<PaymentFlowEvent>()
+
+            val result =
+                fixture.useCase(input(countryCode = "VE", printerType = PrinterType.THE_FACTORY_HKA)) { events += it }
+
+            // 1) El request SÍ viaja al backend (procesa la venta comercial).
+            // 2) Pero el backend CUANDO recibe useHka20=true debe omitir digital:
+            //    aquí sólo verificamos que el POS transportó la bandera correcta.
+            val request = fixture.sales.request
+            assertNotNull(request)
+            assertEquals("El POS debe enviar useHka20=true cuando printerType=THE_FACTORY_HKA", true, request?.useHka20)
+
+            // 3) El flujo continúa con impresión fiscal HKA-20 y confirmación.
+            assertTrue(result is PaymentFlowResult.Success)
+            assertEquals("remote-invoice", fixture.sales.confirmedInvoiceId)
+            assertEquals("FISCAL-9", fixture.sales.confirmation?.numeroDocumentoFiscal)
+            assertEquals("SERIAL-2", fixture.sales.confirmation?.impresoraSerial)
+        }
+
+    @Test
+    fun `Venezuela HKA-20 print failure stays Success but never retries with useHka20=false`() =
+        runTest {
+            // Simula que la impresora fiscal HKA-20 física NO logró imprimir ni devolvió
+            // número fiscal. El resultado de la venta sigue siendo SUCCESS (la venta
+            // comercial ya está confirmada) pero no se reintenta procesar la venta con
+            // useHka20=false.
+            val fixture =
+                fixture(
+                    FixtureOptions(
+                        isOnline = true,
+                        printFeedback = null, // gateway fiscal no retorna número
+                    ),
+                )
+
+            val firstResult =
+                fixture.useCase(input(countryCode = "VE", printerType = PrinterType.THE_FACTORY_HKA)) {}
+
+            assertTrue(firstResult is PaymentFlowResult.Success)
+            // Sólo se invoca al backend UNA vez: el fallo fiscal NO dispara reintento digital.
+            assertEquals("Reintento fiscal falla no debe disparar reintento digital", 1, fixture.sales.processSaleCalls)
+            // No se invoca confirmación porque no hay número fiscal.
+            assertEquals(null, fixture.sales.confirmedInvoiceId)
+            assertEquals(null, fixture.sales.confirmation)
+            // Y la bandera que viajó fue useHka20=true.
+            assertEquals("Bandera transportada fue useHka20=true", true, fixture.sales.request?.useHka20)
         }
 
     private data class Fixture(

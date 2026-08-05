@@ -1,6 +1,7 @@
 package com.amaxonia.pos.domain.usecase.payment
 
 import com.amaxonia.pos.data.local.AppJson
+import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.sales.SaleCurrencyDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
 import com.amaxonia.pos.domain.model.sales.SaleItemDto
@@ -104,4 +105,66 @@ class BuildSaleRequestUseCaseTest {
             itemTotalConIva = 11.6,
             itemCantidadTotal = 1.0,
         )
+
+    // ─── FASE 1.1: propagación de la selección HKA20 al DTO ─────────────────
+
+    @Test
+    fun `THE_FACTORY_HKA produce useHka20=true en el DTO de venta`() {
+        val request =
+            BuildSaleRequestUseCase()(
+                BuildSaleRequestInput(
+                    invoice = invoice(),
+                    items = listOf(item()),
+                    taxes = emptyList(),
+                    paymentSummary = SalePaymentSummaryDto(11.6, 20.0, 8.4, 0.0, mapOf("CASH" to 11.6)),
+                    payments = listOf(SalePaymentDto(1, "CASH", 11.6, 20.0, 8.4)),
+                    currency = SaleCurrencyDto("NO", 1.0, 0, 1, "USD", 1, "USD", 11.6),
+                    printerType = PrinterType.THE_FACTORY_HKA,
+                ),
+            )
+
+        assertEquals(true, request.useHka20)
+    }
+
+    @Test
+    fun `cualquier otro printerType produce useHka20=false en el DTO de venta`() {
+        PrinterType.entries
+            .filter { it != PrinterType.THE_FACTORY_HKA }
+            .forEach { printer ->
+                val request =
+                    BuildSaleRequestUseCase()(
+                        BuildSaleRequestInput(
+                            invoice = invoice(),
+                            items = listOf(item()),
+                            taxes = emptyList(),
+                            paymentSummary = SalePaymentSummaryDto(11.6, 20.0, 8.4, 0.0, mapOf("CASH" to 11.6)),
+                            payments = listOf(SalePaymentDto(1, "CASH", 11.6, 20.0, 8.4)),
+                            currency = SaleCurrencyDto("NO", 1.0, 0, 1, "USD", 1, "USD", 11.6),
+                            printerType = printer,
+                        ),
+                    )
+
+                assertEquals(
+                    "PrinterType=$printer no debe setear useHka20",
+                    false,
+                    request.useHka20,
+                )            }
+    }
+
+    @Test
+    fun `sin indicar printerType el default es useHka20=false`() {
+        val request =
+            BuildSaleRequestUseCase()(
+                BuildSaleRequestInput(
+                    invoice = invoice(),
+                    items = listOf(item()),
+                    taxes = emptyList(),
+                    paymentSummary = SalePaymentSummaryDto(11.6, 20.0, 8.4, 0.0, mapOf("CASH" to 11.6)),
+                    payments = listOf(SalePaymentDto(1, "CASH", 11.6, 20.0, 8.4)),
+                    currency = SaleCurrencyDto("NO", 1.0, 0, 1, "USD", 1, "USD", 11.6),
+                ),
+            )
+
+        assertEquals(false, request.useHka20)
+    }
 }

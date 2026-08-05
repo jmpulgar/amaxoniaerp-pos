@@ -301,6 +301,7 @@ class FacturasRepository {
                 f.puntoFacturacionFiscal,
                 f.nroProtocoloAutorizacion,
                 s.codigo_sucursal_emisor AS sucursal_codigo,
+                NULL AS numero_control_thka,
                 """.trimIndent()
             } else {
                 """
@@ -312,6 +313,7 @@ class FacturasRepository {
                 NULL AS puntoFacturacionFiscal,
                 NULL AS nroProtocoloAutorizacion,
                 NULL AS sucursal_codigo,
+                f.numero_control_thka AS numero_control_thka,
                 """.trimIndent()
             }
         val clientBranchJoin =
@@ -463,6 +465,9 @@ class FacturasRepository {
             puntoFacturacionFiscal = factura.stringOrNull("puntoFacturacionFiscal"),
             codigoSucursal = factura.stringOrNull("sucursal_codigo"),
             protocoloAutorizacion = factura.stringOrNull("nroProtocoloAutorizacion"),
+            // FASE 2.3b — Exponer número de control HKA persistido (Venezuela digital).
+            // En Panamá el SELECT emite NULL; aquí nunca se inventa un valor.
+            numeroControlThka = factura.stringOrNull("numero_control_thka"),
         )
     }
 
