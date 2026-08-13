@@ -76,7 +76,7 @@ class FormasPagoRepository {
             orden = row[CajaFormaPagoTable.orden],
             idBancoCuenta = row[CajaFormaPagoTable.idBancoCuenta].takeIf { it > 0 },
             idBancoOperacion = row[CajaFormaPagoTable.idBancoOperacion].takeIf { it > 0 },
-            tipoMoneda = row[CajaFormaPagoTable.tipoMoneda],
+            tipoMoneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda).orEmpty(),
             idCaja = idCaja
         )
     }

@@ -3,6 +3,8 @@ package com.amaxonia.pos.domain.usecase.cart
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.DraftInvoice
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
 import com.amaxonia.pos.domain.system.AppClock
@@ -13,6 +15,7 @@ data class SaveDraftInvoiceInput(
     val client: Client?,
     val seller: Seller?,
     val total: Double,
+    val financialSnapshot: SaleFinancialSnapshot? = null,
 )
 
 class SaveDraftInvoiceUseCase(
@@ -21,6 +24,7 @@ class SaveDraftInvoiceUseCase(
     private val clock: AppClock,
 ) {
     suspend operator fun invoke(input: SaveDraftInvoiceInput): DraftInvoice {
+        val snapshot = input.financialSnapshot ?: buildFinancialSnapshot(input.items, input.total)
         val draft =
             DraftInvoice(
                 id = idGenerator.nextId(),
@@ -30,12 +34,33 @@ class SaveDraftInvoiceUseCase(
                 sellerId = input.seller?.id ?: 0,
                 sellerName = input.seller?.nombre,
                 itemsJson = buildDraftItemsJson(input.items),
-                total = input.total,
+                total = snapshot.total,
                 itemCount = input.items.sumOf { it.quantity },
                 createdAt = clock.now().toEpochMilli(),
+                subtotalGross = snapshot.subtotalGross,
+                itemDiscounts = snapshot.itemDiscounts,
+                subtotalNet = snapshot.subtotalNet,
+                tax = snapshot.tax,
             )
         repository.save(draft)
         return draft
+    }
+
+    private fun buildFinancialSnapshot(
+        items: List<CartItem>,
+        total: Double,
+    ): SaleFinancialSnapshot {
+        val subtotalGross = items.fold(Money.ZERO) { sum, item -> sum + Money.fromDouble(item.subtotalWithoutTax) }
+        val itemDiscounts = items.fold(Money.ZERO) { sum, item -> sum + Money.fromDouble(item.discountAmountWithoutTax) }
+        val subtotalNet = items.fold(Money.ZERO) { sum, item -> sum + Money.fromDouble(item.totalWithoutTax) }
+        val totalMoney = Money.fromDouble(total)
+        return SaleFinancialSnapshot(
+            subtotalGross = subtotalGross.toDouble(),
+            itemDiscounts = itemDiscounts.toDouble(),
+            subtotalNet = subtotalNet.toDouble(),
+            tax = (totalMoney - subtotalNet).toDouble(),
+            total = totalMoney.toDouble(),
+        )
     }
 
     private fun buildDraftItemsJson(items: List<CartItem>): String {

@@ -7,6 +7,7 @@ import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,10 +56,22 @@ class CartRepository {
     private val _currentSeller = MutableStateFlow<Seller?>(null)
     val currentSeller: StateFlow<Seller?> = _currentSeller.asStateFlow()
 
+    private val _financialSnapshot = MutableStateFlow<SaleFinancialSnapshot?>(null)
+    val financialSnapshot: StateFlow<SaleFinancialSnapshot?> = _financialSnapshot.asStateFlow()
+
+    fun setFinancialSnapshot(snapshot: SaleFinancialSnapshot?) {
+        _financialSnapshot.value = snapshot
+    }
+
+    private fun invalidateFinancialSnapshot() {
+        if (_financialSnapshot.value != null) _financialSnapshot.value = null
+    }
+
     fun addToCart(
         product: Product,
         quantity: Int = 1,
     ) {
+        invalidateFinancialSnapshot()
         val safeQuantity = quantity.coerceAtLeast(1)
         val currentSellerId = _currentSeller.value?.id ?: 0
         val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
@@ -110,6 +123,7 @@ class CartRepository {
         promocion: Promocion,
         times: Int = 1,
     ) {
+        invalidateFinancialSnapshot()
         val safeTimes = times.coerceAtLeast(1)
         val currentSellerId = _currentSeller.value?.id ?: 0
         _cartItems.update { currentItems ->
@@ -200,6 +214,7 @@ class CartRepository {
             removeItem(productId)
             return
         }
+        invalidateFinancialSnapshot()
         _cartItems.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine) {
@@ -219,16 +234,19 @@ class CartRepository {
             removePromotion(promocionId)
             return
         }
+        invalidateFinancialSnapshot()
         _cartItems.update { items ->
             updatePromotionLines(items, promocionId, times, append = false)
         }
     }
 
     fun removeItem(productId: String) {
+        invalidateFinancialSnapshot()
         _cartItems.update { items -> items.filter { it.product.id != productId || it.isPromotionLine } }
     }
 
     fun removePromotion(promotionId: String) {
+        invalidateFinancialSnapshot()
         _cartItems.update { items -> items.filter { it.promocionId != promotionId } }
     }
 
@@ -257,6 +275,7 @@ class CartRepository {
         productId: String,
         unitPriceWithTax: Double,
     ) {
+        invalidateFinancialSnapshot()
         val safePrice = unitPriceWithTax.coerceAtLeast(0.0)
         _cartItems.update { items ->
             items.map { item ->
@@ -273,6 +292,7 @@ class CartRepository {
         productId: String,
         discountPercent: Double,
     ) {
+        invalidateFinancialSnapshot()
         val safeDiscount = discountPercent.coerceIn(0.0, 100.0)
         _cartItems.update { items ->
             items.map { item ->
@@ -289,6 +309,7 @@ class CartRepository {
         productId: String,
         unit: String,
     ) {
+        invalidateFinancialSnapshot()
         val normalizedUnit = if (unit == "UNIDAD") "UNIDAD" else "EMPAQUE"
         _cartItems.update { items ->
             items.map { item ->
@@ -338,6 +359,7 @@ class CartRepository {
 
     fun clearCart() {
         _cartItems.value = emptyList()
+        _financialSnapshot.value = null
         _selectedClient.value = null
         _selectedClientSucursal.value = null
         _clientSucursales.value = emptyList()
@@ -348,6 +370,7 @@ class CartRepository {
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)
     fun clearItemsOnly() {
         _cartItems.value = emptyList()
+        _financialSnapshot.value = null
     }
 
     // Nuevas funciones para manejar el cliente

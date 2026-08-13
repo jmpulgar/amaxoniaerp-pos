@@ -26,6 +26,8 @@ data class ClientDto(
     val addressLevel2: String? = null,
     val addressLevel3: String? = null,
     val photoFilename: String? = null,
+    val permiteCredito: Boolean = false,
+    val diasCredito: Int = 0,
 )
 
 @Serializable

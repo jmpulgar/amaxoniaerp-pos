@@ -41,11 +41,22 @@ class TheFactoryHkaPayloadBuilder {
     /**
      * Construye el payload completo a partir del contexto de la factura.
      */
-    fun build(context: InvoiceFEContext): TheFactoryHkaDocumentoWrapper {
+    fun build(context: InvoiceFEContext): TheFactoryHkaDocumentoWrapper =
+        build(context, null)
+
+    /**
+     * Variante interna para documentos que referencian otro documento fiscal.
+     * El camino público de factura mantiene exactamente el payload anterior al
+     * pasar una lista de referencias nula.
+     */
+    internal fun build(
+        context: InvoiceFEContext,
+        documentosFiscalesReferenciados: List<TheFactoryHkaDocFiscalRef>?,
+    ): TheFactoryHkaDocumentoWrapper {
         return TheFactoryHkaDocumentoWrapper(
             documento = TheFactoryHkaDocumento(
                 codigoSucursalEmisor = context.codigoSucursalEmisor,
-                datosTransaccion = buildDatosTransaccion(context),
+                datosTransaccion = buildDatosTransaccion(context, documentosFiscalesReferenciados),
                 listaItems = buildItems(context.detalles, normalizeTipoClienteFE(context.cliente.tipoClienteFE)),
                 totalesSubTotales = buildTotales(context),
             )
@@ -54,7 +65,10 @@ class TheFactoryHkaPayloadBuilder {
 
     // ─── Datos de Transacción ────────────────────────────────────────────────
 
-    private fun buildDatosTransaccion(ctx: InvoiceFEContext): TheFactoryHkaDatosTransaccion {
+    private fun buildDatosTransaccion(
+        ctx: InvoiceFEContext,
+        documentosFiscalesReferenciados: List<TheFactoryHkaDocFiscalRef>?,
+    ): TheFactoryHkaDatosTransaccion {
         val factura = ctx.factura
         val config = ctx.config
 
@@ -65,7 +79,7 @@ class TheFactoryHkaPayloadBuilder {
         val destinoOperacion = if (tipoDocumento == "03") "2" else config.destinoOperacion
 
         // Fecha emisión en formato ISO 8601
-        val fechaEmision = formatFechaEmision(factura.fechaFactura)
+        val fechaEmision = formatFechaEmisionForPayload(factura.fechaFactura)
 
         // Contingencia: solo aplica si tipoEmision es "02" o "04".
         // En modo "02" el flujo legacy usa la fecha actual y motivo fijo.
@@ -91,6 +105,7 @@ class TheFactoryHkaPayloadBuilder {
             fechaInicioContingencia = if (esContingencia) fechaInicioContingencia else null,
             motivoContingencia = if (esContingencia) motivoContingencia else null,
             cliente = buildCliente(ctx),
+            listaDocsFiscalReferenciados = documentosFiscalesReferenciados,
         )
     }
 
@@ -378,7 +393,7 @@ class TheFactoryHkaPayloadBuilder {
      * Formatea la fecha de la factura al formato ISO 8601 (yyyy-MM-dd'T'HH:mm:ss).
      * La fecha viene en formato "yyyy-MM-dd" desde la DB.
      */
-    private fun formatFechaEmision(fecha: String?): String {
+    internal fun formatFechaEmisionForPayload(fecha: String?): String {
         if (fecha.isNullOrBlank()) {
             return LocalDate.now().format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
         }

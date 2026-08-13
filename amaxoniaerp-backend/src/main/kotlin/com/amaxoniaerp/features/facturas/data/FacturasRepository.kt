@@ -23,6 +23,9 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.Query
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -34,6 +37,17 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.math.BigDecimal
 import java.math.RoundingMode
+
+data class FacturasFilter(
+    val search: String? = null,
+    val usuario: String? = null,
+    val sucursalId: Int? = null,
+    val fechaInicio: LocalDate? = null,
+    val fechaFin: LocalDate? = null,
+    val estatusList: List<Int>? = null,
+)
+
+private val FACTURA_DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 class FacturasRepository {
     suspend fun findByCorrelationId(
@@ -74,10 +88,7 @@ class FacturasRepository {
         countryCode: String,
         limit: Int,
         offset: Long,
-        search: String?,
-        fechaInicio: LocalDate?,
-        fechaFin: LocalDate?,
-        estatusList: List<Int>?,
+        filter: FacturasFilter,
     ): Pair<List<FacturaSummary>, Long> = dbQuery(database) {
         val tabla = FacturasTableFactory.forCountry(countryCode)
         val query = tabla
@@ -85,25 +96,7 @@ class FacturasRepository {
             .join(EstatusTable, JoinType.LEFT, tabla.codEstatus, EstatusTable.codEstatus)
             .selectAll()
 
-        if (fechaInicio != null && fechaFin != null) {
-            val start = fechaInicio.format(DateTimeFormatter.ISO_DATE)
-            val end = fechaFin.format(DateTimeFormatter.ISO_DATE)
-            query.andWhere { tabla.fechaFactura.between(start, end) }
-        }
-
-        if (!estatusList.isNullOrEmpty()) {
-            query.andWhere { tabla.codEstatus inList estatusList }
-        }
-
-        if (!search.isNullOrBlank()) {
-            val term = "%$search%"
-            query.andWhere {
-                (tabla.codFactura like term) or
-                    (FacturasClientesTable.nombre like term) or
-                    (FacturasClientesTable.rif like term) or
-                    (EstatusTable.descripcion like term)
-            }
-        }
+        query.applyInvoiceFilters(tabla, filter)
 
         val total = query.count()
         val data = query.orderBy(tabla.fechaFactura to SortOrder.DESC)
@@ -154,12 +147,14 @@ class FacturasRepository {
     suspend fun getResumen(
         database: Database,
         countryCode: String,
+        filter: FacturasFilter = FacturasFilter(),
     ): FacturasResumen = dbQuery(database) {
         val tabla = FacturasTableFactory.forCountry(countryCode)
-        val rows = tabla
+        val query = tabla
             .join(EstatusTable, JoinType.LEFT, tabla.codEstatus, EstatusTable.codEstatus)
             .selectAll()
-            .toList()
+        query.applyInvoiceFilters(tabla, filter)
+        val rows = query.toList()
 
         var ventasBrutas = 0.0
         var ventasNetas = 0.0
@@ -241,6 +236,42 @@ class FacturasRepository {
             ticketPromedioRef = if (hasMultiCurrency && totalPagadas > 0) ventasNetasRef / totalPagadas else null,
             abrMonedaSecundaria = abrMonedaSec,
         )
+    }
+
+    private fun Query.applyInvoiceFilters(
+        tabla: BaseFacturasTable,
+        filter: FacturasFilter,
+    ) {
+        filter.usuario?.takeIf(String::isNotBlank)?.let { usuario ->
+            andWhere { tabla.usuarioCreacion eq usuario }
+        }
+        filter.sucursalId?.let { sucursalId ->
+            andWhere { tabla.idSucursal eq sucursalId }
+        }
+        filter.fechaInicio?.let { fechaInicio ->
+            val start = fechaInicio.atStartOfDay().format(FACTURA_DATE_TIME_FORMAT)
+            andWhere { tabla.fechaCreacion greaterEq start }
+        }
+        filter.fechaFin?.let { fechaFin ->
+            val endExclusive =
+                fechaFin
+                    .plusDays(1)
+                    .atStartOfDay()
+                    .format(FACTURA_DATE_TIME_FORMAT)
+            andWhere { tabla.fechaCreacion less endExclusive }
+        }
+        filter.estatusList?.takeIf(List<Int>::isNotEmpty)?.let { estatusList ->
+            andWhere { tabla.codEstatus inList estatusList }
+        }
+        filter.search?.takeIf(String::isNotBlank)?.let { search ->
+            val term = "%$search%"
+            andWhere {
+                (tabla.codFactura like term) or
+                    (FacturasClientesTable.nombre like term) or
+                    (FacturasClientesTable.rif like term) or
+                    (EstatusTable.descripcion like term)
+            }
+        }
     }
 
     suspend fun confirmFiscal(

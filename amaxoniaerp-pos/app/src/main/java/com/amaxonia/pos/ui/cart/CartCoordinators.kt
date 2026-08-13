@@ -38,12 +38,17 @@ class CartStateCoordinator(
         }
         scope.launch {
             cartRepository.cartItems.collect { items ->
-                updateCartState(state, items, cartRepository.selectedClient.value)
+                updateCartState(state, items, cartRepository.selectedClient.value, cartRepository.financialSnapshot.value)
+            }
+        }
+        scope.launch {
+            cartRepository.financialSnapshot.collect { snapshot ->
+                updateCartState(state, cartRepository.cartItems.value, cartRepository.selectedClient.value, snapshot)
             }
         }
         scope.launch {
             cartRepository.selectedClient.collect { client ->
-                updateCartState(state, cartRepository.cartItems.value, client)
+                updateCartState(state, cartRepository.cartItems.value, client, cartRepository.financialSnapshot.value)
                 state.update { it.copy(selectedClientPhotoUrl = client?.let { resolveClientImageUrl(it) }.orEmpty()) }
                 loadClientBranches(client, state)
             }
@@ -81,12 +86,13 @@ class CartStateCoordinator(
         state: MutableStateFlow<CartState>,
         items: List<CartItem>,
         client: Client?,
+        financialSnapshot: com.amaxonia.pos.domain.model.SaleFinancialSnapshot? = cartRepository.financialSnapshot.value,
     ) {
         state.update {
             it.copy(
                 items = items,
                 displayItems = cartRepository.getDisplayItems(),
-                total = items.sumOf { item -> item.total },
+                total = financialSnapshot?.total ?: items.sumOf { item -> item.total },
                 selectedClient = client,
                 selectedClientPhotoUrl = if (client == null) "" else it.selectedClientPhotoUrl,
                 cartActionError = if (client == null) null else it.cartActionError,

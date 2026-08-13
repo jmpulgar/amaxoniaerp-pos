@@ -38,6 +38,8 @@ fun ClientDto.toEntity(): ClientEntity =
         addressLevel1 = addressLevel1.orEmpty(),
         addressLevel2 = addressLevel2.orEmpty(),
         addressLevel3 = addressLevel3.orEmpty(),
+        permiteCredito = permiteCredito,
+        diasCredito = diasCredito,
     )
 
 fun ClientEntity.toDomain(): Client {
@@ -66,6 +68,8 @@ fun ClientEntity.toDomain(): Client {
         addressLevel1 = addressLevel1,
         addressLevel2 = addressLevel2,
         addressLevel3 = addressLevel3,
+        permiteCredito = permiteCredito,
+        diasCredito = diasCredito,
     )
 }
 

@@ -33,6 +33,24 @@ data class FacturasListResponseDto(
     val total: Long,
 )
 
+@Serializable
+data class FacturasResumenDto(
+    val ventasBrutas: Double = 0.0,
+    val ventasNetas: Double = 0.0,
+    val descuentos: Double = 0.0,
+    val cancelaciones: Double = 0.0,
+    val totalFacturas: Int = 0,
+    val totalFacturasPagadas: Int = 0,
+    val totalFacturasAnuladas: Int = 0,
+    val ticketPromedio: Double = 0.0,
+    val moneda: String = "USD",
+    val ventasBrutasRef: Double? = null,
+    val ventasNetasRef: Double? = null,
+    val cancelacionesRef: Double? = null,
+    val ticketPromedioRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
+)
+
 /**
  * Mirrors the backend FacturaDetalleItem returned by GET /facturas/{id}/detalle.
  */

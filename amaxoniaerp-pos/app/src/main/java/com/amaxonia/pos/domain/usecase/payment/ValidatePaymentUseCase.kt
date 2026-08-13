@@ -1,6 +1,16 @@
 package com.amaxonia.pos.domain.usecase.payment
 
 class ValidatePaymentUseCase {
+    fun validatePaymentCondition(
+        condition: PaymentCondition,
+        clientAllowsCredit: Boolean,
+    ): PaymentValidationFailure? =
+        if (condition == PaymentCondition.CREDITO && !clientAllowsCredit) {
+            PaymentValidationFailure.CreditNotAllowed
+        } else {
+            null
+        }
+
     fun validateAmount(isPaymentEnough: Boolean): PaymentValidationFailure? =
         if (isPaymentEnough) null else PaymentValidationFailure.InsufficientAmount
 
@@ -44,6 +54,8 @@ class ValidatePaymentUseCase {
 sealed class PaymentValidationFailure(
     val message: String,
 ) {
+    data object CreditNotAllowed : PaymentValidationFailure("El cliente seleccionado no permite ventas a crédito")
+
     data object InsufficientAmount : PaymentValidationFailure("El monto recibido no cubre el total")
 
     data object MissingPaymentMethod : PaymentValidationFailure("Debes indicar al menos una forma de pago valida")

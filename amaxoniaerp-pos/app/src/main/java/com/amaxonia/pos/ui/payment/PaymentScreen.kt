@@ -89,6 +89,7 @@ import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
+import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.LocalDeviceClass
 import com.amaxonia.pos.ui.common.components.Keypad
@@ -128,6 +129,7 @@ fun PaymentScreen(
                 buildPaymentDetails = DependencyContainer.buildPaymentDetailsUseCase,
                 executePaymentFlow = DependencyContainer.executePaymentFlowUseCase,
                 posSettings = DependencyContainer.posConfigurationRepository,
+                selectedClient = DependencyContainer.cartRepository.selectedClient,
                 tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
             )
         }
@@ -232,6 +234,44 @@ fun PaymentScreen(
                 state = state,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             )
+
+            Text(
+                text = "Condición de pago",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                SegmentedButton(
+                    selected = state.paymentCondition == PaymentCondition.CONTADO,
+                    onClick = { viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CONTADO)) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {
+                        Icon(Icons.Default.Wallet, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    label = { Text("Contado") },
+                )
+                SegmentedButton(
+                    selected = state.paymentCondition == PaymentCondition.CREDITO,
+                    enabled = state.canUseCredit,
+                    onClick = { viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO)) },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {
+                        Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    label = { Text("Crédito") },
+                )
+            }
+            if (!state.canUseCredit) {
+                Text(
+                    text = "El cliente seleccionado no tiene crédito habilitado.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+            }
 
             // Selector Efectivo / Tarjeta
             SingleChoiceSegmentedButtonRow(

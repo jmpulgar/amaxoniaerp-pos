@@ -222,6 +222,8 @@ enum class CreditNoteSettlementTypeDto {
 @Serializable
 enum class CreditNoteFiscalStatusDto {
     PENDIENTE,
+    INCIERTA,
+    RECHAZADA,
     CONFIRMADA,
 }
 

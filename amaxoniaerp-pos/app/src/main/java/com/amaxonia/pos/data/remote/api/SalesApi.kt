@@ -6,9 +6,11 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
+import com.amaxonia.pos.domain.model.sales.FacturasResumenDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 
 interface SalesApi {
     suspend fun processSale(
@@ -20,8 +22,13 @@ interface SalesApi {
         authHeader: String,
         limit: Int = 100,
         offset: Long = 0,
-        search: String? = null,
+        filter: InvoiceHistoryFilter = InvoiceHistoryFilter(),
     ): Result<FacturasListResponseDto>
+
+    suspend fun getFacturasResumen(
+        authHeader: String,
+        filter: InvoiceHistoryFilter = InvoiceHistoryFilter(),
+    ): Result<FacturasResumenDto>
 
     suspend fun getFacturaDetalle(
         authHeader: String,

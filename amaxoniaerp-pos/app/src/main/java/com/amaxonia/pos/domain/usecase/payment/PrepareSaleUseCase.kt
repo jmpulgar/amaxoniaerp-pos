@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSecuencia
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.SaleCurrencyDto
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
@@ -228,7 +229,8 @@ class AssemblePreparedSaleUseCase(
         val base = ready.branched.base
         val configuration = resolveConfiguration(base.caja)
         val items = input.saleItemsOverride ?: buildItems(base, configuration)
-        val totals = operations.calculateSaleTotals(items)
+        val authorizedSnapshot = input.financialSnapshotOverride ?: repositories.state.cart.financialSnapshot.value
+        val totals = authorizedSnapshot?.toSaleTotals() ?: operations.calculateSaleTotals(items)
         val payments = buildPayments(input)
         val request =
             operations.buildSaleRequest(
@@ -312,7 +314,7 @@ class AssemblePreparedSaleUseCase(
             codigoCaja = caja.codCaja.orEmpty(),
             idCajaSecuencia = ready.sequence?.idCajaSecuencia ?: "OFFLINE-${caja.idCaja}",
             serieSucursal = ready.sequence?.serieSucursal ?: caja.serieSucursal ?: caja.serieCaja,
-            formaPago = "contado",
+            formaPago = input.paymentCondition.wireValue,
             codEstatus = PROCESSED_STATUS,
             subtotal = totals.subtotalGross,
             descuentosItemFactura = totals.itemDiscounts,
@@ -342,14 +344,20 @@ class AssemblePreparedSaleUseCase(
         input: ExecutePaymentFlowInput,
         totals: SaleTotals,
         payments: List<SalePaymentDto>,
-    ): SalePaymentSummaryDto =
-        SalePaymentSummaryDto(
+    ): SalePaymentSummaryDto {
+        val saldoPendiente =
+            payments
+                .filter { it.tipoMovimiento.equals(CXC_SIGLA, ignoreCase = true) }
+                .fold(Money.ZERO) { accumulated, payment -> accumulated + Money.fromDouble(payment.monto) }
+
+        return SalePaymentSummaryDto(
             totalizarMontoCancelar = totals.total,
             totalizarMontoEfectivo = payments.filter { it.tipoMovimiento == CASH_SIGLA }.sumOf { it.montoRecibido },
             totalizarCambio = input.changeDue,
-            totalizarSaldoPendiente = 0.0,
+            totalizarSaldoPendiente = saldoPendiente.toDouble(),
             montosPorTipo = payments.groupBy { it.tipoMovimiento }.mapValues { (_, values) -> values.sumOf { it.monto } },
         )
+    }
 
     private fun buildCurrency(
         caja: Caja,
@@ -392,6 +400,16 @@ class AssemblePreparedSaleUseCase(
             .joinToString(" + ")
 }
 
+private fun com.amaxonia.pos.domain.model.SaleFinancialSnapshot.toSaleTotals(): SaleTotals =
+    SaleTotals(
+        subtotalGross = subtotalGross,
+        itemDiscounts = itemDiscounts,
+        subtotalNet = subtotalNet,
+        tax = tax,
+        total = total,
+        taxLines = taxLines,
+    )
+
 internal data class BaseSaleContext(
     val cartItems: List<CartItem>,
     val client: Client,
@@ -422,6 +440,7 @@ private fun Client.paymentDisplayName(): String = "$firstName $lastName".trim().
 private const val PANAMA_CODE = "PA"
 private const val VENEZUELA_CODE = "VE"
 private const val CASH_SIGLA = "CASH"
+private const val CXC_SIGLA = "CXC"
 private const val DEFAULT_CURRENCY = "USD"
 private const val DEFAULT_CURRENCY_ID = 1
 private const val DEFAULT_RATE = 1.0

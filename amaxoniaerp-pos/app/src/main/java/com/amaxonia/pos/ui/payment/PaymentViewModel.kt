@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.payment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
@@ -16,6 +17,7 @@ import com.amaxonia.pos.domain.usecase.payment.PaymentFlowEvent
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.PaymentMethodsResult
+import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,7 +25,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -34,6 +38,7 @@ class PaymentViewModel(
     private val buildPaymentDetails: BuildPaymentDetailsUseCase,
     private val executePaymentFlow: PaymentFlowExecutor,
     private val posSettings: PosSettingsRepository,
+    private val selectedClient: StateFlow<Client?> = MutableStateFlow(null),
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
@@ -47,6 +52,22 @@ class PaymentViewModel(
     init {
         initializePaymentContext()
         viewModelScope.launch { countryCode = loadPaymentCountry() }
+        viewModelScope.launch {
+            selectedClient.collect { client ->
+                val canUseCredit = client?.permiteCredito == true
+                _state.update { current ->
+                    if (current.paymentCondition == PaymentCondition.CREDITO && !canUseCredit) {
+                        current.copy(
+                            paymentCondition = PaymentCondition.CONTADO,
+                            canUseCredit = false,
+                            nonCashAmountsInput = current.withoutCxcAmounts(),
+                        )
+                    } else {
+                        current.copy(canUseCredit = canUseCredit)
+                    }
+                }
+            }
+        }
     }
 
     fun onAction(action: PaymentUiAction) {
@@ -63,6 +84,7 @@ class PaymentViewModel(
                 }
             is PaymentUiAction.SelectMethod ->
                 _state.update { it.copy(selectedMethod = action.method, showInsufficientReminder = false) }
+            is PaymentUiAction.SelectCondition -> selectPaymentCondition(action.condition)
             is PaymentUiAction.SetExactNonCashAmount -> setExactNonCashAmount(action.paymentMethodId)
             is PaymentUiAction.SetNonCashAmount -> setNonCashAmount(action.paymentMethodId, action.amount)
             PaymentUiAction.ProcessPayment -> processPayment()
@@ -73,8 +95,39 @@ class PaymentViewModel(
         }
     }
 
+    private fun selectPaymentCondition(condition: PaymentCondition) {
+        val clientAllowsCredit = selectedClient.value?.permiteCredito == true
+        val failure = validatePayment.validatePaymentCondition(condition, clientAllowsCredit)
+        if (failure != null) {
+            _state.update {
+                it.copy(
+                    paymentCondition = PaymentCondition.CONTADO,
+                    canUseCredit = clientAllowsCredit,
+                    nonCashAmountsInput = it.withoutCxcAmounts(),
+                    paymentError = failure.message,
+                    showInsufficientReminder = false,
+                )
+            }
+            return
+        }
+
+        _state.update {
+            it.copy(
+                paymentCondition = condition,
+                canUseCredit = clientAllowsCredit,
+                nonCashAmountsInput =
+                    if (condition == PaymentCondition.CONTADO) it.withoutCxcAmounts() else it.nonCashAmountsInput,
+                paymentError = null,
+                showInsufficientReminder = false,
+            )
+        }
+    }
+
     private fun setExactNonCashAmount(paymentMethodId: Int) {
         _state.update { current ->
+            if (current.paymentCondition != PaymentCondition.CREDITO && current.isCxcPaymentMethod(paymentMethodId)) {
+                return@update current.copy(nonCashAmountsInput = current.withoutCxcAmounts())
+            }
             val assignedToOtherMethods =
                 current.nonCashAmountsInput
                     .filterKeys { it != paymentMethodId }
@@ -103,6 +156,9 @@ class PaymentViewModel(
     ) {
         val normalized = Money.normalizeInput(amount)
         _state.update { current ->
+            if (current.paymentCondition != PaymentCondition.CREDITO && current.isCxcPaymentMethod(paymentMethodId)) {
+                return@update current.copy(nonCashAmountsInput = current.withoutCxcAmounts())
+            }
             current.copy(
                 nonCashAmountsInput =
                     current.nonCashAmountsInput.toMutableMap().apply {
@@ -117,6 +173,14 @@ class PaymentViewModel(
         val currentState = _state.value
         when {
             currentState.isProcessingPayment -> Unit
+            validatePayment.validatePaymentCondition(currentState.paymentCondition, currentState.canUseCredit) != null ->
+                _state.update {
+                    it.copy(
+                        paymentCondition = PaymentCondition.CONTADO,
+                        nonCashAmountsInput = it.withoutCxcAmounts(),
+                        paymentError = "El cliente seleccionado no permite ventas a crédito",
+                    )
+                }
             validatePayment.validateAmount(currentState.isPaymentEnough) != null -> showInsufficientPaymentReminder()
             else -> {
                 val details =
@@ -269,9 +333,11 @@ class PaymentViewModel(
             secondaryCurrency = abrMonedaSecundaria,
             isMultiCurrency = isMultiCurrency,
             availableMethods = formasPago,
+            paymentCondition = paymentCondition,
             preferredCorrelationId = tablePayment?.correlationId,
             correlationCarryOver = tablePayment?.correlationId,
             saleItemsOverride = tablePayment?.saleItems,
+            financialSnapshotOverride = tablePayment?.financialSnapshot,
             cuentaMesa = tablePayment?.saleContext,
             printerType = printerType,
         )
@@ -302,6 +368,16 @@ class PaymentViewModel(
                 )
             }
         }
+
+    private fun PaymentState.withoutCxcAmounts(): Map<Int, String> =
+        nonCashAmountsInput.filterKeys { paymentMethodId -> !isCxcPaymentMethod(paymentMethodId) }
+
+    private fun PaymentState.isCxcPaymentMethod(paymentMethodId: Int): Boolean =
+        formasPago
+            .firstOrNull { it.idFormaPago == paymentMethodId }
+            ?.siglas
+            ?.trim()
+            ?.equals("CXC", ignoreCase = true) == true
 
     private companion object {
         const val TAG = "PaymentVM"

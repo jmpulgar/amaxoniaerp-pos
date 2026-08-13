@@ -5,15 +5,22 @@ import com.amaxonia.pos.BuildConfig
 import com.amaxonia.pos.data.local.AppJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException as KtorSocketTimeoutException
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.HttpMethod
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.random.Random
 import java.util.concurrent.TimeUnit
 
 /**
@@ -62,6 +69,9 @@ class ApiClient(
             install(ContentNegotiation) {
                 json(AppJson)
             }
+            install(HttpRequestRetry) {
+                configureCajaRetry()
+            }
             install(HttpTimeout) {
                 requestTimeoutMillis = 60_000
                 connectTimeoutMillis = 15_000
@@ -96,4 +106,37 @@ class ApiClient(
         cachedClient?.close()
         cachedClient = createHttpClient()
     }
+}
+
+/** Configuración de retry segura para lecturas idempotentes. */
+internal fun HttpRequestRetry.Configuration.configureCajaRetry() {
+    maxRetries = 2
+    retryIf { request, response ->
+        request.method == HttpMethod.Get && response.status.value in 502..504
+    }
+    retryOnExceptionIf { request, cause ->
+        request.method == HttpMethod.Get && isRetryableConnectionFailure(cause)
+    }
+    delayMillis(respectRetryAfterHeader = false) { retry ->
+        val exponent = (retry - 1).coerceIn(0, 1)
+        val exponentialDelay = 100L shl exponent
+        exponentialDelay + Random.nextLong(from = 0L, until = 101L)
+    }
+}
+
+private fun isRetryableConnectionFailure(cause: Throwable): Boolean {
+    if (cause is CancellationException) return false
+
+    var current: Throwable? = cause
+    while (current != null) {
+        if (
+            current is IOException ||
+                current is ConnectTimeoutException ||
+                current is KtorSocketTimeoutException
+        ) {
+            return true
+        }
+        current = current.cause
+    }
+    return false
 }

@@ -183,6 +183,8 @@ fun ClientDto.toDomain(): Client =
         addressLevel1 = addressLevel1.orEmpty(),
         addressLevel2 = addressLevel2.orEmpty(),
         addressLevel3 = addressLevel3.orEmpty(),
+        permiteCredito = permiteCredito,
+        diasCredito = diasCredito,
         // CORRECCIÓN 2: Mapear tipo de identificación extranjera
         foreignIdType = foreignAuthTypeId.toForeignIdType(),
         foreignIdNumber = if (clientTypeId == 4) identification.orEmpty() else "",

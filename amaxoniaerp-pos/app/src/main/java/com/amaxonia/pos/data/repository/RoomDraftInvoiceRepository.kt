@@ -15,8 +15,38 @@ class RoomDraftInvoiceRepository(
     override suspend fun delete(id: String) = dao.deleteById(id)
 
     private fun DraftInvoiceEntity.toDomain() =
-        DraftInvoice(id, clientId, clientFirstName, clientLastName, sellerId, sellerName, itemsJson, total, itemCount, createdAt)
+        DraftInvoice(
+            id = id,
+            clientId = clientId,
+            clientFirstName = clientFirstName,
+            clientLastName = clientLastName,
+            sellerId = sellerId,
+            sellerName = sellerName,
+            itemsJson = itemsJson,
+            total = total,
+            itemCount = itemCount,
+            createdAt = createdAt,
+            subtotalGross = subtotalGross,
+            itemDiscounts = itemDiscounts,
+            subtotalNet = subtotalNet,
+            tax = tax,
+        )
 
     private fun DraftInvoice.toEntity() =
-        DraftInvoiceEntity(id, clientId, clientFirstName, clientLastName, sellerId, sellerName, itemsJson, total, itemCount, createdAt)
+        DraftInvoiceEntity(
+            id = id,
+            clientId = clientId,
+            clientFirstName = clientFirstName,
+            clientLastName = clientLastName,
+            sellerId = sellerId,
+            sellerName = sellerName,
+            itemsJson = itemsJson,
+            total = total,
+            itemCount = itemCount,
+            createdAt = createdAt,
+            subtotalGross = subtotalGross,
+            itemDiscounts = itemDiscounts,
+            subtotalNet = subtotalNet,
+            tax = tax,
+        )
 }

@@ -19,6 +19,10 @@ data class DraftInvoiceEntity(
     val total: Double,
     val itemCount: Int,
     val createdAt: Long = System.currentTimeMillis(),
+    val subtotalGross: Double = total,
+    val itemDiscounts: Double = 0.0,
+    val subtotalNet: Double = total,
+    val tax: Double = 0.0,
 )
 
 @Dao

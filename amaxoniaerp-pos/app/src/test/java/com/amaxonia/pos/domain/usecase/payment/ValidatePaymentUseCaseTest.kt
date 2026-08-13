@@ -8,6 +8,16 @@ class ValidatePaymentUseCaseTest {
     private val useCase = ValidatePaymentUseCase()
 
     @Test
+    fun `credit condition requires a client that allows credit`() {
+        assertEquals(
+            PaymentValidationFailure.CreditNotAllowed,
+            useCase.validatePaymentCondition(PaymentCondition.CREDITO, clientAllowsCredit = false),
+        )
+        assertNull(useCase.validatePaymentCondition(PaymentCondition.CREDITO, clientAllowsCredit = true))
+        assertNull(useCase.validatePaymentCondition(PaymentCondition.CONTADO, clientAllowsCredit = false))
+    }
+
+    @Test
     fun `sale context preserves validation priority`() {
         assertEquals(
             PaymentValidationFailure.EmptyCart,

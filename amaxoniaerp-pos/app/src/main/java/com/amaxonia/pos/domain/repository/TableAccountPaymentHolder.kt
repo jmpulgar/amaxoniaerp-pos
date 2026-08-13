@@ -1,8 +1,11 @@
 package com.amaxonia.pos.domain.repository
 
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.sales.CuentaMesaVentaDto
 import com.amaxonia.pos.domain.model.sales.SaleItemDto
+import com.amaxonia.pos.domain.model.sales.SaleTaxDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,8 @@ data class TableAccountPayment(
             cuentaMesaId = cuenta.id,
         )
 
+    val financialSnapshot: SaleFinancialSnapshot = cuenta.toFinancialSnapshot()
+
     val saleItems: List<SaleItemDto> =
         cuenta.detalle.map { detalle ->
             SaleItemDto(
@@ -47,6 +52,31 @@ data class TableAccountPayment(
                 itemCodigo = detalle.itemCodigo,
             )
         }
+}
+
+private fun CuentaMesaResponse.toFinancialSnapshot(): SaleFinancialSnapshot {
+    val taxLines =
+        detalle
+            .groupBy { it.itemPIva }
+            .filterKeys { it > 0.0 }
+            .map { (_, lines) ->
+                SaleTaxDto(
+                    totalizarBaseRetencion = Money.fromDouble(lines.sumOf { it.itemTotalSinIva }).toDouble(),
+                    codImpuestoIva = 1,
+                    totalizarMontoIva2 =
+                        Money
+                            .fromDouble(lines.sumOf { it.itemTotalConIva - it.itemTotalSinIva })
+                            .toDouble(),
+                )
+            }
+    return SaleFinancialSnapshot(
+        subtotalGross = Money.fromDouble(subtotal).toDouble(),
+        itemDiscounts = Money.fromDouble(descuento).toDouble(),
+        subtotalNet = Money.fromDouble((subtotal - descuento).coerceAtLeast(0.0)).toDouble(),
+        tax = Money.fromDouble(impuesto).toDouble(),
+        total = Money.fromDouble(total).toDouble(),
+        taxLines = taxLines,
+    )
 }
 
 interface TableAccountPaymentReader {

@@ -164,6 +164,14 @@ data class CreateCreditNoteResponse(
     val total: Double,
     val fiscalStatus: CreditNoteFiscalStatus,
     val detail: CreditNoteDetailResponse,
+    val fiscalMessage: String? = null,
+)
+
+/** Datos de una NC PA reservada antes de llamar al PAC. */
+data class PreparedCreditNote(
+    val id: String,
+    val codigo: String,
+    val numeroDocumentoFiscal: String,
 )
 
 @Serializable
@@ -222,5 +230,7 @@ enum class CreditNoteSettlementType {
 @Serializable
 enum class CreditNoteFiscalStatus {
     PENDIENTE,
+    INCIERTA,
+    RECHAZADA,
     CONFIRMADA,
 }

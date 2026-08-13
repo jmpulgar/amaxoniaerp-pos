@@ -46,6 +46,7 @@ data class ExecutePaymentFlowInput(
     val correlationCarryOver: String? = null,
     val preferredCorrelationId: String? = null,
     val saleItemsOverride: List<SaleItemDto>? = null,
+    val financialSnapshotOverride: com.amaxonia.pos.domain.model.SaleFinancialSnapshot? = null,
     val cuentaMesa: CuentaMesaVentaDto? = null,
     /**
      * Configuración de impresora seleccionada por el usuario en Settings (única
@@ -53,6 +54,7 @@ data class ExecutePaymentFlowInput(
      * Se propaga hasta el backend como `ProcessSaleRequestDto.useHka20`.
      */
     val printerType: PrinterType = PrinterType.NONE,
+    val paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
 )
 
 sealed interface PaymentFlowEvent {

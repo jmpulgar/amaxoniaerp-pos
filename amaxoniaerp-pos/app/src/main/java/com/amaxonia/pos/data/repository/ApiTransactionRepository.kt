@@ -7,6 +7,9 @@ import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaSummaryDto
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
+import com.amaxonia.pos.domain.repository.InvoiceHistoryPage
+import com.amaxonia.pos.domain.repository.InvoiceHistorySummary
 import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
 
 /**
@@ -18,21 +21,52 @@ class ApiTransactionRepository(
     private val localStore: LocalStore,
 ) : InvoiceHistoryRepository {
     override suspend fun getAllTransactions(): Result<List<Transaction>> =
-        catchingResult {
-            val authHeader = getAuthHeader()
-            salesApi.getFacturas(authHeader = authHeader, limit = 200).map { response ->
-                response.data.map { dto -> dto.toTransaction() }
-            }
-        }
+        getTransactions().map { it.transactions }
 
     override suspend fun getTransactionById(id: String): Result<Transaction> =
         catchingResult {
             val authHeader = getAuthHeader()
-            salesApi.getFacturas(authHeader = authHeader, search = id, limit = 10).map { response ->
+            salesApi.getFacturas(
+                authHeader = authHeader,
+                limit = 10,
+                filter = InvoiceHistoryFilter(search = id),
+            ).map { response ->
                 response.data
                     .firstOrNull { it.id == id || it.codigo == id }
                     ?.toTransaction()
                     ?: error("Transaccion no encontrada: $id")
+            }
+        }
+
+    override suspend fun getTransactions(
+        filter: InvoiceHistoryFilter,
+        limit: Int,
+        offset: Long,
+    ): Result<InvoiceHistoryPage> =
+        catchingResult {
+            val authHeader = getAuthHeader()
+            salesApi.getFacturas(
+                authHeader = authHeader,
+                limit = limit,
+                offset = offset,
+                filter = filter,
+            ).map { response ->
+                InvoiceHistoryPage(
+                    transactions = response.data.map { dto -> dto.toTransaction() },
+                    total = response.total,
+                )
+            }
+        }
+
+    override suspend fun getSummary(filter: InvoiceHistoryFilter): Result<InvoiceHistorySummary> =
+        catchingResult {
+            val authHeader = getAuthHeader()
+            salesApi.getFacturasResumen(authHeader = authHeader, filter = filter).map { summary ->
+                InvoiceHistorySummary(
+                    ventasNetas = summary.ventasNetas,
+                    totalFacturas = summary.totalFacturas,
+                    moneda = summary.moneda,
+                )
             }
         }
 

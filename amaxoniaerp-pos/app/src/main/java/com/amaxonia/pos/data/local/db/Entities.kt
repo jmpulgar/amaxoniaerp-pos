@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.local.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.amaxonia.pos.domain.model.PriceLevel
@@ -22,6 +23,8 @@ data class ClientEntity(
     val addressLevel1: String,
     val addressLevel2: String,
     val addressLevel3: String,
+    @ColumnInfo(defaultValue = "0") val permiteCredito: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val diasCredito: Int = 0,
 )
 
 @Entity(tableName = "client_sucursales")

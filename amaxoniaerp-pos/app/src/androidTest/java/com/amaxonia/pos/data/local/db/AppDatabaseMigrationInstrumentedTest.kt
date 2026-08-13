@@ -64,9 +64,34 @@ class AppDatabaseMigrationInstrumentedTest {
                 // 1-13 the migration pumps through 13_14 before reaching 14.)
                 assertV14TransactionLogColumnsExist(sqlite)
                 assertV14PendingInvoicesColumnsExist(sqlite)
+                assertV17DraftFinancialColumnsExist(sqlite)
             } finally {
                 database.close()
             }
+        }
+    }
+
+    @Test
+    fun migrationFromV15ToV16AddsCreditConfigurationWithLegacyDefaults() {
+        val name = "migration-15-16-${System.nanoTime()}.db"
+        databaseNames += name
+        createDatabaseAtVersion(name, 15)
+
+        val database =
+            Room
+                .databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(*AppDatabase.ALL_MIGRATIONS)
+                .build()
+        try {
+            database.openHelper.writableDatabase
+                .query("SELECT permiteCredito, diasCredito FROM clients WHERE id = 'client-1'")
+                .use { cursor ->
+                    assertTrue("client seed missing after migration 15→16", cursor.moveToFirst())
+                    assertEquals(0, cursor.getInt(0))
+                    assertEquals(0, cursor.getInt(1))
+                }
+        } finally {
+            database.close()
         }
     }
 
@@ -178,6 +203,15 @@ class AppDatabaseMigrationInstrumentedTest {
         db
             .query(
                 "SELECT tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, tenantLabel, totalMinor, currencyCode, leasedUntil FROM pending_invoices LIMIT 0",
+            ).use { cursor ->
+                cursor.columnCount
+            }
+    }
+
+    private fun assertV17DraftFinancialColumnsExist(db: SupportSQLiteDatabase) {
+        db
+            .query(
+                "SELECT subtotalGross, itemDiscounts, subtotalNet, tax FROM draft_invoices LIMIT 0",
             ).use { cursor ->
                 cursor.columnCount
             }

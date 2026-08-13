@@ -10,6 +10,7 @@ import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.route.clientTypesRoutes
 import com.amaxoniaerp.features.clients.route.clientsRoutes
 import com.amaxoniaerp.features.companies.domain.CompanyService
+import com.amaxoniaerp.features.creditnotes.application.PanamaCreditNoteProcessor
 import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
 import com.amaxoniaerp.features.creditnotes.data.CreditNoteRepository
 import com.amaxoniaerp.features.creditnotes.route.creditNoteRoutes
@@ -37,10 +38,12 @@ import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceReposito
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.domain.VenezuelaInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaCreditNotePayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaRestClient
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaPayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaRestClient
 import com.amaxoniaerp.features.electronicinvoice.route.electronicInvoiceRoutes
+import com.amaxoniaerp.features.electronicinvoice.storage.FileSystemPanamaCreditNotePdfStorage
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
 import com.amaxoniaerp.features.sales.route.salesRoutes
@@ -79,6 +82,8 @@ fun Application.configureRouting() {
     }
 
     val jwtConfig = loadJwtConfig()
+    val dotenv = loadDotEnv()
+    val dataBasePath = loadConfigValue("DATA_BASE_PATH", "assets.dataBasePath", dotenv)
 
     // Servicios inicializados sin DB fija (se resuelve dinámicamente)
     val authService = AuthService(jwtConfig)
@@ -133,7 +138,16 @@ fun Application.configureRouting() {
     )
     val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor, venezuelaProcessor)
 
-    val creditNoteService = CreditNoteService(CreditNoteRepository())
+    val creditNoteRepository = CreditNoteRepository()
+    val creditNoteProcessor = PanamaCreditNoteProcessor(
+        repository = feRepository,
+        pacClient = pacClient,
+        payloadBuilder = TheFactoryHkaCreditNotePayloadBuilder(payloadBuilder),
+        pdfStorage = dataBasePath
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::FileSystemPanamaCreditNotePdfStorage),
+    )
+    val creditNoteService = CreditNoteService(creditNoteRepository, creditNoteProcessor)
 
     routing {
         get("/") {
@@ -168,7 +182,6 @@ fun Application.configureRouting() {
         creditNoteRoutes(creditNoteService)
         electronicInvoiceRoutes(feFactory)
 
-        val dotenv = loadDotEnv()
         val genericAssetsUrl = loadConfigValue("ASSETS_BASE_URL", "assets.baseUrl", dotenv)
         val veAssetsUrl = loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv)
             ?: genericAssetsUrl
@@ -177,7 +190,6 @@ fun Application.configureRouting() {
         val assetsBaseUrls = mutableMapOf<String, String>()
         if (!veAssetsUrl.isNullOrBlank()) assetsBaseUrls["VE"] = veAssetsUrl.trimEnd('/')
         if (!paAssetsUrl.isNullOrBlank()) assetsBaseUrls["PA"] = paAssetsUrl.trimEnd('/')
-        val dataBasePath = loadConfigValue("DATA_BASE_PATH", "assets.dataBasePath", dotenv)
         assetsRoutes(assetsBaseUrls = assetsBaseUrls, dataBasePath = dataBasePath)
         
         // Rutas auxiliares que aún podrían necesitar refactoring

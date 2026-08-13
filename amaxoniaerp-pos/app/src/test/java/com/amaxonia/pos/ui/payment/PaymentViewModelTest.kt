@@ -1,6 +1,7 @@
 package com.amaxonia.pos.ui.payment
 
 import com.amaxonia.pos.domain.model.ServerCountry
+import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CurrencyConfig
 import com.amaxonia.pos.domain.model.payment.FormaPago
@@ -13,9 +14,11 @@ import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
+import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
+import com.amaxonia.pos.domain.usecase.payment.PaymentValidationFailure
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +58,100 @@ class PaymentViewModelTest {
             assertEquals("Bs.", viewModel.state.value.abrMonedaSecundaria)
             assertTrue(viewModel.state.value.isMultiCurrency)
             assertFalse(viewModel.state.value.isLoadingFormasPago)
+        }
+
+    @Test
+    fun `contado does not list CXC`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods =
+                        Result.success(
+                            listOf(
+                                method(1, 1, "CASH"),
+                                method(2, 2, "CXC"),
+                                method(3, 3, "CRED"),
+                            ),
+                        ),
+                )
+
+            runCurrent()
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertEquals(listOf(3), viewModel.state.value.formasPagoTarjetaOtro.map { it.idFormaPago })
+        }
+
+    @Test
+    fun `changing credit to contado clears CXC amount`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
+            assertEquals(mapOf(2 to "10.00"), viewModel.state.value.nonCashAmountsInput)
+
+            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CONTADO))
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
+        }
+
+    @Test
+    fun `client without credit permission cannot select credit`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = false),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertEquals(PaymentValidationFailure.CreditNotAllowed.message, viewModel.state.value.paymentError)
+        }
+
+    @Test
+    fun `client with credit permission can select credit`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
+
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+            assertTrue(viewModel.state.value.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
+        }
+
+    @Test
+    fun `credit card does not activate CXC condition`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CRED"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertEquals(listOf(2), viewModel.state.value.formasPagoTarjetaOtro.map { it.idFormaPago })
         }
 
     @Test
@@ -139,6 +236,7 @@ class PaymentViewModelTest {
         caja: Caja?,
         methods: Result<List<FormaPago>>,
         executor: PaymentFlowExecutor = PaymentFlowExecutor { _, _ -> error("not used") },
+        client: Client? = null,
     ): PaymentViewModel {
         val cajaReader =
             object : ActiveCajaReader {
@@ -172,6 +270,7 @@ class PaymentViewModelTest {
             buildPaymentDetails = BuildPaymentDetailsUseCase(),
             executePaymentFlow = executor,
             posSettings = fakeSettings,
+            selectedClient = MutableStateFlow(client),
         )
     }
 

@@ -5,11 +5,14 @@ import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 
 data class PaymentState(
     val totalAmount: Double = 0.0,
     val tenderedAmountInput: String = "0",
     val selectedMethod: PaymentMethod = PaymentMethod.CASH,
+    val paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
+    val canUseCredit: Boolean = false,
     val isSuccess: Boolean = false,
     val formasPago: List<FormaPago> = emptyList(),
     val nonCashAmountsInput: Map<Int, String> = emptyMap(),
@@ -37,7 +40,10 @@ data class PaymentState(
         get() = formasPago.filter { it.siglas.equals("CASH", ignoreCase = true) }
 
     val formasPagoTarjetaOtro: List<FormaPago>
-        get() = formasPago.filterNot { it.siglas.equals("CASH", ignoreCase = true) }
+        get() =
+            formasPago
+                .filterNot { it.siglas.equals("CASH", ignoreCase = true) }
+                .filter { paymentCondition == PaymentCondition.CREDITO || !it.isCxc() }
 
     val nonCashAssignedMoney: Money
         get() =
@@ -150,6 +156,8 @@ enum class PaymentMethod {
     NON_CASH,
 }
 
+private fun FormaPago.isCxc(): Boolean = siglas?.trim()?.equals("CXC", ignoreCase = true) == true
+
 sealed interface PaymentUiAction {
     data class SetTotalAmount(
         val amount: Double,
@@ -163,6 +171,10 @@ sealed interface PaymentUiAction {
 
     data class SelectMethod(
         val method: PaymentMethod,
+    ) : PaymentUiAction
+
+    data class SelectCondition(
+        val condition: PaymentCondition,
     ) : PaymentUiAction
 
     data class SetExactNonCashAmount(

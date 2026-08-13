@@ -25,7 +25,7 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         PromocionDetalleEntity::class,
         TransactionLogEntity::class,
     ],
-    version = 15,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -593,6 +593,48 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        internal val MIGRATION_15_16 =
+            object : Migration(15, 16) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE clients ADD COLUMN permiteCredito INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE clients ADD COLUMN diasCredito INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        internal val MIGRATION_16_17 =
+            object : Migration(16, 17) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE draft_invoices_v17 (" +
+                            "id TEXT NOT NULL, " +
+                            "clientId TEXT, " +
+                            "clientFirstName TEXT, " +
+                            "clientLastName TEXT, " +
+                            "sellerId INTEGER NOT NULL, " +
+                            "sellerName TEXT, " +
+                            "itemsJson TEXT NOT NULL, " +
+                            "total REAL NOT NULL, " +
+                            "itemCount INTEGER NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "subtotalGross REAL NOT NULL, " +
+                            "itemDiscounts REAL NOT NULL, " +
+                            "subtotalNet REAL NOT NULL, " +
+                            "tax REAL NOT NULL, " +
+                            "PRIMARY KEY(id))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO draft_invoices_v17 (" +
+                            "id, clientId, clientFirstName, clientLastName, sellerId, sellerName, " +
+                            "itemsJson, total, itemCount, createdAt, subtotalGross, itemDiscounts, subtotalNet, tax) " +
+                            "SELECT id, clientId, clientFirstName, clientLastName, sellerId, sellerName, " +
+                            "itemsJson, total, itemCount, createdAt, total, 0.0, total, 0.0 " +
+                            "FROM draft_invoices",
+                    )
+                    db.execSQL("DROP TABLE draft_invoices")
+                    db.execSQL("ALTER TABLE draft_invoices_v17 RENAME TO draft_invoices")
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -609,6 +651,8 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
+                MIGRATION_16_17,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -633,6 +677,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
+                        MIGRATION_15_16,
+                        MIGRATION_16_17,
                     ).build()
                     .also { instance = it }
             }

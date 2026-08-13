@@ -75,6 +75,7 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                     call.respond(
                         creditNoteService.listEligibleInvoices(
                             database = database,
+                            countryCode = resolved.second.getCountryCode()!!,
                             limit = limit,
                             offset = offset,
                             search = search,
@@ -84,14 +85,18 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 
             get("/facturas/{id}") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
-                val (database, _) = resolved
+                val (database, principal) = resolved
                 val invoiceId = call.parameters["id"]
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Factura requerida")
                     )
 
-                val detail = creditNoteService.getInvoiceDetail(database, invoiceId)
+                val detail = creditNoteService.getInvoiceDetail(
+                    database,
+                    invoiceId,
+                    principal.getCountryCode()!!,
+                )
                     ?: return@get call.respond(
                         HttpStatusCode.NotFound,
                         mapOf("error" to "Factura no encontrada")
@@ -127,7 +132,13 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val countryCode = principal.getCountryCode()!!
 
                 try {
-                    val response = creditNoteService.create(database, countryCode, request, username)
+                    val response = creditNoteService.create(
+                        database = database,
+                        countryCode = countryCode,
+                        request = request,
+                        username = username,
+                        companyDb = call.request.headers["Company-DB"],
+                    )
                     call.respond(HttpStatusCode.Created, response)
                 } catch (e: CreditNoteValidationException) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))

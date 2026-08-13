@@ -37,8 +37,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -119,6 +121,26 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding),
         ) {
+            HistoryFilters(
+                filter = state.filter,
+                onSearchChanged = viewModel::onSearchChanged,
+                onUsuarioChanged = viewModel::onUsuarioChanged,
+                onSucursalChanged = viewModel::onSucursalChanged,
+                onFechaInicioChanged = viewModel::onFechaInicioChanged,
+                onFechaFinChanged = viewModel::onFechaFinChanged,
+                onEstatusChanged = viewModel::onEstatusChanged,
+                onApply = viewModel::applyFilters,
+                onClear = viewModel::clearFilters,
+            )
+
+            if (!state.isLoading || state.transactions.isNotEmpty()) {
+                SummaryBar(
+                    totalFacturas = state.summary.totalFacturas,
+                    totalMonto = state.summary.ventasNetas,
+                    currency = state.summary.moneda,
+                )
+            }
+
             when {
                 state.isLoading && state.transactions.isEmpty() -> {
                     Box(
@@ -204,12 +226,6 @@ fun HistoryScreen(
                             state.transactions.groupBy { it.dateHeader }
                         }
 
-                    // Summary bar
-                    SummaryBar(
-                        totalFacturas = state.transactions.size,
-                        totalMonto = state.transactions.sumOf { it.amount },
-                    )
-
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding =
@@ -247,6 +263,7 @@ fun HistoryScreen(
 private fun SummaryBar(
     totalFacturas: Int,
     totalMonto: Double,
+    currency: String,
 ) {
     ElevatedCard(
         modifier =
@@ -286,11 +303,93 @@ private fun SummaryBar(
                     color = PosPalette.FixedWhite.copy(alpha = 0.7f),
                 )
                 Text(
-                    text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", totalMonto)}",
+                    text = "$currency ${String.format(java.util.Locale.getDefault(), "%.2f", totalMonto)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
                     color = PosPalette.FixedWhite,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryFilters(
+    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
+    onSearchChanged: (String) -> Unit,
+    onUsuarioChanged: (String) -> Unit,
+    onSucursalChanged: (String) -> Unit,
+    onFechaInicioChanged: (String) -> Unit,
+    onFechaFinChanged: (String) -> Unit,
+    onEstatusChanged: (String) -> Unit,
+    onApply: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = filter.search.orEmpty(),
+            onValueChange = onSearchChanged,
+            label = { Text("Buscar factura") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = filter.usuario.orEmpty(),
+                onValueChange = onUsuarioChanged,
+                label = { Text("Usuario") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = filter.sucursalId?.toString().orEmpty(),
+                onValueChange = onSucursalChanged,
+                label = { Text("Sucursal") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = filter.fechaInicio.orEmpty(),
+                onValueChange = onFechaInicioChanged,
+                label = { Text("Desde (AAAA-MM-DD)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = filter.fechaFin.orEmpty(),
+                onValueChange = onFechaFinChanged,
+                label = { Text("Hasta (AAAA-MM-DD)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        OutlinedTextField(
+            value = filter.estatus.joinToString(","),
+            onValueChange = onEstatusChanged,
+            label = { Text("Estatus (códigos separados por coma)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(onClick = onClear) {
+                Text("Limpiar")
+            }
+            Button(onClick = onApply) {
+                Text("Aplicar")
             }
         }
     }

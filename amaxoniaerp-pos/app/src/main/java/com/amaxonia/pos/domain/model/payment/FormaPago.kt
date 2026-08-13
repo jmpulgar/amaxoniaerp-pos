@@ -34,7 +34,7 @@ data class FormaPago(
     @SerialName("id_banco_operacion")
     val idBancoOperacion: Int? = null,
     @SerialName("tipo_moneda")
-    val tipoMoneda: String,
+    val tipoMoneda: String = "",
     @SerialName("id_caja")
     val idCaja: String? = null,
 )

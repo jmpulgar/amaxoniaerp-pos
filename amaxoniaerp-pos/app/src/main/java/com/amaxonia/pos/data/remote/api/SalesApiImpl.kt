@@ -10,12 +10,15 @@ import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.FacturasListResponseDto
+import com.amaxonia.pos.domain.model.sales.FacturasResumenDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
@@ -88,7 +91,7 @@ class SalesApiImpl(
         authHeader: String,
         limit: Int,
         offset: Long,
-        search: String?,
+        filter: InvoiceHistoryFilter,
     ): Result<FacturasListResponseDto> =
         catchingResult {
             val response =
@@ -96,9 +99,7 @@ class SalesApiImpl(
                     header("Authorization", authHeader)
                     parameter("limit", limit)
                     parameter("offset", offset)
-                    if (!search.isNullOrBlank()) {
-                        parameter("search", search)
-                    }
+                    applyInvoiceHistoryFilter(filter)
                 }
 
             val responseText = response.bodyAsText()
@@ -112,6 +113,33 @@ class SalesApiImpl(
                         error(error ?: "Error al obtener facturas")
                     }
                     error("Respuesta invalida al obtener facturas")
+                }
+
+            Result.success(parsed)
+        }
+
+    override suspend fun getFacturasResumen(
+        authHeader: String,
+        filter: InvoiceHistoryFilter,
+    ): Result<FacturasResumenDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get("facturas/resumen") {
+                    header("Authorization", authHeader)
+                    applyInvoiceHistoryFilter(filter)
+                }
+
+            val responseText = response.bodyAsText()
+            val parsed =
+                runCatching {
+                    AppJson.decodeFromString(FacturasResumenDto.serializer(), responseText)
+                }.getOrElse {
+                    val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                    if (json is JsonObject) {
+                        val error = json["error"]?.jsonPrimitive?.contentOrNull
+                        error(error ?: "Error al obtener resumen de facturas")
+                    }
+                    error("Respuesta invalida al obtener resumen de facturas")
                 }
 
             Result.success(parsed)
@@ -256,4 +284,13 @@ class SalesApiImpl(
 
             Result.success(parsed)
         }
+}
+
+internal fun HttpRequestBuilder.applyInvoiceHistoryFilter(filter: InvoiceHistoryFilter) {
+    filter.search?.takeIf(String::isNotBlank)?.let { parameter("search", it) }
+    filter.usuario?.takeIf(String::isNotBlank)?.let { parameter("usuario", it) }
+    filter.sucursalId?.let { parameter("sucursal_id", it) }
+    filter.fechaInicio?.takeIf(String::isNotBlank)?.let { parameter("fecha_inicio", it) }
+    filter.fechaFin?.takeIf(String::isNotBlank)?.let { parameter("fecha_fin", it) }
+    filter.estatus.takeIf(List<Int>::isNotEmpty)?.let { parameter("estatus", it.joinToString(",")) }
 }

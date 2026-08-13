@@ -102,6 +102,8 @@ class ClientsRepository {
             taxpayerTypeId = request.taxpayerTypeId,
             foreignAuthTypeId = request.foreignAuthTypeId,
             countryId = request.countryId,
+            permiteCredito = false,
+            diasCredito = 0,
         )
     }
 
@@ -218,6 +220,8 @@ class ClientsRepository {
             foreignAuthTypeId = row[ClientsTable.tipoIdentificacionExtranjera],
             countryId = row[ClientsTable.pais],
             photoFilename = row[ClientsTable.foto],
+            permiteCredito = row[ClientsTable.permiteCredito],
+            diasCredito = row[ClientsTable.dias],
         )
     }
 }

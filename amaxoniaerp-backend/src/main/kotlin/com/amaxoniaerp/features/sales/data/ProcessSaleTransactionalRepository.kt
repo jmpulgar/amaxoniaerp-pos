@@ -6,6 +6,7 @@ import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableVE
 import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
 import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.clients.data.ClientSucursalTable
+import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
@@ -62,6 +63,10 @@ open class ProcessSaleTransactionalRepository(
             validateStock(preparedRequest)
         }
 
+        val now = BusinessClock.nowForCountry(countryCode)
+        val today = now.toLocalDate()
+        val creditDecision = resolveCreditDecision(preparedRequest, today)
+
         val invoiceId = preparedRequest.idFactura?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
         val cuentaValidada =
             preparedRequest.cuentaMesa?.let { context ->
@@ -71,19 +76,17 @@ open class ProcessSaleTransactionalRepository(
                 repository.validarVentaEnTransaccion(context, preparedRequest, invoiceId)
             }
         val invoiceCode = resolveInvoiceCode(countryCode, preparedRequest)
-        val now = BusinessClock.nowForCountry(countryCode)
-        val today = now.toLocalDate()
 
-        insertFactura(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
+        insertFactura(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext, creditDecision)
         val detalleIds = insertFacturaDetalle(preparedRequest, invoiceId, now, monetaryContext)
         processLotTracking(preparedRequest, detalleIds)
         insertFacturaImpuestos(preparedRequest, invoiceId, now, monetaryContext)
-        insertFacturaDetalleFormaPago(preparedRequest, invoiceId, now, monetaryContext)
+        insertFacturaDetalleFormaPago(preparedRequest, invoiceId, now, monetaryContext, creditDecision)
 
         val shouldAffectInventory = (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) && !preparedRequest.esCobroCreditoPrevio
         if (shouldAffectInventory) {
             updateInventoryAndKardex(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
-            insertCajaEntries(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
+            insertCajaEntries(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext, creditDecision)
         }
 
         if (monetaryContext.multiMoneda == "SI" && monetaryContext.idTasa > 0) {
@@ -247,6 +250,105 @@ open class ProcessSaleTransactionalRepository(
         val serieSucursal: String?,
     )
 
+    private data class CreditDecision(
+        val formaPago: String,
+        val totalGeneral: BigDecimal,
+        val totalPagos: BigDecimal,
+        val totalCxc: BigDecimal,
+        val totalPagadoReal: BigDecimal,
+        val saldoEsperado: BigDecimal,
+        val isCredit: Boolean,
+        val fechaVencimiento: LocalDate?,
+    )
+
+    private fun resolveCreditDecision(
+        request: ProcessSaleRequest,
+        today: LocalDate,
+    ): CreditDecision {
+        val totalGeneral = request.factura.totalTotalFactura.toScaledBigDecimal(2)
+        val pagos = request.pagos.map { payment ->
+            payment.tipoMovimiento.trim().uppercase() to payment.monto.toScaledBigDecimal(2)
+        }
+        val totalPagos = pagos.fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
+        val totalCxc = pagos
+            .filter { (tipoMovimiento, _) -> tipoMovimiento == "CXC" }
+            .fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
+        val totalPagadoReal = totalPagos - totalCxc
+        val saldoEsperado = totalGeneral
+            .subtract(totalPagadoReal)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP)
+        val saldoDeclarado = request.pagoResumen.totalizarSaldoPendiente.toScaledBigDecimal(2)
+        val formaPagoSolicitada = request.factura.formaPago.trim().lowercase()
+        val isCredit = formaPagoSolicitada == "credito" || totalCxc > BigDecimal.ZERO || saldoDeclarado > BigDecimal.ZERO
+
+        if (totalGeneral < BigDecimal.ZERO || pagos.any { (_, amount) -> amount < BigDecimal.ZERO }) {
+            throw InvalidSaleRequestException("Los montos de la venta no pueden ser negativos")
+        }
+        if (saldoDeclarado < BigDecimal.ZERO) {
+            throw InvalidSaleRequestException("El saldo pendiente no puede ser negativo")
+        }
+        if (totalCxc > totalGeneral) {
+            throw InvalidSaleRequestException("El monto CXC no puede exceder el total de la venta")
+        }
+
+        val excesoPago = totalPagadoReal - totalGeneral
+        if (excesoPago > BigDecimal.ZERO) {
+            val cambioDeclarado = request.pagoResumen.totalizarCambio.toScaledBigDecimal(2)
+            if (cambioDeclarado != excesoPago.setScale(2, RoundingMode.HALF_UP)) {
+                throw InvalidSaleRequestException("Los pagos exceden el total sin un cambio de efectivo coherente")
+            }
+        }
+
+        if (!isCredit) {
+            if (totalCxc > BigDecimal.ZERO || saldoEsperado > BigDecimal.ZERO || saldoDeclarado > BigDecimal.ZERO) {
+                throw InvalidSaleRequestException("Una venta de contado debe quedar totalmente pagada y sin CXC")
+            }
+        } else {
+            if (totalCxc > BigDecimal.ZERO && totalCxc != saldoEsperado) {
+                throw InvalidSaleRequestException("El monto CXC no coincide con el saldo esperado")
+            }
+            if (saldoDeclarado > BigDecimal.ZERO && saldoDeclarado != saldoEsperado) {
+                throw InvalidSaleRequestException("El saldo pendiente no coincide con los pagos recibidos")
+            }
+            if (totalCxc == BigDecimal.ZERO && saldoDeclarado == BigDecimal.ZERO && saldoEsperado > BigDecimal.ZERO) {
+                throw InvalidSaleRequestException("Debe indicar el saldo pendiente de la venta a crédito")
+            }
+        }
+
+        val diasCredito = if (isCredit) {
+            val client = ClientsTable
+                .select(ClientsTable.permiteCredito, ClientsTable.dias)
+                .where { ClientsTable.idCliente eq request.factura.idCliente }
+                .limit(1)
+                .firstOrNull()
+                ?: throw InvalidSaleRequestException("No se encontró el cliente para la venta a crédito")
+
+            if (!client[ClientsTable.permiteCredito]) {
+                throw InvalidSaleRequestException("El cliente no permite ventas a crédito")
+            }
+
+            client[ClientsTable.dias].also { dias ->
+                if (dias < 0) {
+                    throw InvalidSaleRequestException("La configuración de días de crédito del cliente es inválida")
+                }
+            }
+        } else {
+            null
+        }
+
+        return CreditDecision(
+            formaPago = if (isCredit) "credito" else "contado",
+            totalGeneral = totalGeneral,
+            totalPagos = totalPagos,
+            totalCxc = totalCxc,
+            totalPagadoReal = totalPagadoReal,
+            saldoEsperado = saldoEsperado,
+            isCredit = isCredit,
+            fechaVencimiento = diasCredito?.let { today.plusDays(it.toLong()) },
+        )
+    }
+
     private fun resolveMonetaryContext(countryCode: String, request: ProcessSaleRequest): MonetaryContext {
         val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
         val params = pgTable
@@ -351,6 +453,15 @@ open class ProcessSaleTransactionalRepository(
                 normalizedRef.multiply(tasa).setScale(2, RoundingMode.HALF_UP)
             } else {
                 normalizedRef.setScale(2, RoundingMode.HALF_UP)
+            }
+        }
+
+        fun toBase(amountRef: BigDecimal): BigDecimal {
+            val normalizedRef = amountRef.setScale(2, RoundingMode.HALF_UP)
+            return if (multiMoneda == "SI") {
+                normalizedRef.multiply(tasa).setScale(2, RoundingMode.HALF_UP)
+            } else {
+                normalizedRef
             }
         }
 
@@ -536,6 +647,7 @@ open class ProcessSaleTransactionalRepository(
         now: LocalDateTime,
         today: LocalDate,
         monetaryContext: MonetaryContext,
+        creditDecision: CreditDecision,
     ) {
         val f = request.factura
         val subtotalBase = monetaryContext.toBase(f.subtotal)
@@ -549,7 +661,8 @@ open class ProcessSaleTransactionalRepository(
         )
         val ivaTotalBase = monetaryContext.toBase(f.ivaTotalFactura)
         val totalGeneralBase = monetaryContext.toBase(f.totalTotalFactura)
-        val fechaVencimientoFactura = today.plusDays(monetaryContext.diasVencimiento.toLong())
+        val fechaVencimientoFactura = creditDecision.fechaVencimiento
+            ?: today.plusDays(monetaryContext.diasVencimiento.toLong())
         val totalBultosQty = request.items.sumOf { it.itemCantidadTotal }
         val serieSucursalValue = f.serieSucursal.take(10)
         val cajaSecuenciaValue = resolveCajaSecuenciaCodigo(f.idCajaSecuencia)
@@ -577,7 +690,7 @@ open class ProcessSaleTransactionalRepository(
             it[facturaTable.totalizarMontoIva] = monetaryContext.toBase(f.totalizarMontoIva)
             it[facturaTable.totalizarTotalGeneral] = monetaryContext.toBase(f.totalizarTotalGeneral)
             it[facturaTable.totalizarTotalRetencion] = BigDecimal.ZERO.setScale(2)
-            it[facturaTable.formaPago] = "contado"
+            it[facturaTable.formaPago] = creditDecision.formaPago
             it[facturaTable.codEstatus] = f.codEstatus
             it[facturaTable.totalBultos] = totalBultosQty.toMoney()
             it[facturaTable.fechaCreacion] = now
@@ -719,12 +832,20 @@ open class ProcessSaleTransactionalRepository(
                         it[cantidad] = lote.cantidad
                     }
 
-                    // Descontar disponibilidad y registrar venta en item_lote
+                    // Descontar disponibilidad y registrar venta en item_lote de forma condicional.
                     val loteCantidad = BigDecimal.valueOf(lote.cantidad.toLong())
-                    ItemLoteTable.update({ ItemLoteTable.idLoteItem eq lote.idLoteItem }) {
+                    val updated = ItemLoteTable.update({
+                        (ItemLoteTable.idLoteItem eq lote.idLoteItem) and
+                            (ItemLoteTable.disponibilidad greaterEq loteCantidad)
+                    }) {
                         it.update(disponibilidad, disponibilidad.minus(loteCantidad))
                         it.update(procesamiento, procesamiento.plus(loteCantidad))
                         it.update(venta, venta.plus(loteCantidad))
+                    }
+                    if (updated != 1) {
+                        throw InsufficientStockException(
+                            "Lote insuficiente: idLoteItem=${lote.idLoteItem}, solicitado=$loteCantidad",
+                        )
                     }
                 }
             }
@@ -755,6 +876,7 @@ open class ProcessSaleTransactionalRepository(
         invoiceId: String,
         now: LocalDateTime,
         monetaryContext: MonetaryContext,
+        creditDecision: CreditDecision,
     ) {
         val resumen = request.pagoResumen
         val montosPorTipo = request.pagos
@@ -771,8 +893,6 @@ open class ProcessSaleTransactionalRepository(
         val montoCredito = amountOf("CR", "CREDITO")
         val montoDebito = amountOf("DB", "DEBITO")
         val montoCertificado = amountOf("CERT", "CERTIFICADO")
-        val montoCxc = amountOf("CXC")
-
         val knownCodes = setOf(
             "CASH", "EF", "EFE", "EFECTIVO",
             "CH", "CHEQUE",
@@ -796,7 +916,7 @@ open class ProcessSaleTransactionalRepository(
             it[fpgTable.codFacturaDetalleFormaPago] = UUID.randomUUID().toString()
             it[fpgTable.idFactura] = invoiceId
             it[fpgTable.totalizarMontoCancelar] = monetaryContext.toBase(resumen.totalizarMontoCancelar)
-            it[fpgTable.totalizarSaldoPendiente] = monetaryContext.toBase(resumen.totalizarSaldoPendiente)
+            it[fpgTable.totalizarSaldoPendiente] = monetaryContext.toBase(creditDecision.saldoEsperado)
             it[fpgTable.totalizarCambio] = monetaryContext.toBase(resumen.totalizarCambio)
             it[fpgTable.totalizarMontoEfectivo] = monetaryContext.toBase(montoEfectivo)
             it[fpgTable.optCheque] = if (montoCheque > 0.0) 1 else 0
@@ -811,7 +931,7 @@ open class ProcessSaleTransactionalRepository(
             it[fpgTable.totalizarMontoDeposito] = monetaryContext.toBase(montoDeposito)
             it[fpgTable.totalizarNroDeposito] = BigDecimal.ZERO.setScale(2)
             it[fpgTable.totalizarBancoDeposito] = 0
-            it[fpgTable.fechaVencimiento] = null
+            it[fpgTable.fechaVencimiento] = creditDecision.fechaVencimiento
             it[fpgTable.observacion] = ""
             it[fpgTable.personaContacto] = ""
             it[fpgTable.telefono] = ""
@@ -826,7 +946,7 @@ open class ProcessSaleTransactionalRepository(
             it[fpgTable.totalizarMontoDebito] = monetaryContext.toBase(montoDebito)
             it[fpgTable.totalizarMontoTransferencia] = monetaryContext.toBase(montoTransferencia)
             it[fpgTable.totalizarMontoCertificado] = monetaryContext.toBase(montoCertificado)
-            it[fpgTable.totalizarMontoCxc] = monetaryContext.toBase(montoCxc)
+            it[fpgTable.totalizarMontoCxc] = monetaryContext.toBase(creditDecision.totalCxc)
             it[fpgTable.totalizarMontoOtros] = monetaryContext.toBase(montoOtros)
             if (fpgTable is SalesFacturaDetalleFormaPagoTableVE) {
                 it[fpgTable.totalizarMontoDivisa] = BigDecimal.ZERO.setScale(2)
@@ -959,6 +1079,7 @@ open class ProcessSaleTransactionalRepository(
         now: LocalDateTime,
         today: LocalDate,
         monetaryContext: MonetaryContext,
+        creditDecision: CreditDecision,
     ) {
         val cajaId = UUID.randomUUID().toString()
         val transactionId = UUID.randomUUID().toString()
@@ -984,7 +1105,11 @@ open class ProcessSaleTransactionalRepository(
             it[cajaNuevaTable.idFactura] = invoiceId
             it[cajaNuevaTable.idCliente] = request.factura.idCliente
             it[cajaNuevaTable.concepto] = conceptoCaja
-            it[cajaNuevaTable.status] = CajaStatus.Pagada
+            it[cajaNuevaTable.status] = if (creditDecision.saldoEsperado > BigDecimal.ZERO) {
+                CajaStatus.Pendiente
+            } else {
+                CajaStatus.Pagada
+            }
             it[cajaNuevaTable.sucursalId] = request.factura.idSucursal
             it[cajaNuevaTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
             it[cajaNuevaTable.fechaCreacion] = now
@@ -1084,7 +1209,7 @@ open class ProcessSaleTransactionalRepository(
 
     private fun normalizeTipoMovimiento(value: String): String {
         val normalized = value.trim().uppercase()
-        val allowed = setOf("DE", "TR", "CH", "MB", "OT", "TDC", "NEQ", "ABONO", "CASH")
+        val allowed = setOf("DE", "TR", "CH", "MB", "OT", "TDC", "NEQ", "ABONO", "CASH", "CXC")
         if (normalized in allowed) return normalized
 
         return when (normalized) {
@@ -1094,7 +1219,7 @@ open class ProcessSaleTransactionalRepository(
             "TRANSFERENCIA", "TRANSF", "PM" -> "TR"
             "TARJETA", "POS", "PV", "DB", "DEBITO", "DEBIT", "CR", "CRED", "CREDITO", "PT", "PUNTO" -> "TDC"
             "NEQUI" -> "NEQ"
-            "GC", "CXC", "OTRO", "OTROS" -> "OT"
+            "GC", "OTRO", "OTROS" -> "OT"
             else -> "OT"
         }
     }

@@ -4,6 +4,7 @@ import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.TransactionStatus
@@ -29,6 +30,7 @@ import com.amaxonia.pos.domain.model.sales.FacturaPrintPayloadDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
+import com.amaxonia.pos.domain.model.sales.SaleItemDto
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.CajaRepository
@@ -83,6 +85,120 @@ class ExecutePaymentFlowUseCaseTest {
             assertEquals(TransactionStatus.PAID, fixture.transactions.saved?.status)
             assertEquals("INV-1", fixture.transactions.saved?.invoiceNumber)
             assertTrue(events.any { it is PaymentFlowEvent.Progress })
+        }
+
+    @Test
+    fun preloadedFinancialSnapshotRemainsAuthoritativeInRequest() =
+        runTest {
+            val fixture = fixture(FixtureOptions(isOnline = true))
+            val snapshot =
+                SaleFinancialSnapshot(
+                    subtotalGross = 9.38,
+                    itemDiscounts = 0.11,
+                    subtotalNet = 9.27,
+                    tax = 0.74,
+                    total = 10.01,
+                )
+            val preloadedItem =
+                SaleItemDto(
+                    idItem = 42,
+                    itemAlmacen = 1,
+                    itemDescripcion = "Reserved line",
+                    itemCantidad = 1.0,
+                    itemPrecioSinIva = 9.38,
+                    itemPIva = 8.0,
+                    itemTotalSinIva = 9.27,
+                    itemTotalConIva = 10.01,
+                    itemCantidadTotal = 1.0,
+                )
+
+            val result =
+                fixture.useCase(
+                    input(
+                        amount = 10.01,
+                        saleItemsOverride = listOf(preloadedItem),
+                        financialSnapshotOverride = snapshot,
+                    ),
+                ) {}
+
+            assertTrue(result is PaymentFlowResult.Success)
+            val request = fixture.sales.request
+            assertEquals(10.01, request?.factura?.totalTotalFactura ?: -1.0, 0.0)
+            assertEquals(9.38, request?.factura?.subtotal ?: -1.0, 0.0)
+            assertEquals(0.11, request?.factura?.descuentosItemFactura ?: -1.0, 0.0)
+            assertEquals(0.74, request?.factura?.ivaTotalFactura ?: -1.0, 0.0)
+            assertEquals(9.27, request?.factura?.montoItemsFactura ?: -1.0, 0.0)
+            assertEquals(preloadedItem, request?.items?.single())
+        }
+
+    @Test
+    fun `credit condition sends credito and full CXC as pending balance`() =
+        runTest {
+            val fixture = fixture(FixtureOptions(isOnline = true))
+            val cxc = paymentMethod(2, "CXC", "Cuenta por cobrar")
+
+            val result =
+                fixture.useCase(
+                    input(
+                        paymentDetails = listOf(FormaPagoDetalle(idFormaPago = 2, sigla = "CXC", monto = 10.0)),
+                        methods = listOf(cxc),
+                        tenderedAmount = Money.ZERO,
+                        paymentCondition = PaymentCondition.CREDITO,
+                    ),
+                ) {}
+
+            assertTrue(result is PaymentFlowResult.Success)
+            assertEquals("credito", fixture.sales.request?.factura?.formaPago)
+            assertEquals(10.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
+        }
+
+    @Test
+    fun `credit condition sends partial payment and CXC remainder`() =
+        runTest {
+            val fixture = fixture(FixtureOptions(isOnline = true))
+            val cash = paymentMethod(1, "CASH", "Efectivo")
+            val cxc = paymentMethod(2, "CXC", "Cuenta por cobrar")
+
+            val result =
+                fixture.useCase(
+                    input(
+                        paymentDetails =
+                            listOf(
+                                FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = 4.0),
+                                FormaPagoDetalle(idFormaPago = 2, sigla = "CXC", monto = 6.0),
+                            ),
+                        methods = listOf(cash, cxc),
+                        tenderedAmount = Money.parse("4.00"),
+                        paymentCondition = PaymentCondition.CREDITO,
+                    ),
+                ) {}
+
+            assertTrue(result is PaymentFlowResult.Success)
+            assertEquals("credito", fixture.sales.request?.factura?.formaPago)
+            assertEquals(6.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
+            assertEquals(
+                mapOf("CASH" to 4.0, "CXC" to 6.0),
+                fixture.sales.request?.pagoResumen?.montosPorTipo,
+            )
+        }
+
+    @Test
+    fun `normal credit card keeps contado and zero CXC balance`() =
+        runTest {
+            val fixture = fixture(FixtureOptions(isOnline = true))
+            val card = paymentMethod(2, "CRED", "Tarjeta de crédito")
+
+            val result =
+                fixture.useCase(
+                    input(
+                        paymentDetails = listOf(FormaPagoDetalle(idFormaPago = 2, sigla = "CRED", monto = 10.0)),
+                        methods = listOf(card),
+                    ),
+                ) {}
+
+            assertTrue(result is PaymentFlowResult.Success)
+            assertEquals("contado", fixture.sales.request?.factura?.formaPago)
+            assertEquals(0.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
         }
 
     @Test
@@ -425,29 +541,33 @@ class ExecutePaymentFlowUseCaseTest {
     private fun input(
         countryCode: String = "PA",
         gatewayPayment: Boolean = false,
+        amount: Double = 10.0,
         paymentDetails: List<FormaPagoDetalle>? = null,
         methods: List<FormaPago>? = null,
-        tenderedAmount: Money = Money.parse("10.00"),
+        tenderedAmount: Money? = null,
         changeDue: Double = 0.0,
         correlationCarryOver: String? = null,
         printerType: PrinterType = PrinterType.NONE,
+        paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
+        saleItemsOverride: List<SaleItemDto>? = null,
+        financialSnapshotOverride: SaleFinancialSnapshot? = null,
     ): ExecutePaymentFlowInput {
         val method = paymentMethod(1, "CASH", "Efectivo")
-        val details = paymentDetails ?: listOf(FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = 10.0))
+        val details = paymentDetails ?: listOf(FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = amount))
         return ExecutePaymentFlowInput(
             countryCode = countryCode,
             paymentDetails =
                 PaymentDetails(
-                    payload = FormapagoDetallePayload(10.0, 0.0, 0.0, details),
+                    payload = FormapagoDetallePayload(amount, 0.0, 0.0, details),
                     transactionMethods =
                         if (gatewayPayment) {
-                            listOf(TransactionPaymentMethod(description = "Gateway", amount = 10.0))
+                            listOf(TransactionPaymentMethod(description = "Gateway", amount = amount))
                         } else {
                             emptyList()
                         },
                 ),
-            totalAmount = Money.parse("10.00"),
-            tenderedAmount = tenderedAmount,
+            totalAmount = Money.fromDouble(amount),
+            tenderedAmount = tenderedAmount ?: Money.fromDouble(amount),
             changeDue = changeDue,
             totalAmountBs = 0.0,
             changeDueBs = 0.0,
@@ -456,7 +576,10 @@ class ExecutePaymentFlowUseCaseTest {
             isMultiCurrency = false,
             availableMethods = methods ?: listOf(method),
             correlationCarryOver = correlationCarryOver,
+            saleItemsOverride = saleItemsOverride,
+            financialSnapshotOverride = financialSnapshotOverride,
             printerType = printerType,
+            paymentCondition = paymentCondition,
         )
     }
 

@@ -4,6 +4,7 @@ import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.auth.route.getAdminDb
 import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
+import com.amaxoniaerp.features.facturas.data.FacturasFilter
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
@@ -52,10 +53,6 @@ fun Route.facturasRoutes(
 
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-                val search = call.request.queryParameters["search"]
-                val fechaInicioParam = call.request.queryParameters["fecha_inicio"]
-                val fechaFinParam = call.request.queryParameters["fecha_fin"]
-                val estatusParam = call.request.queryParameters["estatus"]
 
                 if (limit <= 0 || limit > 1000 || offset < 0) {
                     return@get call.respond(
@@ -64,17 +61,13 @@ fun Route.facturasRoutes(
                     )
                 }
 
-                val fechaInicio = fechaInicioParam?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                val fechaFin = fechaFinParam?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-
-                if ((fechaInicioParam != null && fechaInicio == null) || (fechaFinParam != null && fechaFin == null)) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Invalid date format, expected yyyy-MM-dd")
-                    )
-                }
-
-                val estatusList = estatusParam?.split(",")?.mapNotNull { it.toIntOrNull() }
+                val filter =
+                    call.request.queryParameters.toFacturasFilter().getOrElse { error ->
+                        return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (error.message ?: "Invalid invoice filters")),
+                        )
+                    }
 
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val (facturas, total) = facturasRepository.listFacturas(
@@ -82,10 +75,7 @@ fun Route.facturasRoutes(
                     countryCode = countryCode,
                     limit = limit,
                     offset = offset,
-                    search = search,
-                    fechaInicio = fechaInicio,
-                    fechaFin = fechaFin,
-                    estatusList = estatusList,
+                    filter = filter,
                 )
 
                 call.respond(FacturasListResponse(data = facturas, total = total))
@@ -120,8 +110,16 @@ fun Route.facturasRoutes(
                         mapOf("error" to "Country code not found")
                     )
 
+                val filter =
+                    call.request.queryParameters.toFacturasFilter().getOrElse { error ->
+                        return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (error.message ?: "Invalid invoice filters")),
+                        )
+                    }
+
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val resumen = facturasRepository.getResumen(companyDb, countryCode)
+                val resumen = facturasRepository.getResumen(companyDb, countryCode, filter)
                 call.respond(resumen)
             }
 
@@ -374,3 +372,33 @@ fun Route.facturasRoutes(
         }
     }
 }
+
+private fun Parameters.toFacturasFilter(): Result<FacturasFilter> = runCatching {
+    val fechaInicio = this["fecha_inicio"]?.let(::parseFacturasDate)
+    val fechaFin = this["fecha_fin"]?.let(::parseFacturasDate)
+    val sucursalValue = this["sucursal_id"]?.takeIf(String::isNotBlank)
+    val sucursalId = sucursalValue?.toIntOrNull()
+        ?: if (sucursalValue != null) {
+            throw IllegalArgumentException("Invalid sucursal_id")
+        } else {
+            null
+        }
+    val estatusList = this["estatus"]
+        ?.takeIf(String::isNotBlank)
+        ?.split(",")
+        ?.mapNotNull { it.trim().toIntOrNull() }
+
+    FacturasFilter(
+        search = this["search"],
+        usuario = this["usuario"],
+        sucursalId = sucursalId,
+        fechaInicio = fechaInicio,
+        fechaFin = fechaFin,
+        estatusList = estatusList,
+    )
+}
+
+private fun parseFacturasDate(value: String): LocalDate =
+    runCatching { LocalDate.parse(value) }.getOrElse {
+        throw IllegalArgumentException("Invalid date format, expected yyyy-MM-dd")
+    }

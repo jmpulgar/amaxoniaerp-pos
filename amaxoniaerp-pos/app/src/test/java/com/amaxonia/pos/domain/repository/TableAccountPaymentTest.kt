@@ -42,4 +42,45 @@ class TableAccountPaymentTest {
         assertEquals(1.5, payment.saleItems.single().itemCantidadTotal, 0.0)
         assertEquals(7, payment.saleItems.single().itemAlmacen)
     }
+
+    @Test
+    fun accountSnapshotKeepsBackendTotals() {
+        val payment =
+            TableAccountPayment(
+                areaId = 1,
+                mesaId = 2,
+                sesionId = 3,
+                cuenta =
+                    CuentaMesaResponse(
+                        id = 9,
+                        sesionMesaId = 3,
+                        subtotal = 9.38,
+                        descuento = 0.11,
+                        impuesto = 0.74,
+                        total = 10.01,
+                        detalle =
+                            listOf(
+                                CuentaDetalleResponse(
+                                    productoId = 1,
+                                    itemTotalSinIva = 4.635,
+                                    itemTotalConIva = 5.005,
+                                    itemPIva = 8.0,
+                                ),
+                                CuentaDetalleResponse(
+                                    productoId = 2,
+                                    itemTotalSinIva = 4.635,
+                                    itemTotalConIva = 5.005,
+                                    itemPIva = 8.0,
+                                ),
+                            ),
+                    ),
+            )
+
+        assertEquals(9.38, payment.financialSnapshot.subtotalGross, 0.0)
+        assertEquals(0.11, payment.financialSnapshot.itemDiscounts, 0.0)
+        assertEquals(9.27, payment.financialSnapshot.subtotalNet, 0.0)
+        assertEquals(0.74, payment.financialSnapshot.tax, 0.0)
+        assertEquals(10.01, payment.financialSnapshot.total, 0.0)
+        assertEquals(1, payment.financialSnapshot.taxLines.size)
+    }
 }

@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.domain.model.DraftInvoice
+import com.amaxonia.pos.domain.model.financialSnapshot
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.repository.CartRepository
@@ -18,6 +19,7 @@ class JsonDraftInvoiceRestorer(
             for (index in 0 until jsonArray.length()) {
                 restoreItem(jsonArray.getJSONObject(index))
             }
+            cartRepository.setFinancialSnapshot(draft.financialSnapshot)
         }
 
     private fun restoreItem(item: org.json.JSONObject) {

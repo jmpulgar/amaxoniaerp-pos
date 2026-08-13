@@ -47,4 +47,6 @@ data class Client(
     val urbanization: String = "",
     val street: String = "",
     val photoFilename: String = "",
+    val permiteCredito: Boolean = false,
+    val diasCredito: Int = 0,
 )

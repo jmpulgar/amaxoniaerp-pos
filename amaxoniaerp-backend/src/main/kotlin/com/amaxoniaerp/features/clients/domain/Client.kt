@@ -22,6 +22,8 @@ data class Client(
     val foreignAuthTypeId: String? = null,
     val countryId: Int,
     val photoFilename: String? = null,
+    val permiteCredito: Boolean = false,
+    val diasCredito: Int = 0,
 )
 
 @Serializable

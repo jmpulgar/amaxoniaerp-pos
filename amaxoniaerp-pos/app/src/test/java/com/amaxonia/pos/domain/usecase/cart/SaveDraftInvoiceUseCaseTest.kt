@@ -4,6 +4,7 @@ import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.DraftInvoice
 import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.model.financialSnapshot
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
 import com.amaxonia.pos.domain.system.AppClock
@@ -59,6 +60,11 @@ class SaveDraftInvoiceUseCaseTest {
             assertEquals(2, result.itemCount)
             assertEquals(result, repository.saved)
             assertEquals(EXPECTED_ITEMS_JSON, result.itemsJson)
+            assertEquals(6.54, result.subtotalGross, 0.0)
+            assertEquals(0.33, result.itemDiscounts, 0.0)
+            assertEquals(6.21, result.subtotalNet, 0.0)
+            assertEquals(0.44, result.tax, 0.0)
+            assertEquals(6.65, result.financialSnapshot.total, 0.0)
         }
 
     private class CapturingDraftRepository : DraftInvoiceRepository {
