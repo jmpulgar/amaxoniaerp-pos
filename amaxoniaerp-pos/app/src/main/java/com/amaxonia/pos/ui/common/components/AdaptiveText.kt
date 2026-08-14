@@ -12,19 +12,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 
 /**
- * Single-line monetary text that gracefully shrinks its font size when the content would
- * otherwise overflow the available width. Used for heroes such as `Cobrar $XX.XX` and
- * `Total a pagar` so large amounts never wrap or clip on narrow POS displays (320dp class).
- *
- * The component is single-line by contract. Weight and alignment travel inside [baseStyle]
- * (`baseStyle.copy(fontWeight = …, textAlign = …)`); the shrinking is driven by
- * [TextLayoutResult.didOverflowWidth] and state is keyed on text/style so a new amount
- * re-evaluates from the base size.
+ * Monetary text that gracefully shrinks its font size when the content would otherwise
+ * overflow the available width. Styling can be supplied either through [baseStyle] or the
+ * optional text overrides, which keeps call sites concise while preserving one reusable
+ * implementation for narrow POS displays.
  */
 @Composable
 fun AdaptiveAmountText(
@@ -33,19 +32,28 @@ fun AdaptiveAmountText(
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
     minFontSizeSp: Float = 14f,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign? = null,
+    maxLines: Int = 1,
 ) {
     val baseFontSize: TextUnit = if (baseStyle.fontSize.isSpecified) baseStyle.fontSize else 16.sp
+    val resolvedStyle =
+        baseStyle.copy(
+            color = if (color.isSpecified) color else LocalContentColor.current,
+            fontWeight = fontWeight ?: baseStyle.fontWeight,
+            textAlign = textAlign ?: baseStyle.textAlign,
+        )
     val minScale = (minFontSizeSp / baseFontSize.value).coerceIn(MIN_FLOOR, 1f)
-    var scale by remember(text, baseStyle, minFontSizeSp) { mutableFloatStateOf(1f) }
-    val resolvedColor = if (color.isSpecified) color else LocalContentColor.current
+    var scale by remember(text, resolvedStyle, minFontSizeSp, maxLines) { mutableFloatStateOf(1f) }
+
     Text(
         text = text,
         modifier = modifier,
-        style = baseStyle.copy(color = resolvedColor),
+        style = resolvedStyle,
         fontSize = (baseFontSize.value * scale).sp,
-        maxLines = 1,
+        maxLines = maxLines,
         softWrap = false,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+        overflow = TextOverflow.Clip,
         onTextLayout = { result ->
             if (result.didOverflowWidth && scale > minScale) {
                 scale = (scale - STEP).coerceAtLeast(minScale)
