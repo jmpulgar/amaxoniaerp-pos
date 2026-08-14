@@ -6,7 +6,7 @@ import java.math.BigDecimal
 
 /** Canonical implementation behind the [PaymentOperation] external seam. */
 internal class DefaultPaymentOperation(
-    private val executeLegacyFlow:
+    private val executeFlow:
         suspend (
             ExecutePaymentFlowInput,
             suspend (PaymentFlowEvent) -> Unit,
@@ -44,7 +44,7 @@ internal class DefaultPaymentOperation(
                 printerType = printerTypeProvider(),
                 paymentCondition = request.payment.condition,
             )
-        return executeLegacyFlow(input, onEvent)
+        return executeFlow(input, onEvent)
     }
 
     private fun PaymentExecutionContext.secondaryAmount(amount: Money): Double {
