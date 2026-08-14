@@ -29,7 +29,10 @@ object UuidGenerator : IdGenerator {
     override fun nextId(): String = UUID.randomUUID().toString()
 }
 
-object DefaultDispatcherProvider : DispatcherProvider {
-    override val io: CoroutineDispatcher = Dispatchers.IO
-    override val default: CoroutineDispatcher = Dispatchers.Default
+class DefaultDispatcherProvider(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
+) : DispatcherProvider {
+    override val io: CoroutineDispatcher get() = ioDispatcher
+    override val default: CoroutineDispatcher get() = defaultDispatcher
 }

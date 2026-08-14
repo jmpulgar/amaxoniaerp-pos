@@ -1,4 +1,4 @@
-package com.amaxonia.pos.data.printer
+﻿package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.core.logging.SafeLog
@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TicketPrinter
 import com.amaxonia.pos.domain.repository.PrinterProvider
 import com.amaxonia.pos.domain.repository.PrinterRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,15 +20,16 @@ import kotlinx.coroutines.runBlocking
 class PrinterFactory(
     context: Context,
     private val localStore: LocalStore,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : PrinterProvider {
     private val appContext = context.applicationContext
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
     private val printerTypeState = MutableStateFlow(PrinterType.NONE)
 
     @Volatile
     private var isHydrated = false
 
-    /** Carga bajo demanda; si la librería fiscal falla (p. ej. en Android 10), no se cierra la app. */
+    /** Carga bajo demanda; si la librerÃ­a fiscal falla (p. ej. en Android 10), no se cierra la app. */
     @Volatile
     private var theFactoryPrinterInstance: PrinterRepository? = null
     private var sunmiPrinterInstance: TicketPrinter? = null

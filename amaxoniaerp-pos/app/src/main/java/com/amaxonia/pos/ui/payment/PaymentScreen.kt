@@ -18,6 +18,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,8 +37,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -69,6 +73,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,10 +90,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
@@ -96,9 +103,10 @@ import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
-import com.amaxonia.pos.ui.common.LocalDeviceClass
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
+import com.amaxonia.pos.ui.common.components.KeypadKey
 import com.amaxonia.pos.ui.common.components.PosEmptyState
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
@@ -112,7 +120,7 @@ import kotlinx.coroutines.delay
 
 private const val SECONDARY_CURRENCY_LABEL = "Bs."
 private val COMPACT_WIDTH_THRESHOLD = 600.dp
-private val TABLET_LANDSCAPE_WIDTH_THRESHOLD = 900.dp
+private val COMFORTABLE_HEIGHT_THRESHOLD = 600.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -202,6 +210,8 @@ fun PaymentScreen(
         onPaymentSuccess(payload)
     }
 
+    val onAction: (PaymentUiAction) -> Unit = viewModel::onAction
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -226,6 +236,10 @@ fun PaymentScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
+                colors =
+                    TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
             )
         },
     ) { padding ->
@@ -236,54 +250,28 @@ fun PaymentScreen(
                     .padding(padding)
                     .background(MaterialTheme.colorScheme.background),
         ) {
-            val compactLayout = maxWidth < COMPACT_WIDTH_THRESHOLD
-            val tabletLandscape =
-                LocalDeviceClass.current == DeviceClass.TABLET &&
-                    isLandscape() &&
-                    maxWidth >= TABLET_LANDSCAPE_WIDTH_THRESHOLD
-
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .widthIn(max = 980.dp)
-                        .align(Alignment.TopCenter),
-            ) {
-                PaymentHeader(
-                    state = state,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-
-                PaymentMethodSelectorRow(
-                    selectedMethod = state.selectedMethod,
-                    cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
-                    nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
-                    onSelect = { viewModel.onAction(PaymentUiAction.SelectMethod(it)) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-
-                if (state.isLoadingFormasPago) {
+            when {
+                state.isLoadingFormasPago ->
                     PosLoadingState(
                         message = "Cargando formas de pago…",
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else if (state.formasPagoError != null) {
-                    PosFeedbackCard(
-                        title = "Formas de pago no disponibles",
-                        message = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
-                        tone = PosVisualTone.Error,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                } else if (compactLayout) {
-                    when (state.selectedMethod) {
-                        PaymentMethod.CASH -> CashPaymentCompact(state, viewModel)
-                        PaymentMethod.NON_CASH -> NonCashPaymentCompact(state, viewModel)
+                state.formasPagoError != null ->
+                    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                        PosFeedbackCard(
+                            title = "Formas de pago no disponibles",
+                            message = state.formasPagoError ?: "No se pudieron cargar las formas de pago",
+                            tone = PosVisualTone.Error,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
-                } else if (tabletLandscape) {
-                    PaymentTabletLandscape(state, viewModel)
-                } else {
-                    PaymentWide(state, viewModel)
-                }
+                isLandscape() -> PaymentLandscape(state = state, onAction = onAction)
+                maxWidth < COMPACT_WIDTH_THRESHOLD ->
+                    when (state.selectedMethod) {
+                        PaymentMethod.CASH -> CashPaymentCompact(state = state, onAction = onAction, maxHeight = maxHeight)
+                        PaymentMethod.NON_CASH -> NonCashPaymentCompact(state = state, onAction = onAction)
+                    }
+                else -> PaymentWide(state = state, onAction = onAction)
             }
 
             if (state.isProcessingPayment) {
@@ -299,24 +287,24 @@ fun PaymentScreen(
                     paymentError ==
                         com.amaxonia.pos.domain.usecase.payment.PaymentValidationFailure.MissingCajaSequence.message
                 AlertDialog(
-                    onDismissRequest = { viewModel.onAction(PaymentUiAction.ClearPaymentError) },
+                    onDismissRequest = { onAction(PaymentUiAction.ClearPaymentError) },
                     confirmButton = {
                         if (isMissingCajaSequence) {
                             TextButton(onClick = {
-                                viewModel.onAction(PaymentUiAction.ClearPaymentError)
+                                onAction(PaymentUiAction.ClearPaymentError)
                                 onNavigateToApertura()
                             }) {
                                 Text("Aperturar caja")
                             }
                         } else {
-                            TextButton(onClick = { viewModel.onAction(PaymentUiAction.ClearPaymentError) }) {
+                            TextButton(onClick = { onAction(PaymentUiAction.ClearPaymentError) }) {
                                 Text("Entendido")
                             }
                         }
                     },
                     dismissButton = {
                         if (isMissingCajaSequence) {
-                            TextButton(onClick = { viewModel.onAction(PaymentUiAction.ClearPaymentError) }) {
+                            TextButton(onClick = { onAction(PaymentUiAction.ClearPaymentError) }) {
                                 Text("Cancelar")
                             }
                         }
@@ -329,17 +317,17 @@ fun PaymentScreen(
             val duplicate = state.duplicateInvoice
             if (duplicate != null) {
                 AlertDialog(
-                    onDismissRequest = { viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice) },
+                    onDismissRequest = { onAction(PaymentUiAction.DismissDuplicateInvoice) },
                     confirmButton = {
                         TextButton(onClick = {
-                            viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice)
+                            onAction(PaymentUiAction.DismissDuplicateInvoice)
                             onBack()
                         }) {
                             Text("Reconciliar")
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { viewModel.onAction(PaymentUiAction.DismissDuplicateInvoice) }) {
+                        TextButton(onClick = { onAction(PaymentUiAction.DismissDuplicateInvoice) }) {
                             Text("Revisión manual")
                         }
                     },
@@ -369,62 +357,83 @@ fun PaymentScreen(
 internal fun PaymentHeader(
     state: PaymentState,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
+    val heroStyle =
+        if (compact) {
+            MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+        } else {
+            PosTextStyles.totalDisplay
+        }
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null)
+        Column(modifier = Modifier.padding(horizontal = if (compact) 14.dp else 16.dp, vertical = if (compact) 10.dp else 14.dp)) {
+            if (!compact) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, modifier = Modifier.size(22.dp))
+                        }
                     }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Total a pagar",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "$ ",
-                            style = PosTextStyles.totalDisplay,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            state.totalAmountText,
-                            style = PosTextStyles.totalDisplay,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
-                        Text(
-                            "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
-                            style = PosTextStyles.amountSecondary,
+                            "Total a pagar",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        HeroAmount(state = state, style = heroStyle)
                     }
                 }
+            } else {
+                Text(
+                    "Total a pagar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                HeroAmount(state = state, style = heroStyle)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(if (compact) 10.dp else 12.dp))
             FinancialBreakdown(
                 snapshot = state.financialSnapshot,
                 totalFallback = state.totalAmountMoney,
                 taxLabel = state.effectiveTaxLabel,
                 isMultiCurrency = state.isMultiCurrency,
                 tasa = state.tasa,
+                compact = compact,
             )
         }
+    }
+}
+
+@Composable
+private fun HeroAmount(
+    state: PaymentState,
+    style: androidx.compose.ui.text.TextStyle,
+) {
+    AdaptiveAmountText(
+        text = "$ ${state.totalAmountText}",
+        baseStyle = style,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth(),
+        minFontSizeSp = 18f,
+    )
+    if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
+        Text(
+            "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
+            style = PosTextStyles.amountSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -435,6 +444,7 @@ internal fun FinancialBreakdown(
     taxLabel: String,
     isMultiCurrency: Boolean,
     tasa: Double,
+    compact: Boolean = false,
 ) {
     val subtotal = snapshot?.subtotalGross ?: totalFallback.toDouble()
     val discount = snapshot?.itemDiscounts ?: 0.0
@@ -446,20 +456,22 @@ internal fun FinancialBreakdown(
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            BreakdownRow(label = "Subtotal", amount = subtotal, isMultiCurrency = isMultiCurrency, tasa = tasa)
+        Column(modifier = Modifier.padding(horizontal = if (compact) 12.dp else 14.dp, vertical = if (compact) 8.dp else 10.dp)) {
+            BreakdownRow(label = "Subtotal", amount = subtotal, compact = compact, isMultiCurrency = isMultiCurrency, tasa = tasa)
             BreakdownRow(
                 label = "Descuento",
                 amount = discount,
+                compact = compact,
                 isMultiCurrency = isMultiCurrency,
                 tasa = tasa,
                 emphasize = discount > 0.0,
             )
-            BreakdownRow(label = taxLabel, amount = tax, isMultiCurrency = isMultiCurrency, tasa = tasa)
+            BreakdownRow(label = taxLabel, amount = tax, compact = compact, isMultiCurrency = isMultiCurrency, tasa = tasa)
             Spacer(modifier = Modifier.height(4.dp))
             BreakdownRow(
                 label = "Total",
                 amount = total,
+                compact = compact,
                 emphasize = true,
                 isMultiCurrency = isMultiCurrency,
                 tasa = tasa,
@@ -473,28 +485,52 @@ private fun BreakdownRow(
     label: String,
     amount: Double,
     emphasize: Boolean = false,
+    compact: Boolean = false,
     isMultiCurrency: Boolean = false,
     tasa: Double = 0.0,
 ) {
     val moneyAmount = Money.fromDouble(amount)
+    val labelStyle =
+        when {
+            emphasize -> MaterialTheme.typography.titleSmall
+            compact -> MaterialTheme.typography.bodySmall
+            else -> MaterialTheme.typography.bodyMedium
+        }
+    val amountStyle =
+        when {
+            emphasize -> MaterialTheme.typography.titleLarge
+            compact -> MaterialTheme.typography.titleSmall
+            else -> MaterialTheme.typography.titleMedium
+        }
+    val externalAmountStyle =
+        when {
+            emphasize -> MaterialTheme.typography.titleMedium
+            compact -> MaterialTheme.typography.titleSmall
+            else -> MaterialTheme.typography.bodyMedium
+        }
     Row(
-        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 24.dp).padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = if (compact) 20.dp else 24.dp).padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            style = if (emphasize) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+            style = labelStyle,
             color = if (emphasize) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
         )
         Column(horizontalAlignment = Alignment.End) {
-            Text(
+            AdaptiveAmountText(
                 text = "$ ${Money.format(moneyAmount)}",
-                style = if (emphasize) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                fontWeight = if (emphasize) FontWeight.ExtraBold else FontWeight.Medium,
+                baseStyle =
+                    (if (emphasize) amountStyle else externalAmountStyle).copy(
+                        fontWeight = if (emphasize) FontWeight.ExtraBold else FontWeight.Medium,
+                    ),
                 color = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.widthIn(max = 220.dp),
+                minFontSizeSp = 11f,
             )
             if (isMultiCurrency && tasa > 0.0 && amount > 0.0) {
                 val converted = moneyAmount.times(java.math.BigDecimal.valueOf(tasa))
@@ -555,6 +591,8 @@ private fun MethodCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val borderColor =
         if (selected) {
             MaterialTheme.colorScheme.primary
@@ -576,11 +614,19 @@ private fun MethodCard(
     Card(
         modifier =
             modifier
-                .height(76.dp)
-                .defaultMinSize(minHeight = 60.dp)
-                .clickable(enabled = enabled, onClick = onClick),
+                .height(72.dp)
+                .defaultMinSize(minHeight = 64.dp)
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = interactionSource,
+                    indication = ripple(),
+                    onClick = onClick,
+                ),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+        colors = CardDefaults.cardColors(
+            containerColor = if (pressed && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else containerColor,
+            contentColor = contentColor,
+        ),
         border =
             BorderStroke(
                 width = if (selected) 2.dp else 1.dp,
@@ -619,11 +665,15 @@ private fun MethodCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (selected) contentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (selected) {
@@ -633,7 +683,9 @@ private fun MethodCard(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(24.dp),
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
                 }
             }
         }
@@ -641,72 +693,213 @@ private fun MethodCard(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Layouts: compact (phones/POS), wide (small tablets), tablet-landscape (wide POS).
+// Layouts: compact (phones/POS portrait), landscape (phones+tablets), wide (tablet portrait).
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Computes the keypad height for compact-portrait so it scales fluidly with the screen
+ * (≈40% of the available height, clamped to comfortable POS proportions). Keys then
+ * `fillMaxHeight` inside the grid, guaranteeing usable ≥48dp targets across 320–480dp widths.
+ */
+private fun keypadHeightFor(maxHeight: Dp): Dp =
+    (maxHeight.value * 0.40f).coerceIn(196f, 300f).dp
+
 @Composable
-private fun PaymentWide(
+internal fun PaymentWide(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            when (state.selectedMethod) {
-                PaymentMethod.CASH -> CashAmountPanel(state, viewModel)
-                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state)
+    Column(
+        modifier = Modifier.fillMaxSize().widthIn(max = 980.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PaymentHeader(
+            state = state,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        PaymentMethodSelectorRow(
+            selectedMethod = state.selectedMethod,
+            cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+            nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+            onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                when (state.selectedMethod) {
+                    PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction, modifier = Modifier.fillMaxWidth())
+                    PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
+                }
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            when (state.selectedMethod) {
-                PaymentMethod.CASH -> CashKeypadBlock(state, viewModel, fillRemaining = true)
-                PaymentMethod.NON_CASH -> NonCashListPanel(state, viewModel, fillRemaining = true)
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                when (state.selectedMethod) {
+                    PaymentMethod.CASH ->
+                        CashKeypadBlock(
+                            state = state,
+                            onAction = onAction,
+                            fillRemaining = true,
+                            modifier = Modifier.fillMaxHeight(),
+                        )
+                    PaymentMethod.NON_CASH ->
+                        NonCashListPanel(
+                            state = state,
+                            onAction = onAction,
+                            fillRemaining = true,
+                            modifier = Modifier.fillMaxHeight(),
+                        )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PaymentTabletLandscape(
+internal fun PaymentLandscape(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+    Row(
+        modifier = Modifier.fillMaxSize().padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PaymentHeader(state = state, compact = true, modifier = Modifier.fillMaxWidth())
+            PaymentMethodSelectorRow(
+                selectedMethod = state.selectedMethod,
+                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
             when (state.selectedMethod) {
-                PaymentMethod.CASH -> CashAmountPanel(state, viewModel)
-                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state)
+                PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction, modifier = Modifier.fillMaxWidth())
+                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
             when (state.selectedMethod) {
-                PaymentMethod.CASH -> CashKeypadBlock(state, viewModel, fillRemaining = true)
-                PaymentMethod.NON_CASH -> NonCashListPanel(state, viewModel, fillRemaining = true)
+                PaymentMethod.CASH ->
+                    CashKeypadBlock(
+                        state = state,
+                        onAction = onAction,
+                        fillRemaining = true,
+                        modifier = Modifier.fillMaxHeight(),
+                    )
+                PaymentMethod.NON_CASH ->
+                    NonCashListPanel(
+                        state = state,
+                        onAction = onAction,
+                        fillRemaining = true,
+                        modifier = Modifier.fillMaxHeight(),
+                    )
             }
         }
     }
 }
 
 @Composable
-private fun CashPaymentCompact(
+internal fun CashPaymentCompact(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
+    maxHeight: Dp,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        CashAmountPanel(state, viewModel)
-        Spacer(modifier = Modifier.weight(1f))
-        CashKeypadBlock(state, viewModel, fillRemaining = false)
+    // `Cobrar $XX.XX` and the keypad stay anchored in the thumb zone (bottom) on every size:
+    //  - Tall screens (≥600dp): a weighted spacer creates intentional separation between the
+    //    summary block and the action block — no scrolling, no awkward empty gaps inside a scroll.
+    //  - Short screens (320×568 class): the summary scrolls if needed while the keypad + CTA
+    //    stay pinned, so nothing ever clips and the primary action remains reachable.
+    val keypadHeight = keypadHeightFor(maxHeight)
+    if (maxHeight >= COMFORTABLE_HEIGHT_THRESHOLD) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            PaymentHeader(
+                state = state,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+            PaymentMethodSelectorRow(
+                selectedMethod = state.selectedMethod,
+                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            CashAmountPanel(
+                state = state,
+                onAction = onAction,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            CashKeypadBlock(
+                state = state,
+                onAction = onAction,
+                fillRemaining = false,
+                keypadHeight = keypadHeight,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            )
+        }
+        return
+    }
+
+    val scrollState = rememberScrollState()
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState),
+        ) {
+            PaymentHeader(
+                state = state,
+                compact = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            PaymentMethodSelectorRow(
+                selectedMethod = state.selectedMethod,
+                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            CashAmountPanel(
+                state = state,
+                onAction = onAction,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        CashKeypadBlock(
+            state = state,
+            onAction = onAction,
+            fillRemaining = false,
+            keypadHeight = keypadHeight,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+        )
     }
 }
 
 @Composable
-private fun NonCashPaymentCompact(
+internal fun NonCashPaymentCompact(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        NonCashSummaryPanel(state)
-        Spacer(modifier = Modifier.height(12.dp))
-        NonCashListPanel(state, viewModel, fillRemaining = true)
+    Column(modifier = Modifier.fillMaxSize()) {
+        PaymentHeader(
+            state = state,
+            compact = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        PaymentMethodSelectorRow(
+            selectedMethod = state.selectedMethod,
+            cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+            nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+            onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(12.dp))
+            NonCashListPanel(state = state, onAction = onAction, fillRemaining = true, modifier = Modifier.weight(1f).fillMaxWidth())
+        }
     }
 }
 
@@ -717,7 +910,8 @@ private fun NonCashPaymentCompact(
 @Composable
 private fun CashAmountPanel(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val missingCashAmountText =
         Money.format(
@@ -725,18 +919,20 @@ private fun CashAmountPanel(
                 .coerceAtLeastZero(),
         )
     val isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough
+    val isPositive = state.tenderedAmountMoney > Money.ZERO && state.isPaymentEnough
 
-    Column {
+    Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Monto recibido",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
             )
             FilledTonalButton(
-                onClick = { viewModel.onAction(PaymentUiAction.SetExactAmount) },
-                modifier = Modifier.height(40.dp),
+                onClick = { onAction(PaymentUiAction.SetExactAmount) },
+                modifier = Modifier.height(44.dp),
                 contentPadding = ButtonDefaults.ContentPadding,
             ) {
                 Icon(Icons.Default.PointOfSale, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -749,6 +945,7 @@ private fun CashAmountPanel(
             label = "Recibido",
             amountText = state.tenderedAmountText,
             isError = isInsufficient,
+            isPositive = isPositive,
             secondaryLine =
                 (state.isMultiCurrency && state.tenderedAmountBsText.isNotBlank()).let { hasSecondary ->
                     if (hasSecondary) "$SECONDARY_CURRENCY_LABEL ${state.tenderedAmountBsText}" else null
@@ -791,8 +988,10 @@ private fun CashAmountPanel(
 @Composable
 private fun CashKeypadBlock(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
     fillRemaining: Boolean,
+    modifier: Modifier = Modifier,
+    keypadHeight: Dp = 280.dp,
 ) {
     val warningScale by animateFloatAsState(
         targetValue = if (state.showInsufficientReminder && !state.isPaymentEnough) 1.03f else 1f,
@@ -800,38 +999,19 @@ private fun CashKeypadBlock(
     )
     val isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough
 
-    Column {
+    Column(modifier = modifier) {
         Keypad(
-            onKey = { key -> viewModel.onAction(PaymentUiAction.KeyPadInput(key)) },
-            height = if (fillRemaining) null else 300.dp,
+            onKey = { key -> onAction(PaymentUiAction.KeyPadInput(key)) },
+            modifier = if (fillRemaining) Modifier.weight(1f) else Modifier,
+            height = if (fillRemaining) null else keypadHeight,
             actionColumn = {
-                // Single backspace column — the COBRAR action is a full-width primary button below
-                // so it never wraps on narrow POS displays.
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth()
-                            .padding(4.dp)
-                            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
-                            .clickable { viewModel.onAction(PaymentUiAction.KeyPadInput("BACK")) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Backspace,
-                            contentDescription = "Borrar",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Borrar",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                        )
-                    }
-                }
+                // Backspace key sized to match the numeric keys. The COBRAR action is a
+                // full-width primary button below so it never wraps on narrow POS displays.
+                KeypadKey(
+                    text = "Borrar",
+                    modifier = Modifier.fillMaxHeight(),
+                    icon = Icons.AutoMirrored.Filled.Backspace,
+                ) { onAction(PaymentUiAction.KeyPadInput("BACK")) }
             },
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -839,7 +1019,7 @@ private fun CashKeypadBlock(
             state = state,
             warningScale = warningScale,
             isInsufficient = isInsufficient,
-            onClick = { viewModel.onAction(PaymentUiAction.ProcessPayment) },
+            onClick = { onAction(PaymentUiAction.ProcessPayment) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -859,26 +1039,27 @@ internal fun PrimaryCtaButton(
         } else {
             MaterialTheme.colorScheme.primary
         }
+    val onHeroColor = MaterialTheme.colorScheme.onPrimary
     Button(
         onClick = onClick,
         enabled = !state.isProcessingPayment,
         modifier =
             modifier
-                .height(64.dp)
+                .height(60.dp)
                 .defaultMinSize(minHeight = 56.dp),
         shape = MaterialTheme.shapes.medium,
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = heroColor,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                contentColor = onHeroColor,
             ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
     ) {
         if (state.isProcessingPayment) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
                 strokeWidth = 3.dp,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = onHeroColor,
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
@@ -891,22 +1072,22 @@ internal fun PrimaryCtaButton(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = onHeroColor,
                 modifier = Modifier.size(((22 * warningScale).dp)),
             )
             Spacer(modifier = Modifier.width(10.dp))
-            // Cobrar $ XX.XX nunca puede hacer wrap ni quedar fuera de pantalla. `softWrap = false`
-            // + `maxLines = 1` garantizan que la cadena se mantenga en una sola línea física;
-            // los layouts adaptativos (`PaymentWide` / `PaymentTabletLandscape` /
-            // `CashPaymentCompact`) reservan el ancho completo del panel para el CTA, por lo que
-            // el texto no se recorta en la práctica.
-            Text(
+            // `Cobrar $XX.XX` nunca puede hacer wrap ni quedar fuera de pantalla: AdaptiveAmountText
+            // reduce el tamaño de fuente paso a paso hasta encajar en el ancho disponible (320dp incluido).
+            AdaptiveAmountText(
                 text = "Cobrar $ ${state.totalAmountText}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                softWrap = false,
-                textAlign = TextAlign.Center,
+                baseStyle =
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center,
+                    ),
+                color = onHeroColor,
+                modifier = Modifier.weight(1f),
+                minFontSizeSp = 14f,
             )
         }
     }
@@ -917,12 +1098,16 @@ internal fun PrimaryCtaButton(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun NonCashSummaryPanel(state: PaymentState) {
-    Column {
+private fun NonCashSummaryPanel(
+    state: PaymentState,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
         Text(
             "Resumen del cobro",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Surface(
@@ -979,10 +1164,12 @@ private fun NonCashSummaryPanel(state: PaymentState) {
 @Composable
 private fun NonCashListPanel(
     state: PaymentState,
-    viewModel: PaymentViewModel,
+    onAction: (PaymentUiAction) -> Unit,
     fillRemaining: Boolean,
+    modifier: Modifier = Modifier,
+    narrow: Boolean = false,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier) {
         if (state.formasPagoTarjetaOtro.isEmpty()) {
             PosEmptyState(
                 icon = Icons.Default.CreditCard,
@@ -997,6 +1184,7 @@ private fun NonCashListPanel(
             "Formas disponibles",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1011,11 +1199,12 @@ private fun NonCashListPanel(
                     value = state.nonCashAmountsInput[forma.idFormaPago].orEmpty(),
                     pendingAmount = state.nonCashPendingText,
                     canUseCredit = state.canUseCredit,
+                    narrow = narrow,
                     onValueChange = {
-                        viewModel.onAction(PaymentUiAction.SetNonCashAmount(forma.idFormaPago, it))
+                        onAction(PaymentUiAction.SetNonCashAmount(forma.idFormaPago, it))
                     },
                     onUseExactAmount = {
-                        viewModel.onAction(PaymentUiAction.SetExactNonCashAmount(forma.idFormaPago))
+                        onAction(PaymentUiAction.SetExactNonCashAmount(forma.idFormaPago))
                     },
                 )
             }
@@ -1026,7 +1215,7 @@ private fun NonCashListPanel(
             state = state,
             warningScale = 1f,
             isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
-            onClick = { viewModel.onAction(PaymentUiAction.ProcessPayment) },
+            onClick = { onAction(PaymentUiAction.ProcessPayment) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -1040,6 +1229,7 @@ fun NonCashRow(
     canUseCredit: Boolean,
     onValueChange: (String) -> Unit,
     onUseExactAmount: () -> Unit,
+    narrow: Boolean = false,
 ) {
     val isCxc = forma.siglas?.trim()?.equals("CXC", ignoreCase = true) == true
     val isPending = pendingAmount.isNotBlank() && pendingAmount != "0.00"
@@ -1063,6 +1253,7 @@ fun NonCashRow(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     val subtitle =
                         when {
@@ -1074,23 +1265,26 @@ fun NonCashRow(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (narrow) {
+                // <360dp: stack the field and the "Completar" button vertically so both get full
+                // width — avoids clipping the "Completar $XXX.XX" label on small phones.
                 OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
                     label = { Text("Monto asignado") },
                     prefix = { Text("$ ") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.width(10.dp))
                 FilledTonalButton(
                     onClick = onUseExactAmount,
                     enabled = isPending,
-                    modifier = Modifier.height(52.dp).defaultMinSize(minWidth = 132.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = MaterialTheme.shapes.medium,
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1101,6 +1295,34 @@ fun NonCashRow(
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                     )
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        label = { Text("Monto asignado") },
+                        prefix = { Text("$ ") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    FilledTonalButton(
+                        onClick = onUseExactAmount,
+                        enabled = isPending,
+                        modifier = Modifier.height(52.dp).defaultMinSize(minWidth = 132.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Completar \$$pendingAmount",
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -1126,16 +1348,21 @@ private fun PaymentSummaryLine(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Column(horizontalAlignment = Alignment.End) {
-            Text(
+            AdaptiveAmountText(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+                baseStyle =
+                    MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+                    ),
                 color =
                     if (emphasized) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+                modifier = Modifier.widthIn(max = 180.dp),
+                minFontSizeSp = 11f,
+                maxLines = 1,
             )
             secondary?.let {
                 Text(

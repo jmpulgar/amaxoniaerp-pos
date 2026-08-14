@@ -61,6 +61,7 @@ import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.mesas.EstadoPedidoMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 import com.amaxonia.pos.ui.cart.CartViewModel
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosSectionHeader
@@ -333,11 +334,13 @@ private fun LineRowCarrito(display: ItemCarrito) {
                     icon = Icons.Default.Restaurant,
                 )
                 Spacer(Modifier.weight(1f))
-                Text(
-                    "$ ${"%.2f".format(total)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                AdaptiveAmountText(
+                    text = "$ ${"%.2f".format(total)}",
+                    baseStyle = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    minFontSizeSp = 12f,
+                    maxLines = 1,
                 )
             }
         }
@@ -345,14 +348,15 @@ private fun LineRowCarrito(display: ItemCarrito) {
 }
 
 @Composable
-private fun LineRowPedido(
+internal fun LineRowPedido(
     pedido: PedidoMesa,
     onCambiarEstado: ((Int, String) -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     val finalizado = EstadoPedidoMesa.FINALES.contains(pedido.estado)
     val cancelado = pedido.estado == EstadoPedidoMesa.CANCELADA
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors =
             CardDefaults.cardColors(
@@ -385,11 +389,13 @@ private fun LineRowPedido(
                 )
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        "$ ${"%.2f".format(pedido.itemTotalConIva)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                    AdaptiveAmountText(
+                        text = "$ ${"%.2f".format(pedido.itemTotalConIva)}",
+                        baseStyle = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        minFontSizeSp = 12f,
+                        maxLines = 1,
                     )
                     pedido.comandaSecuencia?.let {
                         Text(

@@ -134,6 +134,7 @@ import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.CategoryChipRow
 import com.amaxonia.pos.ui.common.components.PosMoneyInput
 import com.amaxonia.pos.ui.common.components.QuantityStepper
@@ -706,16 +707,19 @@ fun DashboardScreen(
                                 selected = state.bottomSelected == 0,
                                 onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(0)) },
                                 icon = Icons.Default.GridView,
+                                label = "Catálogo",
                             )
                             BottomPillItem(
                                 selected = state.bottomSelected == 1,
                                 onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(1)) },
                                 icon = Icons.Default.StarBorder,
+                                label = "Top ventas",
                             )
                             BottomPillItem(
                                 selected = state.bottomSelected == 2,
                                 onClick = { viewModel.onAction(DashboardCatalogUiAction.SetBottomSelected(2)) },
                                 icon = Icons.Default.EditNote,
+                                label = "Manual",
                             )
                         }
                     }
@@ -935,8 +939,10 @@ fun DashboardScreen(
                                 if (state.viewMode == ProductViewMode.GRID) {
                                     LazyVerticalGrid(
                                         state = productGridState,
-                                        columns = GridCells.Adaptive(minSize = 160.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        // 140dp: 2 columnas incluso en 320dp (densidad POS) sin
+                                        // desbordar la fila de acciones de la tarjeta.
+                                        columns = GridCells.Adaptive(minSize = 140.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         verticalArrangement = Arrangement.spacedBy(12.dp),
                                         contentPadding = PaddingValues(bottom = 120.dp),
                                     ) {
@@ -1016,6 +1022,7 @@ fun DashboardScreen(
                             onClick = { viewModel.onAction(DashboardSaleUiAction.Checkout) },
                             shape = MaterialTheme.shapes.medium,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 6.dp),
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomCenter)
@@ -1028,15 +1035,27 @@ fun DashboardScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                ) {
                                     Icon(Icons.Default.ShoppingCart, null, tint = PosPalette.FixedWhite)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("${state.cartItemCount} productos", color = PosPalette.FixedWhite)
+                                    Text(
+                                        if (state.cartItemCount == 1) "1 artículo" else "${state.cartItemCount} artículos",
+                                        color = PosPalette.FixedWhite,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
-                                Text(
-                                    "Total: $${String.format(java.util.Locale.getDefault(), "%.2f", state.cartTotal)}",
-                                    fontWeight = FontWeight.Bold,
+                                // Total adaptive: montos grandes encogen sin recortarse en 320dp.
+                                AdaptiveAmountText(
+                                    text = "$${String.format(java.util.Locale.getDefault(), "%.2f", state.cartTotal)}",
+                                    baseStyle = MaterialTheme.typography.titleMedium,
                                     color = PosPalette.FixedWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    minFontSizeSp = 13f,
+                                    maxLines = 1,
                                 )
                             }
                         }
@@ -1335,6 +1354,7 @@ private fun BottomPillItem(
     selected: Boolean,
     onClick: () -> Unit,
     icon: ImageVector,
+    label: String,
 ) {
     val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else PosPalette.Transparent
     val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -1343,11 +1363,18 @@ private fun BottomPillItem(
         color = bg,
         shape = MaterialTheme.shapes.medium,
     ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier.size(46.dp),
+        Column(
+            modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
+            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -1370,14 +1397,16 @@ fun ProductCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth().height(260.dp),
+        modifier = Modifier.fillMaxWidth().height(240.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
+            // Imagen flexible: absorbe el alto restante para que la tarjeta nunca
+            // desborde en columnas estrechas (320dp → 2 columnas de ~138dp).
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(110.dp)
+                        .weight(1f)
                         .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
@@ -1395,70 +1424,73 @@ fun ProductCard(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
                         tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = product.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!product.code.isNullOrBlank()) {
                 Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    text = "Ref: ${product.code}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (!product.code.isNullOrBlank()) {
-                    Text(
-                        text = "Ref: ${product.code}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp),
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                }
             }
             Spacer(modifier = Modifier.height(8.dp))
+            // Precio en su propia fila (adaptive: montos grandes encogen sin recortarse).
+            AdaptiveAmountText(
+                text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
+                baseStyle = PosTextStyles.priceTileLarge,
+                color = MaterialTheme.colorScheme.primary,
+                minFontSizeSp = 12f,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            // Acciones alineadas a la derecha; targets ≥48dp vía minimum interactive.
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                    style = PosTextStyles.priceTileLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onQuantityClick,
-                        modifier =
-                            Modifier
-                                .size(44.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Elegir cantidad",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    IconButton(
-                        onClick = onAddClick,
-                        modifier =
-                            Modifier
-                                .size(44.dp)
-                                .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Agregar una unidad",
-                            tint = PosPalette.FixedWhite,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                IconButton(
+                    onClick = onQuantityClick,
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Elegir cantidad",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = onAddClick,
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Agregar una unidad",
+                        tint = PosPalette.FixedWhite,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }
@@ -1482,13 +1514,13 @@ fun ProductListRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(64.dp)
+                        .size(56.dp)
                         .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
@@ -1504,7 +1536,7 @@ fun ProductListRow(
                         imageVector = Icons.Default.Inventory,
                         contentDescription = "Sin imagen",
                         tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
             }
@@ -1515,7 +1547,7 @@ fun ProductListRow(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 if (!product.code.isNullOrBlank()) {
                     Text(
@@ -1523,15 +1555,17 @@ fun ProductListRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                 }
-                Text(
+                AdaptiveAmountText(
                     text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                    style = PosTextStyles.priceTileLarge,
+                    baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 13f,
+                    maxLines = 1,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1539,28 +1573,28 @@ fun ProductListRow(
                     onClick = onQuantityClick,
                     modifier =
                         Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
                 ) {
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = "Elegir cantidad",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 IconButton(
                     onClick = onAddClick,
                     modifier =
                         Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Agregar una unidad",
                         tint = PosPalette.FixedWhite,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -1624,51 +1658,57 @@ fun ManualEntryContent(
                     .padding(bottom = 24.dp),
         )
 
-        // Pantalla del precio (Visor)
+        // Pantalla del precio (Visor) — monto adaptive para que importes largos no se corten.
         Card(
-            shape = MaterialTheme.shapes.small,
+            shape = MaterialTheme.shapes.medium,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 16.dp),
         ) {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     text = "Monto a cobrar",
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
+                Spacer(modifier = Modifier.height(4.dp))
+                AdaptiveAmountText(
                     text = if (currentValue.isEmpty()) "$ 0.00" else "$ $currentValue",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
+                    baseStyle =
+                        TextStyle(
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                        ),
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 18f,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
 
-        // Teclado Numérico
+        // Teclado Numérico (el bottomBar ya reserva su espacio vía paddingValues;
+        // sin padding extra que desperdicie pantalla).
         Row(
             modifier =
                 Modifier
                     .weight(1f)
-                    .padding(bottom = 80.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Columna Izquierda (Números)
             Column(
                 modifier = Modifier.weight(3f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val keys =
                     listOf(
@@ -1681,7 +1721,7 @@ fun ManualEntryContent(
                 keys.forEach { row ->
                     Row(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         row.forEach { key ->
                             Button(
@@ -1691,6 +1731,7 @@ fun ManualEntryContent(
                                 shape = MaterialTheme.shapes.small,
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                                contentPadding = PaddingValues(0.dp),
                                 modifier =
                                     Modifier
                                         .weight(1f)
@@ -1711,7 +1752,7 @@ fun ManualEntryContent(
             // Columna Derecha (Acciones)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // Botón Borrar
                 Button(

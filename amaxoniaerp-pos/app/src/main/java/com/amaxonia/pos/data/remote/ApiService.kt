@@ -68,21 +68,17 @@ class ApiService(
                 setBody(request)
             }
         if (!response.status.isSuccess()) {
-            val message =
-                if (response.status.value == 401) {
-                    "Usuario o contrasena incorrectos"
-                } else {
-                    runCatching {
-                        AppJson
-                            .decodeFromString(
-                                ErrorResponse.serializer(),
-                                response.bodyAsText(),
-                            ).error
-                    }.getOrNull()
-                }
             if (response.status.value == 401) {
-                throw UnauthorizedException(message ?: "Usuario o contrasena incorrectos")
+                throw UnauthorizedException("Usuario o contrasena incorrectos")
             }
+            val message =
+                runCatching {
+                    AppJson
+                        .decodeFromString(
+                            ErrorResponse.serializer(),
+                            response.bodyAsText(),
+                        ).error
+                }.getOrNull()
             error(message ?: "No se pudo iniciar sesion")
         }
         return response.body()

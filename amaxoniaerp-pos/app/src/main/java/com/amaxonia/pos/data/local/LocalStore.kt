@@ -132,10 +132,11 @@ class LocalStore(
         val snapshot =
             runCatching {
                 AppJson.decodeFromString(ActiveCajaSnapshot.serializer(), json)
-            }.getOrNull() ?: run {
-                clearActiveCaja()
-                return null
-            }
+            }.getOrNull()
+        if (snapshot == null) {
+            clearActiveCaja()
+            return null
+        }
 
         val session = readCompanySession()
         val isSameCompany = session?.company?.adminDb == snapshot.companyDb
@@ -175,7 +176,8 @@ class LocalStore(
         val snapshot =
             runCatching {
                 AppJson.decodeFromString(FormasPagoSnapshot.serializer(), json)
-            }.getOrNull() ?: return emptyList()
+            }.getOrNull()
+        if (snapshot == null) return emptyList()
 
         val session = readCompanySession()
         val isSameCompany = session?.company?.adminDb == snapshot.companyDb

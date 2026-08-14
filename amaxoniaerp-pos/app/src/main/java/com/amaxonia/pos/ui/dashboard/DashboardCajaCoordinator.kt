@@ -212,9 +212,12 @@ class DashboardCajaCoordinator(
             cajaRepository.openCaja(request).fold(
                 onSuccess = {
                     cajaRepository.setActiveCaja(caja)
-                    val ticketOffer = closedSequenceId?.let { buildAutomaticCloseTicketOffer(caja, it) }
-                    state.update {
-                        it.copy(
+                    val ticketOffer =
+                        closedSequenceId?.let { sequenceId ->
+                            buildAutomaticCloseTicketOffer(caja, sequenceId)
+                        }
+                    state.update { current ->
+                        current.copy(
                             isLoadingCajas = false,
                             showCajaSelector = false,
                             automaticCloseTicketOffer = ticketOffer,

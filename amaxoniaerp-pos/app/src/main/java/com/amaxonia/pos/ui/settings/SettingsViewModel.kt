@@ -222,7 +222,7 @@ class SettingsViewModel(
         return runCatching {
             require(settings.ipAddress.isNotBlank()) { "Ingresa la IP de The Factory HKA" }
             require(settings.port.isNotBlank()) { "Ingresa el puerto de The Factory HKA" }
-            require(settings.port.toIntOrNull() != null) { "El puerto de The Factory HKA no es valido" }
+            requireNotNull(settings.port.toIntOrNull()) { "El puerto de The Factory HKA no es valido" }
             if (requireGatewaySelection) {
                 require(settings.gatewayKey.isNotBlank()) { "Selecciona una pasarela HKA en configuración de impresora" }
             }

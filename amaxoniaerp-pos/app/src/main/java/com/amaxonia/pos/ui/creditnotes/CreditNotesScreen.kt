@@ -1,4 +1,4 @@
-package com.amaxonia.pos.ui.creditnotes
+﻿package com.amaxonia.pos.ui.creditnotes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -232,8 +232,8 @@ private fun CreditNotesListContent(
         if (state.creditNotes.isEmpty()) {
             EmptyState(
                 icon = Icons.AutoMirrored.Filled.ReceiptLong,
-                title = "Aún no hay notas de crédito",
-                subtitle = "Pulsa agregar para seleccionar una factura y generar una devolución",
+                title = "AÃºn no hay notas de crÃ©dito",
+                subtitle = "Pulsa agregar para seleccionar una factura y generar una devoluciÃ³n",
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -259,7 +259,7 @@ private fun CreditNoteInvoicePickerContent(
             EmptyState(
                 icon = Icons.Default.Inventory2,
                 title = "No hay facturas elegibles",
-                subtitle = "Aparecerán aquí las facturas con saldo disponible para devolución",
+                subtitle = "AparecerÃ¡n aquÃ­ las facturas con saldo disponible para devoluciÃ³n",
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -288,7 +288,7 @@ private fun CreditNoteCreateContent(
         EmptyState(
             icon = Icons.AutoMirrored.Filled.ReceiptLong,
             title = "Selecciona una factura",
-            subtitle = "El flujo de creación necesita una factura origen",
+            subtitle = "El flujo de creaciÃ³n necesita una factura origen",
         )
         return
     }
@@ -301,13 +301,13 @@ private fun CreditNoteCreateContent(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Generar la Nota de Crédito",
+                    "Generar la Nota de CrÃ©dito",
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    "Se anulará la factura y se devolverá la totalidad de las líneas.",
+                    "Se anularÃ¡ la factura y se devolverÃ¡ la totalidad de las lÃ­neas.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                 )
@@ -407,7 +407,7 @@ private fun CreditNoteCreateContent(
                     )
                 }
                 OutlinedTextField(value = state.form.observacion, onValueChange = onObservacionChange, label = {
-                    Text("Observación")
+                    Text("ObservaciÃ³n")
                 }, modifier = Modifier.fillMaxWidth())
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -433,7 +433,7 @@ private fun CreditNoteCreateContent(
             ) {
                 Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Â¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -515,7 +515,7 @@ private fun CreditNoteCreateContent(
                 if (state.isSubmitting) {
                     androidx.compose.material3.CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Generar nota de crédito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Generar nota de crÃ©dito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -544,12 +544,14 @@ private fun SearchRow(
 }
 
 @Composable
-private fun SummaryBanner(
+internal fun SummaryBanner(
     title: String,
     value: String,
     amount: Double,
+    modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -558,13 +560,24 @@ private fun SummaryBanner(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = PosPalette.FixedWhite.copy(alpha = 0.8f), fontSize = 12.sp)
                 Text(value, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 24.sp)
             }
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
                 Text("Monto total", color = PosPalette.FixedWhite.copy(alpha = 0.8f), fontSize = 12.sp)
-                Text(formatAmount(amount), color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                // Monto adaptive: totales enormes encogen sin recortarse en 320dp.
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
+                    text = "Bs ${formatAmount(amount)}",
+                    baseStyle =
+                        MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
+                    color = PosPalette.FixedWhite,
+                    minFontSizeSp = 13f,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -616,6 +629,8 @@ private fun CreditNoteCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -659,16 +674,22 @@ private fun CreditNoteCard(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                // Monto adaptive: totales enormes no colisionan con nombres largos en 320dp.
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "Bs ${formatAmount(note.total)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    baseStyle =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 11f,
                 )
                 Text(
                     text = note.facturaCodigo,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -721,6 +742,8 @@ private fun SourceInvoiceCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -760,11 +783,14 @@ private fun SourceInvoiceCard(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    baseStyle =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 11f,
                 )
             }
             Icon(
@@ -837,11 +863,14 @@ private fun InvoiceLineReadOnlyCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "$currency ${formatAmount(line.totalConIvaOriginal)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    baseStyle =
+                        MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                     color = MaterialTheme.colorScheme.onSurface,
+                    minFontSizeSp = 11f,
                 )
                 Text(
                     text = "IVA: ${formatAmount(line.pIva)}%",
@@ -997,11 +1026,14 @@ private fun CreditNoteDetailSheet(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Monto", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Text(
-                        "Bs ${formatAmount(detail.total)}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
+                        text = "Bs ${formatAmount(detail.total)}",
+                        baseStyle =
+                            MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                            ),
                         color = MaterialTheme.colorScheme.primary,
+                        minFontSizeSp = 12f,
                     )
                 }
             }
@@ -1022,7 +1054,7 @@ private fun CreditNoteDetailSheet(
                 } else {
                     Icon(Icons.Default.Print, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Procesar nota de crédito fiscal", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Procesar nota de crÃ©dito fiscal", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1048,9 +1080,9 @@ private fun EmptyState(
 
 private fun screenTitle(mode: CreditNotesMode): String =
     when (mode) {
-        CreditNotesMode.LIST -> "Notas de crédito"
+        CreditNotesMode.LIST -> "Notas de crÃ©dito"
         CreditNotesMode.INVOICE_PICKER -> "Seleccionar factura"
-        CreditNotesMode.CREATE -> "Nueva nota de crédito"
+        CreditNotesMode.CREATE -> "Nueva nota de crÃ©dito"
     }
 
 private fun formatAmount(value: Double): String = String.format(java.util.Locale.getDefault(), "%.2f", value)

@@ -215,8 +215,8 @@ private class DashboardProductActionHandler(
         validatePromotion(promotion, cartWithoutSamePromotion).fold(
             onSuccess = {
                 cartRepository.addPromotionToCart(promotion, safeTimes)
-                state.update {
-                    it.copy(
+                state.update { current ->
+                    current.copy(
                         showPromotionChoice = false,
                         pendingPromotionProduct = null,
                         promotionOptions = emptyList(),
@@ -315,6 +315,6 @@ private fun DashboardProduct.toManualProduct(): Product =
         taxRate = taxRate,
         isExempt = isExempt,
         department = category,
-        code = code ?: "",
-        barcode1 = barcode ?: "",
+        code = code.orEmpty(),
+        barcode1 = barcode.orEmpty(),
     )

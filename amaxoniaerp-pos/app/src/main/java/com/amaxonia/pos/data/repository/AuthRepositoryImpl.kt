@@ -1,6 +1,5 @@
-package com.amaxonia.pos.data.repository
+﻿package com.amaxonia.pos.data.repository
 
-import com.amaxonia.pos.data.local.AuthSnapshot
 import com.amaxonia.pos.data.local.CompanySessionSnapshot
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.toSnapshot
@@ -81,21 +80,8 @@ private fun Throwable.toAuthenticationException(): Throwable =
         is SocketTimeoutException,
         is IOException,
         -> AuthenticationConnectivityException(this)
-        else -> UnexpectedAuthenticationException(message ?: "No se pudo iniciar sesión", this)
+        else -> UnexpectedAuthenticationException(message ?: "No se pudo iniciar sesiÃ³n", this)
     }
-
-private fun AuthSnapshot.toDomain(isOffline: Boolean): AuthSession =
-    AuthSession(
-        token = token,
-        user =
-            AuthUser(
-                id = user.id,
-                username = user.username,
-                role = user.role,
-            ),
-        companies = companies.map { CompanySummary(id = it.id, name = it.name) },
-        isOffline = isOffline,
-    )
 
 private fun com.amaxonia.pos.data.remote.dto.LoginResponse.toDomain(isOffline: Boolean): AuthSession =
     AuthSession(

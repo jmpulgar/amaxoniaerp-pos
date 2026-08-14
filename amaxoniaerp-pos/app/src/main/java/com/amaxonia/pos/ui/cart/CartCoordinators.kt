@@ -49,7 +49,7 @@ class CartStateCoordinator(
         scope.launch {
             cartRepository.selectedClient.collect { client ->
                 updateCartState(state, cartRepository.cartItems.value, client, cartRepository.financialSnapshot.value)
-                state.update { it.copy(selectedClientPhotoUrl = client?.let { resolveClientImageUrl(it) }.orEmpty()) }
+                state.update { it.copy(selectedClientPhotoUrl = client?.let { selected -> resolveClientImageUrl(selected) }.orEmpty()) }
                 loadClientBranches(client, state)
             }
         }

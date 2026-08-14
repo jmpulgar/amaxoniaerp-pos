@@ -1,4 +1,4 @@
-package com.amaxonia.pos.data.printer
+﻿package com.amaxonia.pos.data.printer
 
 import android.content.ComponentName
 import android.content.Context
@@ -8,6 +8,7 @@ import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.printer.GatewayOption
 import com.thefactoryhka.hkacryptolib.MainFactory
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -34,6 +35,7 @@ import kotlin.math.roundToLong
 class TheFactoryRapidPayClient(
     context: Context,
     private val localStore: LocalStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val appContext = context.applicationContext
     private val cryptography = MainFactory().createInstance(appContext)
@@ -43,8 +45,8 @@ class TheFactoryRapidPayClient(
      *
      * @param amount The amount to charge in bolivares
      * @param commandPrefix The gateway command prefix (e.g. "KRV")
-     * @param customerIdentifier CI/RIF del cliente (solo dígitos, máx. 9)
-     * @param commerceRif RIF del comercio desde parametros_generales.rif (máx. 11)
+     * @param customerIdentifier CI/RIF del cliente (solo dÃ­gitos, mÃ¡x. 9)
+     * @param commerceRif RIF del comercio desde parametros_generales.rif (mÃ¡x. 11)
      * @return The Intent to launch, or a failure with the error message
      */
     fun buildGatewayIntent(
@@ -100,7 +102,7 @@ class TheFactoryRapidPayClient(
      * - expects JSON array response containing message with gateway list
      */
     suspend fun listGateways(): Result<List<GatewayOption>> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 val ip = settings.ipAddress.trim()
@@ -131,9 +133,9 @@ class TheFactoryRapidPayClient(
      * Parses the result Intent extras returned by the HKA POS app via onNewIntent().
      *
      * The HKA POS app re-launches our MainActivity with these extras:
-     * - "codeRapidPay" → "200" (approved) or "400" (rejected)
-     * - "resultRapidPay" → JSON string with transaction details
-     * - "messageRapidPay" → error/status message
+     * - "codeRapidPay" â†’ "200" (approved) or "400" (rejected)
+     * - "resultRapidPay" â†’ JSON string with transaction details
+     * - "messageRapidPay" â†’ error/status message
      */
     fun parseResultIntent(intent: Intent): RapidPayResult {
         val code = intent.getStringExtra(EXTRA_RESULT_CODE)
@@ -230,7 +232,7 @@ class TheFactoryRapidPayClient(
                 error("No hay comando de pasarela configurado para esta forma de pago")
             }
         if (amount > MAX_GATEWAY_AMOUNT) {
-            error("Monto excede máximo permitido por plataforma financiera (999999999.99)")
+            error("Monto excede mÃ¡ximo permitido por plataforma financiera (999999999.99)")
         }
         val amountCents =
             (amount.coerceAtLeast(0.01) * 100)
@@ -244,7 +246,7 @@ class TheFactoryRapidPayClient(
                 .uppercase()
                 .filter { it.isLetterOrDigit() }
                 .take(11)
-                .ifBlank { error("RIF de comercio inválido. Configura parametros_generales.rif") }
+                .ifBlank { error("RIF de comercio invÃ¡lido. Configura parametros_generales.rif") }
 
         // Manual HKA V1.0.2: K{gateway}V{amount16}|{ci/rif}|{rifComercio}|
         return "$prefix$amountCents|$customer|$commerce|"
@@ -253,7 +255,7 @@ class TheFactoryRapidPayClient(
     /**
      * Wraps the command in a JSON envelope {"cmd":"..."} and encrypts it.
      * Matches the SDK's GatewayController.generateCommandEncrypt():
-     *   1. Command.java wraps: "KRV..." → '{"cmd":"KRV..."}'
+     *   1. Command.java wraps: "KRV..." â†’ '{"cmd":"KRV..."}'
      *   2. iCryptography.encryptString() encrypts the JSON string
      */
     private fun encryptCommand(command: String): ByteArray {
@@ -328,7 +330,7 @@ class TheFactoryRapidPayClient(
                 "com.thefactory.hkapos.fiscal.demo.demo",
             )
 
-        // Intent extra keys — from SDK Constants.java
+        // Intent extra keys â€” from SDK Constants.java
         private const val EXTRA_COMMAND = "commandRapidPay"
         private const val EXTRA_RESULT_CODE = "codeRapidPay"
         private const val EXTRA_RESULT_DATA = "resultRapidPay"

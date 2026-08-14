@@ -245,7 +245,7 @@ class ComandaViewModel(
                 )
             result.fold(
                 onSuccess = {
-                    _state.update { it.copy(error = null, info = "Pedido $pedidoId → $nuevoEstado") }
+                    _state.update { current -> current.copy(error = null, info = "Pedido $pedidoId → $nuevoEstado") }
                     cargar(skipSpinner = true)
                 },
                 onFailure = { e -> _state.update { it.copy(error = e.message ?: "No se pudo cambiar el estado") } },

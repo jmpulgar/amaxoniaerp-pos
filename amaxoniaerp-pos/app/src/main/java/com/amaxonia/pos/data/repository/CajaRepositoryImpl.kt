@@ -148,7 +148,7 @@ class CajaRepositoryImpl(
                                 CierreCajaPaymentLine(
                                     idFormaPago = it.id,
                                     label = it.forma_pago ?: it.siglas ?: "Forma de pago",
-                                    siglas = it.siglas ?: "",
+                                    siglas = it.siglas.orEmpty(),
                                     amount = it.monto,
                                 )
                             }

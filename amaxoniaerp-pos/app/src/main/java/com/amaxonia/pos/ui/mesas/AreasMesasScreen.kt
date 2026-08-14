@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,14 +64,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.common.rememberDeviceClass
 
-private const val PHONE_GRID_COLUMNS = 2
-private const val TABLET_GRID_COLUMNS = 4
+/** Ancho mínimo de tile para el grid de mesas: 2 columnas en 320dp, 3 en 480dp, más en tablet. */
+private val MESA_GRID_MIN_TILE = 150.dp
 
 /**
  * Selección de área y mesa.
@@ -102,7 +102,6 @@ fun AreasMesasScreen(
     onComenzarPedido: (mesa: Mesa, sesionId: Int) -> Unit = { _, _ -> },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val columns = if (rememberDeviceClass() == DeviceClass.TABLET) TABLET_GRID_COLUMNS else PHONE_GRID_COLUMNS
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Mesa pendiente de apertura: se abre el dialog de "cantidad de personas" primero; solo al
@@ -173,7 +172,6 @@ fun AreasMesasScreen(
             }
             AreasMesasBody(
                 state = state,
-                columns = columns,
                 viewModel = viewModel,
                 onSelectCaja = onSelectCaja,
             )
@@ -330,7 +328,6 @@ private fun AreasMesasTopBar(
 @Composable
 private fun AreasMesasBody(
     state: AreasMesasState,
-    columns: Int,
     viewModel: AreasMesasViewModel,
     onSelectCaja: () -> Unit,
 ) {
@@ -379,7 +376,6 @@ private fun AreasMesasBody(
             Spacer(modifier = Modifier.height(12.dp))
             MesasContent(
                 state = state,
-                columns = columns,
                 onMesaClick = viewModel::onMesaSelected,
                 onRetryMesas = viewModel::onRetryMesas,
             )
@@ -390,7 +386,6 @@ private fun AreasMesasBody(
 @Composable
 private fun MesasContent(
     state: AreasMesasState,
-    columns: Int,
     onMesaClick: (Int) -> Unit,
     onRetryMesas: () -> Unit,
 ) {
@@ -424,9 +419,10 @@ private fun MesasContent(
 
         else ->
             // Fallback a lista/cuadrícula: áreas sin distribución válida, mesas apiladas en
-            // (0,0) o porque el usuario cambió a la vista de lista manualmente.
+            // (0,0) o porque el usuario cambió a la vista de lista manualmente. Adaptive sin
+            // breakpoints por dispositivo: 2 columnas en 320dp, 3 en 480dp, más en tablet.
             LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
+                columns = GridCells.Adaptive(minSize = MESA_GRID_MIN_TILE),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -449,19 +445,25 @@ private fun MesasContent(
  * no abre venta ni modifica la mesa.
  */
 @Composable
-private fun SelectedMesaBar(
+internal fun SelectedMesaBar(
     mesaName: String,
     areaName: String,
     onClear: () -> Unit,
     onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
+        modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 10.dp,
         tonalElevation = 2.dp,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -504,15 +506,17 @@ private fun SelectedMesaBar(
             ) {
                 OutlinedButton(
                     onClick = onClear,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text("Cambiar mesa")
+                    Text("Cambiar mesa", maxLines = 1)
                 }
                 Button(
                     onClick = onConfirm,
-                    modifier = Modifier.weight(1.4f),
+                    modifier = Modifier.weight(1.4f).heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text("Continuar")
+                    Text("Continuar", fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         }

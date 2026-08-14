@@ -184,11 +184,11 @@ class ClientFormViewModel(
             _state.update { it.copy(isSaving = true) }
             clientRepository.saveClient(_state.value.client).fold(
                 onSuccess = {
-                    _state.update { it.copy(isSaving = false) }
+                    _state.update { current -> current.copy(isSaving = false) }
                     onSuccess()
                 },
                 onFailure = { ex ->
-                    _state.update { it.copy(isSaving = false, error = ex.message) }
+                    _state.update { current -> current.copy(isSaving = false, error = ex.message) }
                 },
             )
         }

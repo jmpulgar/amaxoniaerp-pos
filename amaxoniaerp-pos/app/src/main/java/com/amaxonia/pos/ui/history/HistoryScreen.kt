@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Person
@@ -46,7 +48,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,17 +125,41 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding),
         ) {
-            HistoryFilters(
-                filter = state.filter,
-                onSearchChanged = viewModel::onSearchChanged,
-                onUsuarioChanged = viewModel::onUsuarioChanged,
-                onSucursalChanged = viewModel::onSucursalChanged,
-                onFechaInicioChanged = viewModel::onFechaInicioChanged,
-                onFechaFinChanged = viewModel::onFechaFinChanged,
-                onEstatusChanged = viewModel::onEstatusChanged,
-                onApply = viewModel::applyFilters,
-                onClear = viewModel::clearFilters,
+            // Búsqueda siempre visible; los filtros avanzados se pliegan detrás del toggle para
+            // que la lista ocupe la pantalla. Mismos callbacks del ViewModel, ensamblados aquí.
+            var filtersExpanded by remember { mutableStateOf(false) }
+            HistorySearchField(
+                value = state.filter.search.orEmpty(),
+                onValueChange = viewModel::onSearchChanged,
+                filtersExpanded = filtersExpanded,
+                onToggleFilters = { filtersExpanded = !filtersExpanded },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            androidx.compose.animation.AnimatedVisibility(visible = filtersExpanded) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    HistoryIdentityFilters(
+                        filter = state.filter,
+                        onUsuarioChanged = viewModel::onUsuarioChanged,
+                        onSucursalChanged = viewModel::onSucursalChanged,
+                    )
+                    HistoryDateRangeFilters(
+                        filter = state.filter,
+                        onFechaInicioChanged = viewModel::onFechaInicioChanged,
+                        onFechaFinChanged = viewModel::onFechaFinChanged,
+                    )
+                    HistoryStatusFilter(
+                        filter = state.filter,
+                        onEstatusChanged = viewModel::onEstatusChanged,
+                    )
+                    HistoryFilterActions(
+                        onApply = viewModel::applyFilters,
+                        onClear = viewModel::clearFilters,
+                    )
+                }
+            }
 
             if (!state.isLoading || state.transactions.isNotEmpty()) {
                 SummaryBar(
@@ -260,14 +288,15 @@ fun HistoryScreen(
 // ---------- Summary Bar ----------
 
 @Composable
-private fun SummaryBar(
+internal fun SummaryBar(
     totalFacturas: Int,
     totalMonto: Double,
     currency: String,
+    modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 12.dp),
@@ -283,10 +312,10 @@ private fun SummaryBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Facturas Cargadas",
-                    fontSize = 11.sp,
+                    text = "Facturas cargadas",
+                    style = MaterialTheme.typography.labelMedium,
                     color = PosPalette.FixedWhite.copy(alpha = 0.7f),
                 )
                 Text(
@@ -296,101 +325,157 @@ private fun SummaryBar(
                     color = PosPalette.FixedWhite,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Monto Total",
-                    fontSize = 11.sp,
+                    text = "Monto total",
+                    style = MaterialTheme.typography.labelMedium,
                     color = PosPalette.FixedWhite.copy(alpha = 0.7f),
                 )
-                Text(
+                // Monto adaptive: totales enormes encogen sin recortarse en 320dp.
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "$currency ${String.format(java.util.Locale.getDefault(), "%.2f", totalMonto)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
+                    baseStyle =
+                        MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
                     color = PosPalette.FixedWhite,
+                    minFontSizeSp = 13f,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
     }
 }
 
+/**
+ * Búsqueda siempre visible + toggle de filtros avanzados. El estado de pliegue vive en el
+ * caller para que las piezas sean puras y reutilizables en previews.
+ */
 @Composable
-private fun HistoryFilters(
+internal fun HistorySearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    filtersExpanded: Boolean,
+    onToggleFilters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text("Buscar factura") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        androidx.compose.material3.FilledTonalIconButton(
+            onClick = onToggleFilters,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector = if (filtersExpanded) Icons.Filled.ExpandLess else Icons.Filled.FilterList,
+                contentDescription = if (filtersExpanded) "Ocultar filtros" else "Mostrar filtros",
+            )
+        }
+    }
+}
+
+@Composable
+internal fun HistoryIdentityFilters(
     filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
-    onSearchChanged: (String) -> Unit,
     onUsuarioChanged: (String) -> Unit,
     onSucursalChanged: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = filter.usuario.orEmpty(),
+            onValueChange = onUsuarioChanged,
+            label = { Text("Usuario") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        OutlinedTextField(
+            value = filter.sucursalId?.toString().orEmpty(),
+            onValueChange = onSucursalChanged,
+            label = { Text("Sucursal") },
+            supportingText = { Text("ID numérico") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+internal fun HistoryDateRangeFilters(
+    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
     onFechaInicioChanged: (String) -> Unit,
     onFechaFinChanged: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = filter.fechaInicio.orEmpty(),
+            onValueChange = onFechaInicioChanged,
+            label = { Text("Desde") },
+            supportingText = { Text("AAAA-MM-DD") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        OutlinedTextField(
+            value = filter.fechaFin.orEmpty(),
+            onValueChange = onFechaFinChanged,
+            label = { Text("Hasta") },
+            supportingText = { Text("AAAA-MM-DD") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+internal fun HistoryStatusFilter(
+    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
     onEstatusChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = filter.estatus.joinToString(","),
+        onValueChange = onEstatusChanged,
+        label = { Text("Estatus") },
+        supportingText = { Text("Códigos separados por coma") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+internal fun HistoryFilterActions(
     onApply: () -> Unit,
     onClear: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedTextField(
-            value = filter.search.orEmpty(),
-            onValueChange = onSearchChanged,
-            label = { Text("Buscar factura") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        androidx.compose.material3.OutlinedButton(
+            onClick = onClear,
+            modifier = Modifier.weight(1f).height(48.dp),
         ) {
-            OutlinedTextField(
-                value = filter.usuario.orEmpty(),
-                onValueChange = onUsuarioChanged,
-                label = { Text("Usuario") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = filter.sucursalId?.toString().orEmpty(),
-                onValueChange = onSucursalChanged,
-                label = { Text("Sucursal") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
+            Text("Limpiar")
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Button(
+            onClick = onApply,
+            modifier = Modifier.weight(1f).height(48.dp),
         ) {
-            OutlinedTextField(
-                value = filter.fechaInicio.orEmpty(),
-                onValueChange = onFechaInicioChanged,
-                label = { Text("Desde (AAAA-MM-DD)") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = filter.fechaFin.orEmpty(),
-                onValueChange = onFechaFinChanged,
-                label = { Text("Hasta (AAAA-MM-DD)") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        OutlinedTextField(
-            value = filter.estatus.joinToString(","),
-            onValueChange = onEstatusChanged,
-            label = { Text("Estatus (códigos separados por coma)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = onClear) {
-                Text("Limpiar")
-            }
-            Button(onClick = onApply) {
-                Text("Aplicar")
-            }
+            Text("Aplicar")
         }
     }
 }
@@ -473,6 +558,8 @@ private fun TransactionCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -512,13 +599,16 @@ private fun TransactionCard(
                 }
             }
 
-            // Amount + arrow
+            // Amount + arrow: adaptive para que montos enormes no colisionen con el cliente.
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    baseStyle =
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 11f,
                 )
                 if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
                     Text(
@@ -800,16 +890,19 @@ private fun FacturaDetalleSheetContent(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "${transaction.currency} ${String.format(
-                                    java.util.Locale.getDefault(),
-                                    "%.2f",
-                                    transaction.amount,
-                                )}",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                            com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
+                                  text = "${transaction.currency} ${String.format(
+                                      java.util.Locale.getDefault(),
+                                      "%.2f",
+                                      transaction.amount,
+                                  )}",
+                                  baseStyle =
+                                      MaterialTheme.typography.titleLarge.copy(
+                                          fontWeight = FontWeight.Bold,
+                                      ),
+                                  color = MaterialTheme.colorScheme.primary,
+                                  minFontSizeSp = 13f,
+                              )
                             if (transaction.totalRef != null &&
                                 transaction.totalRef > 0.0 &&
                                 !transaction.abrMonedaSecundaria.isNullOrBlank()
@@ -895,11 +988,14 @@ private fun DetalleItemRow(
             Spacer(modifier = Modifier.width(8.dp))
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
                     text = "$currency ${String.format(java.util.Locale.getDefault(), "%.2f", item.totalConIva)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    baseStyle =
+                        MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                     color = MaterialTheme.colorScheme.onSurface,
+                    minFontSizeSp = 11f,
                 )
                 Text(
                     text = "c/u ${String.format(java.util.Locale.getDefault(), "%.2f", item.precioUnitario)}",

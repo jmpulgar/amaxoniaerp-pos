@@ -46,51 +46,50 @@ class StartTransactionUseCase(
                 ?.takeIf { it.clientCorrelationId == command.preferredId }
                 ?.takeIf { it.status == STATUS_CONFIRMED || it.status == STATUS_DUPLICATE }
                 ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
-        return if (resumable != null || completedPreferred != null) {
-            val recovered = resumable ?: completedPreferred!!
-            StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
-        } else {
-            val tenant = command.tenant ?: return null
-            val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()
-            // Auditoría ítem 10 (OBS-001): emit the structured sale-started
-            // event before any network or printer call so every observable
-            // flow has a unique correlated id.
-            com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
-                event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,
-                idFactura = id,
-                "tenant" to tenant.tenantId,
-                "total" to command.totalAmount,
-                "currency" to command.currency,
-            )
-            // Auditoría ítem 8 (MONEY-001): persist the canonical total in
-            // minor-units via BigDecimal. The legacy `totalAmount` Double is
-            // still written for the migration window but is no longer the
-            // source of truth for money calculations.
-            val totalMinor =
-                com.amaxonia.pos.domain.model.money.MinorUnitMoney
-                    .fromDoubleAsMinor(command.totalAmount)
-            dao.upsert(
-                TransactionLogEntity(
-                    clientCorrelationId = id,
-                    idCaja = command.idCaja,
-                    idCajaSecuencia = command.idCajaSecuencia,
-                    totalAmount = command.totalAmount,
-                    currency = command.currency,
-                    clientName = command.clientName,
-                    status = STATUS_SENDING,
-                    tenantId = tenant.tenantId,
-                    tenantCompanyId = tenant.companyId,
-                    tenantAdminDb = tenant.adminDb,
-                    tenantContableDb = tenant.contableDb,
-                    tenantNominaDb = tenant.nominaDb,
-                    tenantLabel = tenant.label,
-                    totalAmountMinor = totalMinor,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-            StartedTransaction(clientCorrelationId = id, resumed = false)
+        val recovered = resumable ?: completedPreferred
+        if (recovered != null) {
+            return StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
         }
+        val tenant = command.tenant ?: return null
+        val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()
+        // Auditoría ítem 10 (OBS-001): emit the structured sale-started
+        // event before any network or printer call so every observable
+        // flow has a unique correlated id.
+        com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
+            event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,
+            idFactura = id,
+            "tenant" to tenant.tenantId,
+            "total" to command.totalAmount,
+            "currency" to command.currency,
+        )
+        // Auditoría ítem 8 (MONEY-001): persist the canonical total in
+        // minor-units via BigDecimal. The legacy `totalAmount` Double is
+        // still written for the migration window but is no longer the
+        // source of truth for money calculations.
+        val totalMinor =
+            com.amaxonia.pos.domain.model.money.MinorUnitMoney
+                .fromDoubleAsMinor(command.totalAmount)
+        dao.upsert(
+            TransactionLogEntity(
+                clientCorrelationId = id,
+                idCaja = command.idCaja,
+                idCajaSecuencia = command.idCajaSecuencia,
+                totalAmount = command.totalAmount,
+                currency = command.currency,
+                clientName = command.clientName,
+                status = STATUS_SENDING,
+                tenantId = tenant.tenantId,
+                tenantCompanyId = tenant.companyId,
+                tenantAdminDb = tenant.adminDb,
+                tenantContableDb = tenant.contableDb,
+                tenantNominaDb = tenant.nominaDb,
+                tenantLabel = tenant.label,
+                totalAmountMinor = totalMinor,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        return StartedTransaction(clientCorrelationId = id, resumed = false)
     }
 
     suspend fun markConfirmed(

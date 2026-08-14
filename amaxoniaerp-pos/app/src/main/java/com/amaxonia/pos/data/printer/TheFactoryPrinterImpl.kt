@@ -1,4 +1,4 @@
-package com.amaxonia.pos.data.printer
+﻿package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.R
@@ -14,6 +14,7 @@ import com.amaxonia.pos.domain.model.creditnote.ReceiptPrintResult
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PrinterRepository
 import com.thefactoryhka.hkacryptolib.MainFactory
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -28,12 +29,13 @@ import kotlin.math.roundToInt
 class TheFactoryPrinterImpl(
     context: Context,
     private val localStore: LocalStore,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : PrinterRepository {
     private val appContext = context.applicationContext
     private val cryptography = MainFactory().createInstance(appContext)
 
     override suspend fun printReceipt(transaction: Transaction): Result<ReceiptPrintResult> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
@@ -63,12 +65,12 @@ class TheFactoryPrinterImpl(
                 SafeLog.d(TAG, "Fiscal receipt operations completed")
 
                 val printerState = readPrinterState(settings)
-                val fiscalNumber =
+                val paddedFiscalNumber =
                     printerState.lastInvoiceNumber
                         .takeIf { it > 0 }
                         ?.toString()
                         ?.padStart(8, '0')
-                        ?: ""
+                val fiscalNumber = paddedFiscalNumber.orEmpty()
 
                 if (fiscalNumber.isBlank()) {
                     SafeLog.w(TAG, "Fiscal printer did not return a receipt number")
@@ -86,7 +88,7 @@ class TheFactoryPrinterImpl(
         }
 
     override suspend fun printCreditNote(document: CreditNoteFiscalDocumentDto): Result<CreditNotePrintResult> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
@@ -134,7 +136,7 @@ class TheFactoryPrinterImpl(
                         .takeIf { it > 0 }
                         ?.toString()
                         ?.padStart(8, '0')
-                        ?: error("No se pudo determinar el número fiscal de la nota de crédito")
+                        ?: error("No se pudo determinar el nÃºmero fiscal de la nota de crÃ©dito")
 
                 CreditNotePrintResult(
                     fiscalNumber = fiscalNumber,
@@ -149,20 +151,20 @@ class TheFactoryPrinterImpl(
      * Builds the fiscal command list for The Factory HKA protocol.
      *
      * Protocol commands:
-     * - "iR*{clientId}" — customer tax id / identification
-     * - "iS*{clientName}" — customer name
-     * - "@{text}"      — free text / comment line (non-fiscal)
-     * - "{taxPrefix}{price}{qty}{description}" — item line
+     * - "iR*{clientId}" â€” customer tax id / identification
+     * - "iS*{clientName}" â€” customer name
+     * - "@{text}"      â€” free text / comment line (non-fiscal)
+     * - "{taxPrefix}{price}{qty}{description}" â€” item line
      *     - price: monto con 2 decimales implicitos (x100), padded to 10 digits
      *     - qty: cantidad con 3 decimales implicitos (x1000), padded to 8 digits
      *     - description: up to 30 chars
      *     - taxPrefix: ' ' exento, '!' IVA general, '"' IVA reducido, '#' IVA adicional
-     * - "3"   — subtotal
-     * - "101" — close with cash payment
-     * - "102" — close with debit card payment
-     * - "103" — close with credit card payment
-     * - "104" — close with other payment method
-     * - "199" — close without specifying payment method
+     * - "3"   â€” subtotal
+     * - "101" â€” close with cash payment
+     * - "102" â€” close with debit card payment
+     * - "103" â€” close with credit card payment
+     * - "104" â€” close with other payment method
+     * - "199" â€” close without specifying payment method
      */
     private fun buildFiscalCommands(transaction: Transaction): List<String> {
         val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
@@ -242,10 +244,10 @@ class TheFactoryPrinterImpl(
         val fiscalRef = document.originalFiscalNumber.trim()
         if (fiscalRef.isBlank()) {
             error(
-                "La factura original no tiene número de documento fiscal en el sistema. " +
-                    "El comando iF* de la nota de crédito debe usar el número fiscal de la factura impresa " +
-                    "(no el código interno tipo 018-00015). " +
-                    "Confirma que la venta quedó con número fiscal guardado en el ERP o vuelve a emitir/consultar la factura.",
+                "La factura original no tiene nÃºmero de documento fiscal en el sistema. " +
+                    "El comando iF* de la nota de crÃ©dito debe usar el nÃºmero fiscal de la factura impresa " +
+                    "(no el cÃ³digo interno tipo 018-00015). " +
+                    "Confirma que la venta quedÃ³ con nÃºmero fiscal guardado en el ERP o vuelve a emitir/consultar la factura.",
             )
         }
         val referenceNumber = normalizeOriginalFiscalReference(fiscalRef)
@@ -332,7 +334,7 @@ class TheFactoryPrinterImpl(
             }
 
     override suspend fun printReportX(): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
@@ -354,7 +356,7 @@ class TheFactoryPrinterImpl(
         }
 
     override suspend fun printReportZ(): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val settings = localStore.readTheFactorySettings()
                 validateSettings(settings)
@@ -479,7 +481,7 @@ class TheFactoryPrinterImpl(
             outputStream.flush()
             val response = readSocketResponse(socket)
             if (response.isEmpty()) {
-                error("La impresora no respondió al comando $command")
+                error("La impresora no respondiÃ³ al comando $command")
             }
             return response
         }
@@ -592,7 +594,7 @@ class TheFactoryPrinterImpl(
                 }
             }
         } catch (_: java.net.SocketTimeoutException) {
-            // Timeout from soTimeout — treat whatever we have as the full response
+            // Timeout from soTimeout â€” treat whatever we have as the full response
         }
 
         return output.toByteArray()

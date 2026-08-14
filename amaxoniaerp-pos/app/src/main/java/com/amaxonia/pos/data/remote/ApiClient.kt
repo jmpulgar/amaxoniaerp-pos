@@ -23,6 +23,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import io.ktor.client.network.sockets.SocketTimeoutException as KtorSocketTimeoutException
 
+/** Base (ms) del backoff exponencial de reintento para lecturas idempotentes. */
+private const val RETRY_BASE_DELAY_MS = 100L
+
 /**
  * Cliente HTTP de Ktor configurado dinámicamente según el país seleccionado.
  * En Android 10 (API 29) se fuerza TLS 1.2 para evitar cierres en el handshake SSL.
@@ -119,24 +122,16 @@ internal fun HttpRequestRetry.Configuration.configureCajaRetry() {
     }
     delayMillis(respectRetryAfterHeader = false) { retry ->
         val exponent = (retry - 1).coerceIn(0, 1)
-        val exponentialDelay = 100L shl exponent
+        val exponentialDelay = RETRY_BASE_DELAY_MS shl exponent
         exponentialDelay + Random.nextLong(from = 0L, until = 101L)
     }
 }
 
 private fun isRetryableConnectionFailure(cause: Throwable): Boolean {
     if (cause is CancellationException) return false
-
-    var current: Throwable? = cause
-    while (current != null) {
-        if (
-            current is IOException ||
-            current is ConnectTimeoutException ||
-            current is KtorSocketTimeoutException
-        ) {
-            return true
-        }
-        current = current.cause
+    return generateSequence(cause) { node -> node.cause }.any { node ->
+        node is IOException ||
+            node is ConnectTimeoutException ||
+            node is KtorSocketTimeoutException
     }
-    return false
 }

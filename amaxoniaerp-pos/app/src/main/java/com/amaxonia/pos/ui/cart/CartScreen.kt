@@ -1,10 +1,10 @@
 package com.amaxonia.pos.ui.cart
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,10 +26,12 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -76,6 +78,7 @@ import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.CartEmptyState
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -84,6 +87,9 @@ import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.cartBrandGradient
+
+/** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
+private val CHECKOUT_BUTTON_WEIGHT = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,18 +238,28 @@ fun CartScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        "Carrito",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "Carrito",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (state.items.isNotEmpty()) {
+                            Text(
+                                if (state.items.size == 1) "1 artículo" else "${state.items.size} artículos",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Atrás",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
@@ -264,151 +280,28 @@ fun CartScreen(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (state.items.isNotEmpty()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 16.dp,
-                    shape = PosExtraShapes.BottomBarTop,
-                ) {
-                    Column(modifier = Modifier.padding(24.dp).navigationBarsPadding()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            Text("Total", style = MaterialTheme.typography.titleMedium)
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    "$${String.format(java.util.Locale.getDefault(), "%.2f", state.total)}",
-                                    style = PosTextStyles.totalDisplay,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                if (state.isMultiCurrency && state.totalBsText.isNotBlank()) {
-                                    Text(
-                                        "${formatCurrencyLabel(state.abrMonedaSecundaria)} ${state.totalBsText}",
-                                        style = PosTextStyles.amountSecondary,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Botones de Acción
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            // 1. Boton GUARDAR BORRADOR (factura pendiente local)
-                            OutlinedButton(
-                                onClick = { viewModel.onAction(CartUiAction.SaveDraft) },
-                                modifier = Modifier.weight(1f).height(56.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp),
-                                shape = MaterialTheme.shapes.small,
-                            ) {
-                                Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Guardar", fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-
-                            // 2. Botón PAGAR / FACTURAR
-                            Button(
-                                onClick = { viewModel.onAction(CartUiAction.Checkout) },
-                                modifier = Modifier.weight(1f).height(56.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                shape = MaterialTheme.shapes.small,
-                            ) {
-                                Text(
-                                    "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", state.total)}",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-                }
+                CartBottomBar(
+                    total = state.total,
+                    secondaryTotal =
+                        state.totalBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "${formatCurrencyLabel(state.abrMonedaSecundaria)} $it" },
+                    onSaveDraft = { viewModel.onAction(CartUiAction.SaveDraft) },
+                    onCheckout = { viewModel.onAction(CartUiAction.Checkout) },
+                )
             }
         },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+        Column(modifier = Modifier.padding(padding).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
             // SECCIÓN CLIENTE + VENDEDOR (panel consolidado)
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelectClient() }
-                            .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val selectedClient = state.selectedClient
-                    if (selectedClient != null) {
-                        val clientPhotoUrl = state.selectedClientPhotoUrl
-                        ClientAvatar(
-                            clientPhotoUrl = clientPhotoUrl,
-                            clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                    } else {
-                        Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(16.dp))
-                    }
-                    if (selectedClient != null) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Cliente asignado:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                "${selectedClient.firstName} ${selectedClient.lastName}",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                            )
-                        }
-                        IconButton(onClick = { viewModel.onAction(CartUiAction.RemoveClient) }) {
-                            Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
-                        }
-                    } else {
-                        Text("Asignar Cliente", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+            CartClientVendorPanel(
+                state = state,
+                onSelectClient = onSelectClient,
+                onRemoveClient = { viewModel.onAction(CartUiAction.RemoveClient) },
+                onChangeSeller = { showSellerSheet = true },
+            )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = state.availableSellers.isNotEmpty()) { showSellerSheet = true }
-                            .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Vendedor asignado:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = state.currentSeller?.nombre ?: "Sin vendedor",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Icon(
-                        Icons.Default.Autorenew,
-                        contentDescription = "Cambiar vendedor",
-                        tint =
-                            if (state.availableSellers.isEmpty()) {
-                                MaterialTheme.colorScheme.outline
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
                 ClientSucursalSelectorCard(
@@ -422,19 +315,7 @@ fun CartScreen(
             }
 
             state.cartActionError?.let { message ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                ) {
-                    Text(
-                        text = message,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+                CartErrorBanner(message)
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -489,6 +370,246 @@ fun CartScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom bar: total (adaptive) + Guardar borrador / Cobrar $XX.XX (adaptive, nunca elipsis).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+internal fun CartBottomBar(
+    total: Double,
+    secondaryTotal: String?,
+    onSaveDraft: () -> Unit,
+    onCheckout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 16.dp,
+        shape = PosExtraShapes.BottomBarTop,
+    ) {
+        BoxWithConstraints {
+            val compact = maxHeight < 480.dp
+            val totalStyle =
+                if (compact) {
+                    MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+                } else {
+                    PosTextStyles.totalDisplay
+                }
+            Column(
+                modifier =
+                    Modifier
+                        .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
+                        .navigationBarsPadding(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        "Total",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        AdaptiveAmountText(
+                            text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                            baseStyle = totalStyle,
+                            color = MaterialTheme.colorScheme.primary,
+                            minFontSizeSp = 16f,
+                        )
+                        secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
+                            Text(
+                                secondary,
+                                style = PosTextStyles.amountSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // 1. Boton GUARDAR BORRADOR (factura pendiente local)
+                    OutlinedButton(
+                        onClick = onSaveDraft,
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "Guardar",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    // 2. Botón PAGAR / FACTURAR — mismo contrato visual que el CTA de Payment:
+                    // AdaptiveAmountText evita elipsis/wrap con montos grandes en 320dp.
+                    Button(
+                        onClick = onCheckout,
+                        modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT).height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+                    ) {
+                        AdaptiveAmountText(
+                            text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                            baseStyle =
+                                MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                ),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            minFontSizeSp = 13f,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cliente + vendedor: panel consolidado con tipografía tokenizada e iconos
+// diferenciados (Person / Storefront). Mismos clicks y estados habilitados.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+internal fun CartClientVendorPanel(
+    state: CartState,
+    onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    onChangeSeller: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectClient() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val selectedClient = state.selectedClient
+            if (selectedClient != null) {
+                ClientAvatar(
+                    clientPhotoUrl = state.selectedClientPhotoUrl,
+                    clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Cliente asignado",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "${selectedClient.firstName} ${selectedClient.lastName}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(onClick = onRemoveClient) {
+                    Icon(Icons.Default.Delete, contentDescription = "Quitar cliente", tint = MaterialTheme.colorScheme.error)
+                }
+            } else {
+                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Asignar cliente",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = 14.dp))
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Vendedor asignado",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = state.currentSeller?.nombre ?: "Sin vendedor",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                Icons.Default.Autorenew,
+                contentDescription = "Cambiar vendedor",
+                tint =
+                    if (state.availableSellers.isEmpty()) {
+                        MaterialTheme.colorScheme.outline
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CartErrorBanner(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -602,7 +723,7 @@ private fun ClientAvatar(
     Box(
         modifier =
             modifier
-                .size(44.dp)
+                .size(40.dp)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(gradient)),
         contentAlignment = Alignment.Center,
@@ -794,19 +915,29 @@ fun CartItemRow(
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-            // Descripcion completa (hasta 2 lineas)
-            Text(
-                item.product.description,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Fila 1: descripción (flexible) + eliminar (target ≥48dp vía minimum interactive).
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    item.product.description,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Quitar del carrito",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Precio, controles de cantidad, total y acciones
+            // Fila 2: precio unitario (flexible) + total de línea (adaptive, nunca desborda).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -817,76 +948,77 @@ fun CartItemRow(
                         "%.2f",
                         item.unitPriceWithTax,
                     )} / ${item.displayUnitLabel.lowercase()}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-
                 Spacer(modifier = Modifier.weight(1f))
-
-                Text(
-                    "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
-                    style = PosTextStyles.priceTileLarge,
+                AdaptiveAmountText(
+                    text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
+                    baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 13f,
                 )
+            }
 
-                // Acciones compactas
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Fila 3: stepper (flexible) + acciones de precio/descuento con targets ≥48dp
+            // (IconButton enforza minimum interactive size) y sin solapamiento.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                QuantityStepper(
+                    quantityText = quantityText,
+                    onQuantityTextChange = { value ->
+                        quantityText = sanitizeQuantityInput(value)
+                        quantityText.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
+                    },
+                    onDecrease = {
+                        val next = (item.quantity - 1)
+                        if (next <= 0) {
+                            onRemove()
+                        } else {
+                            quantityText = next.toString()
+                            onDecrease()
+                        }
+                    },
+                    onIncrease = {
+                        val next = item.quantity + 1
+                        quantityText = next.toString()
+                        onIncrease()
+                    },
+                    onDone = {
+                        if (typedQuantity >= 1) onQuantityChange(typedQuantity)
+                    },
+                    isError = quantityText.isNotBlank() && typedQuantity < 1,
+                    label = "Cantidad",
+                    modifier = Modifier.weight(1f),
+                )
                 if (allowEditPrice) {
-                    IconButton(onClick = onEditPrice, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onEditPrice, modifier = Modifier.size(40.dp)) {
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = "Editar precio",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
                 if (allowDiscount) {
-                    IconButton(onClick = onEditDiscount, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onEditDiscount, modifier = Modifier.size(40.dp)) {
                         Icon(
                             Icons.Default.Percent,
                             contentDescription = "Aplicar descuento",
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
-                IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        Icons.Default.Delete,
-                        null,
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            QuantityStepper(
-                quantityText = quantityText,
-                onQuantityTextChange = { value ->
-                    quantityText = sanitizeQuantityInput(value)
-                    quantityText.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
-                },
-                onDecrease = {
-                    val next = (item.quantity - 1)
-                    if (next <= 0) {
-                        onRemove()
-                    } else {
-                        quantityText = next.toString()
-                        onDecrease()
-                    }
-                },
-                onIncrease = {
-                    val next = item.quantity + 1
-                    quantityText = next.toString()
-                    onIncrease()
-                },
-                onDone = {
-                    if (typedQuantity >= 1) onQuantityChange(typedQuantity)
-                },
-                isError = quantityText.isNotBlank() && typedQuantity < 1,
-                label = "Cantidad",
-            )
 
             if (item.product.canSwitchUnit) {
                 Spacer(modifier = Modifier.height(8.dp))

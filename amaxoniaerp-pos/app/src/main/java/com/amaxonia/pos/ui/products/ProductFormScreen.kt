@@ -327,7 +327,7 @@ private fun selectedName(
     selectedId: String,
 ): String {
     val id = selectedId.toIntOrNull() ?: return ""
-    return options.firstOrNull { it.id == id }?.name ?: ""
+    return options.firstOrNull { it.id == id }?.name.orEmpty()
 }
 
 @Composable

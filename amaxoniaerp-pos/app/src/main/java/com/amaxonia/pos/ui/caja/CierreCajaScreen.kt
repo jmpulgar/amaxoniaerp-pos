@@ -62,16 +62,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AccentPurple
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.SuccessGreen
 import com.amaxonia.pos.ui.theme.WarningOrange
+
+/** Acciones del cierre agrupadas para mantener las firmas de los composables pequeñas. */
+internal class CierreCajaActions(
+    val onConfirmClose: () -> Unit,
+    val onPrintReportX: () -> Unit,
+    val onPrintReportZ: () -> Unit,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,9 +175,12 @@ fun CierreCajaScreen(
                         isPrintingReportX = isPrintingX,
                         isPrintingReportZ = isPrintingZ,
                         showReportButtons = viewModel.hasActivePrinter,
-                        onConfirmClose = { viewModel.requestClose() },
-                        onPrintReportX = { viewModel.printReportX() },
-                        onPrintReportZ = { viewModel.printReportZ() },
+                        actions =
+                            CierreCajaActions(
+                                onConfirmClose = { viewModel.requestClose() },
+                                onPrintReportX = { viewModel.printReportX() },
+                                onPrintReportZ = { viewModel.printReportZ() },
+                            ),
                     )
                 is CierreCajaUiState.Closing ->
                     ReadyContent(
@@ -176,9 +189,12 @@ fun CierreCajaScreen(
                         isPrintingReportX = false,
                         isPrintingReportZ = false,
                         showReportButtons = viewModel.hasActivePrinter,
-                        onConfirmClose = {},
-                        onPrintReportX = {},
-                        onPrintReportZ = {},
+                        actions =
+                            CierreCajaActions(
+                                onConfirmClose = {},
+                                onPrintReportX = {},
+                                onPrintReportZ = {},
+                            ),
                     )
                 is CierreCajaUiState.Success ->
                     SuccessContent(
@@ -221,15 +237,13 @@ private fun LoadingContent() {
 // ---------- Ready / Closing ----------
 
 @Composable
-private fun ReadyContent(
+internal fun ReadyContent(
     summary: CierreCajaSummary,
     isClosing: Boolean,
     isPrintingReportX: Boolean,
     isPrintingReportZ: Boolean,
     showReportButtons: Boolean,
-    onConfirmClose: () -> Unit,
-    onPrintReportX: () -> Unit,
-    onPrintReportZ: () -> Unit,
+    actions: CierreCajaActions,
 ) {
     Column(
         modifier =
@@ -240,320 +254,367 @@ private fun ReadyContent(
                 .padding(bottom = 24.dp),
     ) {
         Spacer(modifier = Modifier.height(8.dp))
-
-        // -- Caja Info Header Card --
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Rounded.PointOfSale,
-                            contentDescription = null,
-                            tint = PosPalette.FixedWhite,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = summary.cajaName,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = PosPalette.FixedWhite,
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp),
-                        ) {
-                            Icon(
-                                Icons.Rounded.Schedule,
-                                contentDescription = null,
-                                tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Abierta: ${summary.openedAt}",
-                                fontSize = 12.sp,
-                                color = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    MiniStat(
-                        label = "Monto Apertura",
-                        value = formatMoney(summary.openAmount),
-                        color = PosPalette.FixedWhite,
-                    )
-                    MiniStat(
-                        label = "Transacciones",
-                        value = "${summary.transactionCount}",
-                        color = PosPalette.FixedWhite,
-                    )
-                }
-            }
-        }
-
+        CajaHeaderCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
 
-        // -- Resumen de Ventas --
         SectionTitle("Resumen de Ventas")
         Spacer(modifier = Modifier.height(12.dp))
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                SummaryRow(
-                    icon = Icons.Rounded.ShoppingCart,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    label = "Total Ventas",
-                    value = formatMoney(summary.totalSales),
-                    valueColor = MaterialTheme.colorScheme.primary,
-                    isBold = true,
-                )
-            }
-        }
-
+        VentasSummaryCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
 
-        // -- Desglose por Método de Pago --
         SectionTitle("Desglose por Método de Pago")
         Spacer(modifier = Modifier.height(12.dp))
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                val lines =
-                    summary.paymentLines.ifEmpty {
-                        listOf(
-                            com.amaxonia.pos.domain.model.caja
-                                .CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
-                            com.amaxonia.pos.domain.model.caja
-                                .CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
-                            com.amaxonia.pos.domain.model.caja
-                                .CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
-                        ).filter { it.amount > 0.0 }
-                    }
-
-                lines.forEachIndexed { index, line ->
-                    val (icon, tint) =
-                        when (line.siglas.uppercase()) {
-                            "CASH", "EF", "EFE", "EFECTIVO" -> Icons.Rounded.AttachMoney to SuccessGreen
-                            "TDC", "TARJETA", "PV", "POS", "DB", "DEBITO", "CR", "CREDITO" ->
-                                Icons.Rounded.CreditCard to AccentPurple
-                            else -> Icons.Rounded.AccountBalance to WarningOrange
-                        }
-
-                    SummaryRow(
-                        icon = icon,
-                        iconTint = tint,
-                        label = line.label,
-                        value = formatMoney(line.amount),
-                        valueColor = tint,
-                    )
-
-                    if (index < lines.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 14.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                    }
-                }
-            }
-        }
-
+        PaymentBreakdownCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
 
-        // -- Total Esperado de Cierre --
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        ) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Receipt,
-                        contentDescription = null,
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "Cierre Esperado",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Text(
-                    formatMoney(summary.expectedClose),
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
-            }
-        }
-
+        ExpectedCloseCard(summary = summary)
         Spacer(modifier = Modifier.height(32.dp))
 
         if (showReportButtons) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = onPrintReportX,
-                    enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
+            ReportButtons(
+                isClosing = isClosing,
+                isPrintingReportX = isPrintingReportX,
+                isPrintingReportZ = isPrintingReportZ,
+                onPrintReportX = actions.onPrintReportX,
+                onPrintReportZ = actions.onPrintReportZ,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        ConfirmCloseButton(isClosing = isClosing, onConfirmClose = actions.onConfirmClose)
+    }
+}
+
+@Composable
+private fun CajaHeaderCard(summary: CierreCajaSummary) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
                     modifier =
                         Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors =
-                        ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        ),
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (isPrintingReportX) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    } else {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.Assignment,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    Text(
-                        if (isPrintingReportX) "Imprimiendo..." else "Reporte X",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                    Icon(
+                        Icons.Rounded.PointOfSale,
+                        contentDescription = null,
+                        tint = PosPalette.FixedWhite,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
-
-                OutlinedButton(
-                    onClick = onPrintReportZ,
-                    enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors =
-                        ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                            disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-                        ),
-                ) {
-                    if (isPrintingReportZ) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    } else {
-                        Icon(
-                            Icons.Rounded.Description,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        if (isPrintingReportZ) "Imprimiendo..." else "Reporte Z",
+                        text = summary.cajaName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = 20.sp,
+                        color = PosPalette.FixedWhite,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) {
+                        Icon(
+                            Icons.Rounded.Schedule,
+                            contentDescription = null,
+                            tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Abierta: ${summary.openedAt}",
+                            fontSize = 12.sp,
+                            color = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                MiniStat(
+                    label = "Monto Apertura",
+                    value = formatMoney(summary.openAmount),
+                    color = PosPalette.FixedWhite,
+                    modifier = Modifier.weight(1f),
+                )
+                MiniStat(
+                    label = "Transacciones",
+                    value = "${summary.transactionCount}",
+                    color = PosPalette.FixedWhite,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VentasSummaryCard(summary: CierreCajaSummary) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            SummaryRow(
+                icon = Icons.Rounded.ShoppingCart,
+                iconTint = MaterialTheme.colorScheme.primary,
+                label = "Total Ventas",
+                value = formatMoney(summary.totalSales),
+                valueColor = MaterialTheme.colorScheme.primary,
+                isBold = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaymentBreakdownCard(summary: CierreCajaSummary) {
+    val lines = resolvePaymentLines(summary)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            lines.forEachIndexed { index, line ->
+                val (icon, tint) = paymentLineVisual(line.siglas)
+                SummaryRow(
+                    icon = icon,
+                    iconTint = tint,
+                    label = line.label,
+                    value = formatMoney(line.amount),
+                    valueColor = tint,
+                )
+                if (index < lines.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
 
-        // -- Botón Confirmar Cierre --
-        Button(
-            onClick = onConfirmClose,
-            enabled = !isClosing,
+/** Fallback legado cuando el resumen no trae líneas: las sintetiza de los totales agregados. */
+private fun resolvePaymentLines(summary: CierreCajaSummary): List<CierreCajaPaymentLine> =
+    summary.paymentLines.ifEmpty {
+        listOf(
+            CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
+            CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
+            CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
+        ).filter { it.amount > 0.0 }
+    }
+
+private fun paymentLineVisual(siglas: String): Pair<ImageVector, Color> =
+    when (siglas.uppercase()) {
+        "CASH", "EF", "EFE", "EFECTIVO" -> Icons.Rounded.AttachMoney to SuccessGreen
+        "TDC", "TARJETA", "PV", "POS", "DB", "DEBITO", "CR", "CREDITO" -> Icons.Rounded.CreditCard to AccentPurple
+        else -> Icons.Rounded.AccountBalance to WarningOrange
+    }
+
+@Composable
+private fun ExpectedCloseCard(summary: CierreCajaSummary) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                    .padding(20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (isClosing) {
-                CircularProgressIndicator(
-                    color = PosPalette.FixedWhite,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Cerrando Caja...",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                )
-            } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
                 Icon(
-                    Icons.Rounded.Lock,
+                    Icons.Rounded.Receipt,
                     contentDescription = null,
+                    tint = SuccessGreen,
                     modifier = Modifier.size(22.dp),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    "Confirmar Cierre de Caja",
+                    "Cierre Esperado",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            // El número más importante de la pantalla: adaptive para que importes
+            // enormes jamás se recorten en 320dp.
+            AdaptiveAmountText(
+                text = formatMoney(summary.expectedClose),
+                baseStyle =
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    ),
+                color = MaterialTheme.colorScheme.tertiary,
+                minFontSizeSp = 14f,
+                modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportButtons(
+    isClosing: Boolean,
+    isPrintingReportX: Boolean,
+    isPrintingReportZ: Boolean,
+    onPrintReportX: () -> Unit,
+    onPrintReportZ: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(
+            onClick = onPrintReportX,
+            enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors =
+                ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                ),
+        ) {
+            if (isPrintingReportX) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            } else {
+                Icon(
+                    Icons.AutoMirrored.Rounded.Assignment,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                if (isPrintingReportX) "Imprimiendo..." else "Reporte X",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+            )
+        }
+
+        OutlinedButton(
+            onClick = onPrintReportZ,
+            enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors =
+                ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                    disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
+                ),
+        ) {
+            if (isPrintingReportZ) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            } else {
+                Icon(
+                    Icons.Rounded.Description,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                if (isPrintingReportZ) "Imprimiendo..." else "Reporte Z",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmCloseButton(
+    isClosing: Boolean,
+    onConfirmClose: () -> Unit,
+) {
+    Button(
+        onClick = onConfirmClose,
+        enabled = !isClosing,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+            ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+    ) {
+        if (isClosing) {
+            CircularProgressIndicator(
+                color = PosPalette.FixedWhite,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                "Cerrando Caja...",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
+        } else {
+            Icon(
+                Icons.Rounded.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                "Confirmar Cierre de Caja",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+            )
         }
     }
 }
@@ -706,18 +767,24 @@ private fun MiniStat(
     label: String,
     value: String,
     color: Color,
+    modifier: Modifier = Modifier,
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            style = MaterialTheme.typography.labelSmall,
             color = color.copy(alpha = 0.7f),
+            maxLines = 1,
         )
-        Text(
+        AdaptiveAmountText(
             text = value,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            baseStyle =
+                MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                ),
             color = color,
+            minFontSizeSp = 12f,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -736,7 +803,10 @@ private fun SummaryRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f, fill = false),
+        ) {
             Box(
                 modifier =
                     Modifier
@@ -755,16 +825,30 @@ private fun SummaryRow(
             Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = label,
-                fontSize = 15.sp,
+                style = if (isBold) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
-        Text(
+        // Monto adaptive: etiquetas largas + importes enormes nunca desbordan en 320dp.
+        AdaptiveAmountText(
             text = value,
-            fontWeight = FontWeight.Bold,
-            fontSize = if (isBold) 18.sp else 16.sp,
+            baseStyle =
+                (
+                    if (isBold) {
+                        MaterialTheme.typography.titleMedium
+                    } else {
+                        MaterialTheme.typography.titleSmall
+                    }
+                ).copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                ),
             color = valueColor,
+            minFontSizeSp = 12f,
+            modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
         )
     }
 }

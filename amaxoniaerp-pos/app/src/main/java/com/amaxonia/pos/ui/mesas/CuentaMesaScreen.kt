@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
 import com.amaxonia.pos.domain.model.mesas.EstadoCuentaMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.PosEmptyState
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
@@ -383,14 +384,15 @@ private fun FullAccountAction(
 }
 
 @Composable
-private fun SplitProductCard(
+internal fun SplitProductCard(
     pedido: PedidoMesa,
     disponible: Double,
     value: String,
     onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = CardDefaults.outlinedCardBorder(),
@@ -414,10 +416,13 @@ private fun SplitProductCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
+                Spacer(Modifier.width(8.dp))
+                AdaptiveAmountText(
                     text = formatMoney(pedido.itemTotalConIva),
-                    style = PosTextStyles.priceTileLarge,
+                    baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
+                    minFontSizeSp = 13f,
+                    maxLines = 1,
                 )
             }
             OutlinedTextField(
@@ -434,14 +439,15 @@ private fun SplitProductCard(
 }
 
 @Composable
-private fun CuentaActivaCard(
+internal fun CuentaActivaCard(
     cuenta: CuentaMesaResponse,
     canPay: Boolean,
     onPay: () -> Unit,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = CardDefaults.outlinedCardBorder(),
@@ -472,7 +478,7 @@ private fun CuentaActivaCard(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             cuenta.detalle.forEach { line ->
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     Text(
                         text = "${line.itemDescripcion} × ${formatQuantity(line.cantidad)}",
                         modifier = Modifier.weight(1f),
@@ -480,10 +486,15 @@ private fun CuentaActivaCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
+                    Spacer(Modifier.width(12.dp))
+                    AdaptiveAmountText(
                         text = formatMoney(line.itemTotalConIva),
-                        style = MaterialTheme.typography.labelLarge,
+                        baseStyle = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
+                        minFontSizeSp = 11f,
+                        maxLines = 1,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
                     )
                 }
             }
@@ -495,10 +506,14 @@ private fun CuentaActivaCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
+                // Total de la cuenta: hero adaptive — montos enormes encogen sin recortarse en 320dp.
+                AdaptiveAmountText(
                     text = formatMoney(cuenta.total),
-                    style = PosTextStyles.totalDisplay,
+                    baseStyle = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.ExtraBold,
+                    minFontSizeSp = 16f,
+                    maxLines = 1,
                 )
             }
             Row(

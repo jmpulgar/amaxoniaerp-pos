@@ -228,12 +228,12 @@ class ProductFormViewModel(
             _state.update { it.copy(isSaving = true, error = null) }
             productRepository.saveProduct(_state.value.product).fold(
                 onSuccess = {
-                    _state.update { it.copy(isSaving = false) }
+                    _state.update { current -> current.copy(isSaving = false) }
                     onSuccess()
                 },
                 onFailure = { exception ->
-                    _state.update {
-                        it.copy(
+                    _state.update { current ->
+                        current.copy(
                             isSaving = false,
                             error = exception.message ?: "Error al guardar el producto",
                         )
@@ -253,10 +253,10 @@ class ProductFormViewModel(
             val familyId = product.family.toIntOrNull()
             val brandId = product.brand.toIntOrNull()
 
-            val sections = departmentId?.let { productRepository.getSections(it).getOrDefault(emptyList()) } ?: emptyList()
-            val families = sectionId?.let { productRepository.getFamilies(it).getOrDefault(emptyList()) } ?: emptyList()
-            val subFamilies = familyId?.let { productRepository.getSubFamilies(it).getOrDefault(emptyList()) } ?: emptyList()
-            val lines = brandId?.let { productRepository.getLines(it).getOrDefault(emptyList()) } ?: emptyList()
+            val sections = departmentId?.let { productRepository.getSections(it).getOrDefault(emptyList()) }.orEmpty()
+            val families = sectionId?.let { productRepository.getFamilies(it).getOrDefault(emptyList()) }.orEmpty()
+            val subFamilies = familyId?.let { productRepository.getSubFamilies(it).getOrDefault(emptyList()) }.orEmpty()
+            val lines = brandId?.let { productRepository.getLines(it).getOrDefault(emptyList()) }.orEmpty()
 
             _state.update {
                 it.copy(

@@ -68,7 +68,7 @@ class ProductListViewModel(
                     }
                 },
                 onFailure = {
-                    _state.update { it.copy(loadingStockIds = it.loadingStockIds - productId) }
+                    _state.update { current -> current.copy(loadingStockIds = current.loadingStockIds - productId) }
                 },
             )
         }

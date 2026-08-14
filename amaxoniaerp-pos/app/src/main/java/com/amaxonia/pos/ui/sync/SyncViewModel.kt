@@ -25,12 +25,12 @@ class SyncViewModel(
             _state.update { it.copy(isLoading = true, error = null) }
             catalogSyncer.syncAll().fold(
                 onSuccess = {
-                    _state.update { it.copy(isLoading = false, isCompleted = true) }
+                    _state.update { current -> current.copy(isLoading = false, isCompleted = true) }
                     onCompleted()
                 },
                 onFailure = { error ->
-                    _state.update {
-                        it.copy(isLoading = false, error = error.message ?: "Error al sincronizar")
+                    _state.update { current ->
+                        current.copy(isLoading = false, error = error.message ?: "Error al sincronizar")
                     }
                 },
             )

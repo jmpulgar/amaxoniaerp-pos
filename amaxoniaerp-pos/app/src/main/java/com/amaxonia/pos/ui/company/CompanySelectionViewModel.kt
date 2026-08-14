@@ -66,12 +66,12 @@ class CompanySelectionViewModel(
             }
             authRepository.selectCompany(companyId).fold(
                 onSuccess = {
-                    _state.update { it.copy(isLoading = false) }
+                    _state.update { current -> current.copy(isLoading = false) }
                     onCompanySelected()
                 },
                 onFailure = { exception ->
-                    _state.update {
-                        it.copy(
+                    _state.update { current ->
+                        current.copy(
                             isLoading = false,
                             error = exception.message ?: "Error al seleccionar empresa",
                         )
