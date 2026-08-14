@@ -113,6 +113,7 @@ import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.isLandscape
+import com.amaxonia.pos.ui.common.paymentOperation
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.paymentMethodColor
@@ -142,8 +143,7 @@ fun PaymentScreen(
                 loadPaymentCountry = LoadPaymentCountryUseCase(DependencyContainer.localStore),
                 validatePayment = DependencyContainer.validatePaymentUseCase,
                 buildPaymentDetails = DependencyContainer.buildPaymentDetailsUseCase,
-                executePaymentFlow = DependencyContainer.executePaymentFlowUseCase,
-                posSettings = DependencyContainer.posConfigurationRepository,
+                paymentOperation = DependencyContainer.paymentOperation,
                 selectedClient = DependencyContainer.cartRepository.selectedClient,
                 tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
                 cartFinancialSnapshot = DependencyContainer.cartRepository.financialSnapshot,
@@ -349,10 +349,6 @@ fun PaymentScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header: hero total + financial breakdown (Subtotal / Descuento / Impuesto / Total)
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 internal fun PaymentHeader(
     state: PaymentState,
@@ -426,9 +422,10 @@ private fun HeroAmount(
         baseStyle = style,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth(),
-    options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-        minFontSizeSp = 18f,
-    ))
+        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+            minFontSizeSp = 18f,
+        ),
+    )
     if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
         Text(
             "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
@@ -531,9 +528,10 @@ private fun BreakdownRow(
                     ),
                 color = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.widthIn(max = 220.dp),
-            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                minFontSizeSp = 11f,
-            ))
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 11f,
+                ),
+            )
             if (isMultiCurrency && tasa > 0.0 && amount > 0.0) {
                 val converted = moneyAmount.times(java.math.BigDecimal.valueOf(tasa))
                 Text(
@@ -545,10 +543,6 @@ private fun BreakdownRow(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Selector Efectivo / Tarjeta-Otro — full-width Material 3 cards with strong state.
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 internal fun PaymentMethodSelectorRow(
@@ -694,15 +688,6 @@ private fun MethodCard(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Layouts: compact (phones/POS portrait), landscape (phones+tablets), wide (tablet portrait).
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Computes the keypad height for compact-portrait so it scales fluidly with the screen
- * (≈40% of the available height, clamped to comfortable POS proportions). Keys then
- * `fillMaxHeight` inside the grid, guaranteeing usable ≥48dp targets across 320–480dp widths.
- */
 private fun keypadHeightFor(maxHeight: Dp): Dp =
     (maxHeight.value * 0.40f).coerceIn(196f, 300f).dp
 
@@ -809,11 +794,6 @@ internal fun CashPaymentCompact(
     onAction: (PaymentUiAction) -> Unit,
     maxHeight: Dp,
 ) {
-    // `Cobrar $XX.XX` and the keypad stay anchored in the thumb zone (bottom) on every size:
-    //  - Tall screens (≥600dp): a weighted spacer creates intentional separation between the
-    //    summary block and the action block — no scrolling, no awkward empty gaps inside a scroll.
-    //  - Short screens (320×568 class): the summary scrolls if needed while the keypad + CTA
-    //    stay pinned, so nothing ever clips and the primary action remains reachable.
     val keypadHeight = keypadHeightFor(maxHeight)
     if (maxHeight >= COMFORTABLE_HEIGHT_THRESHOLD) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -904,10 +884,6 @@ internal fun NonCashPaymentCompact(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CASH: amount display + primary CTA + numeric keypad.
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CashAmountPanel(
@@ -1007,8 +983,6 @@ private fun CashKeypadBlock(
             modifier = if (fillRemaining) Modifier.weight(1f) else Modifier,
             height = if (fillRemaining) null else keypadHeight,
             actionColumn = {
-                // Backspace key sized to match the numeric keys. The COBRAR action is a
-                // full-width primary button below so it never wraps on narrow POS displays.
                 KeypadKey(
                     text = "Borrar",
                     modifier = Modifier.fillMaxHeight(),
@@ -1078,8 +1052,6 @@ internal fun PrimaryCtaButton(
                 modifier = Modifier.size(((22 * warningScale).dp)),
             )
             Spacer(modifier = Modifier.width(10.dp))
-            // `Cobrar $XX.XX` nunca puede hacer wrap ni quedar fuera de pantalla: AdaptiveAmountText
-            // reduce el tamaño de fuente paso a paso hasta encajar en el ancho disponible (320dp incluido).
             AdaptiveAmountText(
                 text = "Cobrar $ ${state.totalAmountText}",
                 baseStyle =
@@ -1089,16 +1061,13 @@ internal fun PrimaryCtaButton(
                     ),
                 color = onHeroColor,
                 modifier = Modifier.weight(1f),
-            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                minFontSizeSp = 14f,
-            ))
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 14f,
+                ),
+            )
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NON-CASH: forms list + summary + primary CTA.
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun NonCashSummaryPanel(
@@ -1274,8 +1243,6 @@ fun NonCashRow(
                 }
             }
             if (narrow) {
-                // <360dp: stack the field and the "Completar" button vertically so both get full
-                // width — avoids clipping the "Completar $XXX.XX" label on small phones.
                 OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
@@ -1332,10 +1299,6 @@ fun NonCashRow(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared primitives.
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun PaymentSummaryLine(
     label: String,
@@ -1364,10 +1327,11 @@ private fun PaymentSummaryLine(
                         MaterialTheme.colorScheme.onSurface
                     },
                 modifier = Modifier.widthIn(max = 180.dp),
-            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                minFontSizeSp = 11f,
-                maxLines = 1,
-            ))
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 11f,
+                    maxLines = 1,
+                ),
+            )
             secondary?.let {
                 Text(
                     text = it,
