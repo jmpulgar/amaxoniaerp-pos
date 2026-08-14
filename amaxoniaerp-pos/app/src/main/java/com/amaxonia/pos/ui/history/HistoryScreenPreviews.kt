@@ -1,5 +1,3 @@
-@file:Suppress("MagicNumber", "UnusedPrivateMember", "LongMethod")
-
 package com.amaxonia.pos.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
@@ -18,38 +16,32 @@ import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.ui.theme.PosTheme
 
-/**
- * Visual regression surface for the invoice-history screen.
- *
- * Exercises the production composables — [HistoryFilters] (plegado y expandido),
- * [SummaryBar] and [TransactionCard] — at the target Android widths, including the
- * trickiest variants: enormous totals that must shrink via AdaptiveAmountText instead
- * of clipping, long client names that must ellipsize, and every transaction status.
- */
+private const val HUGE_TOTAL = 9_876_543.21
+private const val LARGE_AMOUNT_THRESHOLD = 1_000.0
+private const val SECONDARY_RATE = 40.0
+private const val SUMMARY_INVOICE_COUNT = 248
+
 @Preview(name = "Filtros plegados · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistoryFiltersCollapsed320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        HistoryFilters(
-            filter = InvoiceHistoryFilter(search = "FAC-2026"),
-            onSearchChanged = {},
-            onUsuarioChanged = {},
-            onSucursalChanged = {},
-            onFechaInicioChanged = {},
-            onFechaFinChanged = {},
-            onEstatusChanged = {},
-            onApply = {},
-            onClear = {},
-        )
+private fun HistoryFiltersCollapsed320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            HistorySearchField(
+                value = "FAC-2026",
+                onValueChange = {},
+                filtersExpanded = false,
+                onToggleFilters = {},
+                modifier = Modifier.padding(16.dp),
+            )
+        }
     }
-}
 
 @Preview(name = "Filtros expandidos · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun HistoryFiltersExpanded360() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        HistoryFilters(
-            filter =
+private fun HistoryFiltersExpanded360() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            val filter =
                 InvoiceHistoryFilter(
                     search = "FAC-2026",
                     usuario = "jperez",
@@ -57,46 +49,55 @@ private fun HistoryFiltersExpanded360() = PosTheme {
                     fechaInicio = "2026-08-01",
                     fechaFin = "2026-08-14",
                     estatus = listOf(1, 3),
-                ),
-            onSearchChanged = {},
-            onUsuarioChanged = {},
-            onSucursalChanged = {},
-            onFechaInicioChanged = {},
-            onFechaFinChanged = {},
-            onEstatusChanged = {},
-            onApply = {},
-            onClear = {},
-        )
+                )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HistorySearchField(
+                    value = filter.search.orEmpty(),
+                    onValueChange = {},
+                    filtersExpanded = true,
+                    onToggleFilters = {},
+                )
+                HistoryIdentityFilters(filter, {}, {})
+                HistoryDateRangeFilters(filter, {}, {})
+                HistoryStatusFilter(filter, {})
+                HistoryFilterActions({}, {})
+            }
+        }
     }
-}
 
 @Preview(name = "Summary bar · 320×568 · monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistorySummaryBarHuge() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        SummaryBar(
-            totalFacturas = 248,
-            totalMonto = 9_876_543.21,
-            currency = "USD",
-        )
+private fun HistorySummaryBarHuge() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            SummaryBar(
+                totalFacturas = SUMMARY_INVOICE_COUNT,
+                totalMonto = HUGE_TOTAL,
+                currency = "USD",
+            )
+        }
     }
-}
 
 @Preview(name = "Fila factura · 320×568 · estados + monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistoryTransactionCards320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        HistoryTransactionCardsPreviewContent()
+private fun HistoryTransactionCards320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            HistoryTransactionCardsPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Fila factura · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun HistoryTransactionCardsLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        HistoryTransactionCardsPreviewContent()
+private fun HistoryTransactionCardsLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            HistoryTransactionCardsPreviewContent()
+        }
     }
-}
 
 @Composable
 private fun HistoryTransactionCardsPreviewContent() {
@@ -114,19 +115,17 @@ private fun HistoryTransactionCardsPreviewContent() {
                     status = TransactionStatus.PAID,
                 ),
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
         )
         TransactionCard(
             transaction =
                 previewTransaction(
                     id = "2",
                     invoiceNumber = "FAC-2026-000124",
-                    cliente = "Constructorora Andina del Centro C.A.",
-                    amount = 9_876_543.21,
+                    cliente = "Constructora Andina del Centro C.A.",
+                    amount = HUGE_TOTAL,
                     status = TransactionStatus.PENDING,
                 ),
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
         )
         TransactionCard(
             transaction =
@@ -138,7 +137,6 @@ private fun HistoryTransactionCardsPreviewContent() {
                     status = TransactionStatus.CANCELLED,
                 ),
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -160,6 +158,6 @@ private fun previewTransaction(
         dateHeader = "Hoy, 14 de agosto",
         clienteNombre = cliente,
         formaPago = "Efectivo",
-        totalRef = if (amount > 1_000.0) amount * 40.0 else null,
-        abrMonedaSecundaria = if (amount > 1_000.0) "VES" else null,
+        totalRef = if (amount > LARGE_AMOUNT_THRESHOLD) amount * SECONDARY_RATE else null,
+        abrMonedaSecundaria = if (amount > LARGE_AMOUNT_THRESHOLD) "VES" else null,
     )
