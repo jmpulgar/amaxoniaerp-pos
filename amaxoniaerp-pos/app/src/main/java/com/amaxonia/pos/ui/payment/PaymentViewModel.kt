@@ -6,17 +6,19 @@ import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
-import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import com.amaxonia.pos.domain.repository.TableAccountPaymentReader
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsInput
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
-import com.amaxonia.pos.domain.usecase.payment.ExecutePaymentFlowInput
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
+import com.amaxonia.pos.domain.usecase.payment.PaymentExecutionContext
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowEvent
-import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
+import com.amaxonia.pos.domain.usecase.payment.PaymentIntent
 import com.amaxonia.pos.domain.usecase.payment.PaymentMethodsResult
+import com.amaxonia.pos.domain.usecase.payment.PaymentOperation
+import com.amaxonia.pos.domain.usecase.payment.PaymentOperationRequest
+import com.amaxonia.pos.domain.usecase.payment.PaymentSource
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,18 +28,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-@Suppress("LongParameterList")
 class PaymentViewModel(
     private val loadPaymentContext: LoadPaymentContextUseCase,
     private val loadPaymentCountry: LoadPaymentCountryUseCase,
     private val validatePayment: ValidatePaymentUseCase,
     private val buildPaymentDetails: BuildPaymentDetailsUseCase,
-    private val executePaymentFlow: PaymentFlowExecutor,
-    private val posSettings: PosSettingsRepository,
+    private val paymentOperation: PaymentOperation,
     private val selectedClient: StateFlow<Client?> = MutableStateFlow(null),
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
     private val cartFinancialSnapshot: StateFlow<SaleFinancialSnapshot?> = MutableStateFlow(null),
@@ -195,13 +194,10 @@ class PaymentViewModel(
                 if (failure != null) {
                     _state.update { it.copy(paymentError = failure.message) }
                 } else {
+                    val request = currentState.toPaymentOperationRequest(details)
                     beginProcessing(details)
                     viewModelScope.launch {
-                        val result =
-                            executePaymentFlow(
-                                input = currentState.toExecutionInput(countryCode, details),
-                                onEvent = ::handlePaymentFlowEvent,
-                            )
+                        val result = paymentOperation.execute(request, ::handlePaymentFlowEvent)
                         applyPaymentResult(result)
                     }
                 }
@@ -308,36 +304,34 @@ class PaymentViewModel(
         }
     }
 
-    private suspend fun PaymentState.toExecutionInput(
-        countryCode: String,
+    private fun PaymentState.toPaymentOperationRequest(
         details: com.amaxonia.pos.domain.usecase.payment.PaymentDetails,
-    ): ExecutePaymentFlowInput {
+    ): PaymentOperationRequest {
         val tablePayment = tableAccountPaymentReader?.current?.value
-        // FASE 1.1: la selección de impresora persistida en Settings es la única
-        // fuente de verdad para que el backend sepa si la venta debe ir por HKA20
-        // físico (Venezuela) o por facturación digital.
-        val printerType = posSettings.selectedPrinterType.first()
-        return ExecutePaymentFlowInput(
-            countryCode = countryCode,
-            paymentDetails = details,
-            totalAmount = totalAmountMoney,
-            tenderedAmount = tenderedAmountMoney,
-            changeDue = changeDue,
-            totalAmountBs = totalAmountBs,
-            changeDueBs = changeDueBs,
-            exchangeRate = tasa,
-            secondaryCurrency = abrMonedaSecundaria,
-            isMultiCurrency = isMultiCurrency,
-            availableMethods = formasPago,
-            // Condition is now derived exclusively from the CXC amount + credit permission,
-            // never from a manual selector. See [PaymentState.paymentCondition].
-            paymentCondition = paymentCondition,
-            preferredCorrelationId = tablePayment?.correlationId,
-            correlationCarryOver = tablePayment?.correlationId,
-            saleItemsOverride = tablePayment?.saleItems,
-            financialSnapshotOverride = tablePayment?.financialSnapshot ?: financialSnapshot,
-            cuentaMesa = tablePayment?.saleContext,
-            printerType = printerType,
+        val source =
+            if (tablePayment == null) {
+                PaymentSource.CurrentCart(financialSnapshot)
+            } else {
+                PaymentSource.TableAccount(tablePayment)
+            }
+        return PaymentOperationRequest(
+            payment =
+                PaymentIntent(
+                    details = details,
+                    totalAmount = totalAmountMoney,
+                    tenderedAmount = tenderedAmountMoney,
+                    changeDue = changeDueMoney,
+                    condition = paymentCondition,
+                ),
+            source = source,
+            context =
+                PaymentExecutionContext(
+                    countryCode = countryCode,
+                    availableMethods = formasPago,
+                    exchangeRate = tasa,
+                    secondaryCurrency = abrMonedaSecundaria,
+                    isMultiCurrency = isMultiCurrency,
+                ),
         )
     }
 
