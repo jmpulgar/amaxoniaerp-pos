@@ -17,42 +17,228 @@ jobs:
         with:
           ref: chatgpt/phase4-detekt-cleanup
           fetch-depth: 0
-      - name: Apply targeted source repairs
+
+      - name: Apply deterministic Detekt repairs
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           root = Path('amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos')
 
-          product = root / 'ui/products/ProductFormScreen.kt'
-          text = product.read_text()
-          replacements = [
-              ('import androidx.compose.material3.LocalTextStyle\n', ''),
-              ('import com.amaxonia.pos.domain.repository.Department\n', 'import com.amaxonia.pos.domain.model.PriceLevel\nimport com.amaxonia.pos.domain.repository.Department\n'),
-              ('prices: List<ProductPriceRow>,', 'prices: List<PriceLevel>,'),
-              ('textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall),', 'textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),'),
-          ]
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'Missing ProductForm target: {old!r}')
-              text = text.replace(old, new, 1)
-          product.write_text(text)
+          # 1) Migrate every AdaptiveAmountText call to the grouped options object.
+          option_names = {'minFontSizeSp', 'fontWeight', 'textAlign', 'maxLines'}
 
-          visibility_targets = [
-              (root / 'ui/history/HistoryScreen.kt', 'private fun TransactionCard(', 'internal fun TransactionCard('),
-              (root / 'ui/creditnotes/CreditNotesScreen.kt', 'private fun CreditNoteCard(', 'internal fun CreditNoteCard('),
-              (root / 'ui/creditnotes/CreditNotesScreen.kt', 'private fun SourceInvoiceCard(', 'internal fun SourceInvoiceCard('),
+          def matching_paren(text, start):
+              depth = 0
+              quote = None
+              escape = False
+              for i in range(start, len(text)):
+                  ch = text[i]
+                  if quote:
+                      if escape:
+                          escape = False
+                      elif ch == '\\':
+                          escape = True
+                      elif ch == quote:
+                          quote = None
+                      continue
+                  if ch in ('"', "'"):
+                      quote = ch
+                  elif ch == '(':
+                      depth += 1
+                  elif ch == ')':
+                      depth -= 1
+                      if depth == 0:
+                          return i
+              raise RuntimeError('unbalanced AdaptiveAmountText call')
+
+          def split_args(body):
+              args, start = [], 0
+              p = b = c = 0
+              quote = None
+              escape = False
+              for i, ch in enumerate(body):
+                  if quote:
+                      if escape:
+                          escape = False
+                      elif ch == '\\':
+                          escape = True
+                      elif ch == quote:
+                          quote = None
+                      continue
+                  if ch in ('"', "'"):
+                      quote = ch
+                  elif ch == '(':
+                      p += 1
+                  elif ch == ')':
+                      p -= 1
+                  elif ch == '[':
+                      b += 1
+                  elif ch == ']':
+                      b -= 1
+                  elif ch == '{':
+                      c += 1
+                  elif ch == '}':
+                      c -= 1
+                  elif ch == ',' and p == b == c == 0:
+                      args.append(body[start:i])
+                      start = i + 1
+              args.append(body[start:])
+              return args
+
+          for path in root.rglob('*.kt'):
+              text = path.read_text(encoding='utf-8-sig')
+              positions = []
+              cursor = 0
+              while True:
+                  idx = text.find('AdaptiveAmountText(', cursor)
+                  if idx < 0:
+                      break
+                  open_idx = idx + len('AdaptiveAmountText')
+                  close_idx = matching_paren(text, open_idx)
+                  positions.append((idx, open_idx, close_idx))
+                  cursor = close_idx + 1
+              changed = False
+              for idx, open_idx, close_idx in reversed(positions):
+                  body = text[open_idx + 1:close_idx]
+                  args = split_args(body)
+                  kept, options = [], []
+                  for arg in args:
+                      match = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*', arg, re.S)
+                      if match and match.group(1) in option_names:
+                          options.append(arg.strip())
+                      else:
+                          kept.append(arg)
+                  if not options:
+                      continue
+                  indent_match = re.search(r'\n([ \t]*)[^\n]*$', body)
+                  indent = indent_match.group(1) if indent_match else '        '
+                  options_text = (
+                      'options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(\n'
+                      + ''.join(f'{indent}    {opt},\n' for opt in options)
+                      + f'{indent})'
+                  )
+                  while kept and not kept[-1].strip():
+                      kept.pop()
+                  new_body = ','.join(kept)
+                  if new_body.strip() and not new_body.rstrip().endswith(','):
+                      new_body = new_body.rstrip() + ',\n' + indent
+                  new_body += options_text
+                  text = text[:open_idx + 1] + new_body + text[close_idx:]
+                  changed = True
+              if changed:
+                  path.write_text(text, encoding='utf-8')
+
+          # 2) Preview composables are tooling entry points, not unused private helpers.
+          preview_files = [
+              'ui/caja/CierreCajaScreenPreviews.kt',
+              'ui/cart/CartScreenPreviews.kt',
+              'ui/history/HistoryScreenPreviews.kt',
+              'ui/payment/SuccessScreenPreviews.kt',
+              'ui/creditnotes/CreditNotesScreenPreviews.kt',
           ]
-          for path, old, new in visibility_targets:
-              text = path.read_text()
-              if old not in text:
-                  raise SystemExit(f'Missing visibility target in {path}: {old}')
-              path.write_text(text.replace(old, new, 1))
+          for relative in preview_files:
+              path = root / relative
+              text = path.read_text(encoding='utf-8-sig')
+              text = text.replace('@Composable\nprivate fun ', '@Composable\ninternal fun ')
+              path.write_text(text, encoding='utf-8')
+
+          # 3) Replace reported magic values with named constants.
+          path = root / 'ui/caja/CierreCajaScreenPreviews.kt'
+          text = path.read_text()
+          anchor = 'private const val HUGE_AMOUNT_SCALE = 10_000.0\n'
+          constants = '''private const val CASH_PAYMENT_ID = 1\nprivate const val CARD_DEBIT_PAYMENT_ID = 2\nprivate const val CARD_CREDIT_PAYMENT_ID = 3\nprivate const val ACH_PAYMENT_ID = 4\nprivate const val CASH_PAYMENT_AMOUNT = 4_820.25\nprivate const val CARD_DEBIT_AMOUNT = 3_275.30\nprivate const val CARD_CREDIT_AMOUNT = 2_875.20\nprivate const val ACH_PAYMENT_AMOUNT = 1_510.00\n'''
+          if constants not in text:
+              text = text.replace(anchor, anchor + constants)
+          replacements = {
+              'CierreCajaPaymentLine(1, "Efectivo", "CASH", 4_820.25 * scale)': 'CierreCajaPaymentLine(CASH_PAYMENT_ID, "Efectivo", "CASH", CASH_PAYMENT_AMOUNT * scale)',
+              'CierreCajaPaymentLine(2, "Mastercard Débito", "TARJETA", 3_275.30 * scale)': 'CierreCajaPaymentLine(CARD_DEBIT_PAYMENT_ID, "Mastercard Débito", "TARJETA", CARD_DEBIT_AMOUNT * scale)',
+              'CierreCajaPaymentLine(3, "Visa Crédito", "TARJETA", 2_875.20 * scale)': 'CierreCajaPaymentLine(CARD_CREDIT_PAYMENT_ID, "Visa Crédito", "TARJETA", CARD_CREDIT_AMOUNT * scale)',
+              'CierreCajaPaymentLine(4, "Transferencia ACH", "OT", 1_510.00 * scale)': 'CierreCajaPaymentLine(ACH_PAYMENT_ID, "Transferencia ACH", "OT", ACH_PAYMENT_AMOUNT * scale)',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          path.write_text(text)
+
+          path = root / 'ui/history/HistoryScreenPreviews.kt'
+          text = path.read_text()
+          anchor = 'private const val SUMMARY_INVOICE_COUNT = 248\n'
+          constants = 'private const val PAID_STATUS_ID = 1\nprivate const val CANCELLED_STATUS_ID = 3\n'
+          if constants not in text:
+              text = text.replace(anchor, anchor + constants)
+          text = text.replace('estatus = listOf(1, 3),', 'estatus = listOf(PAID_STATUS_ID, CANCELLED_STATUS_ID),')
+          path.write_text(text)
+
+          path = root / 'ui/reports/ReportsScreen.kt'
+          text = path.read_text()
+          anchor = 'private const val BEST_SELLER_LIMIT = 10\n'
+          if 'BEST_SELLER_AMOUNT_WEIGHT' not in text:
+              text = text.replace(anchor, anchor + 'private const val BEST_SELLER_AMOUNT_WEIGHT = 0.6f\n')
+          text = text.replace('Modifier.weight(0.6f)', 'Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT)')
+          path.write_text(text)
+
+          path = root / 'ui/drafts/DraftInvoicesScreen.kt'
+          text = path.read_text()
+          if 'DRAFT_AMOUNT_WEIGHT' not in text:
+              package_end = text.index('\n\n', text.index('package ')) + 2
+              text = text[:package_end] + 'private const val DRAFT_AMOUNT_WEIGHT = 0.7f\n\n' + text[package_end:]
+          text = text.replace('Modifier.weight(0.7f)', 'Modifier.weight(DRAFT_AMOUNT_WEIGHT)')
+          path.write_text(text)
+
+          path = root / 'ui/clients/ClientFormScreen.kt'
+          text = path.read_text()
+          text = text.replace('Modifier.weight(0.72f)', 'Modifier.weight(DOCUMENT_FIELD_WEIGHT)')
+          text = text.replace('Modifier.weight(0.28f)', 'Modifier.weight(DV_FIELD_WEIGHT)')
+          if 'DOCUMENT_FIELD_WEIGHT' not in text.split('private const val NATURAL_CLIENT_TYPE')[1]:
+              text = text.replace(
+                  'private const val NATURAL_CLIENT_TYPE = 2\n',
+                  'private const val DOCUMENT_FIELD_WEIGHT = 0.72f\nprivate const val DV_FIELD_WEIGHT = 0.28f\nprivate const val NATURAL_CLIENT_TYPE = 2\n',
+              )
+          path.write_text(text)
+
+          # 4) Simple style finding.
+          path = root / 'ui/cart/CartScreen.kt'
+          text = path.read_text()
+          text = text.replace('private val CHECKOUT_BUTTON_WEIGHT =', 'private const val CHECKOUT_BUTTON_WEIGHT =')
+          path.write_text(text)
+
+          # 5) Reduce Success preview helper parameters by grouping secondary-currency values.
+          path = root / 'ui/payment/SuccessScreenPreviews.kt'
+          text = path.read_text()
+          text = text.replace(
+              '''                    multiCurrency = true,\n                    totalBs = 1_820.16,\n                    changeDueBs = 469.78,\n''',
+              '''                    secondaryAmounts = 1_820.16 to 469.78,\n''',
+          )
+          old_signature = '''    multiCurrency: Boolean = false,\n    totalBs: Double = 0.0,\n    changeDueBs: Double = 0.0,\n    feError: String? = null,\n): PaymentSuccessPayload =\n    PaymentSuccessPayload(\n'''
+          new_signature = '''    secondaryAmounts: Pair<Double, Double>? = null,\n    feError: String? = null,\n): PaymentSuccessPayload =\n    PaymentSuccessPayload(\n'''
+          text = text.replace(old_signature, new_signature)
+          text = text.replace('        totalBs = totalBs,', '        totalBs = secondaryAmounts?.first ?: 0.0,')
+          text = text.replace('        changeDueBs = changeDueBs,', '        changeDueBs = secondaryAmounts?.second ?: 0.0,')
+          text = text.replace('        abrMonedaSecundaria = if (multiCurrency) "VES" else "",', '        abrMonedaSecundaria = if (secondaryAmounts != null) "VES" else "",')
+          text = text.replace('        isMultiCurrency = multiCurrency,', '        isMultiCurrency = secondaryAmounts != null,')
+          path.write_text(text)
+
+          # 6) Collapse StartTransactionUseCase to one return path without changing behavior.
+          path = root / 'domain/usecase/payment/StartTransactionUseCase.kt'
+          text = path.read_text()
+          start = text.index('    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {')
+          end = text.index('\n    suspend fun markConfirmed(', start)
+          replacement = '''    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {\n        val now = clock.now().toEpochMilli()\n        val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }\n        val resumable =\n            existing\n                ?.takeIf { it.status == STATUS_SENDING }\n                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }\n        val completedPreferred =\n            existing\n                ?.takeIf { it.clientCorrelationId == command.preferredId }\n                ?.takeIf { it.status == STATUS_CONFIRMED || it.status == STATUS_DUPLICATE }\n                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }\n        val recovered = resumable ?: completedPreferred\n        val tenant = command.tenant\n        val result =\n            if (recovered != null) {\n                StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)\n            } else if (tenant == null) {\n                null\n            } else {\n                startNewTransaction(command = command, tenant = tenant, now = now)\n            }\n        return result\n    }\n\n    private suspend fun startNewTransaction(\n        command: StartTransactionCommand,\n        tenant: SaleTenant,\n        now: Long,\n    ): StartedTransaction {\n        val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()\n        com.amaxonia.pos.core.telemetry.SaleTelemetry.record(\n            event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,\n            idFactura = id,\n            "tenant" to tenant.tenantId,\n            "total" to command.totalAmount,\n            "currency" to command.currency,\n        )\n        val totalMinor =\n            com.amaxonia.pos.domain.model.money.MinorUnitMoney\n                .fromDoubleAsMinor(command.totalAmount)\n        dao.upsert(\n            TransactionLogEntity(\n                clientCorrelationId = id,\n                idCaja = command.idCaja,\n                idCajaSecuencia = command.idCajaSecuencia,\n                totalAmount = command.totalAmount,\n                currency = command.currency,\n                clientName = command.clientName,\n                status = STATUS_SENDING,\n                tenantId = tenant.tenantId,\n                tenantCompanyId = tenant.companyId,\n                tenantAdminDb = tenant.adminDb,\n                tenantContableDb = tenant.contableDb,\n                tenantNominaDb = tenant.nominaDb,\n                tenantLabel = tenant.label,\n                totalAmountMinor = totalMinor,\n                createdAt = now,\n                updatedAt = now,\n            ),\n        )\n        return StartedTransaction(clientCorrelationId = id, resumed = false)\n    }\n'''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text)
           PY
+
+      - name: Format changed Kotlin sources
+        working-directory: amaxoniaerp-pos
+        run: |
+          chmod +x gradlew
+          ./gradlew ktlintFormat --no-daemon --console=plain || true
+
       - name: Commit repairs
         run: |
           git config user.name "Yoiner Moreno"
           git config user.email "yoinerdeyhan@gmail.com"
           git add amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos
-          git commit -m "fix: repair interrupted UI changes"
+          git commit -m "refactor: resolve Detekt findings without suppressions"
           git push origin HEAD:chatgpt/phase4-detekt-cleanup
