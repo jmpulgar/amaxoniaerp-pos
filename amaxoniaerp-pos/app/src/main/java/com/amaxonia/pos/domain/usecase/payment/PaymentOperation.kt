@@ -47,7 +47,7 @@ sealed interface PaymentSource {
     ) : PaymentSource
 
     data class TableAccount(
-        val payment: com.amaxonia.pos.domain.repository.TableAccountPayment,
+        val payment: TableAccountPayment,
     ) : PaymentSource
 }
 
