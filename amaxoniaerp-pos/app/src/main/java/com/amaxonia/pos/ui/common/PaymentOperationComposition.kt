@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.first
 
 private val canonicalPaymentOperation: PaymentOperation by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
     DefaultPaymentOperation(
-        executeLegacyFlow = { input, onEvent -> DependencyContainer.executePaymentFlowUseCase(input, onEvent) },
+        executeFlow = { input, onEvent -> DependencyContainer.executePaymentFlowUseCase(input, onEvent) },
         printerTypeProvider = { DependencyContainer.posConfigurationRepository.selectedPrinterType.first() },
     )
 }
