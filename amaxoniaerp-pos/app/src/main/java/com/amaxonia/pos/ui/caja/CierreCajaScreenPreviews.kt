@@ -28,7 +28,7 @@ private const val ACH_PAYMENT_AMOUNT = 1_510.00
  * lines) that must shrink via AdaptiveAmountText instead of clipping, and long caja names /
  * payment labels that must ellipsize gracefully.
  */
-@Preview(name = "Cierre Â· 320Ã—568", showBackground = true, widthDp = 320, heightDp = 568)
+@Preview(name = "Cierre · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
 internal fun CierreReady320() =
     PosTheme {
@@ -44,7 +44,7 @@ internal fun CierreReady320() =
         }
     }
 
-@Preview(name = "Cierre Â· 360Ã—640", showBackground = true, widthDp = 360, heightDp = 640)
+@Preview(name = "Cierre · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
 internal fun CierreReady360() =
     PosTheme {
@@ -60,7 +60,7 @@ internal fun CierreReady360() =
         }
     }
 
-@Preview(name = "Cierre Â· 390Ã—844 (montos enormes)", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "Cierre · 390×844 (montos enormes)", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 internal fun CierreReadyHugeAmounts() =
     PosTheme {
@@ -76,7 +76,7 @@ internal fun CierreReadyHugeAmounts() =
         }
     }
 
-@Preview(name = "Cierre Â· 480Ã—960 (cerrando)", showBackground = true, widthDp = 480, heightDp = 960)
+@Preview(name = "Cierre · 480×960 (cerrando)", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
 internal fun CierreReadyClosing() =
     PosTheme {
@@ -92,7 +92,7 @@ internal fun CierreReadyClosing() =
         }
     }
 
-@Preview(name = "Cierre Â· landscape Â· 733Ã—360", showBackground = true, widthDp = 733, heightDp = 360)
+@Preview(name = "Cierre · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
 internal fun CierreReadyLandscape() =
     PosTheme {
@@ -132,8 +132,18 @@ private fun previewSummary(huge: Boolean = false): CierreCajaSummary {
         paymentLines =
             listOf(
                 CierreCajaPaymentLine(CASH_PAYMENT_ID, "Efectivo", "CASH", CASH_PAYMENT_AMOUNT * scale),
-                CierreCajaPaymentLine(2, "Mastercard DÃ©bito", "TARJETA", 3_275.30 * scale),
-                CierreCajaPaymentLine(3, "Visa CrÃ©dito", "TARJETA", 2_875.20 * scale),
+                CierreCajaPaymentLine(
+                    CARD_DEBIT_PAYMENT_ID,
+                    "Mastercard Débito",
+                    "TARJETA",
+                    CARD_DEBIT_AMOUNT * scale,
+                ),
+                CierreCajaPaymentLine(
+                    CARD_CREDIT_PAYMENT_ID,
+                    "Visa Crédito",
+                    "TARJETA",
+                    CARD_CREDIT_AMOUNT * scale,
+                ),
                 CierreCajaPaymentLine(ACH_PAYMENT_ID, "Transferencia ACH", "OT", ACH_PAYMENT_AMOUNT * scale),
             ),
     )
