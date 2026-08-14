@@ -13,7 +13,7 @@ import org.junit.Test
 
 class PaymentOperationTest {
     @Test
-    fun `canonical request maps to legacy implementation without changing observable behavior`() =
+    fun `canonical request maps to internal implementation without changing observable behavior`() =
         runTest {
             val method =
                 FormaPago(
@@ -70,7 +70,7 @@ class PaymentOperationTest {
             val events = mutableListOf<PaymentFlowEvent>()
             val operation =
                 DefaultPaymentOperation(
-                    executeLegacyFlow = { input, onEvent ->
+                    executeFlow = { input, onEvent ->
                         captured = input
                         onEvent(PaymentFlowEvent.Progress("mapped"))
                         expectedResult
