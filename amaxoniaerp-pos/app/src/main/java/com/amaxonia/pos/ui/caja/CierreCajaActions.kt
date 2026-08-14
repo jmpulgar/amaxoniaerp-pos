@@ -6,3 +6,11 @@ internal class CierreCajaActions(
     val onPrintReportX: () -> Unit,
     val onPrintReportZ: () -> Unit,
 )
+
+/** Estado puramente visual del contenido listo/cerrando. */
+internal data class CierreCajaReadyState(
+    val isClosing: Boolean,
+    val isPrintingReportX: Boolean,
+    val isPrintingReportZ: Boolean,
+    val showReportButtons: Boolean,
+)
