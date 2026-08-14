@@ -530,11 +530,11 @@ private fun BestSellerItem(
     product: BestSellerProduct,
     position: Int,
 ) {
+    val productColor = Color(product.colorHex)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val productColor = Color(product.colorHex)
         Surface(
             color = productColor.copy(alpha = 0.1f),
             shape = RoundedCornerShape(10.dp),
@@ -550,32 +550,11 @@ private fun BestSellerItem(
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = product.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${product.salesCount} ventas",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                LinearProgressIndicator(
-                    progress = { product.progress },
-                    modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    color = productColor,
-                    trackColor = productColor.copy(alpha = 0.1f),
-                )
-            }
-        }
+        BestSellerDetails(
+            product = product,
+            productColor = productColor,
+            modifier = Modifier.weight(1f),
+        )
         Spacer(modifier = Modifier.width(10.dp))
         AdaptiveAmountText(
             text = money("$", product.price, separator = ""),
@@ -586,11 +565,48 @@ private fun BestSellerItem(
                     textAlign = TextAlign.End,
                 ),
             color = MaterialTheme.colorScheme.primary,
-        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-            minFontSizeSp = 10f,
-        ))
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 10f,
+                ),
+        )
     }
 }
+
+@Composable
+private fun BestSellerDetails(
+    product: BestSellerProduct,
+    productColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = product.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${product.salesCount} ventas",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            LinearProgressIndicator(
+                progress = { product.progress },
+                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = productColor,
+                trackColor = productColor.copy(alpha = 0.1f),
+            )
+        }
+    }
+}
+
 
 private fun money(
     currency: String,

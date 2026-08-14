@@ -35,10 +35,13 @@ internal fun CierreReady320() =
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             ReadyContent(
                 summary = previewSummary(),
-                isClosing = false,
-                isPrintingReportX = false,
-                isPrintingReportZ = false,
-                showReportButtons = true,
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
                 actions = previewActions(),
             )
         }
@@ -51,10 +54,13 @@ internal fun CierreReady360() =
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             ReadyContent(
                 summary = previewSummary(),
-                isClosing = false,
-                isPrintingReportX = false,
-                isPrintingReportZ = false,
-                showReportButtons = true,
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
                 actions = previewActions(),
             )
         }
@@ -67,10 +73,13 @@ internal fun CierreReadyHugeAmounts() =
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             ReadyContent(
                 summary = previewSummary(huge = true),
-                isClosing = false,
-                isPrintingReportX = false,
-                isPrintingReportZ = false,
-                showReportButtons = true,
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
                 actions = previewActions(),
             )
         }
@@ -83,10 +92,13 @@ internal fun CierreReadyClosing() =
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             ReadyContent(
                 summary = previewSummary(),
-                isClosing = true,
-                isPrintingReportX = false,
-                isPrintingReportZ = false,
-                showReportButtons = false,
+                state =
+                    CierreCajaReadyState(
+                        isClosing = true,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = false,
+                    ),
                 actions = previewActions(),
             )
         }
@@ -99,10 +111,13 @@ internal fun CierreReadyLandscape() =
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             ReadyContent(
                 summary = previewSummary(),
-                isClosing = false,
-                isPrintingReportX = false,
-                isPrintingReportZ = false,
-                showReportButtons = true,
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
                 actions = previewActions(),
             )
         }

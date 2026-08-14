@@ -517,123 +517,127 @@ internal fun TransactionCard(
     onClick: () -> Unit,
 ) {
     ElevatedCard(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Receipt icon
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.Receipt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-
+            TransactionCardIcon()
             Spacer(modifier = Modifier.width(14.dp))
-
-            // Invoice info
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = transaction.invoiceNumber,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                StatusBadge(status = transaction.status)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = transaction.time,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (transaction.clienteNombre.isNotBlank()) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp),
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = transaction.clienteNombre,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                }
-            }
-
-            // Amount + arrow: adaptive para que montos enormes no colisionen con el cliente.
-            Column(horizontalAlignment = Alignment.End) {
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
-                    baseStyle =
-                        MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                        ),
-                    color = MaterialTheme.colorScheme.primary,
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 11f,
-                ))
-                if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
-                    Text(
-                        text = "${formatCurrencyLabel(
-                            transaction.abrMonedaSecundaria,
-                        )} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            TransactionCardInfo(transaction = transaction, modifier = Modifier.weight(1f))
+            TransactionCardAmount(transaction)
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
-                modifier =
-                    Modifier
-                        .padding(start = 4.dp)
-                        .size(20.dp),
+                modifier = Modifier.padding(start = 4.dp).size(20.dp),
             )
         }
     }
 }
+
+@Composable
+private fun TransactionCardIcon() {
+    Box(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.Receipt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+private fun TransactionCardInfo(
+    transaction: Transaction,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = transaction.invoiceNumber,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        StatusBadge(status = transaction.status)
+        Spacer(modifier = Modifier.height(6.dp))
+        TransactionMetadataRow(transaction)
+    }
+}
+
+@Composable
+private fun TransactionMetadataRow(transaction: Transaction) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Rounded.Schedule,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(13.dp),
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = transaction.time,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (transaction.clienteNombre.isNotBlank()) {
+            Spacer(modifier = Modifier.width(10.dp))
+            Icon(
+                Icons.Rounded.Person,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = transaction.clienteNombre,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TransactionCardAmount(transaction: Transaction) {
+    Column(horizontalAlignment = Alignment.End) {
+        com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
+            text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
+            baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 11f,
+                ),
+        )
+        if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
+            Text(
+                text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 
 // ---------- Status Badge ----------
 
