@@ -20,7 +20,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-data class ExecutePaymentFlowInput(
+internal data class ExecutePaymentFlowInput(
     val countryCode: String,
     val paymentDetails: PaymentDetails,
     val totalAmount: Money,
@@ -32,27 +32,11 @@ data class ExecutePaymentFlowInput(
     val secondaryCurrency: String,
     val isMultiCurrency: Boolean,
     val availableMethods: List<FormaPago>,
-    /**
-     * Canonical `idFactura` persisted in a PRIOR attempt of the same
-     * operation (e.g. after a timeout/crash). When non-null and the row is
-     * still in `SENDING` state on the local ledger,
-     * [StartTransactionUseCase.recoverOrStart] reuses it so the backend
-     * dedup (HTTP 409) detects the retry and the sale converges to a single
-     * invoice. Required for auditoría ítem 1 — "timeout + restart + retry
-     * never create another sale nor another id".
-     *
-     * null/blank for brand-new operations → fresh UUID is minted.
-     */
     val correlationCarryOver: String? = null,
     val preferredCorrelationId: String? = null,
     val saleItemsOverride: List<SaleItemDto>? = null,
     val financialSnapshotOverride: com.amaxonia.pos.domain.model.SaleFinancialSnapshot? = null,
     val cuentaMesa: CuentaMesaVentaDto? = null,
-    /**
-     * Configuración de impresora seleccionada por el usuario en Settings (única
-     * fuente de verdad para HKA20 vs facturación digital en Venezuela).
-     * Se propaga hasta el backend como `ProcessSaleRequestDto.useHka20`.
-     */
     val printerType: PrinterType = PrinterType.NONE,
     val paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
 )
@@ -79,19 +63,13 @@ sealed interface PaymentFlowResult {
         val message: String,
     ) : PaymentFlowResult
 
-    /**
-     * The backend rejected the submission with HTTP 409 because the same
-     * [DuplicateInvoice.clientCorrelationId] was already processed. The user
-     * is reconciled through the canonical invoice lookup. This result remains
-     * for the ambiguous case where that lookup is unavailable.
-     */
     data class DuplicateInvoice(
         val clientCorrelationId: String,
         val reason: String,
     ) : PaymentFlowResult
 }
 
-class PaymentExecutionOperations(
+internal class PaymentExecutionOperations(
     val queueOfflineInvoice: QueueOfflineInvoiceUseCase,
     val printInvoice: PrintInvoiceUseCase,
     val confirmFiscalDocument: ConfirmFiscalDocumentUseCase,
@@ -99,7 +77,7 @@ class PaymentExecutionOperations(
     val handlePaymentFailure: HandlePaymentFailureUseCase,
 )
 
-class ExecutePaymentFlowUseCase(
+internal class ExecutePaymentFlowUseCase(
     private val operations: PaymentExecutionOperations,
     private val prepareSale: PrepareSaleUseCase,
     private val completeSale: CompletePaymentSaleUseCase,
@@ -228,7 +206,7 @@ class ExecutePaymentFlowUseCase(
     }
 }
 
-class CompletePaymentSaleUseCase(
+internal class CompletePaymentSaleUseCase(
     private val repositories: PaymentFlowRepositories,
     private val operations: PaymentExecutionOperations,
     private val clock: AppClock,
