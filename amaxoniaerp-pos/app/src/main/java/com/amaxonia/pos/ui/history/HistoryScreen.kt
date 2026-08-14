@@ -511,7 +511,7 @@ private fun DateStickyHeader(date: String) {
 // ---------- Transaction Card ----------
 
 @Composable
-private fun TransactionCard(
+internal fun TransactionCard(
     transaction: Transaction,
     onClick: () -> Unit,
 ) {

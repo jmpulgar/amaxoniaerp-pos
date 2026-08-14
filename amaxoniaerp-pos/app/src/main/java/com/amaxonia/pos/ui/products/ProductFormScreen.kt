@@ -31,7 +31,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
@@ -369,7 +369,7 @@ private fun ProductFormError(message: String) {
 
 @Composable
 private fun PriceTable(
-    prices: List<ProductPriceRow>,
+    prices: List<PriceLevel>,
     onUtilityChange: (Int, String) -> Unit,
 ) {
     Card(
@@ -509,6 +509,6 @@ fun CompactNumericInput(
                 .padding(horizontal = 6.dp, vertical = 14.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
-        textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall),
+        textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),
     )
 }

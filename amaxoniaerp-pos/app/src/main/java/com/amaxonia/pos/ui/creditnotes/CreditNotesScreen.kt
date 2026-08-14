@@ -584,7 +584,7 @@ internal fun SummaryBanner(
 }
 
 @Composable
-private fun CreditNoteCard(
+internal fun CreditNoteCard(
     note: CreditNoteSummaryDto,
     onClick: () -> Unit,
 ) {
@@ -697,7 +697,7 @@ private fun CreditNoteCard(
 }
 
 @Composable
-private fun SourceInvoiceCard(
+internal fun SourceInvoiceCard(
     invoice: CreditNoteSourceInvoiceSummaryDto,
     onClick: () -> Unit,
 ) {
