@@ -32,11 +32,27 @@ internal data class ExecutePaymentFlowInput(
     val secondaryCurrency: String,
     val isMultiCurrency: Boolean,
     val availableMethods: List<FormaPago>,
+    /**
+     * Canonical `idFactura` persisted in a PRIOR attempt of the same
+     * operation (e.g. after a timeout/crash). When non-null and the row is
+     * still in `SENDING` state on the local ledger,
+     * [StartTransactionUseCase.recoverOrStart] reuses it so the backend
+     * dedup (HTTP 409) detects the retry and the sale converges to a single
+     * invoice. Required for auditoría ítem 1 — "timeout + restart + retry
+     * never create another sale nor another id".
+     *
+     * null/blank for brand-new operations → fresh UUID is minted.
+     */
     val correlationCarryOver: String? = null,
     val preferredCorrelationId: String? = null,
     val saleItemsOverride: List<SaleItemDto>? = null,
     val financialSnapshotOverride: com.amaxonia.pos.domain.model.SaleFinancialSnapshot? = null,
     val cuentaMesa: CuentaMesaVentaDto? = null,
+    /**
+     * Configuración de impresora seleccionada por el usuario en Settings (única
+     * fuente de verdad para HKA20 vs facturación digital en Venezuela).
+     * Se propaga hasta el backend como `ProcessSaleRequestDto.useHka20`.
+     */
     val printerType: PrinterType = PrinterType.NONE,
     val paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
 )
@@ -63,6 +79,12 @@ sealed interface PaymentFlowResult {
         val message: String,
     ) : PaymentFlowResult
 
+    /**
+     * The backend rejected the submission with HTTP 409 because the same
+     * [DuplicateInvoice.clientCorrelationId] was already processed. The user
+     * is reconciled through the canonical invoice lookup. This result remains
+     * for the ambiguous case where that lookup is unavailable.
+     */
     data class DuplicateInvoice(
         val clientCorrelationId: String,
         val reason: String,
@@ -108,7 +130,9 @@ internal class ExecutePaymentFlowUseCase(
         sale: PreparedSale,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
-        val tenant = sessionReader?.currentTenant()
+        val tenant =
+            sessionReader
+                ?.currentTenant()
         val correlationId =
             startTransaction
                 ?.recoverOrStart(
@@ -126,7 +150,8 @@ internal class ExecutePaymentFlowUseCase(
         val stampedSale = sale.withCorrelationId(correlationId)
         val gatewayFailure = executeGatewayIfRequired(input, stampedSale, correlationId, onEvent)
         return if (gatewayFailure != null) {
-            correlationId?.let { startTransaction?.markFailed(it, "Gateway: ${gatewayFailure.message}") }
+            correlationId
+                ?.let { startTransaction?.markFailed(it, "Gateway: ${gatewayFailure.message}") }
             gatewayFailure
         } else {
             onEvent(PaymentFlowEvent.Progress("Generando factura..."))
@@ -169,12 +194,20 @@ internal class ExecutePaymentFlowUseCase(
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult.Failure? {
         if (input.countryCode != VENEZUELA_CODE) return null
+        // Persist the await BEFORE launching HKA so a process death does not
+        // silently drop the callback. The reconciler worker picks the row up
+        // after LEASE_DURATION; MainActivity.deliverResult flips it to RESOLVED.
         if (correlationId != null) {
             gatewayCallbackLedger?.markAwaiting(
                 correlationId = correlationId,
                 nextAttemptAt = 0L,
             )
-            com.amaxonia.pos.data.printer.RapidPayBridge.setPendingCorrelationId(correlationId)
+            // Pin the correlationId on the in-memory bridge so MainActivity can
+            // mark RESOLVED on the matching row when the HKA Intent returns.
+            com.amaxonia.pos.data.printer.RapidPayBridge
+                .setPendingCorrelationId(correlationId)
+            // Auditoría ítem 10 (OBS-001): emit the structured gateway event
+            // correlated by idFactura so the pilot log is observable.
             com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
                 event = com.amaxonia.pos.core.telemetry.SaleEvent.GATEWAY_AWAITING,
                 idFactura = correlationId,
@@ -195,6 +228,8 @@ internal class ExecutePaymentFlowUseCase(
                 },
             )
         if (result.isFailure && correlationId != null) {
+            // Gateway failed before any Intent returned — clear the await so
+            // the reconciler does not flag the row as a lost callback.
             gatewayCallbackLedger?.markResolved(
                 correlationId = correlationId,
                 responseCode = "ERROR_LOCAL",
@@ -278,8 +313,18 @@ internal class CompletePaymentSaleUseCase(
         repositories.runtime.sales.processSale(sale.request).fold(
             onFailure = { error ->
                 if (error is DuplicateInvoiceException) {
+                    // Auditoría ítem 2 (INT-BE-001). The backend told us this
+                    // idFactura already exists; try to fetch the existing
+                    // invoice so the sale converges to a single terminal state
+                    // instead of leaving the cashier in a dead-end. If the
+                    // reconciliation lookup fails or returns nothing, fall
+                    // back to the explicit DuplicateInvoice result so the user
+                    // either retries later or escalates manually.
                     reconcileDuplicate(error.clientCorrelationId, input, sale, correlationId, onEvent)
                 } else {
+                    // Auditoría ítem 10 (OBS-001): generic backend rejection —
+                    // the cashier will see the friendly toast, but the pilot
+                    // log captures the correlation id and the error class.
                     com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
                         event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_REJECTED_BACKEND,
                         idFactura = correlationId ?: sale.request.idFactura.orEmpty(),
@@ -300,7 +345,13 @@ internal class CompletePaymentSaleUseCase(
     ): PaymentFlowResult {
         val lookup = repositories.runtime.sales.findByCorrelationId(clientCorrelationId)
         val reconciled = lookup.getOrNull()
+        // Auditoría ítem 10 (OBS-001): both branches below represent
+        // money-touching ambiguous/duplicate events the pilot must observe.
         if (lookup.isFailure || reconciled == null) {
+            // The conflict could not be auto-reconciled: surface the
+            // explicit DuplicateInvoice state so the user is not silently
+            // promoted to an approval. NEVER allow an ambiguous 409 to
+            // become Success without a real invoice reference.
             com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
                 event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_AMBIGUOUS,
                 idFactura = clientCorrelationId,
@@ -321,6 +372,9 @@ internal class CompletePaymentSaleUseCase(
             idFactura = reconciled.idFactura,
             "resolved" to true,
         )
+        // We have the backend's authoritative record: converge to a Success
+        // built from the reconciled reference, marking the local ledger as
+        // CONFIRMED so retries against the same idFactura are inert.
         val synthetic =
             ProcessSaleResponseDto(
                 success = true,
@@ -347,7 +401,10 @@ internal class CompletePaymentSaleUseCase(
                 input = input,
                 sale = sale,
             )
-        val saveError = repositories.state.transaction.saveTransaction(transaction).exceptionOrNull()
+        val saveError =
+            repositories.state.transaction
+                .saveTransaction(transaction)
+                .exceptionOrNull()
         return if (saveError != null) {
             operations.failure(saveError, "La venta se proceso, pero no se pudo guardar la transaccion local")
         } else {
@@ -381,6 +438,8 @@ internal class CompletePaymentSaleUseCase(
         val printResult = operations.printInvoice(input.countryCode, transaction, response.idFactura)
         val fiscalNumber = printResult?.fiscalNumber?.takeIf(String::isNotBlank).orEmpty()
         val printerSerial = printResult?.printerSerial.orEmpty()
+        // Auditoría ítem 10 (OBS-001): observe both the sale confirmation
+        // and the fiscal print event with their canonical idFactura.
         com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
             event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_CONFIRMED,
             idFactura = response.idFactura,
