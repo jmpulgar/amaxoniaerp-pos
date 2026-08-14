@@ -101,6 +101,7 @@ import com.amaxonia.pos.domain.usecase.payment.BuildSaleRequestUseCase
 import com.amaxonia.pos.domain.usecase.payment.CalculateSaleTotalsUseCase
 import com.amaxonia.pos.domain.usecase.payment.CompletePaymentSaleUseCase
 import com.amaxonia.pos.domain.usecase.payment.ConfirmFiscalDocumentUseCase
+import com.amaxonia.pos.domain.usecase.payment.DefaultPaymentOperation
 import com.amaxonia.pos.domain.usecase.payment.ExecuteGatewayPaymentUseCase
 import com.amaxonia.pos.domain.usecase.payment.ExecutePaymentFlowUseCase
 import com.amaxonia.pos.domain.usecase.payment.GatewayCallbackLedger
@@ -109,6 +110,7 @@ import com.amaxonia.pos.domain.usecase.payment.HandlePaymentFailureUseCase
 import com.amaxonia.pos.domain.usecase.payment.PaymentExecutionOperations
 import com.amaxonia.pos.domain.usecase.payment.PaymentFiscalConfirmationLedger
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowRepositories
+import com.amaxonia.pos.domain.usecase.payment.PaymentOperation
 import com.amaxonia.pos.domain.usecase.payment.PaymentPreparationOperations
 import com.amaxonia.pos.domain.usecase.payment.PaymentRuntimeServices
 import com.amaxonia.pos.domain.usecase.payment.PaymentStateRepositories
@@ -119,11 +121,17 @@ import com.amaxonia.pos.domain.usecase.payment.QueueGatewayCallbackUseCase
 import com.amaxonia.pos.domain.usecase.payment.QueueOfflineInvoiceUseCase
 import com.amaxonia.pos.domain.usecase.payment.StartTransactionUseCase
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
+import kotlinx.coroutines.flow.first
 
 object DependencyContainer {
     private var initialized = false
     private lateinit var appContext: Context
 
+    /**
+     * Evento one-shot para pedir que el Dashboard abra el diálogo de apertura de
+     * caja al recibir el foco (p. ej. tras cerrar caja y pulsar "Aperturar nueva
+     * caja"). El Dashboard lo consume con [consumeAperturaRequest].
+     */
     private val _pendingAperturaRequest = kotlinx.coroutines.flow.MutableStateFlow(false)
     val pendingAperturaRequest: kotlinx.coroutines.flow.StateFlow<Boolean>
         get() = _pendingAperturaRequest
@@ -136,6 +144,11 @@ object DependencyContainer {
         _pendingAperturaRequest.value = false
     }
 
+    /**
+     * Evento one-shot equivalente al de apertura, para que "Áreas y mesas" pueda pedir al
+     * Dashboard que abra el selector de caja cuando todavía no hay una caja activa (sin caja no
+     * hay sucursal y por tanto no hay áreas que mostrar).
+     */
     private val _pendingCajaSelectorRequest = kotlinx.coroutines.flow.MutableStateFlow(false)
     val pendingCajaSelectorRequest: kotlinx.coroutines.flow.StateFlow<Boolean>
         get() = _pendingCajaSelectorRequest
@@ -208,8 +221,12 @@ object DependencyContainer {
     lateinit var cuentaMesaRepository: CuentaMesaRepository
         private set
 
+    /** Selección de mesa en memoria; no persiste ni escribe en el backend. */
     val selectedTableHolder: SelectedTableHolder = InMemorySelectedTableHolder()
-    val tableAccountPaymentHolder: TableAccountPaymentHolder = InMemoryTableAccountPaymentHolder()
+
+    /** Cuenta concreta que atraviesa el flujo estándar de pago/facturación. */
+    val tableAccountPaymentHolder: TableAccountPaymentHolder =
+        InMemoryTableAccountPaymentHolder()
 
     lateinit var salesRepository: SalesRepository
         private set
@@ -334,6 +351,12 @@ object DependencyContainer {
             sessionReader = localStore,
         )
     }
+    val paymentOperation: PaymentOperation by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        DefaultPaymentOperation(
+            executeFlow = { input, onEvent -> executePaymentFlowUseCase(input, onEvent) },
+            printerTypeProvider = { posConfigurationRepository.selectedPrinterType.first() },
+        )
+    }
 
     val printerFactory: PrinterFactory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
@@ -389,7 +412,8 @@ object DependencyContainer {
             )
         cajaRepository =
             CajaRepositoryImpl(
-                com.amaxonia.pos.data.remote.api.CajaApiImpl(apiClient),
+                com.amaxonia.pos.data.remote.api
+                    .CajaApiImpl(apiClient),
                 localStore,
             )
         formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, networkMonitor)
