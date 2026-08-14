@@ -23,8 +23,6 @@ internal fun SuccessPortrait320() = PosTheme {
         SuccessContent(
             isLoading = false,
             payload = previewPayload(codFactura = "FAC-2026-000123", changeDue = 234.50),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -37,8 +35,6 @@ internal fun SuccessPortrait360() = PosTheme {
         SuccessContent(
             isLoading = false,
             payload = previewPayload(codFactura = "FAC-2026-000123", changeDue = 12.75),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -56,8 +52,6 @@ internal fun SuccessPortrait390MultiCurrency() = PosTheme {
                     changeDue = 64.30,
                     secondaryAmounts = 1_820.16 to 469.78,
                 ),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -75,8 +69,6 @@ internal fun SuccessPortrait412FiscalPending() = PosTheme {
                     changeDue = 0.0,
                     feError = "El proveedor fiscal no respondió a tiempo; la factura quedó en cola de confirmación.",
                 ),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -89,8 +81,6 @@ internal fun SuccessPortrait480BigChange() = PosTheme {
         SuccessContent(
             isLoading = false,
             payload = previewPayload(codFactura = "FAC-2026-777777", changeDue = 9_876_543.21),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -108,8 +98,6 @@ internal fun SuccessLandscapePhone() = PosTheme {
                     changeDue = 234.50,
                     secondaryAmounts = 1_820.16 to 469.78,
                 ),
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }
@@ -122,8 +110,6 @@ internal fun SuccessLoadingPreview() = PosTheme {
         SuccessContent(
             isLoading = true,
             payload = null,
-            isSendingReceiptEmail = false,
-            isPrinting = false,
             actions = previewActions(),
         )
     }

@@ -84,10 +84,16 @@ private const val CARD_SCALE_ANIMATION_DURATION_MS = 260
 private val WIDE_CONTENT_MAX_WIDTH = 560.dp
 
 /** Acciones de la pantalla agrupadas para mantener las firmas de los composables pequeñas. */
+internal data class SuccessReceiptState(
+    val isSendingReceiptEmail: Boolean = false,
+    val isPrinting: Boolean = false,
+)
+
 internal class SuccessActions(
     val onPrintReceipt: () -> Unit,
     val onSendReceiptEmail: () -> Unit,
     val onNextOrder: () -> Unit,
+    val receiptState: SuccessReceiptState = SuccessReceiptState(),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,10 +149,13 @@ fun SuccessScreen(
             SuccessContent(
                 isLoading = uiState.isLoading || payload == null,
                 payload = payload,
-                isSendingReceiptEmail = uiState.isSendingReceiptEmail,
-                isPrinting = isPrinting,
                 actions =
                     SuccessActions(
+                        receiptState =
+                            SuccessReceiptState(
+                                isSendingReceiptEmail = uiState.isSendingReceiptEmail,
+                                isPrinting = isPrinting,
+                            ),
                         onPrintReceipt = {
                             if (transactionId.isBlank()) {
                                 scope.launch { snackbarHostState.showSnackbar("No hay transaccion para imprimir") }
@@ -179,16 +188,51 @@ fun SuccessScreen(
 internal fun SuccessContent(
     isLoading: Boolean,
     payload: PaymentSuccessPayload?,
-    isSendingReceiptEmail: Boolean,
-    isPrinting: Boolean,
     actions: SuccessActions,
     modifier: Modifier = Modifier,
 ) {
+    val animation = rememberSuccessAnimationState()
+    Column(
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .widthIn(max = WIDE_CONTENT_MAX_WIDTH)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        SuccessAnimatedBody(
+            isLoading = isLoading,
+            payload = payload,
+            animation = animation,
+            modifier = Modifier.weight(1f),
+        )
+        SecondaryReceiptActions(
+            isPrinting = actions.receiptState.isPrinting,
+            isSendingReceiptEmail = actions.receiptState.isSendingReceiptEmail,
+            onPrintReceipt = actions.onPrintReceipt,
+            onSendReceiptEmail = actions.onSendReceiptEmail,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        NextOrderButton(onNextOrder = actions.onNextOrder)
+    }
+}
+
+private data class SuccessAnimationState(
+    val visible: Boolean,
+    val scale: Float,
+    val ringScale: Float,
+    val ringAlpha: Float,
+)
+
+@Composable
+private fun rememberSuccessAnimationState(): SuccessAnimationState {
     var visible by remember { mutableStateOf(false) }
     val scale = remember { Animatable(CARD_INITIAL_SCALE) }
     val ringScale = remember { Animatable(RING_INITIAL_SCALE) }
     val ringAlpha = remember { Animatable(RING_INITIAL_ALPHA) }
-
     LaunchedEffect(Unit) {
         visible = true
         scale.animateTo(
@@ -205,53 +249,42 @@ internal fun SuccessContent(
     LaunchedEffect(Unit) {
         ringAlpha.animateTo(0f, animationSpec = tween(RING_ANIMATION_DURATION_MS))
     }
+    return SuccessAnimationState(
+        visible = visible,
+        scale = scale.value,
+        ringScale = ringScale.value,
+        ringAlpha = ringAlpha.value,
+    )
+}
 
+@Composable
+private fun SuccessAnimatedBody(
+    isLoading: Boolean,
+    payload: PaymentSuccessPayload?,
+    animation: SuccessAnimationState,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier =
-            modifier
-                .fillMaxHeight()
-                .fillMaxWidth()
-                .widthIn(max = WIDE_CONTENT_MAX_WIDTH)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .navigationBarsPadding(),
+        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        AnimatedVisibility(
+            visible = animation.visible,
+            enter = fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
+                scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
         ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
-                    scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
-            ) {
-                if (isLoading) {
-                    LoadingConfirmation(scale = scale.value)
-                } else {
-                    SuccessCard(
-                        payload = requireNotNull(payload) { "SuccessCard requires a loaded payload" },
-                        scale = scale.value,
-                        ringScale = ringScale.value,
-                        ringAlpha = ringAlpha.value,
-                    )
-                }
+            if (isLoading) {
+                LoadingConfirmation(scale = animation.scale)
+            } else {
+                SuccessCard(
+                    payload = requireNotNull(payload) { "SuccessCard requires a loaded payload" },
+                    scale = animation.scale,
+                    ringScale = animation.ringScale,
+                    ringAlpha = animation.ringAlpha,
+                )
             }
         }
-
-        SecondaryReceiptActions(
-            isPrinting = isPrinting,
-            isSendingReceiptEmail = isSendingReceiptEmail,
-            onPrintReceipt = actions.onPrintReceipt,
-            onSendReceiptEmail = actions.onSendReceiptEmail,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        NextOrderButton(onNextOrder = actions.onNextOrder)
     }
 }
 

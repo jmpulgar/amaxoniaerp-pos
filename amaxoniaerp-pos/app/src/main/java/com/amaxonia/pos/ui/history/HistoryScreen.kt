@@ -630,7 +630,9 @@ private fun TransactionCardAmount(transaction: Transaction) {
         )
         if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
             Text(
-                text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
+                text =
+            "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} " +
+                String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
