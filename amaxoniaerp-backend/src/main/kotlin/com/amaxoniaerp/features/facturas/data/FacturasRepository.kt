@@ -426,6 +426,16 @@ class FacturasRepository {
         val totalImpuesto = factura.decimal("totalizar_monto_iva")
         val montoExento = (subtotal - baseImponible).coerceAtLeast(BigDecimal.ZERO)
         val total = factura.decimal("TotalTotalFactura")
+        // Total discount aggregated from the per-line `_item_montodescuento`. Computed entirely in
+        // BigDecimal (no Double arithmetic) so the printed value matches the on-screen Cobro and
+        // the line on the physical receipt. The receipt always prints this row even when zero so
+        // customers/cashiers see the same breakdown regardless of cart contents.
+        val descuentoTotal =
+            productos
+                .fold(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)) { acc, producto ->
+                    acc + (producto.descuento.toBigDecimalOrNull() ?: BigDecimal.ZERO)
+                }
+                .setScale(2, RoundingMode.HALF_UP)
         val pagos =
             queryMany(
                 """
@@ -484,6 +494,10 @@ class FacturasRepository {
             productos = productos,
             subtotal = subtotal.toMoneyString(),
             montoExento = montoExento.toMoneyString(),
+            // Total line-item discount aggregated in BigDecimal above. Always present in the
+            // payload (never null) so the Android formatter can render the row unconditionally
+            // and stay coherent with the on-screen Cobro.
+            descuento = descuentoTotal.toMoneyString(),
             totalImpuesto = totalImpuesto.toMoneyString(),
             total = total.toMoneyString(),
             pagos = pagos,

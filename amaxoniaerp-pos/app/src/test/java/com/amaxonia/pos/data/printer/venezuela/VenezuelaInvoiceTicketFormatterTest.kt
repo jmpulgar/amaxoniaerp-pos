@@ -51,8 +51,10 @@ class VenezuelaInvoiceTicketFormatterTest {
         val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
 
         assertTrue("Debe incluir el título FACTURA", texts.contains("FACTURA"))
-        assertFalse("NO debe incluir el título Panamá (DGI/Comprobante Auxiliar)",
-            texts.any { it.contains("DGI") || it.contains("Comprobante Auxiliar") })
+        assertFalse(
+            "NO debe incluir el título Panamá (DGI/Comprobante Auxiliar)",
+            texts.any { it.contains("DGI") || it.contains("Comprobante Auxiliar") },
+        )
     }
 
     @Test
@@ -76,9 +78,9 @@ class VenezuelaInvoiceTicketFormatterTest {
     @Test
     fun `5 - totales usan Total IVA`() {
         val ticket = VenezuelaInvoiceTicketFormatter().format(payload())
-        val cols = ticket.elements.filterIsInstance<TicketElement.Columns>().map { it.values }
-        assertTrue("Debe mostrar 'Total IVA:'", cols.any { it.first() == "Total IVA:" })
-        assertFalse("NO debe mostrar 'Total Impuesto:'", cols.any { it.first() == "Total Impuesto:" })
+        val totals = ticket.elements.filterIsInstance<TicketElement.TotalsRow>().map { it.label }
+        assertTrue("Debe mostrar 'Total IVA:'", totals.contains("Total IVA:"))
+        assertFalse("NO debe mostrar 'Total Impuesto:'", totals.contains("Total Impuesto:"))
     }
 
     @Test
@@ -99,12 +101,18 @@ class VenezuelaInvoiceTicketFormatterTest {
         val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
         val cols = ticket.elements.filterIsInstance<TicketElement.Columns>().map { it.values }
 
-        assertFalse("No debe imprimir FACTURA DIGITAL sin persistencia",
-            texts.contains("FACTURA DIGITAL"))
-        assertFalse("No debe inventar Nro. documento",
-            cols.any { it.first() == "Nro. documento:" })
-        assertFalse("No debe inventar Nro. control",
-            cols.any { it.first() == "Nro. control:" })
+        assertFalse(
+            "No debe imprimir FACTURA DIGITAL sin persistencia",
+            texts.contains("FACTURA DIGITAL"),
+        )
+        assertFalse(
+            "No debe inventar Nro. documento",
+            cols.any { it.first() == "Nro. documento:" },
+        )
+        assertFalse(
+            "No debe inventar Nro. control",
+            cols.any { it.first() == "Nro. control:" },
+        )
     }
 
     @Test
@@ -162,8 +170,10 @@ class VenezuelaInvoiceTicketFormatterTest {
                 payload().copy(tasaCambioBs = "40.00", totalDivisa = null),
             )
         val colsPartial = ticketPartial.elements.filterIsInstance<TicketElement.Columns>().map { it.values }
-        assertFalse("No debe imprimir tasa sin totalDivisa",
-            colsPartial.any { it.first().startsWith("Tasa") })
+        assertFalse(
+            "No debe imprimir tasa sin totalDivisa",
+            colsPartial.any { it.first().startsWith("Tasa") },
+        )
     }
 
     @Test
@@ -224,6 +234,72 @@ class VenezuelaInvoiceTicketFormatterTest {
         )
     }
 
+    /**
+     * 16. Totals (Subtotal / Descuento / IVA / Total) are emitted as TotalsRow so the SUNMI
+     *     driver renders each one as a single physical line in the 40-column Venezuela layout.
+     *     No label can spill a trailing character to the next row.
+     */
+    @Test
+    fun `16 - totales se emiten como filas monoespaciadas de 40 columnas`() {
+        val ticket = VenezuelaInvoiceTicketFormatter().format(payload())
+        val totals = ticket.elements.filterIsInstance<TicketElement.TotalsRow>()
+
+        // Subtotal / Monto Exento / Descuento / Total IVA / Total
+        assertEquals(5, totals.size)
+        val labels = totals.map { it.label }
+        assertTrue(labels.contains("Subtotal Items:"))
+        assertTrue(labels.contains("Descuento:"))
+        assertTrue(labels.contains("Total IVA:"))
+        assertTrue(labels.contains("Total:"))
+        totals.forEach { row ->
+            assertEquals(40, row.printerWidth)
+            assertTrue(
+                "Label '${row.label}' fits in labelWidth ${row.labelWidth}",
+                row.label.length <= row.labelWidth,
+            )
+        }
+    }
+
+    /**
+     * 17. Descuento is always rendered, even when zero, mirroring the Cobro breakdown.
+     */
+    @Test
+    fun `17 - la linea de Descuento siempre se muestra incluso en cero`() {
+        val ticket =
+            VenezuelaInvoiceTicketFormatter().format(payload().copy(descuento = "0.00"))
+        val descuento = ticket.elements.filterIsInstance<TicketElement.TotalsRow>().first { it.label == "Descuento:" }
+        assertEquals("0.00", descuento.value)
+    }
+
+    @Test
+    fun `18 - descuento ausente en backend se renderiza como cero sin romper el ticket`() {
+        val ticket =
+            VenezuelaInvoiceTicketFormatter().format(payload().copy(descuento = null))
+        val descuento = ticket.elements.filterIsInstance<TicketElement.TotalsRow>().first { it.label == "Descuento:" }
+        assertEquals("0.00", descuento.value)
+    }
+
+    /**
+     * 19. Las cuatro etiquetas canónicas caben completas en labelWidth (sin ellipsis ni
+     *     truncamiento). Garantía del contrato SUNMI物理ico.
+     */
+    @Test
+    fun `19 - etiquetas canonicas de totales caben completas sin ellipsis`() {
+        val ticket = VenezuelaInvoiceTicketFormatter().format(payload())
+        val totals = ticket.elements.filterIsInstance<TicketElement.TotalsRow>()
+        val canonical = setOf("Subtotal Items:", "Descuento:", "Total IVA:", "Total:")
+
+        totals.filter { it.label in canonical }.forEach { row ->
+            assertTrue(
+                "Label '${row.label}' debe caber en labelWidth ${row.labelWidth}",
+                row.label.length <= row.labelWidth,
+            )
+        }
+        totals.forEach { row ->
+            assertFalse("Ninguna etiqueta puede usar ellipsis: ${row.label}", row.label.contains("…"))
+        }
+    }
+
     // ─── Fixture ───────────────────────────────────────────────────────────
 
     private fun payload(): FacturaPrintPayloadDto =
@@ -262,6 +338,7 @@ class VenezuelaInvoiceTicketFormatterTest {
                 ),
             subtotal = "100.00",
             montoExento = "0.00",
+            descuento = "0.00",
             totalImpuesto = "16.00",
             total = "116.00",
             pagos =

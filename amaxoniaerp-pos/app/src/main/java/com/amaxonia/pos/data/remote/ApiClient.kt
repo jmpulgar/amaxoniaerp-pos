@@ -6,22 +6,22 @@ import com.amaxonia.pos.data.local.AppJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.network.sockets.SocketTimeoutException as KtorSocketTimeoutException
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
-import io.ktor.http.HttpMethod
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
-import java.util.concurrent.TimeUnit
+import io.ktor.client.network.sockets.SocketTimeoutException as KtorSocketTimeoutException
 
 /**
  * Cliente HTTP de Ktor configurado dinámicamente según el país seleccionado.
@@ -131,8 +131,8 @@ private fun isRetryableConnectionFailure(cause: Throwable): Boolean {
     while (current != null) {
         if (
             current is IOException ||
-                current is ConnectTimeoutException ||
-                current is KtorSocketTimeoutException
+            current is ConnectTimeoutException ||
+            current is KtorSocketTimeoutException
         ) {
             return true
         }

@@ -16,9 +16,9 @@ import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post

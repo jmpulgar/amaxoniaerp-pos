@@ -1,7 +1,8 @@
 package com.amaxonia.pos.ui.payment
 
-import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
+import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CurrencyConfig
 import com.amaxonia.pos.domain.model.payment.FormaPago
@@ -18,7 +19,6 @@ import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
-import com.amaxonia.pos.domain.usecase.payment.PaymentValidationFailure
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -60,8 +60,11 @@ class PaymentViewModelTest {
             assertFalse(viewModel.state.value.isLoadingFormasPago)
         }
 
+    /**
+     * 1. Without CXC the derived condition is CONTADO.
+     */
     @Test
-    fun `contado does not list CXC`() =
+    fun `without CXC amount the condition is CONTADO`() =
         runTest(mainDispatcherRule.dispatcher) {
             val viewModel =
                 viewModel(
@@ -74,16 +77,19 @@ class PaymentViewModelTest {
                                 method(3, 3, "CRED"),
                             ),
                         ),
+                    client = Client(permiteCredito = true),
                 )
 
             runCurrent()
 
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertEquals(listOf(3), viewModel.state.value.formasPagoTarjetaOtro.map { it.idFormaPago })
         }
 
+    /**
+     * 2. CXC > 0 (with credit permission) → condition CREDITO.
+     */
     @Test
-    fun `changing credit to contado clears CXC amount`() =
+    fun `CXC amount greater than zero derives CREDITO condition`() =
         runTest(mainDispatcherRule.dispatcher) {
             val viewModel =
                 viewModel(
@@ -93,50 +99,40 @@ class PaymentViewModelTest {
                 )
 
             runCurrent()
-            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
-            assertEquals(mapOf(2 to "10.00"), viewModel.state.value.nonCashAmountsInput)
-
-            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CONTADO))
-
-            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
-        }
-
-    @Test
-    fun `client without credit permission cannot select credit`() =
-        runTest(mainDispatcherRule.dispatcher) {
-            val viewModel =
-                viewModel(
-                    caja = null,
-                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = false),
-                )
-
-            runCurrent()
-            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
-
-            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertEquals(PaymentValidationFailure.CreditNotAllowed.message, viewModel.state.value.paymentError)
-        }
-
-    @Test
-    fun `client with credit permission can select credit`() =
-        runTest(mainDispatcherRule.dispatcher) {
-            val viewModel =
-                viewModel(
-                    caja = null,
-                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = true),
-                )
-
-            runCurrent()
-            viewModel.onAction(PaymentUiAction.SelectCondition(PaymentCondition.CREDITO))
 
             assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
-            assertTrue(viewModel.state.value.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
+            assertEquals(mapOf(2 to "10.00"), viewModel.state.value.nonCashAmountsInput)
         }
 
+    /**
+     * 3. Removing the CXC amount reverts the condition to CONTADO.
+     */
+    @Test
+    fun `removing CXC amount reverts the condition to CONTADO`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, ""))
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertTrue(
+                viewModel.state.value.nonCashAmountsInput
+                    .isEmpty(),
+            )
+        }
+
+    /**
+     * 4. A normal credit-card payment (CRED) does NOT activate CxC.
+     */
     @Test
     fun `credit card does not activate CXC condition`() =
         runTest(mainDispatcherRule.dispatcher) {
@@ -151,7 +147,219 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
 
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertEquals(listOf(2), viewModel.state.value.formasPagoTarjetaOtro.map { it.idFormaPago })
+            assertEquals(
+                listOf(2),
+                viewModel.state.value.formasPagoTarjetaOtro
+                    .map { it.idFormaPago },
+            )
+        }
+
+    /**
+     * 5. A client without `permiteCredito` cannot use CXC: any attempt to assign it is silently
+     *    dropped, and CXC is not even listed.
+     */
+    @Test
+    fun `client without credit permission cannot use CXC`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = false),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertFalse(
+                viewModel.state.value.formasPagoTarjetaOtro
+                    .any { it.siglas == "CXC" },
+            )
+            assertTrue(
+                viewModel.state.value.nonCashAmountsInput
+                    .isEmpty(),
+            )
+        }
+
+    /**
+     * 6. Client with `permiteCredito` can list CXC and the condition follows the assigned amount.
+     */
+    @Test
+    fun `client with credit permission can list CXC and the condition follows the amount`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            assertTrue(
+                viewModel.state.value.formasPagoTarjetaOtro
+                    .any { it.siglas == "CXC" },
+            )
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "5.00"))
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+        }
+
+    /**
+     * 7. Partial cash tender + CXC for the remainder.
+     */
+    @Test
+    fun `partial cash plus CXC remainder derives CREDITO condition`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = Client(permiteCredito = true),
+                )
+
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SetTotalAmount(100.0))
+            viewModel.onAction(PaymentUiAction.KeyPadInput("4"))
+            viewModel.onAction(PaymentUiAction.KeyPadInput("0"))
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "60.00"))
+
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+            assertEquals(
+                40.0,
+                viewModel.state.value.tenderedAmountMoney
+                    .toDouble(),
+                0.001,
+            )
+            assertEquals(
+                60.0,
+                viewModel.state.value.cxcAssignedMoney
+                    .toDouble(),
+                0.001,
+            )
+        }
+
+    /**
+     * Stripping `permiteCredito` after a CXC entry was made clears the entry and reverts to CONTADO.
+     */
+    @Test
+    fun `losing credit permission mid-flow clears CXC amount and reverts condition`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val clientFlow = MutableStateFlow<Client?>(Client(permiteCredito = true))
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = null,
+                    clientFlow = clientFlow,
+                )
+
+            runCurrent()
+            clientFlow.value = Client(permiteCredito = true)
+            runCurrent()
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+
+            clientFlow.value = Client(permiteCredito = false)
+            runCurrent()
+
+            assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
+            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
+        }
+
+    /**
+     * End-to-end regression: cliente A habilita crédito → se asigna CXC → se cambia a cliente B sin
+     * crédito. No puede quedar monto CXC residual y un ProcessPayment posterior no puede pasar como
+     * crédito; el estado del cajero es coherente con lo que el backend validará.
+     */
+    @Test
+    fun `switching to a non-credit client after assigning CXC leaves no residual and blocks credit`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val clientFlow = MutableStateFlow<Client?>(Client(permiteCredito = true))
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
+                    client = null,
+                    clientFlow = clientFlow,
+                )
+
+            runCurrent()
+            // Cajero asigna CXC para el cliente con crédito
+            viewModel.onAction(PaymentUiAction.SetTotalAmount(50.0))
+            viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "50.00"))
+            assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
+            assertEquals(50.0, viewModel.state.value.cxcAssignedMoney.toDouble(), 0.001)
+
+            // Se reemplaza el cliente por uno que NO permite crédito (mismo flujo que seleccionar
+            // otro cliente en el directorio).
+            clientFlow.value = Client(permiteCredito = false)
+            runCurrent()
+
+            // El estado derivado debe ser coherente: cero CXC, CONTADO, sin crédito disponible
+            val stateAfterSwitch = viewModel.state.value
+            assertEquals(PaymentCondition.CONTADO, stateAfterSwitch.paymentCondition)
+            assertFalse(stateAfterSwitch.canUseCredit)
+            assertEquals(0.0, stateAfterSwitch.cxcAssignedMoney.toDouble(), 0.0)
+            assertTrue(
+                "No debe quedar ninguna entrada CXC residual en nonCashAmountsInput",
+                stateAfterSwitch.nonCashAmountsInput.none { (methodId) ->
+                    viewModel.state.value.formasPago
+                        .firstOrNull { it.idFormaPago == methodId }
+                        ?.siglas?.equals("CXC", ignoreCase = true) == true
+                },
+            )
+            // CXC tampoco debe aparecer listado para el nuevo cliente
+            assertFalse(stateAfterSwitch.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
+        }
+
+    /**
+     * 8. The financial snapshot exposed to the UI preserves subtotal / discount / tax / total.
+     */
+    @Test
+    fun `financial snapshot is exposed in state for the breakdown`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val snapshot =
+                SaleFinancialSnapshot(
+                    subtotalGross = 100.0,
+                    itemDiscounts = 5.0,
+                    subtotalNet = 95.0,
+                    tax = 15.2,
+                    total = 110.2,
+                )
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"))),
+                    snapshot = snapshot,
+                )
+
+            runCurrent()
+
+            val exposed = viewModel.state.value.financialSnapshot
+            assertEquals(100.0, exposed?.subtotalGross ?: 0.0, 0.001)
+            assertEquals(5.0, exposed?.itemDiscounts ?: 0.0, 0.001)
+            assertEquals(95.0, exposed?.subtotalNet ?: 0.0, 0.001)
+            assertEquals(15.2, exposed?.tax ?: 0.0, 0.001)
+            assertEquals(110.2, exposed?.total ?: 0.0, 0.001)
+        }
+
+    /**
+     * Venezuela tenant drives the "IVA" label surfaced in the breakdown.
+     */
+    @Test
+    fun `tax label adapts to country code`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1, "CASH"))),
+                    countryCode = "PA",
+                )
+
+            runCurrent()
+            assertEquals("ITBMS", viewModel.state.value.taxLabel)
         }
 
     @Test
@@ -237,6 +445,9 @@ class PaymentViewModelTest {
         methods: Result<List<FormaPago>>,
         executor: PaymentFlowExecutor = PaymentFlowExecutor { _, _ -> error("not used") },
         client: Client? = null,
+        clientFlow: MutableStateFlow<Client?>? = null,
+        snapshot: SaleFinancialSnapshot? = null,
+        countryCode: String = "VE",
     ): PaymentViewModel {
         val cajaReader =
             object : ActiveCajaReader {
@@ -248,7 +459,7 @@ class PaymentViewModelTest {
             }
         val countryReader =
             object : PaymentCountryReader {
-                override suspend fun currentCountryCode(): String = "VE"
+                override suspend fun currentCountryCode(): String = countryCode
             }
         val fakeSettings =
             object : PosSettingsRepository {
@@ -257,12 +468,18 @@ class PaymentViewModelTest {
                 override val factorySettings: Flow<TheFactorySettings> = flowOf(TheFactorySettings())
                 override val allowEditPrices: Flow<Boolean> = flowOf(true)
                 override val allowDiscounts: Flow<Boolean> = flowOf(true)
+
                 override suspend fun currentCountry(): ServerCountry? = null
+
                 override suspend fun savePrinterType(printerType: PrinterType) = Unit
+
                 override suspend fun saveFactorySettings(settings: TheFactorySettings) = Unit
+
                 override suspend fun saveAllowEditPrices(enabled: Boolean) = Unit
+
                 override suspend fun saveAllowDiscounts(enabled: Boolean) = Unit
             }
+        val resolvedClientFlow: MutableStateFlow<Client?> = clientFlow ?: MutableStateFlow(client)
         return PaymentViewModel(
             loadPaymentContext = LoadPaymentContextUseCase(cajaReader, methodRepository),
             loadPaymentCountry = LoadPaymentCountryUseCase(countryReader),
@@ -270,7 +487,8 @@ class PaymentViewModelTest {
             buildPaymentDetails = BuildPaymentDetailsUseCase(),
             executePaymentFlow = executor,
             posSettings = fakeSettings,
-            selectedClient = MutableStateFlow(client),
+            selectedClient = resolvedClientFlow,
+            cartFinancialSnapshot = MutableStateFlow(snapshot),
         )
     }
 

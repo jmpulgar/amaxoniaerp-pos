@@ -43,10 +43,11 @@ class HistoryViewModel(
     fun onSearchChanged(value: String) {
         _state.update { it.copy(filter = it.filter.copy(search = value.takeIf(String::isNotBlank))) }
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MILLIS)
-            refresh(_state.value.filter)
-        }
+        searchJob =
+            viewModelScope.launch {
+                delay(SEARCH_DEBOUNCE_MILLIS)
+                refresh(_state.value.filter)
+            }
     }
 
     fun onUsuarioChanged(value: String) {

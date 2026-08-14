@@ -69,16 +69,26 @@ class VenezuelaInvoiceTicketFormatter {
         // para el SENIAT; el bloque fiscal digital aparece al final del ticket.
         add(TicketElement.Text(TICKET_TITLE, TicketAlign.CENTER, bold = true))
         add(TicketElement.Text(payload.empresa.nombre.uppercase(), TicketAlign.CENTER, bold = true))
-        payload.empresa.ruc?.takeIfNotBlank()?.let { add(TicketElement.Text("$RIF_LABEL: $it", TicketAlign.CENTER)) }
-        payload.empresa.direccion?.takeIfNotBlank()?.let { add(TicketElement.Text(it, TicketAlign.CENTER)) }
-        payload.empresa.telefono?.takeIfNotBlank()?.let { add(TicketElement.Text("Teléfono: $it", TicketAlign.CENTER)) }
+        payload.empresa.ruc
+            ?.takeIfNotBlank()
+            ?.let { add(TicketElement.Text("$RIF_LABEL: $it", TicketAlign.CENTER)) }
+        payload.empresa.direccion
+            ?.takeIfNotBlank()
+            ?.let { add(TicketElement.Text(it, TicketAlign.CENTER)) }
+        payload.empresa.telefono
+            ?.takeIfNotBlank()
+            ?.let { add(TicketElement.Text("Teléfono: $it", TicketAlign.CENTER)) }
         add(TicketElement.Feed(SINGLE_FEED))
     }
 
     private fun MutableList<TicketElement>.addInvoiceMetadata(payload: FacturaPrintPayloadDto) {
         addDateAndTime(payload.fecha)
-        payload.empresa.tienda?.takeIfNotBlank()?.let { add(labelValue("Sucursal:", it)) }
-        payload.empresa.caja?.takeIfNotBlank()?.let { add(labelValue("Caja:", it)) }
+        payload.empresa.tienda
+            ?.takeIfNotBlank()
+            ?.let { add(labelValue("Sucursal:", it)) }
+        payload.empresa.caja
+            ?.takeIfNotBlank()
+            ?.let { add(labelValue("Caja:", it)) }
         add(labelValue("Factura:", payload.numeroFactura))
         payload.vendedor?.takeIfNotBlank()?.let { add(labelValue("Vendedor:", it)) }
         add(TicketElement.Divider)
@@ -138,12 +148,29 @@ class VenezuelaInvoiceTicketFormatter {
     }
 
     private fun MutableList<TicketElement>.addTotals(payload: FacturaPrintPayloadDto) {
-        add(labelValue("Subtotal Items:", payload.subtotal))
-        payload.montoExento?.takeIfNotBlank()?.let { add(labelValue("Monto Exento:", it)) }
-        add(labelValue("$TAX_ABBR_TOTAL_LABEL", payload.totalImpuesto))
-        add(labelValue("Total:", payload.total))
+        // Totals are emitted as TotalsRow so the printer renders each row as a single physical
+        // line, mirroring the Panamá formatter. SUNMI treats `widths` as proportional weights,
+        // not characters, so any label longer than its column used to spill a single character
+        // to the next row. The Descuento line is always present (defaults to "0.00") to match
+        // the breakdown the cashier saw on the Cobro screen.
+        add(totalsRow("Subtotal Items:", payload.subtotal))
+        payload.montoExento?.takeIfNotBlank()?.let { add(totalsRow("Monto Exento:", it)) }
+        add(totalsRow("Descuento:", payload.descuento ?: DEFAULT_DISCOUNT))
+        add(totalsRow("$TAX_ABBR_TOTAL_LABEL", payload.totalImpuesto))
+        add(totalsRow("Total:", payload.total))
         add(TicketElement.Divider)
     }
+
+    private fun totalsRow(
+        label: String,
+        value: String,
+    ): TicketElement.TotalsRow =
+        TicketElement.TotalsRow(
+            label = label,
+            value = value,
+            labelWidth = TOTALS_LABEL_WIDTH,
+            printerWidth = VENEZUELA_PRINTER_WIDTH,
+        )
 
     /**
      * IGTF: **solo** cuando el tenant lo aplica (pago en divisa) y el monto
@@ -206,8 +233,7 @@ class VenezuelaInvoiceTicketFormatter {
     // Helpers
     // ───────────────────────────────────────────────────────────────────────
 
-    private fun formatPaymentLine(payment: PagoPrintDto): TicketElement.Columns =
-        labelValue(payment.metodo.uppercase(), payment.monto)
+    private fun formatPaymentLine(payment: PagoPrintDto): TicketElement.Columns = labelValue(payment.metodo.uppercase(), payment.monto)
 
     private fun labelValue(
         label: String,
@@ -218,7 +244,6 @@ class VenezuelaInvoiceTicketFormatter {
             widths = listOf(LABEL_WIDTH, VALUE_WIDTH),
             aligns = listOf(TicketAlign.LEFT, TicketAlign.RIGHT),
         )
-
 
     /**
      * Indica si un monto en string (p.ej. "0", "0.00", "0,00") representa cero.
@@ -237,6 +262,13 @@ class VenezuelaInvoiceTicketFormatter {
         const val VALUE_WIDTH = 22
         const val TIME_TEXT_LENGTH = 8
         const val DIVIDER_LENGTH = 40
+
+        // SUNMI v2 58mm thermal printer = 40 physical columns at the default font in VE.
+        // Distinct from Panamá (32 cols) because Venezuela pins font size to the default and
+        // uses the wider 40-column layout documented in ticket_builder.php.
+        const val VENEZUELA_PRINTER_WIDTH = 40
+        const val TOTALS_LABEL_WIDTH = 20
+        const val DEFAULT_DISCOUNT = "0.00"
 
         // ── Feeds ──────────────────────────────────────────────────────────
         const val SINGLE_FEED = 1

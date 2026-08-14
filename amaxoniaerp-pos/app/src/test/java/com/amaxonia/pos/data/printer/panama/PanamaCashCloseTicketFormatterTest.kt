@@ -63,6 +63,8 @@ class PanamaCashCloseTicketFormatterTest {
             is TicketElement.Columns ->
                 "COLUMNS|${element.values.joinToString("~")}|${element.widths.joinToString(",")}|" +
                     element.aligns.joinToString(",")
+            is TicketElement.TotalsRow ->
+                "TOTALS|${element.bold}|${element.labelWidth}|${element.printerWidth}|${element.label}|${element.value}"
             is TicketElement.Qr -> "QR|${element.size}|${element.value}"
             is TicketElement.Feed -> "FEED|${element.lines}"
             TicketElement.Divider -> "DIVIDER"

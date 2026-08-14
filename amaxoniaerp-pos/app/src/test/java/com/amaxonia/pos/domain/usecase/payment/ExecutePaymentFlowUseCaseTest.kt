@@ -148,8 +148,19 @@ class ExecutePaymentFlowUseCaseTest {
                 ) {}
 
             assertTrue(result is PaymentFlowResult.Success)
-            assertEquals("credito", fixture.sales.request?.factura?.formaPago)
-            assertEquals(10.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
+            assertEquals(
+                "credito",
+                fixture.sales.request
+                    ?.factura
+                    ?.formaPago,
+            )
+            assertEquals(
+                10.0,
+                fixture.sales.request
+                    ?.pagoResumen
+                    ?.totalizarSaldoPendiente ?: -1.0,
+                0.0,
+            )
         }
 
     @Test
@@ -174,11 +185,24 @@ class ExecutePaymentFlowUseCaseTest {
                 ) {}
 
             assertTrue(result is PaymentFlowResult.Success)
-            assertEquals("credito", fixture.sales.request?.factura?.formaPago)
-            assertEquals(6.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
+            assertEquals(
+                "credito",
+                fixture.sales.request
+                    ?.factura
+                    ?.formaPago,
+            )
+            assertEquals(
+                6.0,
+                fixture.sales.request
+                    ?.pagoResumen
+                    ?.totalizarSaldoPendiente ?: -1.0,
+                0.0,
+            )
             assertEquals(
                 mapOf("CASH" to 4.0, "CXC" to 6.0),
-                fixture.sales.request?.pagoResumen?.montosPorTipo,
+                fixture.sales.request
+                    ?.pagoResumen
+                    ?.montosPorTipo,
             )
         }
 
@@ -197,8 +221,19 @@ class ExecutePaymentFlowUseCaseTest {
                 ) {}
 
             assertTrue(result is PaymentFlowResult.Success)
-            assertEquals("contado", fixture.sales.request?.factura?.formaPago)
-            assertEquals(0.0, fixture.sales.request?.pagoResumen?.totalizarSaldoPendiente ?: -1.0, 0.0)
+            assertEquals(
+                "contado",
+                fixture.sales.request
+                    ?.factura
+                    ?.formaPago,
+            )
+            assertEquals(
+                0.0,
+                fixture.sales.request
+                    ?.pagoResumen
+                    ?.totalizarSaldoPendiente ?: -1.0,
+                0.0,
+            )
         }
 
     @Test

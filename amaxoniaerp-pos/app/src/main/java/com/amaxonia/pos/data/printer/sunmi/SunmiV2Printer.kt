@@ -38,9 +38,10 @@ class SunmiV2Printer(
                 when (element) {
                     is TicketElement.Text -> {
                         service.setAlignment(element.align.toSunmiAlign(), null)
-                        if (element.bold) service.setFontSize(28f, null) else service.setFontSize(24f, null)
+                        val size = if (element.bold) SunmiFontSize.BOLD else SunmiFontSize.REGULAR
+                        service.setFontSize(size, null)
                         service.printText(element.value + "\n", null)
-                        service.setFontSize(24f, null)
+                        service.setFontSize(SunmiFontSize.REGULAR, null)
                     }
 
                     is TicketElement.Columns -> {
@@ -51,6 +52,20 @@ class SunmiV2Printer(
                             element.aligns.map { it.toSunmiAlign() }.toIntArray(),
                             null,
                         )
+                    }
+
+                    is TicketElement.TotalsRow -> {
+                        // Render the totals row as a single physical line so trailing characters
+                        // of long labels ("Subtotal Items:", "Total Impuesto:") never wrap to the
+                        // next physical line on the SUNMI thermal printer.
+                        service.setAlignment(TicketAlign.LEFT.toSunmiAlign(), null)
+                        if (element.bold) {
+                            service.setFontSize(SunmiFontSize.TOTALS_BOLD, null)
+                        } else {
+                            service.setFontSize(SunmiFontSize.TOTALS_REGULAR, null)
+                        }
+                        service.printText(element.formatMonospacedLine() + "\n", null)
+                        service.setFontSize(SunmiFontSize.TOTALS_REGULAR, null)
                     }
 
                     is TicketElement.Qr -> {
@@ -88,4 +103,39 @@ class SunmiV2Printer(
             TicketAlign.CENTER -> 1
             TicketAlign.RIGHT -> 2
         }
+}
+
+/**
+ * SUNMI v2 font sizes (points) used by [SunmiV2Printer]. Centralized so detekt magic-number
+ * rule does not flag the print pipeline.
+ */
+private object SunmiFontSize {
+    const val REGULAR = 24f
+    const val BOLD = 28f
+    const val TOTALS_REGULAR = 24f
+    const val TOTALS_BOLD = 26f
+}
+
+/**
+ * Builds a single physical line for [TicketElement.TotalsRow], guaranteeing that the rendered
+ * output never wraps a single trailing character.
+ *
+ * The label is padded to [TotalsRow.labelWidth] and the value is right-aligned within the
+ * remaining space. The four canonical labels ("Subtotal Items:", "Descuento:", "Total Impuesto:"
+ * / "Total IVA:" and "Total:") are designed to fit within the formatter-provided [TotalsRow.labelWidth],
+ * so no ellipsis is ever emitted. The Unicode "…" glyph is intentionally avoided because some
+ * SUNMI firmware revisions render it as "?".
+ *
+ * Defensive truncation still keeps the layout intact if a future label overflows [TotalsRow.labelWidth]:
+ * the label is hard-truncated to [TotalsRow.labelWidth] (no ellipsis) and the value gets the
+ * remaining physical width.
+ */
+private fun TicketElement.TotalsRow.formatMonospacedLine(): String {
+    val width = printerWidth.coerceAtLeast(1)
+    val safeLabel = if (label.length <= labelWidth) label else label.take(labelWidth)
+    val paddedLabel = safeLabel.padEnd(labelWidth)
+    val remaining = (width - paddedLabel.length).coerceAtLeast(0)
+    val safeValue = value.take(remaining)
+    val paddedValue = if (safeValue.length < remaining) safeValue.padStart(remaining) else safeValue
+    return (paddedLabel + paddedValue).take(width)
 }

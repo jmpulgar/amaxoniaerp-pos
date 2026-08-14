@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
-import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import com.amaxonia.pos.domain.repository.TableAccountPaymentReader
 import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsInput
@@ -17,20 +17,20 @@ import com.amaxonia.pos.domain.usecase.payment.PaymentFlowEvent
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowExecutor
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.PaymentMethodsResult
-import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Suppress("LongParameterList")
 class PaymentViewModel(
     private val loadPaymentContext: LoadPaymentContextUseCase,
     private val loadPaymentCountry: LoadPaymentCountryUseCase,
@@ -40,6 +40,7 @@ class PaymentViewModel(
     private val posSettings: PosSettingsRepository,
     private val selectedClient: StateFlow<Client?> = MutableStateFlow(null),
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
+    private val cartFinancialSnapshot: StateFlow<SaleFinancialSnapshot?> = MutableStateFlow(null),
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
 
@@ -51,15 +52,34 @@ class PaymentViewModel(
 
     init {
         initializePaymentContext()
-        viewModelScope.launch { countryCode = loadPaymentCountry() }
+        viewModelScope.launch {
+            val country = loadPaymentCountry()
+            countryCode = country
+            _state.update { it.copy(taxLabel = taxLabelFor(country)) }
+        }
+        // Cart sales: subscribe to the canonical financial snapshot so the UI shows
+        // exactly what the backend will invoice. Table-account sales override this
+        // via the tableAccountPaymentReader below.
+        viewModelScope.launch {
+            cartFinancialSnapshot.collect { snapshot -> _state.update { it.copy(financialSnapshot = snapshot) } }
+        }
+        viewModelScope.launch {
+            tableAccountPaymentReader?.current?.collect { payment ->
+                val snapshot = payment?.financialSnapshot
+                if (snapshot != null) {
+                    _state.update { it.copy(financialSnapshot = snapshot) }
+                }
+            }
+        }
         viewModelScope.launch {
             selectedClient.collect { client ->
                 val canUseCredit = client?.permiteCredito == true
                 _state.update { current ->
-                    if (current.paymentCondition == PaymentCondition.CREDITO && !canUseCredit) {
+                    if (!canUseCredit && current.cxcAssignedMoney > Money.ZERO) {
+                        // Client no longer allows credit → drop any CXC amounts so the
+                        // derived condition reverts to CONTADO automatically.
                         current.copy(
-                            paymentCondition = PaymentCondition.CONTADO,
-                            canUseCredit = false,
+                            canUseCredit = canUseCredit,
                             nonCashAmountsInput = current.withoutCxcAmounts(),
                         )
                     } else {
@@ -84,7 +104,6 @@ class PaymentViewModel(
                 }
             is PaymentUiAction.SelectMethod ->
                 _state.update { it.copy(selectedMethod = action.method, showInsufficientReminder = false) }
-            is PaymentUiAction.SelectCondition -> selectPaymentCondition(action.condition)
             is PaymentUiAction.SetExactNonCashAmount -> setExactNonCashAmount(action.paymentMethodId)
             is PaymentUiAction.SetNonCashAmount -> setNonCashAmount(action.paymentMethodId, action.amount)
             PaymentUiAction.ProcessPayment -> processPayment()
@@ -95,37 +114,13 @@ class PaymentViewModel(
         }
     }
 
-    private fun selectPaymentCondition(condition: PaymentCondition) {
-        val clientAllowsCredit = selectedClient.value?.permiteCredito == true
-        val failure = validatePayment.validatePaymentCondition(condition, clientAllowsCredit)
-        if (failure != null) {
-            _state.update {
-                it.copy(
-                    paymentCondition = PaymentCondition.CONTADO,
-                    canUseCredit = clientAllowsCredit,
-                    nonCashAmountsInput = it.withoutCxcAmounts(),
-                    paymentError = failure.message,
-                    showInsufficientReminder = false,
-                )
-            }
-            return
-        }
-
-        _state.update {
-            it.copy(
-                paymentCondition = condition,
-                canUseCredit = clientAllowsCredit,
-                nonCashAmountsInput =
-                    if (condition == PaymentCondition.CONTADO) it.withoutCxcAmounts() else it.nonCashAmountsInput,
-                paymentError = null,
-                showInsufficientReminder = false,
-            )
-        }
-    }
-
+    /**
+     * Assigns the remaining balance to a non-cash method. CXC is silently rejected
+     * when the selected client does not allow credit, so the derived condition stays CONTADO.
+     */
     private fun setExactNonCashAmount(paymentMethodId: Int) {
         _state.update { current ->
-            if (current.paymentCondition != PaymentCondition.CREDITO && current.isCxcPaymentMethod(paymentMethodId)) {
+            if (!current.canUseCredit && current.isCxcPaymentMethod(paymentMethodId)) {
                 return@update current.copy(nonCashAmountsInput = current.withoutCxcAmounts())
             }
             val assignedToOtherMethods =
@@ -156,7 +151,7 @@ class PaymentViewModel(
     ) {
         val normalized = Money.normalizeInput(amount)
         _state.update { current ->
-            if (current.paymentCondition != PaymentCondition.CREDITO && current.isCxcPaymentMethod(paymentMethodId)) {
+            if (!current.canUseCredit && current.isCxcPaymentMethod(paymentMethodId)) {
                 return@update current.copy(nonCashAmountsInput = current.withoutCxcAmounts())
             }
             current.copy(
@@ -173,10 +168,11 @@ class PaymentViewModel(
         val currentState = _state.value
         when {
             currentState.isProcessingPayment -> Unit
+            // The condition is auto-derived; the validator only enforces the credit
+            // permission so a stale CXC entry cannot slip through if the client lost credit.
             validatePayment.validatePaymentCondition(currentState.paymentCondition, currentState.canUseCredit) != null ->
                 _state.update {
                     it.copy(
-                        paymentCondition = PaymentCondition.CONTADO,
                         nonCashAmountsInput = it.withoutCxcAmounts(),
                         paymentError = "El cliente seleccionado no permite ventas a crédito",
                     )
@@ -333,11 +329,13 @@ class PaymentViewModel(
             secondaryCurrency = abrMonedaSecundaria,
             isMultiCurrency = isMultiCurrency,
             availableMethods = formasPago,
+            // Condition is now derived exclusively from the CXC amount + credit permission,
+            // never from a manual selector. See [PaymentState.paymentCondition].
             paymentCondition = paymentCondition,
             preferredCorrelationId = tablePayment?.correlationId,
             correlationCarryOver = tablePayment?.correlationId,
             saleItemsOverride = tablePayment?.saleItems,
-            financialSnapshotOverride = tablePayment?.financialSnapshot,
+            financialSnapshotOverride = tablePayment?.financialSnapshot ?: financialSnapshot,
             cuentaMesa = tablePayment?.saleContext,
             printerType = printerType,
         )
@@ -378,6 +376,19 @@ class PaymentViewModel(
             ?.siglas
             ?.trim()
             ?.equals("CXC", ignoreCase = true) == true
+
+    /**
+     * Country-aware tax label. The POS surfaces this in the financial breakdown so
+     * Venezuelians see "IVA" and Panamanians see "ITBMS" while the multi-country
+     * fallback remains "Impuesto". Does not break compatibility: the underlying
+     * financial values are unchanged.
+     */
+    private fun taxLabelFor(country: String): String =
+        when (country.uppercase()) {
+            "VE" -> "IVA"
+            "PA" -> "ITBMS"
+            else -> "Impuesto"
+        }
 
     private companion object {
         const val TAG = "PaymentVM"

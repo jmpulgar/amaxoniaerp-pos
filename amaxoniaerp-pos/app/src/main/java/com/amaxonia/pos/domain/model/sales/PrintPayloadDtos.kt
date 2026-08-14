@@ -15,6 +15,15 @@ data class FacturaPrintPayloadDto(
     val montoExento: String? = null,
     val totalImpuesto: String,
     val total: String,
+    /**
+     * Total line-item discount applied to this invoice (`SUM(_item_montodescuento)`).
+     *
+     * Computed by the backend with `BigDecimal` and exposed in the print payload so the
+     * Android formatter can show "Descuento: $ X.XX" without re-parsing formatted strings.
+     * Defaults to null for backward compatibility with backends that haven't deployed the new
+     * field yet; formatters fall back to "0.00" when absent.
+     */
+    val descuento: String? = null,
     val pagos: List<PagoPrintDto>,
     val cambio: String? = null,
     val qrUrl: String? = null,

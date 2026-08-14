@@ -44,4 +44,3 @@ data class BuildSaleRequestInput(
      */
     val printerType: PrinterType = PrinterType.NONE,
 )
-

@@ -13,6 +13,16 @@ data class FacturaPrintPayloadResponse(
     val productos: List<ProductoPrintResponse>,
     val subtotal: String,
     val montoExento: String? = null,
+    /**
+     * Total line-item discount aggregated from `factura_detalle._item_montodescuento` and
+     * serialized as a money string with 2 decimal places. The arithmetic is done in
+     * [BigDecimal] in [FacturasRepository.getPrintPayload] so no IEEE-754 residue leaks into the
+     * printed total. Android clients consume this as `FacturaPrintPayloadDto.descuento`.
+     *
+     * Nullable for backward compatibility with old clients: when the field is absent the printer
+     * formatter falls back to "0.00" on the receipt.
+     */
+    val descuento: String? = null,
     val totalImpuesto: String,
     val total: String,
     val pagos: List<PagoPrintResponse>,

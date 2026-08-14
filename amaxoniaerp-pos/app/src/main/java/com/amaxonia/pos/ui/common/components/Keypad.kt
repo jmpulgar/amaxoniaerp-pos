@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,32 +30,44 @@ private val KEY_ROWS =
         listOf("C", "0", "."),
     )
 
-private const val DIGITS_COLUMN_WEIGHT = 3f
-
 /**
  * Reusable POS numeric keypad: a 3x4 digit grid plus a caller-supplied action column
  * (e.g. backspace + a "cobrar"/confirm button). Emits the raw key string ("0"-"9", ".", "C", "BACK")
  * matching the existing PaymentUiAction.KeyPadInput contract.
+ *
+ * The action column historically consumed 1/4 of the horizontal space which forced the COBRAR
+ * button into a vertical, wrap-prone layout. Callers may now opt out of the action column with
+ * [compactActions] = false and supply a full-width primary action below the keypad instead, via
+ * [belowKeypad].
  */
 @Composable
 fun Keypad(
     onKey: (String) -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp? = 350.dp,
-    actionColumn: @Composable ColumnScope.() -> Unit,
+    height: Dp? = 320.dp,
+    actionColumn: (@Composable ColumnScope.() -> Unit)? = null,
+    belowKeypad: (@Composable () -> Unit)? = null,
 ) {
     val sizeModifier = if (height != null) Modifier.height(height) else Modifier.fillMaxHeight()
-    Row(modifier = modifier.fillMaxWidth().then(sizeModifier)) {
-        Column(modifier = Modifier.weight(DIGITS_COLUMN_WEIGHT)) {
-            KEY_ROWS.forEach { rowKeys ->
-                Row(modifier = Modifier.weight(1f)) {
-                    rowKeys.forEach { key ->
-                        KeypadKey(key, Modifier.weight(1f)) { onKey(key) }
+    Column(modifier = modifier.fillMaxWidth().then(sizeModifier)) {
+        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Numeric grid takes the whole width when there's no action column, or 3/4 when callers
+            // still want the legacy backspace/confirm column.
+            val gridWeight = if (actionColumn == null) 1f else KEY_GRID_WEIGHT
+            Column(modifier = Modifier.weight(gridWeight)) {
+                KEY_ROWS.forEach { rowKeys ->
+                    Row(modifier = Modifier.weight(1f)) {
+                        rowKeys.forEach { key ->
+                            KeypadKey(key, Modifier.weight(1f)) { onKey(key) }
+                        }
                     }
                 }
             }
+            if (actionColumn != null) {
+                Column(modifier = Modifier.weight(ACTION_COLUMN_WEIGHT), content = actionColumn)
+            }
         }
-        Column(modifier = Modifier.weight(1f), content = actionColumn)
+        belowKeypad?.invoke()
     }
 }
 
@@ -69,6 +82,7 @@ fun KeypadKey(
             modifier
                 .fillMaxHeight()
                 .padding(4.dp)
+                .defaultMinSize(minHeight = 48.dp)
                 .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -107,7 +121,7 @@ fun KeypadDisplay(
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(8.dp))
-        Row {
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(currencyPrefix, style = PosTextStyles.totalDisplay, color = MaterialTheme.colorScheme.primary)
             Text(amountText, style = PosTextStyles.totalDisplay, color = MaterialTheme.colorScheme.primary)
         }
@@ -121,3 +135,6 @@ fun KeypadDisplay(
         extraContent()
     }
 }
+
+private const val KEY_GRID_WEIGHT = 3f
+private const val ACTION_COLUMN_WEIGHT = 1f

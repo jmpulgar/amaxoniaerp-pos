@@ -148,7 +148,8 @@ class BuildSaleRequestUseCaseTest {
                     "PrinterType=$printer no debe setear useHka20",
                     false,
                     request.useHka20,
-                )            }
+                )
+            }
     }
 
     @Test

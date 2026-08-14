@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.payment
 
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.FormapagoDetallePayload
@@ -11,7 +12,6 @@ data class PaymentState(
     val totalAmount: Double = 0.0,
     val tenderedAmountInput: String = "0",
     val selectedMethod: PaymentMethod = PaymentMethod.CASH,
-    val paymentCondition: PaymentCondition = PaymentCondition.CONTADO,
     val canUseCredit: Boolean = false,
     val isSuccess: Boolean = false,
     val formasPago: List<FormaPago> = emptyList(),
@@ -29,7 +29,41 @@ data class PaymentState(
     val tasa: Double = 0.0,
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
+    /**
+     * Source-of-truth financial breakdown for the cart or table account currently
+     * traversing the payment pipeline. Drives the on-screen Subtotal / Discount /
+     * Tax / Total block so the cashier sees exactly what will be invoiced.
+     *
+     * - Cart sales: [com.amaxonia.pos.domain.repository.CartRepository.financialSnapshot]
+     * - Table account sales: [com.amaxonia.pos.domain.repository.TableAccountPayment.financialSnapshot]
+     *
+     * May be null when no breakdown has been computed yet; the UI falls back to the
+     * `totalAmount` only for the hero amount, never for the breakdown rows.
+     */
+    val financialSnapshot: SaleFinancialSnapshot? = null,
+    /**
+     * localized tax label for the current tenant (e.g. "IVA" in VE, "ITBMS"/"Impuesto" in PA).
+     * Empty when unknown; the UI falls back to a neutral label.
+     */
+    val taxLabel: String = "",
 ) {
+    /**
+     * Auto-derived payment condition:
+     * - `CREDITO` only when at least one non-cash method with `siglas == "CXC"` carries an
+     *   amount > 0 AND the selected client allows credit.
+     * - `CONTADO` otherwise.
+     *
+     * A plain credit-card payment (`CRED`, `TDC`, etc.) is NOT a CxC and never sets CREDITO.
+     * Removing the CXC amount (or losing the credit permission) automatically reverts to CONTADO.
+     */
+    val paymentCondition: PaymentCondition
+        get() =
+            if (canUseCredit && cxcAssignedMoney > Money.ZERO) {
+                PaymentCondition.CREDITO
+            } else {
+                PaymentCondition.CONTADO
+            }
+
     val totalAmountMoney: Money
         get() = Money.fromDouble(totalAmount)
 
@@ -43,13 +77,27 @@ data class PaymentState(
         get() =
             formasPago
                 .filterNot { it.siglas.equals("CASH", ignoreCase = true) }
-                .filter { paymentCondition == PaymentCondition.CREDITO || !it.isCxc() }
+                // CXC is only listed when the selected client allows credit; never
+                // otherwise. The condition (CONTADO/CREDITO) is derived downstream
+                // from the actual amount assigned to CXC, so we must NOT filter on it
+                // here — otherwise the cashier could never seed the CXC line.
+                .filter { canUseCredit || !it.isCxc() }
 
     val nonCashAssignedMoney: Money
         get() =
             nonCashAmountsInput.values.fold(Money.ZERO) { acc, amount ->
                 acc + Money.parse(amount)
             }
+
+    /**
+     * Amount currently assigned to the CXC method (only present when allowed by the client).
+     * Used both to derive [paymentCondition] and to clear it when the client loses credit.
+     */
+    val cxcAssignedMoney: Money
+        get() =
+            nonCashAmountsInput.entries
+                .filter { (methodId) -> isCxcPaymentMethod(methodId) }
+                .fold(Money.ZERO) { acc, (_, amount) -> acc + Money.parse(amount) }
 
     val assignedAmountMoney: Money
         get() = tenderedAmountMoney + nonCashAssignedMoney
@@ -83,6 +131,13 @@ data class PaymentState(
 
     val isPaymentEnough: Boolean
         get() = assignedAmountMoney >= totalAmountMoney
+
+    /**
+     * Effective tax label surfaced in the financial breakdown: prefer the explicit
+     * tenant label, otherwise default to "Impuesto". Venezuela always uses "IVA".
+     */
+    val effectiveTaxLabel: String
+        get() = taxLabel.takeIf { it.isNotBlank() } ?: "Impuesto"
 
     fun toBs(amount: Double): Double {
         if (!isMultiCurrency || tasa <= 0.0) return 0.0
@@ -139,6 +194,13 @@ data class PaymentState(
 
     val monedaSecundariaLabel: String
         get() = formatCurrencyLabel(abrMonedaSecundaria)
+
+    private fun isCxcPaymentMethod(paymentMethodId: Int): Boolean =
+        formasPago
+            .firstOrNull { it.idFormaPago == paymentMethodId }
+            ?.siglas
+            ?.trim()
+            ?.equals("CXC", ignoreCase = true) == true
 }
 
 fun formatCurrencyLabel(abr: String): String {
@@ -171,10 +233,6 @@ sealed interface PaymentUiAction {
 
     data class SelectMethod(
         val method: PaymentMethod,
-    ) : PaymentUiAction
-
-    data class SelectCondition(
-        val condition: PaymentCondition,
     ) : PaymentUiAction
 
     data class SetExactNonCashAmount(

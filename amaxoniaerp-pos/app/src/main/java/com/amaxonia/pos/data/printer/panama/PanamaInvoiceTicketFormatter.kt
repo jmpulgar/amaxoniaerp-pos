@@ -151,18 +151,33 @@ class PanamaInvoiceTicketFormatter {
         payload: FacturaPrintPayloadDto,
         countryCode: String,
     ) {
-        add(labelValue("Subtotal Items:", payload.subtotal))
-        payload.montoExento?.takeIfNotBlank()?.let { add(labelValue("Monto Exento:", it)) }
-        val taxLabel =
-            if (countryCode.equals(VENEZUELA_CODE, ignoreCase = true)) {
-                "Total IVA:"
-            } else {
-                "Total Impuesto:"
-            }
-        add(labelValue(taxLabel, payload.totalImpuesto))
-        add(labelValue("Total:", payload.total))
+        // Totals are emitted as TotalsRow so the printer renders each one as a single physical
+        // line. The SUNMI `printColumnsString` API interprets `widths` as column proportions, not
+        // character counts, so a label longer than its column ("Subtotal Items:", "Total
+        // Impuesto:") used to leave a single trailing character on the next physical row.
+        val isVenezuela = countryCode.equals(VENEZUELA_CODE, ignoreCase = true)
+        val taxLabel = if (isVenezuela) "Total IVA:" else "Total Impuesto:"
+        add(totalsRow("Subtotal Items:", payload.subtotal))
+        payload.montoExento?.takeIfNotBlank()?.let { add(totalsRow("Monto Exento:", it)) }
+        // Always show Descuento (backed by the backend `_item_montodescuento` sum) so the cashier
+        // and the customer see the exact same breakdown as the on-screen Cobro. Old backends
+        // without the field fall back to "0.00".
+        add(totalsRow("Descuento:", payload.descuento ?: DEFAULT_DISCOUNT))
+        add(totalsRow(taxLabel, payload.totalImpuesto))
+        add(totalsRow("Total:", payload.total))
         add(TicketElement.Divider)
     }
+
+    private fun totalsRow(
+        label: String,
+        value: String,
+    ): TicketElement.TotalsRow =
+        TicketElement.TotalsRow(
+            label = label,
+            value = value,
+            labelWidth = TOTALS_LABEL_WIDTH,
+            printerWidth = PANAMA_PRINTER_WIDTH,
+        )
 
     private fun MutableList<TicketElement>.addPayments(payload: FacturaPrintPayloadDto) {
         add(TicketElement.Text("MÉTODOS DE PAGO:", TicketAlign.LEFT, bold = true))
@@ -228,6 +243,15 @@ class PanamaInvoiceTicketFormatter {
         const val HALF_LINE_WIDTH = 16
         const val FISCAL_TEXT_WIDTH = 32
         const val TIME_TEXT_LENGTH = 8
+
+        // SUNMI v2 58mm thermal printer = 32 physical columns at the default font used by the
+        // totals block (24pt). Designed against the printer's physical width, NOT against the
+        // previous `widths` array that SUNMI treats as proportional weights.
+        const val PANAMA_PRINTER_WIDTH = 32
+
+        // Wide enough for the longest total label ("Subtotal Items:" = 15 chars) + 1-char gutter.
+        const val TOTALS_LABEL_WIDTH = 18
+        const val DEFAULT_DISCOUNT = "0.00"
         const val PANAMA_CODE = "PA"
         const val VENEZUELA_CODE = "VE"
         const val DGI_ACCESS_URL = "https://dgi-fep.mef.gob.pa/Consultas/FacturasPorCUFE"
