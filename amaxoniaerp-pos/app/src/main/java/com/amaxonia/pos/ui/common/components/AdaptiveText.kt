@@ -10,7 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -19,39 +18,39 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 
-/**
- * Monetary text that gracefully shrinks its font size when the content would otherwise
- * overflow the available width. Styling can be supplied either through [baseStyle] or the
- * optional text overrides, which keeps call sites concise while preserving one reusable
- * implementation for narrow POS displays.
- */
+/** Optional fitting and typography overrides for [AdaptiveAmountText]. */
+data class AdaptiveAmountOptions(
+    val minFontSizeSp: Float = 14f,
+    val fontWeight: FontWeight? = null,
+    val textAlign: TextAlign? = null,
+    val maxLines: Int = 1,
+)
+
+/** Monetary text that shrinks only when the available width requires it. */
 @Composable
 fun AdaptiveAmountText(
     text: String,
     baseStyle: TextStyle,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
-    minFontSizeSp: Float = 14f,
-    fontWeight: FontWeight? = null,
-    textAlign: TextAlign? = null,
-    maxLines: Int = 1,
+    options: AdaptiveAmountOptions = AdaptiveAmountOptions(),
 ) {
     val baseFontSize: TextUnit = if (baseStyle.fontSize.isSpecified) baseStyle.fontSize else 16.sp
     val resolvedStyle =
         baseStyle.copy(
             color = if (color.isSpecified) color else LocalContentColor.current,
-            fontWeight = fontWeight ?: baseStyle.fontWeight,
-            textAlign = textAlign ?: baseStyle.textAlign,
+            fontWeight = options.fontWeight ?: baseStyle.fontWeight,
+            textAlign = options.textAlign ?: baseStyle.textAlign,
         )
-    val minScale = (minFontSizeSp / baseFontSize.value).coerceIn(MIN_FLOOR, 1f)
-    var scale by remember(text, resolvedStyle, minFontSizeSp, maxLines) { mutableFloatStateOf(1f) }
+    val minScale = (options.minFontSizeSp / baseFontSize.value).coerceIn(MIN_FLOOR, 1f)
+    var scale by remember(text, resolvedStyle, options) { mutableFloatStateOf(1f) }
 
     Text(
         text = text,
         modifier = modifier,
         style = resolvedStyle,
         fontSize = (baseFontSize.value * scale).sp,
-        maxLines = maxLines,
+        maxLines = options.maxLines,
         softWrap = false,
         overflow = TextOverflow.Clip,
         onTextLayout = { result ->
