@@ -113,7 +113,6 @@ import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.isLandscape
-import com.amaxonia.pos.ui.common.paymentOperation
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.paymentMethodColor
