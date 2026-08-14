@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Suppress("LongParameterList")
 class PaymentViewModel(
     private val loadPaymentContext: LoadPaymentContextUseCase,
     private val loadPaymentCountry: LoadPaymentCountryUseCase,
