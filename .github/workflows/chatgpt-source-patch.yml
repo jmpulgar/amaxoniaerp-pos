@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: contains(github.event.head_commit.message, 'run detekt patch a')
+    if: contains(github.event.head_commit.message, 'run detekt patch b')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +18,7 @@ jobs:
           ref: chatgpt/phase4-detekt-cleanup
           fetch-depth: 0
 
-      - name: Refactor remaining Compose findings A
+      - name: Refactor final Detekt findings
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -44,203 +44,48 @@ jobs:
                   raise SystemExit(f'Missing region: {label}') from exc
               return text[:s] + replacement + text[e:]
 
-          # ---- CierreCajaScreen ----
-          path = root / 'ui/caja/CierreCajaScreen.kt'
-          text = read(path)
-          text = replace_once(
-              text,
-              '''/** Acciones del cierre agrupadas para mantener las firmas de los composables pequeñas. */
-          internal class CierreCajaActions(
-              val onConfirmClose: () -> Unit,
-              val onPrintReportX: () -> Unit,
-              val onPrintReportZ: () -> Unit,
-          )
-
-          ''',
-              '',
-              'CierreCajaActions inline declaration',
-          )
-          text = replace_once(
-              text,
-              '''summary = state.summary,
-                                  isClosing = false,
-                                  isPrintingReportX = isPrintingX,
-                                  isPrintingReportZ = isPrintingZ,
-                                  showReportButtons = viewModel.hasActivePrinter,
-                                  actions =''',
-              '''summary = state.summary,
-                                  state =
-                                      CierreCajaReadyState(
-                                          isClosing = false,
-                                          isPrintingReportX = isPrintingX,
-                                          isPrintingReportZ = isPrintingZ,
-                                          showReportButtons = viewModel.hasActivePrinter,
-                                      ),
-                                  actions =''',
-              'Cierre ready call',
-          )
-          text = replace_once(
-              text,
-              '''summary = state.summary,
-                                  isClosing = true,
-                                  isPrintingReportX = false,
-                                  isPrintingReportZ = false,
-                                  showReportButtons = viewModel.hasActivePrinter,
-                                  actions =''',
-              '''summary = state.summary,
-                                  state =
-                                      CierreCajaReadyState(
-                                          isClosing = true,
-                                          isPrintingReportX = false,
-                                          isPrintingReportZ = false,
-                                          showReportButtons = viewModel.hasActivePrinter,
-                                      ),
-                                  actions =''',
-              'Cierre closing call',
-          )
-          text = replace_region(
-              text,
-              '@Composable\ninternal fun ReadyContent(',
-              '\n@Composable\nprivate fun CajaHeaderCard',
-              '''@Composable
-          internal fun ReadyContent(
-              summary: CierreCajaSummary,
-              state: CierreCajaReadyState,
-              actions: CierreCajaActions,
-          ) {
-              Column(
-                  modifier =
-                      Modifier
-                          .fillMaxSize()
-                          .verticalScroll(rememberScrollState())
-                          .padding(horizontal = 20.dp)
-                          .padding(bottom = 24.dp),
-              ) {
-                  Spacer(modifier = Modifier.height(8.dp))
-                  CajaHeaderCard(summary = summary)
-                  Spacer(modifier = Modifier.height(20.dp))
-                  SectionTitle("Resumen de Ventas")
-                  Spacer(modifier = Modifier.height(12.dp))
-                  VentasSummaryCard(summary = summary)
-                  Spacer(modifier = Modifier.height(20.dp))
-                  SectionTitle("Desglose por Método de Pago")
-                  Spacer(modifier = Modifier.height(12.dp))
-                  PaymentBreakdownCard(summary = summary)
-                  Spacer(modifier = Modifier.height(20.dp))
-                  ExpectedCloseCard(summary = summary)
-                  Spacer(modifier = Modifier.height(32.dp))
-                  if (state.showReportButtons) {
-                      ReportButtons(state = state, actions = actions)
-                      Spacer(modifier = Modifier.height(16.dp))
-                  }
-                  ConfirmCloseButton(isClosing = state.isClosing, onConfirmClose = actions.onConfirmClose)
-              }
-          }
-          ''',
-              'ReadyContent',
-          )
-          text = replace_region(
-              text,
-              '@Composable\nprivate fun CajaHeaderCard',
-              '\n@Composable\nprivate fun VentasSummaryCard',
-              '''@Composable
-          private fun CajaHeaderCard(summary: CierreCajaSummary) {
-              ElevatedCard(
-                  modifier = Modifier.fillMaxWidth(),
-                  shape = RoundedCornerShape(20.dp),
-                  colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
-                  elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-              ) {
-                  Column(modifier = Modifier.padding(24.dp)) {
-                      CajaHeaderIdentity(summary)
-                      Spacer(modifier = Modifier.height(20.dp))
-                      HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
-                      Spacer(modifier = Modifier.height(16.dp))
-                      CajaHeaderStats(summary)
-                  }
-              }
-          }
-
-          @Composable
-          private fun CajaHeaderIdentity(summary: CierreCajaSummary) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                  Box(
-                      modifier =
-                          Modifier
-                              .size(44.dp)
-                              .clip(CircleShape)
-                              .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
-                      contentAlignment = Alignment.Center,
-                  ) {
-                      Icon(
-                          Icons.Rounded.PointOfSale,
-                          contentDescription = null,
-                          tint = PosPalette.FixedWhite,
-                          modifier = Modifier.size(24.dp),
-                      )
-                  }
-                  Spacer(modifier = Modifier.width(16.dp))
-                  Column(modifier = Modifier.weight(1f)) {
-                      Text(
-                          text = summary.cajaName,
-                          fontWeight = FontWeight.Bold,
-                          fontSize = 20.sp,
-                          color = PosPalette.FixedWhite,
-                          maxLines = 1,
-                          overflow = TextOverflow.Ellipsis,
-                      )
-                      Row(
-                          verticalAlignment = Alignment.CenterVertically,
-                          modifier = Modifier.padding(top = 4.dp),
-                      ) {
-                          Icon(
-                              Icons.Rounded.Schedule,
-                              contentDescription = null,
-                              tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                              modifier = Modifier.size(14.dp),
-                          )
-                          Spacer(modifier = Modifier.width(4.dp))
-                          Text(
-                              text = "Abierta: ${summary.openedAt}",
-                              fontSize = 12.sp,
-                              color = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                              maxLines = 1,
-                              overflow = TextOverflow.Ellipsis,
-                          )
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          private fun CajaHeaderStats(summary: CierreCajaSummary) {
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween,
-              ) {
-                  MiniStat(
-                      label = "Monto Apertura",
-                      value = formatMoney(summary.openAmount),
-                      color = PosPalette.FixedWhite,
-                      modifier = Modifier.weight(1f),
-                  )
-                  MiniStat(
-                      label = "Transacciones",
-                      value = "${summary.transactionCount}",
-                      color = PosPalette.FixedWhite,
-                      modifier = Modifier.weight(1f),
-                  )
-              }
-          }
-          ''',
-              'CajaHeaderCard',
-          )
+          # ---- Cierre Caja: move report buttons out of the already-large screen file ----
+          cierre = root / 'ui/caja/CierreCajaScreen.kt'
+          text = read(cierre)
           text = replace_region(
               text,
               '@Composable\nprivate fun ReportButtons(',
               '\n@Composable\nprivate fun ConfirmCloseButton',
-              '''@Composable
-          private fun ReportButtons(
+              '',
+              'Cierre ReportButtons region',
+          )
+          write(cierre, text)
+
+          report_buttons = root / 'ui/caja/CierreCajaReportButtons.kt'
+          write(
+              report_buttons,
+              '''package com.amaxonia.pos.ui.caja
+
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.rounded.Assignment
+          import androidx.compose.material.icons.rounded.Description
+          import androidx.compose.material3.ButtonDefaults
+          import androidx.compose.material3.CircularProgressIndicator
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.OutlinedButton
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+
+          @Composable
+          internal fun ReportButtons(
               state: CierreCajaReadyState,
               actions: CierreCajaActions,
           ) {
@@ -276,7 +121,7 @@ jobs:
                   onClick = onClick,
                   enabled = enabled,
                   modifier = Modifier.fillMaxWidth().height(52.dp),
-                  shape = RoundedCornerShape(14.dp),
+                  shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
                   colors =
                       ButtonDefaults.outlinedButtonColors(
                           contentColor = MaterialTheme.colorScheme.primary,
@@ -315,7 +160,7 @@ jobs:
                   onClick = onClick,
                   enabled = enabled,
                   modifier = Modifier.fillMaxWidth().height(52.dp),
-                  shape = RoundedCornerShape(14.dp),
+                  shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
                   colors =
                       ButtonDefaults.outlinedButtonColors(
                           contentColor = MaterialTheme.colorScheme.error,
@@ -343,333 +188,92 @@ jobs:
                   )
               }
           }
-          ''',
-              'ReportButtons',
+          '''.replace('          ', ''),
           )
-          write(path, text)
 
-          # Cash-close previews use the grouped presentation state.
-          path = root / 'ui/caja/CierreCajaScreenPreviews.kt'
-          text = read(path)
-          text = text.replace(
-              '''isClosing = false,
-                          isPrintingReportX = false,
-                          isPrintingReportZ = false,
-                          showReportButtons = true,
+          # ---- History: format the remaining overlong secondary-amount line ----
+          history = root / 'ui/history/HistoryScreen.kt'
+          text = read(history)
+          text = replace_once(
+              text,
+              '''                text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
           ''',
-              '''state =
-                              CierreCajaReadyState(
-                                  isClosing = false,
-                                  isPrintingReportX = false,
-                                  isPrintingReportZ = false,
-                                  showReportButtons = true,
-                              ),
+              '''                text =
+                      "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} " +
+                          String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef),
           ''',
+              'History secondary amount line',
+          )
+          write(history, text)
+
+          # ---- Credit-note list/source cards: move them to a focused component file ----
+          credit = root / 'ui/creditnotes/CreditNotesScreen.kt'
+          text = read(credit)
+          text = replace_region(
+              text,
+              '@Composable\ninternal fun CreditNoteCard(',
+              '\n@Composable\nprivate fun InvoiceLineReadOnlyCard',
+              '',
+              'Credit note cards region',
           )
           text = replace_once(
               text,
-              '''isClosing = true,
-                          isPrintingReportX = false,
-                          isPrintingReportZ = false,
-                          showReportButtons = false,
-          ''',
-              '''state =
-                              CierreCajaReadyState(
-                                  isClosing = true,
-                                  isPrintingReportX = false,
-                                  isPrintingReportZ = false,
-                                  showReportButtons = false,
-                              ),
-          ''',
-              'Cierre closing preview',
+              '@Composable\nprivate fun FiscalStatusChip(status: CreditNoteFiscalStatusDto)',
+              '@Composable\ninternal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto)',
+              'FiscalStatusChip visibility',
           )
-          write(path, text)
-
-          # ---- CartScreen ----
-          path = root / 'ui/cart/CartScreen.kt'
-          text = read(path)
-          text = replace_region(
+          text = replace_once(
               text,
-              '@Composable\ninternal fun CartBottomBar(',
-              '\n// ─────────────────────────────────────────────────────────────────────────────\n// Cliente + vendedor:',
-              '''@Composable
-          internal fun CartBottomBar(
-              total: Double,
-              secondaryTotal: String?,
-              onSaveDraft: () -> Unit,
-              onCheckout: () -> Unit,
-              modifier: Modifier = Modifier,
-          ) {
-              Surface(
-                  modifier = modifier,
-                  color = MaterialTheme.colorScheme.surface,
-                  shadowElevation = 16.dp,
-                  shape = PosExtraShapes.BottomBarTop,
-              ) {
-                  BoxWithConstraints {
-                      val compact = maxHeight < 480.dp
-                      Column(
-                          modifier =
-                              Modifier
-                                  .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
-                                  .navigationBarsPadding(),
-                      ) {
-                          CartBottomTotal(total = total, secondaryTotal = secondaryTotal, compact = compact)
-                          Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
-                          CartBottomActions(total = total, onSaveDraft = onSaveDraft, onCheckout = onCheckout)
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          private fun CartBottomTotal(
-              total: Double,
-              secondaryTotal: String?,
-              compact: Boolean,
-          ) {
-              val totalStyle =
-                  if (compact) {
-                      MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
-                  } else {
-                      PosTextStyles.totalDisplay
-                  }
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween,
-                  verticalAlignment = Alignment.Bottom,
-              ) {
-                  Text(
-                      "Total",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold,
-                      color = MaterialTheme.colorScheme.onSurface,
-                  )
-                  Column(horizontalAlignment = Alignment.End) {
-                      AdaptiveAmountText(
-                          text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-                          baseStyle = totalStyle,
-                          color = MaterialTheme.colorScheme.primary,
-                          options =
-                              com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                                  minFontSizeSp = 16f,
-                              ),
-                      )
-                      secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
-                          Text(
-                              secondary,
-                              style = PosTextStyles.amountSecondary,
-                              color = MaterialTheme.colorScheme.onSurfaceVariant,
-                          )
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          private fun CartBottomActions(
-              total: Double,
-              onSaveDraft: () -> Unit,
-              onCheckout: () -> Unit,
-          ) {
-              Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                  Box(modifier = Modifier.weight(1f)) {
-                      SaveDraftButton(onClick = onSaveDraft)
-                  }
-                  Box(modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT)) {
-                      CheckoutButton(total = total, onClick = onCheckout)
-                  }
-              }
-          }
-
-          @Composable
-          private fun SaveDraftButton(onClick: () -> Unit) {
-              OutlinedButton(
-                  onClick = onClick,
-                  modifier = Modifier.fillMaxWidth().height(56.dp),
-                  contentPadding = PaddingValues(horizontal = 8.dp),
-                  shape = MaterialTheme.shapes.medium,
-              ) {
-                  Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                      "Guardar",
-                      style = MaterialTheme.typography.labelLarge,
-                      maxLines = 1,
-                      overflow = TextOverflow.Ellipsis,
-                  )
-              }
-          }
-
-          @Composable
-          private fun CheckoutButton(
-              total: Double,
-              onClick: () -> Unit,
-          ) {
-              Button(
-                  onClick = onClick,
-                  modifier = Modifier.fillMaxWidth().height(56.dp),
-                  colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                  contentPadding = PaddingValues(horizontal = 12.dp),
-                  shape = MaterialTheme.shapes.medium,
-                  elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
-              ) {
-                  AdaptiveAmountText(
-                      text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-                      baseStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                      color = MaterialTheme.colorScheme.onPrimary,
-                      options =
-                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                              minFontSizeSp = 13f,
-                          ),
-                  )
-              }
-          }
-          ''',
-              'CartBottomBar',
+              'private fun formatAmount(value: Double): String =',
+              'internal fun formatAmount(value: Double): String =',
+              'formatAmount visibility',
           )
-          text = replace_region(
-              text,
-              '@Composable\ninternal fun CartClientVendorPanel(',
-              '\n@Composable\nprivate fun CartErrorBanner',
-              '''@Composable
-          internal fun CartClientVendorPanel(
-              state: CartState,
-              onSelectClient: () -> Unit,
-              onRemoveClient: () -> Unit,
-              onChangeSeller: () -> Unit,
-              modifier: Modifier = Modifier,
-          ) {
-              Column(
-                  modifier =
-                      modifier
-                          .fillMaxWidth()
-                          .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-                          .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
-              ) {
-                  CartClientRow(state = state, onSelectClient = onSelectClient, onRemoveClient = onRemoveClient)
-                  HorizontalDivider(
-                      color = MaterialTheme.colorScheme.outlineVariant,
-                      modifier = Modifier.padding(horizontal = 14.dp),
-                  )
-                  CartSellerRow(state = state, onChangeSeller = onChangeSeller)
-              }
-          }
+          write(credit, text)
+
+          cards = root / 'ui/creditnotes/CreditNoteCards.kt'
+          write(
+              cards,
+              '''package com.amaxonia.pos.ui.creditnotes
+
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+          import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+          import androidx.compose.material.icons.rounded.Person
+          import androidx.compose.material.icons.rounded.Receipt
+          import androidx.compose.material.icons.rounded.Schedule
+          import androidx.compose.material3.CardDefaults
+          import androidx.compose.material3.ElevatedCard
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextOverflow
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceSummaryDto
+          import com.amaxonia.pos.domain.model.creditnote.CreditNoteSummaryDto
+          import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
+          import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 
           @Composable
-          private fun CartClientRow(
-              state: CartState,
-              onSelectClient: () -> Unit,
-              onRemoveClient: () -> Unit,
-          ) {
-              Row(
-                  modifier =
-                      Modifier
-                          .fillMaxWidth()
-                          .clickable { onSelectClient() }
-                          .padding(horizontal = 14.dp, vertical = 12.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-              ) {
-                  val selectedClient = state.selectedClient
-                  if (selectedClient != null) {
-                      ClientAvatar(
-                          clientPhotoUrl = state.selectedClientPhotoUrl,
-                          clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
-                      )
-                      Spacer(modifier = Modifier.width(12.dp))
-                      Column(modifier = Modifier.weight(1f)) {
-                          Text(
-                              "Cliente asignado",
-                              style = MaterialTheme.typography.labelMedium,
-                              color = MaterialTheme.colorScheme.onSurfaceVariant,
-                          )
-                          Text(
-                              "${selectedClient.firstName} ${selectedClient.lastName}",
-                              style = MaterialTheme.typography.titleSmall,
-                              fontWeight = FontWeight.Bold,
-                              color = MaterialTheme.colorScheme.onSurface,
-                              maxLines = 1,
-                              overflow = TextOverflow.Ellipsis,
-                          )
-                      }
-                      IconButton(onClick = onRemoveClient) {
-                          Icon(
-                              Icons.Default.Delete,
-                              contentDescription = "Quitar cliente",
-                              tint = MaterialTheme.colorScheme.error,
-                          )
-                      }
-                  } else {
-                      Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-                      Spacer(modifier = Modifier.width(12.dp))
-                      Text(
-                          "Asignar cliente",
-                          modifier = Modifier.weight(1f),
-                          style = MaterialTheme.typography.bodyLarge,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      )
-                      Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                  }
-              }
-          }
-
-          @Composable
-          private fun CartSellerRow(
-              state: CartState,
-              onChangeSeller: () -> Unit,
-          ) {
-              Row(
-                  modifier =
-                      Modifier
-                          .fillMaxWidth()
-                          .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
-                          .padding(horizontal = 14.dp, vertical = 12.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-              ) {
-                  Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
-                  Spacer(modifier = Modifier.width(12.dp))
-                  Column(modifier = Modifier.weight(1f)) {
-                      Text(
-                          "Vendedor asignado",
-                          style = MaterialTheme.typography.labelMedium,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      )
-                      Text(
-                          text = state.currentSeller?.nombre ?: "Sin vendedor",
-                          style = MaterialTheme.typography.titleSmall,
-                          fontWeight = FontWeight.Bold,
-                          color = MaterialTheme.colorScheme.onSurface,
-                          maxLines = 1,
-                          overflow = TextOverflow.Ellipsis,
-                      )
-                  }
-                  Icon(
-                      Icons.Default.Autorenew,
-                      contentDescription = "Cambiar vendedor",
-                      tint =
-                          if (state.availableSellers.isEmpty()) {
-                              MaterialTheme.colorScheme.outline
-                          } else {
-                              MaterialTheme.colorScheme.primary
-                          },
-                  )
-              }
-          }
-          ''',
-              'CartClientVendorPanel',
-          )
-          write(path, text)
-
-          # ---- History transaction card ----
-          path = root / 'ui/history/HistoryScreen.kt'
-          text = read(path)
-          text = replace_region(
-              text,
-              '@Composable\ninternal fun TransactionCard(',
-              '\n// ---------- Status Badge ----------',
-              '''@Composable
-          internal fun TransactionCard(
-              transaction: Transaction,
+          internal fun CreditNoteCard(
+              note: CreditNoteSummaryDto,
               onClick: () -> Unit,
           ) {
               ElevatedCard(
@@ -682,10 +286,127 @@ jobs:
                       modifier = Modifier.fillMaxWidth().padding(16.dp),
                       verticalAlignment = Alignment.CenterVertically,
                   ) {
-                      TransactionCardIcon()
+                      CreditNoteLeadingIcon()
                       Spacer(modifier = Modifier.width(14.dp))
-                      TransactionCardInfo(transaction = transaction, modifier = Modifier.weight(1f))
-                      TransactionCardAmount(transaction)
+                      CreditNoteInfo(note = note, modifier = Modifier.weight(1f))
+                      CreditNoteAmount(note)
+                  }
+              }
+          }
+
+          @Composable
+          private fun CreditNoteLeadingIcon() {
+              Box(
+                  modifier =
+                      Modifier
+                          .size(44.dp)
+                          .clip(RoundedCornerShape(12.dp))
+                          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Icon(
+                      Icons.AutoMirrored.Filled.ReceiptLong,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.primary,
+                      modifier = Modifier.size(22.dp),
+                  )
+              }
+          }
+
+          @Composable
+          private fun CreditNoteInfo(
+              note: CreditNoteSummaryDto,
+              modifier: Modifier = Modifier,
+          ) {
+              Column(modifier = modifier) {
+                  Text(
+                      text = note.codigo,
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 15.sp,
+                      color = MaterialTheme.colorScheme.onSurface,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                  )
+                  Spacer(modifier = Modifier.height(6.dp))
+                  FiscalStatusChip(status = note.fiscalStatus)
+                  Spacer(modifier = Modifier.height(6.dp))
+                  CreditNoteMetadata(date = note.fecha, clientName = note.clienteNombre)
+              }
+          }
+
+          @Composable
+          private fun CreditNoteMetadata(
+              date: String,
+              clientName: String,
+          ) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(
+                      Icons.Rounded.Schedule,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                      modifier = Modifier.size(13.dp),
+                  )
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text(text = date, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  if (clientName.isNotBlank()) {
+                      Spacer(modifier = Modifier.width(10.dp))
+                      Icon(
+                          Icons.Rounded.Person,
+                          contentDescription = null,
+                          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                          modifier = Modifier.size(13.dp),
+                      )
+                      Spacer(modifier = Modifier.width(3.dp))
+                      Text(
+                          text = clientName,
+                          fontSize = 12.sp,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                          modifier = Modifier.weight(1f, fill = false),
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          private fun CreditNoteAmount(note: CreditNoteSummaryDto) {
+              Column(horizontalAlignment = Alignment.End) {
+                  AdaptiveAmountText(
+                      text = "Bs ${formatAmount(note.total)}",
+                      baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                      color = MaterialTheme.colorScheme.primary,
+                      options = AdaptiveAmountOptions(minFontSizeSp = 11f),
+                  )
+                  Text(
+                      text = note.facturaCodigo,
+                      fontSize = 11.sp,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                  )
+              }
+          }
+
+          @Composable
+          internal fun SourceInvoiceCard(
+              invoice: CreditNoteSourceInvoiceSummaryDto,
+              onClick: () -> Unit,
+          ) {
+              ElevatedCard(
+                  modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+                  shape = RoundedCornerShape(16.dp),
+                  colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                  elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+              ) {
+                  Row(
+                      modifier = Modifier.fillMaxWidth().padding(16.dp),
+                      verticalAlignment = Alignment.CenterVertically,
+                  ) {
+                      SourceInvoiceLeadingIcon()
+                      Spacer(modifier = Modifier.width(14.dp))
+                      SourceInvoiceInfo(invoice = invoice, modifier = Modifier.weight(1f))
+                      SourceInvoiceAmount(invoice)
                       Icon(
                           imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                           contentDescription = null,
@@ -697,7 +418,7 @@ jobs:
           }
 
           @Composable
-          private fun TransactionCardIcon() {
+          private fun SourceInvoiceLeadingIcon() {
               Box(
                   modifier =
                       Modifier
@@ -716,13 +437,13 @@ jobs:
           }
 
           @Composable
-          private fun TransactionCardInfo(
-              transaction: Transaction,
+          private fun SourceInvoiceInfo(
+              invoice: CreditNoteSourceInvoiceSummaryDto,
               modifier: Modifier = Modifier,
           ) {
               Column(modifier = modifier) {
                   Text(
-                      text = transaction.invoiceNumber,
+                      text = invoice.codigo,
                       fontWeight = FontWeight.Bold,
                       fontSize = 15.sp,
                       color = MaterialTheme.colorScheme.onSurface,
@@ -730,242 +451,194 @@ jobs:
                       overflow = TextOverflow.Ellipsis,
                   )
                   Spacer(modifier = Modifier.height(6.dp))
-                  StatusBadge(status = transaction.status)
-                  Spacer(modifier = Modifier.height(6.dp))
-                  TransactionMetadataRow(transaction)
+                  CreditNoteMetadata(date = invoice.fecha, clientName = invoice.clienteNombre)
               }
           }
 
           @Composable
-          private fun TransactionMetadataRow(transaction: Transaction) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(
-                      Icons.Rounded.Schedule,
-                      contentDescription = null,
-                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                      modifier = Modifier.size(13.dp),
-                  )
-                  Spacer(modifier = Modifier.width(4.dp))
-                  Text(
-                      text = transaction.time,
-                      fontSize = 12.sp,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  )
-                  if (transaction.clienteNombre.isNotBlank()) {
-                      Spacer(modifier = Modifier.width(10.dp))
-                      Icon(
-                          Icons.Rounded.Person,
-                          contentDescription = null,
-                          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                          modifier = Modifier.size(13.dp),
-                      )
-                      Spacer(modifier = Modifier.width(3.dp))
-                      Text(
-                          text = transaction.clienteNombre,
-                          fontSize = 12.sp,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                          maxLines = 1,
-                          overflow = TextOverflow.Ellipsis,
-                          modifier = Modifier.weight(1f, fill = false),
-                      )
-                  }
-              }
-          }
-
-          @Composable
-          private fun TransactionCardAmount(transaction: Transaction) {
+          private fun SourceInvoiceAmount(invoice: CreditNoteSourceInvoiceSummaryDto) {
               Column(horizontalAlignment = Alignment.End) {
-                  com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                      text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
+                  AdaptiveAmountText(
+                      text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
                       baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                       color = MaterialTheme.colorScheme.primary,
-                      options =
-                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                              minFontSizeSp = 11f,
-                          ),
+                      options = AdaptiveAmountOptions(minFontSizeSp = 11f),
                   )
-                  if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
-                      Text(
-                          text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
-                          fontSize = 11.sp,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      )
-                  }
               }
           }
-
-          ''',
-              'TransactionCard',
+          '''.replace('          ', ''),
           )
-          write(path, text)
 
-          # ---- Reports: split best-seller details ----
-          path = root / 'ui/reports/ReportsScreen.kt'
-          text = read(path)
+          # ---- Payment success: group receipt state and split animation/body ----
+          success = root / 'ui/payment/SuccessScreen.kt'
+          text = read(success)
+          text = replace_once(
+              text,
+              '''internal class SuccessActions(
+              val onPrintReceipt: () -> Unit,
+              val onSendReceiptEmail: () -> Unit,
+              val onNextOrder: () -> Unit,
+          )
+          ''',
+              '''internal data class SuccessReceiptState(
+              val isSendingReceiptEmail: Boolean = false,
+              val isPrinting: Boolean = false,
+          )
+
+          internal class SuccessActions(
+              val onPrintReceipt: () -> Unit,
+              val onSendReceiptEmail: () -> Unit,
+              val onNextOrder: () -> Unit,
+              val receiptState: SuccessReceiptState = SuccessReceiptState(),
+          )
+          ''',
+              'SuccessActions',
+          )
+          text = replace_once(
+              text,
+              '''                isSendingReceiptEmail = uiState.isSendingReceiptEmail,
+                          isPrinting = isPrinting,
+                          actions =
+                              SuccessActions(
+          ''',
+              '''                actions =
+                              SuccessActions(
+                                  receiptState =
+                                      SuccessReceiptState(
+                                          isSendingReceiptEmail = uiState.isSendingReceiptEmail,
+                                          isPrinting = isPrinting,
+                                      ),
+          ''',
+              'SuccessContent call state',
+          )
           text = replace_region(
               text,
-              '@Composable\nprivate fun BestSellerItem(',
-              '\nprivate fun money(',
+              '@Composable\ninternal fun SuccessContent(',
+              '\n@Composable\nprivate fun LoadingConfirmation',
               '''@Composable
-          private fun BestSellerItem(
-              product: BestSellerProduct,
-              position: Int,
-          ) {
-              val productColor = Color(product.colorHex)
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  verticalAlignment = Alignment.CenterVertically,
-              ) {
-                  Surface(
-                      color = productColor.copy(alpha = 0.1f),
-                      shape = RoundedCornerShape(10.dp),
-                      modifier = Modifier.size(40.dp),
-                  ) {
-                      Box(contentAlignment = Alignment.Center) {
-                          Text(
-                              text = position.toString(),
-                              style = MaterialTheme.typography.titleMedium,
-                              fontWeight = FontWeight.Bold,
-                              color = productColor,
-                          )
-                      }
-                  }
-                  Spacer(modifier = Modifier.width(12.dp))
-                  BestSellerDetails(
-                      product = product,
-                      productColor = productColor,
-                      modifier = Modifier.weight(1f),
-                  )
-                  Spacer(modifier = Modifier.width(10.dp))
-                  AdaptiveAmountText(
-                      text = money("$", product.price, separator = ""),
-                      modifier = Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT),
-                      baseStyle =
-                          MaterialTheme.typography.titleMedium.copy(
-                              fontWeight = FontWeight.Bold,
-                              textAlign = TextAlign.End,
-                          ),
-                      color = MaterialTheme.colorScheme.primary,
-                      options =
-                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                              minFontSizeSp = 10f,
-                          ),
-                  )
-              }
-          }
-
-          @Composable
-          private fun BestSellerDetails(
-              product: BestSellerProduct,
-              productColor: Color,
+          internal fun SuccessContent(
+              isLoading: Boolean,
+              payload: PaymentSuccessPayload?,
+              actions: SuccessActions,
               modifier: Modifier = Modifier,
           ) {
-              Column(modifier = modifier) {
-                  Text(
-                      text = product.name,
-                      style = MaterialTheme.typography.bodyMedium,
-                      fontWeight = FontWeight.Bold,
-                      color = MaterialTheme.colorScheme.onSurface,
-                      maxLines = 1,
-                      overflow = TextOverflow.Ellipsis,
+              val animation = rememberSuccessAnimationState()
+              Column(
+                  modifier =
+                      modifier
+                          .fillMaxHeight()
+                          .fillMaxWidth()
+                          .widthIn(max = WIDE_CONTENT_MAX_WIDTH)
+                          .background(MaterialTheme.colorScheme.background)
+                          .padding(horizontal = 20.dp, vertical = 16.dp)
+                          .navigationBarsPadding(),
+                  horizontalAlignment = Alignment.CenterHorizontally,
+              ) {
+                  SuccessAnimatedBody(
+                      isLoading = isLoading,
+                      payload = payload,
+                      animation = animation,
+                      modifier = Modifier.weight(1f),
                   )
-                  Spacer(modifier = Modifier.height(4.dp))
-                  Row(verticalAlignment = Alignment.CenterVertically) {
-                      Text(
-                          text = "${product.salesCount} ventas",
-                          style = MaterialTheme.typography.labelMedium,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                          maxLines = 1,
-                      )
-                      Spacer(modifier = Modifier.width(10.dp))
-                      LinearProgressIndicator(
-                          progress = { product.progress },
-                          modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                          color = productColor,
-                          trackColor = productColor.copy(alpha = 0.1f),
-                      )
-                  }
+                  SecondaryReceiptActions(
+                      isPrinting = actions.receiptState.isPrinting,
+                      isSendingReceiptEmail = actions.receiptState.isSendingReceiptEmail,
+                      onPrintReceipt = actions.onPrintReceipt,
+                      onSendReceiptEmail = actions.onSendReceiptEmail,
+                  )
+                  Spacer(modifier = Modifier.height(12.dp))
+                  NextOrderButton(onNextOrder = actions.onNextOrder)
               }
           }
 
-          ''',
-              'BestSellerItem',
+          private data class SuccessAnimationState(
+              val visible: Boolean,
+              val scale: Float,
+              val ringScale: Float,
+              val ringAlpha: Float,
           )
-          write(path, text)
 
-          # ---- DraftInvoicesScreen: extract app bar ----
-          path = root / 'ui/drafts/DraftInvoicesScreen.kt'
-          text = read(path)
-          old_topbar = '''topBar = {
-                      TopAppBar(
-                          title = {
-                              Text(
-                                  text = "Facturas pendientes",
-                                  style = MaterialTheme.typography.titleLarge,
-                                  fontWeight = FontWeight.Bold,
-                                  color = MaterialTheme.colorScheme.primary,
-                                  maxLines = 1,
-                                  overflow = TextOverflow.Ellipsis,
-                              )
-                          },
-                          navigationIcon = {
-                              IconButton(
-                                  onClick = onBack,
-                                  modifier = Modifier.size(48.dp),
-                              ) {
-                                  Icon(
-                                      imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                      contentDescription = "Volver",
-                                      tint = MaterialTheme.colorScheme.primary,
-                                  )
-                              }
-                          },
-                          colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                      )
-                  },'''
-          text = replace_once(text, old_topbar, 'topBar = { DraftInvoicesTopBar(onBack = onBack) },', 'Draft top bar')
-          marker = '\n@Composable\nprivate fun DraftLoadingState'
-          helper = '''
-          @OptIn(ExperimentalMaterial3Api::class)
           @Composable
-          private fun DraftInvoicesTopBar(onBack: () -> Unit) {
-              TopAppBar(
-                  title = {
-                      Text(
-                          text = "Facturas pendientes",
-                          style = MaterialTheme.typography.titleLarge,
-                          fontWeight = FontWeight.Bold,
-                          color = MaterialTheme.colorScheme.primary,
-                          maxLines = 1,
-                          overflow = TextOverflow.Ellipsis,
-                      )
-                  },
-                  navigationIcon = {
-                      IconButton(
-                          onClick = onBack,
-                          modifier = Modifier.size(48.dp),
-                      ) {
-                          Icon(
-                              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                              contentDescription = "Volver",
-                              tint = MaterialTheme.colorScheme.primary,
-                          )
-                      }
-                  },
-                  colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+          private fun rememberSuccessAnimationState(): SuccessAnimationState {
+              var visible by remember { mutableStateOf(false) }
+              val scale = remember { Animatable(CARD_INITIAL_SCALE) }
+              val ringScale = remember { Animatable(RING_INITIAL_SCALE) }
+              val ringAlpha = remember { Animatable(RING_INITIAL_ALPHA) }
+              LaunchedEffect(Unit) {
+                  visible = true
+                  scale.animateTo(
+                      targetValue = 1f,
+                      animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS, easing = FastOutSlowInEasing),
+                  )
+              }
+              LaunchedEffect(Unit) {
+                  ringScale.animateTo(
+                      RING_TARGET_SCALE,
+                      animationSpec = tween(RING_ANIMATION_DURATION_MS, easing = FastOutSlowInEasing),
+                  )
+              }
+              LaunchedEffect(Unit) {
+                  ringAlpha.animateTo(0f, animationSpec = tween(RING_ANIMATION_DURATION_MS))
+              }
+              return SuccessAnimationState(
+                  visible = visible,
+                  scale = scale.value,
+                  ringScale = ringScale.value,
+                  ringAlpha = ringAlpha.value,
               )
           }
+
+          @Composable
+          private fun SuccessAnimatedBody(
+              isLoading: Boolean,
+              payload: PaymentSuccessPayload?,
+              animation: SuccessAnimationState,
+              modifier: Modifier = Modifier,
+          ) {
+              Column(
+                  modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                  horizontalAlignment = Alignment.CenterHorizontally,
+                  verticalArrangement = Arrangement.Center,
+              ) {
+                  AnimatedVisibility(
+                      visible = animation.visible,
+                      enter = fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
+                          scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
+                  ) {
+                      if (isLoading) {
+                          LoadingConfirmation(scale = animation.scale)
+                      } else {
+                          SuccessCard(
+                              payload = requireNotNull(payload) { "SuccessCard requires a loaded payload" },
+                              scale = animation.scale,
+                              ringScale = animation.ringScale,
+                              ringAlpha = animation.ringAlpha,
+                          )
+                      }
+                  }
+              }
+          }
+          ''',
+              'SuccessContent',
+          )
+          write(success, text)
+
+          previews = root / 'ui/payment/SuccessScreenPreviews.kt'
+          text = read(previews)
+          old = '''            isSendingReceiptEmail = false,
+                      isPrinting = false,
           '''
-          if marker not in text:
-              raise SystemExit('Missing DraftLoadingState marker')
-          text = text.replace(marker, helper + marker, 1)
-          write(path, text)
+          count = text.count(old)
+          if count != 7:
+              raise SystemExit(f'Expected 7 Success preview state blocks, found {count}')
+          text = text.replace(old, '')
+          write(previews, text)
           PY
 
-      - name: Commit refactors
+      - name: Commit final refactors
         run: |
           git config user.name "Yoiner Moreno"
           git config user.email "yoinerdeyhan@gmail.com"
           git add amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos
-          git commit -m "refactor: split remaining long Compose components"
+          git commit -m "refactor: resolve final Detekt findings"
           git push origin HEAD:chatgpt/phase4-detekt-cleanup
