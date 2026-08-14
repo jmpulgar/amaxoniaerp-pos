@@ -21,25 +21,25 @@ import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
 
-class PaymentStateRepositories(
+internal class PaymentStateRepositories(
     val transaction: TransactionRepository,
     val caja: CajaRepository,
     val cart: CartRepository,
     val clientBranches: ClientBranchRepository,
 )
 
-class PaymentRuntimeServices(
+internal class PaymentRuntimeServices(
     val sales: SalesRepository,
     val session: PaymentSessionReader,
     val connectivity: ConnectivityStatus,
 )
 
-class PaymentFlowRepositories(
+internal class PaymentFlowRepositories(
     val state: PaymentStateRepositories,
     val runtime: PaymentRuntimeServices,
 )
 
-class PaymentPreparationOperations(
+internal class PaymentPreparationOperations(
     val validatePayment: ValidatePaymentUseCase,
     val calculateSaleTotals: CalculateSaleTotalsUseCase,
     val buildSaleItems: BuildSaleItemsUseCase,
@@ -62,25 +62,10 @@ internal data class PreparedSale(
     val request: ProcessSaleRequestDto,
     val details: PreparedSaleDetails,
     val financials: PreparedSaleFinancials,
-    /**
-     * Optional correlation id carried over from a prior attempt of the same
-     * operation (e.g. after a crash/reboot). When non-null and still in
-     * SENDING state on the local ledger, StartTransactionUseCase will reuse
-     * it so the backend dedup (HTTP 409) detects the retry. Defaults to null
-     * for brand-new operations, where StartTransactionUseCase mints a fresh
-     * UUID. Never re-derived from carrito contents.
-     */
     val correlationCarryOver: String? = null,
 ) {
-    /**
-     * Returns a copy of this sale with the provided [clientCorrelationId]
-     * stamped onto the request idFactura field, used after the local ledger
-     * row has been opened.
-     */
     fun withCorrelationId(clientCorrelationId: String?): PreparedSale =
-        copy(
-            request = request.copy(idFactura = clientCorrelationId),
-        )
+        copy(request = request.copy(idFactura = clientCorrelationId))
 }
 
 internal data class PreparedSaleDetails(
@@ -96,7 +81,7 @@ internal data class PreparedSaleFinancials(
     val isMultiCurrency: Boolean,
 )
 
-class PrepareSaleUseCase(
+internal class PrepareSaleUseCase(
     private val repositories: PaymentFlowRepositories,
     private val operations: PaymentPreparationOperations,
     private val assembleSale: AssemblePreparedSaleUseCase,
@@ -172,9 +157,7 @@ class PrepareSaleUseCase(
         }
         val sequenceResult =
             if (isOnline) {
-                repositories.state.caja
-                    .checkCajaStatus(context.base.caja.idCaja)
-                    .map { it.cajaSecuencia }
+                repositories.state.caja.checkCajaStatus(context.base.caja.idCaja).map { it.cajaSecuencia }
             } else {
                 Result.success(repositories.state.caja.activeCajaSecuencia.value)
             }
@@ -218,7 +201,7 @@ class PrepareSaleUseCase(
     }
 }
 
-class AssemblePreparedSaleUseCase(
+internal class AssemblePreparedSaleUseCase(
     private val repositories: PaymentFlowRepositories,
     private val operations: PaymentPreparationOperations,
 ) {
@@ -241,8 +224,6 @@ class AssemblePreparedSaleUseCase(
                     paymentSummary = buildPaymentSummary(input, totals, payments),
                     payments = payments,
                     currency = buildCurrency(base.caja, configuration, totals.total),
-                    // FASE 1.1: propagar la selección de impresora persistida en
-                    // Settings para que el backend decida HKA20 vs digital (Venezuela).
                     printerType = input.printerType,
                 ),
             )
@@ -258,9 +239,6 @@ class AssemblePreparedSaleUseCase(
                     selectedMethods = input.paymentDetails.transactionMethods,
                 ),
             financials = PreparedSaleFinancials(totals.total, configuration.rate, configuration.isMultiCurrency),
-            // Propagate the durable carry-over id (auditoría ítem 1) so a
-            // retry after a timeout/crash reuses the same idFactura and the
-            // backend dedup kicks in. null for brand-new operations.
             correlationCarryOver = input.correlationCarryOver,
         )
     }
@@ -270,9 +248,7 @@ class AssemblePreparedSaleUseCase(
             repositories.state.cart.currentSeller.value
                 ?.id
                 ?.takeIf { it > 0 }
-                ?: repositories.state.cart.availableSellers.value
-                    .firstOrNull()
-                    ?.id
+                ?: repositories.state.cart.availableSellers.value.firstOrNull()?.id
                 ?: DEFAULT_SELLER_ID
         val warehouseId = caja.defaultWarehouseId ?: caja.codAlmacen?.takeIf { it > 0 } ?: DEFAULT_WAREHOUSE_ID
         val isMultiCurrency = caja.currency?.multiMoneda.equals("SI", ignoreCase = true)
