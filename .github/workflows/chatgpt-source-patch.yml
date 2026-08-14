@@ -1,0 +1,58 @@
+name: ChatGPT Source Patch
+
+on:
+  push:
+    branches:
+      - chatgpt/phase4-detekt-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'run source patch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/phase4-detekt-cleanup
+          fetch-depth: 0
+      - name: Apply targeted source repairs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos')
+
+          product = root / 'ui/products/ProductFormScreen.kt'
+          text = product.read_text()
+          replacements = [
+              ('import androidx.compose.material3.LocalTextStyle\n', ''),
+              ('import com.amaxonia.pos.domain.repository.Department\n', 'import com.amaxonia.pos.domain.model.PriceLevel\nimport com.amaxonia.pos.domain.repository.Department\n'),
+              ('prices: List<ProductPriceRow>,', 'prices: List<PriceLevel>,'),
+              ('textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall),', 'textStyle = MaterialTheme.typography.bodySmall.copy(textAlign = TextAlign.Center),'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'Missing ProductForm target: {old!r}')
+              text = text.replace(old, new, 1)
+          product.write_text(text)
+
+          visibility_targets = [
+              (root / 'ui/history/HistoryScreen.kt', 'private fun TransactionCard(', 'internal fun TransactionCard('),
+              (root / 'ui/creditnotes/CreditNotesScreen.kt', 'private fun CreditNoteCard(', 'internal fun CreditNoteCard('),
+              (root / 'ui/creditnotes/CreditNotesScreen.kt', 'private fun SourceInvoiceCard(', 'internal fun SourceInvoiceCard('),
+          ]
+          for path, old, new in visibility_targets:
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing visibility target in {path}: {old}')
+              path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit repairs
+        run: |
+          git config user.name "Yoiner Moreno"
+          git config user.email "yoinerdeyhan@gmail.com"
+          git add amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos
+          git commit -m "fix: repair interrupted UI changes"
+          git push origin HEAD:chatgpt/phase4-detekt-cleanup
