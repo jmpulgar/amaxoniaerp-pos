@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: contains(github.event.head_commit.message, 'run source patch')
+    if: contains(github.event.head_commit.message, 'run detekt patch a')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,227 +18,954 @@ jobs:
           ref: chatgpt/phase4-detekt-cleanup
           fetch-depth: 0
 
-      - name: Apply deterministic Detekt repairs
+      - name: Refactor remaining Compose findings A
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           root = Path('amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos')
 
-          # 1) Migrate every AdaptiveAmountText call to the grouped options object.
-          option_names = {'minFontSizeSp', 'fontWeight', 'textAlign', 'maxLines'}
+          def read(path):
+              return path.read_text(encoding='utf-8')
 
-          def matching_paren(text, start):
-              depth = 0
-              quote = None
-              escape = False
-              for i in range(start, len(text)):
-                  ch = text[i]
-                  if quote:
-                      if escape:
-                          escape = False
-                      elif ch == '\\':
-                          escape = True
-                      elif ch == quote:
-                          quote = None
-                      continue
-                  if ch in ('"', "'"):
-                      quote = ch
-                  elif ch == '(':
-                      depth += 1
-                  elif ch == ')':
-                      depth -= 1
-                      if depth == 0:
-                          return i
-              raise RuntimeError('unbalanced AdaptiveAmountText call')
-
-          def split_args(body):
-              args, start = [], 0
-              p = b = c = 0
-              quote = None
-              escape = False
-              for i, ch in enumerate(body):
-                  if quote:
-                      if escape:
-                          escape = False
-                      elif ch == '\\':
-                          escape = True
-                      elif ch == quote:
-                          quote = None
-                      continue
-                  if ch in ('"', "'"):
-                      quote = ch
-                  elif ch == '(':
-                      p += 1
-                  elif ch == ')':
-                      p -= 1
-                  elif ch == '[':
-                      b += 1
-                  elif ch == ']':
-                      b -= 1
-                  elif ch == '{':
-                      c += 1
-                  elif ch == '}':
-                      c -= 1
-                  elif ch == ',' and p == b == c == 0:
-                      args.append(body[start:i])
-                      start = i + 1
-              args.append(body[start:])
-              return args
-
-          for path in root.rglob('*.kt'):
-              text = path.read_text(encoding='utf-8-sig')
-              positions = []
-              cursor = 0
-              while True:
-                  idx = text.find('AdaptiveAmountText(', cursor)
-                  if idx < 0:
-                      break
-                  open_idx = idx + len('AdaptiveAmountText')
-                  close_idx = matching_paren(text, open_idx)
-                  positions.append((idx, open_idx, close_idx))
-                  cursor = close_idx + 1
-              changed = False
-              for idx, open_idx, close_idx in reversed(positions):
-                  body = text[open_idx + 1:close_idx]
-                  args = split_args(body)
-                  kept, options = [], []
-                  for arg in args:
-                      match = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*', arg, re.S)
-                      if match and match.group(1) in option_names:
-                          options.append(arg.strip())
-                      else:
-                          kept.append(arg)
-                  if not options:
-                      continue
-                  indent_match = re.search(r'\n([ \t]*)[^\n]*$', body)
-                  indent = indent_match.group(1) if indent_match else '        '
-                  options_text = (
-                      'options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(\n'
-                      + ''.join(f'{indent}    {opt},\n' for opt in options)
-                      + f'{indent})'
-                  )
-                  while kept and not kept[-1].strip():
-                      kept.pop()
-                  new_body = ','.join(kept)
-                  if new_body.strip() and not new_body.rstrip().endswith(','):
-                      new_body = new_body.rstrip() + ',\n' + indent
-                  new_body += options_text
-                  text = text[:open_idx + 1] + new_body + text[close_idx:]
-                  changed = True
-              if changed:
-                  path.write_text(text, encoding='utf-8')
-
-          # 2) Preview composables are tooling entry points, not unused private helpers.
-          preview_files = [
-              'ui/caja/CierreCajaScreenPreviews.kt',
-              'ui/cart/CartScreenPreviews.kt',
-              'ui/history/HistoryScreenPreviews.kt',
-              'ui/payment/SuccessScreenPreviews.kt',
-              'ui/creditnotes/CreditNotesScreenPreviews.kt',
-          ]
-          for relative in preview_files:
-              path = root / relative
-              text = path.read_text(encoding='utf-8-sig')
-              text = text.replace('@Composable\nprivate fun ', '@Composable\ninternal fun ')
+          def write(path, text):
               path.write_text(text, encoding='utf-8')
 
-          # 3) Replace reported magic values with named constants.
-          path = root / 'ui/caja/CierreCajaScreenPreviews.kt'
-          text = path.read_text()
-          anchor = 'private const val HUGE_AMOUNT_SCALE = 10_000.0\n'
-          constants = '''private const val CASH_PAYMENT_ID = 1\nprivate const val CARD_DEBIT_PAYMENT_ID = 2\nprivate const val CARD_CREDIT_PAYMENT_ID = 3\nprivate const val ACH_PAYMENT_ID = 4\nprivate const val CASH_PAYMENT_AMOUNT = 4_820.25\nprivate const val CARD_DEBIT_AMOUNT = 3_275.30\nprivate const val CARD_CREDIT_AMOUNT = 2_875.20\nprivate const val ACH_PAYMENT_AMOUNT = 1_510.00\n'''
-          if constants not in text:
-              text = text.replace(anchor, anchor + constants)
-          replacements = {
-              'CierreCajaPaymentLine(1, "Efectivo", "CASH", 4_820.25 * scale)': 'CierreCajaPaymentLine(CASH_PAYMENT_ID, "Efectivo", "CASH", CASH_PAYMENT_AMOUNT * scale)',
-              'CierreCajaPaymentLine(2, "Mastercard Débito", "TARJETA", 3_275.30 * scale)': 'CierreCajaPaymentLine(CARD_DEBIT_PAYMENT_ID, "Mastercard Débito", "TARJETA", CARD_DEBIT_AMOUNT * scale)',
-              'CierreCajaPaymentLine(3, "Visa Crédito", "TARJETA", 2_875.20 * scale)': 'CierreCajaPaymentLine(CARD_CREDIT_PAYMENT_ID, "Visa Crédito", "TARJETA", CARD_CREDIT_AMOUNT * scale)',
-              'CierreCajaPaymentLine(4, "Transferencia ACH", "OT", 1_510.00 * scale)': 'CierreCajaPaymentLine(ACH_PAYMENT_ID, "Transferencia ACH", "OT", ACH_PAYMENT_AMOUNT * scale)',
-          }
-          for old, new in replacements.items():
-              text = text.replace(old, new)
-          path.write_text(text)
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'Missing target: {label}')
+              return text.replace(old, new, 1)
 
-          path = root / 'ui/history/HistoryScreenPreviews.kt'
-          text = path.read_text()
-          anchor = 'private const val SUMMARY_INVOICE_COUNT = 248\n'
-          constants = 'private const val PAID_STATUS_ID = 1\nprivate const val CANCELLED_STATUS_ID = 3\n'
-          if constants not in text:
-              text = text.replace(anchor, anchor + constants)
-          text = text.replace('estatus = listOf(1, 3),', 'estatus = listOf(PAID_STATUS_ID, CANCELLED_STATUS_ID),')
-          path.write_text(text)
+          def replace_region(text, start, end, replacement, label):
+              try:
+                  s = text.index(start)
+                  e = text.index(end, s)
+              except ValueError as exc:
+                  raise SystemExit(f'Missing region: {label}') from exc
+              return text[:s] + replacement + text[e:]
 
-          path = root / 'ui/reports/ReportsScreen.kt'
-          text = path.read_text()
-          anchor = 'private const val BEST_SELLER_LIMIT = 10\n'
-          if 'BEST_SELLER_AMOUNT_WEIGHT' not in text:
-              text = text.replace(anchor, anchor + 'private const val BEST_SELLER_AMOUNT_WEIGHT = 0.6f\n')
-          text = text.replace('Modifier.weight(0.6f)', 'Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT)')
-          path.write_text(text)
-
-          path = root / 'ui/drafts/DraftInvoicesScreen.kt'
-          text = path.read_text()
-          if 'DRAFT_AMOUNT_WEIGHT' not in text:
-              package_end = text.index('\n\n', text.index('package ')) + 2
-              text = text[:package_end] + 'private const val DRAFT_AMOUNT_WEIGHT = 0.7f\n\n' + text[package_end:]
-          text = text.replace('Modifier.weight(0.7f)', 'Modifier.weight(DRAFT_AMOUNT_WEIGHT)')
-          path.write_text(text)
-
-          path = root / 'ui/clients/ClientFormScreen.kt'
-          text = path.read_text()
-          text = text.replace('Modifier.weight(0.72f)', 'Modifier.weight(DOCUMENT_FIELD_WEIGHT)')
-          text = text.replace('Modifier.weight(0.28f)', 'Modifier.weight(DV_FIELD_WEIGHT)')
-          if 'DOCUMENT_FIELD_WEIGHT' not in text.split('private const val NATURAL_CLIENT_TYPE')[1]:
-              text = text.replace(
-                  'private const val NATURAL_CLIENT_TYPE = 2\n',
-                  'private const val DOCUMENT_FIELD_WEIGHT = 0.72f\nprivate const val DV_FIELD_WEIGHT = 0.28f\nprivate const val NATURAL_CLIENT_TYPE = 2\n',
-              )
-          path.write_text(text)
-
-          # 4) Simple style finding.
-          path = root / 'ui/cart/CartScreen.kt'
-          text = path.read_text()
-          text = text.replace('private val CHECKOUT_BUTTON_WEIGHT =', 'private const val CHECKOUT_BUTTON_WEIGHT =')
-          path.write_text(text)
-
-          # 5) Reduce Success preview helper parameters by grouping secondary-currency values.
-          path = root / 'ui/payment/SuccessScreenPreviews.kt'
-          text = path.read_text()
-          text = text.replace(
-              '''                    multiCurrency = true,\n                    totalBs = 1_820.16,\n                    changeDueBs = 469.78,\n''',
-              '''                    secondaryAmounts = 1_820.16 to 469.78,\n''',
+          # ---- CierreCajaScreen ----
+          path = root / 'ui/caja/CierreCajaScreen.kt'
+          text = read(path)
+          text = replace_once(
+              text,
+              '''/** Acciones del cierre agrupadas para mantener las firmas de los composables pequeñas. */
+          internal class CierreCajaActions(
+              val onConfirmClose: () -> Unit,
+              val onPrintReportX: () -> Unit,
+              val onPrintReportZ: () -> Unit,
           )
-          old_signature = '''    multiCurrency: Boolean = false,\n    totalBs: Double = 0.0,\n    changeDueBs: Double = 0.0,\n    feError: String? = null,\n): PaymentSuccessPayload =\n    PaymentSuccessPayload(\n'''
-          new_signature = '''    secondaryAmounts: Pair<Double, Double>? = null,\n    feError: String? = null,\n): PaymentSuccessPayload =\n    PaymentSuccessPayload(\n'''
-          text = text.replace(old_signature, new_signature)
-          text = text.replace('        totalBs = totalBs,', '        totalBs = secondaryAmounts?.first ?: 0.0,')
-          text = text.replace('        changeDueBs = changeDueBs,', '        changeDueBs = secondaryAmounts?.second ?: 0.0,')
-          text = text.replace('        abrMonedaSecundaria = if (multiCurrency) "VES" else "",', '        abrMonedaSecundaria = if (secondaryAmounts != null) "VES" else "",')
-          text = text.replace('        isMultiCurrency = multiCurrency,', '        isMultiCurrency = secondaryAmounts != null,')
-          path.write_text(text)
 
-          # 6) Collapse StartTransactionUseCase to one return path without changing behavior.
-          path = root / 'domain/usecase/payment/StartTransactionUseCase.kt'
-          text = path.read_text()
-          start = text.index('    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {')
-          end = text.index('\n    suspend fun markConfirmed(', start)
-          replacement = '''    suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {\n        val now = clock.now().toEpochMilli()\n        val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }\n        val resumable =\n            existing\n                ?.takeIf { it.status == STATUS_SENDING }\n                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }\n        val completedPreferred =\n            existing\n                ?.takeIf { it.clientCorrelationId == command.preferredId }\n                ?.takeIf { it.status == STATUS_CONFIRMED || it.status == STATUS_DUPLICATE }\n                ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }\n        val recovered = resumable ?: completedPreferred\n        val tenant = command.tenant\n        val result =\n            if (recovered != null) {\n                StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)\n            } else if (tenant == null) {\n                null\n            } else {\n                startNewTransaction(command = command, tenant = tenant, now = now)\n            }\n        return result\n    }\n\n    private suspend fun startNewTransaction(\n        command: StartTransactionCommand,\n        tenant: SaleTenant,\n        now: Long,\n    ): StartedTransaction {\n        val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()\n        com.amaxonia.pos.core.telemetry.SaleTelemetry.record(\n            event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,\n            idFactura = id,\n            "tenant" to tenant.tenantId,\n            "total" to command.totalAmount,\n            "currency" to command.currency,\n        )\n        val totalMinor =\n            com.amaxonia.pos.domain.model.money.MinorUnitMoney\n                .fromDoubleAsMinor(command.totalAmount)\n        dao.upsert(\n            TransactionLogEntity(\n                clientCorrelationId = id,\n                idCaja = command.idCaja,\n                idCajaSecuencia = command.idCajaSecuencia,\n                totalAmount = command.totalAmount,\n                currency = command.currency,\n                clientName = command.clientName,\n                status = STATUS_SENDING,\n                tenantId = tenant.tenantId,\n                tenantCompanyId = tenant.companyId,\n                tenantAdminDb = tenant.adminDb,\n                tenantContableDb = tenant.contableDb,\n                tenantNominaDb = tenant.nominaDb,\n                tenantLabel = tenant.label,\n                totalAmountMinor = totalMinor,\n                createdAt = now,\n                updatedAt = now,\n            ),\n        )\n        return StartedTransaction(clientCorrelationId = id, resumed = false)\n    }\n'''
-          text = text[:start] + replacement + text[end:]
-          path.write_text(text)
+          ''',
+              '',
+              'CierreCajaActions inline declaration',
+          )
+          text = replace_once(
+              text,
+              '''summary = state.summary,
+                                  isClosing = false,
+                                  isPrintingReportX = isPrintingX,
+                                  isPrintingReportZ = isPrintingZ,
+                                  showReportButtons = viewModel.hasActivePrinter,
+                                  actions =''',
+              '''summary = state.summary,
+                                  state =
+                                      CierreCajaReadyState(
+                                          isClosing = false,
+                                          isPrintingReportX = isPrintingX,
+                                          isPrintingReportZ = isPrintingZ,
+                                          showReportButtons = viewModel.hasActivePrinter,
+                                      ),
+                                  actions =''',
+              'Cierre ready call',
+          )
+          text = replace_once(
+              text,
+              '''summary = state.summary,
+                                  isClosing = true,
+                                  isPrintingReportX = false,
+                                  isPrintingReportZ = false,
+                                  showReportButtons = viewModel.hasActivePrinter,
+                                  actions =''',
+              '''summary = state.summary,
+                                  state =
+                                      CierreCajaReadyState(
+                                          isClosing = true,
+                                          isPrintingReportX = false,
+                                          isPrintingReportZ = false,
+                                          showReportButtons = viewModel.hasActivePrinter,
+                                      ),
+                                  actions =''',
+              'Cierre closing call',
+          )
+          text = replace_region(
+              text,
+              '@Composable\ninternal fun ReadyContent(',
+              '\n@Composable\nprivate fun CajaHeaderCard',
+              '''@Composable
+          internal fun ReadyContent(
+              summary: CierreCajaSummary,
+              state: CierreCajaReadyState,
+              actions: CierreCajaActions,
+          ) {
+              Column(
+                  modifier =
+                      Modifier
+                          .fillMaxSize()
+                          .verticalScroll(rememberScrollState())
+                          .padding(horizontal = 20.dp)
+                          .padding(bottom = 24.dp),
+              ) {
+                  Spacer(modifier = Modifier.height(8.dp))
+                  CajaHeaderCard(summary = summary)
+                  Spacer(modifier = Modifier.height(20.dp))
+                  SectionTitle("Resumen de Ventas")
+                  Spacer(modifier = Modifier.height(12.dp))
+                  VentasSummaryCard(summary = summary)
+                  Spacer(modifier = Modifier.height(20.dp))
+                  SectionTitle("Desglose por Método de Pago")
+                  Spacer(modifier = Modifier.height(12.dp))
+                  PaymentBreakdownCard(summary = summary)
+                  Spacer(modifier = Modifier.height(20.dp))
+                  ExpectedCloseCard(summary = summary)
+                  Spacer(modifier = Modifier.height(32.dp))
+                  if (state.showReportButtons) {
+                      ReportButtons(state = state, actions = actions)
+                      Spacer(modifier = Modifier.height(16.dp))
+                  }
+                  ConfirmCloseButton(isClosing = state.isClosing, onConfirmClose = actions.onConfirmClose)
+              }
+          }
+          ''',
+              'ReadyContent',
+          )
+          text = replace_region(
+              text,
+              '@Composable\nprivate fun CajaHeaderCard',
+              '\n@Composable\nprivate fun VentasSummaryCard',
+              '''@Composable
+          private fun CajaHeaderCard(summary: CierreCajaSummary) {
+              ElevatedCard(
+                  modifier = Modifier.fillMaxWidth(),
+                  shape = RoundedCornerShape(20.dp),
+                  colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
+                  elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+              ) {
+                  Column(modifier = Modifier.padding(24.dp)) {
+                      CajaHeaderIdentity(summary)
+                      Spacer(modifier = Modifier.height(20.dp))
+                      HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
+                      Spacer(modifier = Modifier.height(16.dp))
+                      CajaHeaderStats(summary)
+                  }
+              }
+          }
+
+          @Composable
+          private fun CajaHeaderIdentity(summary: CierreCajaSummary) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                  Box(
+                      modifier =
+                          Modifier
+                              .size(44.dp)
+                              .clip(CircleShape)
+                              .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
+                      contentAlignment = Alignment.Center,
+                  ) {
+                      Icon(
+                          Icons.Rounded.PointOfSale,
+                          contentDescription = null,
+                          tint = PosPalette.FixedWhite,
+                          modifier = Modifier.size(24.dp),
+                      )
+                  }
+                  Spacer(modifier = Modifier.width(16.dp))
+                  Column(modifier = Modifier.weight(1f)) {
+                      Text(
+                          text = summary.cajaName,
+                          fontWeight = FontWeight.Bold,
+                          fontSize = 20.sp,
+                          color = PosPalette.FixedWhite,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                      )
+                      Row(
+                          verticalAlignment = Alignment.CenterVertically,
+                          modifier = Modifier.padding(top = 4.dp),
+                      ) {
+                          Icon(
+                              Icons.Rounded.Schedule,
+                              contentDescription = null,
+                              tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                              modifier = Modifier.size(14.dp),
+                          )
+                          Spacer(modifier = Modifier.width(4.dp))
+                          Text(
+                              text = "Abierta: ${summary.openedAt}",
+                              fontSize = 12.sp,
+                              color = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                              maxLines = 1,
+                              overflow = TextOverflow.Ellipsis,
+                          )
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun CajaHeaderStats(summary: CierreCajaSummary) {
+              Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                  MiniStat(
+                      label = "Monto Apertura",
+                      value = formatMoney(summary.openAmount),
+                      color = PosPalette.FixedWhite,
+                      modifier = Modifier.weight(1f),
+                  )
+                  MiniStat(
+                      label = "Transacciones",
+                      value = "${summary.transactionCount}",
+                      color = PosPalette.FixedWhite,
+                      modifier = Modifier.weight(1f),
+                  )
+              }
+          }
+          ''',
+              'CajaHeaderCard',
+          )
+          text = replace_region(
+              text,
+              '@Composable\nprivate fun ReportButtons(',
+              '\n@Composable\nprivate fun ConfirmCloseButton',
+              '''@Composable
+          private fun ReportButtons(
+              state: CierreCajaReadyState,
+              actions: CierreCajaActions,
+          ) {
+              val enabled = !state.isClosing && !state.isPrintingReportX && !state.isPrintingReportZ
+              Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.spacedBy(12.dp),
+              ) {
+                  Box(modifier = Modifier.weight(1f)) {
+                      ReportXButton(
+                          isPrinting = state.isPrintingReportX,
+                          enabled = enabled,
+                          onClick = actions.onPrintReportX,
+                      )
+                  }
+                  Box(modifier = Modifier.weight(1f)) {
+                      ReportZButton(
+                          isPrinting = state.isPrintingReportZ,
+                          enabled = enabled,
+                          onClick = actions.onPrintReportZ,
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          private fun ReportXButton(
+              isPrinting: Boolean,
+              enabled: Boolean,
+              onClick: () -> Unit,
+          ) {
+              OutlinedButton(
+                  onClick = onClick,
+                  enabled = enabled,
+                  modifier = Modifier.fillMaxWidth().height(52.dp),
+                  shape = RoundedCornerShape(14.dp),
+                  colors =
+                      ButtonDefaults.outlinedButtonColors(
+                          contentColor = MaterialTheme.colorScheme.primary,
+                          disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                      ),
+              ) {
+                  if (isPrinting) {
+                      CircularProgressIndicator(
+                          strokeWidth = 2.dp,
+                          modifier = Modifier.size(18.dp),
+                          color = MaterialTheme.colorScheme.primary,
+                      )
+                  } else {
+                      Icon(
+                          Icons.AutoMirrored.Rounded.Assignment,
+                          contentDescription = null,
+                          modifier = Modifier.size(20.dp),
+                      )
+                  }
+                  Spacer(modifier = Modifier.width(8.dp))
+                  Text(
+                      if (isPrinting) "Imprimiendo..." else "Reporte X",
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 14.sp,
+                  )
+              }
+          }
+
+          @Composable
+          private fun ReportZButton(
+              isPrinting: Boolean,
+              enabled: Boolean,
+              onClick: () -> Unit,
+          ) {
+              OutlinedButton(
+                  onClick = onClick,
+                  enabled = enabled,
+                  modifier = Modifier.fillMaxWidth().height(52.dp),
+                  shape = RoundedCornerShape(14.dp),
+                  colors =
+                      ButtonDefaults.outlinedButtonColors(
+                          contentColor = MaterialTheme.colorScheme.error,
+                          disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
+                      ),
+              ) {
+                  if (isPrinting) {
+                      CircularProgressIndicator(
+                          strokeWidth = 2.dp,
+                          modifier = Modifier.size(18.dp),
+                          color = MaterialTheme.colorScheme.error,
+                      )
+                  } else {
+                      Icon(
+                          Icons.Rounded.Description,
+                          contentDescription = null,
+                          modifier = Modifier.size(20.dp),
+                      )
+                  }
+                  Spacer(modifier = Modifier.width(8.dp))
+                  Text(
+                      if (isPrinting) "Imprimiendo..." else "Reporte Z",
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 14.sp,
+                  )
+              }
+          }
+          ''',
+              'ReportButtons',
+          )
+          write(path, text)
+
+          # Cash-close previews use the grouped presentation state.
+          path = root / 'ui/caja/CierreCajaScreenPreviews.kt'
+          text = read(path)
+          text = text.replace(
+              '''isClosing = false,
+                          isPrintingReportX = false,
+                          isPrintingReportZ = false,
+                          showReportButtons = true,
+          ''',
+              '''state =
+                              CierreCajaReadyState(
+                                  isClosing = false,
+                                  isPrintingReportX = false,
+                                  isPrintingReportZ = false,
+                                  showReportButtons = true,
+                              ),
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''isClosing = true,
+                          isPrintingReportX = false,
+                          isPrintingReportZ = false,
+                          showReportButtons = false,
+          ''',
+              '''state =
+                              CierreCajaReadyState(
+                                  isClosing = true,
+                                  isPrintingReportX = false,
+                                  isPrintingReportZ = false,
+                                  showReportButtons = false,
+                              ),
+          ''',
+              'Cierre closing preview',
+          )
+          write(path, text)
+
+          # ---- CartScreen ----
+          path = root / 'ui/cart/CartScreen.kt'
+          text = read(path)
+          text = replace_region(
+              text,
+              '@Composable\ninternal fun CartBottomBar(',
+              '\n// ─────────────────────────────────────────────────────────────────────────────\n// Cliente + vendedor:',
+              '''@Composable
+          internal fun CartBottomBar(
+              total: Double,
+              secondaryTotal: String?,
+              onSaveDraft: () -> Unit,
+              onCheckout: () -> Unit,
+              modifier: Modifier = Modifier,
+          ) {
+              Surface(
+                  modifier = modifier,
+                  color = MaterialTheme.colorScheme.surface,
+                  shadowElevation = 16.dp,
+                  shape = PosExtraShapes.BottomBarTop,
+              ) {
+                  BoxWithConstraints {
+                      val compact = maxHeight < 480.dp
+                      Column(
+                          modifier =
+                              Modifier
+                                  .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
+                                  .navigationBarsPadding(),
+                      ) {
+                          CartBottomTotal(total = total, secondaryTotal = secondaryTotal, compact = compact)
+                          Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
+                          CartBottomActions(total = total, onSaveDraft = onSaveDraft, onCheckout = onCheckout)
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun CartBottomTotal(
+              total: Double,
+              secondaryTotal: String?,
+              compact: Boolean,
+          ) {
+              val totalStyle =
+                  if (compact) {
+                      MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+                  } else {
+                      PosTextStyles.totalDisplay
+                  }
+              Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.Bottom,
+              ) {
+                  Text(
+                      "Total",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      color = MaterialTheme.colorScheme.onSurface,
+                  )
+                  Column(horizontalAlignment = Alignment.End) {
+                      AdaptiveAmountText(
+                          text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                          baseStyle = totalStyle,
+                          color = MaterialTheme.colorScheme.primary,
+                          options =
+                              com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                  minFontSizeSp = 16f,
+                              ),
+                      )
+                      secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
+                          Text(
+                              secondary,
+                              style = PosTextStyles.amountSecondary,
+                              color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          )
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun CartBottomActions(
+              total: Double,
+              onSaveDraft: () -> Unit,
+              onCheckout: () -> Unit,
+          ) {
+              Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                  Box(modifier = Modifier.weight(1f)) {
+                      SaveDraftButton(onClick = onSaveDraft)
+                  }
+                  Box(modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT)) {
+                      CheckoutButton(total = total, onClick = onCheckout)
+                  }
+              }
+          }
+
+          @Composable
+          private fun SaveDraftButton(onClick: () -> Unit) {
+              OutlinedButton(
+                  onClick = onClick,
+                  modifier = Modifier.fillMaxWidth().height(56.dp),
+                  contentPadding = PaddingValues(horizontal = 8.dp),
+                  shape = MaterialTheme.shapes.medium,
+              ) {
+                  Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                      "Guardar",
+                      style = MaterialTheme.typography.labelLarge,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                  )
+              }
+          }
+
+          @Composable
+          private fun CheckoutButton(
+              total: Double,
+              onClick: () -> Unit,
+          ) {
+              Button(
+                  onClick = onClick,
+                  modifier = Modifier.fillMaxWidth().height(56.dp),
+                  colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                  contentPadding = PaddingValues(horizontal = 12.dp),
+                  shape = MaterialTheme.shapes.medium,
+                  elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+              ) {
+                  AdaptiveAmountText(
+                      text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                      baseStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                      color = MaterialTheme.colorScheme.onPrimary,
+                      options =
+                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                              minFontSizeSp = 13f,
+                          ),
+                  )
+              }
+          }
+          ''',
+              'CartBottomBar',
+          )
+          text = replace_region(
+              text,
+              '@Composable\ninternal fun CartClientVendorPanel(',
+              '\n@Composable\nprivate fun CartErrorBanner',
+              '''@Composable
+          internal fun CartClientVendorPanel(
+              state: CartState,
+              onSelectClient: () -> Unit,
+              onRemoveClient: () -> Unit,
+              onChangeSeller: () -> Unit,
+              modifier: Modifier = Modifier,
+          ) {
+              Column(
+                  modifier =
+                      modifier
+                          .fillMaxWidth()
+                          .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                          .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+              ) {
+                  CartClientRow(state = state, onSelectClient = onSelectClient, onRemoveClient = onRemoveClient)
+                  HorizontalDivider(
+                      color = MaterialTheme.colorScheme.outlineVariant,
+                      modifier = Modifier.padding(horizontal = 14.dp),
+                  )
+                  CartSellerRow(state = state, onChangeSeller = onChangeSeller)
+              }
+          }
+
+          @Composable
+          private fun CartClientRow(
+              state: CartState,
+              onSelectClient: () -> Unit,
+              onRemoveClient: () -> Unit,
+          ) {
+              Row(
+                  modifier =
+                      Modifier
+                          .fillMaxWidth()
+                          .clickable { onSelectClient() }
+                          .padding(horizontal = 14.dp, vertical = 12.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+              ) {
+                  val selectedClient = state.selectedClient
+                  if (selectedClient != null) {
+                      ClientAvatar(
+                          clientPhotoUrl = state.selectedClientPhotoUrl,
+                          clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
+                      )
+                      Spacer(modifier = Modifier.width(12.dp))
+                      Column(modifier = Modifier.weight(1f)) {
+                          Text(
+                              "Cliente asignado",
+                              style = MaterialTheme.typography.labelMedium,
+                              color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          )
+                          Text(
+                              "${selectedClient.firstName} ${selectedClient.lastName}",
+                              style = MaterialTheme.typography.titleSmall,
+                              fontWeight = FontWeight.Bold,
+                              color = MaterialTheme.colorScheme.onSurface,
+                              maxLines = 1,
+                              overflow = TextOverflow.Ellipsis,
+                          )
+                      }
+                      IconButton(onClick = onRemoveClient) {
+                          Icon(
+                              Icons.Default.Delete,
+                              contentDescription = "Quitar cliente",
+                              tint = MaterialTheme.colorScheme.error,
+                          )
+                      }
+                  } else {
+                      Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+                      Spacer(modifier = Modifier.width(12.dp))
+                      Text(
+                          "Asignar cliente",
+                          modifier = Modifier.weight(1f),
+                          style = MaterialTheme.typography.bodyLarge,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      )
+                      Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                  }
+              }
+          }
+
+          @Composable
+          private fun CartSellerRow(
+              state: CartState,
+              onChangeSeller: () -> Unit,
+          ) {
+              Row(
+                  modifier =
+                      Modifier
+                          .fillMaxWidth()
+                          .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
+                          .padding(horizontal = 14.dp, vertical = 12.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+              ) {
+                  Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
+                  Spacer(modifier = Modifier.width(12.dp))
+                  Column(modifier = Modifier.weight(1f)) {
+                      Text(
+                          "Vendedor asignado",
+                          style = MaterialTheme.typography.labelMedium,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      )
+                      Text(
+                          text = state.currentSeller?.nombre ?: "Sin vendedor",
+                          style = MaterialTheme.typography.titleSmall,
+                          fontWeight = FontWeight.Bold,
+                          color = MaterialTheme.colorScheme.onSurface,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                      )
+                  }
+                  Icon(
+                      Icons.Default.Autorenew,
+                      contentDescription = "Cambiar vendedor",
+                      tint =
+                          if (state.availableSellers.isEmpty()) {
+                              MaterialTheme.colorScheme.outline
+                          } else {
+                              MaterialTheme.colorScheme.primary
+                          },
+                  )
+              }
+          }
+          ''',
+              'CartClientVendorPanel',
+          )
+          write(path, text)
+
+          # ---- History transaction card ----
+          path = root / 'ui/history/HistoryScreen.kt'
+          text = read(path)
+          text = replace_region(
+              text,
+              '@Composable\ninternal fun TransactionCard(',
+              '\n// ---------- Status Badge ----------',
+              '''@Composable
+          internal fun TransactionCard(
+              transaction: Transaction,
+              onClick: () -> Unit,
+          ) {
+              ElevatedCard(
+                  modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+                  shape = RoundedCornerShape(16.dp),
+                  colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                  elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+              ) {
+                  Row(
+                      modifier = Modifier.fillMaxWidth().padding(16.dp),
+                      verticalAlignment = Alignment.CenterVertically,
+                  ) {
+                      TransactionCardIcon()
+                      Spacer(modifier = Modifier.width(14.dp))
+                      TransactionCardInfo(transaction = transaction, modifier = Modifier.weight(1f))
+                      TransactionCardAmount(transaction)
+                      Icon(
+                          imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                          contentDescription = null,
+                          tint = MaterialTheme.colorScheme.outline,
+                          modifier = Modifier.padding(start = 4.dp).size(20.dp),
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          private fun TransactionCardIcon() {
+              Box(
+                  modifier =
+                      Modifier
+                          .size(44.dp)
+                          .clip(RoundedCornerShape(12.dp))
+                          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Icon(
+                      Icons.Rounded.Receipt,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.primary,
+                      modifier = Modifier.size(22.dp),
+                  )
+              }
+          }
+
+          @Composable
+          private fun TransactionCardInfo(
+              transaction: Transaction,
+              modifier: Modifier = Modifier,
+          ) {
+              Column(modifier = modifier) {
+                  Text(
+                      text = transaction.invoiceNumber,
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 15.sp,
+                      color = MaterialTheme.colorScheme.onSurface,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                  )
+                  Spacer(modifier = Modifier.height(6.dp))
+                  StatusBadge(status = transaction.status)
+                  Spacer(modifier = Modifier.height(6.dp))
+                  TransactionMetadataRow(transaction)
+              }
+          }
+
+          @Composable
+          private fun TransactionMetadataRow(transaction: Transaction) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(
+                      Icons.Rounded.Schedule,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                      modifier = Modifier.size(13.dp),
+                  )
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text(
+                      text = transaction.time,
+                      fontSize = 12.sp,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                  if (transaction.clienteNombre.isNotBlank()) {
+                      Spacer(modifier = Modifier.width(10.dp))
+                      Icon(
+                          Icons.Rounded.Person,
+                          contentDescription = null,
+                          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                          modifier = Modifier.size(13.dp),
+                      )
+                      Spacer(modifier = Modifier.width(3.dp))
+                      Text(
+                          text = transaction.clienteNombre,
+                          fontSize = 12.sp,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                          modifier = Modifier.weight(1f, fill = false),
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          private fun TransactionCardAmount(transaction: Transaction) {
+              Column(horizontalAlignment = Alignment.End) {
+                  com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
+                      text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
+                      baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                      color = MaterialTheme.colorScheme.primary,
+                      options =
+                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                              minFontSizeSp = 11f,
+                          ),
+                  )
+                  if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
+                      Text(
+                          text = "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
+                          fontSize = 11.sp,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      )
+                  }
+              }
+          }
+
+          ''',
+              'TransactionCard',
+          )
+          write(path, text)
+
+          # ---- Reports: split best-seller details ----
+          path = root / 'ui/reports/ReportsScreen.kt'
+          text = read(path)
+          text = replace_region(
+              text,
+              '@Composable\nprivate fun BestSellerItem(',
+              '\nprivate fun money(',
+              '''@Composable
+          private fun BestSellerItem(
+              product: BestSellerProduct,
+              position: Int,
+          ) {
+              val productColor = Color(product.colorHex)
+              Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  verticalAlignment = Alignment.CenterVertically,
+              ) {
+                  Surface(
+                      color = productColor.copy(alpha = 0.1f),
+                      shape = RoundedCornerShape(10.dp),
+                      modifier = Modifier.size(40.dp),
+                  ) {
+                      Box(contentAlignment = Alignment.Center) {
+                          Text(
+                              text = position.toString(),
+                              style = MaterialTheme.typography.titleMedium,
+                              fontWeight = FontWeight.Bold,
+                              color = productColor,
+                          )
+                      }
+                  }
+                  Spacer(modifier = Modifier.width(12.dp))
+                  BestSellerDetails(
+                      product = product,
+                      productColor = productColor,
+                      modifier = Modifier.weight(1f),
+                  )
+                  Spacer(modifier = Modifier.width(10.dp))
+                  AdaptiveAmountText(
+                      text = money("$", product.price, separator = ""),
+                      modifier = Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT),
+                      baseStyle =
+                          MaterialTheme.typography.titleMedium.copy(
+                              fontWeight = FontWeight.Bold,
+                              textAlign = TextAlign.End,
+                          ),
+                      color = MaterialTheme.colorScheme.primary,
+                      options =
+                          com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                              minFontSizeSp = 10f,
+                          ),
+                  )
+              }
+          }
+
+          @Composable
+          private fun BestSellerDetails(
+              product: BestSellerProduct,
+              productColor: Color,
+              modifier: Modifier = Modifier,
+          ) {
+              Column(modifier = modifier) {
+                  Text(
+                      text = product.name,
+                      style = MaterialTheme.typography.bodyMedium,
+                      fontWeight = FontWeight.Bold,
+                      color = MaterialTheme.colorScheme.onSurface,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                  )
+                  Spacer(modifier = Modifier.height(4.dp))
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      Text(
+                          text = "${product.salesCount} ventas",
+                          style = MaterialTheme.typography.labelMedium,
+                          color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          maxLines = 1,
+                      )
+                      Spacer(modifier = Modifier.width(10.dp))
+                      LinearProgressIndicator(
+                          progress = { product.progress },
+                          modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                          color = productColor,
+                          trackColor = productColor.copy(alpha = 0.1f),
+                      )
+                  }
+              }
+          }
+
+          ''',
+              'BestSellerItem',
+          )
+          write(path, text)
+
+          # ---- DraftInvoicesScreen: extract app bar ----
+          path = root / 'ui/drafts/DraftInvoicesScreen.kt'
+          text = read(path)
+          old_topbar = '''topBar = {
+                      TopAppBar(
+                          title = {
+                              Text(
+                                  text = "Facturas pendientes",
+                                  style = MaterialTheme.typography.titleLarge,
+                                  fontWeight = FontWeight.Bold,
+                                  color = MaterialTheme.colorScheme.primary,
+                                  maxLines = 1,
+                                  overflow = TextOverflow.Ellipsis,
+                              )
+                          },
+                          navigationIcon = {
+                              IconButton(
+                                  onClick = onBack,
+                                  modifier = Modifier.size(48.dp),
+                              ) {
+                                  Icon(
+                                      imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                      contentDescription = "Volver",
+                                      tint = MaterialTheme.colorScheme.primary,
+                                  )
+                              }
+                          },
+                          colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                      )
+                  },'''
+          text = replace_once(text, old_topbar, 'topBar = { DraftInvoicesTopBar(onBack = onBack) },', 'Draft top bar')
+          marker = '\n@Composable\nprivate fun DraftLoadingState'
+          helper = '''
+          @OptIn(ExperimentalMaterial3Api::class)
+          @Composable
+          private fun DraftInvoicesTopBar(onBack: () -> Unit) {
+              TopAppBar(
+                  title = {
+                      Text(
+                          text = "Facturas pendientes",
+                          style = MaterialTheme.typography.titleLarge,
+                          fontWeight = FontWeight.Bold,
+                          color = MaterialTheme.colorScheme.primary,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                      )
+                  },
+                  navigationIcon = {
+                      IconButton(
+                          onClick = onBack,
+                          modifier = Modifier.size(48.dp),
+                      ) {
+                          Icon(
+                              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                              contentDescription = "Volver",
+                              tint = MaterialTheme.colorScheme.primary,
+                          )
+                      }
+                  },
+                  colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+              )
+          }
+          '''
+          if marker not in text:
+              raise SystemExit('Missing DraftLoadingState marker')
+          text = text.replace(marker, helper + marker, 1)
+          write(path, text)
           PY
 
-      - name: Format changed Kotlin sources
-        working-directory: amaxoniaerp-pos
-        run: |
-          chmod +x gradlew
-          ./gradlew ktlintFormat --no-daemon --console=plain || true
-
-      - name: Commit repairs
+      - name: Commit refactors
         run: |
           git config user.name "Yoiner Moreno"
           git config user.email "yoinerdeyhan@gmail.com"
           git add amaxoniaerp-pos/app/src/main/java/com/amaxonia/pos
-          git commit -m "refactor: resolve Detekt findings without suppressions"
+          git commit -m "refactor: split remaining long Compose components"
           git push origin HEAD:chatgpt/phase4-detekt-cleanup
