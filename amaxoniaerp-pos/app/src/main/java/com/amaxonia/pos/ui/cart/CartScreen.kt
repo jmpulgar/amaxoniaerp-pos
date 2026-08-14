@@ -89,7 +89,7 @@ import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.cartBrandGradient
 
 /** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
-private val CHECKOUT_BUTTON_WEIGHT = 1.5f
+private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -422,7 +422,10 @@ internal fun CartBottomBar(
                             text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
                             baseStyle = totalStyle,
                             color = MaterialTheme.colorScheme.primary,
-                            minFontSizeSp = 16f,
+                            options =
+                                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                    minFontSizeSp = 16f,
+                                ),
                         )
                         secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
                             Text(
@@ -470,7 +473,10 @@ internal fun CartBottomBar(
                                     fontWeight = FontWeight.ExtraBold,
                                 ),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            minFontSizeSp = 13f,
+                            options =
+                                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                    minFontSizeSp = 13f,
+                                ),
                         )
                     }
                 }
@@ -959,7 +965,10 @@ fun CartItemRow(
                     text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
                     baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 13f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                        ),
                 )
             }
 

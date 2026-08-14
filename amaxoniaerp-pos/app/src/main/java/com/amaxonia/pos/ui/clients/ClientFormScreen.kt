@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -283,13 +282,13 @@ private fun DocumentAndDvRow(
         PosTextInput(
             label = documentLabel,
             value = document,
-            modifier = Modifier.weight(0.72f),
+            modifier = Modifier.weight(DOCUMENT_FIELD_WEIGHT),
             onValueChange = onDocumentChange,
         )
         PosTextInput(
             label = "DV",
             value = dv,
-            modifier = Modifier.weight(0.28f),
+            modifier = Modifier.weight(DV_FIELD_WEIGHT),
             onValueChange = onDvChange,
         )
     }
@@ -403,6 +402,8 @@ private fun SaveClientButton(
     }
 }
 
+private const val DOCUMENT_FIELD_WEIGHT = 0.72f
+private const val DV_FIELD_WEIGHT = 0.28f
 private const val NATURAL_CLIENT_TYPE = 2
 private const val LEGAL_CLIENT_TYPE = 3
 private const val FOREIGN_CLIENT_TYPE = 4

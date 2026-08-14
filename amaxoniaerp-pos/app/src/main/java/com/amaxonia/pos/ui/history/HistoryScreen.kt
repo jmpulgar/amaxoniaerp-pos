@@ -340,9 +340,10 @@ internal fun SummaryBar(
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         ),
                     color = PosPalette.FixedWhite,
-                    minFontSizeSp = 13f,
                     modifier = Modifier.fillMaxWidth(),
-                )
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 13f,
+                ))
             }
         }
     }
@@ -608,8 +609,9 @@ internal fun TransactionCard(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.primary,
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     minFontSizeSp = 11f,
-                )
+                ))
                 if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
                     Text(
                         text = "${formatCurrencyLabel(
@@ -901,8 +903,9 @@ private fun FacturaDetalleSheetContent(
                                           fontWeight = FontWeight.Bold,
                                       ),
                                   color = MaterialTheme.colorScheme.primary,
+                              options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                                   minFontSizeSp = 13f,
-                              )
+                              ))
                             if (transaction.totalRef != null &&
                                 transaction.totalRef > 0.0 &&
                                 !transaction.abrMonedaSecundaria.isNullOrBlank()
@@ -995,8 +998,9 @@ private fun DetalleItemRow(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.onSurface,
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     minFontSizeSp = 11f,
-                )
+                ))
                 Text(
                     text = "c/u ${String.format(java.util.Locale.getDefault(), "%.2f", item.precioUnitario)}",
                     fontSize = 11.sp,

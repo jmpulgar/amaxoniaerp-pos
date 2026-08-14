@@ -63,6 +63,7 @@ import com.amaxonia.pos.ui.theme.SuccessGreen
 import java.util.Locale
 
 private const val BEST_SELLER_LIMIT = 10
+private const val BEST_SELLER_AMOUNT_WEIGHT = 0.6f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -214,8 +215,9 @@ private fun HeroSummaryCard(summary: SummaryStats) {
                         fontWeight = FontWeight.Bold,
                     ),
                 color = PosPalette.FixedWhite,
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 18f,
-            )
+            ))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -263,8 +265,9 @@ private fun SummaryValue(
                     textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
                 ),
             color = PosPalette.FixedWhite,
+        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
             minFontSizeSp = 10f,
-        )
+        ))
     }
 }
 
@@ -336,8 +339,9 @@ private fun MetricMiniCard(
                 modifier = Modifier.fillMaxWidth(),
                 baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 10f,
-            )
+            ))
         }
     }
 }
@@ -416,8 +420,9 @@ private fun TransactionStatusRow(
                 modifier = Modifier.weight(1f),
                 baseStyle = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.End),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 9f,
-            )
+            ))
             Spacer(modifier = Modifier.width(8.dp))
         }
         Text(
@@ -574,15 +579,16 @@ private fun BestSellerItem(
         Spacer(modifier = Modifier.width(10.dp))
         AdaptiveAmountText(
             text = money("$", product.price, separator = ""),
-            modifier = Modifier.weight(0.6f),
+            modifier = Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT),
             baseStyle =
                 MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.End,
                 ),
             color = MaterialTheme.colorScheme.primary,
+        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
             minFontSizeSp = 10f,
-        )
+        ))
     }
 }
 

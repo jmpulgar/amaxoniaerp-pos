@@ -1,5 +1,7 @@
 package com.amaxonia.pos.ui.drafts
 
+private const val DRAFT_AMOUNT_WEIGHT = 0.7f
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -231,15 +233,16 @@ private fun DraftInvoiceCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 AdaptiveAmountText(
                     text = "$ ${String.format(Locale.getDefault(), "%.2f", draft.total)}",
-                    modifier = Modifier.weight(0.7f),
+                    modifier = Modifier.weight(DRAFT_AMOUNT_WEIGHT),
                     baseStyle =
                         MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         ),
                     color = MaterialTheme.colorScheme.primary,
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     minFontSizeSp = 12f,
-                )
+                ))
             }
 
             Row(

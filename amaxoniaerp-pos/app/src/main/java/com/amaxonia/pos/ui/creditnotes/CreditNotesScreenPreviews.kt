@@ -22,7 +22,7 @@ private const val PREVIEW_SOURCE_ITEMS = 4
 
 @Preview(name = "Summary banner · 320×568 · monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CreditNotesSummaryBannerHuge() =
+internal fun CreditNotesSummaryBannerHuge() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             SummaryBanner(
@@ -36,7 +36,7 @@ private fun CreditNotesSummaryBannerHuge() =
 
 @Preview(name = "Tarjetas NC · 320×568 · estados + monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CreditNoteCards320() =
+internal fun CreditNoteCards320() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CreditNoteCardsPreviewContent()
@@ -45,7 +45,7 @@ private fun CreditNoteCards320() =
 
 @Preview(name = "Tarjetas NC · 412×915", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
-private fun CreditNoteCards412() =
+internal fun CreditNoteCards412() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CreditNoteCardsPreviewContent()
@@ -54,7 +54,7 @@ private fun CreditNoteCards412() =
 
 @Preview(name = "Tarjetas NC · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun CreditNoteCardsLandscape() =
+internal fun CreditNoteCardsLandscape() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CreditNoteCardsPreviewContent()
@@ -63,7 +63,7 @@ private fun CreditNoteCardsLandscape() =
 
 @Preview(name = "Facturas elegibles · 320×568 · saldo enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun SourceInvoiceCards320() =
+internal fun SourceInvoiceCards320() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(
@@ -87,7 +87,7 @@ private fun SourceInvoiceCards320() =
     }
 
 @Composable
-private fun CreditNoteCardsPreviewContent() {
+internal fun CreditNoteCardsPreviewContent() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),

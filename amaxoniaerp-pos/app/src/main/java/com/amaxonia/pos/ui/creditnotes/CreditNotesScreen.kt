@@ -1,4 +1,4 @@
-﻿package com.amaxonia.pos.ui.creditnotes
+package com.amaxonia.pos.ui.creditnotes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -575,8 +575,11 @@ internal fun SummaryBanner(
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         ),
                     color = PosPalette.FixedWhite,
-                    minFontSizeSp = 13f,
                     modifier = Modifier.fillMaxWidth(),
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                        ),
                 )
             }
         }
@@ -682,7 +685,10 @@ internal fun CreditNoteCard(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 11f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 11f,
+                        ),
                 )
                 Text(
                     text = note.facturaCodigo,
@@ -790,7 +796,10 @@ internal fun SourceInvoiceCard(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 11f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 11f,
+                        ),
                 )
             }
             Icon(
@@ -870,7 +879,10 @@ private fun InvoiceLineReadOnlyCard(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.onSurface,
-                    minFontSizeSp = 11f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 11f,
+                        ),
                 )
                 Text(
                     text = "IVA: ${formatAmount(line.pIva)}%",
@@ -1033,7 +1045,10 @@ private fun CreditNoteDetailSheet(
                                 fontWeight = FontWeight.Bold,
                             ),
                         color = MaterialTheme.colorScheme.primary,
-                        minFontSizeSp = 12f,
+                        options =
+                            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                minFontSizeSp = 12f,
+                            ),
                     )
                 }
             }

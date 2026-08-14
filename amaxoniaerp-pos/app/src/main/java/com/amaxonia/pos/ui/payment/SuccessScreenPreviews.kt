@@ -18,7 +18,7 @@ import com.amaxonia.pos.ui.theme.PosTheme
  */
 @Preview(name = "Éxito · 320×568 (smallest)", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun SuccessPortrait320() = PosTheme {
+internal fun SuccessPortrait320() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -32,7 +32,7 @@ private fun SuccessPortrait320() = PosTheme {
 
 @Preview(name = "Éxito · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun SuccessPortrait360() = PosTheme {
+internal fun SuccessPortrait360() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -46,7 +46,7 @@ private fun SuccessPortrait360() = PosTheme {
 
 @Preview(name = "Éxito · 390×844 (multi-moneda)", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SuccessPortrait390MultiCurrency() = PosTheme {
+internal fun SuccessPortrait390MultiCurrency() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -54,9 +54,7 @@ private fun SuccessPortrait390MultiCurrency() = PosTheme {
                 previewPayload(
                     codFactura = "FAC-2026-000999",
                     changeDue = 64.30,
-                    multiCurrency = true,
-                    totalBs = 1_820.16,
-                    changeDueBs = 469.78,
+                    secondaryAmounts = 1_820.16 to 469.78,
                 ),
             isSendingReceiptEmail = false,
             isPrinting = false,
@@ -67,7 +65,7 @@ private fun SuccessPortrait390MultiCurrency() = PosTheme {
 
 @Preview(name = "Éxito · 412×915 (fiscal pendiente)", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
-private fun SuccessPortrait412FiscalPending() = PosTheme {
+internal fun SuccessPortrait412FiscalPending() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -86,7 +84,7 @@ private fun SuccessPortrait412FiscalPending() = PosTheme {
 
 @Preview(name = "Éxito · 480×960 (cambio grande)", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
-private fun SuccessPortrait480BigChange() = PosTheme {
+internal fun SuccessPortrait480BigChange() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -100,7 +98,7 @@ private fun SuccessPortrait480BigChange() = PosTheme {
 
 @Preview(name = "Éxito · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun SuccessLandscapePhone() = PosTheme {
+internal fun SuccessLandscapePhone() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = false,
@@ -108,9 +106,7 @@ private fun SuccessLandscapePhone() = PosTheme {
                 previewPayload(
                     codFactura = "FAC-2026-000123",
                     changeDue = 234.50,
-                    multiCurrency = true,
-                    totalBs = 1_820.16,
-                    changeDueBs = 469.78,
+                    secondaryAmounts = 1_820.16 to 469.78,
                 ),
             isSendingReceiptEmail = false,
             isPrinting = false,
@@ -121,7 +117,7 @@ private fun SuccessLandscapePhone() = PosTheme {
 
 @Preview(name = "Éxito · cargando", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun SuccessLoadingPreview() = PosTheme {
+internal fun SuccessLoadingPreview() = PosTheme {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         SuccessContent(
             isLoading = true,
@@ -143,9 +139,7 @@ private fun previewActions() =
 private fun previewPayload(
     codFactura: String,
     changeDue: Double,
-    multiCurrency: Boolean = false,
-    totalBs: Double = 0.0,
-    changeDueBs: Double = 0.0,
+    secondaryAmounts: Pair<Double, Double>? = null,
     feError: String? = null,
 ): PaymentSuccessPayload =
     PaymentSuccessPayload(
@@ -153,10 +147,10 @@ private fun previewPayload(
         paymentMethodsLabel = "Efectivo",
         codFactura = codFactura,
         transactionId = "preview-tx",
-        totalBs = totalBs,
-        changeDueBs = changeDueBs,
-        abrMonedaSecundaria = if (multiCurrency) "VES" else "",
-        isMultiCurrency = multiCurrency,
+        totalBs = secondaryAmounts?.first ?: 0.0,
+        changeDueBs = secondaryAmounts?.second ?: 0.0,
+        abrMonedaSecundaria = if (secondaryAmounts != null) "VES" else "",
+        isMultiCurrency = secondaryAmounts != null,
         feError = feError,
         tableSessionClosed = true,
     )

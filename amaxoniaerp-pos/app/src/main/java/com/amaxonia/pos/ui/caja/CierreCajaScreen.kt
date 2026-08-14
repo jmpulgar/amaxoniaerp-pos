@@ -478,8 +478,11 @@ private fun ExpectedCloseCard(summary: CierreCajaSummary) {
                         textAlign = androidx.compose.ui.text.style.TextAlign.End,
                     ),
                 color = MaterialTheme.colorScheme.tertiary,
-                minFontSizeSp = 14f,
                 modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 14f,
+                    ),
             )
         }
     }
@@ -783,8 +786,11 @@ private fun MiniStat(
                     fontWeight = FontWeight.Bold,
                 ),
             color = color,
-            minFontSizeSp = 12f,
             modifier = Modifier.fillMaxWidth(),
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 12f,
+                ),
         )
     }
 }
@@ -847,8 +853,11 @@ private fun SummaryRow(
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 ),
             color = valueColor,
-            minFontSizeSp = 12f,
             modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 12f,
+                ),
         )
     }
 }

@@ -457,8 +457,9 @@ private fun ChangeSummary(payload: PaymentSuccessPayload) {
                             fontWeight = FontWeight.ExtraBold,
                         ),
                     color = MaterialTheme.colorScheme.primary,
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     minFontSizeSp = 16f,
-                )
+                ))
             }
             if (payload.isMultiCurrency && payload.changeDueBs > 0.0) {
                 Text(
@@ -497,9 +498,10 @@ private fun SummaryLine(
                     textAlign = TextAlign.End,
                 ),
             color = MaterialTheme.colorScheme.onSurface,
-            minFontSizeSp = 12f,
             modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
-        )
+        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+            minFontSizeSp = 12f,
+        ))
     }
 }
 

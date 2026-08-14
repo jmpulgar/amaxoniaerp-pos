@@ -20,10 +20,12 @@ private const val HUGE_TOTAL = 9_876_543.21
 private const val LARGE_AMOUNT_THRESHOLD = 1_000.0
 private const val SECONDARY_RATE = 40.0
 private const val SUMMARY_INVOICE_COUNT = 248
+private const val PAID_STATUS_ID = 1
+private const val CANCELLED_STATUS_ID = 3
 
 @Preview(name = "Filtros plegados · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistoryFiltersCollapsed320() =
+internal fun HistoryFiltersCollapsed320() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             HistorySearchField(
@@ -38,7 +40,7 @@ private fun HistoryFiltersCollapsed320() =
 
 @Preview(name = "Filtros expandidos · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun HistoryFiltersExpanded360() =
+internal fun HistoryFiltersExpanded360() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val filter =
@@ -48,7 +50,7 @@ private fun HistoryFiltersExpanded360() =
                     sucursalId = 12,
                     fechaInicio = "2026-08-01",
                     fechaFin = "2026-08-14",
-                    estatus = listOf(1, 3),
+                    estatus = listOf(PAID_STATUS_ID, CANCELLED_STATUS_ID),
                 )
             Column(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -70,7 +72,7 @@ private fun HistoryFiltersExpanded360() =
 
 @Preview(name = "Summary bar · 320×568 · monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistorySummaryBarHuge() =
+internal fun HistorySummaryBarHuge() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             SummaryBar(
@@ -83,7 +85,7 @@ private fun HistorySummaryBarHuge() =
 
 @Preview(name = "Fila factura · 320×568 · estados + monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun HistoryTransactionCards320() =
+internal fun HistoryTransactionCards320() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             HistoryTransactionCardsPreviewContent()
@@ -92,7 +94,7 @@ private fun HistoryTransactionCards320() =
 
 @Preview(name = "Fila factura · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun HistoryTransactionCardsLandscape() =
+internal fun HistoryTransactionCardsLandscape() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             HistoryTransactionCardsPreviewContent()
@@ -100,7 +102,7 @@ private fun HistoryTransactionCardsLandscape() =
     }
 
 @Composable
-private fun HistoryTransactionCardsPreviewContent() {
+internal fun HistoryTransactionCardsPreviewContent() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
