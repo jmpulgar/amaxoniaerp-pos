@@ -5,6 +5,10 @@ on:
     branches:
       - chatgpt/phase4-detekt-cleanup
 
+concurrency:
+  group: chatgpt-phase4-validation
+  cancel-in-progress: true
+
 jobs:
   detekt:
     if: contains(github.event.head_commit.message, '[validate]')
