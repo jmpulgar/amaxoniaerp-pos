@@ -8,9 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,9 +21,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,30 +36,31 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.DraftInvoice
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val DRAFT_AMOUNT_WEIGHT = 0.7f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DraftInvoicesScreen(
     onBack: () -> Unit,
-    onDraftLoaded: () -> Unit, // Navegar al carrito despues de cargar
+    onDraftLoaded: () -> Unit,
     viewModel: DraftInvoicesViewModel =
         injectedViewModel {
             DraftInvoicesViewModel(
@@ -73,79 +75,104 @@ fun DraftInvoicesScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Facturas Pendientes",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = MaterialTheme.colorScheme.primary,
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { DraftInvoicesTopBar(onBack = onBack) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+    ) { padding ->
+        when {
+            isLoading -> DraftLoadingState(Modifier.padding(padding))
+            drafts.isEmpty() -> DraftEmptyState(Modifier.padding(padding))
+            else -> {
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(drafts, key = { it.id }) { draft ->
+                        DraftInvoiceCard(
+                            draft = draft,
+                            onLoad = {
+                                if (viewModel.loadDraftIntoCart(draft)) {
+                                    onDraftLoaded()
+                                } else {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("Error al cargar borrador")
+                                    }
+                                }
+                            },
+                            onDelete = { viewModel.deleteDraft(draft.id) },
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DraftInvoicesTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Text(
+                text = "Facturas pendientes",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
+        navigationIcon = {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(48.dp),
             ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
-        } else if (drafts.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(64.dp),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "No hay facturas pendientes",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp),
-            ) {
-                items(drafts, key = { it.id }) { draft ->
-                    DraftInvoiceCard(
-                        draft = draft,
-                        onLoad = {
-                            val success = viewModel.loadDraftIntoCart(draft)
-                            if (success) {
-                                onDraftLoaded()
-                            } else {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Error al cargar borrador")
-                                }
-                            }
-                        },
-                        onDelete = { viewModel.deleteDraft(draft.id) },
-                    )
-                }
-            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+@Composable
+private fun DraftLoadingState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun DraftEmptyState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.ShoppingCart,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(56.dp),
+            )
+            Text(
+                text = "No hay facturas pendientes",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -157,67 +184,93 @@ private fun DraftInvoiceCard(
     onDelete: () -> Unit,
 ) {
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
-    val dateStr = dateFormat.format(Date(draft.createdAt))
+    val date = dateFormat.format(Date(draft.createdAt))
     val clientName =
-        if (!draft.clientFirstName.isNullOrBlank()) {
-            "${draft.clientFirstName} ${draft.clientLastName.orEmpty()}".trim()
-        } else {
+        if (draft.clientFirstName.isNullOrBlank()) {
             "Sin cliente"
+        } else {
+            "${draft.clientFirstName} ${draft.clientLastName.orEmpty()}".trim()
         }
 
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
-                        clientName,
+                        text = clientName,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${draft.itemCount} productos - $dateStr",
-                        fontSize = 13.sp,
+                        text = "${draft.itemCount} productos · $date",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     if (!draft.sellerName.isNullOrBlank()) {
                         Text(
-                            "Vendedor: ${draft.sellerName}",
-                            fontSize = 12.sp,
+                            text = "Vendedor: ${draft.sellerName}",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
-                Text(
-                    "$ ${String.format(java.util.Locale.getDefault(), "%.2f", draft.total)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                Spacer(modifier = Modifier.width(12.dp))
+                AdaptiveAmountText(
+                    text = "$ ${String.format(Locale.getDefault(), "%.2f", draft.total)}",
+                    modifier = Modifier.weight(DRAFT_AMOUNT_WEIGHT),
+                    baseStyle =
+                        MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
                     color = MaterialTheme.colorScheme.primary,
+                    options = AdaptiveAmountOptions(minFontSizeSp = 12f),
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Button(
                     onClick = onLoad,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Cargar al Carrito")
+                    Text(
+                        text = "Cargar al carrito",
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(48.dp),
+                ) {
                     Icon(
-                        Icons.Default.Delete,
+                        imageVector = Icons.Default.Delete,
                         contentDescription = "Eliminar borrador",
                         tint = MaterialTheme.colorScheme.error,
                     )

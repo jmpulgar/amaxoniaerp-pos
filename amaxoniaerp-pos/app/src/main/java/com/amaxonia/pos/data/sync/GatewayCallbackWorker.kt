@@ -40,9 +40,10 @@ class GatewayCallbackWorker(
         val now = SystemAppClock().now().toEpochMilli()
         val activeTenant = localStore.currentTenantId()
         val pending =
-            activeTenant?.let { tenantId ->
-                dao.findGatewayReconcilableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
-            }.orEmpty()
+            activeTenant
+                ?.let { tenantId ->
+                    dao.findGatewayReconcilableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
+                }.orEmpty()
 
         if (pending.isEmpty()) {
             SafeLog.d(TAG, "No gateway callbacks awaiting reconciliation")

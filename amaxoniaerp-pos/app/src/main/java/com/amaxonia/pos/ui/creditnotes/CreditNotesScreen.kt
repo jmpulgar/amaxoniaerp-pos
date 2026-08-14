@@ -1,4 +1,4 @@
-﻿package com.amaxonia.pos.ui.creditnotes
+package com.amaxonia.pos.ui.creditnotes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -575,236 +575,17 @@ internal fun SummaryBanner(
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         ),
                     color = PosPalette.FixedWhite,
-                    minFontSizeSp = 13f,
                     modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CreditNoteCard(
-    note: CreditNoteSummaryDto,
-    onClick: () -> Unit,
-) {
-    ElevatedCard(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ReceiptLong,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = note.codigo,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-
-                FiscalStatusChip(status = note.fiscalStatus)
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = note.fecha,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    if (note.clienteNombre.isNotBlank()) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp),
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = note.clienteNombre,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                // Monto adaptive: totales enormes no colisionan con nombres largos en 320dp.
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "Bs ${formatAmount(note.total)}",
-                    baseStyle =
-                        MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
                         ),
-                    color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 11f,
-                )
-                Text(
-                    text = note.facturaCodigo,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
 }
 
-@Composable
-private fun SourceInvoiceCard(
-    invoice: CreditNoteSourceInvoiceSummaryDto,
-    onClick: () -> Unit,
-) {
-    ElevatedCard(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.Receipt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = invoice.codigo,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = invoice.fecha,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (invoice.clienteNombre.isNotBlank()) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp),
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            text = invoice.clienteNombre,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
-                    baseStyle =
-                        MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                        ),
-                    color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 11f,
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier =
-                    Modifier
-                        .padding(start = 4.dp)
-                        .size(20.dp),
-            )
-        }
-    }
-}
 
 @Composable
 private fun InvoiceLineReadOnlyCard(
@@ -870,7 +651,10 @@ private fun InvoiceLineReadOnlyCard(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.onSurface,
-                    minFontSizeSp = 11f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 11f,
+                        ),
                 )
                 Text(
                     text = "IVA: ${formatAmount(line.pIva)}%",
@@ -883,7 +667,7 @@ private fun InvoiceLineReadOnlyCard(
 }
 
 @Composable
-private fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
+internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
     val isConfirmed = status == CreditNoteFiscalStatusDto.CONFIRMADA
     AssistChip(
         onClick = {},
@@ -1033,7 +817,10 @@ private fun CreditNoteDetailSheet(
                                 fontWeight = FontWeight.Bold,
                             ),
                         color = MaterialTheme.colorScheme.primary,
-                        minFontSizeSp = 12f,
+                        options =
+                            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                minFontSizeSp = 12f,
+                            ),
                     )
                 }
             }
@@ -1085,7 +872,7 @@ private fun screenTitle(mode: CreditNotesMode): String =
         CreditNotesMode.CREATE -> "Nueva nota de crÃ©dito"
     }
 
-private fun formatAmount(value: Double): String = String.format(java.util.Locale.getDefault(), "%.2f", value)
+internal fun formatAmount(value: Double): String = String.format(java.util.Locale.getDefault(), "%.2f", value)
 
 private fun formatQuantity(value: Double): String =
     if (value % 1.0 ==

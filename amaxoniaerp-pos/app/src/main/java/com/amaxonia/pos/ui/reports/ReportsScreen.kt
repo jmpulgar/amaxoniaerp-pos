@@ -48,17 +48,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.ReportOrange
 import com.amaxonia.pos.ui.theme.SuccessGreen
+import java.util.Locale
+
+private const val BEST_SELLER_LIMIT = 10
+private const val BEST_SELLER_AMOUNT_WEIGHT = 0.6f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,16 +79,20 @@ fun ReportsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Reportes",
+                        text = "Reportes",
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(48.dp),
+                    ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            "Volver",
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -92,106 +101,85 @@ fun ReportsScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-        ) {
-            when {
-                state.isLoading && state.summary == null -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Cargando reportes...",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+        when {
+            state.isLoading && state.summary == null -> ReportsLoading(Modifier.padding(padding))
+            state.error != null && state.summary == null -> {
+                ReportsError(
+                    message = state.error ?: "Error desconocido",
+                    onRetry = viewModel::retry,
+                    modifier = Modifier.padding(padding),
+                )
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    state.summary?.let { summary ->
+                        item { HeroSummaryCard(summary) }
+                        item { MetricCardsRow(summary) }
+                        item { TransactionBreakdownCard(summary) }
                     }
-                }
-                state.error != null && state.summary == null -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ElevatedCard(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors =
-                                CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                ),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = state.error ?: "Error desconocido",
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    fontSize = 14.sp,
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.retry() }) {
-                                    Text("Reintentar")
-                                }
-                            }
-                        }
-                    }
-                }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding =
-                            PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                bottom = 24.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        // Hero summary card
-                        item {
-                            state.summary?.let { summary ->
-                                HeroSummaryCard(summary = summary)
-                            }
-                        }
-
-                        // Metric cards row
-                        item {
-                            state.summary?.let { summary ->
-                                MetricCardsRow(summary = summary)
-                            }
-                        }
-
-                        // Transaction breakdown card
-                        item {
-                            state.summary?.let { summary ->
-                                TransactionBreakdownCard(summary = summary)
-                            }
-                        }
-
-                        // Best sellers card
-                        item {
-                            BestSellersCard(bestSellers = state.bestSellers)
-                        }
-                    }
+                    item { BestSellersCard(state.bestSellers) }
                 }
             }
         }
     }
 }
 
-// ---------- Hero Summary Card ----------
+@Composable
+private fun ReportsLoading(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = "Cargando reportes...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportsError(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Button(onClick = onRetry) {
+                    Text("Reintentar")
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HeroSummaryCard(summary: SummaryStats) {
@@ -202,70 +190,86 @@ private fun HeroSummaryCard(summary: SummaryStats) {
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Rounded.AttachMoney,
+                    imageVector = Icons.Rounded.AttachMoney,
                     contentDescription = null,
                     tint = PosPalette.FixedWhite.copy(alpha = 0.8f),
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Ventas Totales",
-                    fontSize = 13.sp,
+                    text = "Ventas totales",
+                    style = MaterialTheme.typography.labelLarge,
                     color = PosPalette.FixedWhite.copy(alpha = 0.8f),
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${summary.moneda} ${String.format(java.util.Locale.getDefault(), "%.2f", summary.netSales)}",
-                fontWeight = FontWeight.Bold,
-                fontSize = 32.sp,
+            AdaptiveAmountText(
+                text = money(summary.moneda, summary.netSales),
+                modifier = Modifier.fillMaxWidth(),
+                baseStyle =
+                    MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                    ),
                 color = PosPalette.FixedWhite,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                minFontSizeSp = 18f,
+            ))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Column {
-                    Text(
-                        text = "Ventas Brutas",
-                        fontSize = 11.sp,
-                        color = PosPalette.FixedWhite.copy(alpha = 0.6f),
-                    )
-                    Text(
-                        text = "${summary.moneda} ${String.format(java.util.Locale.getDefault(), "%.2f", summary.grossSales)}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = PosPalette.FixedWhite,
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Total Facturas",
-                        fontSize = 11.sp,
-                        color = PosPalette.FixedWhite.copy(alpha = 0.6f),
-                    )
-                    Text(
-                        text = "${summary.totalTransactions}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = PosPalette.FixedWhite,
-                    )
-                }
+                SummaryValue(
+                    label = "Ventas brutas",
+                    value = money(summary.moneda, summary.grossSales),
+                    modifier = Modifier.weight(1f),
+                )
+                SummaryValue(
+                    label = "Total facturas",
+                    value = summary.totalTransactions.toString(),
+                    modifier = Modifier.weight(1f),
+                    alignEnd = true,
+                )
             }
         }
     }
 }
 
-// ---------- Metric Cards Row ----------
+@Composable
+private fun SummaryValue(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    alignEnd: Boolean = false,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = PosPalette.FixedWhite.copy(alpha = 0.65f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        AdaptiveAmountText(
+            text = value,
+            modifier = Modifier.fillMaxWidth(),
+            baseStyle =
+                MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+                ),
+            color = PosPalette.FixedWhite,
+        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+            minFontSizeSp = 10f,
+        ))
+    }
+}
 
 @Composable
 private fun MetricCardsRow(summary: SummaryStats) {
@@ -277,26 +281,26 @@ private fun MetricCardsRow(summary: SummaryStats) {
             modifier = Modifier.weight(1f),
             icon = Icons.Rounded.ShoppingCart,
             iconTint = MaterialTheme.colorScheme.primary,
-            label = "Ticket Promedio",
-            value = "${summary.moneda} ${String.format(java.util.Locale.getDefault(), "%.2f", summary.ticketPromedio)}",
+            label = "Ticket promedio",
+            value = money(summary.moneda, summary.ticketPromedio),
         )
         MetricMiniCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Rounded.Discount,
             iconTint = ReportOrange,
             label = "Descuentos",
-            value = "${summary.moneda} ${String.format(java.util.Locale.getDefault(), "%.2f", summary.discounts)}",
+            value = money(summary.moneda, summary.discounts),
         )
     }
 }
 
 @Composable
 private fun MetricMiniCard(
-    modifier: Modifier = Modifier,
     icon: ImageVector,
     iconTint: Color,
     label: String,
     value: String,
+    modifier: Modifier = Modifier,
 ) {
     ElevatedCard(
         modifier = modifier,
@@ -305,10 +309,8 @@ private fun MetricMiniCard(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
                 modifier =
@@ -319,30 +321,30 @@ private fun MetricMiniCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    icon,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier.size(22.dp),
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = label,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
+            AdaptiveAmountText(
                 text = value,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                modifier = Modifier.fillMaxWidth(),
+                baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
-            )
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                minFontSizeSp = 10f,
+            ))
         }
     }
 }
-
-// ---------- Transaction Breakdown Card ----------
 
 @Composable
 private fun TransactionBreakdownCard(summary: SummaryStats) {
@@ -353,129 +355,33 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.Receipt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Desglose de Facturas",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Paid vs Cancelled progress
-            val paidRatio =
-                if (summary.totalTransactions > 0) {
-                    summary.totalPaid.toFloat() / summary.totalTransactions
-                } else {
-                    0f
-                }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Pagadas",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Text(
-                    text = "${summary.totalPaid}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = SuccessGreen,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { paidRatio },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+            SectionTitle(
+                icon = Icons.Rounded.Receipt,
+                text = "Desglose de facturas",
+            )
+            TransactionStatusRow(
+                icon = Icons.Rounded.CheckCircle,
+                label = "Pagadas",
+                count = summary.totalPaid,
+                color = SuccessGreen,
+            )
+            ProgressBar(
+                progress = ratio(summary.totalPaid, summary.totalTransactions),
                 color = SuccessGreen,
                 trackColor = MaterialTheme.colorScheme.tertiaryContainer,
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Cancel,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Anuladas",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${summary.totalCancelled}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    if (summary.cancellations > 0) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${summary.moneda} ${String.format(java.util.Locale.getDefault(), "%.2f", summary.cancellations)}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            val cancelledRatio =
-                if (summary.totalTransactions > 0) {
-                    summary.totalCancelled.toFloat() / summary.totalTransactions
-                } else {
-                    0f
-                }
-            LinearProgressIndicator(
-                progress = { cancelledRatio },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+            TransactionStatusRow(
+                icon = Icons.Rounded.Cancel,
+                label = "Anuladas",
+                count = summary.totalCancelled,
+                color = MaterialTheme.colorScheme.error,
+                amount = if (summary.cancellations > 0) money(summary.moneda, summary.cancellations) else null,
+            )
+            ProgressBar(
+                progress = ratio(summary.totalCancelled, summary.totalTransactions),
                 color = MaterialTheme.colorScheme.error,
                 trackColor = MaterialTheme.colorScheme.errorContainer,
             )
@@ -483,7 +389,64 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
     }
 }
 
-// ---------- Best Sellers Card ----------
+@Composable
+private fun TransactionStatusRow(
+    icon: ImageVector,
+    label: String,
+    count: Int,
+    color: Color,
+    amount: String? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        amount?.let {
+            AdaptiveAmountText(
+                text = it,
+                modifier = Modifier.weight(1f),
+                baseStyle = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.End),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                minFontSizeSp = 9f,
+            ))
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
+    }
+}
+
+@Composable
+private fun ProgressBar(
+    progress: Float,
+    color: Color,
+    trackColor: Color,
+) {
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+        color = color,
+        trackColor = trackColor,
+    )
+}
 
 @Composable
 private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
@@ -494,59 +457,20 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.AutoMirrored.Filled.TrendingUp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Productos Mas Vendidos",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
+            SectionTitle(
+                icon = Icons.AutoMirrored.Filled.TrendingUp,
+                text = "Productos más vendidos",
+            )
             if (bestSellers.isEmpty()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Rounded.Inventory2,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(32.dp),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "No hay datos disponibles",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                EmptyBestSellers()
             } else {
-                bestSellers.take(10).forEachIndexed { index, product ->
-                    BestSellerItem(product = product, position = index + 1)
-                    if (index < bestSellers.lastIndex && index < 9) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                bestSellers.take(BEST_SELLER_LIMIT).forEachIndexed { index, product ->
+                    BestSellerItem(product, index + 1)
+                    if (index < bestSellers.take(BEST_SELLER_LIMIT).lastIndex) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
             }
@@ -554,74 +478,143 @@ private fun BestSellersCard(bestSellers: List<BestSellerProduct>) {
     }
 }
 
-// ---------- Best Seller Item ----------
+@Composable
+private fun SectionTitle(
+    icon: ImageVector,
+    text: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun EmptyBestSellers() {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(80.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Rounded.Inventory2,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(32.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No hay datos disponibles",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 private fun BestSellerItem(
     product: BestSellerProduct,
     position: Int,
 ) {
+    val productColor = Color(product.colorHex)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Rank badge
         Surface(
-            color = Color(product.colorHex).copy(alpha = 0.1f),
+            color = productColor.copy(alpha = 0.1f),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.size(40.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = "$position",
+                    text = position.toString(),
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(product.colorHex),
-                    fontSize = 16.sp,
+                    color = productColor,
                 )
             }
         }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        // Product info
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = product.name,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${product.salesCount} ventas",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                LinearProgressIndicator(
-                    progress = { product.progress },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                    color = Color(product.colorHex),
-                    trackColor = Color(product.colorHex).copy(alpha = 0.1f),
-                )
-            }
-        }
-
         Spacer(modifier = Modifier.width(12.dp))
-
-        // Price
-        Text(
-            text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
+        BestSellerDetails(
+            product = product,
+            productColor = productColor,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        AdaptiveAmountText(
+            text = money("$", product.price, separator = ""),
+            modifier = Modifier.weight(BEST_SELLER_AMOUNT_WEIGHT),
+            baseStyle =
+                MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.End,
+                ),
             color = MaterialTheme.colorScheme.primary,
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 10f,
+                ),
         )
     }
 }
+
+@Composable
+private fun BestSellerDetails(
+    product: BestSellerProduct,
+    productColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = product.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${product.salesCount} ventas",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            LinearProgressIndicator(
+                progress = { product.progress },
+                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = productColor,
+                trackColor = productColor.copy(alpha = 0.1f),
+            )
+        }
+    }
+}
+
+
+private fun money(
+    currency: String,
+    amount: Double,
+    separator: String = " ",
+): String = "$currency$separator${String.format(Locale.getDefault(), "%.2f", amount)}"
+
+private fun ratio(
+    value: Int,
+    total: Int,
+): Float = if (total > 0) value.toFloat() / total else 0f

@@ -36,104 +36,113 @@ import com.amaxonia.pos.ui.theme.PosTheme
  */
 @Preview(name = "Grid · 320×568 · 2 columnas", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun DashboardGrid320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CatalogGridPreviewContent()
+private fun DashboardGrid320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CatalogGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Grid · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun DashboardGrid360() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CatalogGridPreviewContent()
+private fun DashboardGrid360() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CatalogGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Grid · 412×915", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
-private fun DashboardGrid412() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CatalogGridPreviewContent()
+private fun DashboardGrid412() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CatalogGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Grid · 480×960", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
-private fun DashboardGrid480() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CatalogGridPreviewContent()
+private fun DashboardGrid480() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CatalogGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Grid · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun DashboardGridLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CatalogGridPreviewContent()
+private fun DashboardGridLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CatalogGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Fila lista · 320×568 · nombre largo + precio enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun DashboardListRowNarrow() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            ProductListRow(
-                product =
-                    previewProduct(
-                        name = "Aceite lubricante premium sintético para motor 4T garrafa 5L",
-                        price = 9_876_543.21,
-                    ),
-                onAddClick = {},
-                onQuantityClick = {},
-            )
-            ProductListRow(
-                product = previewProduct(name = "Café molido 500g", price = 7.90, code = null),
-                onAddClick = {},
-                onQuantityClick = {},
-            )
+private fun DashboardListRowNarrow() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                ProductListRow(
+                    product =
+                        previewProduct(
+                            name = "Aceite lubricante premium sintético para motor 4T garrafa 5L",
+                            price = 9_876_543.21,
+                        ),
+                    onAddClick = {},
+                    onQuantityClick = {},
+                )
+                ProductListRow(
+                    product = previewProduct(name = "Café molido 500g", price = 7.90, code = null),
+                    onAddClick = {},
+                    onQuantityClick = {},
+                )
+            }
         }
     }
-}
 
 @Preview(name = "Entrada manual · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun DashboardManualEntry320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ManualEntryContent(
-            currentValue = "1250",
-            onKeyClick = {},
-            onClearClick = {},
-            onBackspaceClick = {},
-            onEnterClick = {},
-        )
+private fun DashboardManualEntry320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ManualEntryContent(
+                currentValue = "1250",
+                onKeyClick = {},
+                onClearClick = {},
+                onBackspaceClick = {},
+                onEnterClick = {},
+            )
+        }
     }
-}
 
 @Preview(name = "Entrada manual · monto enorme", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun DashboardManualEntryHuge() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ManualEntryContent(
-            currentValue = "9876543.21",
-            onKeyClick = {},
-            onClearClick = {},
-            onBackspaceClick = {},
-            onEnterClick = {},
-        )
+private fun DashboardManualEntryHuge() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ManualEntryContent(
+                currentValue = "9876543.21",
+                onKeyClick = {},
+                onClearClick = {},
+                onBackspaceClick = {},
+                onEnterClick = {},
+            )
+        }
     }
-}
 
 @Preview(name = "Botón carrito · 320×568 · monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun DashboardCartButtonHuge() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
-            CartCheckoutPillPreview(itemCount = 12, total = 9_876_543.21)
+private fun DashboardCartButtonHuge() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
+                CartCheckoutPillPreview(itemCount = 12, total = 9_876_543.21)
+            }
         }
     }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Preview-only helpers — mirror the production layouts.
@@ -171,13 +180,16 @@ private fun CartCheckoutPillPreview(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("${itemCount} artículos")
+            Text("$itemCount artículos")
             AdaptiveAmountText(
                 text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
                 baseStyle = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onPrimary,
-                minFontSizeSp = 13f,
-                maxLines = 1,
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 13f,
+                        maxLines = 1,
+                    ),
             )
         }
     }

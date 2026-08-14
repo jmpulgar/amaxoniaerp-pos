@@ -35,8 +35,6 @@ class StartTransactionUseCase(
     suspend fun recoverOrStart(command: StartTransactionCommand): StartedTransaction? {
         val now = clock.now().toEpochMilli()
         val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }
-        // If the carry-over id resolves to a row owned by a DIFFERENT tenant,
-        // refuse to resume it: that would mix two operations under one id.
         val resumable =
             existing
                 ?.takeIf { it.status == STATUS_SENDING }
@@ -47,14 +45,24 @@ class StartTransactionUseCase(
                 ?.takeIf { it.status == STATUS_CONFIRMED || it.status == STATUS_DUPLICATE }
                 ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
         val recovered = resumable ?: completedPreferred
-        if (recovered != null) {
-            return StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
-        }
-        val tenant = command.tenant ?: return null
+        val tenant = command.tenant
+        val result =
+            if (recovered != null) {
+                StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
+            } else if (tenant == null) {
+                null
+            } else {
+                startNewTransaction(command = command, tenant = tenant, now = now)
+            }
+        return result
+    }
+
+    private suspend fun startNewTransaction(
+        command: StartTransactionCommand,
+        tenant: SaleTenant,
+        now: Long,
+    ): StartedTransaction {
         val id = command.preferredId?.takeIf(String::isNotBlank) ?: idGenerator.nextId()
-        // Auditoría ítem 10 (OBS-001): emit the structured sale-started
-        // event before any network or printer call so every observable
-        // flow has a unique correlated id.
         com.amaxonia.pos.core.telemetry.SaleTelemetry.record(
             event = com.amaxonia.pos.core.telemetry.SaleEvent.SALE_STARTED,
             idFactura = id,
@@ -62,10 +70,6 @@ class StartTransactionUseCase(
             "total" to command.totalAmount,
             "currency" to command.currency,
         )
-        // Auditoría ítem 8 (MONEY-001): persist the canonical total in
-        // minor-units via BigDecimal. The legacy `totalAmount` Double is
-        // still written for the migration window but is no longer the
-        // source of truth for money calculations.
         val totalMinor =
             com.amaxonia.pos.domain.model.money.MinorUnitMoney
                 .fromDoubleAsMinor(command.totalAmount)

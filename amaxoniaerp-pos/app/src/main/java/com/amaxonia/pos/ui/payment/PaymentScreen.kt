@@ -426,8 +426,9 @@ private fun HeroAmount(
         baseStyle = style,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth(),
+    options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
         minFontSizeSp = 18f,
-    )
+    ))
     if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
         Text(
             "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
@@ -530,8 +531,9 @@ private fun BreakdownRow(
                     ),
                 color = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.widthIn(max = 220.dp),
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 11f,
-            )
+            ))
             if (isMultiCurrency && tasa > 0.0 && amount > 0.0) {
                 val converted = moneyAmount.times(java.math.BigDecimal.valueOf(tasa))
                 Text(
@@ -1087,8 +1089,9 @@ internal fun PrimaryCtaButton(
                     ),
                 color = onHeroColor,
                 modifier = Modifier.weight(1f),
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 14f,
-            )
+            ))
         }
     }
 }
@@ -1361,9 +1364,10 @@ private fun PaymentSummaryLine(
                         MaterialTheme.colorScheme.onSurface
                     },
                 modifier = Modifier.widthIn(max = 180.dp),
+            options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                 minFontSizeSp = 11f,
                 maxLines = 1,
-            )
+            ))
             secondary?.let {
                 Text(
                     text = it,

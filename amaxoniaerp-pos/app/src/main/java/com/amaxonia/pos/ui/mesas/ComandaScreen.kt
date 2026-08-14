@@ -338,10 +338,11 @@ private fun LineRowCarrito(display: ItemCarrito) {
                     text = "$ ${"%.2f".format(total)}",
                     baseStyle = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
+                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     fontWeight = FontWeight.Bold,
                     minFontSizeSp = 12f,
                     maxLines = 1,
-                )
+                ))
             }
         }
     }
@@ -393,10 +394,11 @@ internal fun LineRowPedido(
                         text = "$ ${"%.2f".format(pedido.itemTotalConIva)}",
                         baseStyle = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
+                    options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                         fontWeight = FontWeight.Bold,
                         minFontSizeSp = 12f,
                         maxLines = 1,
-                    )
+                    ))
                     pedido.comandaSecuencia?.let {
                         Text(
                             "Comanda #$it",

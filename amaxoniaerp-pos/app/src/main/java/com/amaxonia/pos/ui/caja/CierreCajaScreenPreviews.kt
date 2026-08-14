@@ -1,4 +1,4 @@
-﻿package com.amaxonia.pos.ui.caja
+package com.amaxonia.pos.ui.caja
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +11,14 @@ import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import com.amaxonia.pos.ui.theme.PosTheme
 
 private const val HUGE_AMOUNT_SCALE = 10_000.0
+private const val CASH_PAYMENT_ID = 1
+private const val CARD_DEBIT_PAYMENT_ID = 2
+private const val CARD_CREDIT_PAYMENT_ID = 3
+private const val ACH_PAYMENT_ID = 4
+private const val CASH_PAYMENT_AMOUNT = 4_820.25
+private const val CARD_DEBIT_AMOUNT = 3_275.30
+private const val CARD_CREDIT_AMOUNT = 2_875.20
+private const val ACH_PAYMENT_AMOUNT = 1_510.00
 
 /**
  * Visual regression surface for the cash-close (Cierre de Caja) screen.
@@ -20,80 +28,100 @@ private const val HUGE_AMOUNT_SCALE = 10_000.0
  * lines) that must shrink via AdaptiveAmountText instead of clipping, and long caja names /
  * payment labels that must ellipsize gracefully.
  */
-@Preview(name = "Cierre Â· 320Ã—568", showBackground = true, widthDp = 320, heightDp = 568)
+@Preview(name = "Cierre · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CierreReady320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ReadyContent(
-            summary = previewSummary(),
-            isClosing = false,
-            isPrintingReportX = false,
-            isPrintingReportZ = false,
-            showReportButtons = true,
-            actions = previewActions(),
-        )
+internal fun CierreReady320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ReadyContent(
+                summary = previewSummary(),
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
+                actions = previewActions(),
+            )
+        }
     }
-}
 
-@Preview(name = "Cierre Â· 360Ã—640", showBackground = true, widthDp = 360, heightDp = 640)
+@Preview(name = "Cierre · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun CierreReady360() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ReadyContent(
-            summary = previewSummary(),
-            isClosing = false,
-            isPrintingReportX = false,
-            isPrintingReportZ = false,
-            showReportButtons = true,
-            actions = previewActions(),
-        )
+internal fun CierreReady360() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ReadyContent(
+                summary = previewSummary(),
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
+                actions = previewActions(),
+            )
+        }
     }
-}
 
-@Preview(name = "Cierre Â· 390Ã—844 (montos enormes)", showBackground = true, widthDp = 390, heightDp = 844)
+@Preview(name = "Cierre · 390×844 (montos enormes)", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun CierreReadyHugeAmounts() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ReadyContent(
-            summary = previewSummary(huge = true),
-            isClosing = false,
-            isPrintingReportX = false,
-            isPrintingReportZ = false,
-            showReportButtons = true,
-            actions = previewActions(),
-        )
+internal fun CierreReadyHugeAmounts() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ReadyContent(
+                summary = previewSummary(huge = true),
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
+                actions = previewActions(),
+            )
+        }
     }
-}
 
-@Preview(name = "Cierre Â· 480Ã—960 (cerrando)", showBackground = true, widthDp = 480, heightDp = 960)
+@Preview(name = "Cierre · 480×960 (cerrando)", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
-private fun CierreReadyClosing() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ReadyContent(
-            summary = previewSummary(),
-            isClosing = true,
-            isPrintingReportX = false,
-            isPrintingReportZ = false,
-            showReportButtons = false,
-            actions = previewActions(),
-        )
+internal fun CierreReadyClosing() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ReadyContent(
+                summary = previewSummary(),
+                state =
+                    CierreCajaReadyState(
+                        isClosing = true,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = false,
+                    ),
+                actions = previewActions(),
+            )
+        }
     }
-}
 
-@Preview(name = "Cierre Â· landscape Â· 733Ã—360", showBackground = true, widthDp = 733, heightDp = 360)
+@Preview(name = "Cierre · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun CierreReadyLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ReadyContent(
-            summary = previewSummary(),
-            isClosing = false,
-            isPrintingReportX = false,
-            isPrintingReportZ = false,
-            showReportButtons = true,
-            actions = previewActions(),
-        )
+internal fun CierreReadyLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ReadyContent(
+                summary = previewSummary(),
+                state =
+                    CierreCajaReadyState(
+                        isClosing = false,
+                        isPrintingReportX = false,
+                        isPrintingReportZ = false,
+                        showReportButtons = true,
+                    ),
+                actions = previewActions(),
+            )
+        }
     }
-}
 
 private fun previewActions() =
     CierreCajaActions(
@@ -118,10 +146,20 @@ private fun previewSummary(huge: Boolean = false): CierreCajaSummary {
         expectedClose = 5_320.25 * scale,
         paymentLines =
             listOf(
-                CierreCajaPaymentLine(1, "Efectivo", "CASH", 4_820.25 * scale),
-                CierreCajaPaymentLine(2, "Mastercard DÃ©bito", "TARJETA", 3_275.30 * scale),
-                CierreCajaPaymentLine(3, "Visa CrÃ©dito", "TARJETA", 2_875.20 * scale),
-                CierreCajaPaymentLine(4, "Transferencia ACH", "OT", 1_510.00 * scale),
+                CierreCajaPaymentLine(CASH_PAYMENT_ID, "Efectivo", "CASH", CASH_PAYMENT_AMOUNT * scale),
+                CierreCajaPaymentLine(
+                    CARD_DEBIT_PAYMENT_ID,
+                    "Mastercard Débito",
+                    "TARJETA",
+                    CARD_DEBIT_AMOUNT * scale,
+                ),
+                CierreCajaPaymentLine(
+                    CARD_CREDIT_PAYMENT_ID,
+                    "Visa Crédito",
+                    "TARJETA",
+                    CARD_CREDIT_AMOUNT * scale,
+                ),
+                CierreCajaPaymentLine(ACH_PAYMENT_ID, "Transferencia ACH", "OT", ACH_PAYMENT_AMOUNT * scale),
             ),
     )
 }

@@ -89,7 +89,7 @@ import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.cartBrandGradient
 
 /** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
-private val CHECKOUT_BUTTON_WEIGHT = 1.5f
+private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -394,88 +394,121 @@ internal fun CartBottomBar(
     ) {
         BoxWithConstraints {
             val compact = maxHeight < 480.dp
-            val totalStyle =
-                if (compact) {
-                    MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
-                } else {
-                    PosTextStyles.totalDisplay
-                }
             Column(
                 modifier =
                     Modifier
                         .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
                         .navigationBarsPadding(),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        "Total",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Column(horizontalAlignment = Alignment.End) {
-                        AdaptiveAmountText(
-                            text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-                            baseStyle = totalStyle,
-                            color = MaterialTheme.colorScheme.primary,
-                            minFontSizeSp = 16f,
-                        )
-                        secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
-                            Text(
-                                secondary,
-                                style = PosTextStyles.amountSecondary,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+                CartBottomTotal(total = total, secondaryTotal = secondaryTotal, compact = compact)
                 Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // 1. Boton GUARDAR BORRADOR (factura pendiente local)
-                    OutlinedButton(
-                        onClick = onSaveDraft,
-                        modifier = Modifier.weight(1f).height(56.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "Guardar",
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    // 2. Botón PAGAR / FACTURAR — mismo contrato visual que el CTA de Payment:
-                    // AdaptiveAmountText evita elipsis/wrap con montos grandes en 320dp.
-                    Button(
-                        onClick = onCheckout,
-                        modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT).height(56.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
-                    ) {
-                        AdaptiveAmountText(
-                            text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-                            baseStyle =
-                                MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                ),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            minFontSizeSp = 13f,
-                        )
-                    }
-                }
+                CartBottomActions(total = total, onSaveDraft = onSaveDraft, onCheckout = onCheckout)
             }
         }
+    }
+}
+
+@Composable
+private fun CartBottomTotal(
+    total: Double,
+    secondaryTotal: String?,
+    compact: Boolean,
+) {
+    val totalStyle =
+        if (compact) {
+            MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+        } else {
+            PosTextStyles.totalDisplay
+        }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            "Total",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Column(horizontalAlignment = Alignment.End) {
+            AdaptiveAmountText(
+                text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                baseStyle = totalStyle,
+                color = MaterialTheme.colorScheme.primary,
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 16f,
+                    ),
+            )
+            secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
+                Text(
+                    secondary,
+                    style = PosTextStyles.amountSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartBottomActions(
+    total: Double,
+    onSaveDraft: () -> Unit,
+    onCheckout: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(modifier = Modifier.weight(1f)) {
+            SaveDraftButton(onClick = onSaveDraft)
+        }
+        Box(modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT)) {
+            CheckoutButton(total = total, onClick = onCheckout)
+        }
+    }
+}
+
+@Composable
+private fun SaveDraftButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            "Guardar",
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CheckoutButton(
+    total: Double,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        shape = MaterialTheme.shapes.medium,
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+    ) {
+        AdaptiveAmountText(
+            text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+            baseStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.onPrimary,
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 13f,
+                ),
+        )
     }
 }
 
@@ -499,72 +532,44 @@ internal fun CartClientVendorPanel(
                 .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelectClient() }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val selectedClient = state.selectedClient
-            if (selectedClient != null) {
-                ClientAvatar(
-                    clientPhotoUrl = state.selectedClientPhotoUrl,
-                    clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Cliente asignado",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "${selectedClient.firstName} ${selectedClient.lastName}",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = onRemoveClient) {
-                    Icon(Icons.Default.Delete, contentDescription = "Quitar cliente", tint = MaterialTheme.colorScheme.error)
-                }
-            } else {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Asignar cliente",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        CartClientRow(state = state, onSelectClient = onSelectClient, onRemoveClient = onRemoveClient)
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant,
+            modifier = Modifier.padding(horizontal = 14.dp),
+        )
+        CartSellerRow(state = state, onChangeSeller = onChangeSeller)
+    }
+}
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = 14.dp))
-
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
+@Composable
+private fun CartClientRow(
+    state: CartState,
+    onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onSelectClient() }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val selectedClient = state.selectedClient
+        if (selectedClient != null) {
+            ClientAvatar(
+                clientPhotoUrl = state.selectedClientPhotoUrl,
+                clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Vendedor asignado",
+                    "Cliente asignado",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = state.currentSeller?.nombre ?: "Sin vendedor",
+                    "${selectedClient.firstName} ${selectedClient.lastName}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -572,17 +577,67 @@ internal fun CartClientVendorPanel(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(
-                Icons.Default.Autorenew,
-                contentDescription = "Cambiar vendedor",
-                tint =
-                    if (state.availableSellers.isEmpty()) {
-                        MaterialTheme.colorScheme.outline
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
+            IconButton(onClick = onRemoveClient) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Quitar cliente",
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        } else {
+            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                "Asignar cliente",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CartSellerRow(
+    state: CartState,
+    onChangeSeller: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Vendedor asignado",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = state.currentSeller?.nombre ?: "Sin vendedor",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
+        Icon(
+            Icons.Default.Autorenew,
+            contentDescription = "Cambiar vendedor",
+            tint =
+                if (state.availableSellers.isEmpty()) {
+                    MaterialTheme.colorScheme.outline
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+        )
     }
 }
 
@@ -959,7 +1014,10 @@ fun CartItemRow(
                     text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
                     baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 13f,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                        ),
                 )
             }
 

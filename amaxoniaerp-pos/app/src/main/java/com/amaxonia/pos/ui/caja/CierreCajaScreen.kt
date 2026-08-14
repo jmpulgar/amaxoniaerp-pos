@@ -76,13 +76,6 @@ import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.SuccessGreen
 import com.amaxonia.pos.ui.theme.WarningOrange
 
-/** Acciones del cierre agrupadas para mantener las firmas de los composables pequeñas. */
-internal class CierreCajaActions(
-    val onConfirmClose: () -> Unit,
-    val onPrintReportX: () -> Unit,
-    val onPrintReportZ: () -> Unit,
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 // Raíz Compose conserva alcance de diálogo, snackbar y transición de estados.
@@ -171,10 +164,13 @@ fun CierreCajaScreen(
                 is CierreCajaUiState.Ready ->
                     ReadyContent(
                         summary = state.summary,
-                        isClosing = false,
-                        isPrintingReportX = isPrintingX,
-                        isPrintingReportZ = isPrintingZ,
-                        showReportButtons = viewModel.hasActivePrinter,
+                        state =
+                            CierreCajaReadyState(
+                                isClosing = false,
+                                isPrintingReportX = isPrintingX,
+                                isPrintingReportZ = isPrintingZ,
+                                showReportButtons = viewModel.hasActivePrinter,
+                            ),
                         actions =
                             CierreCajaActions(
                                 onConfirmClose = { viewModel.requestClose() },
@@ -185,10 +181,13 @@ fun CierreCajaScreen(
                 is CierreCajaUiState.Closing ->
                     ReadyContent(
                         summary = state.summary,
-                        isClosing = true,
-                        isPrintingReportX = false,
-                        isPrintingReportZ = false,
-                        showReportButtons = viewModel.hasActivePrinter,
+                        state =
+                            CierreCajaReadyState(
+                                isClosing = true,
+                                isPrintingReportX = false,
+                                isPrintingReportZ = false,
+                                showReportButtons = viewModel.hasActivePrinter,
+                            ),
                         actions =
                             CierreCajaActions(
                                 onConfirmClose = {},
@@ -239,10 +238,7 @@ private fun LoadingContent() {
 @Composable
 internal fun ReadyContent(
     summary: CierreCajaSummary,
-    isClosing: Boolean,
-    isPrintingReportX: Boolean,
-    isPrintingReportZ: Boolean,
-    showReportButtons: Boolean,
+    state: CierreCajaReadyState,
     actions: CierreCajaActions,
 ) {
     Column(
@@ -256,31 +252,21 @@ internal fun ReadyContent(
         Spacer(modifier = Modifier.height(8.dp))
         CajaHeaderCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
-
         SectionTitle("Resumen de Ventas")
         Spacer(modifier = Modifier.height(12.dp))
         VentasSummaryCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
-
         SectionTitle("Desglose por Método de Pago")
         Spacer(modifier = Modifier.height(12.dp))
         PaymentBreakdownCard(summary = summary)
         Spacer(modifier = Modifier.height(20.dp))
-
         ExpectedCloseCard(summary = summary)
         Spacer(modifier = Modifier.height(32.dp))
-
-        if (showReportButtons) {
-            ReportButtons(
-                isClosing = isClosing,
-                isPrintingReportX = isPrintingReportX,
-                isPrintingReportZ = isPrintingReportZ,
-                onPrintReportX = actions.onPrintReportX,
-                onPrintReportZ = actions.onPrintReportZ,
-            )
+        if (state.showReportButtons) {
+            ReportButtons(state = state, actions = actions)
             Spacer(modifier = Modifier.height(16.dp))
         }
-        ConfirmCloseButton(isClosing = isClosing, onConfirmClose = actions.onConfirmClose)
+        ConfirmCloseButton(isClosing = state.isClosing, onConfirmClose = actions.onConfirmClose)
     }
 }
 
@@ -293,74 +279,84 @@ private fun CajaHeaderCard(summary: CierreCajaSummary) {
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.PointOfSale,
-                        contentDescription = null,
-                        tint = PosPalette.FixedWhite,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = summary.cajaName,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = PosPalette.FixedWhite,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Abierta: ${summary.openedAt}",
-                            fontSize = 12.sp,
-                            color = PosPalette.FixedWhite.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+            CajaHeaderIdentity(summary)
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = PosPalette.FixedWhite.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
+            CajaHeaderStats(summary)
+        }
+    }
+}
+
+@Composable
+private fun CajaHeaderIdentity(summary: CierreCajaSummary) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(PosPalette.FixedWhite.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.PointOfSale,
+                contentDescription = null,
+                tint = PosPalette.FixedWhite,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = summary.cajaName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = PosPalette.FixedWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp),
             ) {
-                MiniStat(
-                    label = "Monto Apertura",
-                    value = formatMoney(summary.openAmount),
-                    color = PosPalette.FixedWhite,
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    tint = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                    modifier = Modifier.size(14.dp),
                 )
-                MiniStat(
-                    label = "Transacciones",
-                    value = "${summary.transactionCount}",
-                    color = PosPalette.FixedWhite,
-                    modifier = Modifier.weight(1f),
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Abierta: ${summary.openedAt}",
+                    fontSize = 12.sp,
+                    color = PosPalette.FixedWhite.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CajaHeaderStats(summary: CierreCajaSummary) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        MiniStat(
+            label = "Monto Apertura",
+            value = formatMoney(summary.openAmount),
+            color = PosPalette.FixedWhite,
+            modifier = Modifier.weight(1f),
+        )
+        MiniStat(
+            label = "Transacciones",
+            value = "${summary.transactionCount}",
+            color = PosPalette.FixedWhite,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -478,98 +474,16 @@ private fun ExpectedCloseCard(summary: CierreCajaSummary) {
                         textAlign = androidx.compose.ui.text.style.TextAlign.End,
                     ),
                 color = MaterialTheme.colorScheme.tertiary,
-                minFontSizeSp = 14f,
                 modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 14f,
+                    ),
             )
         }
     }
 }
 
-@Composable
-private fun ReportButtons(
-    isClosing: Boolean,
-    isPrintingReportX: Boolean,
-    isPrintingReportZ: Boolean,
-    onPrintReportX: () -> Unit,
-    onPrintReportZ: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        OutlinedButton(
-            onClick = onPrintReportX,
-            enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors =
-                ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                ),
-        ) {
-            if (isPrintingReportX) {
-                CircularProgressIndicator(
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            } else {
-                Icon(
-                    Icons.AutoMirrored.Rounded.Assignment,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                if (isPrintingReportX) "Imprimiendo..." else "Reporte X",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-            )
-        }
-
-        OutlinedButton(
-            onClick = onPrintReportZ,
-            enabled = !isClosing && !isPrintingReportX && !isPrintingReportZ,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors =
-                ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                    disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-                ),
-        ) {
-            if (isPrintingReportZ) {
-                CircularProgressIndicator(
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            } else {
-                Icon(
-                    Icons.Rounded.Description,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                if (isPrintingReportZ) "Imprimiendo..." else "Reporte Z",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-            )
-        }
-    }
-}
 
 @Composable
 private fun ConfirmCloseButton(
@@ -783,8 +697,11 @@ private fun MiniStat(
                     fontWeight = FontWeight.Bold,
                 ),
             color = color,
-            minFontSizeSp = 12f,
             modifier = Modifier.fillMaxWidth(),
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 12f,
+                ),
         )
     }
 }
@@ -847,8 +764,11 @@ private fun SummaryRow(
                     textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 ),
             color = valueColor,
-            minFontSizeSp = 12f,
             modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 12f,
+                ),
         )
     }
 }

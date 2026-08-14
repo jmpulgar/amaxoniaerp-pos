@@ -198,7 +198,10 @@ fun KeypadDisplay(
             baseStyle = PosTextStyles.totalDisplay,
             color = amountColor,
             modifier = Modifier.fillMaxWidth(),
-            minFontSizeSp = 18f,
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 18f,
+                ),
         )
         if (secondaryLine != null) {
             Text(

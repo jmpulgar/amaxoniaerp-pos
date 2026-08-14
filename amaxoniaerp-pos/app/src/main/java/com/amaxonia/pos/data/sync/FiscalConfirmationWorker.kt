@@ -47,7 +47,8 @@ class FiscalConfirmationWorker(
         val now = SystemAppClock().now().toEpochMilli()
         val activeTenant = localStore.currentTenantId()
         val pending =
-            activeTenant?.let { tenantId ->
+            activeTenant
+                ?.let { tenantId ->
                     dao.findFiscalConfirmableForTenant(tenantId = tenantId, now = now, limit = BATCH_LIMIT)
                 }.orEmpty()
                 .filter { it.remoteInvoiceId != null }

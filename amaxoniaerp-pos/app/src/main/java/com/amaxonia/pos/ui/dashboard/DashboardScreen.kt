@@ -1053,9 +1053,12 @@ fun DashboardScreen(
                                     text = "$${String.format(java.util.Locale.getDefault(), "%.2f", state.cartTotal)}",
                                     baseStyle = MaterialTheme.typography.titleMedium,
                                     color = PosPalette.FixedWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    minFontSizeSp = 13f,
-                                    maxLines = 1,
+                                    options =
+                                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                            fontWeight = FontWeight.Bold,
+                                            minFontSizeSp = 13f,
+                                            maxLines = 1,
+                                        ),
                                 )
                             }
                         }
@@ -1452,9 +1455,12 @@ fun ProductCard(
                 text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
                 baseStyle = PosTextStyles.priceTileLarge,
                 color = MaterialTheme.colorScheme.primary,
-                minFontSizeSp = 12f,
-                maxLines = 1,
                 modifier = Modifier.fillMaxWidth(),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 12f,
+                        maxLines = 1,
+                    ),
             )
             Spacer(modifier = Modifier.height(6.dp))
             // Acciones alineadas a la derecha; targets ≥48dp vía minimum interactive.
@@ -1564,8 +1570,11 @@ fun ProductListRow(
                     text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
                     baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 13f,
-                    maxLines = 1,
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                            maxLines = 1,
+                        ),
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1689,9 +1698,12 @@ fun ManualEntryContent(
                             fontWeight = FontWeight.ExtraBold,
                         ),
                     color = MaterialTheme.colorScheme.primary,
-                    minFontSizeSp = 18f,
-                    maxLines = 1,
                     modifier = Modifier.fillMaxWidth(),
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 18f,
+                            maxLines = 1,
+                        ),
                 )
             }
         }
