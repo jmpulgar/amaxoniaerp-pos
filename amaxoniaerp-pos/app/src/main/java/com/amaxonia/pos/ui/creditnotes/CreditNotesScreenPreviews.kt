@@ -1,5 +1,3 @@
-@file:Suppress("MagicNumber", "UnusedPrivateMember", "LongMethod")
-
 package com.amaxonia.pos.ui.creditnotes
 
 import androidx.compose.foundation.layout.Arrangement
@@ -18,76 +16,75 @@ import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceSummaryDt
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSummaryDto
 import com.amaxonia.pos.ui.theme.PosTheme
 
-/**
- * Visual regression surface for the credit-notes screen.
- *
- * Exercises the production composables — [SummaryBanner], [CreditNoteCard] and
- * [SourceInvoiceCard] — at the target Android widths plus landscape, including
- * enormous totals that must shrink via AdaptiveAmountText, long client names that
- * must ellipsize, and both fiscal statuses (confirmada / pendiente).
- */
+private const val PREVIEW_HUGE_AMOUNT = 9_876_543.21
+private const val PREVIEW_TAX_DIVISOR = 1.16
+private const val PREVIEW_SOURCE_ITEMS = 4
+
 @Preview(name = "Summary banner · 320×568 · monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CreditNotesSummaryBannerHuge() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        SummaryBanner(
-            title = "Devoluciones registradas",
-            value = "24",
-            amount = 9_876_543.21,
-            modifier = Modifier.padding(16.dp),
-        )
-    }
-}
-
-@Preview(name = "Tarjetas NC · 320×568 · estados + monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
-@Composable
-private fun CreditNoteCards320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CreditNoteCardsPreviewContent()
-    }
-}
-
-@Preview(name = "Tarjetas NC · 412×915", showBackground = true, widthDp = 412, heightDp = 915)
-@Composable
-private fun CreditNoteCards412() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CreditNoteCardsPreviewContent()
-    }
-}
-
-@Preview(name = "Tarjetas NC · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
-@Composable
-private fun CreditNoteCardsLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CreditNoteCardsPreviewContent()
-    }
-}
-
-@Preview(name = "Facturas elegibles · 320×568 · saldo enorme", showBackground = true, widthDp = 320, heightDp = 568)
-@Composable
-private fun SourceInvoiceCards320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            SourceInvoiceCard(
-                invoice = previewSourceInvoice(cliente = "María Fernández", remaining = 248.75),
-                onClick = {},
-                modifier = Modifier.fillMaxWidth(),
-            )
-            SourceInvoiceCard(
-                invoice =
-                    previewSourceInvoice(
-                        cliente = "Constructorora Andina del Centro C.A.",
-                        remaining = 9_876_543.21,
-                    ),
-                onClick = {},
-                modifier = Modifier.fillMaxWidth(),
+private fun CreditNotesSummaryBannerHuge() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            SummaryBanner(
+                title = "Devoluciones registradas",
+                value = "24",
+                amount = PREVIEW_HUGE_AMOUNT,
+                modifier = Modifier.padding(16.dp),
             )
         }
     }
-}
+
+@Preview(name = "Tarjetas NC · 320×568 · estados + monto enorme", showBackground = true, widthDp = 320, heightDp = 568)
+@Composable
+private fun CreditNoteCards320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CreditNoteCardsPreviewContent()
+        }
+    }
+
+@Preview(name = "Tarjetas NC · 412×915", showBackground = true, widthDp = 412, heightDp = 915)
+@Composable
+private fun CreditNoteCards412() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CreditNoteCardsPreviewContent()
+        }
+    }
+
+@Preview(name = "Tarjetas NC · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
+@Composable
+private fun CreditNoteCardsLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CreditNoteCardsPreviewContent()
+        }
+    }
+
+@Preview(name = "Facturas elegibles · 320×568 · saldo enorme", showBackground = true, widthDp = 320, heightDp = 568)
+@Composable
+private fun SourceInvoiceCards320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SourceInvoiceCard(
+                    invoice = previewSourceInvoice(cliente = "María Fernández", remaining = 248.75),
+                    onClick = {},
+                )
+                SourceInvoiceCard(
+                    invoice =
+                        previewSourceInvoice(
+                            cliente = "Constructora Andina del Centro C.A.",
+                            remaining = PREVIEW_HUGE_AMOUNT,
+                        ),
+                    onClick = {},
+                )
+            }
+        }
+    }
 
 @Composable
 private fun CreditNoteCardsPreviewContent() {
@@ -98,18 +95,16 @@ private fun CreditNoteCardsPreviewContent() {
         CreditNoteCard(
             note = previewNote(id = "1", total = 248.75, fiscal = CreditNoteFiscalStatusDto.CONFIRMADA),
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
         )
         CreditNoteCard(
             note =
                 previewNote(
                     id = "2",
-                    total = 9_876_543.21,
+                    total = PREVIEW_HUGE_AMOUNT,
                     fiscal = CreditNoteFiscalStatusDto.PENDIENTE,
-                    cliente = "Constructorora Andina del Centro C.A.",
+                    cliente = "Constructora Andina del Centro C.A.",
                 ),
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -119,8 +114,9 @@ private fun previewNote(
     total: Double,
     fiscal: CreditNoteFiscalStatusDto,
     cliente: String = "María Fernández",
-): CreditNoteSummaryDto =
-    CreditNoteSummaryDto(
+): CreditNoteSummaryDto {
+    val subtotal = total / PREVIEW_TAX_DIVISOR
+    return CreditNoteSummaryDto(
         id = id,
         codigo = "NC-2026-0000$id",
         facturaId = "f-$id",
@@ -130,10 +126,11 @@ private fun previewNote(
         clienteNombre = cliente,
         clienteIdentificacion = "V-12345678",
         total = total,
-        subtotal = total / 1.16,
-        impuesto = total - total / 1.16,
+        subtotal = subtotal,
+        impuesto = total - subtotal,
         fiscalStatus = fiscal,
     )
+}
 
 private fun previewSourceInvoice(
     cliente: String,
@@ -149,6 +146,6 @@ private fun previewSourceInvoice(
         clienteIdentificacion = "V-87654321",
         total = remaining,
         remainingAmount = remaining,
-        items = 4,
+        items = PREVIEW_SOURCE_ITEMS,
         moneda = "USD",
     )
