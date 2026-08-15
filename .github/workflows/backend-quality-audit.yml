@@ -1,0 +1,49 @@
+name: Backend Quality Debt Audit
+
+on:
+  push:
+    branches:
+      - architecture-block1-validation
+  workflow_dispatch:
+
+jobs:
+  backend-quality-debt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: amaxoniaerp-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Apply quality plugins only in runner for debt measurement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('build.gradle.kts')
+          text = p.read_text()
+          text = text.replace(
+              'plugins {\n',
+              'plugins {\n    id("io.gitlab.arturbosch.detekt") version "1.23.8"\n    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"\n',
+              1,
+          )
+          text += '''\n\ndetekt {\n    buildUponDefaultConfig = true\n    allRules = false\n    ignoreFailures = false\n}\n\nktlint {\n    verbose.set(true)\n    outputToConsole.set(true)\n    ignoreFailures.set(false)\n}\n'''
+          p.write_text(text)
+          PY
+      - name: Measure Detekt debt
+        id: detekt
+        continue-on-error: true
+        run: ./gradlew detekt --no-daemon --console=plain
+      - name: Measure ktlint debt
+        id: ktlint
+        continue-on-error: true
+        run: ./gradlew ktlintCheck --no-daemon --console=plain
+      - name: Summarize quality debt status
+        run: |
+          echo "detekt_outcome=${{ steps.detekt.outcome }}"
+          echo "ktlint_outcome=${{ steps.ktlint.outcome }}"
