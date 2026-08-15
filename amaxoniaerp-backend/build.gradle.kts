@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
     alias(libs.plugins.kotlin.plugin.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 group = "com.amaxoniaerp"
@@ -16,6 +18,18 @@ application {
     mainClass = "io.ktor.server.netty.EngineMain"
     // Necesario para que Netty escuche en IPv4 (0.0.0.0) y sea alcanzable desde la LAN.
     applicationDefaultJvmArgs = listOf("-Djava.net.preferIPv4Stack=true")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    ignoreFailures = false
+}
+
+ktlint {
+    verbose.set(true)
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
 }
 
 dependencies {
