@@ -23,6 +23,8 @@ jobs:
       - name: Install Android SDK 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Enable Gradle wrapper
+        run: chmod +x gradlew
       - name: Android unit tests
         run: ./gradlew test --no-daemon
       - name: Android Detekt
@@ -45,6 +47,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Enable Gradle wrapper
+        run: chmod +x gradlew
       - name: Backend tests
         run: ./gradlew test --no-daemon
       - name: Backend build
