@@ -38,17 +38,18 @@ jobs:
       - name: Measure Detekt debt
         id: detekt
         continue-on-error: true
-        run: ./gradlew detekt --no-daemon --console=plain
+        run: ./gradlew detekt --no-daemon --console=plain > /tmp/detekt.log 2>&1
       - name: Measure ktlint debt
         id: ktlint
         continue-on-error: true
-        run: ./gradlew ktlintCheck --no-daemon --console=plain
-      - name: Print complete ktlint debt
+        run: ./gradlew ktlintCheck --no-daemon --console=plain > /tmp/ktlint.log 2>&1
+      - name: Print concise measured debt
         if: always()
         run: |
-          find build/reports/ktlint -type f -name '*.txt' -print -exec cat {} \; || true
-      - name: Summarize quality debt status
-        if: always()
-        run: |
+          echo "=== DETEKT ==="
+          grep -E "weighted issues|BUILD (SUCCESSFUL|FAILED)|[0-9]+ weighted issues" /tmp/detekt.log || true
+          echo "=== KTLINT TXT REPORTS ==="
+          find build/reports/ktlint -type f -name '*.txt' -exec cat {} \; || true
+          echo "=== OUTCOMES ==="
           echo "detekt_outcome=${{ steps.detekt.outcome }}"
           echo "ktlint_outcome=${{ steps.ktlint.outcome }}"
