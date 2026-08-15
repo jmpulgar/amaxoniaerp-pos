@@ -1,9 +1,6 @@
 name: Architecture Audit Metrics
 
 on:
-  push:
-    branches:
-      - architecture-block1-validation
   workflow_dispatch:
 
 jobs:
