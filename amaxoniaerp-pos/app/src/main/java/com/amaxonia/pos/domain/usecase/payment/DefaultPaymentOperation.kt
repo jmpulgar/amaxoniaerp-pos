@@ -19,11 +19,12 @@ internal class DefaultPaymentOperation(
         request: PaymentOperationRequest,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
+        // Baseline behavior resolves the table holder inside the payment coroutine, immediately
+        // before execution. Preserve that timing; an explicit TableAccount source is the fallback
+        // used by direct callers/tests when no holder reader is available.
         val tablePayment =
-            when (val source = request.source) {
-                is PaymentSource.CurrentCart -> tableAccountPaymentReader?.current?.value
-                is PaymentSource.TableAccount -> source.payment
-            }
+            tableAccountPaymentReader?.current?.value
+                ?: (request.source as? PaymentSource.TableAccount)?.payment
         val financialSnapshot =
             tablePayment?.financialSnapshot
                 ?: (request.source as? PaymentSource.CurrentCart)?.financialSnapshot
