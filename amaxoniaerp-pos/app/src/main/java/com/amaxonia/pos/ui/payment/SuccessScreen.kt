@@ -271,8 +271,9 @@ private fun SuccessAnimatedBody(
     ) {
         AnimatedVisibility(
             visible = animation.visible,
-            enter = fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
-                scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
+            enter =
+                fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
+                    scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
         ) {
             if (isLoading) {
                 LoadingConfirmation(scale = animation.scale)
@@ -473,27 +474,7 @@ private fun ChangeSummary(payload: PaymentSuccessPayload) {
                     modifier = Modifier.padding(vertical = 10.dp),
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    "Cambio / Vuelto",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                AdaptiveAmountText(
-                    text = "$ ${Money.format(Money.fromDouble(payload.changeDue))}",
-                    baseStyle =
-                        MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                        ),
-                    color = MaterialTheme.colorScheme.primary,
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 16f,
-                ))
-            }
+            ChangeDueRow(payload)
             if (payload.isMultiCurrency && payload.changeDueBs > 0.0) {
                 Text(
                     "${formatCurrencyLabel(payload.abrMonedaSecundaria)} ${
@@ -505,6 +486,33 @@ private fun ChangeSummary(payload: PaymentSuccessPayload) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ChangeDueRow(payload: PaymentSuccessPayload) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            "Cambio / Vuelto",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        AdaptiveAmountText(
+            text = "$ ${Money.format(Money.fromDouble(payload.changeDue))}",
+            baseStyle =
+                MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            color = MaterialTheme.colorScheme.primary,
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 16f,
+                ),
+        )
     }
 }
 
@@ -532,9 +540,11 @@ private fun SummaryLine(
                 ),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f, fill = false).padding(start = 12.dp),
-        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-            minFontSizeSp = 12f,
-        ))
+            options =
+                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                    minFontSizeSp = 12f,
+                ),
+        )
     }
 }
 

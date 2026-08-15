@@ -42,7 +42,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -341,9 +340,11 @@ internal fun SummaryBar(
                         ),
                     color = PosPalette.FixedWhite,
                     modifier = Modifier.fillMaxWidth(),
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 13f,
-                ))
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                        ),
+                )
             }
         }
     }
@@ -631,15 +632,14 @@ private fun TransactionCardAmount(transaction: Transaction) {
         if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
             Text(
                 text =
-            "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} " +
-                String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef),
+                    "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} " +
+                        String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
-
 
 // ---------- Status Badge ----------
 
@@ -899,19 +899,21 @@ private fun FacturaDetalleSheetContent(
                         )
                         Column(horizontalAlignment = Alignment.End) {
                             com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                                  text = "${transaction.currency} ${String.format(
-                                      java.util.Locale.getDefault(),
-                                      "%.2f",
-                                      transaction.amount,
-                                  )}",
-                                  baseStyle =
-                                      MaterialTheme.typography.titleLarge.copy(
-                                          fontWeight = FontWeight.Bold,
-                                      ),
-                                  color = MaterialTheme.colorScheme.primary,
-                              options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                                  minFontSizeSp = 13f,
-                              ))
+                                text = "${transaction.currency} ${String.format(
+                                    java.util.Locale.getDefault(),
+                                    "%.2f",
+                                    transaction.amount,
+                                )}",
+                                baseStyle =
+                                    MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                color = MaterialTheme.colorScheme.primary,
+                                options =
+                                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                        minFontSizeSp = 13f,
+                                    ),
+                            )
                             if (transaction.totalRef != null &&
                                 transaction.totalRef > 0.0 &&
                                 !transaction.abrMonedaSecundaria.isNullOrBlank()
@@ -1004,9 +1006,11 @@ private fun DetalleItemRow(
                             fontWeight = FontWeight.Bold,
                         ),
                     color = MaterialTheme.colorScheme.onSurface,
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 11f,
-                ))
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 11f,
+                        ),
+                )
                 Text(
                     text = "c/u ${String.format(java.util.Locale.getDefault(), "%.2f", item.precioUnitario)}",
                     fontSize = 11.sp,

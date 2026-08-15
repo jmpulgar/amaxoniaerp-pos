@@ -18,3 +18,5 @@ local.properties
 *.keystore
 /.kotlin/
 /.ci/
+.project
+.settings/

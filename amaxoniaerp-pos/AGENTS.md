@@ -21,8 +21,10 @@ Run from `amaxoniaerp-pos/` with Java 17 and Android SDK 36 available:
 - `./gradlew assembleListoerpDebug` — ListoERP debug flavor.
 - `./gradlew connectedAndroidTest` — instrumented tests when a device/emulator is required.
 - `./gradlew lint` — Android Lint.
+- `./gradlew :app:koverXmlReportAmaxoniaDebug` — Kover XML coverage report (`app/build/reports/kover/reportAmaxoniaDebug.xml`).
+- `./gradlew :app:koverVerifyAmaxoniaDebug` — coverage ratchet gate; fails if AmaxoniaDebug line coverage drops below the measured baseline (>= 4383 covered lines and >= 15%).
 
-Before integration, run the relevant tests plus Detekt, ktlint and the required flavor build(s). CI executes all three debug flavors.
+Before integration, run the relevant tests plus Detekt, ktlint and the required flavor build(s). CI executes all three debug flavors and the coverage gate.
 
 ## Architecture Rules
 The canonical dependency direction is:

@@ -1,0 +1,5 @@
+# IDE workspace state (shared project files under .idea/ stay tracked intentionally)
+.idea/workspace.xml
+
+# Kotlin daemon error logs
+.kotlin/

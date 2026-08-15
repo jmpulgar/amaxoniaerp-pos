@@ -489,9 +489,11 @@ private fun PriceAmount(
                 textAlign = TextAlign.Center,
             ),
         color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-    options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-        minFontSizeSp = 9f,
-    ))
+        options =
+            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                minFontSizeSp = 9f,
+            ),
+    )
 }
 
 @Composable

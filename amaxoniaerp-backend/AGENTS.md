@@ -15,6 +15,8 @@ Run from `amaxoniaerp-backend/` with Java 21:
 - `./gradlew ktlintCheck` — Kotlin formatting gate.
 - `./gradlew build` — compile, test and package.
 - `./gradlew buildFatJar` — executable fat JAR when needed.
+- `./gradlew jacocoTestReport` — JaCoCo coverage report (`build/reports/jacoco/test/jacocoTestReport.xml`).
+- `./gradlew jacocoTestCoverageVerification` — coverage ratchet gate; fails if line coverage drops below the measured baseline (COVEREDRATIO >= 0.46526415).
 
 Do not add quality baselines, suppressions, ignores or disabled rules to make a gate green. Fix measured debt explicitly.
 

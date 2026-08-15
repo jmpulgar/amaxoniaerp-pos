@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.plugin.serialization)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    jacoco
 }
 
 group = "com.amaxoniaerp"
@@ -30,6 +31,35 @@ ktlint {
     verbose.set(true)
     outputToConsole.set(true)
     ignoreFailures.set(false)
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.46526415")
+            }
+        }
+    }
 }
 
 dependencies {

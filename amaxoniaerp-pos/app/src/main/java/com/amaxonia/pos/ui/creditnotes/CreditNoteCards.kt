@@ -48,13 +48,13 @@ internal fun CreditNoteCard(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-  modifier = Modifier.fillMaxWidth().padding(16.dp),
-  verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-  CreditNoteLeadingIcon()
-  Spacer(modifier = Modifier.width(14.dp))
-  CreditNoteInfo(note = note, modifier = Modifier.weight(1f))
-  CreditNoteAmount(note)
+            CreditNoteLeadingIcon()
+            Spacer(modifier = Modifier.width(14.dp))
+            CreditNoteInfo(note = note, modifier = Modifier.weight(1f))
+            CreditNoteAmount(note)
         }
     }
 }
@@ -63,17 +63,17 @@ internal fun CreditNoteCard(
 private fun CreditNoteLeadingIcon() {
     Box(
         modifier =
-  Modifier
-      .size(44.dp)
-      .clip(RoundedCornerShape(12.dp))
-      .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-  Icons.AutoMirrored.Filled.ReceiptLong,
-  contentDescription = null,
-  tint = MaterialTheme.colorScheme.primary,
-  modifier = Modifier.size(22.dp),
+            Icons.AutoMirrored.Filled.ReceiptLong,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -85,12 +85,12 @@ private fun CreditNoteInfo(
 ) {
     Column(modifier = modifier) {
         Text(
-  text = note.codigo,
-  fontWeight = FontWeight.Bold,
-  fontSize = 15.sp,
-  color = MaterialTheme.colorScheme.onSurface,
-  maxLines = 1,
-  overflow = TextOverflow.Ellipsis,
+            text = note.codigo,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(6.dp))
         FiscalStatusChip(status = note.fiscalStatus)
@@ -106,30 +106,30 @@ private fun CreditNoteMetadata(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-  Icons.Rounded.Schedule,
-  contentDescription = null,
-  tint = MaterialTheme.colorScheme.onSurfaceVariant,
-  modifier = Modifier.size(13.dp),
+            Icons.Rounded.Schedule,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(13.dp),
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(text = date, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (clientName.isNotBlank()) {
-  Spacer(modifier = Modifier.width(10.dp))
-  Icon(
-      Icons.Rounded.Person,
-      contentDescription = null,
-      tint = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.size(13.dp),
-  )
-  Spacer(modifier = Modifier.width(3.dp))
-  Text(
-      text = clientName,
-      fontSize = 12.sp,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(1f, fill = false),
-  )
+            Spacer(modifier = Modifier.width(10.dp))
+            Icon(
+                Icons.Rounded.Person,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = clientName,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
         }
     }
 }
@@ -138,17 +138,17 @@ private fun CreditNoteMetadata(
 private fun CreditNoteAmount(note: CreditNoteSummaryDto) {
     Column(horizontalAlignment = Alignment.End) {
         AdaptiveAmountText(
-  text = "Bs ${formatAmount(note.total)}",
-  baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-  color = MaterialTheme.colorScheme.primary,
-  options = AdaptiveAmountOptions(minFontSizeSp = 11f),
+            text = "Bs ${formatAmount(note.total)}",
+            baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+            options = AdaptiveAmountOptions(minFontSizeSp = 11f),
         )
         Text(
-  text = note.facturaCodigo,
-  fontSize = 11.sp,
-  color = MaterialTheme.colorScheme.onSurfaceVariant,
-  maxLines = 1,
-  overflow = TextOverflow.Ellipsis,
+            text = note.facturaCodigo,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -165,19 +165,19 @@ internal fun SourceInvoiceCard(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-  modifier = Modifier.fillMaxWidth().padding(16.dp),
-  verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-  SourceInvoiceLeadingIcon()
-  Spacer(modifier = Modifier.width(14.dp))
-  SourceInvoiceInfo(invoice = invoice, modifier = Modifier.weight(1f))
-  SourceInvoiceAmount(invoice)
-  Icon(
-      imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-      contentDescription = null,
-      tint = MaterialTheme.colorScheme.outline,
-      modifier = Modifier.padding(start = 4.dp).size(20.dp),
-  )
+            SourceInvoiceLeadingIcon()
+            Spacer(modifier = Modifier.width(14.dp))
+            SourceInvoiceInfo(invoice = invoice, modifier = Modifier.weight(1f))
+            SourceInvoiceAmount(invoice)
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(start = 4.dp).size(20.dp),
+            )
         }
     }
 }
@@ -186,17 +186,17 @@ internal fun SourceInvoiceCard(
 private fun SourceInvoiceLeadingIcon() {
     Box(
         modifier =
-  Modifier
-      .size(44.dp)
-      .clip(RoundedCornerShape(12.dp))
-      .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-  Icons.Rounded.Receipt,
-  contentDescription = null,
-  tint = MaterialTheme.colorScheme.primary,
-  modifier = Modifier.size(22.dp),
+            Icons.Rounded.Receipt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
         )
     }
 }
@@ -208,12 +208,12 @@ private fun SourceInvoiceInfo(
 ) {
     Column(modifier = modifier) {
         Text(
-  text = invoice.codigo,
-  fontWeight = FontWeight.Bold,
-  fontSize = 15.sp,
-  color = MaterialTheme.colorScheme.onSurface,
-  maxLines = 1,
-  overflow = TextOverflow.Ellipsis,
+            text = invoice.codigo,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(6.dp))
         CreditNoteMetadata(date = invoice.fecha, clientName = invoice.clienteNombre)
@@ -224,10 +224,10 @@ private fun SourceInvoiceInfo(
 private fun SourceInvoiceAmount(invoice: CreditNoteSourceInvoiceSummaryDto) {
     Column(horizontalAlignment = Alignment.End) {
         AdaptiveAmountText(
-  text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
-  baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-  color = MaterialTheme.colorScheme.primary,
-  options = AdaptiveAmountOptions(minFontSizeSp = 11f),
+            text = "${invoice.moneda} ${formatAmount(invoice.remainingAmount)}",
+            baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+            options = AdaptiveAmountOptions(minFontSizeSp = 11f),
         )
     }
 }

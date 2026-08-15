@@ -26,7 +26,7 @@ import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 import com.amaxonia.pos.ui.theme.PosTheme
 
-/**
+/*
  * Visual regression surface for the Fase-2 restaurant screens: mesas (grid + selection bar),
  * cuenta/división (cuenta activa + split cards) y comanda (líneas de pedido).
  *
@@ -34,55 +34,61 @@ import com.amaxonia.pos.ui.theme.PosTheme
  * the tricky variants: enormous totals that must shrink via AdaptiveAmountText instead of
  * clipping, long product descriptions, and all the table/order states.
  */
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AreasMesas: grid fluido + barra de confirmación.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Preview(name = "Mesas grid · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun MesasGrid320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        MesasGridPreviewContent()
+private fun MesasGrid320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MesasGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Mesas grid · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun MesasGrid360() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        MesasGridPreviewContent()
+private fun MesasGrid360() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MesasGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Mesas grid · 480×960 (3 columnas)", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
-private fun MesasGrid480() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        MesasGridPreviewContent()
+private fun MesasGrid480() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MesasGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Mesas grid · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun MesasGridLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        MesasGridPreviewContent()
+private fun MesasGridLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MesasGridPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Barra mesa seleccionada · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun SelectedMesaBarPreview() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        SelectedMesaBar(
-            mesaName = "Mesa Terraza 12",
-            areaName = "Terraza Jardín",
-            onClear = {},
-            onConfirm = {},
-            modifier = Modifier.padding(16.dp),
-        )
+private fun SelectedMesaBarPreview() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            SelectedMesaBar(
+                mesaName = "Mesa Terraza 12",
+                areaName = "Terraza Jardín",
+                onClear = {},
+                onConfirm = {},
+                modifier = Modifier.padding(16.dp),
+            )
+        }
     }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CuentaMesa: cuenta activa (total enorme) + tarjeta de división.
@@ -90,45 +96,49 @@ private fun SelectedMesaBarPreview() = PosTheme {
 
 @Preview(name = "Cuenta activa · 320×568 · total enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CuentaActiva320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CuentaActivaCardPreviewContent()
+private fun CuentaActiva320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CuentaActivaCardPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Cuenta activa · 412×915", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
-private fun CuentaActiva412() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CuentaActivaCardPreviewContent()
+private fun CuentaActiva412() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CuentaActivaCardPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Cuenta activa · landscape · 733×360", showBackground = true, widthDp = 733, heightDp = 360)
 @Composable
-private fun CuentaActivaLandscape() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        CuentaActivaCardPreviewContent()
+private fun CuentaActivaLandscape() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CuentaActivaCardPreviewContent()
+        }
     }
-}
 
 @Preview(name = "División producto · 320×568 · precio enorme", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun SplitProduct320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        SplitProductCard(
-            pedido =
-                previewPedido(
-                    descripcion = "Parrillada mixta familiar para cuatro personas con guarniciones",
-                    total = 9_876_543.21,
-                ),
-            disponible = 3.0,
-            value = "1",
-            onValueChange = {},
-            modifier = Modifier.padding(16.dp),
-        )
+private fun SplitProduct320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            SplitProductCard(
+                pedido =
+                    previewPedido(
+                        descripcion = "Parrillada mixta familiar para cuatro personas con guarniciones",
+                        total = 9_876_543.21,
+                    ),
+                disponible = 3.0,
+                value = "1",
+                onValueChange = {},
+                modifier = Modifier.padding(16.dp),
+            )
+        }
     }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Comanda: líneas de pedido en los estados del flujo de cocina.
@@ -136,30 +146,32 @@ private fun SplitProduct320() = PosTheme {
 
 @Preview(name = "Comanda líneas · 320×568 · todos los estados", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun ComandaLines320() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        ComandaLinesPreviewContent()
+private fun ComandaLines320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ComandaLinesPreviewContent()
+        }
     }
-}
 
 @Preview(name = "Comanda líneas · 360×640 · monto enorme", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun ComandaLinesHuge() = PosTheme {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            LineRowPedido(
-                pedido =
-                    previewPedido(
-                        descripcion = "Botella vino reserva malbec",
-                        total = 9_876_543.21,
-                        estado = EstadoPedidoMesa.EN_PREPARACION,
-                    ),
-                onCambiarEstado = { _, _ -> },
-                modifier = Modifier.fillMaxWidth(),
-            )
+private fun ComandaLinesHuge() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LineRowPedido(
+                    pedido =
+                        previewPedido(
+                            descripcion = "Botella vino reserva malbec",
+                            total = 9_876_543.21,
+                            estado = EstadoPedidoMesa.EN_PREPARACION,
+                        ),
+                    onCambiarEstado = { _, _ -> },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Preview-only helpers — mirror the production layouts.

@@ -421,9 +421,10 @@ private fun HeroAmount(
         baseStyle = style,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth(),
-        options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-            minFontSizeSp = 18f,
-        ),
+        options =
+            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                minFontSizeSp = 18f,
+            ),
     )
     if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
         Text(
@@ -527,9 +528,10 @@ private fun BreakdownRow(
                     ),
                 color = if (emphasize) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.widthIn(max = 220.dp),
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 11f,
-                ),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 11f,
+                    ),
             )
             if (isMultiCurrency && tasa > 0.0 && amount > 0.0) {
                 val converted = moneyAmount.times(java.math.BigDecimal.valueOf(tasa))
@@ -618,10 +620,11 @@ private fun MethodCard(
                     onClick = onClick,
                 ),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = if (pressed && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else containerColor,
-            contentColor = contentColor,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = if (pressed && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else containerColor,
+                contentColor = contentColor,
+            ),
         border =
             BorderStroke(
                 width = if (selected) 2.dp else 1.dp,
@@ -687,8 +690,7 @@ private fun MethodCard(
     }
 }
 
-private fun keypadHeightFor(maxHeight: Dp): Dp =
-    (maxHeight.value * 0.40f).coerceIn(196f, 300f).dp
+private fun keypadHeightFor(maxHeight: Dp): Dp = (maxHeight.value * 0.40f).coerceIn(196f, 300f).dp
 
 @Composable
 internal fun PaymentWide(
@@ -1060,9 +1062,10 @@ internal fun PrimaryCtaButton(
                     ),
                 color = onHeroColor,
                 modifier = Modifier.weight(1f),
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 14f,
-                ),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 14f,
+                    ),
             )
         }
     }
@@ -1326,10 +1329,11 @@ private fun PaymentSummaryLine(
                         MaterialTheme.colorScheme.onSurface
                     },
                 modifier = Modifier.widthIn(max = 180.dp),
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 11f,
-                    maxLines = 1,
-                ),
+                options =
+                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        minFontSizeSp = 11f,
+                        maxLines = 1,
+                    ),
             )
             secondary?.let {
                 Text(

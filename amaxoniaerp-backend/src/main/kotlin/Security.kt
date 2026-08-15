@@ -6,8 +6,6 @@ import io.ktor.server.application.Application
 import io.ktor.server.auth.authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.auth.jwt.verifier
-import io.ktor.server.auth.verifier
 
 fun Application.configureSecurity() {
     val jwtConfig = loadJwtConfig()

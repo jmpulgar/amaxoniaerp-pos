@@ -421,10 +421,12 @@ internal fun SplitProductCard(
                     text = formatMoney(pedido.itemTotalConIva),
                     baseStyle = PosTextStyles.priceTileLarge,
                     color = MaterialTheme.colorScheme.primary,
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 13f,
-                    maxLines = 1,
-                ))
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                            maxLines = 1,
+                        ),
+                )
             }
             OutlinedTextField(
                 value = value,
@@ -492,12 +494,14 @@ internal fun CuentaActivaCard(
                         text = formatMoney(line.itemTotalConIva),
                         baseStyle = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                    options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        fontWeight = FontWeight.Bold,
-                        minFontSizeSp = 11f,
-                        maxLines = 1,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                    ))
+                        options =
+                            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                                fontWeight = FontWeight.Bold,
+                                minFontSizeSp = 11f,
+                                maxLines = 1,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            ),
+                    )
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -513,11 +517,13 @@ internal fun CuentaActivaCard(
                     text = formatMoney(cuenta.total),
                     baseStyle = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
-                options = com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    fontWeight = FontWeight.ExtraBold,
-                    minFontSizeSp = 16f,
-                    maxLines = 1,
-                ))
+                    options =
+                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            fontWeight = FontWeight.ExtraBold,
+                            minFontSizeSp = 16f,
+                            maxLines = 1,
+                        ),
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

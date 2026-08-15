@@ -495,10 +495,20 @@ backend-build
 
 ### TASK-022 — Static analysis backend
 
+> **ESTADO: PENDIENTE.** Detekt backend permanece en ROJO: `1.415` findings preexistentes (idénticos en HEAD `0d63a45` y tras TASK-023/025 — cero findings nuevos). El saneamiento pertenece al siguiente bloque de deuda técnica. NO se considera Detekt Backend "verde"; no se creó baseline ni suppression alguna.
+
 Agregar Detekt + ktlint.
 No crear baseline masivo permanente.
 
 ### TASK-023 — Coverage ratchet
+
+> **ESTADO: COMPLETADA (2026-08-15).**
+>
+> - Android (Kover, `:app:koverVerifyAmaxoniaDebug`): line coverage `>= 15%` y `>= 4383` líneas cubiertas. Medición real post-formato: 4383/27785 = 15.7747%.
+> - Backend (JaCoCo, `jacocoTestCoverageVerification`): LINE COVEREDRATIO `>= 0.46526415`. Medición real: 6878/14783 = 46.526415%.
+> - Gates permanentes integrados en `android-ci.yml` (job `android-coverage`) y `backend-ci.yml` (job `backend-coverage`).
+> - El threshold nunca queda por debajo de la medición real vigente; no se agregaron tests triviales.
+> - TASK-023 no introdujo nuevos findings de Detekt (Android o Backend).
 
 Capturar baseline y prohibir regresión.
 
@@ -515,15 +525,18 @@ Compose UI no debe inflar cobertura con tests triviales.
 
 ### TASK-024 — Branch protection
 
-Después de estabilizar CI:
-
-- [ ] require PR;
-- [ ] require status checks;
-- [ ] block force push;
-- [ ] branch up-to-date;
-- [ ] aprobación si el flujo del equipo lo permite.
+`ANULADA — decisión del proyecto; no implementar.`
 
 ### TASK-025 — Repo hygiene
+
+> **ESTADO: COMPLETADA (2026-08-15).**
+>
+> - Eliminados los workflows temporales: `android-kover-task-audit`, `architecture-audit-metrics`, `architecture-coverage-audit`, `backend-quality-audit`, `backend-quality-fix`, `baseline-audit`.
+> - Conservados: `android-ci.yml`, `backend-ci.yml`.
+> - Retirados del tracking: `amaxoniaerp-backend/.kotlin/errors/**`, `.idea/workspace.xml`, `amaxoniaerp-pos/app/.project`, `amaxoniaerp-pos/app/.settings/**`.
+> - `.gitignore` completados (raíz, backend `.kotlin/`, POS `.project`/`.settings`) sólo donde existía gap real.
+> - `.env*`, secretos y configuración productiva intactos.
+> - TASK-025 no introdujo nuevos findings de Detekt.
 
 Auditar/retirar sólo artefactos no requeridos:
 

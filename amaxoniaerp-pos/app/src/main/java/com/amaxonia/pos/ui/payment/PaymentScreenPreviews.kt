@@ -84,39 +84,45 @@ private fun PaymentPreviewFrame(content: @Composable BoxWithConstraintsScope.() 
 
 @Preview(name = "Cash · 320×568 (smallest POS)", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CashCompactPortrait320() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 65.0), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortrait320() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 65.0), onAction = {}, maxHeight = maxHeight)
+    }
 
 @Preview(name = "Cash · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
-private fun CashCompactPortrait360() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 1_289.50), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortrait360() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 1_289.50), onAction = {}, maxHeight = maxHeight)
+    }
 
 @Preview(name = "Cash · 390×844 (Pixel)", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun CashCompactPortrait390() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 248.75), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortrait390() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 248.75), onAction = {}, maxHeight = maxHeight)
+    }
 
 @Preview(name = "Cash · 412×915 (Pixel 6)", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
-private fun CashCompactPortrait412() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 248.75, withDiscount = true), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortrait412() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 248.75, withDiscount = true), onAction = {}, maxHeight = maxHeight)
+    }
 
 @Preview(name = "Cash · 480×960 (large phone)", showBackground = true, widthDp = 480, heightDp = 960)
 @Composable
-private fun CashCompactPortrait480() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 248.75), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortrait480() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 248.75), onAction = {}, maxHeight = maxHeight)
+    }
 
 @Preview(name = "Cash · total enorme · sin wrap · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun CashCompactPortraitHugeTotal() = PaymentPreviewFrame {
-    CashPaymentCompact(state = cashPreviewState(total = 9_876_543.21), onAction = {}, maxHeight = maxHeight)
-}
+private fun CashCompactPortraitHugeTotal() =
+    PaymentPreviewFrame {
+        CashPaymentCompact(state = cashPreviewState(total = 9_876_543.21), onAction = {}, maxHeight = maxHeight)
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NON-CASH · portrait.
@@ -124,15 +130,17 @@ private fun CashCompactPortraitHugeTotal() = PaymentPreviewFrame {
 
 @Preview(name = "Tarjeta/Otro · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
-private fun NonCashCompactPortrait320() = PaymentPreviewFrame {
-    NonCashPaymentCompact(state = nonCashPreviewState(total = 250.0), onAction = {})
-}
+private fun NonCashCompactPortrait320() =
+    PaymentPreviewFrame {
+        NonCashPaymentCompact(state = nonCashPreviewState(total = 250.0), onAction = {})
+    }
 
 @Preview(name = "Tarjeta/Otro · 390×844", showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun NonCashCompactPortrait390() = PaymentPreviewFrame {
-    NonCashPaymentCompact(state = nonCashPreviewState(total = 1_750.00), onAction = {})
-}
+private fun NonCashCompactPortrait390() =
+    PaymentPreviewFrame {
+        NonCashPaymentCompact(state = nonCashPreviewState(total = 1_750.00), onAction = {})
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Landscape (phone + tablet) — header + summary on the left, keypad/list + CTA on the right.
@@ -140,21 +148,24 @@ private fun NonCashCompactPortrait390() = PaymentPreviewFrame {
 
 @Preview(name = "Cash · landscape · 733×340 (phone)", showBackground = true, widthDp = 733, heightDp = 340)
 @Composable
-private fun CashLandscapePhone() = PaymentPreviewFrame {
-    PaymentLandscape(state = cashPreviewState(total = 248.75), onAction = {})
-}
+private fun CashLandscapePhone() =
+    PaymentPreviewFrame {
+        PaymentLandscape(state = cashPreviewState(total = 248.75), onAction = {})
+    }
 
 @Preview(name = "Tarjeta/Otro · landscape · 733×340 (phone)", showBackground = true, widthDp = 733, heightDp = 340)
 @Composable
-private fun NonCashLandscapePhone() = PaymentPreviewFrame {
-    PaymentLandscape(state = nonCashPreviewState(total = 250.0), onAction = {})
-}
+private fun NonCashLandscapePhone() =
+    PaymentPreviewFrame {
+        PaymentLandscape(state = nonCashPreviewState(total = 250.0), onAction = {})
+    }
 
 @Preview(name = "Cash · landscape · 1280×800 (tablet)", showBackground = true, device = Devices.NEXUS_10)
 @Composable
-private fun CashLandscapeTablet() = PaymentPreviewFrame {
-    PaymentLandscape(state = cashPreviewState(total = 248.75), onAction = {})
-}
+private fun CashLandscapeTablet() =
+    PaymentPreviewFrame {
+        PaymentLandscape(state = cashPreviewState(total = 248.75), onAction = {})
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tablet portrait (≥600dp) → PaymentWide.
@@ -162,15 +173,17 @@ private fun CashLandscapeTablet() = PaymentPreviewFrame {
 
 @Preview(name = "Cash · tablet portrait · 600×960", showBackground = true, widthDp = 600, heightDp = 960)
 @Composable
-private fun CashWidePortraitTablet() = PaymentPreviewFrame {
-    PaymentWide(state = cashPreviewState(total = 248.75), onAction = {})
-}
+private fun CashWidePortraitTablet() =
+    PaymentPreviewFrame {
+        PaymentWide(state = cashPreviewState(total = 248.75), onAction = {})
+    }
 
 @Preview(name = "Tarjeta/Otro · tablet portrait · 600×960", showBackground = true, widthDp = 600, heightDp = 960)
 @Composable
-private fun NonCashWidePortraitTablet() = PaymentPreviewFrame {
-    PaymentWide(state = nonCashPreviewState(total = 250.0), onAction = {})
-}
+private fun NonCashWidePortraitTablet() =
+    PaymentPreviewFrame {
+        PaymentWide(state = nonCashPreviewState(total = 250.0), onAction = {})
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component-level previews for edge cases (long totals, selector states, CTA).

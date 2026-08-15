@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -30,8 +29,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Receipt
-import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -72,8 +69,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceLineDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceSummaryDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteSummaryDto
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
 import com.amaxonia.pos.ui.common.DependencyContainer
@@ -585,7 +580,6 @@ internal fun SummaryBanner(
         }
     }
 }
-
 
 @Composable
 private fun InvoiceLineReadOnlyCard(

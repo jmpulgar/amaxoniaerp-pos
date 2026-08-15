@@ -8,21 +8,21 @@ import org.junit.Test
 class FormaPagoSerializationTest {
     @Test
     fun `deserializes without tipo moneda`() {
-        val formaPago = AppJson.decodeFromString<FormaPago>(baseJson)
+        val formaPago = AppJson.decodeFromString<FormaPago>(BASE_JSON)
 
         assertEquals("", formaPago.tipoMoneda)
     }
 
     @Test
     fun `deserializes empty tipo moneda`() {
-        val formaPago = AppJson.decodeFromString<FormaPago>("""$baseJsonWithoutTipoMoneda,"tipo_moneda":""}""")
+        val formaPago = AppJson.decodeFromString<FormaPago>("""$BASE_JSON_WITHOUT_TIPO_MONEDA,"tipo_moneda":""}""")
 
         assertEquals("", formaPago.tipoMoneda)
     }
 
     private companion object {
-        const val baseJsonWithoutTipoMoneda =
+        const val BASE_JSON_WITHOUT_TIPO_MONEDA =
             "{\"id_forma_pago\":1,\"activo\":1,\"pos\":1,\"grupo\":1,\"orden\":1"
-        const val baseJson = "$baseJsonWithoutTipoMoneda}"
+        const val BASE_JSON = "$BASE_JSON_WITHOUT_TIPO_MONEDA}"
     }
 }

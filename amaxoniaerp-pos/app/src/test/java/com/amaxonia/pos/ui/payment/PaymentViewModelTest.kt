@@ -73,7 +73,7 @@ class PaymentViewModelTest {
                                 method(3, 3, "CRED"),
                             ),
                         ),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -88,7 +88,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -105,7 +105,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -127,7 +127,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CRED"))),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -148,7 +148,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = false),
+                    extras = PaymentExtras(client = Client(permiteCredito = false)),
                 )
 
             runCurrent()
@@ -172,7 +172,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -193,7 +193,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = Client(permiteCredito = true),
+                    extras = PaymentExtras(client = Client(permiteCredito = true)),
                 )
 
             runCurrent()
@@ -225,8 +225,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = null,
-                    clientFlow = clientFlow,
+                    extras = PaymentExtras(clientFlow = clientFlow),
                 )
 
             runCurrent()
@@ -253,8 +252,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"), method(2, 2, "CXC"))),
-                    client = null,
-                    clientFlow = clientFlow,
+                    extras = PaymentExtras(clientFlow = clientFlow),
                 )
 
             runCurrent()
@@ -302,7 +300,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"))),
-                    snapshot = snapshot,
+                    extras = PaymentExtras(snapshot = snapshot),
                 )
 
             runCurrent()
@@ -322,7 +320,7 @@ class PaymentViewModelTest {
                 viewModel(
                     caja = null,
                     methods = Result.success(listOf(method(1, 1, "CASH"))),
-                    countryCode = "PA",
+                    extras = PaymentExtras(countryCode = "PA"),
                 )
 
             runCurrent()
@@ -550,14 +548,18 @@ class PaymentViewModelTest {
             assertEquals(payload, state.successPayload)
         }
 
+    private data class PaymentExtras(
+        val client: Client? = null,
+        val clientFlow: MutableStateFlow<Client?>? = null,
+        val snapshot: SaleFinancialSnapshot? = null,
+        val countryCode: String = "VE",
+    )
+
     private fun viewModel(
         caja: Caja?,
         methods: Result<List<FormaPago>>,
         operation: PaymentOperation = PaymentOperation { _, _ -> error("not used") },
-        client: Client? = null,
-        clientFlow: MutableStateFlow<Client?>? = null,
-        snapshot: SaleFinancialSnapshot? = null,
-        countryCode: String = "VE",
+        extras: PaymentExtras = PaymentExtras(),
     ): PaymentViewModel {
         val cajaReader =
             object : ActiveCajaReader {
@@ -569,9 +571,9 @@ class PaymentViewModelTest {
             }
         val countryReader =
             object : PaymentCountryReader {
-                override suspend fun currentCountryCode(): String = countryCode
+                override suspend fun currentCountryCode(): String = extras.countryCode
             }
-        val resolvedClientFlow: MutableStateFlow<Client?> = clientFlow ?: MutableStateFlow(client)
+        val resolvedClientFlow: MutableStateFlow<Client?> = extras.clientFlow ?: MutableStateFlow(extras.client)
         return PaymentViewModel(
             loadPaymentContext = LoadPaymentContextUseCase(cajaReader, methodRepository),
             loadPaymentCountry = LoadPaymentCountryUseCase(countryReader),
@@ -579,7 +581,7 @@ class PaymentViewModelTest {
             buildPaymentDetails = BuildPaymentDetailsUseCase(),
             paymentOperation = operation,
             selectedClient = resolvedClientFlow,
-            cartFinancialSnapshot = MutableStateFlow(snapshot),
+            cartFinancialSnapshot = MutableStateFlow(extras.snapshot),
         )
     }
 

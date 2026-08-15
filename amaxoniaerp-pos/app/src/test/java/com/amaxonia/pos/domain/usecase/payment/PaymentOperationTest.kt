@@ -37,19 +37,7 @@ class PaymentOperationTest {
                     tax = 0.0,
                     total = 10.0,
                 )
-            val request =
-                PaymentOperationRequest(
-                    payment = cashIntent(details),
-                    source = PaymentSource.CurrentCart(snapshot),
-                    context =
-                        PaymentExecutionContext(
-                            countryCode = "VE",
-                            availableMethods = listOf(method),
-                            exchangeRate = 2.0,
-                            secondaryCurrency = "Bs.",
-                            isMultiCurrency = true,
-                        ),
-                )
+            val request = canonicalRequest(method, details, snapshot)
             var captured: ExecutePaymentFlowInput? = null
             val expectedResult = PaymentFlowResult.Failure("characterized failure")
             val events = mutableListOf<PaymentFlowEvent>()
@@ -131,6 +119,24 @@ class PaymentOperationTest {
             assertEquals(tablePayment.saleItems, input.saleItemsOverride)
             assertEquals(tablePayment.saleContext, input.cuentaMesa)
         }
+
+    private fun canonicalRequest(
+        method: FormaPago,
+        details: PaymentDetails,
+        snapshot: SaleFinancialSnapshot,
+    ): PaymentOperationRequest =
+        PaymentOperationRequest(
+            payment = cashIntent(details),
+            source = PaymentSource.CurrentCart(snapshot),
+            context =
+                PaymentExecutionContext(
+                    countryCode = "VE",
+                    availableMethods = listOf(method),
+                    exchangeRate = 2.0,
+                    secondaryCurrency = "Bs.",
+                    isMultiCurrency = true,
+                ),
+        )
 
     private fun cashDetails(): PaymentDetails =
         PaymentDetails(

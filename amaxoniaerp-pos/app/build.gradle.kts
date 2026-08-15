@@ -1,3 +1,5 @@
+import kotlinx.kover.gradle.plugin.dsl.AggregationType
+import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.gradle.api.GradleException
 import java.util.Properties
 
@@ -158,6 +160,27 @@ ktlint {
     version.set("1.5.0")
     ignoreFailures = false
     outputToConsole = true
+}
+
+kover {
+    reports {
+        variant("amaxoniaDebug") {
+            verify {
+                rule("amaxonia-debug-line-coverage-ratchet") {
+                    bound {
+                        coverageUnits = CoverageUnit.LINE
+                        aggregationForGroup = AggregationType.COVERED_PERCENTAGE
+                        minValue = 15
+                    }
+                    bound {
+                        coverageUnits = CoverageUnit.LINE
+                        aggregationForGroup = AggregationType.COVERED_COUNT
+                        minValue = 4383
+                    }
+                }
+            }
+        }
+    }
 }
 
 val verifyReleaseSigningConfig by tasks.registering {

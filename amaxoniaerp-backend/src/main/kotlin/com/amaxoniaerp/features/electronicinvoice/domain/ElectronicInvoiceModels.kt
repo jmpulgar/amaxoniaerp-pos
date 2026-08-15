@@ -28,8 +28,10 @@ sealed class ElectronicInvoiceResult {
         val fechaRecepcionDGI: String? = null,
         val nroProtocoloAutorizacion: String? = null,
         val fechaLimite: String? = null,
-        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─
-        /** `resultado.numeroDocumento` retornado por HKA VE. Null en PA. */
+        /**
+         * ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ──
+         * `resultado.numeroDocumento` retornado por HKA VE. Null en PA.
+         */
         val numeroDocumentoFiscal: String? = null,
         /** `resultado.numeroControl` retornado por HKA VE. Null en PA. */
         val numeroControlThka: String? = null,
