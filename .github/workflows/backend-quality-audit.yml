@@ -43,7 +43,12 @@ jobs:
         id: ktlint
         continue-on-error: true
         run: ./gradlew ktlintCheck --no-daemon --console=plain
+      - name: Print complete ktlint debt
+        if: always()
+        run: |
+          find build/reports/ktlint -type f -name '*.txt' -print -exec cat {} \; || true
       - name: Summarize quality debt status
+        if: always()
         run: |
           echo "detekt_outcome=${{ steps.detekt.outcome }}"
           echo "ktlint_outcome=${{ steps.ktlint.outcome }}"
