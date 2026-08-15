@@ -1,38 +1,73 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This is a single-module Android app. The main module lives in `app/`.
+This is currently a single-module Android app. The main module is `app/`.
 - Kotlin/Compose source: `app/src/main/java/com/amaxonia/pos/...`
-- Android resources (layouts, drawables, strings): `app/src/main/res/`
+- Android resources: `app/src/main/res/`
 - Unit tests: `app/src/test/java/...`
 - Instrumented tests: `app/src/androidTest/java/...`
+- Architecture policy: `../doc/ARCHITECTURE.md`
+- ADRs: `../doc/adr/`
 
-## Build, Test, and Development Commands
-Use the Gradle wrapper from the repo root:
-- `./gradlew assembleDebug` builds a debug APK.
-- `./gradlew installDebug` installs the debug build on a connected device/emulator.
-- `./gradlew test` runs local JVM unit tests in `app/src/test`.
-- `./gradlew connectedAndroidTest` runs instrumented tests on a device.
-- `./gradlew lint` runs Android Lint (if enabled by the Android plugin).
+Do not introduce Gradle feature modules only for visual symmetry. Module boundaries are enforced first through package/dependency rules and tests.
+
+## Build, Test, and Quality Commands
+Run from `amaxoniaerp-pos/` with Java 17 and Android SDK 36 available:
+- `./gradlew test` — local JVM unit tests.
+- `./gradlew detekt` — Detekt quality gate.
+- `./gradlew ktlintCheck` — Kotlin formatting gate.
+- `./gradlew assembleAmaxoniaDebug` — Amaxonia debug flavor.
+- `./gradlew assembleBanescoVenezuelaDebug` — Banesco Venezuela debug flavor.
+- `./gradlew assembleListoerpDebug` — ListoERP debug flavor.
+- `./gradlew connectedAndroidTest` — instrumented tests when a device/emulator is required.
+- `./gradlew lint` — Android Lint.
+
+Before integration, run the relevant tests plus Detekt, ktlint and the required flavor build(s). CI executes all three debug flavors.
+
+## Architecture Rules
+The canonical dependency direction is:
+
+```text
+ui -> domain
+data -> domain
+composition -> ui + domain + data
+domain -> Kotlin/JDK only
+```
+
+Do not add:
+- `ui -> data` imports;
+- `domain -> data` or `domain -> ui` imports;
+- new direct `DependencyContainer` usage from Screens/ViewModels;
+- service-location from domain code.
+
+Dependencies should be supplied explicitly from the composition boundary. Do not add interfaces, wrappers or use cases for trivial one-line delegation with no invariant or boundary value.
+
+The Payment refactor is closed. Do not redesign Payment architecture unless a TASK explicitly requires a behavior-neutral quality-tooling correction.
 
 ## Coding Style & Naming Conventions
-- Language: Kotlin with Jetpack Compose.
-- Indentation: 4 spaces; follow standard Kotlin formatting.
-- Naming: classes and composables in `UpperCamelCase`, functions/vars in `lowerCamelCase`.
-- Keep UI components and state classes paired in feature folders (e.g., `ui/login`, `ui/products`).
-- No repository-wide formatter/linter config is present; use Android Studio “Reformat Code”.
+- Kotlin + Jetpack Compose, 4-space indentation and standard Kotlin formatting.
+- Classes/composables: `UpperCamelCase`; functions/properties: `lowerCamelCase`.
+- Keep feature UI/state/action/effect types together when they form one cohesive feature.
+- Do not add `@Suppress`, `@file:Suppress`, ignores, baseline entries or disabled rules to make quality gates pass.
+- Existing Detekt baseline entries are debt to remove progressively, not precedent for adding more.
 
 ## Testing Guidelines
-- Unit tests use JUnit (`testImplementation(libs.junit)`).
-- Instrumented tests use AndroidX test runner and Espresso.
-- Name tests with clear intent (e.g., `LoginViewModelTest`, `ExampleInstrumentedTest`).
-- Run relevant tests before submitting UI or ViewModel changes.
+- Unit tests use JUnit/Kotlin test as configured by the project.
+- Instrumented tests use AndroidX test infrastructure.
+- Test behavior and invariants, not implementation trivia.
+- Cover critical money, idempotency, offline/retry and PA / VE digital / VE HKA-20 paths when touching them.
+- Coverage is ratcheted from the measured baseline; do not add trivial tests only to increase a percentage.
+
+## Business-Safety Constraints
+Architecture/quality work must not change business decisions, calculations, credit/CxC, HTTP/JSON contracts, Room schema/migrations, PAC, HKA-20 behavior, fiscal payloads or multi-country policy unless a separate approved functional TASK explicitly says so.
+
+Never modify `.env`, `.env.development`, secrets, keystores or production configuration for architecture work.
 
 ## Commit & Pull Request Guidelines
-- No Git history is available in this workspace, so no enforced commit convention is documented.
-- Recommended: short, imperative commit subjects (e.g., “Add product form validation”).
-- PRs should include a brief description, test commands run, and screenshots for UI changes.
+- Keep commits small, scoped and reversible.
+- PRs state what changed, evidence/tests run and whether any business decision changed.
+- Required CI checks are documented in `../doc/ARCHITECTURE.md`.
+- Do not force-push shared branches.
 
 ## Configuration & Local Setup
-- `local.properties` is present for SDK paths; keep it local and uncommitted.
-- The app targets Android SDK 36 and requires Java 11 (see `app/build.gradle.kts`).
+`local.properties` is local SDK configuration and must remain uncommitted. The application targets Android SDK 36; CI uses Java 17.
