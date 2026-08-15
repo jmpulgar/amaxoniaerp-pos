@@ -1,141 +1,24 @@
 name: Backend Quality Debt Audit
 
 on:
-  push:
-    branches:
-      - architecture-block1-validation
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   backend-quality-debt:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: amaxoniaerp-backend
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: architecture-block1-validation
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      - name: Resolve backend compile classpath
-        run: ./gradlew compileKotlin --no-daemon --console=plain
-      - name: Expand wildcard imports from actually referenced symbols
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re, subprocess, zipfile
-
-          root = Path('src')
-          files = list(root.rglob('*.kt'))
-          wildcard_re = re.compile(r'^\s*import\s+([\w.]+)\.\*\s*$', re.M)
-          packages = set()
-          source_symbols = {}
-
-          decl_re = re.compile(r'^(?:public\s+|internal\s+)?(?:(?:data|sealed|enum|value|annotation)\s+)?(?:class|object|interface|typealias|fun|val|var)\s+([A-Za-z_]\w*)', re.M)
-          package_re = re.compile(r'^\s*package\s+([\w.]+)', re.M)
-
-          for path in files:
-              text = path.read_text()
-              packages.update(wildcard_re.findall(text))
-              pm = package_re.search(text)
-              if pm:
-                  source_symbols.setdefault(pm.group(1), set()).update(decl_re.findall(text))
-
-          symbols = {pkg: set(source_symbols.get(pkg, set())) for pkg in packages}
-          pkg_paths = {pkg: pkg.replace('.', '/') + '/' for pkg in packages}
-          kt_classes = []
-
-          jars = list(Path.home().glob('.gradle/caches/modules-2/files-2.1/**/*.jar'))
-          for jar in jars:
-              try:
-                  with zipfile.ZipFile(jar) as zf:
-                      for name in zf.namelist():
-                          if not name.endswith('.class') or '$' in name:
-                              continue
-                          for pkg, prefix in pkg_paths.items():
-                              if name.startswith(prefix) and '/' not in name[len(prefix):]:
-                                  simple = name[len(prefix):-6]
-                                  if simple and not simple.endswith('Kt'):
-                                      symbols[pkg].add(simple)
-                                  elif simple.endswith('Kt'):
-                                      kt_classes.append((jar, pkg, simple))
-                                  break
-              except zipfile.BadZipFile:
-                  pass
-
-          method_re = re.compile(r'\b([A-Za-z_][\w$]*)\(')
-          for jar, pkg, simple in kt_classes:
-              binary = f'{pkg}.{simple}'
-              try:
-                  out = subprocess.check_output(['javap', '-public', '-classpath', str(jar), binary], text=True, stderr=subprocess.DEVNULL, timeout=8)
-              except Exception:
-                  continue
-              for line in out.splitlines():
-                  if ' static ' not in line:
-                      continue
-                  m = method_re.search(line)
-                  if not m:
-                      continue
-                  name = m.group(1)
-                  if '$' in name:
-                      continue
-                  symbols[pkg].add(name)
-                  if name.startswith('get') and len(name) > 3 and name[3].isupper():
-                      symbols[pkg].add(name[3].lower() + name[4:])
-                  if name.startswith('is') and len(name) > 2 and name[2].isupper():
-                      symbols[pkg].add(name[2].lower() + name[3:])
-
-          token_re = re.compile(r'\b[A-Za-z_]\w*\b')
-          for path in files:
-              text = path.read_text()
-              matches = list(wildcard_re.finditer(text))
-              if not matches:
-                  continue
-              body = re.sub(r'^\s*(?:package|import)\b.*$', '', text, flags=re.M)
-              body = re.sub(r'//.*', '', body)
-              body = re.sub(r'/\*.*?\*/', '', body, flags=re.S)
-              body = re.sub(r'"(?:\\.|[^"\\])*"', '""', body)
-              used = set(token_re.findall(body))
-              lines = text.splitlines()
-              new_lines = []
-              changed = False
-              for line in lines:
-                  m = re.match(r'^\s*import\s+([\w.]+)\.\*\s*$', line)
-                  if not m:
-                      new_lines.append(line)
-                      continue
-                  pkg = m.group(1)
-                  names = sorted(symbols.get(pkg, set()) & used)
-                  if names:
-                      new_lines.extend(f'import {pkg}.{name}' for name in names)
-                      changed = True
-                  else:
-                      new_lines.append(line)
-              if changed:
-                  path.write_text('\n'.join(new_lines) + ('\n' if text.endswith('\n') else ''))
-          PY
-      - name: Apply autocorrectable formatting after import expansion
-        run: ./gradlew ktlintFormat --no-daemon --console=plain || true
-      - name: Commit explicit quality fixes
-        working-directory: .
-        run: |
-          if git diff --quiet -- amaxoniaerp-backend; then
-            echo "No generated quality changes required"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add amaxoniaerp-backend
-            git commit -m "Expand backend imports for ktlint"
-            git push origin HEAD:architecture-block1-validation
-          fi
-      - name: Verify ktlint
-        run: ./gradlew ktlintCheck --no-daemon --console=plain
+      - run: ./gradlew ktlintCheck detekt test build --no-daemon --console=plain
