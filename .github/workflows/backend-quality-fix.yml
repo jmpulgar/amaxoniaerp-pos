@@ -34,31 +34,11 @@ jobs:
               if old in text:
                   p.write_text(text.replace(old, new))
 
-          replace(
-              'src/main/kotlin/com/amaxoniaerp/features/clients/route/ClientTypesRoute.kt',
-              'import io.ktor.server.request.*\n',
-              '',
-          )
-          replace(
-              'src/main/kotlin/com/amaxoniaerp/features/geography/route/GeographyRoutes.kt',
-              'import io.ktor.server.request.*\n',
-              '',
-          )
-          replace(
-              'src/main/kotlin/Routing.kt',
-              'import io.ktor.client.plugins.contentnegotiation.*\n',
-              'import io.ktor.client.plugins.contentnegotiation.ContentNegotiation\n',
-          )
-          replace(
-              'src/main/kotlin/Routing.kt',
-              'import io.ktor.server.application.hooks.*\n',
-              'import io.ktor.server.application.hooks.ApplicationStopped\n',
-          )
-          replace(
-              'src/main/kotlin/Serialization.kt',
-              'import io.ktor.server.plugins.contentnegotiation.*\n',
-              'import io.ktor.server.plugins.contentnegotiation.ContentNegotiation\n',
-          )
+          replace('src/main/kotlin/com/amaxoniaerp/features/clients/route/ClientTypesRoute.kt', 'import io.ktor.server.request.*\n', '')
+          replace('src/main/kotlin/com/amaxoniaerp/features/geography/route/GeographyRoutes.kt', 'import io.ktor.server.request.*\n', '')
+          replace('src/main/kotlin/Routing.kt', 'import io.ktor.client.plugins.contentnegotiation.*\n', 'import io.ktor.client.plugins.contentnegotiation.ContentNegotiation\n')
+          replace('src/main/kotlin/Routing.kt', 'import io.ktor.server.application.hooks.*\n', 'import io.ktor.server.application.hooks.ApplicationStopped\n')
+          replace('src/main/kotlin/Serialization.kt', 'import io.ktor.server.plugins.contentnegotiation.*\n', 'import io.ktor.server.plugins.contentnegotiation.ContentNegotiation\n')
 
           panama = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/application/PanamaInvoiceProcessor.kt')
           text = panama.read_text()
@@ -76,10 +56,7 @@ jobs:
 
           repo = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/data/VenezuelaElectronicInvoiceRepository.kt')
           text = repo.read_text().replace('CAMPO_CORRELATIVO_FE', 'campoCorrelativoFe')
-          text = text.replace(
-              '// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n        /** Código de entorno demo',
-              '// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n\n        /** Código de entorno demo',
-          )
+          text = text.replace('// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n        /**', '// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n\n        /**')
           repo.write_text(text)
 
           test_repo = Path('src/test/kotlin/com/amaxoniaerp/features/electronicinvoice/data/VenezuelaElectronicInvoiceRepositoryTest.kt')
@@ -87,14 +64,13 @@ jobs:
               test_repo.write_text(test_repo.read_text().replace('CAMPO_CORRELATIVO_FE', 'campoCorrelativoFe'))
 
           exceptions = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceExceptions.kt')
-          text = exceptions.read_text()
-          text = text.replace('/**\n * Excepciones específicas del módulo de facturación electrónica.\n */\n\n', '')
+          text = exceptions.read_text().replace('/**\n * Excepciones específicas del módulo de facturación electrónica.\n */\n\n', '')
           exceptions.write_text(text)
 
           models = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceModels.kt')
           text = models.read_text().replace(
-              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n        /** `resultado.numeroDocumento`',
-              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n\n        /** `resultado.numeroDocumento`',
+              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n        /**',
+              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n\n        /**',
           )
           models.write_text(text)
           PY
@@ -112,6 +88,7 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add amaxoniaerp-backend
             git commit -m "Fix remaining backend ktlint debt"
+            git pull --rebase origin architecture-block1-validation
             git push origin HEAD:architecture-block1-validation
           fi
       - name: Verify backend quality
