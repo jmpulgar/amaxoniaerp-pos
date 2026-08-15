@@ -2,6 +2,7 @@ package com.amaxonia.pos.domain.usecase.payment
 
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.repository.TableAccountPaymentReader
 import java.math.BigDecimal
 
 /** Canonical implementation behind the [PaymentOperation] external seam. */
@@ -12,17 +13,20 @@ internal class DefaultPaymentOperation(
             suspend (PaymentFlowEvent) -> Unit,
         ) -> PaymentFlowResult,
     private val printerTypeProvider: suspend () -> PrinterType,
+    private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
 ) : PaymentOperation {
     override suspend fun execute(
         request: PaymentOperationRequest,
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
-        val tablePayment = (request.source as? PaymentSource.TableAccount)?.payment
-        val financialSnapshot =
+        val tablePayment =
             when (val source = request.source) {
-                is PaymentSource.CurrentCart -> source.financialSnapshot
-                is PaymentSource.TableAccount -> source.payment.financialSnapshot
+                is PaymentSource.CurrentCart -> tableAccountPaymentReader?.current?.value
+                is PaymentSource.TableAccount -> source.payment
             }
+        val financialSnapshot =
+            tablePayment?.financialSnapshot
+                ?: (request.source as? PaymentSource.CurrentCart)?.financialSnapshot
         val input =
             ExecutePaymentFlowInput(
                 countryCode = request.context.countryCode,
