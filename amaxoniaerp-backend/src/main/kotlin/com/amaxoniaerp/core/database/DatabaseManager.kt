@@ -41,13 +41,11 @@ data class CountryDbConfig(
     val user: String,
     val password: String,
     val configDbName: String,
-    val displayName: String
+    val displayName: String,
 ) {
-    fun buildConfigJdbcUrl(): String =
-        "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
+    fun buildConfigJdbcUrl(): String = "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
 
-    fun buildCompanyJdbcUrl(companyDbName: String): String =
-        "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
+    fun buildCompanyJdbcUrl(companyDbName: String): String = "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
 }
 
 /**
@@ -56,7 +54,6 @@ data class CountryDbConfig(
  * Todas las conexiones son Lazy y bajo demanda.
  */
 object DatabaseManager {
-
     private val logger by lazy { org.slf4j.LoggerFactory.getLogger(DatabaseManager::class.java) }
 
     /** Lookup inyectado: (key) -> value. Prioridad env vars (12-factor), luego .env en desarrollo. */
@@ -68,7 +65,7 @@ object DatabaseManager {
         val getEnv = envLookup ?: error("DatabaseManager.init(log, getEnv) debe llamarse antes de usar countryConfigs")
         mapOf(
             "VE" to loadCountryConfig(getEnv, "VE", "Venezuela"),
-            "PA" to loadCountryConfig(getEnv, "PA", "Panamá")
+            "PA" to loadCountryConfig(getEnv, "PA", "Panamá"),
         )
     }
 
@@ -79,7 +76,11 @@ object DatabaseManager {
     /**
      * Carga la configuración de un país desde el lookup inyectado (env + .env).
      */
-    private fun loadCountryConfig(getEnv: (String) -> String?, countryCode: String, displayName: String): CountryDbConfig {
+    private fun loadCountryConfig(
+        getEnv: (String) -> String?,
+        countryCode: String,
+        displayName: String,
+    ): CountryDbConfig {
         val prefix = "DB_${countryCode}_"
 
         return CountryDbConfig(
@@ -89,27 +90,32 @@ object DatabaseManager {
             user = getEnv("${prefix}USER") ?: "root",
             password = getEnv("${prefix}PASS") ?: "",
             configDbName = getEnv("${prefix}CONF_DB") ?: getDefaultConfigDb(countryCode),
-            displayName = displayName
+            displayName = displayName,
         )
     }
 
-    private fun getDefaultHost(countryCode: String): String = when (countryCode) {
-        "VE" -> "listoerp.app"
-        "PA" -> "administrativo.amaxoniaerp.com"
-        else -> "localhost"
-    }
+    private fun getDefaultHost(countryCode: String): String =
+        when (countryCode) {
+            "VE" -> "listoerp.app"
+            "PA" -> "administrativo.amaxoniaerp.com"
+            else -> "localhost"
+        }
 
-    private fun getDefaultConfigDb(countryCode: String): String = when (countryCode) {
-        "VE" -> "facturacion_ve_conf"
-        "PA" -> "selectra_conf_pyme"
-        else -> "amaxonia_config"
-    }
+    private fun getDefaultConfigDb(countryCode: String): String =
+        when (countryCode) {
+            "VE" -> "facturacion_ve_conf"
+            "PA" -> "selectra_conf_pyme"
+            else -> "amaxonia_config"
+        }
 
     /**
      * Inicialización (inyección de config + logging).
      * getEnv: lookup (key) -> value; prioridad env vars, luego .env (12-factor).
      */
-    fun init(log: Logger, getEnv: (String) -> String?) {
+    fun init(
+        log: Logger,
+        getEnv: (String) -> String?,
+    ) {
         envLookup = getEnv
         log.info("DatabaseManager inicializado. Países configurados: ${countryConfigs.keys}")
         countryConfigs.forEach { (code, config) ->
@@ -123,14 +129,16 @@ object DatabaseManager {
      */
     fun getConfigDatabase(countryCode: String): Database {
         val upperCode = countryCode.uppercase()
-        val config = countryConfigs[upperCode]
-            ?: throw IllegalArgumentException("País no soportado: $countryCode")
+        val config =
+            countryConfigs[upperCode]
+                ?: throw IllegalArgumentException("País no soportado: $countryCode")
 
         return synchronized(configDataSources) {
-            val dataSource = configDataSources.getOrPut(upperCode) {
-                logger.info("Creando pool de conexión para CONFIG DB de $upperCode (${config.host})")
-                createDataSource(config.buildConfigJdbcUrl(), config.user, config.password)
-            }
+            val dataSource =
+                configDataSources.getOrPut(upperCode) {
+                    logger.info("Creando pool de conexión para CONFIG DB de $upperCode (${config.host})")
+                    createDataSource(config.buildConfigJdbcUrl(), config.user, config.password)
+                }
             Database.connect(dataSource)
         }
     }
@@ -139,29 +147,32 @@ object DatabaseManager {
      * Fallback: Connect to company database assuming default country (VE).
      * Use the two-parameter overload [connectToCompanyDb] when the country is known.
      */
-    fun connectToCompanyDb(companyDbName: String): Database {
-        return connectToCompanyDb("VE", companyDbName)
-    }
+    fun connectToCompanyDb(companyDbName: String): Database = connectToCompanyDb("VE", companyDbName)
 
     /**
      * Conecta a la base de datos administrativa de una empresa específica (Nivel 2).
      */
-    fun connectToCompanyDb(countryCode: String, companyDbName: String): Database {
+    fun connectToCompanyDb(
+        countryCode: String,
+        companyDbName: String,
+    ): Database {
         val upperCode = countryCode.uppercase()
         val cacheKey = "$upperCode:$companyDbName"
 
-        val config = countryConfigs[upperCode]
-            ?: throw IllegalArgumentException("País no soportado: $countryCode")
+        val config =
+            countryConfigs[upperCode]
+                ?: throw IllegalArgumentException("País no soportado: $countryCode")
 
         return synchronized(companyDataSources) {
-            val dataSource = companyDataSources.getOrPut(cacheKey) {
-                logger.info("Creando pool de conexión para COMPANY DB $companyDbName en $upperCode")
-                createDataSource(
-                    config.buildCompanyJdbcUrl(companyDbName),
-                    config.user,
-                    config.password
-                )
-            }
+            val dataSource =
+                companyDataSources.getOrPut(cacheKey) {
+                    logger.info("Creando pool de conexión para COMPANY DB $companyDbName en $upperCode")
+                    createDataSource(
+                        config.buildCompanyJdbcUrl(companyDbName),
+                        config.user,
+                        config.password,
+                    )
+                }
             Database.connect(dataSource)
         }
     }
@@ -169,36 +180,41 @@ object DatabaseManager {
     /**
      * Crea un DataSource HikariCP configurado.
      */
-    private fun createDataSource(jdbcUrl: String, username: String, password: String): HikariDataSource {
-        val hikariConfig = HikariConfig().apply {
-            this.jdbcUrl = jdbcUrl
-            this.username = username
-            this.password = password
-            driverClassName = "com.mysql.cj.jdbc.Driver"
-            maximumPoolSize = 10
-            minimumIdle = 2
-            idleTimeout = 300000  // 5 minutos
-            connectionTimeout = 20000  // 20 segundos
-            maxLifetime = 1200000  // 20 minutos
-            isAutoCommit = false
-            transactionIsolation = "TRANSACTION_READ_COMMITTED"
-            addDataSourceProperty("cachePrepStmts", "true")
-            addDataSourceProperty("prepStmtCacheSize", "250")
-            addDataSourceProperty("prepStmtCacheSqlLimit", "2048")
-            // Propiedades MySQL para estabilidad
-            addDataSourceProperty("useServerPrepStmts", "true")
-            addDataSourceProperty("useLocalSessionState", "true")
-            addDataSourceProperty("rewriteBatchedStatements", "true")
-            addDataSourceProperty("cacheResultSetMetadata", "true")
-            addDataSourceProperty("cacheServerConfiguration", "true")
-            addDataSourceProperty("elideSetAutoCommits", "true")
-            addDataSourceProperty("maintainTimeStats", "false")
-            
-            validate()
-        }
+    private fun createDataSource(
+        jdbcUrl: String,
+        username: String,
+        password: String,
+    ): HikariDataSource {
+        val hikariConfig =
+            HikariConfig().apply {
+                this.jdbcUrl = jdbcUrl
+                this.username = username
+                this.password = password
+                driverClassName = "com.mysql.cj.jdbc.Driver"
+                maximumPoolSize = 10
+                minimumIdle = 2
+                idleTimeout = 300000 // 5 minutos
+                connectionTimeout = 20000 // 20 segundos
+                maxLifetime = 1200000 // 20 minutos
+                isAutoCommit = false
+                transactionIsolation = "TRANSACTION_READ_COMMITTED"
+                addDataSourceProperty("cachePrepStmts", "true")
+                addDataSourceProperty("prepStmtCacheSize", "250")
+                addDataSourceProperty("prepStmtCacheSqlLimit", "2048")
+                // Propiedades MySQL para estabilidad
+                addDataSourceProperty("useServerPrepStmts", "true")
+                addDataSourceProperty("useLocalSessionState", "true")
+                addDataSourceProperty("rewriteBatchedStatements", "true")
+                addDataSourceProperty("cacheResultSetMetadata", "true")
+                addDataSourceProperty("cacheServerConfiguration", "true")
+                addDataSourceProperty("elideSetAutoCommits", "true")
+                addDataSourceProperty("maintainTimeStats", "false")
+
+                validate()
+            }
         return HikariDataSource(hikariConfig)
     }
-    
+
     // Master DB property that throws if accessed before init
     val masterDb: Database
         get() = throw UnsupportedOperationException("masterDb global is deprecated. Use getConfigDatabase(countryCode)")

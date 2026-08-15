@@ -7,60 +7,64 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 
 class FormasPagoRepository {
-
     suspend fun listFormasPago(
         database: Database,
         cajaId: String?,
-        tipoRegistro: List<Int>
-    ): List<FormaPagoItem> = dbQuery(database) {
-        if (cajaId.isNullOrBlank()) {
-            val query = CajaFormaPagoTable
-                .selectAll()
-                .where {
-                    (CajaFormaPagoTable.pos eq 1) and
-                        (CajaFormaPagoTable.activo eq 1)
+        tipoRegistro: List<Int>,
+    ): List<FormaPagoItem> =
+        dbQuery(database) {
+            if (cajaId.isNullOrBlank()) {
+                val query =
+                    CajaFormaPagoTable
+                        .selectAll()
+                        .where {
+                            (CajaFormaPagoTable.pos eq 1) and
+                                (CajaFormaPagoTable.activo eq 1)
+                        }
+
+                if (tipoRegistro.isNotEmpty()) {
+                    query.andWhere { CajaFormaPagoTable.idCajaTpRegistro inList tipoRegistro }
                 }
 
-            if (tipoRegistro.isNotEmpty()) {
-                query.andWhere { CajaFormaPagoTable.idCajaTpRegistro inList tipoRegistro }
-            }
-
-            query.orderBy(
-                CajaFormaPagoTable.orden to SortOrder.ASC,
-                CajaFormaPagoTable.codigo to SortOrder.ASC
-            )
-
-            query.map { row -> mapRow(row, null) }
-        } else {
-            val query = CajaFormaTable
-                .leftJoin(
-                    otherTable = CajaFormaPagoTable,
-                    onColumn = { idFormaPago },
-                    otherColumn = { CajaFormaPagoTable.idFormaPago }
+                query.orderBy(
+                    CajaFormaPagoTable.orden to SortOrder.ASC,
+                    CajaFormaPagoTable.codigo to SortOrder.ASC,
                 )
-                .selectAll()
-                .where {
-                    (CajaFormaTable.idCaja eq cajaId) and
-                        (CajaFormaTable.activo eq 1) and
-                        (CajaFormaPagoTable.pos eq 1) and
-                        (CajaFormaPagoTable.activo eq 1)
+
+                query.map { row -> mapRow(row, null) }
+            } else {
+                val query =
+                    CajaFormaTable
+                        .leftJoin(
+                            otherTable = CajaFormaPagoTable,
+                            onColumn = { idFormaPago },
+                            otherColumn = { CajaFormaPagoTable.idFormaPago },
+                        ).selectAll()
+                        .where {
+                            (CajaFormaTable.idCaja eq cajaId) and
+                                (CajaFormaTable.activo eq 1) and
+                                (CajaFormaPagoTable.pos eq 1) and
+                                (CajaFormaPagoTable.activo eq 1)
+                        }
+
+                if (tipoRegistro.isNotEmpty()) {
+                    query.andWhere { CajaFormaPagoTable.idCajaTpRegistro inList tipoRegistro }
                 }
 
-            if (tipoRegistro.isNotEmpty()) {
-                query.andWhere { CajaFormaPagoTable.idCajaTpRegistro inList tipoRegistro }
+                query.orderBy(
+                    CajaFormaPagoTable.orden to SortOrder.ASC,
+                    CajaFormaPagoTable.codigo to SortOrder.ASC,
+                )
+
+                query.map { row -> mapRow(row, row[CajaFormaTable.idCaja]) }
             }
-
-            query.orderBy(
-                CajaFormaPagoTable.orden to SortOrder.ASC,
-                CajaFormaPagoTable.codigo to SortOrder.ASC
-            )
-
-            query.map { row -> mapRow(row, row[CajaFormaTable.idCaja]) }
         }
-    }
 
-    private fun mapRow(row: ResultRow, idCaja: String?): FormaPagoItem {
-        return FormaPagoItem(
+    private fun mapRow(
+        row: ResultRow,
+        idCaja: String?,
+    ): FormaPagoItem =
+        FormaPagoItem(
             idFormaPago = row[CajaFormaPagoTable.idFormaPago],
             siglas = row[CajaFormaPagoTable.siglas],
             codigo = row[CajaFormaPagoTable.codigo]?.toString(),
@@ -77,7 +81,6 @@ class FormasPagoRepository {
             idBancoCuenta = row[CajaFormaPagoTable.idBancoCuenta].takeIf { it > 0 },
             idBancoOperacion = row[CajaFormaPagoTable.idBancoOperacion].takeIf { it > 0 },
             tipoMoneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda).orEmpty(),
-            idCaja = idCaja
+            idCaja = idCaja,
         )
-    }
 }

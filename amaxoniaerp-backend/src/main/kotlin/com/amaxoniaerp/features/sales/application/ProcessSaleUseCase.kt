@@ -16,21 +16,27 @@ class ProcessSaleUseCase(
 ) {
     private val logger = LoggerFactory.getLogger(ProcessSaleUseCase::class.java)
 
-    suspend fun execute(database: Database, countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
+    suspend fun execute(
+        database: Database,
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ): ProcessSaleResponse {
         if (request.items.isEmpty()) {
             throw InvalidSaleRequestException("La factura debe contener al menos un item")
         }
 
         // Paso 1: Procesar la venta (transaccional, igual que antes)
-        val saleResult = dbQuery(database) {
-            repository.process(countryCode, request)
-        }
+        val saleResult =
+            dbQuery(database) {
+                repository.process(countryCode, request)
+            }
 
         // Paso 2: Facturación Electrónica (post-transaccional, solo si la venta fue exitosa)
         // Solo aplica si la factura fue procesada (cod_estatus == 2) y no es cobro de crédito previo.
-        val shouldProcessFE = saleResult.success
-            && saleResult.codEstatus == 2
-            && !request.esCobroCreditoPrevio
+        val shouldProcessFE =
+            saleResult.success &&
+                saleResult.codEstatus == 2 &&
+                !request.esCobroCreditoPrevio
 
         // FASE 1.1 — Selección explícita del mecanismo fiscal para Venezuela.
         //
@@ -56,7 +62,7 @@ class ProcessSaleUseCase(
             "[FE] Evaluando FE: success=${saleResult.success} codEstatus=${saleResult.codEstatus} " +
                 "esCobroCreditoPrevio=${request.esCobroCreditoPrevio} countryCode=$countryCode " +
                 "useHka20=${request.useHka20} shouldProcessFE=$shouldProcessFE " +
-                "hka20Selected=$isHka20Selected"
+                "hka20Selected=$isHka20Selected",
         )
 
         if (shouldProcessFE && isHka20Selected) {
@@ -155,8 +161,9 @@ class ProcessSaleUseCase(
                             feResult.transaccionId,
                         )
                         return saleResult.copy(
-                            feError = "FE INCIERTA [${feResult.codigo}] ${feResult.mensaje}" +
-                                (feResult.transaccionId?.let { " transaccionId=$it" } ?: ""),
+                            feError =
+                                "FE INCIERTA [${feResult.codigo}] ${feResult.mensaje}" +
+                                    (feResult.transaccionId?.let { " transaccionId=$it" } ?: ""),
                         )
                     }
                 }

@@ -19,7 +19,9 @@ import kotlinx.serialization.Serializable
  * Una sesión cerrable (`tieneOperaciones == false`) requiere que todos sus pedidos estén en
  * `ENTREGADA` o `CANCELADA`. Cualquier otro estado impide cerrar/cancelar.
  */
-enum class EstadoPedidoMesa(val codigo: String) {
+enum class EstadoPedidoMesa(
+    val codigo: String,
+) {
     PENDIENTE("PENDIENTE"),
     ENVIADA("ENVIADA"),
     EN_PREPARACION("EN_PREPARACION"),
@@ -32,8 +34,7 @@ enum class EstadoPedidoMesa(val codigo: String) {
         get() = this == ENTREGADA || this == CANCELADA
 
     companion object {
-        fun fromCodigo(codigo: String): EstadoPedidoMesa? =
-            entries.firstOrNull { it.codigo == codigo }
+        fun fromCodigo(codigo: String): EstadoPedidoMesa? = entries.firstOrNull { it.codigo == codigo }
     }
 }
 
@@ -177,9 +178,13 @@ sealed interface PedidoMesaResult {
         val pedidos: List<PedidoMesaResponse>,
     ) : PedidoMesaResult
 
-    data class EstadoActualizado(val pedido: PedidoMesaResponse) : PedidoMesaResult
+    data class EstadoActualizado(
+        val pedido: PedidoMesaResponse,
+    ) : PedidoMesaResult
 
-    data class Listado(val pedidos: List<PedidoMesaResponse>) : PedidoMesaResult
+    data class Listado(
+        val pedidos: List<PedidoMesaResponse>,
+    ) : PedidoMesaResult
 
     data object SesionNoActiva : PedidoMesaResult
 

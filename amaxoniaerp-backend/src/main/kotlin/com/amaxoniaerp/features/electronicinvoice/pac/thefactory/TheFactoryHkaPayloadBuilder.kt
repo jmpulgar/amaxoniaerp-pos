@@ -22,7 +22,6 @@ import java.time.format.DateTimeFormatter
  * - Manejo de ISC y OTI
  */
 class TheFactoryHkaPayloadBuilder {
-
     companion object {
         private val PHONE_PATTERN = Regex("^\\d{4}-\\d{4}$")
         private val EMAIL_PATTERN = Regex("^[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$")
@@ -41,8 +40,7 @@ class TheFactoryHkaPayloadBuilder {
     /**
      * Construye el payload completo a partir del contexto de la factura.
      */
-    fun build(context: InvoiceFEContext): TheFactoryHkaDocumentoWrapper =
-        build(context, null)
+    fun build(context: InvoiceFEContext): TheFactoryHkaDocumentoWrapper = build(context, null)
 
     /**
      * Variante interna para documentos que referencian otro documento fiscal.
@@ -52,16 +50,16 @@ class TheFactoryHkaPayloadBuilder {
     internal fun build(
         context: InvoiceFEContext,
         documentosFiscalesReferenciados: List<TheFactoryHkaDocFiscalRef>?,
-    ): TheFactoryHkaDocumentoWrapper {
-        return TheFactoryHkaDocumentoWrapper(
-            documento = TheFactoryHkaDocumento(
-                codigoSucursalEmisor = context.codigoSucursalEmisor,
-                datosTransaccion = buildDatosTransaccion(context, documentosFiscalesReferenciados),
-                listaItems = buildItems(context.detalles, normalizeTipoClienteFE(context.cliente.tipoClienteFE)),
-                totalesSubTotales = buildTotales(context),
-            )
+    ): TheFactoryHkaDocumentoWrapper =
+        TheFactoryHkaDocumentoWrapper(
+            documento =
+                TheFactoryHkaDocumento(
+                    codigoSucursalEmisor = context.codigoSucursalEmisor,
+                    datosTransaccion = buildDatosTransaccion(context, documentosFiscalesReferenciados),
+                    listaItems = buildItems(context.detalles, normalizeTipoClienteFE(context.cliente.tipoClienteFE)),
+                    totalesSubTotales = buildTotales(context),
+                ),
         )
-    }
 
     // ─── Datos de Transacción ────────────────────────────────────────────────
 
@@ -119,34 +117,38 @@ class TheFactoryHkaPayloadBuilder {
 
         val esExtranjero = tipoClienteFE == "04"
 
-        val tipoContribuyente = when {
-            esExtranjero -> null
-            tipoClienteFE == "02" && cliente.tipoContribuyente in setOf("", "0", "2") -> "1"
-            tipoClienteFE == "02" -> "1"
-            else -> cliente.tipoContribuyente
-        }
+        val tipoContribuyente =
+            when {
+                esExtranjero -> null
+                tipoClienteFE == "02" && cliente.tipoContribuyente in setOf("", "0", "2") -> "1"
+                tipoClienteFE == "02" -> "1"
+                else -> cliente.tipoContribuyente
+            }
 
         // RUC: si es extranjero, vaciar. Si tiene menos de 5 chars, enviar "00000"
-        val ruc = when {
-            esExtranjero -> null
-            cliente.identificacion.length < 5 -> DEFAULT_RUC
-            else -> cliente.identificacion
-        }
+        val ruc =
+            when {
+                esExtranjero -> null
+                cliente.identificacion.length < 5 -> DEFAULT_RUC
+                else -> cliente.identificacion
+            }
 
         val dv = if (esExtranjero) null else cliente.dv
 
         // Teléfono: validar formato "9999-9999"
-        val telefono = cliente.telefono?.let {
-            if (it.matches(PHONE_PATTERN)) it else DEFAULT_PHONE
-        } ?: DEFAULT_PHONE
+        val telefono =
+            cliente.telefono?.let {
+                if (it.matches(PHONE_PATTERN)) it else DEFAULT_PHONE
+            } ?: DEFAULT_PHONE
 
         val correoBase = cliente.correo?.takeIf { it.isNotBlank() } ?: DEFAULT_EMAIL
-        val correo = if (ctx.factura.tipoFactura == "factura_pos") {
-            null
-        } else {
-            val validated = if (correoBase.matches(EMAIL_PATTERN)) correoBase else DEFAULT_EMAIL
-            validated.padStart(7, '0')
-        }
+        val correo =
+            if (ctx.factura.tipoFactura == "factura_pos") {
+                null
+            } else {
+                val validated = if (correoBase.matches(EMAIL_PATTERN)) correoBase else DEFAULT_EMAIL
+                validated.padStart(7, '0')
+            }
         val direccion = (cliente.direccion?.takeIf { it.isNotBlank() } ?: " ").padStart(4, '-')
 
         return TheFactoryHkaCliente(
@@ -168,16 +170,20 @@ class TheFactoryHkaPayloadBuilder {
 
     // ─── Items ───────────────────────────────────────────────────────────────
 
-    private fun buildItems(detalles: List<FEDetalleData>, tipoClienteFE: String): List<TheFactoryHkaItem> {
+    private fun buildItems(
+        detalles: List<FEDetalleData>,
+        tipoClienteFE: String,
+    ): List<TheFactoryHkaItem> {
         val esGobierno = tipoClienteFE == "03"
 
         return detalles.map { det ->
             // Descripción: rellenar con puntos si tiene menos de 5 caracteres
-            val descripcion = if (det.descripcion.length < MIN_DESCRIPTION_LENGTH) {
-                det.descripcion.padEnd(MIN_DESCRIPTION_LENGTH, '.')
-            } else {
-                det.descripcion
-            }
+            val descripcion =
+                if (det.descripcion.length < MIN_DESCRIPTION_LENGTH) {
+                    det.descripcion.padEnd(MIN_DESCRIPTION_LENGTH, '.')
+                } else {
+                    det.descripcion
+                }
             val codigoCPBS = if (esGobierno) det.codigoCPBS?.takeIf { it.isNotBlank() } else DEFAULT_CPBS
             val codigoCPBSAbrev = if (esGobierno) det.codigoCPBSAbrev?.takeIf { it.isNotBlank() } else DEFAULT_CPBS_ABREV
 
@@ -185,32 +191,35 @@ class TheFactoryHkaPayloadBuilder {
             val tasaITBMS = mapTasaITBMS(det.piva)
 
             // Descuento por unidad: montoDescuento / cantidad (4 decimales)
-            val precioUnitarioDescuento = if (det.cantidad > 0 && det.montoDescuento > 0) {
-                (det.montoDescuento / det.cantidad).formatDecimals(4)
-            } else {
-                null
-            }
+            val precioUnitarioDescuento =
+                if (det.cantidad > 0 && det.montoDescuento > 0) {
+                    (det.montoDescuento / det.cantidad).formatDecimals(4)
+                } else {
+                    null
+                }
 
             // Valor ITBMS: diferencia entre totalConIva y totalSinIva
-            val valorITBMS = (det.totalConIva - det.totalSinIva)
-                .coerceAtLeast(0.0)
-                .formatDecimals(2)
+            val valorITBMS =
+                (det.totalConIva - det.totalSinIva)
+                    .coerceAtLeast(0.0)
+                    .formatDecimals(2)
 
             // ISC
             val tasaISC = det.porcentajeIsc?.takeIf { it > 0 }?.formatDecimals(2)
             val valorISC = det.importeIsc?.takeIf { it > 0 }?.formatDecimals(2)
 
             // OTI
-            val listaOTI = if (det.idOti != null && det.idOti > 0 && det.importeOti != null && det.importeOti > 0) {
-                listOf(
-                    TheFactoryHkaItemOTI(
-                        tasaOTI = det.idOti.toString(),
-                        valorTasa = det.importeOti.formatDecimals(2),
+            val listaOTI =
+                if (det.idOti != null && det.idOti > 0 && det.importeOti != null && det.importeOti > 0) {
+                    listOf(
+                        TheFactoryHkaItemOTI(
+                            tasaOTI = det.idOti.toString(),
+                            valorTasa = det.importeOti.formatDecimals(2),
+                        ),
                     )
-                )
-            } else {
-                null
-            }
+                } else {
+                    null
+                }
 
             TheFactoryHkaItem(
                 descripcion = descripcion,
@@ -242,16 +251,17 @@ class TheFactoryHkaPayloadBuilder {
         val formasPago = buildFormasPago(ctx.formasPago, ctx.vuelto)
 
         // Bonificaciones globales
-        val bonificaciones = if (factura.totalizarDescuentoGlobal > 0) {
-            listOf(
-                TheFactoryHkaDescBonificacion(
-                    descDescuento = "Descuento Global",
-                    montoDescuento = factura.totalizarDescuentoGlobal.formatDecimals(2),
+        val bonificaciones =
+            if (factura.totalizarDescuentoGlobal > 0) {
+                listOf(
+                    TheFactoryHkaDescBonificacion(
+                        descDescuento = "Descuento Global",
+                        montoDescuento = factura.totalizarDescuentoGlobal.formatDecimals(2),
+                    ),
                 )
-            )
-        } else {
-            null
-        }
+            } else {
+                null
+            }
 
         // Sumarizar OTI globales
         val totalOTI = buildTotalOTI(ctx.detalles)
@@ -264,19 +274,21 @@ class TheFactoryHkaPayloadBuilder {
         val totalMontoGravado = factura.ivaTotalFactura + totalISC + totalOTISum
 
         // tiempoPago: "1" contado, "2" crédito, "3" gobierno
-        val tiempoPago = when {
-            ctx.factura.tipoVenta == "2" -> "2"  // Crédito
-            else -> "1"  // Contado
-        }
+        val tiempoPago =
+            when {
+                ctx.factura.tipoVenta == "2" -> "2" // Crédito
+                else -> "1" // Contado
+            }
 
         return TheFactoryHkaTotalesSubTotales(
             totalPrecioNeto = factura.montoItemsFactura.formatDecimals(2),
             totalITBMS = factura.ivaTotalFactura.formatDecimals(2),
             totalISC = if (totalISC > 0) totalISC.formatDecimals(2) else null,
             totalMontoGravado = totalMontoGravado.formatDecimals(2),
-            totalDescuento = factura.totalizarDescuentoGlobal.let {
-                if (it > 0) it.formatDecimals(2) else "0.00"
-            },
+            totalDescuento =
+                factura.totalizarDescuentoGlobal.let {
+                    if (it > 0) it.formatDecimals(2) else "0.00"
+                },
             totalFactura = factura.totalTotalFactura.formatDecimals(2),
             totalValorRecibido = ((ctx.montoCancelar ?: factura.totalTotalFactura) + (ctx.vuelto ?: 0.0)).formatDecimals(2),
             vuelto = ctx.vuelto?.formatDecimals(2),
@@ -290,23 +302,26 @@ class TheFactoryHkaPayloadBuilder {
         )
     }
 
-    private fun buildRetencion(retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?): TheFactoryHkaRetencion? {
-        return retencion?.let {
+    private fun buildRetencion(retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?): TheFactoryHkaRetencion? =
+        retencion?.let {
             TheFactoryHkaRetencion(
                 codigoRetencion = it.codigoRetencion,
                 montoRetencion = it.montoRetencion.formatDecimals(2),
             )
         }
-    }
 
-    private fun buildFormasPago(formasPago: List<FEFormaPagoData>, vuelto: Double?): List<TheFactoryHkaFormaPago> {
+    private fun buildFormasPago(
+        formasPago: List<FEFormaPagoData>,
+        vuelto: Double?,
+    ): List<TheFactoryHkaFormaPago> {
         val cambio = vuelto?.takeIf { it > 0 } ?: 0.0
-        val formasPagoFiltradas = formasPago
-            .filter { fp ->
-                // Ignorar siglas específicas
-                val siglas = fp.siglas?.uppercase()?.trim() ?: ""
-                siglas !in IGNORED_PAYMENT_SIGLAS
-            }
+        val formasPagoFiltradas =
+            formasPago
+                .filter { fp ->
+                    // Ignorar siglas específicas
+                    val siglas = fp.siglas?.uppercase()?.trim() ?: ""
+                    siglas !in IGNORED_PAYMENT_SIGLAS
+                }
 
         val cashIndex = if (cambio > 0) formasPagoFiltradas.indexOfFirst { it.isCashPayment() } else -1
 
@@ -316,24 +331,24 @@ class TheFactoryHkaPayloadBuilder {
                 val formaPagoFact = fp.formaPagoFact?.takeIf { it.isNotBlank() } ?: "99"
 
                 // Descripción: si es menor a 10 caracteres, concatenar consigo misma
-                val descripcion = fp.descripcion.let {
-                    if (it.length < MIN_FORMA_PAGO_DESC_LENGTH) "$it $it" else it
-                }
+                val descripcion =
+                    fp.descripcion.let {
+                        if (it.length < MIN_FORMA_PAGO_DESC_LENGTH) "$it $it" else it
+                    }
 
                 TheFactoryHkaFormaPago(
                     formaPagoFact = formaPagoFact,
                     descFormaPago = descripcion.takeIf { formaPagoFact == "99" },
                     valorCuotaPagada = (fp.monto + if (index == cashIndex) cambio else 0.0).formatDecimals(2),
                 )
-            }
-            .ifEmpty {
+            }.ifEmpty {
                 // Fallback: al menos una forma de pago debe existir
                 listOf(
                     TheFactoryHkaFormaPago(
                         formaPagoFact = "99",
                         descFormaPago = "Otro medio de pago",
                         valorCuotaPagada = "0.00",
-                    )
+                    ),
                 )
             }
     }
@@ -351,12 +366,15 @@ class TheFactoryHkaPayloadBuilder {
             }
         }
 
-        return if (otiMap.isEmpty()) null
-        else otiMap.map { (codigo, valor) ->
-            TheFactoryHkaTotalOTI(
-                codigoTotalOTI = codigo.toString(),
-                valorTotalOTI = valor.formatDecimals(2),
-            )
+        return if (otiMap.isEmpty()) {
+            null
+        } else {
+            otiMap.map { (codigo, valor) ->
+                TheFactoryHkaTotalOTI(
+                    codigoTotalOTI = codigo.toString(),
+                    valorTotalOTI = valor.formatDecimals(2),
+                )
+            }
         }
     }
 
@@ -366,15 +384,19 @@ class TheFactoryHkaPayloadBuilder {
      * Mapea el porcentaje de IVA/ITBMS al código del catálogo The Factory.
      * 7% → "01", 10% → "02", 15% → "03", otro → "00" (exento).
      */
-    private fun mapTasaITBMS(piva: Double): String = when {
-        piva == 7.0 || isApprox(piva, 7.0) -> "01"
-        piva == 10.0 || isApprox(piva, 10.0) -> "02"
-        piva == 15.0 || isApprox(piva, 15.0) -> "03"
-        else -> "00"
-    }
+    private fun mapTasaITBMS(piva: Double): String =
+        when {
+            piva == 7.0 || isApprox(piva, 7.0) -> "01"
+            piva == 10.0 || isApprox(piva, 10.0) -> "02"
+            piva == 15.0 || isApprox(piva, 15.0) -> "03"
+            else -> "00"
+        }
 
-    private fun isApprox(a: Double, b: Double, epsilon: Double = 0.01): Boolean =
-        kotlin.math.abs(a - b) < epsilon
+    private fun isApprox(
+        a: Double,
+        b: Double,
+        epsilon: Double = 0.01,
+    ): Boolean = kotlin.math.abs(a - b) < epsilon
 
     private fun normalizeTipoClienteFE(value: String): String {
         val trimmed = value.trim()
@@ -409,7 +431,8 @@ class TheFactoryHkaPayloadBuilder {
      * Extensión para formatear Double a String con N decimales exactos.
      */
     private fun Double.formatDecimals(scale: Int): String =
-        BigDecimal.valueOf(this)
+        BigDecimal
+            .valueOf(this)
             .setScale(scale, RoundingMode.HALF_UP)
             .toPlainString()
 }

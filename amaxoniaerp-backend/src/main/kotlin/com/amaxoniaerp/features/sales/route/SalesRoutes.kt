@@ -25,31 +25,34 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
     authenticate {
         route("/api/pos/ventas") {
             post("/procesar") {
-                val principal = call.principal<JWTPrincipal>()
-                    ?: return@post call.respond(
-                        HttpStatusCode.Unauthorized,
-                        mapOf("error" to "Token inválido")
-                    )
+                val principal =
+                    call.principal<JWTPrincipal>()
+                        ?: return@post call.respond(
+                            HttpStatusCode.Unauthorized,
+                            mapOf("error" to "Token inválido"),
+                        )
 
                 val tokenType = principal.payload.getClaim("token_type").asString()
                 if (tokenType != "company") {
                     return@post call.respond(
                         HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa")
+                        mapOf("error" to "Se requiere token de empresa"),
                     )
                 }
 
-                val countryCode = principal.getCountryCode()
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Falta country_code en token")
-                    )
+                val countryCode =
+                    principal.getCountryCode()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Falta country_code en token"),
+                        )
 
-                val adminDb = principal.getAdminDb()
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Falta admin_db en token")
-                    )
+                val adminDb =
+                    principal.getAdminDb()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Falta admin_db en token"),
+                        )
 
                 val request = call.receive<ProcessSaleRequest>()
                 log.info(
@@ -60,7 +63,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                     request.factura.idCliente,
                     request.items.size,
                     request.pagos.size,
-                    request.factura.totalTotalFactura
+                    request.factura.totalTotalFactura,
                 )
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
 
@@ -71,7 +74,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                         countryCode,
                         result.idFactura,
                         result.codFactura,
-                        result.codEstatus
+                        result.codEstatus,
                     )
                     call.respond(HttpStatusCode.Created, result)
                 } catch (e: DuplicateInvoiceException) {
@@ -85,7 +88,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                         "Error processing POS sale. idCaja={} idCliente={}",
                         request.factura.idCaja,
                         request.factura.idCliente,
-                        e
+                        e,
                     )
                     call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Error interno al procesar venta"))
                 }

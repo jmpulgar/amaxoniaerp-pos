@@ -12,7 +12,6 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
-
 import io.ktor.http.contentType
 import io.ktor.serialization.JsonConvertException
 import kotlinx.serialization.json.Json
@@ -40,20 +39,20 @@ class VenezuelaHkaRestClient(
     private val httpClient: HttpClient,
     private val json: Json = feJsonVE,
 ) : VenezuelaHkaClient {
-
     private val log = org.slf4j.LoggerFactory.getLogger(VenezuelaHkaRestClient::class.java)
 
-    override suspend fun authenticate(
-        credentials: PacCredentials,
-    ): VenezuelaHkaResponse<VenezuelaHkaAuthResponse> {
+    override suspend fun authenticate(credentials: PacCredentials): VenezuelaHkaResponse<VenezuelaHkaAuthResponse> {
         val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
         log.info("[VE-HKA] Autenticacion usuario={} host={}", credentials.usuario.take(8), hostOf(url))
-        val raw = postRaw(url, token = null) {
-            setBody(VenezuelaHkaAuthRequest(
-                usuario = credentials.usuario,
-                clave = credentials.clave,
-            ))
-        }
+        val raw =
+            postRaw(url, token = null) {
+                setBody(
+                    VenezuelaHkaAuthRequest(
+                        usuario = credentials.usuario,
+                        clave = credentials.clave,
+                    ),
+                )
+            }
         val parsed: VenezuelaHkaAuthResponse? = decodeBody(raw.bodyIfOk)
         // La autenticación no trae codigo de negocio; éxito = HTTP 200 + token.
         val codigo = parsed?.let { "200" } ?: raw.codigo
@@ -100,7 +99,10 @@ class VenezuelaHkaRestClient(
 
     // ─── Interno ─────────────────────────────────────────────────────────────
 
-    private class RawCall(val status: Int, val text: String) {
+    private class RawCall(
+        val status: Int,
+        val text: String,
+    ) {
         val httpOk: Boolean get() = status in 200..299
         val codigo: String get() = if (httpOk) "200" else "HTTP_$status"
         val bodyIfOk: String get() = if (httpOk) text else ""
@@ -110,13 +112,14 @@ class VenezuelaHkaRestClient(
         url: String,
         token: PacAuthToken?,
         crossinline configure: io.ktor.client.request.HttpRequestBuilder.() -> Unit,
-    ): RawCall {
-        return try {
-            val response: HttpResponse = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                if (token != null) header(HttpHeaders.Authorization, "Bearer ${token.token}")
-                configure()
-            }
+    ): RawCall =
+        try {
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    if (token != null) header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                    configure()
+                }
             val status = response.status.value
             val text = response.bodyAsText()
             RawCall(status, text)
@@ -141,13 +144,16 @@ class VenezuelaHkaRestClient(
                 e,
             )
         }
-    }
 
     private inline fun <reified T> decodeBody(body: String): T? {
         if (body.isBlank()) return null
-        return try { json.decodeFromString<T>(body) }
-        catch (_: JsonConvertException) { null }
-        catch (_: Exception) { null }
+        return try {
+            json.decodeFromString<T>(body)
+        } catch (_: JsonConvertException) {
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
@@ -161,21 +167,24 @@ class VenezuelaHkaRestClient(
      * no exitosa (lo que según el contexto derivará en Failure o Uncertain).
      */
     private fun <T : Any> RawCall.build(parsed: T?): VenezuelaHkaResponse<T> {
-        val codigo: String = when (parsed) {
-            is VenezuelaHkaUltimoDocumentoResponse -> parsed.codigo ?: this.codigo
-            is VenezuelaHkaEmisionResponse -> parsed.codigo ?: this.codigo
-            else -> if (httpOk) "INVALID_JSON" else this.codigo
-        }
-        val mensaje: String = when (parsed) {
-            is VenezuelaHkaUltimoDocumentoResponse -> parsed.mensaje.orEmpty()
-            is VenezuelaHkaEmisionResponse -> parsed.mensaje.orEmpty()
-            else -> if (!httpOk) "HTTP $status desde PAC VE" else "Respuesta no decodificable del PAC VE"
-        }
-        val validaciones: List<String> = when (parsed) {
-            is VenezuelaHkaUltimoDocumentoResponse -> parsed.validaciones
-            is VenezuelaHkaEmisionResponse -> parsed.validaciones
-            else -> emptyList()
-        }
+        val codigo: String =
+            when (parsed) {
+                is VenezuelaHkaUltimoDocumentoResponse -> parsed.codigo ?: this.codigo
+                is VenezuelaHkaEmisionResponse -> parsed.codigo ?: this.codigo
+                else -> if (httpOk) "INVALID_JSON" else this.codigo
+            }
+        val mensaje: String =
+            when (parsed) {
+                is VenezuelaHkaUltimoDocumentoResponse -> parsed.mensaje.orEmpty()
+                is VenezuelaHkaEmisionResponse -> parsed.mensaje.orEmpty()
+                else -> if (!httpOk) "HTTP $status desde PAC VE" else "Respuesta no decodificable del PAC VE"
+            }
+        val validaciones: List<String> =
+            when (parsed) {
+                is VenezuelaHkaUltimoDocumentoResponse -> parsed.validaciones
+                is VenezuelaHkaEmisionResponse -> parsed.validaciones
+                else -> emptyList()
+            }
         return VenezuelaHkaResponse(
             httpStatus = status,
             rawBody = text,
@@ -186,6 +195,5 @@ class VenezuelaHkaRestClient(
         )
     }
 
-    private fun hostOf(url: String): String =
-        runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
+    private fun hostOf(url: String): String = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
 }

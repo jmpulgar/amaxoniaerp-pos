@@ -82,7 +82,8 @@ class PedidoMesaRepositoryTest {
     // ---------- Crear ----------
 
     @Test
-    fun `crear pendiente inserta lineas PENDIENTE y comanda_secuencia null`()   = runBlocking {
+    fun `crear pendiente inserta lineas PENDIENTE y comanda_secuencia null`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val request = crearRequest(enviarInmediato = false, items = listOf(item(produtoId = 501, cantidad = 2.0)))
 
@@ -100,7 +101,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `crear enviar_inmediato marca ENVIADA y asigna comanda_secuencia 1`()   = runBlocking {
+    fun `crear enviar_inmediato marca ENVIADA y asigna comanda_secuencia 1`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val request = crearRequest(enviarInmediato = true, items = listOf(item(produtoId = 501, cantidad = 1.0)))
 
@@ -116,7 +118,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `crear sin items devuelve SinItemsParaCrear`()   = runBlocking {
+    fun `crear sin items devuelve SinItemsParaCrear`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val result =
                 pedidoRepository.crear(
@@ -129,7 +132,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `crear en mesa equivocada devuelve SesionNoPerteneceMesa`()   = runBlocking {
+    fun `crear en mesa equivocada devuelve SesionNoPerteneceMesa`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val result =
                 pedidoRepository.crear(
@@ -142,7 +146,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `crear en sesion cerrada devuelve SesionNoActiva`()   = runBlocking {
+    fun `crear en sesion cerrada devuelve SesionNoActiva`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             assertTrue(sesionRepository.cerrar(database, sesionId) is SesionMesaResult.Closed)
 
@@ -159,7 +164,8 @@ class PedidoMesaRepositoryTest {
     // ---------- Enviar comanda ----------
 
     @Test
-    fun `enviar pasa pendientes a ENVIADA y asigna secuencia 1`()   = runBlocking {
+    fun `enviar pasa pendientes a ENVIADA y asigna secuencia 1`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             // Tres items: dos en una llamada, uno en otra.
             pedidoRepository.crear(
@@ -179,7 +185,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `enviar segunda vez asigna secuencia 2 a las nuevas`()   = runBlocking {
+    fun `enviar segunda vez asigna secuencia 2 a las nuevas`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             // Comanda 1 enviada al crear.
             pedidoRepository.crear(
@@ -199,7 +206,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `enviar sin pendientes devuelve SinPedidosPendientes`()   = runBlocking {
+    fun `enviar sin pendientes devuelve SinPedidosPendientes`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val result = pedidoRepository.enviarComanda(database, sesionId, 1001, pedidoIds = emptyList())
             assertEquals(PedidoMesaResult.SinPedidosPendientes, result)
@@ -208,7 +216,8 @@ class PedidoMesaRepositoryTest {
     // ---------- Cambiar estado ----------
 
     @Test
-    fun `cambiar estado avanza ENVIADA a EN_PREPARACION, LISTA y ENTREGADA`()   = runBlocking {
+    fun `cambiar estado avanza ENVIADA a EN_PREPARACION, LISTA y ENTREGADA`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -227,7 +236,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cambiar estado a CANCELADA anula una linea activa`()   = runBlocking {
+    fun `cambiar estado a CANCELADA anula una linea activa`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -244,7 +254,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cambiar estado a PENDIENTE estando ENVIADA esta prohibido`()   = runBlocking {
+    fun `cambiar estado a PENDIENTE estando ENVIADA esta prohibido`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -261,7 +272,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cambiar estado de una linea final entrega devuelve EstadoInvalido`()   = runBlocking {
+    fun `cambiar estado de una linea final entrega devuelve EstadoInvalido`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -280,7 +292,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cambiar estado de pedido inexistente devuelve PedidoNoEncontrado`()   = runBlocking {
+    fun `cambiar estado de pedido inexistente devuelve PedidoNoEncontrado`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             assertEquals(
                 PedidoMesaResult.PedidoNoEncontrado,
@@ -291,7 +304,8 @@ class PedidoMesaRepositoryTest {
     // ---------- tieneOperaciones + bloqueo de cierre ----------
 
     @Test
-    fun `tieneOperaciones es false en sesion vacia y true tras crear un pedido pendiente`()   = runBlocking {
+    fun `tieneOperaciones es false en sesion vacia y true tras crear un pedido pendiente`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             transaction(database) {
                 assertFalse(pedidoRepository.tieneOperaciones(sesionId, 1001))
@@ -303,7 +317,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `tieneOperaciones es false cuando solo quedan entregadas o canceladas`()   = runBlocking {
+    fun `tieneOperaciones es false cuando solo quedan entregadas o canceladas`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -321,7 +336,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cerrar sesion con pedidos pendientes devuelve SesionConOperaciones`()   = runBlocking {
+    fun `cerrar sesion con pedidos pendientes devuelve SesionConOperaciones`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             pedidoRepository.crear(database, sesionId, 1001, crearRequest(items = listOf(item(produtoId = 501))))
 
@@ -329,7 +345,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cerrar sesion se permite cuando todos los pedidos estan entregados o cancelados`()   = runBlocking {
+    fun `cerrar sesion se permite cuando todos los pedidos estan entregados o cancelados`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             val creada =
                 pedidoRepository.crear(
@@ -345,7 +362,8 @@ class PedidoMesaRepositoryTest {
         }
 
     @Test
-    fun `cancelar sesion con operaciones tambien se bloquea`()   = runBlocking {
+    fun `cancelar sesion con operaciones tambien se bloquea`() =
+        runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
             pedidoRepository.crear(database, sesionId, 1001, crearRequest(items = listOf(item(produtoId = 501))))
 

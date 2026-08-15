@@ -1,15 +1,14 @@
 package com.amaxoniaerp.features.mesas.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.mesas.domain.CrearCuentaRequest
 import com.amaxoniaerp.features.mesas.domain.CuentaDetalleResponse
 import com.amaxoniaerp.features.mesas.domain.CuentaMesaResponse
 import com.amaxoniaerp.features.mesas.domain.CuentaMesaResult
-import com.amaxoniaerp.features.mesas.domain.CrearCuentaRequest
 import com.amaxoniaerp.features.mesas.domain.EstadoCuentaIdempotencia
 import com.amaxoniaerp.features.mesas.domain.EstadoCuentaMesa
 import com.amaxoniaerp.features.mesas.domain.EstadoPedidoMesa
 import com.amaxoniaerp.features.mesas.domain.EstadoSesionMesa
-import com.amaxoniaerp.features.mesas.domain.SesionMesaResult
 import com.amaxoniaerp.features.sales.domain.CuentaMesaVentaInput
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
@@ -80,6 +79,7 @@ class CuentaMesaRepository(
                 }.limit(1)
                 .any()
         }
+
     /** Lista todas las cuentas de la sesión (incluye PAGADA/CANCELADA para auditoría). */
     suspend fun listarCuentas(
         database: Database,
@@ -148,13 +148,16 @@ class CuentaMesaRepository(
                     val porPedido = pedidosFacturables.associateBy { it.row[PedidoMesaTable.id] }
                     val lista = mutableListOf<DetallePropuesta>()
                     request.items.groupBy { it.pedidoMesaId }.forEach { (pedidoId, solicitudes) ->
-                        val pedido = porPedido[pedidoId]
-                            ?: return@newSuspendedTransaction CuentaMesaResult.PedidoNoEncontrado
+                        val pedido =
+                            porPedido[pedidoId]
+                                ?: return@newSuspendedTransaction CuentaMesaResult.PedidoNoEncontrado
                         val cantidadSolicitada =
                             solicitudes.fold(BigDecimal.ZERO) { total, solicitud ->
                                 total +
-                                    (solicitud.cantidad?.toBigDecimal()?.stripTrailingZeros()
-                                        ?: pedido.saldoPendiente)
+                                    (
+                                        solicitud.cantidad?.toBigDecimal()?.stripTrailingZeros()
+                                            ?: pedido.saldoPendiente
+                                    )
                             }
                         if (cantidadSolicitada <= BigDecimal.ZERO || cantidadSolicitada > pedido.saldoPendiente) {
                             return@newSuspendedTransaction CuentaMesaResult.CantidadSuperaSaldo
@@ -187,7 +190,11 @@ class CuentaMesaRepository(
                     cantidad.divide(row[PedidoMesaTable.itemCantidad], 6, RoundingMode.HALF_EVEN)
                 val detalleSub = row[PedidoMesaTable.itemTotalSinIva].multiply(factorCantidad)
                 val detalleDesc = row[PedidoMesaTable.itemMontoDescuento].multiply(factorCantidad)
-                val detalleIva = row[PedidoMesaTable.itemTotalConIva].subtract(row[PedidoMesaTable.itemTotalSinIva]).multiply(factorCantidad)
+                val detalleIva =
+                    row[PedidoMesaTable.itemTotalConIva]
+                        .subtract(
+                            row[PedidoMesaTable.itemTotalSinIva],
+                        ).multiply(factorCantidad)
                 val detalleTotal = row[PedidoMesaTable.itemTotalConIva].multiply(factorCantidad)
 
                 CuentaMesaDetalleTable.insert {
@@ -239,7 +246,8 @@ class CuentaMesaRepository(
     ): CuentaMesaResult =
         newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
             val sesion = sesionActiva(sesionId, mesaId) ?: return@newSuspendedTransaction CuentaMesaResult.SesionNoPerteneceMesa
-            val cuenta = cargarCuenta(sesion.id, cuentaId, forUpdate = true)
+            val cuenta =
+                cargarCuenta(sesion.id, cuentaId, forUpdate = true)
                     ?: return@newSuspendedTransaction CuentaMesaResult.CuentaNoEncontrada
             if (cuenta.estado != EstadoCuentaMesa.ACTIVA.codigo) {
                 return@newSuspendedTransaction CuentaMesaResult.CuentaNoActiva
@@ -340,12 +348,13 @@ class CuentaMesaRepository(
                 if (nueva > pedido[PedidoMesaTable.itemCantidad]) {
                     return@newSuspendedTransaction CuentaMesaResult.CantidadSuperaSaldo
                 }
-                val updated = PedidoMesaTable.update({
-                    (PedidoMesaTable.id eq d.pedidoMesaId) and
-                        (PedidoMesaTable.cantidadFacturada eq actual)
-                }) {
-                    it[cantidadFacturada] = nueva
-                }
+                val updated =
+                    PedidoMesaTable.update({
+                        (PedidoMesaTable.id eq d.pedidoMesaId) and
+                            (PedidoMesaTable.cantidadFacturada eq actual)
+                    }) {
+                        it[cantidadFacturada] = nueva
+                    }
                 if (updated != 1) {
                     return@newSuspendedTransaction CuentaMesaResult.CantidadSuperaSaldo
                 }
@@ -539,8 +548,10 @@ class CuentaMesaRepository(
                 .where { CuentaMesaIdempotenciaTable.idempotencyKey eq idFactura }
                 .singleOrNull()
         if (idem != null &&
-            (idem[CuentaMesaIdempotenciaTable.cuentaMesaId] != context.cuentaMesaId ||
-                idem[CuentaMesaIdempotenciaTable.sesionMesaId] != context.sesionMesaId)
+            (
+                idem[CuentaMesaIdempotenciaTable.cuentaMesaId] != context.cuentaMesaId ||
+                    idem[CuentaMesaIdempotenciaTable.sesionMesaId] != context.sesionMesaId
+            )
         ) {
             throw InvalidSaleRequestException("La clave idempotente pertenece a otra cuenta de mesa")
         }
@@ -626,9 +637,15 @@ class CuentaMesaRepository(
     // Helpers internos
     // ------------------------------------------------------------------
 
-    private data class PedidoFacturable(val row: ResultRow, val saldoPendiente: BigDecimal)
+    private data class PedidoFacturable(
+        val row: ResultRow,
+        val saldoPendiente: BigDecimal,
+    )
 
-    private data class DetallePropuesta(val pedido: ResultRow, val cantidad: BigDecimal)
+    private data class DetallePropuesta(
+        val pedido: ResultRow,
+        val cantidad: BigDecimal,
+    )
 
     private fun sesionActiva(
         sesionId: Int,
@@ -650,7 +667,10 @@ class CuentaMesaRepository(
         return SesionSumario(id = row[SesionMesaTable.id], estado = row[SesionMesaTable.estado])
     }
 
-    private data class SesionSumario(val id: Int, val estado: String)
+    private data class SesionSumario(
+        val id: Int,
+        val estado: String,
+    )
 
     private fun siguienteNumeroCuenta(sesionId: Int): Int {
         val maximo =
@@ -687,15 +707,13 @@ class CuentaMesaRepository(
                 (PedidoMesaTable.sesionMesaId eq sesionId) and
                     (PedidoMesaTable.activo eq ACTIVE) and
                     (PedidoMesaTable.estado eq EstadoPedidoMesa.ENTREGADA.codigo)
-            }
-            .orderBy(PedidoMesaTable.id)
+            }.orderBy(PedidoMesaTable.id)
             .map { row ->
                 val cantidad = row[PedidoMesaTable.itemCantidad]
                 val facturada = row[PedidoMesaTable.cantidadFacturada]
                 val saldo = (cantidad - facturada - (reservado[row[PedidoMesaTable.id]] ?: BigDecimal.ZERO)).stripTrailingZeros()
                 PedidoFacturable(row = row, saldoPendiente = saldo)
-            }
-            .filter { it.saldoPendiente.compareTo(BigDecimal.ZERO) > 0 }
+            }.filter { it.saldoPendiente.compareTo(BigDecimal.ZERO) > 0 }
     }
 
     private fun cargarCuentas(sesionIds: List<Int>): List<CuentaMesaResponse> =
@@ -740,8 +758,7 @@ class CuentaMesaRepository(
                 (CuentaMesaTable.sesionMesaId eq sesionId) and
                     (CuentaMesaTable.activo eq ACTIVE) and
                     (CuentaMesaTable.estado eq EstadoCuentaMesa.ACTIVA.codigo)
-            }
-            .limit(1)
+            }.limit(1)
             .singleOrNull() != null
 
     private fun existePedidoPendienteEnSesion(sesionId: Int): Boolean =
@@ -751,8 +768,7 @@ class CuentaMesaRepository(
                 (PedidoMesaTable.sesionMesaId eq sesionId) and
                     (PedidoMesaTable.activo eq ACTIVE) and
                     (PedidoMesaTable.estado notInList ESTADOS_NO_IMPiden_CIERRE)
-            }
-            .limit(1)
+            }.limit(1)
             .singleOrNull() != null
 
     private fun existeSaldoPendienteEnSesion(sesionId: Int): Boolean =
@@ -778,8 +794,7 @@ class CuentaMesaRepository(
                 .where {
                     (SesionMesaTable.id eq sesionId) and
                         (SesionMesaTable.activo eq ACTIVE)
-                }
-                .singleOrNull()
+                }.singleOrNull()
                 ?: return false
         val estadoActual =
             EstadoSesionMesa.fromCodigo(row[SesionMesaTable.estado])
@@ -794,9 +809,7 @@ class CuentaMesaRepository(
         return true
     }
 
-    private fun ResultRow.toCuentaMesaResponse(
-        detalles: List<CuentaDetalleResponse> = emptyList(),
-    ): CuentaMesaResponse =
+    private fun ResultRow.toCuentaMesaResponse(detalles: List<CuentaDetalleResponse> = emptyList()): CuentaMesaResponse =
         CuentaMesaResponse(
             id = this[CuentaMesaTable.id],
             sesionMesaId = this[CuentaMesaTable.sesionMesaId],

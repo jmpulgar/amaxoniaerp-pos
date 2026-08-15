@@ -5,92 +5,101 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.math.BigDecimal
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class FacturasRepositoryFilterTest {
     @Test
-    fun searchMatchesInvoiceCode() = withSeededDatabase {
-        val (facturas, total) = list(FacturasFilter(search = "INV-001"))
+    fun searchMatchesInvoiceCode() =
+        withSeededDatabase {
+            val (facturas, total) = list(FacturasFilter(search = "INV-001"))
 
-        assertEquals(1L, total)
-        assertEquals(listOf("factura-1"), facturas.map { it.id })
-    }
-
-    @Test
-    fun usuarioFiltersInvoiceCreator() = withSeededDatabase {
-        val (facturas, total) = list(FacturasFilter(usuario = "alice"))
-
-        assertEquals(2L, total)
-        assertEquals(listOf("factura-3", "factura-1"), facturas.map { it.id })
-    }
+            assertEquals(1L, total)
+            assertEquals(listOf("factura-1"), facturas.map { it.id })
+        }
 
     @Test
-    fun sucursalFiltersInvoiceBranch() = withSeededDatabase {
-        val (facturas, total) = list(FacturasFilter(sucursalId = 2))
+    fun usuarioFiltersInvoiceCreator() =
+        withSeededDatabase {
+            val (facturas, total) = list(FacturasFilter(usuario = "alice"))
 
-        assertEquals(1L, total)
-        assertEquals(listOf("factura-2"), facturas.map { it.id })
-    }
-
-    @Test
-    fun onlyStartDateIncludesThatDayAndLater() = withSeededDatabase {
-        val (facturas, total) = list(FacturasFilter(fechaInicio = java.time.LocalDate.of(2026, 1, 2)))
-
-        assertEquals(2L, total)
-        assertEquals(listOf("factura-3", "factura-2"), facturas.map { it.id })
-    }
+            assertEquals(2L, total)
+            assertEquals(listOf("factura-3", "factura-1"), facturas.map { it.id })
+        }
 
     @Test
-    fun onlyEndDateIncludesTheWholeDay() = withSeededDatabase {
-        val (facturas, total) = list(FacturasFilter(fechaFin = java.time.LocalDate.of(2026, 1, 2)))
+    fun sucursalFiltersInvoiceBranch() =
+        withSeededDatabase {
+            val (facturas, total) = list(FacturasFilter(sucursalId = 2))
 
-        assertEquals(2L, total)
-        assertEquals(listOf("factura-2", "factura-1"), facturas.map { it.id })
-    }
-
-    @Test
-    fun dateRangeUsesInclusiveStartAndEnd() = withSeededDatabase {
-        val (facturas, total) = list(
-            FacturasFilter(
-                fechaInicio = java.time.LocalDate.of(2026, 1, 2),
-                fechaFin = java.time.LocalDate.of(2026, 1, 3),
-            ),
-        )
-
-        assertEquals(2L, total)
-        assertEquals(listOf("factura-3", "factura-2"), facturas.map { it.id })
-    }
+            assertEquals(1L, total)
+            assertEquals(listOf("factura-2"), facturas.map { it.id })
+        }
 
     @Test
-    fun combinedFiltersNarrowTheSameInvoiceUniverse() = withSeededDatabase {
-        val filter = FacturasFilter(
-            usuario = "alice",
-            sucursalId = 1,
-            fechaInicio = java.time.LocalDate.of(2026, 1, 3),
-            fechaFin = java.time.LocalDate.of(2026, 1, 3),
-        )
+    fun onlyStartDateIncludesThatDayAndLater() =
+        withSeededDatabase {
+            val (facturas, total) = list(FacturasFilter(fechaInicio = java.time.LocalDate.of(2026, 1, 2)))
 
-        val (facturas, total) = list(filter)
-        val resumen = repository.getResumen(database, "VE", filter)
-
-        assertEquals(1L, total)
-        assertEquals(listOf("factura-3"), facturas.map { it.id })
-        assertEquals(facturas.size, resumen.totalFacturas)
-    }
+            assertEquals(2L, total)
+            assertEquals(listOf("factura-3", "factura-2"), facturas.map { it.id })
+        }
 
     @Test
-    fun summaryAndListUseTheSameFilteredUniverse() = withSeededDatabase {
-        val filter = FacturasFilter(usuario = "alice", sucursalId = 1)
-        val (facturas, total) = list(filter)
-        val resumen = repository.getResumen(database, "VE", filter)
+    fun onlyEndDateIncludesTheWholeDay() =
+        withSeededDatabase {
+            val (facturas, total) = list(FacturasFilter(fechaFin = java.time.LocalDate.of(2026, 1, 2)))
 
-        assertEquals(total.toInt(), facturas.size)
-        assertEquals(facturas.size, resumen.totalFacturas)
-        assertEquals(facturas.sumOf { it.total }, resumen.ventasNetas)
-    }
+            assertEquals(2L, total)
+            assertEquals(listOf("factura-2", "factura-1"), facturas.map { it.id })
+        }
+
+    @Test
+    fun dateRangeUsesInclusiveStartAndEnd() =
+        withSeededDatabase {
+            val (facturas, total) =
+                list(
+                    FacturasFilter(
+                        fechaInicio = java.time.LocalDate.of(2026, 1, 2),
+                        fechaFin = java.time.LocalDate.of(2026, 1, 3),
+                    ),
+                )
+
+            assertEquals(2L, total)
+            assertEquals(listOf("factura-3", "factura-2"), facturas.map { it.id })
+        }
+
+    @Test
+    fun combinedFiltersNarrowTheSameInvoiceUniverse() =
+        withSeededDatabase {
+            val filter =
+                FacturasFilter(
+                    usuario = "alice",
+                    sucursalId = 1,
+                    fechaInicio = java.time.LocalDate.of(2026, 1, 3),
+                    fechaFin = java.time.LocalDate.of(2026, 1, 3),
+                )
+
+            val (facturas, total) = list(filter)
+            val resumen = repository.getResumen(database, "VE", filter)
+
+            assertEquals(1L, total)
+            assertEquals(listOf("factura-3"), facturas.map { it.id })
+            assertEquals(facturas.size, resumen.totalFacturas)
+        }
+
+    @Test
+    fun summaryAndListUseTheSameFilteredUniverse() =
+        withSeededDatabase {
+            val filter = FacturasFilter(usuario = "alice", sucursalId = 1)
+            val (facturas, total) = list(filter)
+            val resumen = repository.getResumen(database, "VE", filter)
+
+            assertEquals(total.toInt(), facturas.size)
+            assertEquals(facturas.size, resumen.totalFacturas)
+            assertEquals(facturas.sumOf { it.total }, resumen.ventasNetas)
+        }
 
     private val repository = FacturasRepository()
     private lateinit var database: Database
@@ -105,10 +114,11 @@ class FacturasRepositoryFilterTest {
         )
 
     private fun withSeededDatabase(block: suspend FacturasRepositoryFilterTest.() -> Unit) {
-        database = Database.connect(
-            url = "jdbc:h2:mem:facturas_filter_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:facturas_filter_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(FacturasTableVE, FacturasClientesTable, EstatusTable)
             seedData()

@@ -10,47 +10,50 @@ import java.sql.ResultSet
 import java.sql.Timestamp
 
 class PromotionsRepository {
-    suspend fun listPromotions(database: Database): List<PromotionResponse> = dbQuery(database) {
-        val headers = TransactionManager.current().exec(
-            """
-            SELECT
-                id, id_item, codigo, inicio, fin, promocion, imagen, activo, descuento_global
-            FROM promocion
-            WHERE activo = 1
-            ORDER BY inicio DESC, id DESC
-            """.trimIndent()
-        ) { rs ->
-            buildList {
-                while (rs.next()) add(rs.toPromotionHeader())
-            }
-        } ?: emptyList()
+    suspend fun listPromotions(database: Database): List<PromotionResponse> =
+        dbQuery(database) {
+            val headers =
+                TransactionManager.current().exec(
+                    """
+                    SELECT
+                        id, id_item, codigo, inicio, fin, promocion, imagen, activo, descuento_global
+                    FROM promocion
+                    WHERE activo = 1
+                    ORDER BY inicio DESC, id DESC
+                    """.trimIndent(),
+                ) { rs ->
+                    buildList {
+                        while (rs.next()) add(rs.toPromotionHeader())
+                    }
+                } ?: emptyList()
 
-        if (headers.isEmpty()) return@dbQuery emptyList()
+            if (headers.isEmpty()) return@dbQuery emptyList()
 
-        val ids = headers.joinToString(",") { it.id.toIntOrNull()?.toString() ?: "0" }
-        val detailsByPromotion = TransactionManager.current().exec(
-            """
-            SELECT
-                id, id_promocion, id_item, cantidad, cantidad_total, unidad_empaque,
-                descuento, descuento_monto, id_tipo_precio, precio, impuesto,
-                impuesto_porcentaje, importe, grupo
-            FROM promocion_detalle
-            WHERE id_promocion IN ($ids)
-            ORDER BY id_promocion, grupo, id
-            """.trimIndent()
-        ) { rs ->
-            buildList {
-                while (rs.next()) {
-                    add(rs.getString("id_promocion") to rs.toPromotionDetail())
-                }
-            }.groupBy({ it.first }, { it.second })
-        } ?: emptyMap()
+            val ids = headers.joinToString(",") { it.id.toIntOrNull()?.toString() ?: "0" }
+            val detailsByPromotion =
+                TransactionManager.current().exec(
+                    """
+                    SELECT
+                        id, id_promocion, id_item, cantidad, cantidad_total, unidad_empaque,
+                        descuento, descuento_monto, id_tipo_precio, precio, impuesto,
+                        impuesto_porcentaje, importe, grupo
+                    FROM promocion_detalle
+                    WHERE id_promocion IN ($ids)
+                    ORDER BY id_promocion, grupo, id
+                    """.trimIndent(),
+                ) { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(rs.getString("id_promocion") to rs.toPromotionDetail())
+                        }
+                    }.groupBy({ it.first }, { it.second })
+                } ?: emptyMap()
 
-        headers.map { header -> header.copy(detalle = detailsByPromotion[header.id].orEmpty()) }
-    }
+            headers.map { header -> header.copy(detalle = detailsByPromotion[header.id].orEmpty()) }
+        }
 
-    private fun ResultSet.toPromotionHeader(): PromotionResponse {
-        return PromotionResponse(
+    private fun ResultSet.toPromotionHeader(): PromotionResponse =
+        PromotionResponse(
             id = getString("id"),
             codigo = getString("codigo") ?: "",
             inicio = getTimestampOrNull("inicio")?.toLocalDateTime()?.toString()?.replace("T", " "),
@@ -61,7 +64,6 @@ class PromotionsRepository {
             descuentoGlobal = getBigDecimalOrZero("descuento_global").toDouble(),
             idItem = getString("id_item") ?: "",
         )
-    }
 
     private fun ResultSet.toPromotionDetail(): PromotionDetailResponse {
         val impuestoPorcentaje = getBigDecimalOrZero("impuesto_porcentaje").toDouble()
@@ -84,5 +86,7 @@ class PromotionsRepository {
     }
 
     private fun ResultSet.getTimestampOrNull(column: String): Timestamp? = runCatching { getTimestamp(column) }.getOrNull()
-    private fun ResultSet.getBigDecimalOrZero(column: String): BigDecimal = runCatching { getBigDecimal(column) }.getOrNull() ?: BigDecimal.ZERO
+
+    private fun ResultSet.getBigDecimalOrZero(column: String): BigDecimal =
+        runCatching { getBigDecimal(column) }.getOrNull() ?: BigDecimal.ZERO
 }

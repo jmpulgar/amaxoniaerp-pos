@@ -38,14 +38,13 @@ import com.amaxoniaerp.features.sales.data.SalesKardexTableFactory
 import com.amaxoniaerp.features.sales.data.SalesKardexTablePA
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
@@ -63,7 +62,6 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 class CreditNoteRepository {
-
     fun listCreditNotes(
         countryCode: String,
         limit: Int,
@@ -73,10 +71,11 @@ class CreditNoteRepository {
         fechaFin: LocalDate?,
     ): Pair<List<CreditNoteSummary>, Long> {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
-        val query = headerTable
-            .join(ClientsTable, JoinType.LEFT, headerTable.idCliente, ClientsTable.idCliente)
-            .join(CreditNoteFacturaTable, JoinType.LEFT, headerTable.codFactura, CreditNoteFacturaTable.idFactura)
-            .selectAll()
+        val query =
+            headerTable
+                .join(ClientsTable, JoinType.LEFT, headerTable.idCliente, ClientsTable.idCliente)
+                .join(CreditNoteFacturaTable, JoinType.LEFT, headerTable.codFactura, CreditNoteFacturaTable.idFactura)
+                .selectAll()
 
         if (fechaInicio != null && fechaFin != null) {
             query.andWhere { headerTable.fechaDevolucion.between(fechaInicio, fechaFin) }
@@ -94,31 +93,41 @@ class CreditNoteRepository {
         }
 
         val total = query.count()
-        val data = query
-            .orderBy(headerTable.fechaCreacion to SortOrder.DESC)
-            .limit(limit)
-            .offset(offset)
-            .map { mapSummaryRow(it, countryCode) }
+        val data =
+            query
+                .orderBy(headerTable.fechaCreacion to SortOrder.DESC)
+                .limit(limit)
+                .offset(offset)
+                .map { mapSummaryRow(it, countryCode) }
 
         return data to total
     }
 
-    fun getCreditNoteDetail(id: String, countryCode: String): CreditNoteDetailResponse? {
+    fun getCreditNoteDetail(
+        id: String,
+        countryCode: String,
+    ): CreditNoteDetailResponse? {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
-        val headerRow = headerTable
-            .join(ClientsTable, JoinType.LEFT, headerTable.idCliente, ClientsTable.idCliente)
-            .join(CreditNoteFacturaTable, JoinType.LEFT, headerTable.codFactura, CreditNoteFacturaTable.idFactura)
-            .selectAll()
-            .where { headerTable.idDevolucion eq id }
-            .limit(1)
-            .firstOrNull()
-            ?: return null
+        val headerRow =
+            headerTable
+                .join(ClientsTable, JoinType.LEFT, headerTable.idCliente, ClientsTable.idCliente)
+                .join(CreditNoteFacturaTable, JoinType.LEFT, headerTable.codFactura, CreditNoteFacturaTable.idFactura)
+                .selectAll()
+                .where { headerTable.idDevolucion eq id }
+                .limit(1)
+                .firstOrNull()
+                ?: return null
 
-        val detailRows = CreditNoteDetailTable
-            .join(CreditNoteFacturaDetalleTable, JoinType.LEFT, CreditNoteDetailTable.idDetalleFactura, CreditNoteFacturaDetalleTable.idDetalleFactura)
-            .selectAll()
-            .where { CreditNoteDetailTable.idDevolucion eq id }
-            .toList()
+        val detailRows =
+            CreditNoteDetailTable
+                .join(
+                    CreditNoteFacturaDetalleTable,
+                    JoinType.LEFT,
+                    CreditNoteDetailTable.idDetalleFactura,
+                    CreditNoteFacturaDetalleTable.idDetalleFactura,
+                ).selectAll()
+                .where { CreditNoteDetailTable.idDevolucion eq id }
+                .toList()
 
         val lines = detailRows.map(::mapDetailLine)
         val header = mapHeaderContext(headerRow, countryCode)
@@ -131,9 +140,10 @@ class CreditNoteRepository {
         offset: Long,
         search: String?,
     ): Pair<List<CreditNoteSourceInvoiceSummary>, Long> {
-        val query = CreditNoteFacturaTable
-            .join(ClientsTable, JoinType.LEFT, CreditNoteFacturaTable.idCliente, ClientsTable.idCliente)
-            .selectAll()
+        val query =
+            CreditNoteFacturaTable
+                .join(ClientsTable, JoinType.LEFT, CreditNoteFacturaTable.idCliente, ClientsTable.idCliente)
+                .selectAll()
 
         if (!countryCode.equals("PA", ignoreCase = true)) {
             query.andWhere { CreditNoteFacturaTable.codEstatus neq 3 }
@@ -151,33 +161,35 @@ class CreditNoteRepository {
             }
         }
 
-        val invoiceRows = query
-            .orderBy(CreditNoteFacturaTable.fechaCreacion to SortOrder.DESC)
-            .limit(limit)
-            .offset(offset)
-            .toList()
+        val invoiceRows =
+            query
+                .orderBy(CreditNoteFacturaTable.fechaCreacion to SortOrder.DESC)
+                .limit(limit)
+                .offset(offset)
+                .toList()
 
-        val summaries = invoiceRows.mapNotNull { row ->
-            val invoiceId = row[CreditNoteFacturaTable.idFactura]
-            val source = buildSourceInvoiceDetail(invoiceId, countryCode) ?: return@mapNotNull null
-            if (source.remainingAmount <= 0.0) {
-                null
-            } else {
-                CreditNoteSourceInvoiceSummary(
-                    id = source.id,
-                    codigo = source.codigo,
-                    codigoFiscal = source.codigoFiscal,
-                    numeroDocumentoFiscal = source.numeroDocumentoFiscal,
-                    fecha = source.fecha,
-                    clienteNombre = source.clienteNombre,
-                    clienteIdentificacion = source.clienteIdentificacion,
-                    total = source.totalOriginal,
-                    remainingAmount = source.remainingAmount,
-                    items = source.lines.count { it.cantidadDisponible > 0.0 },
-                    moneda = source.moneda,
-                )
+        val summaries =
+            invoiceRows.mapNotNull { row ->
+                val invoiceId = row[CreditNoteFacturaTable.idFactura]
+                val source = buildSourceInvoiceDetail(invoiceId, countryCode) ?: return@mapNotNull null
+                if (source.remainingAmount <= 0.0) {
+                    null
+                } else {
+                    CreditNoteSourceInvoiceSummary(
+                        id = source.id,
+                        codigo = source.codigo,
+                        codigoFiscal = source.codigoFiscal,
+                        numeroDocumentoFiscal = source.numeroDocumentoFiscal,
+                        fecha = source.fecha,
+                        clienteNombre = source.clienteNombre,
+                        clienteIdentificacion = source.clienteIdentificacion,
+                        total = source.totalOriginal,
+                        remainingAmount = source.remainingAmount,
+                        items = source.lines.count { it.cantidadDisponible > 0.0 },
+                        moneda = source.moneda,
+                    )
+                }
             }
-        }
 
         return summaries to summaries.size.toLong()
     }
@@ -185,23 +197,25 @@ class CreditNoteRepository {
     fun getSourceInvoiceDetail(
         invoiceId: String,
         countryCode: String = "VE",
-    ): CreditNoteSourceInvoiceDetailResponse? {
-        return buildSourceInvoiceDetail(invoiceId, countryCode)
-    }
+    ): CreditNoteSourceInvoiceDetailResponse? = buildSourceInvoiceDetail(invoiceId, countryCode)
 
     /**
      * Reserva e inserta una NC PA sin aplicar todavía efectos comerciales.
      * La fila PENDIENTE y sus líneas son la reserva de cantidades frente a otra
      * preparación concurrente.
      */
-    fun preparePanama(request: CreateCreditNoteRequest, username: String): PreparedCreditNote {
+    fun preparePanama(
+        request: CreateCreditNoteRequest,
+        username: String,
+    ): PreparedCreditNote {
         validateCreateRequest(request)
 
         lockInvoiceForCreditNote(request.idFactura)
             ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
 
-        val invoice = loadInvoiceHeader(request.idFactura)
-            ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
+        val invoice =
+            loadInvoiceHeader(request.idFactura)
+                ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
         val client = loadClient(invoice.idCliente)
         val invoiceLines = loadInvoiceLines("PA", invoice.idFactura)
         if (invoiceLines.isEmpty()) {
@@ -210,13 +224,15 @@ class CreditNoteRepository {
 
         val requestedLines = normalizeRequestedLines(request, invoiceLines)
         val baseProcessedLines = buildProcessedLines(invoiceLines, requestedLines)
-        val allReturnedAfterOperation = invoiceLines.all { sourceLine ->
-            val returnedInThisRequest = baseProcessedLines
-                .firstOrNull { it.sourceLine.idDetalleFactura == sourceLine.idDetalleFactura }
-                ?.quantity
-                ?: BigDecimal.ZERO
-            sourceLine.availableQuantity.subtract(returnedInThisRequest).isEffectivelyZero()
-        }
+        val allReturnedAfterOperation =
+            invoiceLines.all { sourceLine ->
+                val returnedInThisRequest =
+                    baseProcessedLines
+                        .firstOrNull { it.sourceLine.idDetalleFactura == sourceLine.idDetalleFactura }
+                        ?.quantity
+                        ?: BigDecimal.ZERO
+                sourceLine.availableQuantity.subtract(returnedInThisRequest).isEffectivelyZero()
+            }
 
         if (request.anular && !allReturnedAfterOperation) {
             throw CreditNoteValidationException("Para anular la factura debes devolver la totalidad de las líneas restantes")
@@ -227,13 +243,14 @@ class CreditNoteRepository {
             resolveCreditNotePaymentFormId()
         }
 
-        val financials = calculateFinancials(
-            invoice = invoice,
-            invoiceLines = invoiceLines,
-            processedLines = baseProcessedLines,
-            previousTotals = loadPreviousCreditNoteTotals("PA", invoice.idFactura),
-            allReturnedAfterOperation = allReturnedAfterOperation,
-        )
+        val financials =
+            calculateFinancials(
+                invoice = invoice,
+                invoiceLines = invoiceLines,
+                processedLines = baseProcessedLines,
+                previousTotals = loadPreviousCreditNoteTotals("PA", invoice.idFactura),
+                allReturnedAfterOperation = allReturnedAfterOperation,
+            )
         val creditNoteDate = parseDate(request.fecha)
         val now = BusinessClock.nowForCountry("PA")
         val cajaContext = resolveCajaContext(request.idCajaSecuencia)
@@ -310,17 +327,19 @@ class CreditNoteRepository {
         numeroDocumentoFiscal: String,
     ): CreateCreditNoteResponse {
         val header = CreditNoteHeaderTablePA
-        val headerRow = header
-            .selectAll()
-            .where { header.idDevolucion eq id }
-            .forUpdate()
-            .singleOrNull()
-            ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+        val headerRow =
+            header
+                .selectAll()
+                .where { header.idDevolucion eq id }
+                .forUpdate()
+                .singleOrNull()
+                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
 
-        val currentStatus = resolveFiscalStatus(
-            headerRow[header.codDevolucionFiscal].orEmpty(),
-            headerRow[header.numeroDocumentoFiscal].orEmpty(),
-        )
+        val currentStatus =
+            resolveFiscalStatus(
+                headerRow[header.codDevolucionFiscal].orEmpty(),
+                headerRow[header.numeroDocumentoFiscal].orEmpty(),
+            )
         if (currentStatus == CreditNoteFiscalStatus.CONFIRMADA) {
             return buildCreationResponse(id, true)
         }
@@ -331,8 +350,9 @@ class CreditNoteRepository {
         val invoiceId = headerRow[header.codFactura]
         lockInvoiceForCreditNote(invoiceId)
             ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
-        val invoice = loadInvoiceHeader(invoiceId)
-            ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
+        val invoice =
+            loadInvoiceHeader(invoiceId)
+                ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
         val client = loadClient(invoice.idCliente)
         val invoiceLines = loadInvoiceLines("PA", invoice.idFactura)
         val processedLines = loadPreparedLines(id, invoiceLines)
@@ -344,9 +364,10 @@ class CreditNoteRepository {
         val creditNoteDate = headerRow[header.fechaDevolucion]
         val cajaContext = resolveCajaContext(headerRow[header.idCajaSecuencia] ?: request.idCajaSecuencia)
         val username = headerRow[header.usuarioCreacion]
-        val reservedDocumentNumber = normalizeFiscalDocumentNumber(
-            headerRow[header.numeroDocumentoFiscal].orEmpty(),
-        )
+        val reservedDocumentNumber =
+            normalizeFiscalDocumentNumber(
+                headerRow[header.numeroDocumentoFiscal].orEmpty(),
+            )
         val normalizedDocumentNumber = normalizeFiscalDocumentNumber(numeroDocumentoFiscal)
         if (normalizedDocumentNumber != reservedDocumentNumber) {
             throw CreditNoteValidationException("El número fiscal no coincide con la reserva de la nota de crédito")
@@ -369,7 +390,9 @@ class CreditNoteRepository {
 
         processedLines.forEach { line ->
             if (line.sourceLine.availableQuantity.isEffectivelyZero()) {
-                CreditNoteFacturaDetalleTable.update({ CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura }) {
+                CreditNoteFacturaDetalleTable.update(
+                    { CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura },
+                ) {
                     it[anulado] = true
                 }
             }
@@ -410,36 +433,40 @@ class CreditNoteRepository {
 
         when (request.settlementType) {
             CreditNoteSettlementType.NINGUNO -> Unit
-            CreditNoteSettlementType.REINTEGRO -> registerRefundCashEgress(
-                countryCode = "PA",
-                invoice = invoice,
-                creditNoteId = id,
-                creditNoteCode = headerRow[header.codDevolucion],
-                total = headerRow[header.total],
-                idFormaPago = request.idFormaPagoReintegro
-                    ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
-                username = username,
-                now = now,
-                date = creditNoteDate,
-                cajaContext = cajaContext,
-            )
-            CreditNoteSettlementType.ABONO -> registerAbono(
-                creditNoteId = id,
-                total = headerRow[header.total],
-                invoice = invoice,
-                client = client,
-                username = username,
-                now = now,
-                cajaContext = cajaContext,
-            )
-            CreditNoteSettlementType.CERTIFICADO_REGALO -> registerGiftCertificate(
-                creditNoteId = id,
-                total = headerRow[header.total],
-                client = client,
-                username = username,
-                now = now,
-                cajaContext = cajaContext,
-            )
+            CreditNoteSettlementType.REINTEGRO ->
+                registerRefundCashEgress(
+                    countryCode = "PA",
+                    invoice = invoice,
+                    creditNoteId = id,
+                    creditNoteCode = headerRow[header.codDevolucion],
+                    total = headerRow[header.total],
+                    idFormaPago =
+                        request.idFormaPagoReintegro
+                            ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                    username = username,
+                    now = now,
+                    date = creditNoteDate,
+                    cajaContext = cajaContext,
+                )
+            CreditNoteSettlementType.ABONO ->
+                registerAbono(
+                    creditNoteId = id,
+                    total = headerRow[header.total],
+                    invoice = invoice,
+                    client = client,
+                    username = username,
+                    now = now,
+                    cajaContext = cajaContext,
+                )
+            CreditNoteSettlementType.CERTIFICADO_REGALO ->
+                registerGiftCertificate(
+                    creditNoteId = id,
+                    total = headerRow[header.total],
+                    client = client,
+                    username = username,
+                    now = now,
+                    cajaContext = cajaContext,
+                )
         }
 
         return buildCreationResponse(id, true)
@@ -454,16 +481,18 @@ class CreditNoteRepository {
             "Sólo se pueden marcar estados PAC no confirmados"
         }
         val header = CreditNoteHeaderTablePA
-        val row = header
-            .selectAll()
-            .where { header.idDevolucion eq id }
-            .forUpdate()
-            .singleOrNull()
-            ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
-        val currentStatus = resolveFiscalStatus(
-            row[header.codDevolucionFiscal].orEmpty(),
-            row[header.numeroDocumentoFiscal].orEmpty(),
-        )
+        val row =
+            header
+                .selectAll()
+                .where { header.idDevolucion eq id }
+                .forUpdate()
+                .singleOrNull()
+                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+        val currentStatus =
+            resolveFiscalStatus(
+                row[header.codDevolucionFiscal].orEmpty(),
+                row[header.numeroDocumentoFiscal].orEmpty(),
+            )
         if (currentStatus != CreditNoteFiscalStatus.CONFIRMADA) {
             header.update({ header.idDevolucion eq id }) {
                 it[codDevolucionFiscal] = fiscalStatusCode(status)
@@ -477,18 +506,23 @@ class CreditNoteRepository {
         )
     }
 
-    fun recordPanamaDiagnostic(id: String, message: String): CreateCreditNoteResponse {
+    fun recordPanamaDiagnostic(
+        id: String,
+        message: String,
+    ): CreateCreditNoteResponse {
         val header = CreditNoteHeaderTablePA
-        val row = header
-            .selectAll()
-            .where { header.idDevolucion eq id }
-            .forUpdate()
-            .singleOrNull()
-            ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
-        val currentStatus = resolveFiscalStatus(
-            row[header.codDevolucionFiscal].orEmpty(),
-            row[header.numeroDocumentoFiscal].orEmpty(),
-        )
+        val row =
+            header
+                .selectAll()
+                .where { header.idDevolucion eq id }
+                .forUpdate()
+                .singleOrNull()
+                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+        val currentStatus =
+            resolveFiscalStatus(
+                row[header.codDevolucionFiscal].orEmpty(),
+                row[header.numeroDocumentoFiscal].orEmpty(),
+            )
         if (currentStatus == CreditNoteFiscalStatus.CONFIRMADA) {
             header.update({ header.idDevolucion eq id }) {
                 it[header.informacionInteres] = message.take(MAX_PAC_DIAGNOSTIC_LENGTH)
@@ -501,14 +535,19 @@ class CreditNoteRepository {
         )
     }
 
-    fun create(countryCode: String, request: CreateCreditNoteRequest, username: String): CreateCreditNoteResponse {
+    fun create(
+        countryCode: String,
+        request: CreateCreditNoteRequest,
+        username: String,
+    ): CreateCreditNoteResponse {
         validateCreateRequest(request)
 
         lockInvoiceForCreditNote(request.idFactura)
             ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
 
-        val invoice = loadInvoiceHeader(request.idFactura)
-            ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
+        val invoice =
+            loadInvoiceHeader(request.idFactura)
+                ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
         val client = loadClient(invoice.idCliente)
         val invoiceLines = loadInvoiceLines(countryCode, invoice.idFactura)
         if (invoiceLines.isEmpty()) {
@@ -517,32 +556,36 @@ class CreditNoteRepository {
 
         val requestedLines = normalizeRequestedLines(request, invoiceLines)
         val baseProcessedLines = buildProcessedLines(invoiceLines, requestedLines)
-        val allReturnedAfterOperation = invoiceLines.all { sourceLine ->
-            val returnedInThisRequest = baseProcessedLines
-                .firstOrNull { it.sourceLine.idDetalleFactura == sourceLine.idDetalleFactura }
-                ?.quantity
-                ?: BigDecimal.ZERO
-            sourceLine.availableQuantity.subtract(returnedInThisRequest).isEffectivelyZero()
-        }
+        val allReturnedAfterOperation =
+            invoiceLines.all { sourceLine ->
+                val returnedInThisRequest =
+                    baseProcessedLines
+                        .firstOrNull { it.sourceLine.idDetalleFactura == sourceLine.idDetalleFactura }
+                        ?.quantity
+                        ?: BigDecimal.ZERO
+                sourceLine.availableQuantity.subtract(returnedInThisRequest).isEffectivelyZero()
+            }
 
         if (request.anular && !allReturnedAfterOperation) {
             throw CreditNoteValidationException("Para anular la factura debes devolver la totalidad de las líneas restantes")
         }
 
         val previousTotals = loadPreviousCreditNoteTotals(countryCode, invoice.idFactura)
-        val financials = calculateFinancials(
-            invoice = invoice,
-            invoiceLines = invoiceLines,
-            processedLines = baseProcessedLines,
-            previousTotals = previousTotals,
-            allReturnedAfterOperation = allReturnedAfterOperation,
-        )
+        val financials =
+            calculateFinancials(
+                invoice = invoice,
+                invoiceLines = invoiceLines,
+                processedLines = baseProcessedLines,
+                previousTotals = previousTotals,
+                allReturnedAfterOperation = allReturnedAfterOperation,
+            )
         val processedLines = financials.lines
-        val partialPaymentFormId = if (allReturnedAfterOperation) {
-            null
-        } else {
-            resolveCreditNotePaymentFormId()
-        }
+        val partialPaymentFormId =
+            if (allReturnedAfterOperation) {
+                null
+            } else {
+                resolveCreditNotePaymentFormId()
+            }
         val creditNoteDate = parseDate(request.fecha)
         val now = BusinessClock.nowForCountry(countryCode)
         val cajaContext = resolveCajaContext(request.idCajaSecuencia)
@@ -623,9 +666,14 @@ class CreditNoteRepository {
                 it[itemReferencia] = line.sourceLine.referencia
             }
 
-            val lineFullyCancelled = line.sourceLine.availableQuantity.subtract(line.quantity).isEffectivelyZero()
+            val lineFullyCancelled =
+                line.sourceLine.availableQuantity
+                    .subtract(line.quantity)
+                    .isEffectivelyZero()
             if (lineFullyCancelled) {
-                CreditNoteFacturaDetalleTable.update({ CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura }) {
+                CreditNoteFacturaDetalleTable.update(
+                    { CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura },
+                ) {
                     it[anulado] = true
                 }
             }
@@ -653,67 +701,83 @@ class CreditNoteRepository {
         }
 
         if (request.devolverStock) {
-            restoreInventory(countryCode = countryCode, invoice = invoice, creditNoteId = creditNoteId, creditNoteCode = creditNoteCode, lines = processedLines, username = username, date = creditNoteDate, now = now, idSucursal = cajaContext.idSucursal)
-        }
-
-        when (request.settlementType) {
-            CreditNoteSettlementType.NINGUNO -> Unit
-            CreditNoteSettlementType.REINTEGRO -> registerRefundCashEgress(
+            restoreInventory(
                 countryCode = countryCode,
                 invoice = invoice,
                 creditNoteId = creditNoteId,
                 creditNoteCode = creditNoteCode,
-                total = totals.total,
-                idFormaPago = request.idFormaPagoReintegro ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                lines = processedLines,
                 username = username,
-                now = now,
                 date = creditNoteDate,
-                cajaContext = cajaContext,
-            )
-            CreditNoteSettlementType.ABONO -> registerAbono(
-                creditNoteId = creditNoteId,
-                total = totals.total,
-                invoice = invoice,
-                client = client,
-                username = username,
                 now = now,
-                cajaContext = cajaContext,
-            )
-            CreditNoteSettlementType.CERTIFICADO_REGALO -> registerGiftCertificate(
-                creditNoteId = creditNoteId,
-                total = totals.total,
-                client = client,
-                username = username,
-                now = now,
-                cajaContext = cajaContext,
+                idSucursal = cajaContext.idSucursal,
             )
         }
 
-        val responseHeader = CreditNoteHeaderContext(
-            id = creditNoteId,
-            codigo = creditNoteCode,
-            facturaId = invoice.idFactura,
-            facturaCodigo = invoice.codFactura,
-            fecha = creditNoteDate,
-            fechaCreacion = now,
-            periodo = request.periodo,
-            observacion = request.observacion,
-            clienteNombre = client.nombreCompleto,
-            clienteIdentificacion = client.identificacion,
-            clienteDireccion = client.direccion,
-            clienteTelefono = client.telefono,
-            subtotal = totals.subtotal,
-            impuesto = totals.tax,
-            total = totals.total,
-            fiscalStatus = CreditNoteFiscalStatus.PENDIENTE,
-            fiscalNumber = "",
-            printerSerial = "",
-            originalFiscalNumber = request.numeroFiscalElectronico.ifBlank {
-                invoice.numeroDocumentoFiscal.ifBlank { invoice.codFacturaFiscal }
-            },
-            originalInvoiceDate = invoice.fechaFactura,
-            anulaFacturaCompleta = allReturnedAfterOperation,
-        )
+        when (request.settlementType) {
+            CreditNoteSettlementType.NINGUNO -> Unit
+            CreditNoteSettlementType.REINTEGRO ->
+                registerRefundCashEgress(
+                    countryCode = countryCode,
+                    invoice = invoice,
+                    creditNoteId = creditNoteId,
+                    creditNoteCode = creditNoteCode,
+                    total = totals.total,
+                    idFormaPago =
+                        request.idFormaPagoReintegro ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                    username = username,
+                    now = now,
+                    date = creditNoteDate,
+                    cajaContext = cajaContext,
+                )
+            CreditNoteSettlementType.ABONO ->
+                registerAbono(
+                    creditNoteId = creditNoteId,
+                    total = totals.total,
+                    invoice = invoice,
+                    client = client,
+                    username = username,
+                    now = now,
+                    cajaContext = cajaContext,
+                )
+            CreditNoteSettlementType.CERTIFICADO_REGALO ->
+                registerGiftCertificate(
+                    creditNoteId = creditNoteId,
+                    total = totals.total,
+                    client = client,
+                    username = username,
+                    now = now,
+                    cajaContext = cajaContext,
+                )
+        }
+
+        val responseHeader =
+            CreditNoteHeaderContext(
+                id = creditNoteId,
+                codigo = creditNoteCode,
+                facturaId = invoice.idFactura,
+                facturaCodigo = invoice.codFactura,
+                fecha = creditNoteDate,
+                fechaCreacion = now,
+                periodo = request.periodo,
+                observacion = request.observacion,
+                clienteNombre = client.nombreCompleto,
+                clienteIdentificacion = client.identificacion,
+                clienteDireccion = client.direccion,
+                clienteTelefono = client.telefono,
+                subtotal = totals.subtotal,
+                impuesto = totals.tax,
+                total = totals.total,
+                fiscalStatus = CreditNoteFiscalStatus.PENDIENTE,
+                fiscalNumber = "",
+                printerSerial = "",
+                originalFiscalNumber =
+                    request.numeroFiscalElectronico.ifBlank {
+                        invoice.numeroDocumentoFiscal.ifBlank { invoice.codFacturaFiscal }
+                    },
+                originalInvoiceDate = invoice.fechaFactura,
+                anulaFacturaCompleta = allReturnedAfterOperation,
+            )
         val responseLines = processedLines.map { it.toDetailLine() }
         val detail = buildDetailResponse(responseHeader, responseLines)
 
@@ -729,14 +793,19 @@ class CreditNoteRepository {
         )
     }
 
-    fun confirmFiscal(countryCode: String, id: String, request: ConfirmCreditNoteFiscalRequest): ConfirmCreditNoteFiscalResponse {
+    fun confirmFiscal(
+        countryCode: String,
+        id: String,
+        request: ConfirmCreditNoteFiscalRequest,
+    ): ConfirmCreditNoteFiscalResponse {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
-        val header = headerTable
-            .selectAll()
-            .where { headerTable.idDevolucion eq id }
-            .limit(1)
-            .firstOrNull()
-            ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+        val header =
+            headerTable
+                .selectAll()
+                .where { headerTable.idDevolucion eq id }
+                .limit(1)
+                .firstOrNull()
+                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
 
         val requestedFiscalCode = request.codDevolucionFiscal.trim()
         val requestedDocumentNumber = request.numeroDocumentoFiscal.trim()
@@ -807,12 +876,13 @@ class CreditNoteRepository {
     }
 
     private fun loadInvoiceHeader(invoiceId: String): InvoiceHeader? {
-        val row = CreditNoteFacturaTable
-            .selectAll()
-            .where { CreditNoteFacturaTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: return null
+        val row =
+            CreditNoteFacturaTable
+                .selectAll()
+                .where { CreditNoteFacturaTable.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
+                ?: return null
 
         return InvoiceHeader(
             idFactura = row[CreditNoteFacturaTable.idFactura],
@@ -861,11 +931,12 @@ class CreditNoteRepository {
             .singleOrNull()
 
     private fun loadClient(idCliente: String): ClientContext {
-        val row = ClientsTable
-            .selectAll()
-            .where { ClientsTable.idCliente eq idCliente }
-            .limit(1)
-            .firstOrNull()
+        val row =
+            ClientsTable
+                .selectAll()
+                .where { ClientsTable.idCliente eq idCliente }
+                .limit(1)
+                .firstOrNull()
 
         val nombre = row?.get(ClientsTable.nombre).orEmpty()
         val apellido = row?.get(ClientsTable.apellido).orEmpty()
@@ -879,51 +950,60 @@ class CreditNoteRepository {
         )
     }
 
-    private fun loadInvoiceLines(invoiceId: String): List<SourceInvoiceLine> =
-        loadInvoiceLines(countryCode = null, invoiceId = invoiceId)
+    private fun loadInvoiceLines(invoiceId: String): List<SourceInvoiceLine> = loadInvoiceLines(countryCode = null, invoiceId = invoiceId)
 
-    private fun loadInvoiceLines(countryCode: String?, invoiceId: String): List<SourceInvoiceLine> {
-        val detailRows = CreditNoteFacturaDetalleTable
-            .selectAll()
-            .where { CreditNoteFacturaDetalleTable.idFactura eq invoiceId }
-            .orderBy(CreditNoteFacturaDetalleTable.idDetalleFactura)
-            .toList()
+    private fun loadInvoiceLines(
+        countryCode: String?,
+        invoiceId: String,
+    ): List<SourceInvoiceLine> {
+        val detailRows =
+            CreditNoteFacturaDetalleTable
+                .selectAll()
+                .where { CreditNoteFacturaDetalleTable.idFactura eq invoiceId }
+                .orderBy(CreditNoteFacturaDetalleTable.idDetalleFactura)
+                .toList()
         if (detailRows.isEmpty()) return emptyList()
 
         val detailIds = detailRows.map { it[CreditNoteFacturaDetalleTable.idDetalleFactura] }
-        val allReturnedRows = CreditNoteDetailTable
-            .selectAll()
-            .where { CreditNoteDetailTable.idDetalleFactura inList detailIds }
-            .toList()
-        val returnedRows = if (countryCode.equals("PA", ignoreCase = true)) {
-            val rejectedCreditNoteIds = try {
-                CreditNoteHeaderTablePA
-                    .selectAll()
-                    .mapNotNull { row ->
-                        row[CreditNoteHeaderTablePA.codDevolucionFiscal]
-                            .orEmpty()
-                            .trim()
-                            .takeIf { it.equals(REJECTED_FISCAL_CODE, ignoreCase = true) }
-                            ?.let { row[CreditNoteHeaderTablePA.idDevolucion] }
+        val allReturnedRows =
+            CreditNoteDetailTable
+                .selectAll()
+                .where { CreditNoteDetailTable.idDetalleFactura inList detailIds }
+                .toList()
+        val returnedRows =
+            if (countryCode.equals("PA", ignoreCase = true)) {
+                val rejectedCreditNoteIds =
+                    try {
+                        CreditNoteHeaderTablePA
+                            .selectAll()
+                            .mapNotNull { row ->
+                                row[CreditNoteHeaderTablePA.codDevolucionFiscal]
+                                    .orEmpty()
+                                    .trim()
+                                    .takeIf { it.equals(REJECTED_FISCAL_CODE, ignoreCase = true) }
+                                    ?.let { row[CreditNoteHeaderTablePA.idDevolucion] }
+                            }.toSet()
+                    } catch (_: ExposedSQLException) {
+                        // Algunos esquemas de pruebas sólo tienen las tablas comunes.
+                        emptySet()
                     }
-                    .toSet()
-            } catch (_: ExposedSQLException) {
-                // Algunos esquemas de pruebas sólo tienen las tablas comunes.
-                emptySet()
+                allReturnedRows.filterNot { it[CreditNoteDetailTable.idDevolucion] in rejectedCreditNoteIds }
+            } else {
+                allReturnedRows
             }
-            allReturnedRows.filterNot { it[CreditNoteDetailTable.idDevolucion] in rejectedCreditNoteIds }
-        } else {
-            allReturnedRows
-        }
-        val returnedByDetail = returnedRows
-            .groupBy { it[CreditNoteDetailTable.idDetalleFactura] }
-            .mapValues { (_, rows) ->
-                rows.fold(BigDecimal.ZERO) { acc, row -> acc + row[CreditNoteDetailTable.itemCantidad].setScale(3, RoundingMode.HALF_UP) }
-            }
+        val returnedByDetail =
+            returnedRows
+                .groupBy { it[CreditNoteDetailTable.idDetalleFactura] }
+                .mapValues { (_, rows) ->
+                    rows.fold(
+                        BigDecimal.ZERO,
+                    ) { acc, row -> acc + row[CreditNoteDetailTable.itemCantidad].setScale(3, RoundingMode.HALF_UP) }
+                }
 
         return detailRows.map { row ->
             val quantityOriginal = row[CreditNoteFacturaDetalleTable.itemCantidadTotal].setScale(3, RoundingMode.HALF_UP)
-            val returned = returnedByDetail[row[CreditNoteFacturaDetalleTable.idDetalleFactura]] ?: BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)
+            val returned =
+                returnedByDetail[row[CreditNoteFacturaDetalleTable.idDetalleFactura]] ?: BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)
             val available = quantityOriginal.subtract(returned).coerceAtLeastZero(3)
             val unitTotalSinIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalSinIva], quantityOriginal, 6)
             val unitTotalConIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalConIva], quantityOriginal, 6)
@@ -953,14 +1033,18 @@ class CreditNoteRepository {
         }
     }
 
-    private fun normalizeRequestedLines(request: CreateCreditNoteRequest, invoiceLines: List<SourceInvoiceLine>): Map<String, BigDecimal> {
-        val requestLines = if (request.detalle.isEmpty() && request.anular) {
-            invoiceLines
-                .filter { it.availableQuantity > BigDecimal.ZERO }
-                .map { source -> RequestedLine(source.idDetalleFactura, source.availableQuantity.toDouble()) }
-        } else {
-            request.detalle.map { RequestedLine(it.idDetalleFactura, it.cantidad) }
-        }
+    private fun normalizeRequestedLines(
+        request: CreateCreditNoteRequest,
+        invoiceLines: List<SourceInvoiceLine>,
+    ): Map<String, BigDecimal> {
+        val requestLines =
+            if (request.detalle.isEmpty() && request.anular) {
+                invoiceLines
+                    .filter { it.availableQuantity > BigDecimal.ZERO }
+                    .map { source -> RequestedLine(source.idDetalleFactura, source.availableQuantity.toDouble()) }
+            } else {
+                request.detalle.map { RequestedLine(it.idDetalleFactura, it.cantidad) }
+            }
 
         if (requestLines.isEmpty()) {
             throw CreditNoteValidationException("Debes indicar al menos una línea a devolver")
@@ -984,30 +1068,35 @@ class CreditNoteRepository {
         requestedLines: Map<String, BigDecimal>,
     ): List<ProcessedLine> {
         val linesById = invoiceLines.associateBy { it.idDetalleFactura }
-        return requestedLines.map { (idDetalleFactura, quantity) ->
-            val sourceLine = linesById[idDetalleFactura]
-                ?: throw CreditNoteValidationException("La línea $idDetalleFactura no pertenece a la factura origen")
-            if (quantity > sourceLine.availableQuantity) {
-                throw CreditNoteValidationException(
-                    "La cantidad a devolver para ${sourceLine.descripcion} excede lo disponible (${sourceLine.availableQuantity.toDouble()})"
+        return requestedLines
+            .map { (idDetalleFactura, quantity) ->
+                val sourceLine =
+                    linesById[idDetalleFactura]
+                        ?: throw CreditNoteValidationException("La línea $idDetalleFactura no pertenece a la factura origen")
+                if (quantity > sourceLine.availableQuantity) {
+                    throw CreditNoteValidationException(
+                        "La cantidad a devolver para ${sourceLine.descripcion} excede lo disponible (${sourceLine.availableQuantity.toDouble()})",
+                    )
+                }
+
+                val unitTotalSinIva = divideSafe(sourceLine.totalSinIvaOriginal, sourceLine.quantityOriginal, 6)
+                val unitTotalConIva = divideSafe(sourceLine.totalConIvaOriginal, sourceLine.quantityOriginal, 6)
+
+                ProcessedLine(
+                    sourceLine = sourceLine,
+                    quantity = quantity,
+                    discountAmount = sourceLine.unitDiscountAmount.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
+                    totalSinIva = unitTotalSinIva.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
+                    totalConIva = unitTotalConIva.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
+                    globalDiscountAmount = BigDecimal.ZERO.setScale(2),
                 )
-            }
-
-            val unitTotalSinIva = divideSafe(sourceLine.totalSinIvaOriginal, sourceLine.quantityOriginal, 6)
-            val unitTotalConIva = divideSafe(sourceLine.totalConIvaOriginal, sourceLine.quantityOriginal, 6)
-
-            ProcessedLine(
-                sourceLine = sourceLine,
-                quantity = quantity,
-                discountAmount = sourceLine.unitDiscountAmount.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
-                totalSinIva = unitTotalSinIva.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
-                totalConIva = unitTotalConIva.multiply(quantity).setScale(2, RoundingMode.HALF_UP),
-                globalDiscountAmount = BigDecimal.ZERO.setScale(2),
-            )
-        }.sortedBy { it.sourceLine.idDetalleFactura }
+            }.sortedBy { it.sourceLine.idDetalleFactura }
     }
 
-    private fun loadPreviousCreditNoteTotals(countryCode: String, invoiceId: String): PreviousCreditNoteTotals {
+    private fun loadPreviousCreditNoteTotals(
+        countryCode: String,
+        invoiceId: String,
+    ): PreviousCreditNoteTotals {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
         return headerTable
             .selectAll()
@@ -1015,11 +1104,11 @@ class CreditNoteRepository {
             .toList()
             .filter { row ->
                 !countryCode.equals("PA", ignoreCase = true) ||
-                    !row[headerTable.codDevolucionFiscal].orEmpty()
+                    !row[headerTable.codDevolucionFiscal]
+                        .orEmpty()
                         .trim()
                         .equals(REJECTED_FISCAL_CODE, ignoreCase = true)
-            }
-            .fold(PreviousCreditNoteTotals()) { totals, row ->
+            }.fold(PreviousCreditNoteTotals()) { totals, row ->
                 totals.copy(
                     subtotal = totals.subtotal + row[headerTable.subtotal],
                     tax = totals.tax + row[headerTable.impuesto],
@@ -1037,47 +1126,54 @@ class CreditNoteRepository {
         allReturnedAfterOperation: Boolean,
     ): CreditNoteFinancials {
         val originalGlobalDiscount = invoice.totalizarDescuentoGlobal.coerceAtLeastZero(2)
-        val baseBeforeGlobal = invoice.totalizarTotalOperacion.takeIf { it > BigDecimal.ZERO }
-            ?: invoiceLines.fold(BigDecimal.ZERO) { acc, line -> acc + line.totalSinIvaOriginal }
+        val baseBeforeGlobal =
+            invoice.totalizarTotalOperacion.takeIf { it > BigDecimal.ZERO }
+                ?: invoiceLines.fold(BigDecimal.ZERO) { acc, line -> acc + line.totalSinIvaOriginal }
         val remainingGlobalDiscount = (originalGlobalDiscount - previousTotals.globalDiscount).coerceAtLeastZero(2)
         val processedBase = processedLines.fold(BigDecimal.ZERO) { acc, line -> acc + line.totalSinIva }
-        val proportionalCurrentDiscount = proportionalAmount(
-            amount = originalGlobalDiscount,
-            numerator = processedBase,
-            denominator = baseBeforeGlobal,
-        )
-        val currentGlobalDiscount = if (allReturnedAfterOperation) {
-            remainingGlobalDiscount
-        } else {
-            minBigDecimal(proportionalCurrentDiscount, remainingGlobalDiscount)
-        }
+        val proportionalCurrentDiscount =
+            proportionalAmount(
+                amount = originalGlobalDiscount,
+                numerator = processedBase,
+                denominator = baseBeforeGlobal,
+            )
+        val currentGlobalDiscount =
+            if (allReturnedAfterOperation) {
+                remainingGlobalDiscount
+            } else {
+                minBigDecimal(proportionalCurrentDiscount, remainingGlobalDiscount)
+            }
         var allocatedGlobalDiscount = BigDecimal.ZERO.setScale(2)
-        var adjustedLines = processedLines.mapIndexed { index, line ->
-            val allocation = when {
-                currentGlobalDiscount.compareTo(BigDecimal.ZERO) == 0 -> BigDecimal.ZERO.setScale(2)
-                index == processedLines.lastIndex -> currentGlobalDiscount - allocatedGlobalDiscount
-                processedBase.compareTo(BigDecimal.ZERO) == 0 -> BigDecimal.ZERO.setScale(2)
-                else -> minBigDecimal(
-                    currentGlobalDiscount
-                        .multiply(line.totalSinIva)
-                        .divide(processedBase, 12, RoundingMode.HALF_UP)
-                        .setScale(2, RoundingMode.HALF_UP),
-                    currentGlobalDiscount - allocatedGlobalDiscount,
+        var adjustedLines =
+            processedLines.mapIndexed { index, line ->
+                val allocation =
+                    when {
+                        currentGlobalDiscount.compareTo(BigDecimal.ZERO) == 0 -> BigDecimal.ZERO.setScale(2)
+                        index == processedLines.lastIndex -> currentGlobalDiscount - allocatedGlobalDiscount
+                        processedBase.compareTo(BigDecimal.ZERO) == 0 -> BigDecimal.ZERO.setScale(2)
+                        else ->
+                            minBigDecimal(
+                                currentGlobalDiscount
+                                    .multiply(line.totalSinIva)
+                                    .divide(processedBase, 12, RoundingMode.HALF_UP)
+                                    .setScale(2, RoundingMode.HALF_UP),
+                                currentGlobalDiscount - allocatedGlobalDiscount,
+                            )
+                    }
+                allocatedGlobalDiscount += allocation
+                val subtotal = (line.totalSinIva - allocation).setScale(2, RoundingMode.HALF_UP)
+                val tax = calculateLineTax(subtotal, line.sourceLine.pIva)
+                line.copy(
+                    totalSinIva = subtotal,
+                    totalConIva = subtotal + tax,
+                    globalDiscountAmount = allocation,
                 )
             }
-            allocatedGlobalDiscount += allocation
-            val subtotal = (line.totalSinIva - allocation).setScale(2, RoundingMode.HALF_UP)
-            val tax = calculateLineTax(subtotal, line.sourceLine.pIva)
-            line.copy(
-                totalSinIva = subtotal,
-                totalConIva = subtotal + tax,
-                globalDiscountAmount = allocation,
-            )
-        }
 
         if (allReturnedAfterOperation && adjustedLines.isNotEmpty()) {
-            val originalTotal = invoice.totalTotalFactura.takeIf { it.compareTo(BigDecimal.ZERO) != 0 }
-                ?: invoice.totalizarTotalGeneral
+            val originalTotal =
+                invoice.totalTotalFactura.takeIf { it.compareTo(BigDecimal.ZERO) != 0 }
+                    ?: invoice.totalizarTotalGeneral
             val targetTotal = (originalTotal - previousTotals.total).setScale(2, RoundingMode.HALF_UP)
             val targetTax = (invoice.totalizarMontoIva - previousTotals.tax).setScale(2, RoundingMode.HALF_UP)
             val targetSubtotal = targetTotal - targetTax
@@ -1086,16 +1182,17 @@ class CreditNoteRepository {
             val subtotalResidual = targetSubtotal - currentSubtotal
             val totalResidual = targetTotal - currentTotal
             val lastIndex = adjustedLines.lastIndex
-            adjustedLines = adjustedLines.mapIndexed { index, line ->
-                if (index != lastIndex) {
-                    line
-                } else {
-                    line.copy(
-                        totalSinIva = (line.totalSinIva + subtotalResidual).setScale(2, RoundingMode.HALF_UP),
-                        totalConIva = (line.totalConIva + totalResidual).setScale(2, RoundingMode.HALF_UP),
-                    )
+            adjustedLines =
+                adjustedLines.mapIndexed { index, line ->
+                    if (index != lastIndex) {
+                        line
+                    } else {
+                        line.copy(
+                            totalSinIva = (line.totalSinIva + subtotalResidual).setScale(2, RoundingMode.HALF_UP),
+                            totalConIva = (line.totalConIva + totalResidual).setScale(2, RoundingMode.HALF_UP),
+                        )
+                    }
                 }
-            }
         }
 
         return CreditNoteFinancials(
@@ -1105,27 +1202,41 @@ class CreditNoteRepository {
         )
     }
 
-    private fun proportionalAmount(amount: BigDecimal, numerator: BigDecimal, denominator: BigDecimal): BigDecimal {
-        if (amount.compareTo(BigDecimal.ZERO) == 0 || numerator.compareTo(BigDecimal.ZERO) <= 0 || denominator.compareTo(BigDecimal.ZERO) <= 0) {
+    private fun proportionalAmount(
+        amount: BigDecimal,
+        numerator: BigDecimal,
+        denominator: BigDecimal,
+    ): BigDecimal {
+        if (amount.compareTo(BigDecimal.ZERO) == 0 ||
+            numerator.compareTo(BigDecimal.ZERO) <= 0 ||
+            denominator.compareTo(BigDecimal.ZERO) <= 0
+        ) {
             return BigDecimal.ZERO.setScale(2)
         }
         val boundedNumerator = minBigDecimal(numerator, denominator)
-        return amount.multiply(boundedNumerator)
+        return amount
+            .multiply(boundedNumerator)
             .divide(denominator, 12, RoundingMode.HALF_UP)
             .setScale(2, RoundingMode.HALF_UP)
     }
 
-    private fun calculateLineTax(subtotal: BigDecimal, taxRate: BigDecimal): BigDecimal {
+    private fun calculateLineTax(
+        subtotal: BigDecimal,
+        taxRate: BigDecimal,
+    ): BigDecimal {
         if (subtotal.compareTo(BigDecimal.ZERO) == 0 || taxRate.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2)
         }
-        return subtotal.multiply(taxRate)
+        return subtotal
+            .multiply(taxRate)
             .divide(BigDecimal("100"), 12, RoundingMode.HALF_UP)
             .setScale(2, RoundingMode.HALF_UP)
     }
 
-    private fun minBigDecimal(first: BigDecimal, second: BigDecimal): BigDecimal =
-        if (first <= second) first else second
+    private fun minBigDecimal(
+        first: BigDecimal,
+        second: BigDecimal,
+    ): BigDecimal = if (first <= second) first else second
 
     private fun calculateTotals(lines: List<ProcessedLine>): CreditNoteTotals {
         val subtotal = lines.fold(BigDecimal.ZERO.setScale(2)) { acc, line -> acc + line.totalSinIva }
@@ -1135,49 +1246,54 @@ class CreditNoteRepository {
     }
 
     private fun resolveCajaContext(idCajaSecuencia: String): CajaContext {
-        val row = CreditNoteCajaSecuenciaTable
-            .join(CreditNoteCajaTable, JoinType.INNER, CreditNoteCajaSecuenciaTable.idCaja, CreditNoteCajaTable.idCaja)
-            .selectAll()
-            .where { CreditNoteCajaSecuenciaTable.idCajaSecuencia eq idCajaSecuencia }
-            .limit(1)
-            .firstOrNull()
-            ?: throw CreditNoteValidationException("No se encontró la caja secuencia indicada")
+        val row =
+            CreditNoteCajaSecuenciaTable
+                .join(CreditNoteCajaTable, JoinType.INNER, CreditNoteCajaSecuenciaTable.idCaja, CreditNoteCajaTable.idCaja)
+                .selectAll()
+                .where { CreditNoteCajaSecuenciaTable.idCajaSecuencia eq idCajaSecuencia }
+                .limit(1)
+                .firstOrNull()
+                ?: throw CreditNoteValidationException("No se encontró la caja secuencia indicada")
 
         return CajaContext(
             idCaja = row[CreditNoteCajaTable.idCaja],
             idSucursal = row[CreditNoteCajaTable.idSucursal] ?: 1,
             codigoCaja = row[CreditNoteCajaTable.codigo].orEmpty().ifBlank { "NC" },
-            serieSucursal = row[CreditNoteCajaSecuenciaTable.serieSucursal]
-                ?: row[CreditNoteCajaTable.serieCaja]
-                ?: "00001",
+            serieSucursal =
+                row[CreditNoteCajaSecuenciaTable.serieSucursal]
+                    ?: row[CreditNoteCajaTable.serieCaja]
+                    ?: "00001",
             cajaSecuencia = row[CreditNoteCajaSecuenciaTable.secuencia].orEmpty().ifBlank { "000001" },
             impresoraModelo = row[CreditNoteCajaTable.impresoraModelo].orEmpty(),
         )
     }
 
     private fun advanceCreditNoteCorrelative(idCaja: String): Int {
-        val current = CreditNoteCajaTable
-            .select(CreditNoteCajaTable.notacreditoCorrelativo)
-            .where { CreditNoteCajaTable.idCaja eq idCaja }
-            .forUpdate()
-            .limit(1)
-            .firstOrNull()
-            ?.get(CreditNoteCajaTable.notacreditoCorrelativo)
-            ?: 0
+        val current =
+            CreditNoteCajaTable
+                .select(CreditNoteCajaTable.notacreditoCorrelativo)
+                .where { CreditNoteCajaTable.idCaja eq idCaja }
+                .forUpdate()
+                .limit(1)
+                .firstOrNull()
+                ?.get(CreditNoteCajaTable.notacreditoCorrelativo)
+                ?: 0
 
         val next = current + 1
-        val updated = CreditNoteCajaTable.update({ CreditNoteCajaTable.idCaja eq idCaja }) {
-            it[notacreditoCorrelativo] = next
-        }
+        val updated =
+            CreditNoteCajaTable.update({ CreditNoteCajaTable.idCaja eq idCaja }) {
+                it[notacreditoCorrelativo] = next
+            }
         if (updated != 1) {
             throw CreditNoteValidationException("No se pudo avanzar el correlativo de nota de crédito")
         }
         return next
     }
 
-    private fun buildCreditNoteCode(codigoCaja: String, nextCorrelative: Int): String {
-        return "${codigoCaja.takeIf { it.isNotBlank() } ?: "NC"}-${nextCorrelative.toString().padStart(5, '0')}"
-    }
+    private fun buildCreditNoteCode(
+        codigoCaja: String,
+        nextCorrelative: Int,
+    ): String = "${codigoCaja.takeIf { it.isNotBlank() } ?: "NC"}-${nextCorrelative.toString().padStart(5, '0')}"
 
     private fun validateCreateRequest(request: CreateCreditNoteRequest) {
         if (request.idCajaSecuencia.isBlank()) {
@@ -1189,21 +1305,23 @@ class CreditNoteRepository {
     }
 
     private fun reserveFiscalDocumentNumber(): String {
-        val row = FECorrelativosTable
-            .selectAll()
-            .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
-            .forUpdate()
-            .singleOrNull()
-            ?: throw CreditNoteValidationException("No existe correlativo fiscal para numeroDocumentoFiscal")
+        val row =
+            FECorrelativosTable
+                .selectAll()
+                .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
+                .forUpdate()
+                .singleOrNull()
+                ?: throw CreditNoteValidationException("No existe correlativo fiscal para numeroDocumentoFiscal")
 
         val next = row[FECorrelativosTable.contador].toLong() + 1L
         if (next <= 0L || next > 9_999_999_999L) {
             throw CreditNoteValidationException("El correlativo fiscal excede el rango permitido")
         }
 
-        val updated = FECorrelativosTable.update({ FECorrelativosTable.id eq row[FECorrelativosTable.id] }) {
-            it[contador] = next.toInt()
-        }
+        val updated =
+            FECorrelativosTable.update({ FECorrelativosTable.id eq row[FECorrelativosTable.id] }) {
+                it[contador] = next.toInt()
+            }
         if (updated != 1) {
             throw CreditNoteValidationException("No se pudo reservar el correlativo fiscal")
         }
@@ -1230,7 +1348,10 @@ class CreditNoteRepository {
             .getOrNull()
     }
 
-    private fun insertCreditNoteDetails(creditNoteId: String, lines: List<ProcessedLine>) {
+    private fun insertCreditNoteDetails(
+        creditNoteId: String,
+        lines: List<ProcessedLine>,
+    ) {
         lines.forEach { line ->
             CreditNoteDetailTable.insert {
                 it[idDevolucionDetalle] = UUID.randomUUID().toString()
@@ -1262,8 +1383,9 @@ class CreditNoteRepository {
             .where { CreditNoteDetailTable.idDevolucion eq creditNoteId }
             .orderBy(CreditNoteDetailTable.idDevolucionDetalle)
             .map { row ->
-                val sourceLine = sourceLinesById[row[CreditNoteDetailTable.idDetalleFactura]]
-                    ?: throw CreditNoteValidationException("La línea preparada ya no pertenece a la factura origen")
+                val sourceLine =
+                    sourceLinesById[row[CreditNoteDetailTable.idDetalleFactura]]
+                        ?: throw CreditNoteValidationException("La línea preparada ya no pertenece a la factura origen")
                 ProcessedLine(
                     sourceLine = sourceLine,
                     quantity = row[CreditNoteDetailTable.itemCantidad],
@@ -1280,8 +1402,9 @@ class CreditNoteRepository {
         success: Boolean,
         message: String? = null,
     ): CreateCreditNoteResponse {
-        val detail = getCreditNoteDetail(id, "PA")
-            ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+        val detail =
+            getCreditNoteDetail(id, "PA")
+                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
         return CreateCreditNoteResponse(
             success = success,
             id = detail.id,
@@ -1304,21 +1427,27 @@ class CreditNoteRepository {
                     ?.trim()
                     ?.takeIf { it.equals("NC", ignoreCase = true) }
                     ?.let { row[CajaFormaPagoTable.idFormaPago] }
-            }
-            .firstOrNull()
+            }.firstOrNull()
             ?: throw CreditNoteValidationException("No existe forma de pago activa para Nota de CrÃ©dito (NC)")
 
-    private fun cancelInvoiceAndOriginalCash(countryCode: String, invoiceId: String, username: String, date: LocalDate, now: LocalDateTime) {
+    private fun cancelInvoiceAndOriginalCash(
+        countryCode: String,
+        invoiceId: String,
+        username: String,
+        date: LocalDate,
+        now: LocalDateTime,
+    ) {
         CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoiceId }) {
             it[codEstatus] = 3
         }
 
         val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
         val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(countryCode)
-        val originalCajas = cajaNuevaTable
-            .selectAll()
-            .where { cajaNuevaTable.idFactura eq invoiceId }
-            .toList()
+        val originalCajas =
+            cajaNuevaTable
+                .selectAll()
+                .where { cajaNuevaTable.idFactura eq invoiceId }
+                .toList()
 
         originalCajas.forEach { cajaRow ->
             val cajaId = cajaRow[cajaNuevaTable.cajaId]
@@ -1326,11 +1455,12 @@ class CreditNoteRepository {
                 it[status] = CajaStatus.Anulada
             }
 
-            val reciboIds = cajaNuevaDetalleTable
-                .select(cajaNuevaDetalleTable.cajaReciboId)
-                .where { cajaNuevaDetalleTable.cajaId eq cajaId }
-                .map { it[cajaNuevaDetalleTable.cajaReciboId] }
-                .filter { it.isNotBlank() }
+            val reciboIds =
+                cajaNuevaDetalleTable
+                    .select(cajaNuevaDetalleTable.cajaReciboId)
+                    .where { cajaNuevaDetalleTable.cajaId eq cajaId }
+                    .map { it[cajaNuevaDetalleTable.cajaReciboId] }
+                    .filter { it.isNotBlank() }
 
             if (reciboIds.isNotEmpty()) {
                 val reciboTable = SalesCajaNuevaReciboTableFactory.forCountry(countryCode)
@@ -1355,22 +1485,24 @@ class CreditNoteRepository {
     ) {
         val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
         val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(countryCode)
-        val originalCaja = cajaNuevaTable
-            .selectAll()
-            .where { cajaNuevaTable.idFactura eq invoice.idFactura }
-            .orderBy(cajaNuevaTable.fechaCreacion to SortOrder.DESC)
-            .limit(1)
-            .firstOrNull()
-            ?: return
+        val originalCaja =
+            cajaNuevaTable
+                .selectAll()
+                .where { cajaNuevaTable.idFactura eq invoice.idFactura }
+                .orderBy(cajaNuevaTable.fechaCreacion to SortOrder.DESC)
+                .limit(1)
+                .firstOrNull()
+                ?: return
 
         val cajaId = originalCaja[cajaNuevaTable.cajaId]
-        val cajaReciboId = cajaNuevaDetalleTable
-            .select(cajaNuevaDetalleTable.cajaReciboId)
-            .where { cajaNuevaDetalleTable.cajaId eq cajaId }
-            .limit(1)
-            .firstOrNull()
-            ?.get(cajaNuevaDetalleTable.cajaReciboId)
-            .orEmpty()
+        val cajaReciboId =
+            cajaNuevaDetalleTable
+                .select(cajaNuevaDetalleTable.cajaReciboId)
+                .where { cajaNuevaDetalleTable.cajaId eq cajaId }
+                .limit(1)
+                .firstOrNull()
+                ?.get(cajaNuevaDetalleTable.cajaReciboId)
+                .orEmpty()
 
         cajaNuevaDetalleTable.insert {
             it[cajaDetalleId] = UUID.randomUUID().toString()
@@ -1479,14 +1611,14 @@ class CreditNoteRepository {
                 }
             }
 
-            val stockRow = ItemExistenciaAlmacenTable
-                .selectAll()
-                .where {
-                    (ItemExistenciaAlmacenTable.idItem eq line.sourceLine.idItem) and
-                        (ItemExistenciaAlmacenTable.codAlmacen eq line.sourceLine.almacen)
-                }
-                .limit(1)
-                .firstOrNull()
+            val stockRow =
+                ItemExistenciaAlmacenTable
+                    .selectAll()
+                    .where {
+                        (ItemExistenciaAlmacenTable.idItem eq line.sourceLine.idItem) and
+                            (ItemExistenciaAlmacenTable.codAlmacen eq line.sourceLine.almacen)
+                    }.limit(1)
+                    .firstOrNull()
             if (stockRow == null) {
                 ItemExistenciaAlmacenTable.insertIgnore {
                     it[idItem] = line.sourceLine.idItem
@@ -1514,11 +1646,12 @@ class CreditNoteRepository {
         var remaining = line.quantity.setScale(0, RoundingMode.DOWN).toInt()
         if (remaining <= 0) return
 
-        val lotRows = FacturaDetalleProductoLoteTable
-            .selectAll()
-            .where { FacturaDetalleProductoLoteTable.idDetalleFactura eq line.sourceLine.idDetalleFactura }
-            .orderBy(FacturaDetalleProductoLoteTable.id)
-            .toList()
+        val lotRows =
+            FacturaDetalleProductoLoteTable
+                .selectAll()
+                .where { FacturaDetalleProductoLoteTable.idDetalleFactura eq line.sourceLine.idDetalleFactura }
+                .orderBy(FacturaDetalleProductoLoteTable.id)
+                .toList()
 
         lotRows.forEach { row ->
             if (remaining <= 0) return@forEach
@@ -1526,11 +1659,12 @@ class CreditNoteRepository {
             if (restoreQty <= 0) return@forEach
 
             val lotId = row[FacturaDetalleProductoLoteTable.idLoteItem]
-            val lotRow = ItemLoteTable
-                .selectAll()
-                .where { ItemLoteTable.idLoteItem eq lotId }
-                .limit(1)
-                .firstOrNull()
+            val lotRow =
+                ItemLoteTable
+                    .selectAll()
+                    .where { ItemLoteTable.idLoteItem eq lotId }
+                    .limit(1)
+                    .firstOrNull()
             if (lotRow != null) {
                 val currentAvailability = lotRow[ItemLoteTable.disponibilidad]
                 ItemLoteTable.update({ ItemLoteTable.idLoteItem eq lotId }) {
@@ -1643,13 +1777,14 @@ class CreditNoteRepository {
         now: LocalDateTime,
         cajaContext: CajaContext,
     ) {
-        val current = CreditNoteCajaTable
-            .select(CreditNoteCajaTable.abonoCorrelativo)
-            .where { CreditNoteCajaTable.idCaja eq cajaContext.idCaja }
-            .limit(1)
-            .firstOrNull()
-            ?.get(CreditNoteCajaTable.abonoCorrelativo)
-            ?: 0
+        val current =
+            CreditNoteCajaTable
+                .select(CreditNoteCajaTable.abonoCorrelativo)
+                .where { CreditNoteCajaTable.idCaja eq cajaContext.idCaja }
+                .limit(1)
+                .firstOrNull()
+                ?.get(CreditNoteCajaTable.abonoCorrelativo)
+                ?: 0
         val next = current + 1
         CreditNoteCajaTable.update({ CreditNoteCajaTable.idCaja eq cajaContext.idCaja }) {
             it[abonoCorrelativo] = next
@@ -1694,13 +1829,14 @@ class CreditNoteRepository {
         now: LocalDateTime,
         cajaContext: CajaContext,
     ) {
-        val current = CreditNoteCajaTable
-            .select(CreditNoteCajaTable.certificadoCorrelativo)
-            .where { CreditNoteCajaTable.idCaja eq cajaContext.idCaja }
-            .limit(1)
-            .firstOrNull()
-            ?.get(CreditNoteCajaTable.certificadoCorrelativo)
-            ?: 0
+        val current =
+            CreditNoteCajaTable
+                .select(CreditNoteCajaTable.certificadoCorrelativo)
+                .where { CreditNoteCajaTable.idCaja eq cajaContext.idCaja }
+                .limit(1)
+                .firstOrNull()
+                ?.get(CreditNoteCajaTable.certificadoCorrelativo)
+                ?: 0
         val next = current + 1
         CreditNoteCajaTable.update({ CreditNoteCajaTable.idCaja eq cajaContext.idCaja }) {
             it[certificadoCorrelativo] = next
@@ -1720,8 +1856,11 @@ class CreditNoteRepository {
         }
     }
 
-    private fun buildDetailResponse(header: CreditNoteHeaderContext, lines: List<CreditNoteDetailLine>): CreditNoteDetailResponse {
-        return CreditNoteDetailResponse(
+    private fun buildDetailResponse(
+        header: CreditNoteHeaderContext,
+        lines: List<CreditNoteDetailLine>,
+    ): CreditNoteDetailResponse =
+        CreditNoteDetailResponse(
             id = header.id,
             codigo = header.codigo,
             facturaId = header.facturaId,
@@ -1739,42 +1878,48 @@ class CreditNoteRepository {
             printerSerial = header.printerSerial,
             anulaFacturaCompleta = header.anulaFacturaCompleta,
             lines = lines,
-            fiscalDocument = CreditNoteFiscalDocument(
-                creditNoteId = header.id,
-                creditNoteCode = header.codigo,
-                date = formatDate(header.fecha),
-                customerName = header.clienteNombre,
-                customerIdentifier = header.clienteIdentificacion,
-                customerAddress = header.clienteDireccion,
-                customerPhone = header.clienteTelefono,
-                originalInvoiceCode = header.facturaCodigo,
-                originalFiscalNumber = header.originalFiscalNumber,
-                originalInvoiceDate = formatDate(header.originalInvoiceDate),
-                printerSerial = header.printerSerial,
-                comment = header.observacion,
-                lines = lines.map { line ->
-                    CreditNoteFiscalLine(
-                        description = line.descripcion,
-                        quantity = line.cantidad,
-                        unitPriceWithoutTax = line.precioSinIva,
-                        totalWithTax = line.totalConIva,
-                        taxRate = line.pIva,
-                    )
-                },
-            ),
+            fiscalDocument =
+                CreditNoteFiscalDocument(
+                    creditNoteId = header.id,
+                    creditNoteCode = header.codigo,
+                    date = formatDate(header.fecha),
+                    customerName = header.clienteNombre,
+                    customerIdentifier = header.clienteIdentificacion,
+                    customerAddress = header.clienteDireccion,
+                    customerPhone = header.clienteTelefono,
+                    originalInvoiceCode = header.facturaCodigo,
+                    originalFiscalNumber = header.originalFiscalNumber,
+                    originalInvoiceDate = formatDate(header.originalInvoiceDate),
+                    printerSerial = header.printerSerial,
+                    comment = header.observacion,
+                    lines =
+                        lines.map { line ->
+                            CreditNoteFiscalLine(
+                                description = line.descripcion,
+                                quantity = line.cantidad,
+                                unitPriceWithoutTax = line.precioSinIva,
+                                totalWithTax = line.totalConIva,
+                                taxRate = line.pIva,
+                            )
+                        },
+                ),
         )
-    }
 
-    private fun mapSummaryRow(row: ResultRow, countryCode: String): CreditNoteSummary {
+    private fun mapSummaryRow(
+        row: ResultRow,
+        countryCode: String,
+    ): CreditNoteSummary {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
-        val clienteNombre = listOf(row[ClientsTable.nombre], row[ClientsTable.apellido].orEmpty())
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-            .ifBlank { "CONSUMIDOR FINAL" }
-        val fiscalNumber = resolveDisplayFiscalNumber(
-            codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
-            numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
-        )
+        val clienteNombre =
+            listOf(row[ClientsTable.nombre], row[ClientsTable.apellido].orEmpty())
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { "CONSUMIDOR FINAL" }
+        val fiscalNumber =
+            resolveDisplayFiscalNumber(
+                codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
+                numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
+            )
 
         return CreditNoteSummary(
             id = row[headerTable.idDevolucion],
@@ -1788,22 +1933,27 @@ class CreditNoteRepository {
             total = row[headerTable.total].toDouble(),
             subtotal = row[headerTable.subtotal].toDouble(),
             impuesto = row[headerTable.impuesto].toDouble(),
-            fiscalStatus = resolveFiscalStatus(
-                codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
-                numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
-            ),
+            fiscalStatus =
+                resolveFiscalStatus(
+                    codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
+                    numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
+                ),
             fiscalNumber = fiscalNumber,
             printerSerial = if (headerTable is CreditNoteHeaderTableVE) row[headerTable.impresoraSerial].orEmpty() else "",
             observacion = row[headerTable.observacion].orEmpty(),
         )
     }
 
-    private fun mapHeaderContext(row: ResultRow, countryCode: String): CreditNoteHeaderContext {
+    private fun mapHeaderContext(
+        row: ResultRow,
+        countryCode: String,
+    ): CreditNoteHeaderContext {
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
-        val clienteNombre = listOf(row[ClientsTable.nombre], row[ClientsTable.apellido].orEmpty())
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-            .ifBlank { "CONSUMIDOR FINAL" }
+        val clienteNombre =
+            listOf(row[ClientsTable.nombre], row[ClientsTable.apellido].orEmpty())
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { "CONSUMIDOR FINAL" }
 
         val codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty()
         val numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty()
@@ -1827,16 +1977,17 @@ class CreditNoteRepository {
             fiscalStatus = resolveFiscalStatus(codDevolucionFiscal, numeroDocumentoFiscal),
             fiscalNumber = resolveDisplayFiscalNumber(codDevolucionFiscal, numeroDocumentoFiscal),
             printerSerial = if (headerTable is CreditNoteHeaderTableVE) row[headerTable.impresoraSerial].orEmpty() else "",
-            originalFiscalNumber = row[CreditNoteFacturaTable.numeroDocumentoFiscal].orEmpty().ifBlank {
-                row[CreditNoteFacturaTable.codFacturaFiscal].orEmpty()
-            },
+            originalFiscalNumber =
+                row[CreditNoteFacturaTable.numeroDocumentoFiscal].orEmpty().ifBlank {
+                    row[CreditNoteFacturaTable.codFacturaFiscal].orEmpty()
+                },
             originalInvoiceDate = row[CreditNoteFacturaTable.fechaFactura],
             anulaFacturaCompleta = row[headerTable.total].compareTo(row[CreditNoteFacturaTable.totalTotalFactura]) == 0,
         )
     }
 
-    private fun mapDetailLine(row: ResultRow): CreditNoteDetailLine {
-        return CreditNoteDetailLine(
+    private fun mapDetailLine(row: ResultRow): CreditNoteDetailLine =
+        CreditNoteDetailLine(
             id = row[CreditNoteDetailTable.idDevolucionDetalle],
             idDetalleFactura = row[CreditNoteDetailTable.idDetalleFactura],
             idItem = row[CreditNoteDetailTable.idItem],
@@ -1851,10 +2002,12 @@ class CreditNoteRepository {
             totalSinIva = row[CreditNoteDetailTable.itemTotalSinIva].toDouble(),
             totalConIva = row[CreditNoteDetailTable.itemTotalConIva].toDouble(),
         )
-    }
 
-    private fun resolveFiscalStatus(codDevolucionFiscal: String, numeroDocumentoFiscal: String): CreditNoteFiscalStatus {
-        return when (codDevolucionFiscal.trim().uppercase()) {
+    private fun resolveFiscalStatus(
+        codDevolucionFiscal: String,
+        numeroDocumentoFiscal: String,
+    ): CreditNoteFiscalStatus =
+        when (codDevolucionFiscal.trim().uppercase()) {
             PENDING_FISCAL_CODE -> CreditNoteFiscalStatus.PENDIENTE
             UNCERTAIN_FISCAL_CODE -> CreditNoteFiscalStatus.INCIERTA
             REJECTED_FISCAL_CODE -> CreditNoteFiscalStatus.RECHAZADA
@@ -1865,21 +2018,23 @@ class CreditNoteRepository {
                 if (hasFiscalCode || hasDocumentNumber) CreditNoteFiscalStatus.CONFIRMADA else CreditNoteFiscalStatus.PENDIENTE
             }
         }
-    }
 
-    private fun fiscalStatusCode(status: CreditNoteFiscalStatus): String = when (status) {
-        CreditNoteFiscalStatus.PENDIENTE -> PENDING_FISCAL_CODE
-        CreditNoteFiscalStatus.INCIERTA -> UNCERTAIN_FISCAL_CODE
-        CreditNoteFiscalStatus.RECHAZADA -> REJECTED_FISCAL_CODE
-        CreditNoteFiscalStatus.CONFIRMADA -> CONFIRMED_FISCAL_CODE
-    }
+    private fun fiscalStatusCode(status: CreditNoteFiscalStatus): String =
+        when (status) {
+            CreditNoteFiscalStatus.PENDIENTE -> PENDING_FISCAL_CODE
+            CreditNoteFiscalStatus.INCIERTA -> UNCERTAIN_FISCAL_CODE
+            CreditNoteFiscalStatus.RECHAZADA -> REJECTED_FISCAL_CODE
+            CreditNoteFiscalStatus.CONFIRMADA -> CONFIRMED_FISCAL_CODE
+        }
 
-    private fun resolveDisplayFiscalNumber(codDevolucionFiscal: String, numeroDocumentoFiscal: String): String {
-        return listOf(codDevolucionFiscal, numeroDocumentoFiscal)
+    private fun resolveDisplayFiscalNumber(
+        codDevolucionFiscal: String,
+        numeroDocumentoFiscal: String,
+    ): String =
+        listOf(codDevolucionFiscal, numeroDocumentoFiscal)
             .map(String::trim)
             .firstOrNull(::isValidFiscalValue)
             .orEmpty()
-    }
 
     private fun isValidFiscalValue(value: String): Boolean {
         val normalized = value.trim()
@@ -1889,10 +2044,9 @@ class CreditNoteRepository {
         return digits.isNotEmpty() && digits.any { it != '0' }
     }
 
-    private fun parseDate(value: String): LocalDate {
-        return runCatching { LocalDate.parse(value) }
+    private fun parseDate(value: String): LocalDate =
+        runCatching { LocalDate.parse(value) }
             .getOrElse { throw CreditNoteValidationException("Fecha inválida, usa formato yyyy-MM-dd") }
-    }
 
     private fun formatDate(value: LocalDate?): String {
         if (value == null) return ""
@@ -1904,13 +2058,17 @@ class CreditNoteRepository {
         return value.format(DATE_TIME_FORMATTER)
     }
 
-    private fun divideSafe(value: BigDecimal, divisor: BigDecimal, scale: Int): BigDecimal {
+    private fun divideSafe(
+        value: BigDecimal,
+        divisor: BigDecimal,
+        scale: Int,
+    ): BigDecimal {
         if (divisor.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP)
         return value.divide(divisor, scale, RoundingMode.HALF_UP)
     }
 
-    private fun ProcessedLine.toDetailLine(): CreditNoteDetailLine {
-        return CreditNoteDetailLine(
+    private fun ProcessedLine.toDetailLine(): CreditNoteDetailLine =
+        CreditNoteDetailLine(
             id = "",
             idDetalleFactura = sourceLine.idDetalleFactura,
             idItem = sourceLine.idItem,
@@ -1925,10 +2083,9 @@ class CreditNoteRepository {
             totalSinIva = totalSinIva.toDouble(),
             totalConIva = totalConIva.toDouble(),
         )
-    }
 
-    private fun SourceInvoiceLine.toResponseLine(): CreditNoteSourceInvoiceLine {
-        return CreditNoteSourceInvoiceLine(
+    private fun SourceInvoiceLine.toResponseLine(): CreditNoteSourceInvoiceLine =
+        CreditNoteSourceInvoiceLine(
             idDetalleFactura = idDetalleFactura,
             idItem = idItem,
             descripcion = descripcion,
@@ -1947,7 +2104,6 @@ class CreditNoteRepository {
             totalConIvaDisponible = availableTotalConIva.toDouble(),
             almacen = almacen,
         )
-    }
 
     private data class RequestedLine(
         val idDetalleFactura: String,
@@ -2093,8 +2249,8 @@ class CreditNoteRepository {
     }
 }
 
-private fun BigDecimal.coerceAtLeastZero(scale: Int): BigDecimal {
-    return if (this < BigDecimal.ZERO) BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP) else setScale(scale, RoundingMode.HALF_UP)
-}
+private fun BigDecimal.coerceAtLeastZero(scale: Int): BigDecimal =
+    if (this < BigDecimal.ZERO) BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP) else setScale(scale, RoundingMode.HALF_UP)
 
-private fun BigDecimal.isEffectivelyZero(): Boolean = setScale(3, RoundingMode.HALF_UP).compareTo(BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)) == 0
+private fun BigDecimal.isEffectivelyZero(): Boolean =
+    setScale(3, RoundingMode.HALF_UP).compareTo(BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)) == 0

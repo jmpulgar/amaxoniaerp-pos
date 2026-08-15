@@ -24,7 +24,6 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
 
     authenticate {
         route("/api/facturacion-electronica") {
-
             /**
              * POST /api/facturacion-electronica/{invoiceId}/enviar
              *
@@ -32,11 +31,12 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
              * Si el país es VE, retorna 200 con "no aplicable".
              */
             post("/{invoiceId}/enviar") {
-                val principal = call.principal<JWTPrincipal>()
-                    ?: return@post call.respond(
-                        HttpStatusCode.Unauthorized,
-                        mapOf("error" to "Token inválido"),
-                    )
+                val principal =
+                    call.principal<JWTPrincipal>()
+                        ?: return@post call.respond(
+                            HttpStatusCode.Unauthorized,
+                            mapOf("error" to "Token inválido"),
+                        )
 
                 val tokenType = principal.payload.getClaim("token_type").asString()
                 if (tokenType != "company") {
@@ -46,23 +46,26 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
                     )
                 }
 
-                val countryCode = principal.getCountryCode()
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Falta country_code en token"),
-                    )
+                val countryCode =
+                    principal.getCountryCode()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Falta country_code en token"),
+                        )
 
-                val adminDb = principal.getAdminDb()
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Falta admin_db en token"),
-                    )
+                val adminDb =
+                    principal.getAdminDb()
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Falta admin_db en token"),
+                        )
 
-                val invoiceId = call.parameters["invoiceId"]
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Falta invoiceId en la URL"),
-                    )
+                val invoiceId =
+                    call.parameters["invoiceId"]
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Falta invoiceId en la URL"),
+                        )
 
                 val database = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val processor = factory.forCountry(countryCode)
@@ -70,57 +73,75 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
                 try {
                     when (val result = processor.processElectronicInvoice(database, invoiceId)) {
                         is ElectronicInvoiceResult.Success -> {
-                            call.respond(HttpStatusCode.OK, mapOf(
-                                "success" to true,
-                                "cufe" to result.cufe,
-                                "qr" to (result.qr ?: ""),
-                                "fechaRecepcionDGI" to (result.fechaRecepcionDGI ?: ""),
-                                "nroProtocoloAutorizacion" to (result.nroProtocoloAutorizacion ?: ""),
-                            ))
+                            call.respond(
+                                HttpStatusCode.OK,
+                                mapOf(
+                                    "success" to true,
+                                    "cufe" to result.cufe,
+                                    "qr" to (result.qr ?: ""),
+                                    "fechaRecepcionDGI" to (result.fechaRecepcionDGI ?: ""),
+                                    "nroProtocoloAutorizacion" to (result.nroProtocoloAutorizacion ?: ""),
+                                ),
+                            )
                         }
 
                         is ElectronicInvoiceResult.Failure -> {
-                            call.respond(HttpStatusCode.BadGateway, mapOf(
-                                "success" to false,
-                                "codigo" to result.codigo,
-                                "mensaje" to result.mensaje,
-                            ))
+                            call.respond(
+                                HttpStatusCode.BadGateway,
+                                mapOf(
+                                    "success" to false,
+                                    "codigo" to result.codigo,
+                                    "mensaje" to result.mensaje,
+                                ),
+                            )
                         }
 
                         is ElectronicInvoiceResult.NotApplicable -> {
-                            call.respond(HttpStatusCode.OK, mapOf(
-                                "success" to true,
-                                "message" to "Facturación electrónica no aplica para ${result.country}",
-                            ))
+                            call.respond(
+                                HttpStatusCode.OK,
+                                mapOf(
+                                    "success" to true,
+                                    "message" to "Facturación electrónica no aplica para ${result.country}",
+                                ),
+                            )
                         }
 
                         is ElectronicInvoiceResult.UnsupportedDocumentType -> {
-                            call.respond(HttpStatusCode.OK, mapOf(
-                                "success" to true,
-                                "message" to "Tipo de documento '${result.tipoDocumento}' no implementado en ${result.country} (FASE 1)",
-                            ))
+                            call.respond(
+                                HttpStatusCode.OK,
+                                mapOf(
+                                    "success" to true,
+                                    "message" to "Tipo de documento '${result.tipoDocumento}' no implementado en ${result.country} (FASE 1)",
+                                ),
+                            )
                         }
 
                         is ElectronicInvoiceResult.AlreadyIssued -> {
-                            call.respond(HttpStatusCode.OK, mapOf(
-                                "success" to true,
-                                "message" to "La factura ya posee numeración fiscal (${result.numeroDocumentoFiscal})",
-                                "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
-                                "numeroControl" to (result.numeroControl ?: ""),
-                            ))
+                            call.respond(
+                                HttpStatusCode.OK,
+                                mapOf(
+                                    "success" to true,
+                                    "message" to "La factura ya posee numeración fiscal (${result.numeroDocumentoFiscal})",
+                                    "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
+                                    "numeroControl" to (result.numeroControl ?: ""),
+                                ),
+                            )
                         }
 
                         is ElectronicInvoiceResult.Uncertain -> {
                             // Resultado incierto: el PAC pudo haber creado el
                             // documento. No se puede afirmar fallo ni éxito.
-                            call.respond(HttpStatusCode.Conflict, mapOf(
-                                "success" to false,
-                                "codigo" to result.codigo,
-                                "mensaje" to result.mensaje,
-                                "incierta" to true,
-                                "transaccionId" to (result.transaccionId ?: ""),
-                                "action" to "Requiere conciliación manual",
-                            ))
+                            call.respond(
+                                HttpStatusCode.Conflict,
+                                mapOf(
+                                    "success" to false,
+                                    "codigo" to result.codigo,
+                                    "mensaje" to result.mensaje,
+                                    "incierta" to true,
+                                    "transaccionId" to (result.transaccionId ?: ""),
+                                    "action" to "Requiere conciliación manual",
+                                ),
+                            )
                         }
                     }
                 } catch (e: Exception) {

@@ -53,16 +53,16 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     // AQUÍ ESTABA EL ERROR: El esquema SQL dice que la llave primaria es `id`
     val idCajaSecuencia = varchar("id", 36)
     val idCaja = varchar("id_caja", 36)
-    
+
     // Y la columna estado no se llamaba estado sino "contabilizado" o simplemente no tiene "estado" pero sí tiene "activo"
     // Según tu esquema SQL enviado la llave se llama id.
     val idVendedor = integer("id_vendedor").nullable()
     val secuencia = varchar("secuencia", 10).nullable()
-    
+
     val fechaApertura = datetime("fecha_apertura").nullable()
     val fechaCierre = datetime("fecha_cierre").nullable()
     val fechaCreacion = datetime("fecha_creacion").nullable()
-    
+
     // Montos base
     val montoEfectivoApertura = decimal("monto_efectivo_apertura", 10, 2).default(java.math.BigDecimal.ZERO)
     val montoEfectivoVentas = decimal("monto_efectivo_ventas", 10, 2).default(java.math.BigDecimal.ZERO)
@@ -83,7 +83,7 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     val usuario = varchar("usuario", 10).nullable()
     val serieSucursal = varchar("serie_sucursal", 10)
     val contabilizado = integer("contabilizado").default(0)
-    
+
     // Los campos faltantes que hacían fallar la inserción (serial_fiscal, observacion_apertura, observacion_cierre)
     val serialFiscal = varchar("serial_fiscal", 50).default("")
     val observacionApertura = varchar("observacion_apertura", 300).default("")

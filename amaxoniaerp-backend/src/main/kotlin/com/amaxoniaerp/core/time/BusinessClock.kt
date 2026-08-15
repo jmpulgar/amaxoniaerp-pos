@@ -17,22 +17,17 @@ import java.time.ZoneId
  * guardado coincide con el valor generado aquí (VE/PA sin DST reducen sorpresas).
  */
 object BusinessClock {
-
-    fun zoneForCountry(countryCode: String): ZoneId {
-        return when (countryCode.uppercase()) {
+    fun zoneForCountry(countryCode: String): ZoneId =
+        when (countryCode.uppercase()) {
             "VE" -> ZoneId.of("America/Caracas")
             "PA" -> ZoneId.of("America/Panama")
             else -> throw IllegalArgumentException("País no soportado para zona horaria: $countryCode")
         }
-    }
 
-    fun nowForCountry(countryCode: String): LocalDateTime =
-        LocalDateTime.now(Clock.system(zoneForCountry(countryCode)))
+    fun nowForCountry(countryCode: String): LocalDateTime = LocalDateTime.now(Clock.system(zoneForCountry(countryCode)))
 
-    fun todayForCountry(countryCode: String): LocalDate =
-        nowForCountry(countryCode).toLocalDate()
+    fun todayForCountry(countryCode: String): LocalDate = nowForCountry(countryCode).toLocalDate()
 
     /** Año de dos dígitos (p. ej. 26) según la fecha civil en la zona del país. */
-    fun yearTwoDigitsForCountry(countryCode: String): Int =
-        Year.from(todayForCountry(countryCode)).value % 100
+    fun yearTwoDigitsForCountry(countryCode: String): Int = Year.from(todayForCountry(countryCode)).value % 100
 }

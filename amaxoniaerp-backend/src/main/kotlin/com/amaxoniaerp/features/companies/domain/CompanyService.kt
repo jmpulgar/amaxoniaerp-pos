@@ -22,7 +22,7 @@ class CompanyService(
     suspend fun selectCompany(
         userId: Int,
         companyId: Int,
-        countryCode: String
+        countryCode: String,
     ): CompanySelectResponse {
         // Obtener BD de configuración del país
         val configDatabase = DatabaseManager.getConfigDatabase(countryCode)
@@ -32,8 +32,9 @@ class CompanyService(
         val companyRepository = CompanyRepository(configDatabase)
 
         // Cargar usuario
-        val user = authRepository.loadUserById(userId)
-            ?: throw AuthenticationException("Token inválido o usuario no encontrado")
+        val user =
+            authRepository.loadUserById(userId)
+                ?: throw AuthenticationException("Token inválido o usuario no encontrado")
 
         // Validar acceso a empresa
         val companyCodes = parseCompanyCodes(user.companyCodesRaw)
@@ -42,8 +43,9 @@ class CompanyService(
         }
 
         // Cargar configuración de la empresa
-        val company = companyRepository.loadCompanyConfig(companyId)
-            ?: throw NotFoundException("Empresa no encontrada")
+        val company =
+            companyRepository.loadCompanyConfig(companyId)
+                ?: throw NotFoundException("Empresa no encontrada")
         val rif = companyRepository.loadCompanyRifByAdminDb(company.adminDb, countryCode)
 
         if (!company.admisActivo) {
@@ -56,36 +58,39 @@ class CompanyService(
         return CompanySelectResponse(
             success = true,
             token = token,
-            currentCompany = CompanyDetailResponse(
-                id = company.id,
-                name = company.name,
-                adminDb = company.adminDb,
-                accountingDb = company.accountingDb,
-                payrollDb = company.payrollDb,
-                rif = rif,
-            ),
+            currentCompany =
+                CompanyDetailResponse(
+                    id = company.id,
+                    name = company.name,
+                    adminDb = company.adminDb,
+                    accountingDb = company.accountingDb,
+                    payrollDb = company.payrollDb,
+                    rif = rif,
+                ),
             countryCode = countryCode,
-            schemaType = getSchemaTypeForCountry(countryCode)
+            schemaType = getSchemaTypeForCountry(countryCode),
         )
     }
 
     private fun createCompanyToken(
         user: com.amaxoniaerp.features.auth.domain.UserRecord,
         company: CompanyConfig,
-        countryCode: String
+        countryCode: String,
     ): String {
-        val builder = JWT.create()
-            .withIssuer(jwtConfig.domain)
-            .withAudience(jwtConfig.audience)
-            .withClaim("token_type", "company")
-            .withClaim("user_id", user.id)
-            .withClaim("username", user.username)
-            .withClaim("role", user.role ?: "")
-            .withClaim("level_id", user.levelId ?: 0)
-            .withClaim("company_id", company.id)
-            .withClaim("admin_db", company.adminDb ?: "")
-            .withClaim("country_code", countryCode)
-            .withClaim("schema_type", getSchemaTypeForCountry(countryCode))
+        val builder =
+            JWT
+                .create()
+                .withIssuer(jwtConfig.domain)
+                .withAudience(jwtConfig.audience)
+                .withClaim("token_type", "company")
+                .withClaim("user_id", user.id)
+                .withClaim("username", user.username)
+                .withClaim("role", user.role ?: "")
+                .withClaim("level_id", user.levelId ?: 0)
+                .withClaim("company_id", company.id)
+                .withClaim("admin_db", company.adminDb ?: "")
+                .withClaim("country_code", countryCode)
+                .withClaim("schema_type", getSchemaTypeForCountry(countryCode))
 
         if (!company.accountingDb.isNullOrBlank()) {
             builder.withClaim("accounting_db", company.accountingDb)
@@ -97,8 +102,9 @@ class CompanyService(
         return builder.sign(Algorithm.HMAC256(jwtConfig.secret))
     }
 
-    private fun getSchemaTypeForCountry(countryCode: String): String = when (countryCode.uppercase()) {
-        "VE" -> "TYPE_B"
-        else -> "TYPE_A" // PA
-    }
+    private fun getSchemaTypeForCountry(countryCode: String): String =
+        when (countryCode.uppercase()) {
+            "VE" -> "TYPE_B"
+            else -> "TYPE_A" // PA
+        }
 }

@@ -9,7 +9,6 @@ import com.amaxoniaerp.features.mesas.domain.EnviarComandaResponse
 import com.amaxoniaerp.features.mesas.domain.EstadoPedidoMesa
 import com.amaxoniaerp.features.mesas.domain.PedidoMesaActualizadoResponse
 import com.amaxoniaerp.features.mesas.domain.PedidoMesaCreadoResponse
-import com.amaxoniaerp.features.mesas.domain.PedidoMesaResponse
 import com.amaxoniaerp.features.mesas.domain.PedidoMesaResult
 import com.amaxoniaerp.features.mesas.domain.PedidosMesaListResponse
 import io.ktor.http.HttpStatusCode
@@ -40,9 +39,7 @@ import org.slf4j.LoggerFactory
  * (igual que en sesiones): los pedidos viven exclusivamente ligados a la sesión, no a la caja,
  * porque varias cajas pueden operar contra la misma mesa en turnos distintos.
  */
-fun Route.pedidoMesaRouting(
-    pedidoMesaRepository: PedidoMesaRepository,
-) {
+fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
     val log = LoggerFactory.getLogger("PedidoMesaRouting")
 
     authenticate {
@@ -58,12 +55,13 @@ fun Route.pedidoMesaRouting(
                 val mesaId = call.requireMesaId() ?: return@get
                 val sesionId = call.requireSesionId() ?: return@get
 
-                val estado = call.request.queryParameters["estado"]?.let { codigo ->
-                    EstadoPedidoMesa.fromCodigo(codigo.uppercase()) ?: run {
-                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Estado de pedido inválido"))
-                        return@get
+                val estado =
+                    call.request.queryParameters["estado"]?.let { codigo ->
+                        EstadoPedidoMesa.fromCodigo(codigo.uppercase()) ?: run {
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Estado de pedido inválido"))
+                            return@get
+                        }
                     }
-                }
 
                 try {
                     val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
@@ -253,7 +251,11 @@ fun Route.pedidoMesaRouting(
                         PedidoMesaResult.SesionNoPerteneceMesa ->
                             call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
-                        else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cambiar el estado del pedido"))
+                        else ->
+                            call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "No se pudo cambiar el estado del pedido"),
+                            )
                     }
                 } catch (e: Exception) {
                     log.error("Error cambiando estado. adminDb={} pedidoId={}", ctx.adminDb, pedidoId, e)

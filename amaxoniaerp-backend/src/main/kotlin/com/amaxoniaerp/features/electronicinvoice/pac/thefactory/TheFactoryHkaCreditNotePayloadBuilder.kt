@@ -12,7 +12,6 @@ import com.amaxoniaerp.features.electronicinvoice.domain.PanamaCreditNotePayload
 class TheFactoryHkaCreditNotePayloadBuilder(
     private val invoicePayloadBuilder: TheFactoryHkaPayloadBuilder = TheFactoryHkaPayloadBuilder(),
 ) {
-
     fun build(context: PanamaCreditNotePayloadContext): TheFactoryHkaDocumentoWrapper {
         require(context.originalInvoiceCufe.isNotBlank()) {
             "La factura original electrónica debe tener CUFE"
@@ -29,18 +28,22 @@ class TheFactoryHkaCreditNotePayloadBuilder(
         val numeroDocumentoFiscal = normalizeFiscalNumber(context.invoice.factura.numeroDocumentoFiscal)
         val puntoFacturacionFiscal = normalizeBillingPoint(context.invoice.puntoFacturacionFiscal)
 
-        val creditNoteContext = context.invoice.copy(
-            factura = context.invoice.factura.copy(
-                tipoDocumento = "04",
-                numeroDocumentoFiscal = numeroDocumentoFiscal,
-            ),
-            puntoFacturacionFiscal = puntoFacturacionFiscal,
-        )
-        val referencedDocument = TheFactoryHkaDocFiscalRef(
-            fechaEmisionDocFiscalReferenciado = invoicePayloadBuilder
-                .formatFechaEmisionForPayload(context.originalInvoiceDate),
-            cufeFEReferenciada = context.originalInvoiceCufe,
-        )
+        val creditNoteContext =
+            context.invoice.copy(
+                factura =
+                    context.invoice.factura.copy(
+                        tipoDocumento = "04",
+                        numeroDocumentoFiscal = numeroDocumentoFiscal,
+                    ),
+                puntoFacturacionFiscal = puntoFacturacionFiscal,
+            )
+        val referencedDocument =
+            TheFactoryHkaDocFiscalRef(
+                fechaEmisionDocFiscalReferenciado =
+                    invoicePayloadBuilder
+                        .formatFechaEmisionForPayload(context.originalInvoiceDate),
+                cufeFEReferenciada = context.originalInvoiceCufe,
+            )
 
         return invoicePayloadBuilder.build(
             context = creditNoteContext,

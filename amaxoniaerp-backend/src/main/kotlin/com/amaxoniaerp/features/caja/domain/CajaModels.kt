@@ -1,7 +1,7 @@
 package com.amaxoniaerp.features.caja.domain
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class Caja(
@@ -68,7 +68,7 @@ data class CajaSecuencia(
     val usuarioApertura: String,
     val usuarioCierre: String? = null,
     val serieSucursal: String,
-    val idSucursal: Int?
+    val idSucursal: Int?,
 )
 
 @Serializable
@@ -82,7 +82,7 @@ data class AperturaRequest(
     val facturaInicial: Int = 0,
     val notacreditoInicial: Int = 0,
     val devolucionInicial: Int = 0,
-    val zInicial: Int = 0
+    val zInicial: Int = 0,
 )
 
 @Serializable
@@ -93,14 +93,14 @@ data class CajaSecuenciaCodigoResponse(
 @Serializable
 data class CajaStatusResponse(
     val isOpen: Boolean,
-    val cajaSecuencia: CajaSecuencia? = null
+    val cajaSecuencia: CajaSecuencia? = null,
 )
 
 @Serializable
 data class CajaSecuenciaResumenResponse(
     val isOpen: Boolean,
     val summary: CajaCierreSummary? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 @Serializable

@@ -17,17 +17,18 @@ import io.ktor.server.routing.get
 fun Route.clientTypesRoutes(clientTypesRepository: ClientTypesRepository) {
     authenticate {
         get("/client-types") {
-            val principal = call.principal<JWTPrincipal>()
-                ?: return@get call.respond(
-                    HttpStatusCode.Unauthorized,
-                    mapOf("error" to "Invalid or missing token")
-                )
+            val principal =
+                call.principal<JWTPrincipal>()
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid or missing token"),
+                    )
 
             val tokenType = principal.payload.getClaim("token_type").asString()
             if (tokenType != "company") {
                 return@get call.respond(
                     HttpStatusCode.Forbidden,
-                    mapOf("error" to "Company token required")
+                    mapOf("error" to "Company token required"),
                 )
             }
 
@@ -35,15 +36,16 @@ fun Route.clientTypesRoutes(clientTypesRepository: ClientTypesRepository) {
             if (adminDb.isNullOrBlank()) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf("error" to "Company database not found in token")
+                    mapOf("error" to "Company database not found in token"),
                 )
             }
 
-            val countryCode = principal.getCountryCode()
-                ?: return@get call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "Country code not found in token")
-                )
+            val countryCode =
+                principal.getCountryCode()
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Country code not found in token"),
+                    )
 
             val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
             val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
@@ -55,23 +57,24 @@ fun Route.clientTypesRoutes(clientTypesRepository: ClientTypesRepository) {
             if (limit <= 0 || limit > 1000 || offset < 0) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf("error" to "Invalid pagination parameters")
+                    mapOf("error" to "Invalid pagination parameters"),
                 )
             }
             if (includeTotalParam != null && includeTotalParam.toBooleanStrictOrNull() == null) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf("error" to "Invalid includeTotal parameter")
+                    mapOf("error" to "Invalid includeTotal parameter"),
                 )
             }
 
             val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-            val (types, total) = clientTypesRepository.listClientTypes(
-                database = companyDb,
-                limit = limit,
-                offset = offset,
-                includeTotal = includeTotal,
-            )
+            val (types, total) =
+                clientTypesRepository.listClientTypes(
+                    database = companyDb,
+                    limit = limit,
+                    offset = offset,
+                    includeTotal = includeTotal,
+                )
             call.respond(ClientTypesListResponse(data = types, total = total))
         }
     }

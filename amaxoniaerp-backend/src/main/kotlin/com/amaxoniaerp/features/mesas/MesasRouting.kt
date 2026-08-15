@@ -5,7 +5,6 @@ import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.domain.AreasListResponse
 import com.amaxoniaerp.features.mesas.domain.MesasListResponse
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route

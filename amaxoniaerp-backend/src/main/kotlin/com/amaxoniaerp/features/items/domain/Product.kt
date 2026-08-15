@@ -54,13 +54,12 @@ data class PriceLevel(
 data class CreateProductRequest(
     // Campos base comunes
     val code: String,
-    val name: String,           // descripcion1
-    val description: String? = null,  // descripcion2
+    val name: String, // descripcion1
+    val description: String? = null, // descripcion2
     val reference: String? = null,
     val barcode: String = "",
     val barcode2: String? = null,
     val barcode3: String? = null,
-
     // Categorización
     val departmentId: Int = 0,
     val sectionId: Int = 0,
@@ -68,44 +67,34 @@ data class CreateProductRequest(
     val subfamilyId: Int = 0,
     val brandId: Int = 0,
     val lineId: Int = 0,
-
     // Precios
     val price1: Double = 0.0,
     val utility1: Double = 0.0,
     val priceWithTax1: Double = 0.0,
-
     val price2: Double = 0.0,
     val utility2: Double = 0.0,
     val priceWithTax2: Double = 0.0,
-
     val price3: Double = 0.0,
     val utility3: Double = 0.0,
     val priceWithTax3: Double = 0.0,
-
     val price4: Double = 0.0,
     val utility4: Double = 0.0,
     val priceWithTax4: Double = 0.0,
-
     val price5: Double = 0.0,
     val utility5: Double = 0.0,
     val priceWithTax5: Double = 0.0,
-
     // Costos e impuestos
     val currentCost: Double = 0.0,
     val isTaxExempt: Boolean = false,
     val taxRate: Double = 0.0,
-
     // Existencias
     val totalStock: Int = 0,
-
     // ============== CAMPOS ESPECÍFICOS POR PAÍS (nullable) ==============
-
     // Venezuela (TYPE_B) - Multimoneda y Balanza
     val isScale: Boolean? = null,
     val baseCurrencyId: Int? = null,
-
     // Panamá (TYPE_A) - Kits y Gobierno
-    val kitDetails: String? = null,           // 'T' o 'F'
+    val kitDetails: String? = null, // 'T' o 'F'
     val governmentSegmentId: Int? = null,
     val governmentFamilyId: Int? = null,
 )
@@ -119,12 +108,12 @@ data class ProductsListResponse(
 @Serializable
 data class DepartmentItemResponse(
     val id: Int,
-    val name: String
+    val name: String,
 )
 
 @Serializable
 data class DepartmentsApiResponse(
-    val data: List<DepartmentItemResponse>
+    val data: List<DepartmentItemResponse>,
 )
 
 @Serializable
@@ -133,10 +122,10 @@ data class BestSellerItemResponse(
     val name: String,
     val price: Double,
     val salesCount: Int,
-    val photoUrl: String = ""
+    val photoUrl: String = "",
 )
 
 @Serializable
 data class BestSellersApiResponse(
-    val data: List<BestSellerItemResponse>
+    val data: List<BestSellerItemResponse>,
 )

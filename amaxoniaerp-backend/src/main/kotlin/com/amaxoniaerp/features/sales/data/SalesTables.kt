@@ -10,91 +10,91 @@ import org.jetbrains.exposed.sql.javatime.datetime
  * monedaBase, abrMonedaBase, monedaSecundaria, abrMonedaSecundaria, totalRef) van
  * únicamente en [SalesFacturaTableVE].
  */
-abstract class BaseSalesFacturaTable(name: String = "factura") : Table(name) {
-    val idFactura               = varchar("id_factura", 36)
-    val codFactura              = varchar("cod_factura", 32)
-    val codFacturaFiscal        = varchar("cod_factura_fiscal", 10)
-    val idCliente               = varchar("id_cliente", 36)
-    val codVendedor             = integer("cod_vendedor")
-    val fechaFactura            = date("fechaFactura").nullable()
-    val subtotal                = decimal("subtotal", 20, 2)
-    val descuentosItemFactura   = decimal("descuentosItemFactura", 20, 2)
-    val montoItemsFactura       = decimal("montoItemsFactura", 20, 2)
-    val ivaTotalFactura         = decimal("ivaTotalFactura", 20, 2)
-    val totalTotalFactura       = decimal("TotalTotalFactura", 20, 2)
-    val cantidadItems           = integer("cantidad_items")
-    val totalizarSubTotal       = decimal("totalizar_sub_total", 20, 2)
-    val totalizarDescuentoParcial   = decimal("totalizar_descuento_parcial", 20, 2)
-    val totalizarTotalOperacion     = decimal("totalizar_total_operacion", 20, 2)
-    val totalizarPDescuentoGlobal   = decimal("totalizar_pdescuento_global", 20, 2)
-    val totalizarDescuentoGlobal    = decimal("totalizar_descuento_global", 20, 2)
-    val totalizarBaseImponible      = decimal("totalizar_base_imponible", 20, 2)
-    val totalizarMontoIva           = decimal("totalizar_monto_iva", 20, 2)
-    val totalizarTotalGeneral       = decimal("totalizar_total_general", 20, 2)
-    val totalizarTotalRetencion     = decimal("totalizar_total_retencion", 20, 2)
-    val formaPago               = varchar("formapago", 20)
-    val codEstatus              = integer("cod_estatus").nullable()
-    val totalBultos             = decimal("total_bultos", 10, 2).nullable()
-    val fechaCreacion           = datetime("fecha_creacion").nullable()
-    val usuarioCreacion         = varchar("usuario_creacion", 40)
-    val tipoFactura             = varchar("tipo_factura", 50)
-    val modeloFactura           = varchar("modelo_factura", 100).nullable()
-    val terminoPagoId           = integer("termino_pago_id").nullable()
-    val facturarA               = varchar("facturar_a", 80)
-    val facturarARuc            = varchar("facturar_a_ruc", 50)
-    val facturarADireccion      = varchar("facturar_a_direccion", 250)
-    val facturarATelefono       = varchar("facturar_a_telefono", 50)
-    val validarStock            = varchar("validar_stock", 2)
-    val idShop                  = integer("id_shop")
-    val servicioPeriodo         = varchar("servicio_periodo", 50)
-    val servicioOrden           = varchar("servicio_orden", 50)
-    val observacion             = varchar("observacion", 300)
-    val fechaVencimiento        = date("fecha_vencimiento").nullable()
-    val servicioAnio            = integer("servicio_anio")
-    val servicioMes             = varchar("servicio_mes", 2)
-    val idCajaSecuencia         = varchar("id_caja_secuencia", 36)
-    val numcomContabilizado     = integer("numcom_contabilizado")
-    val fechaContabilizado      = date("fecha_contabilizado")
-    val serieSucursal           = varchar("serie_sucursal", 10)
-    val cajaSecuencia           = varchar("caja_secuencia", 10)
-    val idSucursal              = integer("id_sucursal")
-    val idCaja                  = varchar("id_caja", 36)
-    val codigoCaja              = varchar("codigo_caja", 50)
-    val codCliente              = varchar("cod_cliente", 80)
+abstract class BaseSalesFacturaTable(
+    name: String = "factura",
+) : Table(name) {
+    val idFactura = varchar("id_factura", 36)
+    val codFactura = varchar("cod_factura", 32)
+    val codFacturaFiscal = varchar("cod_factura_fiscal", 10)
+    val idCliente = varchar("id_cliente", 36)
+    val codVendedor = integer("cod_vendedor")
+    val fechaFactura = date("fechaFactura").nullable()
+    val subtotal = decimal("subtotal", 20, 2)
+    val descuentosItemFactura = decimal("descuentosItemFactura", 20, 2)
+    val montoItemsFactura = decimal("montoItemsFactura", 20, 2)
+    val ivaTotalFactura = decimal("ivaTotalFactura", 20, 2)
+    val totalTotalFactura = decimal("TotalTotalFactura", 20, 2)
+    val cantidadItems = integer("cantidad_items")
+    val totalizarSubTotal = decimal("totalizar_sub_total", 20, 2)
+    val totalizarDescuentoParcial = decimal("totalizar_descuento_parcial", 20, 2)
+    val totalizarTotalOperacion = decimal("totalizar_total_operacion", 20, 2)
+    val totalizarPDescuentoGlobal = decimal("totalizar_pdescuento_global", 20, 2)
+    val totalizarDescuentoGlobal = decimal("totalizar_descuento_global", 20, 2)
+    val totalizarBaseImponible = decimal("totalizar_base_imponible", 20, 2)
+    val totalizarMontoIva = decimal("totalizar_monto_iva", 20, 2)
+    val totalizarTotalGeneral = decimal("totalizar_total_general", 20, 2)
+    val totalizarTotalRetencion = decimal("totalizar_total_retencion", 20, 2)
+    val formaPago = varchar("formapago", 20)
+    val codEstatus = integer("cod_estatus").nullable()
+    val totalBultos = decimal("total_bultos", 10, 2).nullable()
+    val fechaCreacion = datetime("fecha_creacion").nullable()
+    val usuarioCreacion = varchar("usuario_creacion", 40)
+    val tipoFactura = varchar("tipo_factura", 50)
+    val modeloFactura = varchar("modelo_factura", 100).nullable()
+    val terminoPagoId = integer("termino_pago_id").nullable()
+    val facturarA = varchar("facturar_a", 80)
+    val facturarARuc = varchar("facturar_a_ruc", 50)
+    val facturarADireccion = varchar("facturar_a_direccion", 250)
+    val facturarATelefono = varchar("facturar_a_telefono", 50)
+    val validarStock = varchar("validar_stock", 2)
+    val idShop = integer("id_shop")
+    val servicioPeriodo = varchar("servicio_periodo", 50)
+    val servicioOrden = varchar("servicio_orden", 50)
+    val observacion = varchar("observacion", 300)
+    val fechaVencimiento = date("fecha_vencimiento").nullable()
+    val servicioAnio = integer("servicio_anio")
+    val servicioMes = varchar("servicio_mes", 2)
+    val idCajaSecuencia = varchar("id_caja_secuencia", 36)
+    val numcomContabilizado = integer("numcom_contabilizado")
+    val fechaContabilizado = date("fecha_contabilizado")
+    val serieSucursal = varchar("serie_sucursal", 10)
+    val cajaSecuencia = varchar("caja_secuencia", 10)
+    val idSucursal = integer("id_sucursal")
+    val idCaja = varchar("id_caja", 36)
+    val codigoCaja = varchar("codigo_caja", 50)
+    val codCliente = varchar("cod_cliente", 80)
 
     override val primaryKey = PrimaryKey(idFactura)
 }
 
 /** Venezuela: multimoneda, impresora fiscal y campos de tasa. */
 object SalesFacturaTableVE : BaseSalesFacturaTable() {
-    val nroz               = varchar("nroz", 4)
-    val impresoraSerial    = varchar("impresora_serial", 50)
-    val multiMoneda        = varchar("multi_moneda", 2)
-    val tasa               = float("tasa")
-    val idTasa             = integer("id_tasa")
-    val monedaBase         = integer("moneda_base")
-    val abrMonedaBase      = varchar("abr_moneda_base", 10)
-    val monedaSecundaria   = integer("moneda_secundaria")
+    val nroz = varchar("nroz", 4)
+    val impresoraSerial = varchar("impresora_serial", 50)
+    val multiMoneda = varchar("multi_moneda", 2)
+    val tasa = float("tasa")
+    val idTasa = integer("id_tasa")
+    val monedaBase = integer("moneda_base")
+    val abrMonedaBase = varchar("abr_moneda_base", 10)
+    val monedaSecundaria = integer("moneda_secundaria")
     val abrMonedaSecundaria = varchar("abr_moneda_secundaria", 10)
-    val totalRef           = float("total_ref")
+    val totalRef = float("total_ref")
 }
 
 /** Panamá: mismo esquema que VE pero sin multimoneda funcional. */
 object SalesFacturaTablePA : BaseSalesFacturaTable() {
-    val nroz                = varchar("nroz", 4)
-    val impresoraSerial     = varchar("impresora_serial", 50)
-    val multiMoneda         = varchar("multi_moneda", 2)
-    val tasa                = float("tasa")
-    val idTasa              = integer("id_tasa")
-    val monedaBase          = integer("moneda_base")
-    val abrMonedaBase       = varchar("abr_moneda_base", 10)
-    val monedaSecundaria    = integer("moneda_secundaria")
+    val nroz = varchar("nroz", 4)
+    val impresoraSerial = varchar("impresora_serial", 50)
+    val multiMoneda = varchar("multi_moneda", 2)
+    val tasa = float("tasa")
+    val idTasa = integer("id_tasa")
+    val monedaBase = integer("moneda_base")
+    val abrMonedaBase = varchar("abr_moneda_base", 10)
+    val monedaSecundaria = integer("moneda_secundaria")
     val abrMonedaSecundaria = varchar("abr_moneda_secundaria", 10)
-    val totalRef            = float("total_ref")
-    val clienteSucursalId   = integer("cliente_sucursal_id").nullable()
+    val totalRef = float("total_ref")
+    val clienteSucursalId = integer("cliente_sucursal_id").nullable()
 }
-
-
 
 /** Devuelve la tabla correcta según el país. */
 object SalesFacturaTableFactory {
@@ -159,7 +159,9 @@ object SalesFacturaImpuestosTable : Table("factura_impuestos") {
     override val primaryKey = PrimaryKey(idFacturaImpuestos)
 }
 
-abstract class BaseSalesFacturaDetalleFormaPagoTable(name: String = "factura_detalle_formapago") : Table(name) {
+abstract class BaseSalesFacturaDetalleFormaPagoTable(
+    name: String = "factura_detalle_formapago",
+) : Table(name) {
     val codFacturaDetalleFormaPago = varchar("cod_factura_detalle_formapago", 36)
     val idFactura = varchar("id_factura", 36)
     val totalizarMontoCancelar = decimal("totalizar_monto_cancelar", 10, 2)
@@ -257,7 +259,9 @@ object SalesCajaSecuenciaTable : Table("caja_secuencia") {
     override val primaryKey = PrimaryKey(id)
 }
 
-abstract class BaseSalesKardexTable(name: String = "kardex_almacen") : Table(name) {
+abstract class BaseSalesKardexTable(
+    name: String = "kardex_almacen",
+) : Table(name) {
     val idTransaccion = varchar("id_transaccion", 36)
     val tipoMovimientoAlmacen = integer("tipo_movimiento_almacen")
     val autorizadoPor = varchar("autorizado_por", 100)
@@ -302,7 +306,9 @@ object SalesKardexTableFactory {
         }
 }
 
-abstract class BaseSalesKardexDetalleTable(name: String = "kardex_almacen_detalle") : Table(name) {
+abstract class BaseSalesKardexDetalleTable(
+    name: String = "kardex_almacen_detalle",
+) : Table(name) {
     val idTransaccionDetalle = varchar("id_transaccion_detalle", 36)
     val idTransaccion = varchar("id_transaccion", 36)
     val idAlmacenEntrada = integer("id_almacen_entrada")
@@ -342,29 +348,31 @@ object SalesKardexDetalleTableFactory {
  * Columnas comunes de `caja_nueva` en VE y PA.
  * VE añade [SalesCajaNuevaTableVE]; PA no tiene columnas extra aquí.
  */
-abstract class BaseSalesCajaNuevaTable(name: String = "caja_nueva") : Table(name) {
-    val cajaId           = varchar("caja_id", 36)
-    val idTransaccion    = varchar("id_transaccion", 36)
-    val fecha            = date("fecha").nullable()
-    val ingEg            = enumerationByName("ing_eg", 1, CajaIngresoEgreso::class).nullable()
-    val monto            = decimal("monto", 10, 2).nullable()
-    val comprobante      = varchar("comprobante", 20)
+abstract class BaseSalesCajaNuevaTable(
+    name: String = "caja_nueva",
+) : Table(name) {
+    val cajaId = varchar("caja_id", 36)
+    val idTransaccion = varchar("id_transaccion", 36)
+    val fecha = date("fecha").nullable()
+    val ingEg = enumerationByName("ing_eg", 1, CajaIngresoEgreso::class).nullable()
+    val monto = decimal("monto", 10, 2).nullable()
+    val comprobante = varchar("comprobante", 20)
     val comprobanteNumero = varchar("comprobante_numero", 50)
-    val idFactura        = varchar("id_factura", 36)
-    val idCliente        = varchar("id_cliente", 36)
-    val status           = enumerationByName("status", 10, CajaStatus::class)
-    val sucursalId       = integer("sucursal_id").nullable()
-    val usuarioCreacion  = varchar("usuario_creacion", 20).nullable()
-    val fechaCreacion    = datetime("fecha_creacion").nullable()
-    val idCompra         = varchar("id_compra", 36)
-    val idProveedor      = varchar("id_proveedor", 36)
-    val concepto         = varchar("concepto", 300).nullable()
-    val idOrdenPago      = varchar("id_ordenpago", 36)
-    val serieSucursal    = varchar("serie_sucursal", 10)
-    val idCajaSecuencia  = varchar("id_caja_secuencia", 36)
-    val idPedido         = varchar("id_pedido", 36)
-    val idAbono          = varchar("id_abono", 36)
-    val idNotaCredito    = varchar("id_notacredito", 36)
+    val idFactura = varchar("id_factura", 36)
+    val idCliente = varchar("id_cliente", 36)
+    val status = enumerationByName("status", 10, CajaStatus::class)
+    val sucursalId = integer("sucursal_id").nullable()
+    val usuarioCreacion = varchar("usuario_creacion", 20).nullable()
+    val fechaCreacion = datetime("fecha_creacion").nullable()
+    val idCompra = varchar("id_compra", 36)
+    val idProveedor = varchar("id_proveedor", 36)
+    val concepto = varchar("concepto", 300).nullable()
+    val idOrdenPago = varchar("id_ordenpago", 36)
+    val serieSucursal = varchar("serie_sucursal", 10)
+    val idCajaSecuencia = varchar("id_caja_secuencia", 36)
+    val idPedido = varchar("id_pedido", 36)
+    val idAbono = varchar("id_abono", 36)
+    val idNotaCredito = varchar("id_notacredito", 36)
 
     override val primaryKey = PrimaryKey(cajaId)
 }
@@ -374,8 +382,6 @@ object SalesCajaNuevaTableVE : BaseSalesCajaNuevaTable()
 
 /** Panamá: sin columnas extra en caja_nueva vs la base. */
 object SalesCajaNuevaTablePA : BaseSalesCajaNuevaTable()
-
-
 
 /** Devuelve la tabla correcta según el país. */
 object SalesCajaNuevaTableFactory {
@@ -393,27 +399,29 @@ object SalesCajaNuevaTableFactory {
  * VE añade [SalesCajaNuevaDetalleTableVE] con monto_recibido y monto_moneda_principal
  * que no existen en el esquema de Panamá.
  */
-abstract class BaseSalesCajaNuevaDetalleTable(name: String = "caja_nueva_detalle") : Table(name) {
-    val cajaDetalleId        = varchar("caja_detalle_id", 36)
-    val cajaId               = varchar("caja_id", 36)
-    val idFormaPago          = integer("id_forma_pago").nullable()
-    val idTransaccion        = varchar("id_transaccion", 36)
-    val cajaReciboId         = varchar("caja_recibo_id", 36)
-    val monto                = decimal("monto", 10, 2).nullable()
-    val montoOriginal        = decimal("monto_original", 10, 2)
-    val concepto             = varchar("concepto", 300).nullable()
-    val usuarioCreacion      = varchar("usuario_creacion", 20).nullable()
-    val fechaCreacion        = datetime("fecha_creacion").nullable()
-    val retencionTipo        = varchar("retencion_tipo", 10)
-    val retencionPorcentaje  = varchar("retencion_porcentaje", 300)
-    val numero               = varchar("numero", 300)
-    val observacion          = varchar("observacion", 300)
+abstract class BaseSalesCajaNuevaDetalleTable(
+    name: String = "caja_nueva_detalle",
+) : Table(name) {
+    val cajaDetalleId = varchar("caja_detalle_id", 36)
+    val cajaId = varchar("caja_id", 36)
+    val idFormaPago = integer("id_forma_pago").nullable()
+    val idTransaccion = varchar("id_transaccion", 36)
+    val cajaReciboId = varchar("caja_recibo_id", 36)
+    val monto = decimal("monto", 10, 2).nullable()
+    val montoOriginal = decimal("monto_original", 10, 2)
+    val concepto = varchar("concepto", 300).nullable()
+    val usuarioCreacion = varchar("usuario_creacion", 20).nullable()
+    val fechaCreacion = datetime("fecha_creacion").nullable()
+    val retencionTipo = varchar("retencion_tipo", 10)
+    val retencionPorcentaje = varchar("retencion_porcentaje", 300)
+    val numero = varchar("numero", 300)
+    val observacion = varchar("observacion", 300)
     val retencionBaseCalculo = varchar("retencion_base_calculo", 300)
-    val serieSucursal        = varchar("serie_sucursal", 10)
-    val cajaSecuencia        = varchar("caja_secuencia", 36)
-    val numeroControl        = varchar("numero_control", 300)
-    val numeroComprobante    = varchar("numero_comprobante", 300)
-    val retencionMonto       = varchar("retencion_monto", 300)
+    val serieSucursal = varchar("serie_sucursal", 10)
+    val cajaSecuencia = varchar("caja_secuencia", 36)
+    val numeroControl = varchar("numero_control", 300)
+    val numeroComprobante = varchar("numero_comprobante", 300)
+    val retencionMonto = varchar("retencion_monto", 300)
     val retencionDetalleJson = text("retencion_detalle_json")
 
     override val primaryKey = PrimaryKey(cajaDetalleId)
@@ -421,14 +429,12 @@ abstract class BaseSalesCajaNuevaDetalleTable(name: String = "caja_nueva_detalle
 
 /** Venezuela: campos de multimoneda en el detalle de caja. */
 object SalesCajaNuevaDetalleTableVE : BaseSalesCajaNuevaDetalleTable() {
-    val montoRecibido        = decimal("monto_recibido", 10, 2)
+    val montoRecibido = decimal("monto_recibido", 10, 2)
     val montoMonedaPrincipal = decimal("monto_moneda_principal", 10, 2)
 }
 
 /** Panamá: sin campos de multimoneda en el detalle de caja. */
 object SalesCajaNuevaDetalleTablePA : BaseSalesCajaNuevaDetalleTable()
-
-
 
 /** Devuelve la tabla correcta según el país. */
 object SalesCajaNuevaDetalleTableFactory {
@@ -461,7 +467,9 @@ object SalesCajaNuevaDetalleFormaPagoTable : Table("caja_nueva_detalle_forma_pag
     override val primaryKey = PrimaryKey(cajaDetalleFormaPagoId)
 }
 
-abstract class BaseSalesCajaNuevaReciboTable(name: String = "caja_nueva_recibo") : Table(name) {
+abstract class BaseSalesCajaNuevaReciboTable(
+    name: String = "caja_nueva_recibo",
+) : Table(name) {
     val cajaReciboId = varchar("caja_recibo_id", 36)
     val tipoRecibo = varchar("tipo_recibo", 3)
     val nroRecibo = varchar("nro_recibo", 32)

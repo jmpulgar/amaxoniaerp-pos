@@ -31,11 +31,12 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
             get {
                 val ctx = call.resolveCajaCompanyContext() ?: return@get
                 val principal = call.principal<JWTPrincipal>()!!
-                val userId = principal.payload.getClaim("user_id").asInt()
-                    ?: run {
-                        call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido: falta user_id"))
-                        return@get
-                    }
+                val userId =
+                    principal.payload.getClaim("user_id").asInt()
+                        ?: run {
+                            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido: falta user_id"))
+                            return@get
+                        }
 
                 try {
                     val cajas = cajaRepository.getCajas(ctx.countryCode, ctx.companyDb, userId)
@@ -49,7 +50,12 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
             post("/open") {
                 val ctx = call.resolveCajaCompanyContext() ?: return@post
                 val principal = call.principal<JWTPrincipal>()!!
-                val username = principal.payload.getClaim("username").asString().orEmpty().ifBlank { "Unknown" }
+                val username =
+                    principal.payload
+                        .getClaim("username")
+                        .asString()
+                        .orEmpty()
+                        .ifBlank { "Unknown" }
 
                 try {
                     val request = call.receive<AperturaRequest>()
@@ -144,9 +150,10 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                     return@get
                 }
 
-                val verify = call.request.queryParameters["by.verificar_facturas_temporales"]
-                    ?.let { it == "1" || it.equals("true", ignoreCase = true) }
-                    ?: false
+                val verify =
+                    call.request.queryParameters["by.verificar_facturas_temporales"]
+                        ?.let { it == "1" || it.equals("true", ignoreCase = true) }
+                        ?: false
 
                 cajaRepository.getCajaSecuenciaData(ctx.countryCode, ctx.companyDb, id, verify).fold(
                     onSuccess = { data ->
@@ -183,17 +190,18 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
             post("/close") {
                 val ctx = call.resolveCajaCompanyContext() ?: return@post
 
-                val request = runCatching { call.receive<CajaCierreSaveRequest>() }.getOrElse { e ->
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        CajaCierreSaveResponse(
-                            success = false,
-                            message = "Payload inválido",
-                            error = e.message,
-                        ),
-                    )
-                    return@post
-                }
+                val request =
+                    runCatching { call.receive<CajaCierreSaveRequest>() }.getOrElse { e ->
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            CajaCierreSaveResponse(
+                                success = false,
+                                message = "Payload inválido",
+                                error = e.message,
+                            ),
+                        )
+                        return@post
+                    }
 
                 cajaRepository.saveCajaCierre(ctx.countryCode, ctx.companyDb, request).fold(
                     onSuccess = { response ->
@@ -225,11 +233,12 @@ private data class CajaCompanyContext(
  * Misma regla que notas de crédito / ventas POS: token de empresa, `Company-DB` = `admin_db`, `country_code` en JWT.
  */
 private suspend fun ApplicationCall.resolveCajaCompanyContext(): CajaCompanyContext? {
-    val principal = principal<JWTPrincipal>()
-        ?: run {
-            respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-            return null
-        }
+    val principal =
+        principal<JWTPrincipal>()
+            ?: run {
+                respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                return null
+            }
 
     if (principal.payload.getClaim("token_type").asString() != "company") {
         respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
@@ -242,22 +251,24 @@ private suspend fun ApplicationCall.resolveCajaCompanyContext(): CajaCompanyCont
         return null
     }
 
-    val adminDb = principal.getAdminDb()
-        ?: run {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
-            return null
-        }
+    val adminDb =
+        principal.getAdminDb()
+            ?: run {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                return null
+            }
 
     if (!companyDbHeader.equals(adminDb, ignoreCase = true)) {
         respond(HttpStatusCode.Forbidden, mapOf("error" to "Company-DB no coincide con la empresa autenticada"))
         return null
     }
 
-    val countryCode = principal.getCountryCode()
-        ?: run {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-            return null
-        }
+    val countryCode =
+        principal.getCountryCode()
+            ?: run {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                return null
+            }
 
     return CajaCompanyContext(countryCode = countryCode, companyDb = companyDbHeader)
 }

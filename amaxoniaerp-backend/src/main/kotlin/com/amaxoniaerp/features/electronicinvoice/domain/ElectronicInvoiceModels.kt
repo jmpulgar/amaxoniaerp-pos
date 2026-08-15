@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
  * Permite al llamador manejar los tres escenarios posibles de forma exhaustiva.
  */
 sealed class ElectronicInvoiceResult {
-
     /**
      * El PAC aceptó el documento.
      *

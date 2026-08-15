@@ -11,113 +11,121 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.Test
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
-import org.junit.Test
 
 class CreditNoteFinancialsTest {
     @Test
-    fun `credit note without global discount preserves original amounts`() = withSeededDatabase(
-        lines = listOf(LineSpec("detail-1", 1.0, 50.0, 20.0), LineSpec("detail-2", 1.0, 50.0, 0.0)),
-        globalDiscount = 0.0,
-        originalTax = 10.0,
-        originalTotal = 110.0,
-    ) {
-        val response = createNote(listOf("detail-1" to 1.0, "detail-2" to 1.0))
+    fun `credit note without global discount preserves original amounts`() =
+        withSeededDatabase(
+            lines = listOf(LineSpec("detail-1", 1.0, 50.0, 20.0), LineSpec("detail-2", 1.0, 50.0, 0.0)),
+            globalDiscount = 0.0,
+            originalTax = 10.0,
+            originalTotal = 110.0,
+        ) {
+            val response = createNote(listOf("detail-1" to 1.0, "detail-2" to 1.0))
 
-        assertEquals(100.0, response.subtotal, 0.001)
-        assertEquals(10.0, response.impuesto, 0.001)
-        assertEquals(110.0, response.total, 0.001)
-        assertEquals(0.0, headers().single().globalDiscount, 0.001)
-    }
-
-    @Test
-    fun `global discount is allocated across lines with different tax rates`() = withSeededDatabase(
-        lines = listOf(
-            LineSpec("detail-1", 1.0, 50.0, 20.0),
-            LineSpec("detail-2", 1.0, 30.0, 10.0),
-            LineSpec("detail-3", 1.0, 20.0, 0.0),
-        ),
-        globalDiscount = 10.0,
-        originalTax = 11.70,
-        originalTotal = 101.70,
-    ) {
-        val response = createNote(
-            listOf("detail-1" to 1.0, "detail-2" to 1.0, "detail-3" to 1.0),
-        )
-
-        assertEquals(90.0, response.subtotal, 0.001)
-        assertEquals(11.70, response.impuesto, 0.001)
-        assertEquals(101.70, response.total, 0.001)
-        assertEquals(10.0, headers().single().globalDiscount, 0.001)
-        assertEquals(10.0, headers().single().globalDiscountPercent, 0.001)
-    }
+            assertEquals(100.0, response.subtotal, 0.001)
+            assertEquals(10.0, response.impuesto, 0.001)
+            assertEquals(110.0, response.total, 0.001)
+            assertEquals(0.0, headers().single().globalDiscount, 0.001)
+        }
 
     @Test
-    fun `partial return applies only the proportional global discount`() = withSeededDatabase(
-        lines = listOf(LineSpec("detail-1", 10.0, 100.0, 20.0)),
-        globalDiscount = 10.0,
-        originalTax = 18.0,
-        originalTotal = 108.0,
-    ) {
-        val response = createNote(listOf("detail-1" to 5.0))
+    fun `global discount is allocated across lines with different tax rates`() =
+        withSeededDatabase(
+            lines =
+                listOf(
+                    LineSpec("detail-1", 1.0, 50.0, 20.0),
+                    LineSpec("detail-2", 1.0, 30.0, 10.0),
+                    LineSpec("detail-3", 1.0, 20.0, 0.0),
+                ),
+            globalDiscount = 10.0,
+            originalTax = 11.70,
+            originalTotal = 101.70,
+        ) {
+            val response =
+                createNote(
+                    listOf("detail-1" to 1.0, "detail-2" to 1.0, "detail-3" to 1.0),
+                )
 
-        assertEquals(45.0, response.subtotal, 0.001)
-        assertEquals(9.0, response.impuesto, 0.001)
-        assertEquals(54.0, response.total, 0.001)
-        assertEquals(5.0, headers().single().globalDiscount, 0.001)
-    }
-
-    @Test
-    fun `multiple partial returns exhaust the original discount and total`() = withSeededDatabase(
-        lines = listOf(LineSpec("detail-1", 10.0, 100.0, 20.0)),
-        globalDiscount = 10.0,
-        originalTax = 18.0,
-        originalTotal = 108.0,
-    ) {
-        createNote(listOf("detail-1" to 3.0))
-        createNote(listOf("detail-1" to 4.0))
-        createNote(listOf("detail-1" to 3.0))
-
-        val notes = headers()
-        assertEquals(3, notes.size)
-        assertEquals(10.0, notes.sumOf { it.globalDiscount }, 0.001)
-        assertEquals(108.0, notes.sumOf { it.total }, 0.001)
-    }
+            assertEquals(90.0, response.subtotal, 0.001)
+            assertEquals(11.70, response.impuesto, 0.001)
+            assertEquals(101.70, response.total, 0.001)
+            assertEquals(10.0, headers().single().globalDiscount, 0.001)
+            assertEquals(10.0, headers().single().globalDiscountPercent, 0.001)
+        }
 
     @Test
-    fun `cent residual is absorbed by the remaining return`() = withSeededDatabase(
-        lines = listOf(LineSpec("detail-1", 10.0, 100.0, 0.0)),
-        globalDiscount = 10.01,
-        originalTax = 0.0,
-        originalTotal = 89.99,
-    ) {
-        createNote(listOf("detail-1" to 3.0))
-        createNote(listOf("detail-1" to 3.0))
-        createNote(listOf("detail-1" to 4.0))
+    fun `partial return applies only the proportional global discount`() =
+        withSeededDatabase(
+            lines = listOf(LineSpec("detail-1", 10.0, 100.0, 20.0)),
+            globalDiscount = 10.0,
+            originalTax = 18.0,
+            originalTotal = 108.0,
+        ) {
+            val response = createNote(listOf("detail-1" to 5.0))
 
-        val discounts = headers().map { it.globalDiscount }
-        assertEquals(10.01, discounts.sum(), 0.001)
-        assertEquals(4.01, headers().last().globalDiscount, 0.001)
-    }
+            assertEquals(45.0, response.subtotal, 0.001)
+            assertEquals(9.0, response.impuesto, 0.001)
+            assertEquals(54.0, response.total, 0.001)
+            assertEquals(5.0, headers().single().globalDiscount, 0.001)
+        }
 
     @Test
-    fun `exempt and taxed lines recalculate tax without inventing exempt tax`() = withSeededDatabase(
-        lines = listOf(LineSpec("detail-1", 1.0, 50.0, 20.0), LineSpec("detail-2", 1.0, 50.0, 0.0)),
-        globalDiscount = 10.0,
-        originalTax = 9.0,
-        originalTotal = 99.0,
-    ) {
-        val response = createNote(listOf("detail-1" to 1.0, "detail-2" to 1.0))
+    fun `multiple partial returns exhaust the original discount and total`() =
+        withSeededDatabase(
+            lines = listOf(LineSpec("detail-1", 10.0, 100.0, 20.0)),
+            globalDiscount = 10.0,
+            originalTax = 18.0,
+            originalTotal = 108.0,
+        ) {
+            createNote(listOf("detail-1" to 3.0))
+            createNote(listOf("detail-1" to 4.0))
+            createNote(listOf("detail-1" to 3.0))
 
-        assertEquals(90.0, response.subtotal, 0.001)
-        assertEquals(9.0, response.impuesto, 0.001)
-        assertEquals(99.0, response.total, 0.001)
-    }
+            val notes = headers()
+            assertEquals(3, notes.size)
+            assertEquals(10.0, notes.sumOf { it.globalDiscount }, 0.001)
+            assertEquals(108.0, notes.sumOf { it.total }, 0.001)
+        }
+
+    @Test
+    fun `cent residual is absorbed by the remaining return`() =
+        withSeededDatabase(
+            lines = listOf(LineSpec("detail-1", 10.0, 100.0, 0.0)),
+            globalDiscount = 10.01,
+            originalTax = 0.0,
+            originalTotal = 89.99,
+        ) {
+            createNote(listOf("detail-1" to 3.0))
+            createNote(listOf("detail-1" to 3.0))
+            createNote(listOf("detail-1" to 4.0))
+
+            val discounts = headers().map { it.globalDiscount }
+            assertEquals(10.01, discounts.sum(), 0.001)
+            assertEquals(4.01, headers().last().globalDiscount, 0.001)
+        }
+
+    @Test
+    fun `exempt and taxed lines recalculate tax without inventing exempt tax`() =
+        withSeededDatabase(
+            lines = listOf(LineSpec("detail-1", 1.0, 50.0, 20.0), LineSpec("detail-2", 1.0, 50.0, 0.0)),
+            globalDiscount = 10.0,
+            originalTax = 9.0,
+            originalTotal = 99.0,
+        ) {
+            val response = createNote(listOf("detail-1" to 1.0, "detail-2" to 1.0))
+
+            assertEquals(90.0, response.subtotal, 0.001)
+            assertEquals(9.0, response.impuesto, 0.001)
+            assertEquals(99.0, response.total, 0.001)
+        }
 
     private lateinit var database: Database
     private val repository = CreditNoteRepository()
@@ -126,30 +134,32 @@ class CreditNoteFinancialsTest {
         transaction(database) {
             repository.create(
                 countryCode = "PA",
-                request = CreateCreditNoteRequest(
-                    idFactura = SOURCE_INVOICE_ID,
-                    fecha = LocalDate.of(2026, 1, 10).toString(),
-                    detalle = lines.map { (id, quantity) -> CreateCreditNoteLineInput(id, quantity) },
-                    devolverStock = false,
-                    idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
-                    settlementType = CreditNoteSettlementType.NINGUNO,
-                ),
+                request =
+                    CreateCreditNoteRequest(
+                        idFactura = SOURCE_INVOICE_ID,
+                        fecha = LocalDate.of(2026, 1, 10).toString(),
+                        detalle = lines.map { (id, quantity) -> CreateCreditNoteLineInput(id, quantity) },
+                        devolverStock = false,
+                        idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
+                        settlementType = CreditNoteSettlementType.NINGUNO,
+                    ),
                 username = "tester",
             )
         }
 
-    private fun headers() = transaction(database) {
-        CreditNoteHeaderTablePA
-            .selectAll()
-            .orderBy(CreditNoteHeaderTablePA.fechaCreacion)
-            .map {
-                HeaderAmounts(
-                    globalDiscount = it[CreditNoteHeaderTablePA.descuentoGlobal]?.toDouble() ?: 0.0,
-                    globalDiscountPercent = it[CreditNoteHeaderTablePA.pdescuentoGlobal]?.toDouble() ?: 0.0,
-                    total = it[CreditNoteHeaderTablePA.total].toDouble(),
-                )
-            }
-    }
+    private fun headers() =
+        transaction(database) {
+            CreditNoteHeaderTablePA
+                .selectAll()
+                .orderBy(CreditNoteHeaderTablePA.fechaCreacion)
+                .map {
+                    HeaderAmounts(
+                        globalDiscount = it[CreditNoteHeaderTablePA.descuentoGlobal]?.toDouble() ?: 0.0,
+                        globalDiscountPercent = it[CreditNoteHeaderTablePA.pdescuentoGlobal]?.toDouble() ?: 0.0,
+                        total = it[CreditNoteHeaderTablePA.total].toDouble(),
+                    )
+                }
+        }
 
     private fun withSeededDatabase(
         lines: List<LineSpec>,
@@ -158,10 +168,11 @@ class CreditNoteFinancialsTest {
         originalTotal: Double,
         block: CreditNoteFinancialsTest.() -> Unit,
     ) {
-        database = Database.connect(
-            url = "jdbc:h2:mem:credit_note_financials_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:credit_note_financials_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 ClientsTable,
@@ -261,9 +272,11 @@ class CreditNoteFinancialsTest {
             it[totalRef] = originalTotal.toBigDecimal()
         }
         lines.forEachIndexed { index, line ->
-            val detailTax = line.base.toBigDecimal()
-                .multiply(line.taxRate.toBigDecimal())
-                .divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+            val detailTax =
+                line.base
+                    .toBigDecimal()
+                    .multiply(line.taxRate.toBigDecimal())
+                    .divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
             CreditNoteFacturaDetalleTable.insert {
                 it[idDetalleFactura] = line.id
                 it[idFactura] = SOURCE_INVOICE_ID
@@ -316,8 +329,17 @@ class CreditNoteFinancialsTest {
         }
     }
 
-    private fun percentage(amount: Double, base: Double): BigDecimal =
-        if (base == 0.0) BigDecimal.ZERO else amount.toBigDecimal().multiply(BigDecimal("100")).divide(base.toBigDecimal(), 2, RoundingMode.HALF_UP)
+    private fun percentage(
+        amount: Double,
+        base: Double,
+    ): BigDecimal =
+        if (base ==
+            0.0
+        ) {
+            BigDecimal.ZERO
+        } else {
+            amount.toBigDecimal().multiply(BigDecimal("100")).divide(base.toBigDecimal(), 2, RoundingMode.HALF_UP)
+        }
 
     private data class LineSpec(
         val id: String,

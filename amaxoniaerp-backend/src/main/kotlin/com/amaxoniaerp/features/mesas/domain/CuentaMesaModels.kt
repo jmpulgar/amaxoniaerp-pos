@@ -11,7 +11,9 @@ import kotlinx.serialization.Serializable
  *   restados de `pedido_mesa.cantidad_facturada`.
  * - [CANCELADA]: descartada sin facturación; los saldos reservados regresan al pool pendiente.
  */
-enum class EstadoCuentaMesa(val codigo: String) {
+enum class EstadoCuentaMesa(
+    val codigo: String,
+) {
     ACTIVA("ACTIVA"),
     PAGADA("PAGADA"),
     CANCELADA("CANCELADA"),
@@ -21,8 +23,7 @@ enum class EstadoCuentaMesa(val codigo: String) {
         get() = this == PAGADA || this == CANCELADA
 
     companion object {
-        fun fromCodigo(codigo: String): EstadoCuentaMesa? =
-            entries.firstOrNull { it.codigo == codigo }
+        fun fromCodigo(codigo: String): EstadoCuentaMesa? = entries.firstOrNull { it.codigo == codigo }
     }
 }
 
@@ -36,15 +37,16 @@ enum class EstadoCuentaMesa(val codigo: String) {
  * - [FAILED]: el POS reportó fallo de facturación (404/500/etc); este intento se puede
  *   descartar y se puede iniciar uno nuevo con otra `idempotencyKey`.
  */
-enum class EstadoCuentaIdempotencia(val codigo: String) {
+enum class EstadoCuentaIdempotencia(
+    val codigo: String,
+) {
     SENDING("SENDING"),
     CONFIRMED("CONFIRMED"),
     FAILED("FAILED"),
     ;
 
     companion object {
-        fun fromCodigo(codigo: String): EstadoCuentaIdempotencia? =
-            entries.firstOrNull { it.codigo == codigo }
+        fun fromCodigo(codigo: String): EstadoCuentaIdempotencia? = entries.firstOrNull { it.codigo == codigo }
     }
 }
 
@@ -176,11 +178,17 @@ data class CancelarCuentaRequest(
 
 /** Resultado interno del repositorio de cuenta. Lo traduce el routing a HTTP status. */
 sealed interface CuentaMesaResult {
-    data class Creada(val cuenta: CuentaMesaResponse) : CuentaMesaResult
+    data class Creada(
+        val cuenta: CuentaMesaResponse,
+    ) : CuentaMesaResult
 
-    data class Listada(val cuentas: List<CuentaMesaResponse>) : CuentaMesaResult
+    data class Listada(
+        val cuentas: List<CuentaMesaResponse>,
+    ) : CuentaMesaResult
 
-    data class SolicitudRegistrada(val sesion: SesionMesaResponse) : CuentaMesaResult
+    data class SolicitudRegistrada(
+        val sesion: SesionMesaResponse,
+    ) : CuentaMesaResult
 
     data class Facturada(
         val cuenta: CuentaMesaResponse,

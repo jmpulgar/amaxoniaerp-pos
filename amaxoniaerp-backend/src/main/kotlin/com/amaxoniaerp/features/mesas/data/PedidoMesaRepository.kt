@@ -156,8 +156,7 @@ class PedidoMesaRepository {
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
                                 (PedidoMesaTable.estado eq EstadoPedidoMesa.PENDIENTE.codigo) and
                                 (PedidoMesaTable.activo eq ACTIVE)
-                        }
-                        .orderBy(PedidoMesaTable.id)
+                        }.orderBy(PedidoMesaTable.id)
                         .map { it[PedidoMesaTable.id] }
                 } else {
                     PedidoMesaTable
@@ -167,8 +166,7 @@ class PedidoMesaRepository {
                                 (PedidoMesaTable.estado eq EstadoPedidoMesa.PENDIENTE.codigo) and
                                 (PedidoMesaTable.activo eq ACTIVE) and
                                 (PedidoMesaTable.id inList pedidoIds)
-                        }
-                        .orderBy(PedidoMesaTable.id)
+                        }.orderBy(PedidoMesaTable.id)
                         .map { it[PedidoMesaTable.id] }
                 }
 
@@ -216,11 +214,11 @@ class PedidoMesaRepository {
                         (PedidoMesaTable.id eq pedidoId) and
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
                             (PedidoMesaTable.activo eq ACTIVE)
-                    }
-                    .singleOrNull()
+                    }.singleOrNull()
                     ?: return@newSuspendedTransaction PedidoMesaResult.PedidoNoEncontrado
 
-            val actual = EstadoPedidoMesa.fromCodigo(linea[PedidoMesaTable.estado]) ?: return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
+            val actual =
+                EstadoPedidoMesa.fromCodigo(linea[PedidoMesaTable.estado]) ?: return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
             if (!transicionValida(actual, destino)) return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
 
             val ahora = LocalDateTime.now()
@@ -260,15 +258,17 @@ class PedidoMesaRepository {
                 (PedidoMesaTable.sesionMesaId eq sesionId) and
                     (PedidoMesaTable.activo eq ACTIVE) and
                     (PedidoMesaTable.estado notInList ESTADOS_FINALES_CODIGO)
-            }
-            .limit(1)
+            }.limit(1)
             .singleOrNull() != null
 
     // ------------------------------------------------------------------
     // Helpers internos
     // ------------------------------------------------------------------
 
-    private data class SesionSumario(val id: Int, val estado: String)
+    private data class SesionSumario(
+        val id: Int,
+        val estado: String,
+    )
 
     private fun sesionActivaPorMesa(
         sesionId: Int,
@@ -280,8 +280,7 @@ class PedidoMesaRepository {
                 .where {
                     (SesionMesaTable.id eq sesionId) and
                         (SesionMesaTable.mesaId eq mesaId)
-                }
-                .singleOrNull()
+                }.singleOrNull()
                 ?: return null
         return SesionSumario(id = row[SesionMesaTable.id], estado = row[SesionMesaTable.estado])
     }

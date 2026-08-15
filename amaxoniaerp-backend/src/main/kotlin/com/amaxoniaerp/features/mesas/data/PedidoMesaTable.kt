@@ -51,6 +51,7 @@ object PedidoMesaTable : Table("pedido_mesa") {
     val fechaCreacion = datetime("fecha_creacion")
     val fechaEnvio = datetime("fecha_envio").nullable()
     val fechaEntrega = datetime("fecha_entrega").nullable()
+
     /** Cantidad acumulada ya asociada a cuentas facturadas. Evita cobrar 2x y permite
      *  divisiones parciales: `saldoPendiente = itemCantidad - cantidadFacturada`. */
     val cantidadFacturada = decimal("cantidad_facturada", 32, 3).default(0.toBigDecimal())

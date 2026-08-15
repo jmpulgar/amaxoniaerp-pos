@@ -8,12 +8,12 @@ data class ItemLotInfo(
     val codigoLoteItem: String,
     val vencimiento: String? = null,
     val disponibilidad: Int,
-    val idAlmacen: Int = 1
+    val idAlmacen: Int = 1,
 )
 
 @Serializable
 data class ItemLotsResponse(
     val itemId: Int,
     val poseeConfiguracionLote: Boolean,
-    val lotes: List<ItemLotInfo>
+    val lotes: List<ItemLotInfo>,
 )

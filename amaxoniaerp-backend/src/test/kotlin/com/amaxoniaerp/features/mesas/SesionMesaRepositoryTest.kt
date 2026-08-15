@@ -261,8 +261,7 @@ class SesionMesaRepositoryTest {
         cajaId: String,
         mesaId: Int,
         cantidadPersonas: Int = 4,
-    ): SesionMesaResult =
-        repository.abrir(database, abrirScope(cajaId = cajaId, mesaId = mesaId, cantidadPersonas = cantidadPersonas))
+    ): SesionMesaResult = repository.abrir(database, abrirScope(cajaId = cajaId, mesaId = mesaId, cantidadPersonas = cantidadPersonas))
 
     private fun abrirScope(
         cajaId: String,

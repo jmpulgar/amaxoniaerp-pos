@@ -17,11 +17,12 @@ class GeographyRepository {
         limit: Int,
         offset: Long,
         includeTotal: Boolean,
-    ): Pair<List<JsonObject>, Long> = dbQuery(database) {
-        val total = if (includeTotal) countRows(tableName) else -1L
-        val data = fetchRows(tableName, limit, offset)
-        data to total
-    }
+    ): Pair<List<JsonObject>, Long> =
+        dbQuery(database) {
+            val total = if (includeTotal) countRows(tableName) else -1L
+            val data = fetchRows(tableName, limit, offset)
+            data to total
+        }
 
     suspend fun listAddressLevels(
         database: Database,
@@ -29,11 +30,12 @@ class GeographyRepository {
         limit: Int,
         offset: Long,
         includeTotal: Boolean,
-    ): Pair<List<AddressLevelCatalog>, Long> = dbQuery(database) {
-        val total = if (includeTotal) countRows(tableName) else -1L
-        val data = fetchAddressLevelRows(tableName, limit, offset)
-        data to total
-    }
+    ): Pair<List<AddressLevelCatalog>, Long> =
+        dbQuery(database) {
+            val total = if (includeTotal) countRows(tableName) else -1L
+            val data = fetchAddressLevelRows(tableName, limit, offset)
+            data to total
+        }
 
     private fun countRows(tableName: String): Long {
         val sql = "select count(*) from $tableName"
@@ -42,7 +44,11 @@ class GeographyRepository {
         } ?: 0L
     }
 
-    private fun fetchRows(tableName: String, limit: Int, offset: Long): List<JsonObject> {
+    private fun fetchRows(
+        tableName: String,
+        limit: Int,
+        offset: Long,
+    ): List<JsonObject> {
         val sql = "select * from $tableName order by 1 limit $limit offset $offset"
         return TransactionManager.current().exec(sql) { result ->
             val rows = mutableListOf<JsonObject>()
@@ -64,9 +70,14 @@ class GeographyRepository {
         return JsonObject(values)
     }
 
-    private fun fetchAddressLevelRows(tableName: String, limit: Int, offset: Long): List<AddressLevelCatalog> {
-        val sql = "select codigo_pais, codigo, denominacion from $tableName " +
-            "order by codigo_pais, codigo limit $limit offset $offset"
+    private fun fetchAddressLevelRows(
+        tableName: String,
+        limit: Int,
+        offset: Long,
+    ): List<AddressLevelCatalog> {
+        val sql =
+            "select codigo_pais, codigo, denominacion from $tableName " +
+                "order by codigo_pais, codigo limit $limit offset $offset"
         return TransactionManager.current().exec(sql) { result ->
             val rows = mutableListOf<AddressLevelCatalog>()
             while (result.next()) {
@@ -75,15 +86,15 @@ class GeographyRepository {
                         countryCode = result.getString("codigo_pais") ?: "",
                         code = result.getString("codigo") ?: "",
                         name = result.getString("denominacion") ?: "",
-                    )
+                    ),
                 )
             }
             rows
         } ?: emptyList()
     }
 
-    private fun toJsonElement(value: Any?): JsonElement {
-        return when (value) {
+    private fun toJsonElement(value: Any?): JsonElement =
+        when (value) {
             null -> JsonNull
             is Boolean -> JsonPrimitive(value)
             is Number -> JsonPrimitive(value)
@@ -94,5 +105,4 @@ class GeographyRepository {
             is java.time.LocalDateTime -> JsonPrimitive(value.toString())
             else -> JsonPrimitive(value.toString())
         }
-    }
 }

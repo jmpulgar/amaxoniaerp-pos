@@ -11,7 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TheFactoryHkaCreditNotePayloadBuilderTest {
-
     @Test
     fun `builds type 04 with original electronic invoice reference and task 11 totals`() {
         val payload = TheFactoryHkaCreditNotePayloadBuilder().build(context())
@@ -33,84 +32,90 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
         )
     }
 
-    private fun context() = PanamaCreditNotePayloadContext(
-        invoice = InvoiceFEContext(
-            config = FEConfigData(
-                tokenEmpresa = "usuario",
-                tokenPassword = "clave",
-                api_thefactoryhka = "https://example.com",
-                tipoEmision = "01",
-                destinoOperacion = "1",
-                procesoGeneracion = "1",
-                codigoSucursalEmisorFallback = "0000",
-                puntoFacturacionFiscalFallback = "001",
-                fechaInicioContingencia = null,
-                motivoContingencia = null,
-                tipoFacturacion = 3,
-            ),
-            factura = FEFacturaData(
-                idFactura = "nc-001",
-                codFactura = "NC-000001",
-                numeroDocumentoFiscal = "9001",
-                fechaFactura = "2026-08-12",
-                tipoDocumento = "01",
-                naturalezaOperacion = "01",
-                tipoOperacion = "1",
-                formatoCAFE = "1",
-                entregaCAFE = "1",
-                envioContenedor = "1",
-                tipoVenta = "1",
-                tipoFactura = "nota_credito",
-                observacion = "Devolución parcial",
-                montoItemsFactura = 9.35,
-                ivaTotalFactura = 0.65,
-                totalTotalFactura = 10.0,
-                totalizarDescuentoGlobal = 0.65,
-                cajaId = "caja-001",
-            ),
-            cliente = FEClienteData(
-                tipoClienteFE = "02",
-                tipoContribuyente = "1",
-                identificacion = "155-001-001",
-                dv = "1",
-                nombre = "CLIENTE PRUEBA",
-                codigoUbicacion = null,
-                telefono = "6000-0000",
-                correo = "cliente@example.com",
-                direccion = "Calle 1",
-                paisIso = "PA",
-                paisExtranjeroIso = null,
-            ),
-            detalles = listOf(
-                FEDetalleData(
-                    descripcion = "Producto devuelto",
-                    codigo = "P-001",
-                    unidadMedida = "und",
-                    codigoCPBS = null,
-                    codigoCPBSAbrev = null,
-                    cantidad = 1.0,
-                    precioSinIva = 9.35,
-                    montoDescuento = 0.0,
-                    piva = 7.0,
-                    totalSinIva = 9.35,
-                    totalConIva = 10.0,
-                    porcentajeIsc = null,
-                    importeIsc = null,
-                    idOti = null,
-                    importeOti = null,
+    private fun context() =
+        PanamaCreditNotePayloadContext(
+            invoice =
+                InvoiceFEContext(
+                    config =
+                        FEConfigData(
+                            tokenEmpresa = "usuario",
+                            tokenPassword = "clave",
+                            api_thefactoryhka = "https://example.com",
+                            tipoEmision = "01",
+                            destinoOperacion = "1",
+                            procesoGeneracion = "1",
+                            codigoSucursalEmisorFallback = "0000",
+                            puntoFacturacionFiscalFallback = "001",
+                            fechaInicioContingencia = null,
+                            motivoContingencia = null,
+                            tipoFacturacion = 3,
+                        ),
+                    factura =
+                        FEFacturaData(
+                            idFactura = "nc-001",
+                            codFactura = "NC-000001",
+                            numeroDocumentoFiscal = "9001",
+                            fechaFactura = "2026-08-12",
+                            tipoDocumento = "01",
+                            naturalezaOperacion = "01",
+                            tipoOperacion = "1",
+                            formatoCAFE = "1",
+                            entregaCAFE = "1",
+                            envioContenedor = "1",
+                            tipoVenta = "1",
+                            tipoFactura = "nota_credito",
+                            observacion = "Devolución parcial",
+                            montoItemsFactura = 9.35,
+                            ivaTotalFactura = 0.65,
+                            totalTotalFactura = 10.0,
+                            totalizarDescuentoGlobal = 0.65,
+                            cajaId = "caja-001",
+                        ),
+                    cliente =
+                        FEClienteData(
+                            tipoClienteFE = "02",
+                            tipoContribuyente = "1",
+                            identificacion = "155-001-001",
+                            dv = "1",
+                            nombre = "CLIENTE PRUEBA",
+                            codigoUbicacion = null,
+                            telefono = "6000-0000",
+                            correo = "cliente@example.com",
+                            direccion = "Calle 1",
+                            paisIso = "PA",
+                            paisExtranjeroIso = null,
+                        ),
+                    detalles =
+                        listOf(
+                            FEDetalleData(
+                                descripcion = "Producto devuelto",
+                                codigo = "P-001",
+                                unidadMedida = "und",
+                                codigoCPBS = null,
+                                codigoCPBSAbrev = null,
+                                cantidad = 1.0,
+                                precioSinIva = 9.35,
+                                montoDescuento = 0.0,
+                                piva = 7.0,
+                                totalSinIva = 9.35,
+                                totalConIva = 10.0,
+                                porcentajeIsc = null,
+                                importeIsc = null,
+                                idOti = null,
+                                importeOti = null,
+                            ),
+                        ),
+                    formasPago = emptyList(),
+                    retencion = null,
+                    montoCancelar = null,
+                    codigoSucursalEmisor = "0000",
+                    puntoFacturacionFiscal = "001",
+                    vuelto = null,
                 ),
-            ),
-            formasPago = emptyList(),
-            retencion = null,
-            montoCancelar = null,
-            codigoSucursalEmisor = "0000",
-            puntoFacturacionFiscal = "001",
-            vuelto = null,
-        ),
-        originalInvoiceCufe = ORIGINAL_CUFE,
-        originalInvoiceDate = "2026-08-01",
-        originalInvoiceFiscalNumber = "7001",
-    )
+            originalInvoiceCufe = ORIGINAL_CUFE,
+            originalInvoiceDate = "2026-08-01",
+            originalInvoiceFiscalNumber = "7001",
+        )
 
     private companion object {
         val ORIGINAL_CUFE = "A".repeat(66)

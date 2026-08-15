@@ -9,81 +9,88 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.junit.Test
 
 class CreditNoteRepositoryEligibilityTest {
     @Test
-    fun `PA invoice status 3 remains eligible while balance remains`() = withSeededDatabase {
-        updateSourceInvoiceStatus(3)
-        addReturnedQuantity(2.0, "return-1")
+    fun `PA invoice status 3 remains eligible while balance remains`() =
+        withSeededDatabase {
+            updateSourceInvoiceStatus(3)
+            addReturnedQuantity(2.0, "return-1")
 
-        val (data, total) = listEligible("PA")
+            val (data, total) = listEligible("PA")
 
-        assertEquals(1L, total)
-        assertEquals(36.0, data.single().remainingAmount, 0.001)
-    }
-
-    @Test
-    fun `VE invoice status 3 remains excluded`() = withSeededDatabase {
-        updateSourceInvoiceStatus(3)
-
-        val (data, total) = listEligible("VE")
-
-        assertEquals(0L, total)
-        assertEquals(emptyList(), data)
-    }
-
-    @Test
-    fun `two sequential returns consume only the available balance`() = withSeededDatabase {
-        addReturnedQuantity(2.0, "return-1")
-        val afterFirst = listEligible("PA").first.single()
-        assertEquals(36.0, afterFirst.remainingAmount, 0.001)
-
-        addReturnedQuantity(3.0, "return-2")
-        val afterSecond = listEligible("PA")
-        assertEquals(0L, afterSecond.second)
-        assertEquals(emptyList(), afterSecond.first)
-    }
-
-    @Test
-    fun `return greater than remaining is rejected before persistence work`() = withSeededDatabase {
-        addReturnedQuantity(4.0, "return-1")
-
-        val exception = assertFailsWith<CreditNoteValidationException> {
-            transaction(database) {
-                repository.create(
-                    countryCode = "PA",
-                    request = CreateCreditNoteRequest(
-                        idFactura = SOURCE_INVOICE_ID,
-                        fecha = LocalDate.now().toString(),
-                        detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, 2.0)),
-                        idCajaSecuencia = "caja-secuencia-1",
-                        settlementType = CreditNoteSettlementType.NINGUNO,
-                    ),
-                    username = "tester",
-                )
-            }
+            assertEquals(1L, total)
+            assertEquals(36.0, data.single().remainingAmount, 0.001)
         }
 
-        assertEquals(true, exception.message?.contains("excede lo disponible"))
-    }
+    @Test
+    fun `VE invoice status 3 remains excluded`() =
+        withSeededDatabase {
+            updateSourceInvoiceStatus(3)
+
+            val (data, total) = listEligible("VE")
+
+            assertEquals(0L, total)
+            assertEquals(emptyList(), data)
+        }
+
+    @Test
+    fun `two sequential returns consume only the available balance`() =
+        withSeededDatabase {
+            addReturnedQuantity(2.0, "return-1")
+            val afterFirst = listEligible("PA").first.single()
+            assertEquals(36.0, afterFirst.remainingAmount, 0.001)
+
+            addReturnedQuantity(3.0, "return-2")
+            val afterSecond = listEligible("PA")
+            assertEquals(0L, afterSecond.second)
+            assertEquals(emptyList(), afterSecond.first)
+        }
+
+    @Test
+    fun `return greater than remaining is rejected before persistence work`() =
+        withSeededDatabase {
+            addReturnedQuantity(4.0, "return-1")
+
+            val exception =
+                assertFailsWith<CreditNoteValidationException> {
+                    transaction(database) {
+                        repository.create(
+                            countryCode = "PA",
+                            request =
+                                CreateCreditNoteRequest(
+                                    idFactura = SOURCE_INVOICE_ID,
+                                    fecha = LocalDate.now().toString(),
+                                    detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, 2.0)),
+                                    idCajaSecuencia = "caja-secuencia-1",
+                                    settlementType = CreditNoteSettlementType.NINGUNO,
+                                ),
+                            username = "tester",
+                        )
+                    }
+                }
+
+            assertEquals(true, exception.message?.contains("excede lo disponible"))
+        }
 
     private val repository = CreditNoteRepository()
     private lateinit var database: Database
 
     private fun withSeededDatabase(block: suspend CreditNoteRepositoryEligibilityTest.() -> Unit) {
-        database = Database.connect(
-            url = "jdbc:h2:mem:credit_note_eligibility_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:credit_note_eligibility_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 ClientsTable,
@@ -187,7 +194,10 @@ class CreditNoteRepositoryEligibilityTest {
         }
     }
 
-    private fun addReturnedQuantity(quantity: Double, id: String) {
+    private fun addReturnedQuantity(
+        quantity: Double,
+        id: String,
+    ) {
         transaction(database) {
             CreditNoteDetailTable.insert {
                 it[idDevolucionDetalle] = id

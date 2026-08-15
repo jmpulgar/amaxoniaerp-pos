@@ -11,11 +11,12 @@ class ClientTypesRepository {
         limit: Int,
         offset: Long,
         includeTotal: Boolean,
-    ): Pair<List<ClientTypeCatalog>, Long> = dbQuery(database) {
-        val total = if (includeTotal) countRows("tipo_cliente") else -1L
-        val data = fetchClientTypes(limit, offset)
-        data to total
-    }
+    ): Pair<List<ClientTypeCatalog>, Long> =
+        dbQuery(database) {
+            val total = if (includeTotal) countRows("tipo_cliente") else -1L
+            val data = fetchClientTypes(limit, offset)
+            data to total
+        }
 
     private fun countRows(tableName: String): Long {
         val sql = "select count(*) from $tableName"
@@ -24,7 +25,10 @@ class ClientTypesRepository {
         } ?: 0L
     }
 
-    private fun fetchClientTypes(limit: Int, offset: Long): List<ClientTypeCatalog> {
+    private fun fetchClientTypes(
+        limit: Int,
+        offset: Long,
+    ): List<ClientTypeCatalog> {
         val sql = "select * from tipo_cliente order by 1 limit $limit offset $offset"
         return TransactionManager.current().exec(sql) { result ->
             val meta = result.metaData
@@ -43,14 +47,17 @@ class ClientTypesRepository {
                         id = id,
                         description = description,
                         feCode = feCode,
-                    )
+                    ),
                 )
             }
             rows
         } ?: emptyList()
     }
 
-    private fun findColumnIndex(columns: Map<String, Int>, vararg names: String): Int? {
+    private fun findColumnIndex(
+        columns: Map<String, Int>,
+        vararg names: String,
+    ): Int? {
         for (name in names) {
             val index = columns[name.lowercase()]
             if (index != null) {
@@ -60,23 +67,22 @@ class ClientTypesRepository {
         return null
     }
 
-    private fun getObject(result: java.sql.ResultSet, index: Int?): Any? {
-        return index?.let { result.getObject(it) }
-    }
+    private fun getObject(
+        result: java.sql.ResultSet,
+        index: Int?,
+    ): Any? = index?.let { result.getObject(it) }
 
-    private fun toInt(value: Any?): Int {
-        return when (value) {
+    private fun toInt(value: Any?): Int =
+        when (value) {
             is Number -> value.toInt()
             is String -> value.toIntOrNull() ?: 0
             else -> 0
         }
-    }
 
-    private fun toStringValue(value: Any?): String? {
-        return when (value) {
+    private fun toStringValue(value: Any?): String? =
+        when (value) {
             null -> null
             is String -> value
             else -> value.toString()
         }
-    }
 }

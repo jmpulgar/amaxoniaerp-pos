@@ -21,7 +21,6 @@ import java.math.BigDecimal
  * NO modifica la lógica de escritura de facturas existente (eso lo hace ProcessSaleTransactionalRepository).
  */
 class ElectronicInvoiceRepository {
-
     private val logger = LoggerFactory.getLogger(ElectronicInvoiceRepository::class.java)
 
     /**
@@ -31,90 +30,105 @@ class ElectronicInvoiceRepository {
     suspend fun loadInvoiceContext(
         database: Database,
         invoiceId: String,
-    ): InvoiceFEContext = dbQuery(database) {
+    ): InvoiceFEContext =
+        dbQuery(database) {
+            // 1. Leer cabecera de factura con JOIN a clientes, tipo_cliente y paises
+            val paisLocal = FEPaisesReadTable.alias("pais_local")
+            val paisExtranjero = FEPaisesReadTable.alias("pais_ext")
 
-        // 1. Leer cabecera de factura con JOIN a clientes, tipo_cliente y paises
-        val paisLocal = FEPaisesReadTable.alias("pais_local")
-        val paisExtranjero = FEPaisesReadTable.alias("pais_ext")
+            val facturaRow =
+                FEFacturaReadTable
+                    .join(FECientesReadTable, JoinType.LEFT, FEFacturaReadTable.idCliente, FECientesReadTable.idCliente)
+                    .join(FETipoClienteReadTable, JoinType.LEFT, FECientesReadTable.codTipoCliente, FETipoClienteReadTable.codTipoCliente)
+                    .join(paisLocal, JoinType.LEFT, FECientesReadTable.pais, paisLocal[FEPaisesReadTable.id])
+                    .join(paisExtranjero, JoinType.LEFT, FECientesReadTable.paisExtranjero, paisExtranjero[FEPaisesReadTable.id])
+                    .selectAll()
+                    .where { FEFacturaReadTable.idFactura eq invoiceId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
 
-        val facturaRow = FEFacturaReadTable
-            .join(FECientesReadTable, JoinType.LEFT, FEFacturaReadTable.idCliente, FECientesReadTable.idCliente)
-            .join(FETipoClienteReadTable, JoinType.LEFT, FECientesReadTable.codTipoCliente, FETipoClienteReadTable.codTipoCliente)
-            .join(paisLocal, JoinType.LEFT, FECientesReadTable.pais, paisLocal[FEPaisesReadTable.id])
-            .join(paisExtranjero, JoinType.LEFT, FECientesReadTable.paisExtranjero, paisExtranjero[FEPaisesReadTable.id])
-            .selectAll()
-            .where { FEFacturaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
+            val cajaId = facturaRow[FEFacturaReadTable.idCaja]
+            val idSucursal = facturaRow[FEFacturaReadTable.idSucursal]
 
-        val cajaId = facturaRow[FEFacturaReadTable.idCaja]
-        val idSucursal = facturaRow[FEFacturaReadTable.idSucursal]
+            // 2. Leer configuración PAC desde parametros_generales
+            val configRow =
+                FEParametrosReadTable
+                    .selectAll()
+                    .orderBy(FEParametrosReadTable.codEmpresa)
+                    .limit(1)
+                    .firstOrNull()
+                    ?: throw FEConfigurationException("No se encontró parametros_generales para FE")
 
-        // 2. Leer configuración PAC desde parametros_generales
-        val configRow = FEParametrosReadTable
-            .selectAll()
-            .orderBy(FEParametrosReadTable.codEmpresa)
-            .limit(1)
-            .firstOrNull()
-            ?: throw FEConfigurationException("No se encontró parametros_generales para FE")
+            val config = mapConfig(configRow)
 
-        val config = mapConfig(configRow)
+            logger.info(
+                "[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(
+                    8,
+                )}... api_thefactoryhka=${config.api_thefactoryhka} tipoEmision=${config.tipoEmision}",
+            )
 
-        logger.info("[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(8)}... api_thefactoryhka=${config.api_thefactoryhka} tipoEmision=${config.tipoEmision}")
+            // 3. Resolver código sucursal emisor y punto facturación fiscal
+            val (codigoSucursal, puntoFacturacion) =
+                resolveCodigoSucursalYPuntoFacturacion(
+                    cajaId = cajaId,
+                    idSucursal = idSucursal,
+                    codigoSucursalFallback = config.codigoSucursalEmisorFallback,
+                    puntoFacturacionFallback = config.puntoFacturacionFiscalFallback,
+                )
 
-        // 3. Resolver código sucursal emisor y punto facturación fiscal
-        val (codigoSucursal, puntoFacturacion) = resolveCodigoSucursalYPuntoFacturacion(
-            cajaId = cajaId,
-            idSucursal = idSucursal,
-            codigoSucursalFallback = config.codigoSucursalEmisorFallback,
-            puntoFacturacionFallback = config.puntoFacturacionFiscalFallback,
-        )
+            logger.info(
+                "[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal puntoFacturacionFiscal=$puntoFacturacion",
+            )
 
-        logger.info("[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal puntoFacturacionFiscal=$puntoFacturacion")
+            // 4. Leer número de documento fiscal desde tabla correlativos
+            val numeroDocFiscal = resolveNumeroDocumentoFiscal()
+            logger.info("[FE] numeroDocumentoFiscal=$numeroDocFiscal")
 
-        // 4. Leer número de documento fiscal desde tabla correlativos
-        val numeroDocFiscal = resolveNumeroDocumentoFiscal()
-        logger.info("[FE] numeroDocumentoFiscal=$numeroDocFiscal")
+            // 5. Mapear factura
+            val factura = mapFactura(facturaRow, numeroDocFiscal)
 
-        // 5. Mapear factura
-        val factura = mapFactura(facturaRow, numeroDocFiscal)
+            // 6. Mapear cliente (JOIN con paises)
+            val cliente = mapCliente(facturaRow, paisLocal, paisExtranjero)
+            logger.info(
+                "[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} nombre=${cliente.nombre} pais=${cliente.paisIso}",
+            )
 
-        // 6. Mapear cliente (JOIN con paises)
-        val cliente = mapCliente(facturaRow, paisLocal, paisExtranjero)
-        logger.info("[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} nombre=${cliente.nombre} pais=${cliente.paisIso}")
+            // 7. Leer detalle de factura con JOIN a unidad de medida
+            val detalles = loadDetalles(invoiceId)
+            logger.info("[FE] detalles cargados: ${detalles.size} items")
 
-        // 7. Leer detalle de factura con JOIN a unidad de medida
-        val detalles = loadDetalles(invoiceId)
-        logger.info("[FE] detalles cargados: ${detalles.size} items")
+            // 8. Leer formas de pago
+            val formasPago = loadFormasPago(invoiceId)
+            logger.info(
+                "[FE] formasPago cargadas: ${formasPago.size} -> ${formasPago.map {
+                    "${it.descripcion}(${it.formaPagoFact ?: "?"})=${it.monto}"
+                }}",
+            )
 
-        // 8. Leer formas de pago
-        val formasPago = loadFormasPago(invoiceId)
-        logger.info("[FE] formasPago cargadas: ${formasPago.size} -> ${formasPago.map { "${it.descripcion}(${it.formaPagoFact ?: "?"})=${it.monto}" }}")
+            // 9. Leer retención y totales de pago
+            val retencion = loadRetencion(invoiceId)
+            logger.info("[FE] retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}")
 
-        // 9. Leer retención y totales de pago
-        val retencion = loadRetencion(invoiceId)
-        logger.info("[FE] retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}")
+            val montoCancelar = loadMontoCancelar(invoiceId)
+            logger.info("[FE] montoCancelar=$montoCancelar")
 
-        val montoCancelar = loadMontoCancelar(invoiceId)
-        logger.info("[FE] montoCancelar=$montoCancelar")
+            val vuelto = loadVuelto(invoiceId)
+            logger.info("[FE] vuelto=$vuelto")
 
-        val vuelto = loadVuelto(invoiceId)
-        logger.info("[FE] vuelto=$vuelto")
-
-        InvoiceFEContext(
-            config = config,
-            factura = factura,
-            cliente = cliente,
-            detalles = detalles,
-            formasPago = formasPago,
-            retencion = retencion,
-            montoCancelar = montoCancelar,
-            codigoSucursalEmisor = codigoSucursal,
-            puntoFacturacionFiscal = puntoFacturacion,
-            vuelto = vuelto,
-        )
-    }
+            InvoiceFEContext(
+                config = config,
+                factura = factura,
+                cliente = cliente,
+                detalles = detalles,
+                formasPago = formasPago,
+                retencion = retencion,
+                montoCancelar = montoCancelar,
+                codigoSucursalEmisor = codigoSucursal,
+                puntoFacturacionFiscal = puntoFacturacion,
+                vuelto = vuelto,
+            )
+        }
 
     /**
      * Carga el contexto inmutable de una NC PA ya preparada.
@@ -133,34 +147,35 @@ class ElectronicInvoiceRepository {
             throw FEConfigurationException("numeroDocumentoFiscal de NC no resuelto")
         }
 
-        val sourceInvoiceId = dbQuery(database) {
-            CreditNoteHeaderTablePA
-                .select(CreditNoteHeaderTablePA.codFactura)
-                .where { CreditNoteHeaderTablePA.idDevolucion eq creditNoteId }
-                .limit(1)
-                .firstOrNull()
-                ?.get(CreditNoteHeaderTablePA.codFactura)
-        } ?: throw FEInvoiceNotFoundException("Nota de crédito no encontrada: $creditNoteId")
+        val sourceInvoiceId =
+            dbQuery(database) {
+                CreditNoteHeaderTablePA
+                    .select(CreditNoteHeaderTablePA.codFactura)
+                    .where { CreditNoteHeaderTablePA.idDevolucion eq creditNoteId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.get(CreditNoteHeaderTablePA.codFactura)
+            } ?: throw FEInvoiceNotFoundException("Nota de crédito no encontrada: $creditNoteId")
 
         val invoiceContext = loadInvoiceContext(database, sourceInvoiceId)
-        val originalFiscal = dbQuery(database) {
-            FacturasTablePA
-                .select(
-                    FacturasTablePA.numeroDocumentoFiscal,
-                    FacturasTablePA.fechaFactura,
-                    FacturasTablePA.cufe,
-                )
-                .where { FacturasTablePA.idFactura eq sourceInvoiceId }
-                .limit(1)
-                .firstOrNull()
-                ?.let { row ->
-                    OriginalInvoiceFiscalData(
-                        numeroDocumentoFiscal = row[FacturasTablePA.numeroDocumentoFiscal].orEmpty(),
-                        fechaFactura = row[FacturasTablePA.fechaFactura].orEmpty(),
-                        cufe = row[FacturasTablePA.cufe].orEmpty(),
-                    )
-                }
-        } ?: throw FEInvoiceNotFoundException("Factura original no encontrada: $sourceInvoiceId")
+        val originalFiscal =
+            dbQuery(database) {
+                FacturasTablePA
+                    .select(
+                        FacturasTablePA.numeroDocumentoFiscal,
+                        FacturasTablePA.fechaFactura,
+                        FacturasTablePA.cufe,
+                    ).where { FacturasTablePA.idFactura eq sourceInvoiceId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.let { row ->
+                        OriginalInvoiceFiscalData(
+                            numeroDocumentoFiscal = row[FacturasTablePA.numeroDocumentoFiscal].orEmpty(),
+                            fechaFactura = row[FacturasTablePA.fechaFactura].orEmpty(),
+                            cufe = row[FacturasTablePA.cufe].orEmpty(),
+                        )
+                    }
+            } ?: throw FEInvoiceNotFoundException("Factura original no encontrada: $sourceInvoiceId")
 
         if (originalFiscal.cufe.isBlank()) {
             throw FEConfigurationException("La factura original no tiene CUFE: $sourceInvoiceId")
@@ -169,110 +184,115 @@ class ElectronicInvoiceRepository {
             throw FEConfigurationException("La factura original no tiene número fiscal: $sourceInvoiceId")
         }
 
-        val creditNoteData = dbQuery(database) {
-            val header = CreditNoteHeaderTablePA
-                .selectAll()
-                .where { CreditNoteHeaderTablePA.idDevolucion eq creditNoteId }
-                .limit(1)
-                .firstOrNull()
-                ?: throw FEInvoiceNotFoundException("Nota de crédito no encontrada: $creditNoteId")
+        val creditNoteData =
+            dbQuery(database) {
+                val header =
+                    CreditNoteHeaderTablePA
+                        .selectAll()
+                        .where { CreditNoteHeaderTablePA.idDevolucion eq creditNoteId }
+                        .limit(1)
+                        .firstOrNull()
+                        ?: throw FEInvoiceNotFoundException("Nota de crédito no encontrada: $creditNoteId")
 
-            val details = CreditNoteDetailTable
-                .join(
-                    FEFacturaDetalleReadTable,
-                    JoinType.INNER,
-                    onColumn = CreditNoteDetailTable.idDetalleFactura,
-                    otherColumn = FEFacturaDetalleReadTable.idDetalleFactura,
-                )
-                .join(
-                    FEItemReadTable,
-                    JoinType.LEFT,
-                    onColumn = CreditNoteDetailTable.idItem,
-                    otherColumn = FEItemReadTable.idItem,
-                )
-                .join(
-                    FEUnidadEmpaquesReadTable,
-                    JoinType.LEFT,
-                    onColumn = FEItemReadTable.unidadMedida,
-                    otherColumn = FEUnidadEmpaquesReadTable.codUnidad,
-                )
-                .selectAll()
-                .where { CreditNoteDetailTable.idDevolucion eq creditNoteId }
-                .orderBy(CreditNoteDetailTable.idDevolucionDetalle)
-                .map { row ->
-                    FEDetalleData(
-                        descripcion = row[FEFacturaDetalleReadTable.itemDescripcion],
-                        codigo = row[CreditNoteDetailTable.itemCodigo],
-                        unidadMedida = row.getOrNull(FEUnidadEmpaquesReadTable.simbolo)
-                            ?.takeIf { it.isNotBlank() } ?: "und",
-                        codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
-                        codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
-                        cantidad = row[CreditNoteDetailTable.itemCantidad].toDouble(),
-                        precioSinIva = row[CreditNoteDetailTable.itemPrecioSinIva].toDouble(),
-                        montoDescuento = row[CreditNoteDetailTable.itemMontoDescuento].toDouble(),
-                        piva = row[CreditNoteDetailTable.itemPIva].toDouble(),
-                        totalSinIva = row[CreditNoteDetailTable.itemTotalSinIva].toDouble(),
-                        totalConIva = row[CreditNoteDetailTable.itemTotalConIva].toDouble(),
-                        porcentajeIsc = null,
-                        importeIsc = null,
-                        idOti = null,
-                        importeOti = null,
-                    )
-                }
+                val details =
+                    CreditNoteDetailTable
+                        .join(
+                            FEFacturaDetalleReadTable,
+                            JoinType.INNER,
+                            onColumn = CreditNoteDetailTable.idDetalleFactura,
+                            otherColumn = FEFacturaDetalleReadTable.idDetalleFactura,
+                        ).join(
+                            FEItemReadTable,
+                            JoinType.LEFT,
+                            onColumn = CreditNoteDetailTable.idItem,
+                            otherColumn = FEItemReadTable.idItem,
+                        ).join(
+                            FEUnidadEmpaquesReadTable,
+                            JoinType.LEFT,
+                            onColumn = FEItemReadTable.unidadMedida,
+                            otherColumn = FEUnidadEmpaquesReadTable.codUnidad,
+                        ).selectAll()
+                        .where { CreditNoteDetailTable.idDevolucion eq creditNoteId }
+                        .orderBy(CreditNoteDetailTable.idDevolucionDetalle)
+                        .map { row ->
+                            FEDetalleData(
+                                descripcion = row[FEFacturaDetalleReadTable.itemDescripcion],
+                                codigo = row[CreditNoteDetailTable.itemCodigo],
+                                unidadMedida =
+                                    row
+                                        .getOrNull(FEUnidadEmpaquesReadTable.simbolo)
+                                        ?.takeIf { it.isNotBlank() } ?: "und",
+                                codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
+                                codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
+                                cantidad = row[CreditNoteDetailTable.itemCantidad].toDouble(),
+                                precioSinIva = row[CreditNoteDetailTable.itemPrecioSinIva].toDouble(),
+                                montoDescuento = row[CreditNoteDetailTable.itemMontoDescuento].toDouble(),
+                                piva = row[CreditNoteDetailTable.itemPIva].toDouble(),
+                                totalSinIva = row[CreditNoteDetailTable.itemTotalSinIva].toDouble(),
+                                totalConIva = row[CreditNoteDetailTable.itemTotalConIva].toDouble(),
+                                porcentajeIsc = null,
+                                importeIsc = null,
+                                idOti = null,
+                                importeOti = null,
+                            )
+                        }
 
-            CreditNotePayloadData(
-                codigo = header[CreditNoteHeaderTablePA.codDevolucion],
-                fecha = header[CreditNoteHeaderTablePA.fechaDevolucion].toString(),
-                observacion = header[CreditNoteHeaderTablePA.observacion],
-                subtotal = header[CreditNoteHeaderTablePA.subtotal],
-                impuesto = header[CreditNoteHeaderTablePA.impuesto],
-                total = header[CreditNoteHeaderTablePA.total],
-                descuentoGlobal = header[CreditNoteHeaderTablePA.descuentoGlobal] ?: BigDecimal.ZERO,
-                idCaja = header[CreditNoteHeaderTablePA.idCaja],
-                naturalezaOperacion = header[CreditNoteHeaderTablePA.naturalezaOperacion],
-                tipoOperacion = header[CreditNoteHeaderTablePA.tipoOperacion].toString(),
-                formatoCAFE = header[CreditNoteHeaderTablePA.formatoCAFE].toString(),
-                entregaCAFE = header[CreditNoteHeaderTablePA.entregaCAFE].toString(),
-                envioContenedor = header[CreditNoteHeaderTablePA.envioContenedor].toString(),
-                tipoVenta = header[CreditNoteHeaderTablePA.tipoVenta].toString(),
-                detalles = details,
+                CreditNotePayloadData(
+                    codigo = header[CreditNoteHeaderTablePA.codDevolucion],
+                    fecha = header[CreditNoteHeaderTablePA.fechaDevolucion].toString(),
+                    observacion = header[CreditNoteHeaderTablePA.observacion],
+                    subtotal = header[CreditNoteHeaderTablePA.subtotal],
+                    impuesto = header[CreditNoteHeaderTablePA.impuesto],
+                    total = header[CreditNoteHeaderTablePA.total],
+                    descuentoGlobal = header[CreditNoteHeaderTablePA.descuentoGlobal] ?: BigDecimal.ZERO,
+                    idCaja = header[CreditNoteHeaderTablePA.idCaja],
+                    naturalezaOperacion = header[CreditNoteHeaderTablePA.naturalezaOperacion],
+                    tipoOperacion = header[CreditNoteHeaderTablePA.tipoOperacion].toString(),
+                    formatoCAFE = header[CreditNoteHeaderTablePA.formatoCAFE].toString(),
+                    entregaCAFE = header[CreditNoteHeaderTablePA.entregaCAFE].toString(),
+                    envioContenedor = header[CreditNoteHeaderTablePA.envioContenedor].toString(),
+                    tipoVenta = header[CreditNoteHeaderTablePA.tipoVenta].toString(),
+                    detalles = details,
+                )
+            }
+
+        val creditNoteInvoice =
+            invoiceContext.factura.copy(
+                idFactura = creditNoteId,
+                codFactura = creditNoteData.codigo,
+                numeroDocumentoFiscal = normalizedDocumentNumber,
+                fechaFactura = creditNoteData.fecha,
+                tipoDocumento = "04",
+                naturalezaOperacion = creditNoteData.naturalezaOperacion,
+                tipoOperacion = creditNoteData.tipoOperacion,
+                formatoCAFE = creditNoteData.formatoCAFE,
+                entregaCAFE = creditNoteData.entregaCAFE,
+                envioContenedor = creditNoteData.envioContenedor,
+                tipoVenta = creditNoteData.tipoVenta,
+                tipoFactura = "nota_credito",
+                observacion = creditNoteData.observacion,
+                montoItemsFactura = creditNoteData.subtotal.toDouble(),
+                ivaTotalFactura = creditNoteData.impuesto.toDouble(),
+                totalTotalFactura = creditNoteData.total.toDouble(),
+                totalizarDescuentoGlobal = creditNoteData.descuentoGlobal.toDouble(),
+                cajaId = creditNoteData.idCaja ?: invoiceContext.factura.cajaId,
             )
-        }
-
-        val creditNoteInvoice = invoiceContext.factura.copy(
-            idFactura = creditNoteId,
-            codFactura = creditNoteData.codigo,
-            numeroDocumentoFiscal = normalizedDocumentNumber,
-            fechaFactura = creditNoteData.fecha,
-            tipoDocumento = "04",
-            naturalezaOperacion = creditNoteData.naturalezaOperacion,
-            tipoOperacion = creditNoteData.tipoOperacion,
-            formatoCAFE = creditNoteData.formatoCAFE,
-            entregaCAFE = creditNoteData.entregaCAFE,
-            envioContenedor = creditNoteData.envioContenedor,
-            tipoVenta = creditNoteData.tipoVenta,
-            tipoFactura = "nota_credito",
-            observacion = creditNoteData.observacion,
-            montoItemsFactura = creditNoteData.subtotal.toDouble(),
-            ivaTotalFactura = creditNoteData.impuesto.toDouble(),
-            totalTotalFactura = creditNoteData.total.toDouble(),
-            totalizarDescuentoGlobal = creditNoteData.descuentoGlobal.toDouble(),
-            cajaId = creditNoteData.idCaja ?: invoiceContext.factura.cajaId,
-        )
 
         return PanamaCreditNotePayloadContext(
-            invoice = invoiceContext.copy(
-                factura = creditNoteInvoice,
-                detalles = creditNoteData.detalles,
-                formasPago = emptyList(),
-                retencion = null,
-                montoCancelar = null,
-                vuelto = null,
-            ),
+            invoice =
+                invoiceContext.copy(
+                    factura = creditNoteInvoice,
+                    detalles = creditNoteData.detalles,
+                    formasPago = emptyList(),
+                    retencion = null,
+                    montoCancelar = null,
+                    vuelto = null,
+                ),
             originalInvoiceCufe = originalFiscal.cufe,
-            originalInvoiceDate = originalFiscal.fechaFactura.ifBlank {
-                invoiceContext.factura.fechaFactura.orEmpty()
-            },
+            originalInvoiceDate =
+                originalFiscal.fechaFactura.ifBlank {
+                    invoiceContext.factura.fechaFactura.orEmpty()
+                },
             originalInvoiceFiscalNumber = originalFiscal.numeroDocumentoFiscal,
         )
     }
@@ -315,39 +335,48 @@ class ElectronicInvoiceRepository {
     /**
      * Incrementa el correlativo del número de documento fiscal en la tabla `correlativos`.
      */
-    suspend fun incrementNumeroDocumentoFiscal(database: Database) = dbQuery(database) {
-        val updated = FECorrelativosTable.update({
-            FECorrelativosTable.campo eq "numeroDocumentoFiscal"
-        }) {
-            with(SqlExpressionBuilder) {
-                it.update(FECorrelativosTable.contador, FECorrelativosTable.contador + 1)
+    suspend fun incrementNumeroDocumentoFiscal(database: Database) =
+        dbQuery(database) {
+            val updated =
+                FECorrelativosTable.update({
+                    FECorrelativosTable.campo eq "numeroDocumentoFiscal"
+                }) {
+                    with(SqlExpressionBuilder) {
+                        it.update(FECorrelativosTable.contador, FECorrelativosTable.contador + 1)
+                    }
+                }
+
+            if (updated == 0) {
+                logger.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal'")
             }
         }
 
-        if (updated == 0) {
-            logger.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal'")
+    suspend fun getInvoiceCufe(
+        database: Database,
+        invoiceId: String,
+    ): String? =
+        dbQuery(database) {
+            FacturasTablePA
+                .select(FacturasTablePA.cufe)
+                .where { FacturasTablePA.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
+                ?.get(FacturasTablePA.cufe)
+                ?.takeIf { it.isNotBlank() }
         }
-    }
-
-    suspend fun getInvoiceCufe(database: Database, invoiceId: String): String? = dbQuery(database) {
-        FacturasTablePA
-            .select(FacturasTablePA.cufe)
-            .where { FacturasTablePA.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?.get(FacturasTablePA.cufe)
-            ?.takeIf { it.isNotBlank() }
-    }
 
     // ─── Mappers privados ────────────────────────────────────────────────────
 
     private fun mapConfig(row: ResultRow): FEConfigData {
-        val tokenEmpresa = row[FEParametrosReadTable.tokenEmpresa]
-            ?: throw FEConfigurationException("token_empresa no configurado en parametros_generales")
-        val tokenPassword = row[FEParametrosReadTable.tokenPassword]
-            ?: throw FEConfigurationException("token_password no configurado en parametros_generales")
-        val apiTheFactoryHka = row[FEParametrosReadTable.api_thefactoryhka]
-            ?: throw FEConfigurationException("api_thefactoryhka no configurado en parametros_generales")
+        val tokenEmpresa =
+            row[FEParametrosReadTable.tokenEmpresa]
+                ?: throw FEConfigurationException("token_empresa no configurado en parametros_generales")
+        val tokenPassword =
+            row[FEParametrosReadTable.tokenPassword]
+                ?: throw FEConfigurationException("token_password no configurado en parametros_generales")
+        val apiTheFactoryHka =
+            row[FEParametrosReadTable.api_thefactoryhka]
+                ?: throw FEConfigurationException("api_thefactoryhka no configurado en parametros_generales")
 
         return FEConfigData(
             tokenEmpresa = tokenEmpresa,
@@ -364,8 +393,11 @@ class ElectronicInvoiceRepository {
         )
     }
 
-    private fun mapFactura(row: ResultRow, numeroDocFiscal: String): FEFacturaData {
-        return FEFacturaData(
+    private fun mapFactura(
+        row: ResultRow,
+        numeroDocFiscal: String,
+    ): FEFacturaData =
+        FEFacturaData(
             idFactura = row[FEFacturaReadTable.idFactura],
             codFactura = row[FEFacturaReadTable.codFactura],
             numeroDocumentoFiscal = numeroDocFiscal,
@@ -385,18 +417,18 @@ class ElectronicInvoiceRepository {
             totalizarDescuentoGlobal = row[FEFacturaReadTable.totalizarDescuentoGlobal].toDouble(),
             cajaId = row[FEFacturaReadTable.idCaja],
         )
-    }
 
     private fun mapCliente(
         row: ResultRow,
         paisLocal: Alias<FEPaisesReadTable>,
         paisExtranjero: Alias<FEPaisesReadTable>,
     ): FEClienteData {
-        val nombreCompleto = buildString {
-            append(row.getOrNull(FECientesReadTable.nombre)?.trim().orEmpty())
-            val apellido = row.getOrNull(FECientesReadTable.apellido)?.trim().orEmpty()
-            if (apellido.isNotBlank()) append(" ").append(apellido)
-        }.ifBlank { "CONSUMIDOR FINAL" }
+        val nombreCompleto =
+            buildString {
+                append(row.getOrNull(FECientesReadTable.nombre)?.trim().orEmpty())
+                val apellido = row.getOrNull(FECientesReadTable.apellido)?.trim().orEmpty()
+                if (apellido.isNotBlank()) append(" ").append(apellido)
+            }.ifBlank { "CONSUMIDOR FINAL" }
 
         val paisIso = row.getOrNull(paisLocal[FEPaisesReadTable.iso]) ?: "PA"
         val paisExtIso = row.getOrNull(paisExtranjero[FEPaisesReadTable.iso])
@@ -416,8 +448,8 @@ class ElectronicInvoiceRepository {
         )
     }
 
-    private fun loadDetalles(invoiceId: String): List<FEDetalleData> {
-        return FEFacturaDetalleReadTable
+    private fun loadDetalles(invoiceId: String): List<FEDetalleData> =
+        FEFacturaDetalleReadTable
             .join(FEItemReadTable, JoinType.LEFT, FEFacturaDetalleReadTable.idItem, FEItemReadTable.idItem)
             .join(FEUnidadEmpaquesReadTable, JoinType.LEFT, FEItemReadTable.unidadMedida, FEUnidadEmpaquesReadTable.codUnidad)
             .selectAll()
@@ -426,8 +458,10 @@ class ElectronicInvoiceRepository {
                 FEDetalleData(
                     descripcion = row[FEFacturaDetalleReadTable.itemDescripcion],
                     codigo = row[FEFacturaDetalleReadTable.itemCodigo],
-                    unidadMedida = row.getOrNull(FEUnidadEmpaquesReadTable.simbolo)
-                        ?.takeIf { it.isNotBlank() } ?: "und",
+                    unidadMedida =
+                        row
+                            .getOrNull(FEUnidadEmpaquesReadTable.simbolo)
+                            ?.takeIf { it.isNotBlank() } ?: "und",
                     codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
                     codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
                     cantidad = row[FEFacturaDetalleReadTable.itemCantidad].toDouble(),
@@ -442,23 +476,23 @@ class ElectronicInvoiceRepository {
                     importeOti = row[FEFacturaDetalleReadTable.importeOti]?.toDouble(),
                 )
             }
-    }
 
     private fun loadRetencion(invoiceId: String): FERetencionData? {
         val safeInvoiceId = invoiceId.replace("'", "''")
-        val result = TransactionManager.current().exec(
-            """
-            SELECT codigo_retencion, totalizar_monto_retencion
-            FROM factura_detalle_formapago
-            WHERE id_factura = '$safeInvoiceId'
-            LIMIT 1
-            """.trimIndent()
-        ) { rs ->
-            if (!rs.next()) return@exec null
-            val codigo = rs.getString("codigo_retencion").safeIntOrZero()
-            val monto = rs.getString("totalizar_monto_retencion").safeDoubleOrZero()
-            codigo to monto
-        } ?: return null
+        val result =
+            TransactionManager.current().exec(
+                """
+                SELECT codigo_retencion, totalizar_monto_retencion
+                FROM factura_detalle_formapago
+                WHERE id_factura = '$safeInvoiceId'
+                LIMIT 1
+                """.trimIndent(),
+            ) { rs ->
+                if (!rs.next()) return@exec null
+                val codigo = rs.getString("codigo_retencion").safeIntOrZero()
+                val monto = rs.getString("totalizar_monto_retencion").safeDoubleOrZero()
+                codigo to monto
+            } ?: return null
 
         val (codigo, monto) = result
         if (codigo == 0 || monto <= 0.0) return null
@@ -471,11 +505,12 @@ class ElectronicInvoiceRepository {
 
     private fun loadFormasPago(invoiceId: String): List<FEFormaPagoData> {
         // Buscar el caja_id asociado a esta factura en caja_nueva
-        val cajaRow = FECajaNuevaReadTable
-            .selectAll()
-            .where { FECajaNuevaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
+        val cajaRow =
+            FECajaNuevaReadTable
+                .selectAll()
+                .where { FECajaNuevaReadTable.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
 
         if (cajaRow == null) {
             logger.warn("No se encontró registro en caja_nueva para factura {}", invoiceId)
@@ -491,8 +526,7 @@ class ElectronicInvoiceRepository {
                 JoinType.LEFT,
                 onColumn = FECajaNuevaDetalleReadTable.idFormaPago,
                 otherColumn = CajaFormaPagoTable.idFormaPago,
-            )
-            .selectAll()
+            ).selectAll()
             .where { FECajaNuevaDetalleReadTable.cajaId eq cajaId }
             .mapNotNull { row ->
                 val monto = row[FECajaNuevaDetalleReadTable.monto]?.toDouble() ?: return@mapNotNull null
@@ -512,8 +546,8 @@ class ElectronicInvoiceRepository {
             }
     }
 
-    private fun loadVuelto(invoiceId: String): Double? {
-        return FEFacturaDetalleFormaPagoReadTable
+    private fun loadVuelto(invoiceId: String): Double? =
+        FEFacturaDetalleFormaPagoReadTable
             .select(FEFacturaDetalleFormaPagoReadTable.totalizarCambio)
             .where { FEFacturaDetalleFormaPagoReadTable.idFactura eq invoiceId }
             .limit(1)
@@ -521,10 +555,9 @@ class ElectronicInvoiceRepository {
             ?.get(FEFacturaDetalleFormaPagoReadTable.totalizarCambio)
             ?.toDouble()
             ?.takeIf { it > 0 }
-    }
 
-    private fun loadMontoCancelar(invoiceId: String): Double? {
-        return FEFacturaDetalleFormaPagoReadTable
+    private fun loadMontoCancelar(invoiceId: String): Double? =
+        FEFacturaDetalleFormaPagoReadTable
             .select(FEFacturaDetalleFormaPagoReadTable.totalizarMontoCancelar)
             .where { FEFacturaDetalleFormaPagoReadTable.idFactura eq invoiceId }
             .limit(1)
@@ -532,7 +565,6 @@ class ElectronicInvoiceRepository {
             ?.get(FEFacturaDetalleFormaPagoReadTable.totalizarMontoCancelar)
             ?.toDouble()
             ?.takeIf { it > 0 }
-    }
 
     private fun resolveCodigoSucursalYPuntoFacturacion(
         cajaId: String,
@@ -541,55 +573,68 @@ class ElectronicInvoiceRepository {
         puntoFacturacionFallback: String,
     ): Pair<String, String> {
         // 1. Intentar leer de la caja
-        val cajaRow = FECajaReadTable
-            .selectAll()
-            .where { FECajaReadTable.id eq cajaId }
-            .limit(1)
-            .firstOrNull()
+        val cajaRow =
+            FECajaReadTable
+                .selectAll()
+                .where { FECajaReadTable.id eq cajaId }
+                .limit(1)
+                .firstOrNull()
 
         if (cajaRow == null) {
             logger.warn("[FE] No se encontró caja con id=$cajaId")
         }
 
-        val codigoFromCaja = cajaRow?.get(FECajaReadTable.codigoSucursalEmisor)
-            ?.takeIf { it.isNotBlank() }
-        val puntoFromCaja = cajaRow?.get(FECajaReadTable.puntoFacturacionFiscal)
-            ?.takeIf { it.isNotBlank() }
+        val codigoFromCaja =
+            cajaRow
+                ?.get(FECajaReadTable.codigoSucursalEmisor)
+                ?.takeIf { it.isNotBlank() }
+        val puntoFromCaja =
+            cajaRow
+                ?.get(FECajaReadTable.puntoFacturacionFiscal)
+                ?.takeIf { it.isNotBlank() }
 
         logger.info("[FE] caja lookup: codigoFromCaja=$codigoFromCaja puntoFromCaja=$puntoFromCaja")
 
         // 2. Si la caja no lo tiene, intentar desde sucursal
-        val codigoFromSucursal = if (codigoFromCaja == null) {
-            FESucursalReadTable
-                .select(FESucursalReadTable.codigoSucursalEmisor)
-                .where { FESucursalReadTable.id eq idSucursal }
-                .limit(1)
-                .firstOrNull()
-                ?.get(FESucursalReadTable.codigoSucursalEmisor)
-                ?.takeIf { it.isNotBlank() }
-                .also { logger.info("[FE] sucursal lookup id=$idSucursal -> codigoSucursalEmisor=$it") }
-        } else null
+        val codigoFromSucursal =
+            if (codigoFromCaja == null) {
+                FESucursalReadTable
+                    .select(FESucursalReadTable.codigoSucursalEmisor)
+                    .where { FESucursalReadTable.id eq idSucursal }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.get(FESucursalReadTable.codigoSucursalEmisor)
+                    ?.takeIf { it.isNotBlank() }
+                    .also { logger.info("[FE] sucursal lookup id=$idSucursal -> codigoSucursalEmisor=$it") }
+            } else {
+                null
+            }
 
         // 3. Fallback a parametros_generales
         val codigoFinal = codigoFromCaja ?: codigoFromSucursal ?: codigoSucursalFallback
         val puntoFinal = puntoFromCaja ?: puntoFacturacionFallback
 
         if (codigoFromCaja == null && codigoFromSucursal == null) {
-            logger.warn("[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: $codigoSucursalFallback")
+            logger.warn(
+                "[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: $codigoSucursalFallback",
+            )
         }
         if (puntoFromCaja == null) {
-            logger.warn("[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: $puntoFacturacionFallback")
+            logger.warn(
+                "[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: $puntoFacturacionFallback",
+            )
         }
 
         return codigoFinal to puntoFinal
     }
 
     private fun resolveNumeroDocumentoFiscal(): String {
-        val row = FECorrelativosTable
-            .selectAll()
-            .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
-            .limit(1)
-            .firstOrNull()
+        val row =
+            FECorrelativosTable
+                .selectAll()
+                .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
+                .limit(1)
+                .firstOrNull()
 
         if (row == null) {
             logger.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal', usando 1")
@@ -599,28 +644,30 @@ class ElectronicInvoiceRepository {
         return (row[FECorrelativosTable.contador] + 1).toString()
     }
 
-    private fun formatFechaRecepcion(isoDate: String): String {
-        return try {
+    private fun formatFechaRecepcion(isoDate: String): String =
+        try {
             isoDate
-                .substringBefore("-05:00").substringBefore("-04:00")
+                .substringBefore("-05:00")
+                .substringBefore("-04:00")
                 .replace("T", " ")
                 .take(19)
         } catch (_: Exception) {
             isoDate.take(19).replace("T", " ")
         }
-    }
 
-    private fun String?.safeIntOrZero(): Int = this
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-        ?.toIntOrNull()
-        ?: 0
+    private fun String?.safeIntOrZero(): Int =
+        this
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.toIntOrNull()
+            ?: 0
 
-    private fun String?.safeDoubleOrZero(): Double = this
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-        ?.toDoubleOrNull()
-        ?: 0.0
+    private fun String?.safeDoubleOrZero(): Double =
+        this
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.toDoubleOrNull()
+            ?: 0.0
 
     private data class OriginalInvoiceFiscalData(
         val numeroDocumentoFiscal: String,

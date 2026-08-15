@@ -522,9 +522,7 @@ class SesionMesaRepository(
             .singleOrNull()
             ?.get(UsersTable.usuario)
 
-    private fun ResultRow.toSesionMesaResponse(
-        usuarioByCod: Map<Int, String> = emptyMap(),
-    ): SesionMesaResponse =
+    private fun ResultRow.toSesionMesaResponse(usuarioByCod: Map<Int, String> = emptyMap()): SesionMesaResponse =
         SesionMesaResponse(
             id = this[SesionMesaTable.id],
             sucursalId = this[SesionMesaTable.sucursalId],
@@ -542,8 +540,7 @@ class SesionMesaRepository(
             activo = this[SesionMesaTable.activo] == ACTIVE,
         )
 
-    private fun LocalDateTime.formatIso(): String =
-        ISO_FORMATTER.format(this)
+    private fun LocalDateTime.formatIso(): String = ISO_FORMATTER.format(this)
 
     private fun esViolacionUniqueSesion(e: ExposedSQLException): Boolean {
         val msg = e.message?.lowercase().orEmpty()

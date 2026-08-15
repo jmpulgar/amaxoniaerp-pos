@@ -27,7 +27,6 @@ class PanamaInvoiceProcessor(
     private val pacClient: PanamaElectronicInvoiceClient,
     private val payloadBuilder: TheFactoryHkaPayloadBuilder,
 ) : ElectronicInvoiceStrategy {
-
     override val countryCode: String = "PA"
 
     private val logger = LoggerFactory.getLogger(PanamaInvoiceProcessor::class.java)
@@ -36,17 +35,17 @@ class PanamaInvoiceProcessor(
         database: Database,
         invoiceId: String,
     ): ElectronicInvoiceResult {
-
         // ── 1. Obtener datos de la DB ────────────────────────────────────────
-        val context = try {
-            repository.loadInvoiceContext(database, invoiceId)
-        } catch (e: FEInvoiceNotFoundException) {
-            logger.error("Factura no encontrada para FE: {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("INVOICE_NOT_FOUND", e.message ?: "Factura no encontrada")
-        } catch (e: FEConfigurationException) {
-            logger.error("Configuración FE incompleta para factura: {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("CONFIG_ERROR", e.message ?: "Configuración FE incompleta")
-        }
+        val context =
+            try {
+                repository.loadInvoiceContext(database, invoiceId)
+            } catch (e: FEInvoiceNotFoundException) {
+                logger.error("Factura no encontrada para FE: {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("INVOICE_NOT_FOUND", e.message ?: "Factura no encontrada")
+            } catch (e: FEConfigurationException) {
+                logger.error("Configuración FE incompleta para factura: {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("CONFIG_ERROR", e.message ?: "Configuración FE incompleta")
+            }
 
         // ── 1b. Verificar tipo_facturacion ───────────────────────────────────
         // tipo_facturacion: 0=PDF, 1=FISCAL, 2=FORMA LIBRE, 3=The Factory HKA (FE)
@@ -58,50 +57,63 @@ class PanamaInvoiceProcessor(
         }
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
-        logger.info("[FE] Autenticando con PAC: baseUrl=${context.config.api_thefactoryhka} usuario=${context.config.tokenEmpresa.take(8)}...")
-        val credentials = PacCredentials(
-            usuario = context.config.tokenEmpresa,
-            clave = context.config.tokenPassword,
-            baseUrl = context.config.api_thefactoryhka,
+        logger.info(
+            "[FE] Autenticando con PAC: baseUrl=${context.config.api_thefactoryhka} usuario=${context.config.tokenEmpresa.take(8)}...",
         )
-
-        val token = pacClient.authenticate(credentials).getOrElse { e ->
-            logger.error("Error autenticando con PAC para factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure(
-                "AUTH_ERROR",
-                "Error de autenticación con el PAC: ${e.message}",
+        val credentials =
+            PacCredentials(
+                usuario = context.config.tokenEmpresa,
+                clave = context.config.tokenPassword,
+                baseUrl = context.config.api_thefactoryhka,
             )
-        }
+
+        val token =
+            pacClient.authenticate(credentials).getOrElse { e ->
+                logger.error("Error autenticando con PAC para factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure(
+                    "AUTH_ERROR",
+                    "Error de autenticación con el PAC: ${e.message}",
+                )
+            }
 
         // ── 3. Construir el payload ──────────────────────────────────────────
         logger.info("[FE] Token PAC obtenido OK (longitud=${token.token.length}). Construyendo payload para factura $invoiceId...")
-        val payload = try {
-            payloadBuilder.build(context)
-        } catch (e: Exception) {
-            logger.error("Error construyendo payload FE para factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure(
-                "BUILD_ERROR",
-                "Error construyendo documento electrónico: ${e.message}",
-            )
-        }
+        val payload =
+            try {
+                payloadBuilder.build(context)
+            } catch (e: Exception) {
+                logger.error("Error construyendo payload FE para factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure(
+                    "BUILD_ERROR",
+                    "Error construyendo documento electrónico: ${e.message}",
+                )
+            }
         logPayloadDiagnostics(invoiceId, context, payload)
 
         // ── 4. Enviar al PAC ─────────────────────────────────────────────────
-        logger.info("[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} formasPago=${context.formasPago.size}")
-        val pacResponse = pacClient.sendDocument(
-            baseUrl = context.config.api_thefactoryhka,
-            token = token,
-            payload = payload,
-        ).getOrElse { e ->
-            logger.error("Error enviando documento al PAC para factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure(
-                "SEND_ERROR",
-                "Error de comunicación con el PAC: ${e.message}",
-            )
-        }
+        logger.info(
+            "[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} formasPago=${context.formasPago.size}",
+        )
+        val pacResponse =
+            pacClient
+                .sendDocument(
+                    baseUrl = context.config.api_thefactoryhka,
+                    token = token,
+                    payload = payload,
+                ).getOrElse { e ->
+                    logger.error("Error enviando documento al PAC para factura {}", invoiceId, e)
+                    return ElectronicInvoiceResult.Failure(
+                        "SEND_ERROR",
+                        "Error de comunicación con el PAC: ${e.message}",
+                    )
+                }
 
         // ── 5. Evaluar respuesta ─────────────────────────────────────────────
-        logger.info("[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} cufe=${pacResponse.cufe?.take(20)}")
+        logger.info(
+            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} cufe=${pacResponse.cufe?.take(
+                20,
+            )}",
+        )
         if (!pacResponse.exitoso || pacResponse.cufe.isNullOrBlank()) {
             logger.warn(
                 "PAC rechazó factura {}: [{}] {}",
@@ -180,35 +192,38 @@ class PanamaInvoiceProcessor(
     suspend fun resendInvoiceEmail(
         database: Database,
         invoiceId: String,
-    ): Result<TheFactoryEnviarCorreoResponse> {
-        return runCatching {
+    ): Result<TheFactoryEnviarCorreoResponse> =
+        runCatching {
             val context = repository.loadInvoiceContext(database, invoiceId)
             if (context.config.tipoFacturacion < 3) {
                 throw FEConfigurationException("La factura no usa FEL The Factory HKA")
             }
 
-            val cufe = repository.getInvoiceCufe(database, invoiceId)
-                ?: throw FEConfigurationException("La factura no tiene CUFE generado")
+            val cufe =
+                repository.getInvoiceCufe(database, invoiceId)
+                    ?: throw FEConfigurationException("La factura no tiene CUFE generado")
 
-            val credentials = PacCredentials(
-                usuario = context.config.tokenEmpresa,
-                clave = context.config.tokenPassword,
-                baseUrl = context.config.api_thefactoryhka,
-            )
+            val credentials =
+                PacCredentials(
+                    usuario = context.config.tokenEmpresa,
+                    clave = context.config.tokenPassword,
+                    baseUrl = context.config.api_thefactoryhka,
+                )
             val token = pacClient.authenticate(credentials).getOrThrow()
 
             sendInvoiceEmailIfPossible(context, token, cufe).getOrThrow()
         }
-    }
 
     private suspend fun sendInvoiceEmailIfPossible(
         context: InvoiceFEContext,
         token: PacAuthToken,
         cufe: String,
     ): Result<TheFactoryEnviarCorreoResponse> {
-        val email = context.cliente.correo?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: return Result.failure(FEConfigurationException("El cliente no tiene correo configurado"))
+        val email =
+            context.cliente.correo
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: return Result.failure(FEConfigurationException("El cliente no tiene correo configurado"))
 
         return pacClient.sendEmail(
             baseUrl = context.config.api_thefactoryhka,

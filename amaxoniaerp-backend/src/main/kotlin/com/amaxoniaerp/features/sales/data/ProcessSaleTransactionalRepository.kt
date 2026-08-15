@@ -1,27 +1,27 @@
 package com.amaxoniaerp.features.sales.data
 
 import com.amaxoniaerp.core.time.BusinessClock
+import com.amaxoniaerp.features.clients.data.ClientSucursalTable
+import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableVE
 import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
 import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
-import com.amaxoniaerp.features.clients.data.ClientSucursalTable
-import com.amaxoniaerp.features.clients.data.ClientsTable
+import com.amaxoniaerp.features.items.data.FacturaDetalleProductoLoteTable
+import com.amaxoniaerp.features.items.data.ItemLoteTable
+import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
-import com.amaxoniaerp.features.items.data.FacturaDetalleProductoLoteTable
-import com.amaxoniaerp.features.items.data.ItemLoteTable
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
 import com.amaxoniaerp.features.sales.domain.SaleItemInput
-import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
@@ -52,8 +52,10 @@ import java.util.UUID
 open class ProcessSaleTransactionalRepository(
     private val cuentaMesaRepository: CuentaMesaRepository? = null,
 ) {
-
-    open fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
+    open fun process(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ): ProcessSaleResponse {
         val preparedRequest = prepareRequestWithWarehouses(countryCode, request)
         val monetaryContext = resolveMonetaryContext(countryCode, preparedRequest)
 
@@ -83,7 +85,8 @@ open class ProcessSaleTransactionalRepository(
         insertFacturaImpuestos(preparedRequest, invoiceId, now, monetaryContext)
         insertFacturaDetalleFormaPago(preparedRequest, invoiceId, now, monetaryContext, creditDecision)
 
-        val shouldAffectInventory = (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) && !preparedRequest.esCobroCreditoPrevio
+        val shouldAffectInventory =
+            (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) && !preparedRequest.esCobroCreditoPrevio
         if (shouldAffectInventory) {
             updateInventoryAndKardex(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
             insertCajaEntries(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext, creditDecision)
@@ -113,26 +116,33 @@ open class ProcessSaleTransactionalRepository(
         )
     }
 
-    private fun prepareRequestWithWarehouses(countryCode: String, request: ProcessSaleRequest): ProcessSaleRequest {
+    private fun prepareRequestWithWarehouses(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ): ProcessSaleRequest {
         val context = resolveWarehouseContext(countryCode, request.factura.idCaja)
 
-        val normalizedItems = request.items.map { item ->
-            val resolvedWarehouse = item.itemAlmacen.takeIf { it > 0 } ?: context.defaultWarehouseId
-            item.copy(itemAlmacen = resolvedWarehouse)
-        }
+        val normalizedItems =
+            request.items.map { item ->
+                val resolvedWarehouse = item.itemAlmacen.takeIf { it > 0 } ?: context.defaultWarehouseId
+                item.copy(itemAlmacen = resolvedWarehouse)
+            }
 
-        val normalizedFactura = request.factura.copy(
-            idSucursal = context.idSucursal ?: request.factura.idSucursal,
-            serieSucursal = context.serieSucursal
-                ?: request.factura.serieSucursal.take(10)
-        )
-        val normalizedPayments = request.pagos.map { payment ->
-            val normalizedAmount = if (payment.monto > 0.0) payment.monto else payment.montoRecibido
-            payment.copy(
-                tipoMovimiento = normalizeTipoMovimiento(payment.tipoMovimiento),
-                monto = normalizedAmount,
+        val normalizedFactura =
+            request.factura.copy(
+                idSucursal = context.idSucursal ?: request.factura.idSucursal,
+                serieSucursal =
+                    context.serieSucursal
+                        ?: request.factura.serieSucursal.take(10),
             )
-        }
+        val normalizedPayments =
+            request.pagos.map { payment ->
+                val normalizedAmount = if (payment.monto > 0.0) payment.monto else payment.montoRecibido
+                payment.copy(
+                    tipoMovimiento = normalizeTipoMovimiento(payment.tipoMovimiento),
+                    monto = normalizedAmount,
+                )
+            }
 
         validateWarehouseOwnership(
             request = request,
@@ -147,61 +157,72 @@ open class ProcessSaleTransactionalRepository(
         )
     }
 
-    private fun resolveWarehouseContext(countryCode: String, cajaId: String): WarehouseContext {
+    private fun resolveWarehouseContext(
+        countryCode: String,
+        cajaId: String,
+    ): WarehouseContext {
         val isVE = countryCode.equals("VE", ignoreCase = true)
-        val columns = if (isVE) {
-            listOf(SalesCajaTable.idSucursal, SalesCajaTable.codAlmacen)
-        } else {
-            listOf(SalesCajaTable.idSucursal)
-        }
-        val caja = SalesCajaTable
-            .select(columns)
-            .where { SalesCajaTable.id eq cajaId }
-            .limit(1)
-            .firstOrNull()
-            ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$cajaId")
-
-        val cajaWarehouseId = if (isVE) {
-            caja.getOrNull(SalesCajaTable.codAlmacen)?.takeIf { it > 0 }
-        } else null
-        val cajaSucursalId = caja[SalesCajaTable.idSucursal]
-        val serieSucursal = cajaSucursalId?.let { sucursalId ->
-            SalesSucursalTable
-                .select(SalesSucursalTable.serie)
-                .where { SalesSucursalTable.id eq sucursalId }
+        val columns =
+            if (isVE) {
+                listOf(SalesCajaTable.idSucursal, SalesCajaTable.codAlmacen)
+            } else {
+                listOf(SalesCajaTable.idSucursal)
+            }
+        val caja =
+            SalesCajaTable
+                .select(columns)
+                .where { SalesCajaTable.id eq cajaId }
                 .limit(1)
                 .firstOrNull()
-                ?.get(SalesSucursalTable.serie)
-                ?.takeIf { it.isNotBlank() }
-        }
+                ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$cajaId")
+
+        val cajaWarehouseId =
+            if (isVE) {
+                caja.getOrNull(SalesCajaTable.codAlmacen)?.takeIf { it > 0 }
+            } else {
+                null
+            }
+        val cajaSucursalId = caja[SalesCajaTable.idSucursal]
+        val serieSucursal =
+            cajaSucursalId?.let { sucursalId ->
+                SalesSucursalTable
+                    .select(SalesSucursalTable.serie)
+                    .where { SalesSucursalTable.id eq sucursalId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.get(SalesSucursalTable.serie)
+                    ?.takeIf { it.isNotBlank() }
+            }
 
         val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
-        val globalWarehouseId = pgTable
-            .select(pgTable.codAlmacen)
-            .orderBy(pgTable.codEmpresa)
-            .limit(1)
-            .firstOrNull()
-            ?.get(pgTable.codAlmacen)
-            ?.let { kotlin.math.abs(it) }
-            ?.takeIf { it > 0 }
-
-        val sucursalDefaultWarehouse = cajaSucursalId?.let { sucursalId ->
-            SalesSucursalAlmacenTable
-                .select(SalesSucursalAlmacenTable.idAlmacen)
-                .where {
-                    (SalesSucursalAlmacenTable.idSucursal eq sucursalId) and
-                        (SalesSucursalAlmacenTable.defaultVentas eq 1)
-                }
+        val globalWarehouseId =
+            pgTable
+                .select(pgTable.codAlmacen)
+                .orderBy(pgTable.codEmpresa)
                 .limit(1)
                 .firstOrNull()
-                ?.get(SalesSucursalAlmacenTable.idAlmacen)
+                ?.get(pgTable.codAlmacen)
+                ?.let { kotlin.math.abs(it) }
                 ?.takeIf { it > 0 }
-        }
 
-        val defaultWarehouseId = cajaWarehouseId ?: sucursalDefaultWarehouse ?: globalWarehouseId
-            ?: throw InvalidSaleRequestException(
-                "No se pudo resolver almacén por defecto para caja=$cajaId (caja/sucursal/parámetros generales)"
-            )
+        val sucursalDefaultWarehouse =
+            cajaSucursalId?.let { sucursalId ->
+                SalesSucursalAlmacenTable
+                    .select(SalesSucursalAlmacenTable.idAlmacen)
+                    .where {
+                        (SalesSucursalAlmacenTable.idSucursal eq sucursalId) and
+                            (SalesSucursalAlmacenTable.defaultVentas eq 1)
+                    }.limit(1)
+                    .firstOrNull()
+                    ?.get(SalesSucursalAlmacenTable.idAlmacen)
+                    ?.takeIf { it > 0 }
+            }
+
+        val defaultWarehouseId =
+            cajaWarehouseId ?: sucursalDefaultWarehouse ?: globalWarehouseId
+                ?: throw InvalidSaleRequestException(
+                    "No se pudo resolver almacén por defecto para caja=$cajaId (caja/sucursal/parámetros generales)",
+                )
 
         val allowedWarehouseIds = mutableSetOf<Int>()
         if (cajaWarehouseId != null) {
@@ -211,10 +232,11 @@ open class ProcessSaleTransactionalRepository(
             allowedWarehouseIds += globalWarehouseId
         }
         if (cajaSucursalId != null) {
-            allowedWarehouseIds += SalesSucursalAlmacenTable
-                .select(SalesSucursalAlmacenTable.idAlmacen)
-                .where { SalesSucursalAlmacenTable.idSucursal eq cajaSucursalId }
-                .mapNotNull { row -> row[SalesSucursalAlmacenTable.idAlmacen].takeIf { it > 0 } }
+            allowedWarehouseIds +=
+                SalesSucursalAlmacenTable
+                    .select(SalesSucursalAlmacenTable.idAlmacen)
+                    .where { SalesSucursalAlmacenTable.idSucursal eq cajaSucursalId }
+                    .mapNotNull { row -> row[SalesSucursalAlmacenTable.idAlmacen].takeIf { it > 0 } }
         }
         allowedWarehouseIds += defaultWarehouseId
 
@@ -231,14 +253,17 @@ open class ProcessSaleTransactionalRepository(
         normalizedItems: List<SaleItemInput>,
         context: WarehouseContext,
     ) {
-        val invalidWarehouses = normalizedItems
-            .map { it.itemAlmacen }
-            .filter { it !in context.allowedWarehouseIds }
-            .distinct()
+        val invalidWarehouses =
+            normalizedItems
+                .map { it.itemAlmacen }
+                .filter { it !in context.allowedWarehouseIds }
+                .distinct()
 
         if (invalidWarehouses.isNotEmpty()) {
             throw InvalidSaleRequestException(
-                "Almacen(es) no permitidos para caja=${request.factura.idCaja}: ${invalidWarehouses.joinToString(",")}. Permitidos: ${context.allowedWarehouseIds.sorted().joinToString(",")}" 
+                "Almacen(es) no permitidos para caja=${request.factura.idCaja}: ${invalidWarehouses.joinToString(
+                    ",",
+                )}. Permitidos: ${context.allowedWarehouseIds.sorted().joinToString(",")}",
             )
         }
     }
@@ -266,20 +291,26 @@ open class ProcessSaleTransactionalRepository(
         today: LocalDate,
     ): CreditDecision {
         val totalGeneral = request.factura.totalTotalFactura.toScaledBigDecimal(2)
-        val pagos = request.pagos.map { payment ->
-            payment.tipoMovimiento.trim().uppercase() to payment.monto.toScaledBigDecimal(2)
-        }
+        val pagos =
+            request.pagos.map { payment ->
+                payment.tipoMovimiento.trim().uppercase() to payment.monto.toScaledBigDecimal(2)
+            }
         val totalPagos = pagos.fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
-        val totalCxc = pagos
-            .filter { (tipoMovimiento, _) -> tipoMovimiento == "CXC" }
-            .fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
+        val totalCxc =
+            pagos
+                .filter { (tipoMovimiento, _) -> tipoMovimiento == "CXC" }
+                .fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
         val totalPagadoReal = totalPagos - totalCxc
-        val saldoEsperado = totalGeneral
-            .subtract(totalPagadoReal)
-            .max(BigDecimal.ZERO)
-            .setScale(2, RoundingMode.HALF_UP)
+        val saldoEsperado =
+            totalGeneral
+                .subtract(totalPagadoReal)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP)
         val saldoDeclarado = request.pagoResumen.totalizarSaldoPendiente.toScaledBigDecimal(2)
-        val formaPagoSolicitada = request.factura.formaPago.trim().lowercase()
+        val formaPagoSolicitada =
+            request.factura.formaPago
+                .trim()
+                .lowercase()
         val isCredit = formaPagoSolicitada == "credito" || totalCxc > BigDecimal.ZERO || saldoDeclarado > BigDecimal.ZERO
 
         if (totalGeneral < BigDecimal.ZERO || pagos.any { (_, amount) -> amount < BigDecimal.ZERO }) {
@@ -316,26 +347,28 @@ open class ProcessSaleTransactionalRepository(
             }
         }
 
-        val diasCredito = if (isCredit) {
-            val client = ClientsTable
-                .select(ClientsTable.permiteCredito, ClientsTable.dias)
-                .where { ClientsTable.idCliente eq request.factura.idCliente }
-                .limit(1)
-                .firstOrNull()
-                ?: throw InvalidSaleRequestException("No se encontró el cliente para la venta a crédito")
+        val diasCredito =
+            if (isCredit) {
+                val client =
+                    ClientsTable
+                        .select(ClientsTable.permiteCredito, ClientsTable.dias)
+                        .where { ClientsTable.idCliente eq request.factura.idCliente }
+                        .limit(1)
+                        .firstOrNull()
+                        ?: throw InvalidSaleRequestException("No se encontró el cliente para la venta a crédito")
 
-            if (!client[ClientsTable.permiteCredito]) {
-                throw InvalidSaleRequestException("El cliente no permite ventas a crédito")
-            }
-
-            client[ClientsTable.dias].also { dias ->
-                if (dias < 0) {
-                    throw InvalidSaleRequestException("La configuración de días de crédito del cliente es inválida")
+                if (!client[ClientsTable.permiteCredito]) {
+                    throw InvalidSaleRequestException("El cliente no permite ventas a crédito")
                 }
+
+                client[ClientsTable.dias].also { dias ->
+                    if (dias < 0) {
+                        throw InvalidSaleRequestException("La configuración de días de crédito del cliente es inválida")
+                    }
+                }
+            } else {
+                null
             }
-        } else {
-            null
-        }
 
         return CreditDecision(
             formaPago = if (isCredit) "credito" else "contado",
@@ -349,71 +382,80 @@ open class ProcessSaleTransactionalRepository(
         )
     }
 
-    private fun resolveMonetaryContext(countryCode: String, request: ProcessSaleRequest): MonetaryContext {
+    private fun resolveMonetaryContext(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ): MonetaryContext {
         val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
-        val params = pgTable
-            .selectAll()
-            .orderBy(pgTable.codEmpresa)
-            .limit(1)
-            .firstOrNull()
-            ?: throw InvalidSaleRequestException("No se encontró parametros_generales")
+        val params =
+            pgTable
+                .selectAll()
+                .orderBy(pgTable.codEmpresa)
+                .limit(1)
+                .firstOrNull()
+                ?: throw InvalidSaleRequestException("No se encontró parametros_generales")
 
         // multiMoneda y monedaSecundaria solo existen en VE
-        val paramsMulti = if (pgTable is ParametrosGeneralesTableVE) {
-            params[pgTable.multiMoneda].equals("Si", ignoreCase = true)
-        } else {
-            false
-        }
+        val paramsMulti =
+            if (pgTable is ParametrosGeneralesTableVE) {
+                params[pgTable.multiMoneda].equals("Si", ignoreCase = true)
+            } else {
+                false
+            }
         val multiMoneda = if (paramsMulti) "SI" else "NO"
 
         val monedaBase = params[pgTable.monedaBase] ?: 1
         val abrMonedaBase = params[pgTable.abrMonedaBase].take(10)
 
-        val monedaSecundaria = if (pgTable is ParametrosGeneralesTableVE) {
-            params[pgTable.monedaSecundaria]
-        } else {
-            monedaBase
-        }
-        val abrMonedaSecundaria = if (pgTable is ParametrosGeneralesTableVE) {
-            params[pgTable.abrMonedaSecundaria].take(10)
-        } else {
-            abrMonedaBase
-        }
+        val monedaSecundaria =
+            if (pgTable is ParametrosGeneralesTableVE) {
+                params[pgTable.monedaSecundaria]
+            } else {
+                monedaBase
+            }
+        val abrMonedaSecundaria =
+            if (pgTable is ParametrosGeneralesTableVE) {
+                params[pgTable.abrMonedaSecundaria].take(10)
+            } else {
+                abrMonedaBase
+            }
 
         val providedMoneda = request.moneda
         val tasaFromRequest = providedMoneda?.tasa?.takeIf { it > 0.0 }
         val idTasaFromRequest = providedMoneda?.idTasa?.takeIf { it > 0 }
 
         val tasasTable = TasasCambioTableFactory.forCountry(countryCode)
-        val tasaRow = if (paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null) && tasasTable is TasasCambioTableVE) {
-            tasasTable
-                .select(tasasTable.id, tasasTable.tasaInversa)
-                .where {
-                    (tasasTable.divisa eq monedaSecundaria) and
-                        (tasasTable.monedabase eq monedaBase)
-                }
-                .orderBy(tasasTable.id to SortOrder.DESC)
-                .limit(1)
-                .firstOrNull()
-        } else {
-            null
-        }
+        val tasaRow =
+            if (paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null) && tasasTable is TasasCambioTableVE) {
+                tasasTable
+                    .select(tasasTable.id, tasasTable.tasaInversa)
+                    .where {
+                        (tasasTable.divisa eq monedaSecundaria) and
+                            (tasasTable.monedabase eq monedaBase)
+                    }.orderBy(tasasTable.id to SortOrder.DESC)
+                    .limit(1)
+                    .firstOrNull()
+            } else {
+                null
+            }
 
-        val tasa = if (paramsMulti) {
-            tasaFromRequest
-                ?: tasaRow?.get(tasasTable.tasaInversa)?.toDouble()
-                ?: throw InvalidSaleRequestException("No se encontró tasa de cambio vigente")
-        } else {
-            1.0
-        }
+        val tasa =
+            if (paramsMulti) {
+                tasaFromRequest
+                    ?: tasaRow?.get(tasasTable.tasaInversa)?.toDouble()
+                    ?: throw InvalidSaleRequestException("No se encontró tasa de cambio vigente")
+            } else {
+                1.0
+            }
 
-        val idTasa = if (paramsMulti) {
-            idTasaFromRequest
-                ?: tasaRow?.get(tasasTable.id)?.toInt()
-                ?: throw InvalidSaleRequestException("No se encontró id de tasa vigente")
-        } else {
-            0
-        }
+        val idTasa =
+            if (paramsMulti) {
+                idTasaFromRequest
+                    ?: tasaRow?.get(tasasTable.id)?.toInt()
+                    ?: throw InvalidSaleRequestException("No se encontró id de tasa vigente")
+            } else {
+                0
+            }
 
         return MonetaryContext(
             countryCode = countryCode,
@@ -468,17 +510,21 @@ open class ProcessSaleTransactionalRepository(
         fun shouldValidateStock(): Boolean = validarStock.trim().equals("SI", ignoreCase = true)
     }
 
-    private fun validateDuplicateInvoice(countryCode: String, request: ProcessSaleRequest) {
+    private fun validateDuplicateInvoice(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ) {
         val idFactura = request.idFactura?.takeIf { it.isNotBlank() }
         if (idFactura == null) return
 
         val t = SalesFacturaTableFactory.forCountry(countryCode)
-        val existing = t
-            .select(t.idFactura, t.codFactura, t.codEstatus)
-            .where { t.idFactura eq idFactura }
-            .limit(1)
-            .firstOrNull()
-            ?: return
+        val existing =
+            t
+                .select(t.idFactura, t.codFactura, t.codEstatus)
+                .where { t.idFactura eq idFactura }
+                .limit(1)
+                .firstOrNull()
+                ?: return
 
         val status = existing[t.codEstatus] ?: 0
         if (status == 2) {
@@ -488,33 +534,34 @@ open class ProcessSaleTransactionalRepository(
     }
 
     private fun validateStock(request: ProcessSaleRequest) {
-        val requiredByItemWarehouse = request.items
-            .filter { it.esProductoFisico }
-            .groupBy { it.idItem to it.itemAlmacen }
-            .mapValues { (_, lines) -> lines.sumOf { it.itemCantidadTotal }.toScaledBigDecimal(2) }
+        val requiredByItemWarehouse =
+            request.items
+                .filter { it.esProductoFisico }
+                .groupBy { it.idItem to it.itemAlmacen }
+                .mapValues { (_, lines) -> lines.sumOf { it.itemCantidadTotal }.toScaledBigDecimal(2) }
 
         if (requiredByItemWarehouse.isEmpty()) return
 
         val itemIds = requiredByItemWarehouse.keys.map { it.first }.distinct()
         val almacenes = requiredByItemWarehouse.keys.map { it.second }.distinct()
 
-        val available = SalesStockTable
-            .selectAll()
-            .where {
-                (SalesStockTable.idItem inList itemIds) and
-                    (SalesStockTable.codAlmacen inList almacenes)
-            }
-            .associate { row ->
-                (row[SalesStockTable.idItem] to row[SalesStockTable.codAlmacen]) to
-                    row[SalesStockTable.cantidad].toBigDecimal().setScale(2, RoundingMode.HALF_UP)
-            }
+        val available =
+            SalesStockTable
+                .selectAll()
+                .where {
+                    (SalesStockTable.idItem inList itemIds) and
+                        (SalesStockTable.codAlmacen inList almacenes)
+                }.associate { row ->
+                    (row[SalesStockTable.idItem] to row[SalesStockTable.codAlmacen]) to
+                        row[SalesStockTable.cantidad].toBigDecimal().setScale(2, RoundingMode.HALF_UP)
+                }
 
         val failures = mutableListOf<String>()
         requiredByItemWarehouse.forEach { (key, required) ->
             val availableQty = available[key] ?: BigDecimal.ZERO.setScale(2)
             if (availableQty < required) {
                 failures.add(
-                    "item=${key.first}, almacen=${key.second}, solicitado=$required, disponible=$availableQty"
+                    "item=${key.first}, almacen=${key.second}, solicitado=$required, disponible=$availableQty",
                 )
             }
         }
@@ -524,25 +571,33 @@ open class ProcessSaleTransactionalRepository(
         }
     }
 
-    private fun validateClientSucursalIfRequired(countryCode: String, request: ProcessSaleRequest) {
+    private fun validateClientSucursalIfRequired(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ) {
         if (!countryCode.equals("PA", ignoreCase = true)) return
         val clientCode = request.factura.codCliente.take(9)
         if (clientCode.isBlank()) return
 
-        val sucursales = ClientSucursalTable
-            .select(ClientSucursalTable.sucursalId)
-            .where { ClientSucursalTable.clienteCodigo eq clientCode }
-            .map { it[ClientSucursalTable.sucursalId] }
+        val sucursales =
+            ClientSucursalTable
+                .select(ClientSucursalTable.sucursalId)
+                .where { ClientSucursalTable.clienteCodigo eq clientCode }
+                .map { it[ClientSucursalTable.sucursalId] }
         if (sucursales.isEmpty()) return
 
-        val selectedSucursalId = request.factura.clienteSucursalId
-            ?: throw InvalidSaleRequestException("Debes seleccionar la sucursal del cliente")
+        val selectedSucursalId =
+            request.factura.clienteSucursalId
+                ?: throw InvalidSaleRequestException("Debes seleccionar la sucursal del cliente")
         if (selectedSucursalId !in sucursales) {
             throw InvalidSaleRequestException("La sucursal seleccionada no pertenece al cliente")
         }
     }
 
-    private fun resolveInvoiceCode(countryCode: String, request: ProcessSaleRequest): String {
+    private fun resolveInvoiceCode(
+        countryCode: String,
+        request: ProcessSaleRequest,
+    ): String {
         val idCaja = request.factura.idCaja.trim()
         if (idCaja.isBlank()) {
             throw InvalidSaleRequestException("idCaja es obligatorio para generar cod_factura desde caja")
@@ -563,7 +618,10 @@ open class ProcessSaleTransactionalRepository(
         return invoiceCode
     }
 
-    private fun invoiceCodeExists(countryCode: String, code: String): Boolean {
+    private fun invoiceCodeExists(
+        countryCode: String,
+        code: String,
+    ): Boolean {
         val t = SalesFacturaTableFactory.forCountry(countryCode)
         return t
             .select(t.idFactura)
@@ -572,35 +630,44 @@ open class ProcessSaleTransactionalRepository(
             .any()
     }
 
-    private fun getNextCodePreviewFromCaja(idCaja: String, fallbackCodigoCaja: String): String {
-        val row = SalesCajaTable
-            .select(SalesCajaTable.codigo, SalesCajaTable.facturaCorrelativo)
-            .where { SalesCajaTable.id eq idCaja }
-            .limit(1)
-            .firstOrNull()
-            ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
-
-        val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
-        val correlativo = row[SalesCajaTable.facturaCorrelativo] + 1
-        return formatInvoiceCode(codigoCaja, correlativo)
-    }
-
-    private fun consumeAndGetNextCodeFromCaja(idCaja: String, fallbackCodigoCaja: String): String {
-        repeat(10) {
-            val row = SalesCajaTable
+    private fun getNextCodePreviewFromCaja(
+        idCaja: String,
+        fallbackCodigoCaja: String,
+    ): String {
+        val row =
+            SalesCajaTable
                 .select(SalesCajaTable.codigo, SalesCajaTable.facturaCorrelativo)
                 .where { SalesCajaTable.id eq idCaja }
                 .limit(1)
                 .firstOrNull()
                 ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
 
+        val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
+        val correlativo = row[SalesCajaTable.facturaCorrelativo] + 1
+        return formatInvoiceCode(codigoCaja, correlativo)
+    }
+
+    private fun consumeAndGetNextCodeFromCaja(
+        idCaja: String,
+        fallbackCodigoCaja: String,
+    ): String {
+        repeat(10) {
+            val row =
+                SalesCajaTable
+                    .select(SalesCajaTable.codigo, SalesCajaTable.facturaCorrelativo)
+                    .where { SalesCajaTable.id eq idCaja }
+                    .limit(1)
+                    .firstOrNull()
+                    ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
+
             val current = row[SalesCajaTable.facturaCorrelativo]
             val next = current + 1
-            val updated = SalesCajaTable.update({
-                (SalesCajaTable.id eq idCaja) and (SalesCajaTable.facturaCorrelativo eq current)
-            }) {
-                it[facturaCorrelativo] = facturaCorrelativo.plus(1)
-            }
+            val updated =
+                SalesCajaTable.update({
+                    (SalesCajaTable.id eq idCaja) and (SalesCajaTable.facturaCorrelativo eq current)
+                }) {
+                    it[facturaCorrelativo] = facturaCorrelativo.plus(1)
+                }
 
             if (updated == 1) {
                 val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
@@ -613,19 +680,21 @@ open class ProcessSaleTransactionalRepository(
 
     private fun consumeCorrelativoCaja(idCaja: String) {
         repeat(10) {
-            val current = SalesCajaTable
-                .select(SalesCajaTable.facturaCorrelativo)
-                .where { SalesCajaTable.id eq idCaja }
-                .limit(1)
-                .firstOrNull()
-                ?.get(SalesCajaTable.facturaCorrelativo)
-                ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
+            val current =
+                SalesCajaTable
+                    .select(SalesCajaTable.facturaCorrelativo)
+                    .where { SalesCajaTable.id eq idCaja }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.get(SalesCajaTable.facturaCorrelativo)
+                    ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
 
-            val updated = SalesCajaTable.update({
-                (SalesCajaTable.id eq idCaja) and (SalesCajaTable.facturaCorrelativo eq current)
-            }) {
-                it[facturaCorrelativo] = facturaCorrelativo.plus(1)
-            }
+            val updated =
+                SalesCajaTable.update({
+                    (SalesCajaTable.id eq idCaja) and (SalesCajaTable.facturaCorrelativo eq current)
+                }) {
+                    it[facturaCorrelativo] = facturaCorrelativo.plus(1)
+                }
 
             if (updated == 1) return
         }
@@ -633,7 +702,10 @@ open class ProcessSaleTransactionalRepository(
         throw InvalidSaleRequestException("No se pudo consumir correlativo de caja para id_caja=$idCaja")
     }
 
-    private fun formatInvoiceCode(codigoCaja: String, correlativo: Int): String {
+    private fun formatInvoiceCode(
+        codigoCaja: String,
+        correlativo: Int,
+    ): String {
         if (codigoCaja.isBlank()) {
             throw InvalidSaleRequestException("codigo de caja inválido para construir cod_factura")
         }
@@ -651,18 +723,21 @@ open class ProcessSaleTransactionalRepository(
     ) {
         val f = request.factura
         val subtotalBase = monetaryContext.toBase(f.subtotal)
-        val descuentosItemsBase = monetaryContext.toBase(
-            f.descuentosItemFactura.takeIf { it > 0.0 }
-                ?: request.items.sumOf { it.itemMontoDescuento }
-        )
-        val montoItemsBase = monetaryContext.toBase(
-            f.montoItemsFactura.takeIf { it > 0.0 }
-                ?: (f.subtotal - f.descuentosItemFactura).coerceAtLeast(0.0)
-        )
+        val descuentosItemsBase =
+            monetaryContext.toBase(
+                f.descuentosItemFactura.takeIf { it > 0.0 }
+                    ?: request.items.sumOf { it.itemMontoDescuento },
+            )
+        val montoItemsBase =
+            monetaryContext.toBase(
+                f.montoItemsFactura.takeIf { it > 0.0 }
+                    ?: (f.subtotal - f.descuentosItemFactura).coerceAtLeast(0.0),
+            )
         val ivaTotalBase = monetaryContext.toBase(f.ivaTotalFactura)
         val totalGeneralBase = monetaryContext.toBase(f.totalTotalFactura)
-        val fechaVencimientoFactura = creditDecision.fechaVencimiento
-            ?: today.plusDays(monetaryContext.diasVencimiento.toLong())
+        val fechaVencimientoFactura =
+            creditDecision.fechaVencimiento
+                ?: today.plusDays(monetaryContext.diasVencimiento.toLong())
         val totalBultosQty = request.items.sumOf { it.itemCantidadTotal }
         val serieSucursalValue = f.serieSucursal.take(10)
         val cajaSecuenciaValue = resolveCajaSecuenciaCodigo(f.idCajaSecuencia)
@@ -834,14 +909,15 @@ open class ProcessSaleTransactionalRepository(
 
                     // Descontar disponibilidad y registrar venta en item_lote de forma condicional.
                     val loteCantidad = BigDecimal.valueOf(lote.cantidad.toLong())
-                    val updated = ItemLoteTable.update({
-                        (ItemLoteTable.idLoteItem eq lote.idLoteItem) and
-                            (ItemLoteTable.disponibilidad greaterEq loteCantidad)
-                    }) {
-                        it.update(disponibilidad, disponibilidad.minus(loteCantidad))
-                        it.update(procesamiento, procesamiento.plus(loteCantidad))
-                        it.update(venta, venta.plus(loteCantidad))
-                    }
+                    val updated =
+                        ItemLoteTable.update({
+                            (ItemLoteTable.idLoteItem eq lote.idLoteItem) and
+                                (ItemLoteTable.disponibilidad greaterEq loteCantidad)
+                        }) {
+                            it.update(disponibilidad, disponibilidad.minus(loteCantidad))
+                            it.update(procesamiento, procesamiento.plus(loteCantidad))
+                            it.update(venta, venta.plus(loteCantidad))
+                        }
                     if (updated != 1) {
                         throw InsufficientStockException(
                             "Lote insuficiente: idLoteItem=${lote.idLoteItem}, solicitado=$loteCantidad",
@@ -879,9 +955,10 @@ open class ProcessSaleTransactionalRepository(
         creditDecision: CreditDecision,
     ) {
         val resumen = request.pagoResumen
-        val montosPorTipo = request.pagos
-            .groupBy { it.tipoMovimiento.trim().uppercase() }
-            .mapValues { (_, list) -> list.sumOf { it.monto } }
+        val montosPorTipo =
+            request.pagos
+                .groupBy { it.tipoMovimiento.trim().uppercase() }
+                .mapValues { (_, list) -> list.sumOf { it.monto } }
 
         fun amountOf(vararg keys: String): Double = keys.sumOf { key -> montosPorTipo[key] ?: 0.0 }
 
@@ -893,23 +970,41 @@ open class ProcessSaleTransactionalRepository(
         val montoCredito = amountOf("CR", "CREDITO")
         val montoDebito = amountOf("DB", "DEBITO")
         val montoCertificado = amountOf("CERT", "CERTIFICADO")
-        val knownCodes = setOf(
-            "CASH", "EF", "EFE", "EFECTIVO",
-            "CH", "CHEQUE",
-            "TDC", "TARJETA", "PV", "POS", "NEQ",
-            "DE", "DEPOSITO",
-            "TR", "TRANSFERENCIA", "PM",
-            "CR", "CREDITO",
-            "DB", "DEBITO",
-            "CERT", "CERTIFICADO",
-            "CXC",
-            "OT", "MB"
-        )
+        val knownCodes =
+            setOf(
+                "CASH",
+                "EF",
+                "EFE",
+                "EFECTIVO",
+                "CH",
+                "CHEQUE",
+                "TDC",
+                "TARJETA",
+                "PV",
+                "POS",
+                "NEQ",
+                "DE",
+                "DEPOSITO",
+                "TR",
+                "TRANSFERENCIA",
+                "PM",
+                "CR",
+                "CREDITO",
+                "DB",
+                "DEBITO",
+                "CERT",
+                "CERTIFICADO",
+                "CXC",
+                "OT",
+                "MB",
+            )
 
-        val montoOtros = amountOf("OT", "MB") + montosPorTipo
-            .filterKeys { it !in knownCodes }
-            .values
-            .sum()
+        val montoOtros =
+            amountOf("OT", "MB") +
+                montosPorTipo
+                    .filterKeys { it !in knownCodes }
+                    .values
+                    .sum()
 
         val fpgTable = SalesFacturaDetalleFormaPagoTableFactory.forCountry(monetaryContext.countryCode)
         fpgTable.insert {
@@ -974,28 +1069,29 @@ open class ProcessSaleTransactionalRepository(
 
         physicalItems.forEach { item ->
             val requested = item.itemCantidadTotal.toScaledBigDecimal(2)
-            val updated = if (shouldValidateStock) {
-                SalesStockTable.update({
-                    (SalesStockTable.idItem eq item.idItem) and
-                        (SalesStockTable.codAlmacen eq item.itemAlmacen) and
-                        (SalesStockTable.cantidad greaterEq requested.toFloat())
-                }) {
-                    it.update(cantidad, cantidad.minus(requested.toFloat()))
+            val updated =
+                if (shouldValidateStock) {
+                    SalesStockTable.update({
+                        (SalesStockTable.idItem eq item.idItem) and
+                            (SalesStockTable.codAlmacen eq item.itemAlmacen) and
+                            (SalesStockTable.cantidad greaterEq requested.toFloat())
+                    }) {
+                        it.update(cantidad, cantidad.minus(requested.toFloat()))
+                    }
+                } else {
+                    SalesStockTable.update({
+                        (SalesStockTable.idItem eq item.idItem) and
+                            (SalesStockTable.codAlmacen eq item.itemAlmacen)
+                    }) {
+                        it.update(cantidad, cantidad.minus(requested.toFloat()))
+                    }
                 }
-            } else {
-                SalesStockTable.update({
-                    (SalesStockTable.idItem eq item.idItem) and
-                        (SalesStockTable.codAlmacen eq item.itemAlmacen)
-                }) {
-                    it.update(cantidad, cantidad.minus(requested.toFloat()))
-                }
-            }
 
             when {
                 updated == 1 -> Unit
                 shouldValidateStock -> {
                     throw InsufficientStockException(
-                        "No se pudo descontar stock para item=${item.idItem}, almacen=${item.itemAlmacen}"
+                        "No se pudo descontar stock para item=${item.idItem}, almacen=${item.itemAlmacen}",
                     )
                 }
                 else -> {
@@ -1105,11 +1201,12 @@ open class ProcessSaleTransactionalRepository(
             it[cajaNuevaTable.idFactura] = invoiceId
             it[cajaNuevaTable.idCliente] = request.factura.idCliente
             it[cajaNuevaTable.concepto] = conceptoCaja
-            it[cajaNuevaTable.status] = if (creditDecision.saldoEsperado > BigDecimal.ZERO) {
-                CajaStatus.Pendiente
-            } else {
-                CajaStatus.Pagada
-            }
+            it[cajaNuevaTable.status] =
+                if (creditDecision.saldoEsperado > BigDecimal.ZERO) {
+                    CajaStatus.Pendiente
+                } else {
+                    CajaStatus.Pagada
+                }
             it[cajaNuevaTable.sucursalId] = request.factura.idSucursal
             it[cajaNuevaTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
             it[cajaNuevaTable.fechaCreacion] = now
@@ -1224,13 +1321,16 @@ open class ProcessSaleTransactionalRepository(
         }
     }
 
-    private fun parseDateOrToday(value: String?, defaultDate: LocalDate): LocalDate {
+    private fun parseDateOrToday(
+        value: String?,
+        defaultDate: LocalDate,
+    ): LocalDate {
         if (value.isNullOrBlank()) return defaultDate
         return runCatching { LocalDate.parse(value) }.getOrDefault(defaultDate)
     }
 
-    private fun resolveCajaSecuenciaCodigo(idCajaSecuencia: String): String {
-        return SalesCajaSecuenciaTable
+    private fun resolveCajaSecuenciaCodigo(idCajaSecuencia: String): String =
+        SalesCajaSecuenciaTable
             .select(SalesCajaSecuenciaTable.secuencia)
             .where { SalesCajaSecuenciaTable.id eq idCajaSecuencia }
             .limit(1)
@@ -1239,10 +1339,8 @@ open class ProcessSaleTransactionalRepository(
             ?.takeIf { it.isNotBlank() }
             ?.take(10)
             ?: "000001"
-    }
 
     private fun Double.toMoney(): BigDecimal = toScaledBigDecimal(2)
 
-    private fun Double.toScaledBigDecimal(scale: Int): BigDecimal =
-        BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
+    private fun Double.toScaledBigDecimal(scale: Int): BigDecimal = BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
 }

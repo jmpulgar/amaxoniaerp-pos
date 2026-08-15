@@ -16,43 +16,45 @@ import org.jetbrains.exposed.sql.javatime.datetime
  *   entregaCAFE, envioContenedor, tipoVenta, informacionInteres,
  *   descuentoGlobalVenta (factura electrónica DGI Panamá)
  */
-abstract class BaseCreditNoteHeaderTable(name: String = "factura_devolucion") : Table(name) {
-    val idDevolucion        = varchar("id_devolucion", 36)
-    val codDevolucion       = varchar("cod_devolucion", 32)
-    val codFactura          = varchar("cod_factura", 36)
-    val fechaDevolucion     = date("fecha_devolucion")
+abstract class BaseCreditNoteHeaderTable(
+    name: String = "factura_devolucion",
+) : Table(name) {
+    val idDevolucion = varchar("id_devolucion", 36)
+    val codDevolucion = varchar("cod_devolucion", 32)
+    val codFactura = varchar("cod_factura", 36)
+    val fechaDevolucion = date("fecha_devolucion")
     val codDevolucionFiscal = varchar("cod_devolucion_fiscal", 20).nullable()
-    val observacion         = varchar("observacion", 300).nullable()
-    val idCliente           = varchar("id_cliente", 36)
-    val codVendedor         = integer("cod_vendedor")
-    val fechaFactura        = date("fecha_factura").nullable()
-    val subtotal            = decimal("subtotal", 20, 2)
-    val impuesto            = decimal("impuesto", 20, 2)
-    val total               = decimal("total", 20, 2)
-    val usuarioCreacion     = varchar("usuario_creacion", 50)
-    val fechaCreacion       = datetime("fecha_creacion").nullable()
-    val periodoDevolucion   = varchar("periodo_devolucion", 20).nullable()
-    val contabilizado       = integer("contabilizado").default(0)
+    val observacion = varchar("observacion", 300).nullable()
+    val idCliente = varchar("id_cliente", 36)
+    val codVendedor = integer("cod_vendedor")
+    val fechaFactura = date("fecha_factura").nullable()
+    val subtotal = decimal("subtotal", 20, 2)
+    val impuesto = decimal("impuesto", 20, 2)
+    val total = decimal("total", 20, 2)
+    val usuarioCreacion = varchar("usuario_creacion", 50)
+    val fechaCreacion = datetime("fecha_creacion").nullable()
+    val periodoDevolucion = varchar("periodo_devolucion", 20).nullable()
+    val contabilizado = integer("contabilizado").default(0)
     val numcomContabilizado = integer("numcom_contabilizado").default(0)
-    val fechaContabilizado  = date("fecha_contabilizado").nullable()
-    val idCajaSecuencia     = varchar("id_caja_secuencia", 36).nullable()
-    val serieSucursal       = varchar("serie_sucursal", 10).nullable()
-    val cajaSecuencia       = varchar("caja_secuencia", 10).nullable()
-    val idSucursal          = integer("id_sucursal").nullable()
-    val idCaja              = varchar("id_caja", 36).nullable()
-    val codigoCaja          = varchar("codigo_caja", 50).nullable()
-    val codCliente          = varchar("cod_cliente", 80).nullable()
-    val descuentoGlobal     = decimal("descuento_global", 20, 2).nullable()
-    val pdescuentoGlobal    = decimal("pdescuento_global", 20, 2).nullable()
+    val fechaContabilizado = date("fecha_contabilizado").nullable()
+    val idCajaSecuencia = varchar("id_caja_secuencia", 36).nullable()
+    val serieSucursal = varchar("serie_sucursal", 10).nullable()
+    val cajaSecuencia = varchar("caja_secuencia", 10).nullable()
+    val idSucursal = integer("id_sucursal").nullable()
+    val idCaja = varchar("id_caja", 36).nullable()
+    val codigoCaja = varchar("codigo_caja", 50).nullable()
+    val codCliente = varchar("cod_cliente", 80).nullable()
+    val descuentoGlobal = decimal("descuento_global", 20, 2).nullable()
+    val pdescuentoGlobal = decimal("pdescuento_global", 20, 2).nullable()
     val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", 20).nullable()
-    val registroMigrado     = integer("registro_migrado").default(0)
+    val registroMigrado = integer("registro_migrado").default(0)
 
     override val primaryKey = PrimaryKey(idDevolucion)
 }
 
 /** Venezuela: campos de impresora fiscal VE (nroz / impresora_serial). */
 object CreditNoteHeaderTableVE : BaseCreditNoteHeaderTable() {
-    val nroz           = varchar("nroz", 20).nullable()
+    val nroz = varchar("nroz", 20).nullable()
     val impresoraSerial = varchar("impresora_serial", 50).nullable()
 }
 
@@ -61,23 +63,21 @@ object CreditNoteHeaderTableVE : BaseCreditNoteHeaderTable() {
  * `cufe` y `qr` son `text` en ambos esquemas pero no existen en VE.
  */
 object CreditNoteHeaderTablePA : BaseCreditNoteHeaderTable() {
-    val tipoDocumento        = varchar("tipoDocumento", 2).default("04")
-    val naturalezaOperacion  = varchar("NaturalezaOperacion", 2).default("01")
-    val tipoOperacion        = integer("tipoOperacion").default(1)
-    val formatoCAFE          = integer("formatoCAFE").default(1)
-    val entregaCAFE          = integer("entregaCAFE").default(1)
-    val envioContenedor      = integer("envioContenedor").default(1)
-    val tipoVenta            = integer("tipoVenta").default(1)
-    val informacionInteres   = varchar("informacionInteres", 5000).default("")
-    val cufe                 = text("cufe").default("")
-    val qr                   = text("qr").default("")
-    val fechaRecepcionDGI    = datetime("fechaRecepcionDGI").nullable()
+    val tipoDocumento = varchar("tipoDocumento", 2).default("04")
+    val naturalezaOperacion = varchar("NaturalezaOperacion", 2).default("01")
+    val tipoOperacion = integer("tipoOperacion").default(1)
+    val formatoCAFE = integer("formatoCAFE").default(1)
+    val entregaCAFE = integer("entregaCAFE").default(1)
+    val envioContenedor = integer("envioContenedor").default(1)
+    val tipoVenta = integer("tipoVenta").default(1)
+    val informacionInteres = varchar("informacionInteres", 5000).default("")
+    val cufe = text("cufe").default("")
+    val qr = text("qr").default("")
+    val fechaRecepcionDGI = datetime("fechaRecepcionDGI").nullable()
     val nroProtocoloAutorizacion = varchar("nroProtocoloAutorizacion", 200).default("")
-    val fechaLimite          = datetime("fechaLimite").nullable()
+    val fechaLimite = datetime("fechaLimite").nullable()
     val descuentoGlobalVenta = decimal("descuento_global_venta", 20, 2).nullable()
 }
-
-
 
 /** Devuelve la tabla correcta según el país. */
 object CreditNoteHeaderTableFactory {

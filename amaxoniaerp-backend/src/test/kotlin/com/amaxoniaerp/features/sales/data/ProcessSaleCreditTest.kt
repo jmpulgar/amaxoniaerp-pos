@@ -13,14 +13,6 @@ import com.amaxoniaerp.features.sales.domain.SaleInvoiceInput
 import com.amaxoniaerp.features.sales.domain.SaleItemInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentSummaryInput
-import java.math.BigDecimal
-import java.time.LocalDate
-import java.util.UUID
-import kotlin.test.AfterTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
@@ -28,6 +20,13 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.math.BigDecimal
+import java.time.LocalDate
+import java.util.UUID
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class ProcessSaleCreditTest {
     private lateinit var database: Database
@@ -201,24 +200,31 @@ class ProcessSaleCreditTest {
 
         process("VE", request(payments = listOf(cashPayment(100.0))))
 
-        assertEquals("contado", transaction(database) {
-            SalesFacturaTableVE
-                .select(SalesFacturaTableVE.formaPago)
-                .single()[SalesFacturaTableVE.formaPago]
-        })
-        assertEquals(CajaStatus.Pagada, transaction(database) {
-            SalesCajaNuevaTableVE
-                .select(SalesCajaNuevaTableVE.status)
-                .single()[SalesCajaNuevaTableVE.status]
-        })
+        assertEquals(
+            "contado",
+            transaction(database) {
+                SalesFacturaTableVE
+                    .select(SalesFacturaTableVE.formaPago)
+                    .single()[SalesFacturaTableVE.formaPago]
+            },
+        )
+        assertEquals(
+            CajaStatus.Pagada,
+            transaction(database) {
+                SalesCajaNuevaTableVE
+                    .select(SalesCajaNuevaTableVE.status)
+                    .single()[SalesCajaNuevaTableVE.status]
+            },
+        )
     }
 
     private fun createDatabase(countryCode: String): Database {
         schemaCountry = countryCode
-        val db = Database.connect(
-            "jdbc:h2:mem:sales_credit_${countryCode}_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            "org.h2.Driver",
-        )
+        val db =
+            Database.connect(
+                "jdbc:h2:mem:sales_credit_${countryCode}_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(db) {
             if (countryCode == "PA") {
                 SchemaUtils.create(
@@ -342,53 +348,57 @@ class ProcessSaleCreditTest {
         saldoPendiente: Double = 0.0,
         idFactura: String = UUID.randomUUID().toString(),
     ): ProcessSaleRequest {
-        val cashAmount = payments
-            .filter { it.tipoMovimiento.equals("CASH", ignoreCase = true) }
-            .sumOf { it.monto }
+        val cashAmount =
+            payments
+                .filter { it.tipoMovimiento.equals("CASH", ignoreCase = true) }
+                .sumOf { it.monto }
         return ProcessSaleRequest(
             idFactura = idFactura,
-            factura = SaleInvoiceInput(
-                idCliente = "client-1",
-                codCliente = "C001",
-                codVendedor = 1,
-                idShop = 1,
-                idSucursal = 1,
-                idCaja = "caja-1",
-                codigoCaja = "CJ01",
-                idCajaSecuencia = "seq-1",
-                serieSucursal = "S01",
-                formaPago = formaPago,
-                subtotal = 100.0,
-                ivaTotalFactura = 0.0,
-                totalTotalFactura = 100.0,
-                montoItemsFactura = 100.0,
-                totalizarSubTotal = 100.0,
-                totalizarTotalOperacion = 100.0,
-                totalizarBaseImponible = 100.0,
-                totalizarMontoIva = 0.0,
-                totalizarTotalGeneral = 100.0,
-                usuarioCreacion = "TEST",
-            ),
-            items = listOf(
-                SaleItemInput(
-                    idItem = 1,
-                    itemAlmacen = 1,
-                    itemDescripcion = "SERVICIO TEST",
-                    itemCantidad = 1.0,
-                    itemPrecioSinIva = 100.0,
-                    itemPIva = 0.0,
-                    itemTotalSinIva = 100.0,
-                    itemTotalConIva = 100.0,
-                    itemCantidadTotal = 1.0,
-                    esProductoFisico = false,
+            factura =
+                SaleInvoiceInput(
+                    idCliente = "client-1",
+                    codCliente = "C001",
+                    codVendedor = 1,
+                    idShop = 1,
+                    idSucursal = 1,
+                    idCaja = "caja-1",
+                    codigoCaja = "CJ01",
+                    idCajaSecuencia = "seq-1",
+                    serieSucursal = "S01",
+                    formaPago = formaPago,
+                    subtotal = 100.0,
+                    ivaTotalFactura = 0.0,
+                    totalTotalFactura = 100.0,
+                    montoItemsFactura = 100.0,
+                    totalizarSubTotal = 100.0,
+                    totalizarTotalOperacion = 100.0,
+                    totalizarBaseImponible = 100.0,
+                    totalizarMontoIva = 0.0,
+                    totalizarTotalGeneral = 100.0,
+                    usuarioCreacion = "TEST",
                 ),
-            ),
-            pagoResumen = SalePaymentSummaryInput(
-                totalizarMontoCancelar = 100.0,
-                totalizarMontoEfectivo = cashAmount,
-                totalizarCambio = 0.0,
-                totalizarSaldoPendiente = saldoPendiente,
-            ),
+            items =
+                listOf(
+                    SaleItemInput(
+                        idItem = 1,
+                        itemAlmacen = 1,
+                        itemDescripcion = "SERVICIO TEST",
+                        itemCantidad = 1.0,
+                        itemPrecioSinIva = 100.0,
+                        itemPIva = 0.0,
+                        itemTotalSinIva = 100.0,
+                        itemTotalConIva = 100.0,
+                        itemCantidadTotal = 1.0,
+                        esProductoFisico = false,
+                    ),
+                ),
+            pagoResumen =
+                SalePaymentSummaryInput(
+                    totalizarMontoCancelar = 100.0,
+                    totalizarMontoEfectivo = cashAmount,
+                    totalizarCambio = 0.0,
+                    totalizarSaldoPendiente = saldoPendiente,
+                ),
             pagos = payments,
             moneda = SaleCurrencyInput(),
         )
@@ -400,33 +410,38 @@ class ProcessSaleCreditTest {
     private fun cxcPayment(amount: Double) =
         SalePaymentInput(idFormaPago = 2, tipoMovimiento = "CXC", monto = amount, montoRecibido = amount)
 
-    private fun invoiceFormaPago(): String = transaction(database) {
-        SalesFacturaTablePA
-            .select(SalesFacturaTablePA.formaPago)
-            .single()[SalesFacturaTablePA.formaPago]
-    }
+    private fun invoiceFormaPago(): String =
+        transaction(database) {
+            SalesFacturaTablePA
+                .select(SalesFacturaTablePA.formaPago)
+                .single()[SalesFacturaTablePA.formaPago]
+        }
 
-    private fun invoiceDueDate(): LocalDate? = transaction(database) {
-        SalesFacturaTablePA
-            .select(SalesFacturaTablePA.fechaVencimiento)
-            .single()[SalesFacturaTablePA.fechaVencimiento]
-    }
+    private fun invoiceDueDate(): LocalDate? =
+        transaction(database) {
+            SalesFacturaTablePA
+                .select(SalesFacturaTablePA.fechaVencimiento)
+                .single()[SalesFacturaTablePA.fechaVencimiento]
+        }
 
-    private fun cajaStatus(): CajaStatus = transaction(database) {
-        SalesCajaNuevaTablePA
-            .select(SalesCajaNuevaTablePA.status)
-            .single()[SalesCajaNuevaTablePA.status]
-    }
+    private fun cajaStatus(): CajaStatus =
+        transaction(database) {
+            SalesCajaNuevaTablePA
+                .select(SalesCajaNuevaTablePA.status)
+                .single()[SalesCajaNuevaTablePA.status]
+        }
 
-    private fun paymentDetail() = transaction(database) {
-        SalesFacturaDetalleFormaPagoTablePA
-            .selectAll()
-            .single()
-    }
+    private fun paymentDetail() =
+        transaction(database) {
+            SalesFacturaDetalleFormaPagoTablePA
+                .selectAll()
+                .single()
+        }
 
-    private fun cajaPaymentTypes(): List<String?> = transaction(database) {
-        SalesCajaNuevaDetalleFormaPagoTable
-            .select(SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento)
-            .map { it[SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento] }
-    }
+    private fun cajaPaymentTypes(): List<String?> =
+        transaction(database) {
+            SalesCajaNuevaDetalleFormaPagoTable
+                .select(SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento)
+                .map { it[SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento] }
+        }
 }

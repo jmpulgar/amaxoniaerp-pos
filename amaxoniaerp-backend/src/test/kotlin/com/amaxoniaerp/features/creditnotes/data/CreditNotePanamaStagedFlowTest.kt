@@ -17,10 +17,10 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -28,160 +28,189 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.junit.Test
 
 class CreditNotePanamaStagedFlowTest {
-
     @Test
-    fun `accepted applies effects once and finalization is idempotent`() = withDatabase {
-        val prepared = prepare()
-        val response = finalizeAccepted(prepared.id, prepared.numeroDocumentoFiscal)
-        val retry = finalizeAccepted(prepared.id, prepared.numeroDocumentoFiscal)
+    fun `accepted applies effects once and finalization is idempotent`() =
+        withDatabase {
+            val prepared = prepare()
+            val response = finalizeAccepted(prepared.id, prepared.numeroDocumentoFiscal)
+            val retry = finalizeAccepted(prepared.id, prepared.numeroDocumentoFiscal)
 
-        assertEquals(CreditNoteFiscalStatus.CONFIRMADA, response.fiscalStatus)
-        assertEquals(CreditNoteFiscalStatus.CONFIRMADA, retry.fiscalStatus)
-        assertEquals(3, transaction(database) {
-            CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
-        })
-        assertEquals(1, transaction(database) { CreditNoteHeaderTablePA.selectAll().count() })
-        assertEquals(1, transaction(database) { CreditNoteDetailTable.selectAll().count() })
-        assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
-    }
-
-    @Test
-    fun `rejected releases reservation without commercial effects`() = withDatabase {
-        val prepared = prepare()
-
-        val response = transaction(database) {
-            repository.markPanamaFiscalStatus(
-                id = prepared.id,
-                status = CreditNoteFiscalStatus.RECHAZADA,
-                message = "PAC rechazó el documento",
+            assertEquals(CreditNoteFiscalStatus.CONFIRMADA, response.fiscalStatus)
+            assertEquals(CreditNoteFiscalStatus.CONFIRMADA, retry.fiscalStatus)
+            assertEquals(
+                3,
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+                },
             )
+            assertEquals(1, transaction(database) { CreditNoteHeaderTablePA.selectAll().count() })
+            assertEquals(1, transaction(database) { CreditNoteDetailTable.selectAll().count() })
+            assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
         }
-        val source = transaction(database) {
-            repository.getSourceInvoiceDetail(SOURCE_INVOICE_ID, "PA")
-        }
-
-        assertEquals(CreditNoteFiscalStatus.RECHAZADA, response.fiscalStatus)
-        assertEquals(1.0, source?.remainingAmount ?: -1.0, 0.001)
-        assertEquals(2, transaction(database) {
-            CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
-        })
-        assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
-    }
 
     @Test
-    fun `uncertain keeps the reserved quantity`() = withDatabase {
-        val prepared = prepare()
+    fun `rejected releases reservation without commercial effects`() =
+        withDatabase {
+            val prepared = prepare()
 
-        val response = transaction(database) {
-            repository.markPanamaFiscalStatus(
-                id = prepared.id,
-                status = CreditNoteFiscalStatus.INCIERTA,
-                message = "Timeout del PAC",
+            val response =
+                transaction(database) {
+                    repository.markPanamaFiscalStatus(
+                        id = prepared.id,
+                        status = CreditNoteFiscalStatus.RECHAZADA,
+                        message = "PAC rechazó el documento",
+                    )
+                }
+            val source =
+                transaction(database) {
+                    repository.getSourceInvoiceDetail(SOURCE_INVOICE_ID, "PA")
+                }
+
+            assertEquals(CreditNoteFiscalStatus.RECHAZADA, response.fiscalStatus)
+            assertEquals(1.0, source?.remainingAmount ?: -1.0, 0.001)
+            assertEquals(
+                2,
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+                },
             )
+            assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
         }
-        val source = transaction(database) {
-            repository.getSourceInvoiceDetail(SOURCE_INVOICE_ID, "PA")
-        }
-
-        assertEquals(CreditNoteFiscalStatus.INCIERTA, response.fiscalStatus)
-        assertEquals(0.0, source?.remainingAmount ?: -1.0, 0.001)
-        assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
-    }
 
     @Test
-    fun `database failure after PAC acceptance can be marked uncertain without effects`() = withDatabase {
-        val prepared = prepare()
+    fun `uncertain keeps the reserved quantity`() =
+        withDatabase {
+            val prepared = prepare()
 
-        assertFailsWith<Exception> {
-            transaction(database) {
-                repository.finalizePanamaAccepted(
-                    id = prepared.id,
-                    request = request().copy(settlementType = CreditNoteSettlementType.ABONO),
-                    pacResponse = PacResponse(
-                        exitoso = true,
-                        codigo = "200",
-                        mensaje = "OK",
-                        cufe = "A".repeat(66),
-                    ),
-                    numeroDocumentoFiscal = prepared.numeroDocumentoFiscal,
-                )
+            val response =
+                transaction(database) {
+                    repository.markPanamaFiscalStatus(
+                        id = prepared.id,
+                        status = CreditNoteFiscalStatus.INCIERTA,
+                        message = "Timeout del PAC",
+                    )
+                }
+            val source =
+                transaction(database) {
+                    repository.getSourceInvoiceDetail(SOURCE_INVOICE_ID, "PA")
+                }
+
+            assertEquals(CreditNoteFiscalStatus.INCIERTA, response.fiscalStatus)
+            assertEquals(0.0, source?.remainingAmount ?: -1.0, 0.001)
+            assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
+        }
+
+    @Test
+    fun `database failure after PAC acceptance can be marked uncertain without effects`() =
+        withDatabase {
+            val prepared = prepare()
+
+            assertFailsWith<Exception> {
+                transaction(database) {
+                    repository.finalizePanamaAccepted(
+                        id = prepared.id,
+                        request = request().copy(settlementType = CreditNoteSettlementType.ABONO),
+                        pacResponse =
+                            PacResponse(
+                                exitoso = true,
+                                codigo = "200",
+                                mensaje = "OK",
+                                cufe = "A".repeat(66),
+                            ),
+                        numeroDocumentoFiscal = prepared.numeroDocumentoFiscal,
+                    )
+                }
             }
-        }
 
-        val response = transaction(database) {
-            repository.markPanamaFiscalStatus(
-                id = prepared.id,
-                status = CreditNoteFiscalStatus.INCIERTA,
-                message = "PAC aceptó, pero falló la persistencia local",
+            val response =
+                transaction(database) {
+                    repository.markPanamaFiscalStatus(
+                        id = prepared.id,
+                        status = CreditNoteFiscalStatus.INCIERTA,
+                        message = "PAC aceptó, pero falló la persistencia local",
+                    )
+                }
+
+            assertEquals(CreditNoteFiscalStatus.INCIERTA, response.fiscalStatus)
+            assertEquals(
+                2,
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+                },
+            )
+            assertEquals(
+                false,
+                transaction(database) {
+                    CreditNoteFacturaDetalleTable.selectAll().single()[CreditNoteFacturaDetalleTable.anulado]
+                },
             )
         }
 
-        assertEquals(CreditNoteFiscalStatus.INCIERTA, response.fiscalStatus)
-        assertEquals(2, transaction(database) {
-            CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
-        })
-        assertEquals(false, transaction(database) {
-            CreditNoteFacturaDetalleTable.selectAll().single()[CreditNoteFacturaDetalleTable.anulado]
-        })
-    }
-
     @Test
-    fun `concurrent prepares cannot reserve more than the source quantity`() = withDatabase {
-        val request = request()
-        val results = runBlocking {
-            listOf(
-                async(Dispatchers.Default) {
-                    runCatching { transaction(database) { repository.preparePanama(request, "one") } }
-                },
-                async(Dispatchers.Default) {
-                    runCatching { transaction(database) { repository.preparePanama(request, "two") } }
-                },
-            ).awaitAll()
-        }
+    fun `concurrent prepares cannot reserve more than the source quantity`() =
+        withDatabase {
+            val request = request()
+            val results =
+                runBlocking {
+                    listOf(
+                        async(Dispatchers.Default) {
+                            runCatching { transaction(database) { repository.preparePanama(request, "one") } }
+                        },
+                        async(Dispatchers.Default) {
+                            runCatching { transaction(database) { repository.preparePanama(request, "two") } }
+                        },
+                    ).awaitAll()
+                }
 
-        assertEquals(1, results.count { it.isSuccess })
-        assertEquals(1, transaction(database) { CreditNoteHeaderTablePA.selectAll().count() })
-        assertTrue(results.any { it.isFailure })
-    }
+            assertEquals(1, results.count { it.isSuccess })
+            assertEquals(1, transaction(database) { CreditNoteHeaderTablePA.selectAll().count() })
+            assertTrue(results.any { it.isFailure })
+        }
 
     private val repository = CreditNoteRepository()
     private lateinit var database: Database
 
-    private fun prepare() = transaction(database) {
-        repository.preparePanama(request(), "tester")
-    }
+    private fun prepare() =
+        transaction(database) {
+            repository.preparePanama(request(), "tester")
+        }
 
-    private fun finalizeAccepted(id: String, number: String) = transaction(database) {
+    private fun finalizeAccepted(
+        id: String,
+        number: String,
+    ) = transaction(database) {
         repository.finalizePanamaAccepted(
             id = id,
             request = request(),
-            pacResponse = PacResponse(
-                exitoso = true,
-                codigo = "200",
-                mensaje = "OK",
-                cufe = "A".repeat(66),
-            ),
+            pacResponse =
+                PacResponse(
+                    exitoso = true,
+                    codigo = "200",
+                    mensaje = "OK",
+                    cufe = "A".repeat(66),
+                ),
             numeroDocumentoFiscal = number,
         )
     }
 
-    private fun request() = CreateCreditNoteRequest(
-        idFactura = SOURCE_INVOICE_ID,
-        fecha = LocalDate.of(2026, 1, 10).toString(),
-        detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, 1.0)),
-        devolverStock = false,
-        idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
-        settlementType = CreditNoteSettlementType.NINGUNO,
-    )
+    private fun request() =
+        CreateCreditNoteRequest(
+            idFactura = SOURCE_INVOICE_ID,
+            fecha = LocalDate.of(2026, 1, 10).toString(),
+            detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, 1.0)),
+            devolverStock = false,
+            idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
+            settlementType = CreditNoteSettlementType.NINGUNO,
+        )
 
     private fun withDatabase(block: CreditNotePanamaStagedFlowTest.() -> Unit) {
-        database = Database.connect(
-            url = "jdbc:h2:mem:credit_note_staged_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:credit_note_staged_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 ClientsTable,

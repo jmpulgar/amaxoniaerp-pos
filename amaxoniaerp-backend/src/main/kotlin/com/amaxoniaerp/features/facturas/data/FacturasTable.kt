@@ -2,7 +2,9 @@ package com.amaxoniaerp.features.facturas.data
 
 import org.jetbrains.exposed.sql.Table
 
-abstract class BaseFacturasTable(name: String = "factura") : Table(name) {
+abstract class BaseFacturasTable(
+    name: String = "factura",
+) : Table(name) {
     val idFactura = varchar("id_factura", 36)
     val codFactura = varchar("cod_factura", 32)
     val codFacturaFiscal = varchar("cod_factura_fiscal", 10)

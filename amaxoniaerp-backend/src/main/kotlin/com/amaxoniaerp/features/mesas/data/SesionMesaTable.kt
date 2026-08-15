@@ -29,5 +29,4 @@ object SesionMesaTable : Table("sesion_mesa") {
     val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)
-
 }

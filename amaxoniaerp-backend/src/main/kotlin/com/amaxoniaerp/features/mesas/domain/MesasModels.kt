@@ -122,7 +122,9 @@ object LienzoDefaults {
 
 /** Resultado de validar el acceso a una caja y derivar su sucursal. */
 sealed interface CajaScopeResult {
-    data class Allowed(val scope: CajaSucursalScope) : CajaScopeResult
+    data class Allowed(
+        val scope: CajaSucursalScope,
+    ) : CajaScopeResult
 
     data object CajaNotFound : CajaScopeResult
 
@@ -149,10 +151,12 @@ sealed interface CajaScopeResult {
 enum class EstadoMesaOperativo {
     DISPONIBLE,
     OCUPADA,
-    ;}
+}
 
 /** Códigos administrativos que se persisten en `sesion_mesa.estado`. */
-enum class EstadoSesionMesa(val codigo: String) {
+enum class EstadoSesionMesa(
+    val codigo: String,
+) {
     /** Sesión abierta: la mesa está siendo atendida. */
     ABIERTA("ABIERTA"),
 
@@ -178,8 +182,7 @@ enum class EstadoSesionMesa(val codigo: String) {
         get() = this == ABIERTA || this == CUENTA_SOLICITADA
 
     companion object {
-        fun fromCodigo(codigo: String): EstadoSesionMesa? =
-            entries.firstOrNull { it.codigo == codigo }
+        fun fromCodigo(codigo: String): EstadoSesionMesa? = entries.firstOrNull { it.codigo == codigo }
     }
 }
 
@@ -249,11 +252,25 @@ data class SesionMutacionResponse(
 
 /** Resultado interno de las operaciones de sesión que pueden fallar por reglas de negocio. */
 sealed interface SesionMesaResult {
-    data class Opened(val sesion: SesionMesaResponse) : SesionMesaResult
-    data class Closed(val sesion: SesionMesaResponse) : SesionMesaResult
-    data class Cancelled(val sesion: SesionMesaResponse) : SesionMesaResult
-    data class Found(val sesion: SesionMesaResponse?) : SesionMesaResult
-    data class States(val estados: List<MesaEstadoResponse>) : SesionMesaResult
+    data class Opened(
+        val sesion: SesionMesaResponse,
+    ) : SesionMesaResult
+
+    data class Closed(
+        val sesion: SesionMesaResponse,
+    ) : SesionMesaResult
+
+    data class Cancelled(
+        val sesion: SesionMesaResponse,
+    ) : SesionMesaResult
+
+    data class Found(
+        val sesion: SesionMesaResponse?,
+    ) : SesionMesaResult
+
+    data class States(
+        val estados: List<MesaEstadoResponse>,
+    ) : SesionMesaResult
 
     data object SesionYaAbierta : SesionMesaResult
 
@@ -266,7 +283,10 @@ sealed interface SesionMesaResult {
     data object SesionYaFinalizada : SesionMesaResult
 
     data object CantidadPersonasInvalida : SesionMesaResult
+
     data object AreaNoPerteneceSucursal : SesionMesaResult
+
     data object MesaNoPerteneceArea : SesionMesaResult
+
     data object MesaInactiva : SesionMesaResult
 }

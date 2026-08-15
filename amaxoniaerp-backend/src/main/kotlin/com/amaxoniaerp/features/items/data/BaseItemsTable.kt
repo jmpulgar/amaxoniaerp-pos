@@ -6,7 +6,9 @@ import org.jetbrains.exposed.sql.Table
  * Tabla base abstracta con campos comunes de item para todos los países.
  * Define el core de la entidad Item que es idéntico en VE y PA.
  */
-abstract class BaseItemsTable(tableName: String = "item") : Table(tableName) {
+abstract class BaseItemsTable(
+    tableName: String = "item",
+) : Table(tableName) {
     // Identificación
     val idItem = integer("id_item").autoIncrement()
     val codItem = varchar("cod_item", 20)
@@ -149,15 +151,16 @@ object ItemsTablePA : BaseItemsTable("item") {
  * Factory para obtener la tabla correcta según el país.
  */
 object ItemsTableFactory {
-    fun getTableForCountry(countryCode: String): BaseItemsTable = when (countryCode.uppercase()) {
-        "VE" -> ItemsTableVE
-        "PA" -> ItemsTablePA
-        else -> ItemsTableVE
-    }
+    fun getTableForCountry(countryCode: String): BaseItemsTable =
+        when (countryCode.uppercase()) {
+            "VE" -> ItemsTableVE
+            "PA" -> ItemsTablePA
+            else -> ItemsTableVE
+        }
 }
 
 /** Tipos de esquema: TYPE_A = Panamá, TYPE_B = Venezuela. */
 enum class SchemaType {
     TYPE_A,
-    TYPE_B
+    TYPE_B,
 }

@@ -17,7 +17,6 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDo
  * todas las interacciones se normalizan a [PacResponse].
  */
 interface PanamaElectronicInvoiceClient {
-
     /**
      * Obtiene un token JWT del PAC usando las credenciales del contribuyente.
      */

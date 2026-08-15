@@ -17,10 +17,12 @@ public data class DbConfig(
 public fun Application.loadDbConfig(): DbConfig {
     val dotenv = loadDotEnv()
 
-    val url = loadConfigValue("DB_CONFIG_URL", "db.config.url", dotenv)
-        ?: error("Missing DB_CONFIG_URL or db.config.url")
-    val user = loadConfigValue("DB_CONFIG_USER", "db.config.user", dotenv)
-        ?: error("Missing DB_CONFIG_USER or db.config.user")
+    val url =
+        loadConfigValue("DB_CONFIG_URL", "db.config.url", dotenv)
+            ?: error("Missing DB_CONFIG_URL or db.config.url")
+    val user =
+        loadConfigValue("DB_CONFIG_USER", "db.config.user", dotenv)
+            ?: error("Missing DB_CONFIG_USER or db.config.user")
     val password = loadConfigValue("DB_CONFIG_PASS", "db.config.password", dotenv) ?: ""
     val poolSize = loadConfigValue("DB_CONFIG_POOL_SIZE", "db.config.poolSize", dotenv)?.toIntOrNull()
     val driver = loadConfigValue("DB_CONFIG_DRIVER", "db.config.driver", dotenv) ?: inferDriver(url)
@@ -34,8 +36,8 @@ public fun Application.loadDbConfig(): DbConfig {
     )
 }
 
-public fun connectDatabase(dbConfig: DbConfig): Database {
-    return if (dbConfig.driver.isNullOrBlank()) {
+public fun connectDatabase(dbConfig: DbConfig): Database =
+    if (dbConfig.driver.isNullOrBlank()) {
         Database.connect(
             url = dbConfig.url,
             user = dbConfig.user,
@@ -49,9 +51,11 @@ public fun connectDatabase(dbConfig: DbConfig): Database {
             password = dbConfig.password,
         )
     }
-}
 
-public fun verifyDatabaseConnection(database: Database, log: org.slf4j.Logger) {
+public fun verifyDatabaseConnection(
+    database: Database,
+    log: org.slf4j.Logger,
+) {
     try {
         transaction(database) {
             exec("SELECT 1")
@@ -63,10 +67,9 @@ public fun verifyDatabaseConnection(database: Database, log: org.slf4j.Logger) {
     }
 }
 
-private fun inferDriver(url: String): String? {
-    return when {
+private fun inferDriver(url: String): String? =
+    when {
         url.startsWith("jdbc:mysql:") -> "com.mysql.cj.jdbc.Driver"
         url.startsWith("jdbc:h2:") -> "org.h2.Driver"
         else -> null
     }
-}

@@ -33,7 +33,6 @@ class ElectronicInvoiceProcessorFactory(
     private val panamaProcessor: ElectronicInvoiceStrategy,
     private val venezuelaProcessor: ElectronicInvoiceStrategy,
 ) : ProcessorFactory {
-
     override fun forCountry(countryCode: String): ElectronicInvoiceStrategy =
         when (countryCode.uppercase()) {
             "PA" -> panamaProcessor
@@ -46,7 +45,10 @@ class ElectronicInvoiceProcessorFactory(
 private class NoOpElectronicInvoiceStrategy(
     override val countryCode: String,
 ) : ElectronicInvoiceStrategy {
-    override suspend fun processElectronicInvoice(database: org.jetbrains.exposed.sql.Database, invoiceId: String):
-        com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult =
-        com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult.NotApplicable(countryCode)
+    override suspend fun processElectronicInvoice(
+        database: org.jetbrains.exposed.sql.Database,
+        invoiceId: String,
+    ): com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult =
+        com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
+            .NotApplicable(countryCode)
 }

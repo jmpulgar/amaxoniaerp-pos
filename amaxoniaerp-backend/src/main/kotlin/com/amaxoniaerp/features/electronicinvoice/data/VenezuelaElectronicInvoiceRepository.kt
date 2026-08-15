@@ -41,7 +41,6 @@ import java.sql.Connection
  * Clase `open` para permitir fakes en tests sin tocar la DB.
  */
 open class VenezuelaElectronicInvoiceRepository {
-
     private val log = LoggerFactory.getLogger(VenezuelaElectronicInvoiceRepository::class.java)
 
     /** Campo de `correlativos` que indica el contador de FE Venezuela. */
@@ -50,24 +49,28 @@ open class VenezuelaElectronicInvoiceRepository {
     /**
      * Carga el contexto completo de la factura para enviarla a HKA Venezuela.
      */
-    open suspend fun loadInvoiceContext(database: Database, invoiceId: String): InvoiceVEContext = dbQuery(database) {
-        val factura = loadFactura(database, invoiceId)
-        val config = loadConfig(database)
-        val comprador = loadComprador(database, factura.idClienteComprador, factura.facturaData)
-        val detalles = loadDetalles(invoiceId)
-        val formasPago = loadFormasPago(database, factura.idCaja, invoiceId)
-        val caja = loadCaja(database, factura.idCaja, factura.idSucursal, config)
-        val reservado = VECorrelativoReservado(0, 8) // placeholder, lo asigna stratégie
-        InvoiceVEContext(
-            config = config,
-            factura = factura.facturaData,
-            comprador = comprador,
-            detalles = detalles,
-            formasPago = formasPago,
-            caja = caja,
-            correlativoReservado = reservado,
-        )
-    }
+    open suspend fun loadInvoiceContext(
+        database: Database,
+        invoiceId: String,
+    ): InvoiceVEContext =
+        dbQuery(database) {
+            val factura = loadFactura(database, invoiceId)
+            val config = loadConfig(database)
+            val comprador = loadComprador(database, factura.idClienteComprador, factura.facturaData)
+            val detalles = loadDetalles(invoiceId)
+            val formasPago = loadFormasPago(database, factura.idCaja, invoiceId)
+            val caja = loadCaja(database, factura.idCaja, factura.idSucursal, config)
+            val reservado = VECorrelativoReservado(0, 8) // placeholder, lo asigna stratégie
+            InvoiceVEContext(
+                config = config,
+                factura = factura.facturaData,
+                comprador = comprador,
+                detalles = detalles,
+                formasPago = formasPago,
+                caja = caja,
+                correlativoReservado = reservado,
+            )
+        }
 
     /**
      * Verifica idempotencia con semántica OR (FASE 1.1 — Brief item 1).
@@ -91,31 +94,36 @@ open class VenezuelaElectronicInvoiceRepository {
     open suspend fun loadAlreadyIssued(
         database: Database,
         invoiceId: String,
-    ): AlreadyIssuedResult = dbQuery(database) {
-        val row = VEFacturaReadTable
-            .select(VEFacturaReadTable.numeroDocumentoFiscal, VEFacturaReadTable.numeroControlThka)
-            .where { VEFacturaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
-        val num = row[VEFacturaReadTable.numeroDocumentoFiscal]?.takeIf { it.isNotBlank() }
-        val ctrl = row[VEFacturaReadTable.numeroControlThka]?.takeIf { it.isNotBlank() }
-        when {
-            num != null && ctrl != null -> AlreadyIssuedResult.Complete(
-                numeroDocumentoFiscal = num,
-                numeroControl = ctrl,
-            )
-            num != null -> AlreadyIssuedResult.Partial(
-                numeroDocumentoFiscal = num,
-                numeroControl = null,
-            )
-            ctrl != null -> AlreadyIssuedResult.Partial(
-                numeroDocumentoFiscal = null,
-                numeroControl = ctrl,
-            )
-            else -> AlreadyIssuedResult.None
+    ): AlreadyIssuedResult =
+        dbQuery(database) {
+            val row =
+                VEFacturaReadTable
+                    .select(VEFacturaReadTable.numeroDocumentoFiscal, VEFacturaReadTable.numeroControlThka)
+                    .where { VEFacturaReadTable.idFactura eq invoiceId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
+            val num = row[VEFacturaReadTable.numeroDocumentoFiscal]?.takeIf { it.isNotBlank() }
+            val ctrl = row[VEFacturaReadTable.numeroControlThka]?.takeIf { it.isNotBlank() }
+            when {
+                num != null && ctrl != null ->
+                    AlreadyIssuedResult.Complete(
+                        numeroDocumentoFiscal = num,
+                        numeroControl = ctrl,
+                    )
+                num != null ->
+                    AlreadyIssuedResult.Partial(
+                        numeroDocumentoFiscal = num,
+                        numeroControl = null,
+                    )
+                ctrl != null ->
+                    AlreadyIssuedResult.Partial(
+                        numeroDocumentoFiscal = null,
+                        numeroControl = ctrl,
+                    )
+                else -> AlreadyIssuedResult.None
+            }
         }
-    }
 
     /**
      * FASE 2 (Punto 5) — Recarga idempotente de los campos fiscales persistidos.
@@ -132,18 +140,20 @@ open class VenezuelaElectronicInvoiceRepository {
     open suspend fun loadFiscalDataForResponse(
         database: Database,
         invoiceId: String,
-    ): FiscalSnapshot = dbQuery(database) {
-        val row = VEFacturaReadTable
-            .select(VEFacturaReadTable.numeroDocumentoFiscal, VEFacturaReadTable.numeroControlThka)
-            .where { VEFacturaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: return@dbQuery FiscalSnapshot(null, null)
-        FiscalSnapshot(
-            numeroDocumentoFiscal = row[VEFacturaReadTable.numeroDocumentoFiscal]?.takeIf { it.isNotBlank() },
-            numeroControlThka = row[VEFacturaReadTable.numeroControlThka]?.takeIf { it.isNotBlank() },
-        )
-    }
+    ): FiscalSnapshot =
+        dbQuery(database) {
+            val row =
+                VEFacturaReadTable
+                    .select(VEFacturaReadTable.numeroDocumentoFiscal, VEFacturaReadTable.numeroControlThka)
+                    .where { VEFacturaReadTable.idFactura eq invoiceId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?: return@dbQuery FiscalSnapshot(null, null)
+            FiscalSnapshot(
+                numeroDocumentoFiscal = row[VEFacturaReadTable.numeroDocumentoFiscal]?.takeIf { it.isNotBlank() },
+                numeroControlThka = row[VEFacturaReadTable.numeroControlThka]?.takeIf { it.isNotBlank() },
+            )
+        }
 
     /** Snapshot read-only de los campos fiscales Venezuela persistidos. */
     data class FiscalSnapshot(
@@ -185,10 +195,11 @@ open class VenezuelaElectronicInvoiceRepository {
             transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ,
             db = database,
         ) {
-            val candidatos = VECorrelativosTable
-                .selectAll()
-                .where { VECorrelativosTable.campo eq CAMPO_CORRELATIVO_FE }
-                .toList()
+            val candidatos =
+                VECorrelativosTable
+                    .selectAll()
+                    .where { VECorrelativosTable.campo eq CAMPO_CORRELATIVO_FE }
+                    .toList()
 
             if (candidatos.isEmpty()) {
                 throw FEConfigurationException(
@@ -206,22 +217,25 @@ open class VenezuelaElectronicInvoiceRepository {
             val formato = fila[VECorrelativosTable.formato] ?: DEFAULT_CORRELATIVO_FORMAT
 
             // Bloquear la fila real por su id (para FOR UPDATE específico).
-            VECorrelativosTable.select(VECorrelativosTable.id, VECorrelativosTable.contador)
+            VECorrelativosTable
+                .select(VECorrelativosTable.id, VECorrelativosTable.contador)
                 .where { VECorrelativosTable.id eq idFila }
                 .forUpdate()
                 .single()
 
             // Item 3: reservado = max(contadorActual, minimumNextNumber). El contador
             // se sincroniza con el mínimo para que la próxima reserva no colisione.
-            val reservado = VECorrelativoReservado(
-                numero = maxOf(contadorActual, minimumNextNumber),
-                formato = formato,
-            )
-            val updated = VECorrelativosTable.update({ VECorrelativosTable.id eq idFila }) {
-                with(org.jetbrains.exposed.sql.SqlExpressionBuilder) {
-                    it[VECorrelativosTable.contador] = reservado.numero + 1
+            val reservado =
+                VECorrelativoReservado(
+                    numero = maxOf(contadorActual, minimumNextNumber),
+                    formato = formato,
+                )
+            val updated =
+                VECorrelativosTable.update({ VECorrelativosTable.id eq idFila }) {
+                    with(org.jetbrains.exposed.sql.SqlExpressionBuilder) {
+                        it[VECorrelativosTable.contador] = reservado.numero + 1
+                    }
                 }
-            }
             if (updated != 1) {
                 throw FEConfigurationException(
                     "No se pudo actualizar la fila de correlativo id=$idFila (updated=$updated). No se reservó ningún número.",
@@ -267,13 +281,14 @@ open class VenezuelaElectronicInvoiceRepository {
         numeroDocumento: String,
         numeroControl: String,
     ) = dbQuery(database) {
-        val updated = VEFacturaReadTable.update({ VEFacturaReadTable.idFactura eq invoiceId }) {
-            // Cod_factura fiscal se actualiza al mismo valor que numeroDocumento.
-            // El campo existe en VE y PA (ver BaseSalesFacturaTable.codFacturaFiscal).
-            it[VEFacturaReadTable.codFacturaFiscal] = numeroDocumento
-            it[VEFacturaReadTable.numeroDocumentoFiscal] = numeroDocumento
-            it[VEFacturaReadTable.numeroControlThka] = numeroControl
-        }
+        val updated =
+            VEFacturaReadTable.update({ VEFacturaReadTable.idFactura eq invoiceId }) {
+                // Cod_factura fiscal se actualiza al mismo valor que numeroDocumento.
+                // El campo existe en VE y PA (ver BaseSalesFacturaTable.codFacturaFiscal).
+                it[VEFacturaReadTable.codFacturaFiscal] = numeroDocumento
+                it[VEFacturaReadTable.numeroDocumentoFiscal] = numeroDocumento
+                it[VEFacturaReadTable.numeroControlThka] = numeroControl
+            }
         if (updated != 1) {
             log.warn(
                 "[VE-FE] updateInvoiceWithVEResult afectó {} filas, se esperaba 1. invoiceId={}",
@@ -319,40 +334,45 @@ open class VenezuelaElectronicInvoiceRepository {
         val idClienteComprador: String?,
     )
 
-    private fun loadFactura(database: Database, invoiceId: String): FacturaCargada {
-        val row = VEFacturaReadTable
-            .selectAll()
-            .where { VEFacturaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
+    private fun loadFactura(
+        database: Database,
+        invoiceId: String,
+    ): FacturaCargada {
+        val row =
+            VEFacturaReadTable
+                .selectAll()
+                .where { VEFacturaReadTable.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
+                ?: throw FEInvoiceNotFoundException("Factura no encontrada: $invoiceId")
 
-        val factura = VEFacturaData(
-            idFactura = row[VEFacturaReadTable.idFactura],
-            codFactura = row[VEFacturaReadTable.codFactura],
-            numeroDocumentoFiscal = row[VEFacturaReadTable.numeroDocumentoFiscal],
-            numeroControlThka = row[VEFacturaReadTable.numeroControlThka],
-            tipoDocumento = row[VEFacturaReadTable.tipoDocumento] ?: "01",
-            fechaFactura = row[VEFacturaReadTable.fechaFactura],
-            fechaCreacion = row[VEFacturaReadTable.fechaCreacion],
-            facturarANombre = row[VEFacturaReadTable.facturarANombre],
-            facturarARuc = row[VEFacturaReadTable.facturarARuc],
-            facturarADireccion = row[VEFacturaReadTable.facturarADireccion],
-            facturarATelefono = row[VEFacturaReadTable.facturarATelefono],
-            totalTotalFactura = row[VEFacturaReadTable.totalTotalFactura],
-            ivaTotalFactura = row[VEFacturaReadTable.ivaTotalFactura],
-            descuentosItemFactura = row[VEFacturaReadTable.descuentosItemFactura],
-            totalizarBaseImponible = row[VEFacturaReadTable.totalizarBaseImponible],
-            totalizarMontoIva = row[VEFacturaReadTable.totalizarMontoIva],
-            totalizarTotalGeneral = row[VEFacturaReadTable.totalizarTotalGeneral],
-            montoItemsFactura = row[VEFacturaReadTable.montoItemsFactura],
-            multiMoneda = row[VEFacturaReadTable.multiMoneda],
-            tasa = row[VEFacturaReadTable.tasa].toBigDecimal(),
-            monedaBase = row[VEFacturaReadTable.monedaBase],
-            abrMonedaBase = row[VEFacturaReadTable.abrMonedaBase],
-            monedaSecundaria = row[VEFacturaReadTable.monedaSecundaria],
-            abrMonedaSecundaria = row[VEFacturaReadTable.abrMonedaSecundaria],
-        )
+        val factura =
+            VEFacturaData(
+                idFactura = row[VEFacturaReadTable.idFactura],
+                codFactura = row[VEFacturaReadTable.codFactura],
+                numeroDocumentoFiscal = row[VEFacturaReadTable.numeroDocumentoFiscal],
+                numeroControlThka = row[VEFacturaReadTable.numeroControlThka],
+                tipoDocumento = row[VEFacturaReadTable.tipoDocumento] ?: "01",
+                fechaFactura = row[VEFacturaReadTable.fechaFactura],
+                fechaCreacion = row[VEFacturaReadTable.fechaCreacion],
+                facturarANombre = row[VEFacturaReadTable.facturarANombre],
+                facturarARuc = row[VEFacturaReadTable.facturarARuc],
+                facturarADireccion = row[VEFacturaReadTable.facturarADireccion],
+                facturarATelefono = row[VEFacturaReadTable.facturarATelefono],
+                totalTotalFactura = row[VEFacturaReadTable.totalTotalFactura],
+                ivaTotalFactura = row[VEFacturaReadTable.ivaTotalFactura],
+                descuentosItemFactura = row[VEFacturaReadTable.descuentosItemFactura],
+                totalizarBaseImponible = row[VEFacturaReadTable.totalizarBaseImponible],
+                totalizarMontoIva = row[VEFacturaReadTable.totalizarMontoIva],
+                totalizarTotalGeneral = row[VEFacturaReadTable.totalizarTotalGeneral],
+                montoItemsFactura = row[VEFacturaReadTable.montoItemsFactura],
+                multiMoneda = row[VEFacturaReadTable.multiMoneda],
+                tasa = row[VEFacturaReadTable.tasa].toBigDecimal(),
+                monedaBase = row[VEFacturaReadTable.monedaBase],
+                abrMonedaBase = row[VEFacturaReadTable.abrMonedaBase],
+                monedaSecundaria = row[VEFacturaReadTable.monedaSecundaria],
+                abrMonedaSecundaria = row[VEFacturaReadTable.abrMonedaSecundaria],
+            )
         return FacturaCargada(
             facturaData = factura,
             idCaja = row[VEFacturaReadTable.idCaja],
@@ -384,21 +404,25 @@ open class VenezuelaElectronicInvoiceRepository {
         }
 
     private fun loadConfig(database: Database): VEConfigData {
-        val row = VEParametrosReadTable
-            .selectAll()
-            .orderBy(VEParametrosReadTable.codEmpresa)
-            .limit(1)
-            .firstOrNull()
-            ?: throw FEConfigurationException("parametros_generales sin filas para FE VE")
+        val row =
+            VEParametrosReadTable
+                .selectAll()
+                .orderBy(VEParametrosReadTable.codEmpresa)
+                .limit(1)
+                .firstOrNull()
+                ?: throw FEConfigurationException("parametros_generales sin filas para FE VE")
 
         val tipoFact = row[VEParametrosReadTable.tipoFacturacion]
-        val tokenE = row[VEParametrosReadTable.tokenEmpresa]
-            ?: throw FEConfigurationException("Falta token_empresa en parametros_generales (FE VE)")
-        val tokenP = row[VEParametrosReadTable.tokenPassword]
-            ?: throw FEConfigurationException("Falta token_password en parametros_generales (FE VE)")
+        val tokenE =
+            row[VEParametrosReadTable.tokenEmpresa]
+                ?: throw FEConfigurationException("Falta token_empresa en parametros_generales (FE VE)")
+        val tokenP =
+            row[VEParametrosReadTable.tokenPassword]
+                ?: throw FEConfigurationException("Falta token_password en parametros_generales (FE VE)")
         val tipoEntorno = row[VEParametrosReadTable.tipoEntornoVe]
-        val rif = row[VEParametrosReadTable.rif]
-            ?: throw FEConfigurationException("Falta rif en parametros_generales (FE VE)")
+        val rif =
+            row[VEParametrosReadTable.rif]
+                ?: throw FEConfigurationException("Falta rif en parametros_generales (FE VE)")
 
         // FASE 1.1 (cleanup): baseUrl se deriva por configuración de aplicación
         // desde `tipo_entorno_ve` (0=demo, 1=producción). NO se lee de la base
@@ -449,28 +473,29 @@ open class VenezuelaElectronicInvoiceRepository {
                 email = null,
             )
         }
-        val row = VEClientesReadTable
-            .selectAll()
-            .where { VEClientesReadTable.idCliente eq idClienteComprador }
-            .limit(1)
-            .firstOrNull()
-            return if (row == null) {
-                VECompradorData(
-                    nombreRazonSocial = factura.facturarANombre.ifBlank { "CONSUMIDOR FINAL" },
-                    rif = factura.facturarARuc.ifBlank { "V000000000" },
-                    direccion = factura.facturarADireccion.takeIf { it.isNotBlank() },
-                    telefono = factura.facturarATelefono.takeIf { it.isNotBlank() },
-                    email = null,
-                )
-            } else {
-                VECompradorData(
-                    nombreRazonSocial = row[VEClientesReadTable.nombre].ifBlank { factura.facturarANombre },
-                    rif = row[VEClientesReadTable.rif].ifBlank { factura.facturarARuc },
-                    direccion = row[VEClientesReadTable.direccion].takeIf { it.isNotBlank() },
-                    telefono = row[VEClientesReadTable.telefonos].takeIf { it.isNotBlank() },
-                    email = row[VEClientesReadTable.email].takeIf { it.isNotBlank() },
-                )
-            }
+        val row =
+            VEClientesReadTable
+                .selectAll()
+                .where { VEClientesReadTable.idCliente eq idClienteComprador }
+                .limit(1)
+                .firstOrNull()
+        return if (row == null) {
+            VECompradorData(
+                nombreRazonSocial = factura.facturarANombre.ifBlank { "CONSUMIDOR FINAL" },
+                rif = factura.facturarARuc.ifBlank { "V000000000" },
+                direccion = factura.facturarADireccion.takeIf { it.isNotBlank() },
+                telefono = factura.facturarATelefono.takeIf { it.isNotBlank() },
+                email = null,
+            )
+        } else {
+            VECompradorData(
+                nombreRazonSocial = row[VEClientesReadTable.nombre].ifBlank { factura.facturarANombre },
+                rif = row[VEClientesReadTable.rif].ifBlank { factura.facturarARuc },
+                direccion = row[VEClientesReadTable.direccion].takeIf { it.isNotBlank() },
+                telefono = row[VEClientesReadTable.telefonos].takeIf { it.isNotBlank() },
+                email = row[VEClientesReadTable.email].takeIf { it.isNotBlank() },
+            )
+        }
     }
 
     private fun loadDetalles(invoiceId: String): List<VEDetalleData> =
@@ -512,15 +537,16 @@ open class VenezuelaElectronicInvoiceRepository {
         invoiceId: String,
     ): List<VEFormaPagoData> {
         // 1. Buscar la caja_nueva asociada a la factura.
-        val cajaNueva = FECajaNuevaReadTable
-            .selectAll()
-            .where { FECajaNuevaReadTable.idFactura eq invoiceId }
-            .limit(1)
-            .firstOrNull()
-            ?: run {
-                log.warn("[VE-FE] No se encontró caja_nueva para invoiceId={}", invoiceId)
-                return emptyList()
-            }
+        val cajaNueva =
+            FECajaNuevaReadTable
+                .selectAll()
+                .where { FECajaNuevaReadTable.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
+                ?: run {
+                    log.warn("[VE-FE] No se encontró caja_nueva para invoiceId={}", invoiceId)
+                    return emptyList()
+                }
         val cajaNuevaId = cajaNueva[FECajaNuevaReadTable.cajaId]
 
         // 2. JOIN caja_nueva_detalle + caja_forma_pago.
@@ -530,8 +556,7 @@ open class VenezuelaElectronicInvoiceRepository {
                 JoinType.LEFT,
                 onColumn = FECajaNuevaDetalleReadTable.idFormaPago,
                 otherColumn = CajaFormaPagoTable.idFormaPago,
-            )
-            .selectAll()
+            ).selectAll()
             .where { FECajaNuevaDetalleReadTable.cajaId eq cajaNuevaId }
             .mapNotNull { row ->
                 val monto = row[FECajaNuevaDetalleReadTable.monto] ?: return@mapNotNull null
@@ -561,22 +586,27 @@ open class VenezuelaElectronicInvoiceRepository {
         idSucursal: Int,
         config: VEConfigData,
     ): VECajaData {
-        val row = VECajaReadTable
-            .selectAll()
-            .where { VECajaReadTable.id eq cajaId }
-            .limit(1)
-            .firstOrNull()
-        val codigoSucursal = row?.getOrNull(VECajaReadTable.codigoSucursalEmisor)?.takeIf { it.isNotBlank() }
-            ?: config.codigoSucursalEmisorFallback
-        val puntoFact = row?.getOrNull(VECajaReadTable.puntoFacturacionFiscal)?.takeIf { it.isNotBlank() }
-            ?: config.puntoFacturacionFiscalFallback
-        val serieCaja = row?.get(VECajaReadTable.serieCaja)
-        val serieSucursal = row?.get(VECajaReadTable.serieSucursal)
-            ?: VESucursalReadTable.selectAll()
-                .where { VESucursalReadTable.id eq idSucursal }
+        val row =
+            VECajaReadTable
+                .selectAll()
+                .where { VECajaReadTable.id eq cajaId }
                 .limit(1)
                 .firstOrNull()
-                ?.get(VESucursalReadTable.serie)
+        val codigoSucursal =
+            row?.getOrNull(VECajaReadTable.codigoSucursalEmisor)?.takeIf { it.isNotBlank() }
+                ?: config.codigoSucursalEmisorFallback
+        val puntoFact =
+            row?.getOrNull(VECajaReadTable.puntoFacturacionFiscal)?.takeIf { it.isNotBlank() }
+                ?: config.puntoFacturacionFiscalFallback
+        val serieCaja = row?.get(VECajaReadTable.serieCaja)
+        val serieSucursal =
+            row?.get(VECajaReadTable.serieSucursal)
+                ?: VESucursalReadTable
+                    .selectAll()
+                    .where { VESucursalReadTable.id eq idSucursal }
+                    .limit(1)
+                    .firstOrNull()
+                    ?.get(VESucursalReadTable.serie)
         return VECajaData(
             idCaja = cajaId,
             serieCaja = serieCaja ?: "",
@@ -594,12 +624,14 @@ open class VenezuelaElectronicInvoiceRepository {
         // por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.
         /** Código de entorno demo en `parametros_generales.tipo_entorno_ve`. */
         private const val ENV_DEMO = 0
+
         /** Código de entorno producción en `parametros_generales.tipo_entorno_ve`. */
         private const val ENV_PROD = 1
+
         /** URL base The Factory HKA Venezuela — demo. */
         private const val URL_BASE_DEMO = "https://demoemision.thefactoryhka.com.ve/api"
+
         /** URL base The Factory HKA Venezuela — producción. */
         private const val URL_BASE_PROD = "https://emision.thefactoryhka.com.ve/api"
     }
 }
-

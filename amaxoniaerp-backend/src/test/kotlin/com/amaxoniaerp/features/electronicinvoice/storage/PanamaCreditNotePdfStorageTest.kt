@@ -1,16 +1,15 @@
 package com.amaxoniaerp.features.electronicinvoice.storage
 
+import org.junit.After
+import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readBytes
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.After
-import org.junit.Test
 
 class PanamaCreditNotePdfStorageTest {
-
     private val roots = mutableListOf<Path>()
 
     @After

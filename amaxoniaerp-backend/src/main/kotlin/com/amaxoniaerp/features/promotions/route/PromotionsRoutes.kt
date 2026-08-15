@@ -18,15 +18,18 @@ fun Route.promotionsRoutes(repository: PromotionsRepository) {
     authenticate {
         route("/promociones") {
             get {
-                val principal = call.principal<JWTPrincipal>()
-                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                val principal =
+                    call.principal<JWTPrincipal>()
+                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
                 if (principal.payload.getClaim("token_type").asString() != "company") {
                     return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
                 }
-                val countryCode = principal.getCountryCode()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-                val adminDb = principal.getAdminDb()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                val countryCode =
+                    principal.getCountryCode()
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                val adminDb =
+                    principal.getAdminDb()
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 call.respond(PromotionsListResponse(repository.listPromotions(companyDb)))
             }

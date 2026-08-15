@@ -130,6 +130,7 @@ object VEParametrosReadTable : Table("parametros_generales") {
     val codEmpresa = integer("cod_empresa")
     val tipoFacturacion = integer("tipo_facturacion").default(0)
     val tipoEntornoVe = integer("tipo_entorno_ve").default(0)
+
     // FASE 1.1 (cleanup): la URL base del PAC NO se persiste en la base del
     // tenant. Se deriva por configuración de aplicación a partir de
     // `tipo_entorno_ve` (0=demo, 1=producción). Antes se leía la columna

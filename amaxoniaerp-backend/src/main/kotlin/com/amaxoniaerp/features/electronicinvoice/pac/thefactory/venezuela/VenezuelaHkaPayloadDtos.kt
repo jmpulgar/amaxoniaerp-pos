@@ -16,12 +16,13 @@ import kotlinx.serialization.Serializable
 // no se traducen, no se case-convierten, no se renombran. La coincidencia es
 // un contrato con el PAC.
 
-val feJsonVE = kotlinx.serialization.json.Json {
-    encodeDefaults = false
-    explicitNulls = false
-    ignoreUnknownKeys = true
-    prettyPrint = false
-}
+val feJsonVE =
+    kotlinx.serialization.json.Json {
+        encodeDefaults = false
+        explicitNulls = false
+        ignoreUnknownKeys = true
+        prettyPrint = false
+    }
 
 /** Wrapper raíz del documento electrónico venezolano. */
 @Serializable

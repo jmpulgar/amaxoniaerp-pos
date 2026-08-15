@@ -7,7 +7,6 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -17,10 +16,9 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.test.assertIs
 
 /**
  * Tests del [VenezuelaElectronicInvoiceRepository] enfocados en:
@@ -43,16 +41,16 @@ import kotlin.test.assertIs
  * se valida en el suite de Strategy con un cliente en memoria.
  */
 class VenezuelaElectronicInvoiceRepositoryTest {
-
     private lateinit var database: Database
     private val repository = VenezuelaElectronicInvoiceRepository()
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect(
-            url = "jdbc:h2:mem:ve_fe_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_MODE=1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:ve_fe_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_MODE=1",
+                driver = "org.h2.Driver",
+            )
         transaction(database) {
             // Solo creamos las tablas necesarias para los tests de correlativo + persistencia.
             SchemaUtils.create(VECorrelativosTable, VEFacturaReadTable)
@@ -69,38 +67,42 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     // ─── 23. Concurrencia de reserva de correlativo ────────────────────────
 
     @Test
-    fun `reserva concurrente de correlativo asigna numeros unicos sin saltos`() = runBlocking {
-        transaction(database) {
-            VECorrelativosTable.insert {
-                it[id] = 1
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
-                it[contador] = 1
-                it[formato] = 8
+    fun `reserva concurrente de correlativo asigna numeros unicos sin saltos`() =
+        runBlocking {
+            transaction(database) {
+                VECorrelativosTable.insert {
+                    it[id] = 1
+                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[contador] = 1
+                    it[formato] = 8
+                }
             }
-        }
 
-        val n = 50
-        val reservados = (1..n).map {
-            async { repository.reserveCorrelativoFacturaElectronica(database) }
-        }.awaitAll()
+            val n = 50
+            val reservados =
+                (1..n)
+                    .map {
+                        async { repository.reserveCorrelativoFacturaElectronica(database) }
+                    }.awaitAll()
 
-        // Todos los números reservados deben ser distintos y cubrir el rango 1..n.
-        val numeros = reservados.map { it.numero }.toSet()
-        assertEquals(n, numeros.size, "Debe haber $n números únicos (sin duplicados)")
-        assertEquals((1..n).toSet(), numeros, "El rango debe ser continuo 1..$n")
-        assertEquals(n, numeros.size, "Debe haber $n números únicos (sin duplicados)")
-        assertEquals((1..n).toSet(), numeros, "El rango debe ser continuo 1..$n")
-        // El siguiente contador en DB debe ser n+1.
-        val contadorFinal = transaction(database) {
-            VECorrelativosTable
-                .select(VECorrelativosTable.contador)
-                .where { VECorrelativosTable.id eq 1 }
-                .single()[VECorrelativosTable.contador]
+            // Todos los números reservados deben ser distintos y cubrir el rango 1..n.
+            val numeros = reservados.map { it.numero }.toSet()
+            assertEquals(n, numeros.size, "Debe haber $n números únicos (sin duplicados)")
+            assertEquals((1..n).toSet(), numeros, "El rango debe ser continuo 1..$n")
+            assertEquals(n, numeros.size, "Debe haber $n números únicos (sin duplicados)")
+            assertEquals((1..n).toSet(), numeros, "El rango debe ser continuo 1..$n")
+            // El siguiente contador en DB debe ser n+1.
+            val contadorFinal =
+                transaction(database) {
+                    VECorrelativosTable
+                        .select(VECorrelativosTable.contador)
+                        .where { VECorrelativosTable.id eq 1 }
+                        .single()[VECorrelativosTable.contador]
+                }
+            assertEquals(n + 1, contadorFinal)
+            // La longitud formateada respeta el formato definido (8).
+            assertTrue(reservados.all { it.numeroFormateado().length == 8 })
         }
-        assertEquals(n + 1, contadorFinal)
-        // La longitud formateada respeta el formato definido (8).
-        assertTrue(reservados.all { it.numeroFormateado().length == 8 })
-    }
 
     // ─── FASE 1.1 — Item 3: reserveAtLeast con mínimo garantizado ────────
 
@@ -123,61 +125,70 @@ class VenezuelaElectronicInvoiceRepositoryTest {
      * basándote solamente en H2" ). La veredicta productiva recae en MySQL/InnoDB.
      */
     @Test
-    fun `reserveAtLeast sincroniza contador con minimumNextNumber bajando concurrencia`() = runBlocking {
-        transaction(database) {
-            VECorrelativosTable.insert {
-                it[id] = 1
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
-                it[contador] = 1
-                it[formato] = 8
+    fun `reserveAtLeast sincroniza contador con minimumNextNumber bajando concurrencia`() =
+        runBlocking {
+            transaction(database) {
+                VECorrelativosTable.insert {
+                    it[id] = 1
+                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[contador] = 1
+                    it[formato] = 8
+                }
             }
-        }
 
-        val n = 50
-        // Todas las llamadas vienen con el mismo minimumNextNumber (caso Brief:
-        // el PAC devolvió remoto=100 → minimumNextNumber=101).
-        val reservados = (1..n).map {
-            async { repository.reserveAtLeast(database, minimumNextNumber = 101) }
-        }.awaitAll()
+            val n = 50
+            // Todas las llamadas vienen con el mismo minimumNextNumber (caso Brief:
+            // el PAC devolvió remoto=100 → minimumNextNumber=101).
+            val reservados =
+                (1..n)
+                    .map {
+                        async { repository.reserveAtLeast(database, minimumNextNumber = 101) }
+                    }.awaitAll()
 
-        val numeros = reservados.map { it.numero }
-        // Sin duplicados.
-        assertEquals(n, numeros.toSet().size, "No debe haber duplicados")
-        // Todos >= 101.
-        assertTrue(numeros.all { it >= 101 }, "Todos los números deben ser >= 101")
-        // El contador final en DB debe ser mayor al máximo reservado.
-        val maxReservado = numeros.max()
-        val contadorFinal = transaction(database) {
-            VECorrelativosTable
-                .select(VECorrelativosTable.contador)
-                .where { VECorrelativosTable.id eq 1 }
-                .single()[VECorrelativosTable.contador]
+            val numeros = reservados.map { it.numero }
+            // Sin duplicados.
+            assertEquals(n, numeros.toSet().size, "No debe haber duplicados")
+            // Todos >= 101.
+            assertTrue(numeros.all { it >= 101 }, "Todos los números deben ser >= 101")
+            // El contador final en DB debe ser mayor al máximo reservado.
+            val maxReservado = numeros.max()
+            val contadorFinal =
+                transaction(database) {
+                    VECorrelativosTable
+                        .select(VECorrelativosTable.contador)
+                        .where { VECorrelativosTable.id eq 1 }
+                        .single()[VECorrelativosTable.contador]
+                }
+            assertEquals(
+                maxReservado + 1,
+                contadorFinal,
+                "El contador persistido debe ser (max reservado)+1 = ${maxReservado + 1}",
+            )
         }
-        assertEquals(maxReservado + 1, contadorFinal,
-            "El contador persistido debe ser (max reservado)+1 = ${maxReservado + 1}")
-    }
 
     @Test
-    fun `reserveAtLeast con contador local mayor al minimo conserva el contador`() = runBlocking {
-        transaction(database) {
-            VECorrelativosTable.insert {
-                it[id] = 1
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
-                it[contador] = 500
-                it[formato] = 8
+    fun `reserveAtLeast con contador local mayor al minimo conserva el contador`() =
+        runBlocking {
+            transaction(database) {
+                VECorrelativosTable.insert {
+                    it[id] = 1
+                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[contador] = 500
+                    it[formato] = 8
+                }
             }
+            val reservado = repository.reserveAtLeast(database, minimumNextNumber = 100)
+            assertEquals(500, reservado.numero, "max(500, 100) = 500")
+            // El siguiente contador en DB debe ser 501.
+            val contadorFinal =
+                transaction(database) {
+                    VECorrelativosTable
+                        .select(VECorrelativosTable.contador)
+                        .where { VECorrelativosTable.id eq 1 }
+                        .single()[VECorrelativosTable.contador]
+                }
+            assertEquals(501, contadorFinal)
         }
-        val reservado = repository.reserveAtLeast(database, minimumNextNumber = 100)
-        assertEquals(500, reservado.numero, "max(500, 100) = 500")
-        // El siguiente contador en DB debe ser 501.
-        val contadorFinal = transaction(database) {
-            VECorrelativosTable
-                .select(VECorrelativosTable.contador)
-                .where { VECorrelativosTable.id eq 1 }
-                .single()[VECorrelativosTable.contador]
-        }
-        assertEquals(501, contadorFinal)
-    }
 
     @Test
     fun `reserveAtLeast con minimumNextNumber menor que 1 falla con IllegalArgumentException`() {
@@ -190,10 +201,16 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     fun `reserva con dos filas duplicadas del mismo campo falla controladamente`() {
         transaction(database) {
             VECorrelativosTable.insert {
-                it[id] = 1; it[campo] = repository.CAMPO_CORRELATIVO_FE; it[contador] = 1; it[formato] = 8
+                it[id] = 1
+                it[campo] = repository.CAMPO_CORRELATIVO_FE
+                it[contador] = 1
+                it[formato] = 8
             }
             VECorrelativosTable.insert {
-                it[id] = 2; it[campo] = repository.CAMPO_CORRELATIVO_FE; it[contador] = 99; it[formato] = 8
+                it[id] = 2
+                it[campo] = repository.CAMPO_CORRELATIVO_FE
+                it[contador] = 99
+                it[formato] = 8
             }
         }
         assertFailsWith<FEConfigurationException> {
@@ -206,7 +223,10 @@ class VenezuelaElectronicInvoiceRepositoryTest {
         // No se inserta ninguna fila con el campo esperado.
         transaction(database) {
             VECorrelativosTable.insert {
-                it[id] = 1; it[campo] = "otro_campo"; it[contador] = 1; it[formato] = 8
+                it[id] = 1
+                it[campo] = "otro_campo"
+                it[contador] = 1
+                it[formato] = 8
             }
         }
         assertFailsWith<FEConfigurationException> {
@@ -215,58 +235,63 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     }
 
     @Test
-    fun `reserva usa formato por defecto cuando la columna formato es null`() = runBlocking {
-        transaction(database) {
-            VECorrelativosTable.insert {
-                it[id] = 1
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
-                it[contador] = 7
-                it[formato] = null
+    fun `reserva usa formato por defecto cuando la columna formato es null`() =
+        runBlocking {
+            transaction(database) {
+                VECorrelativosTable.insert {
+                    it[id] = 1
+                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[contador] = 7
+                    it[formato] = null
+                }
             }
+            val reservado = repository.reserveCorrelativoFacturaElectronica(database)
+            assertEquals(7, reservado.numero)
+            // DEFAULT_CORRELATIVO_FORMAT = 8 (privado); por contrato debe ser >= 1.
+            assertTrue(reservado.formato >= 1)
         }
-        val reservado = repository.reserveCorrelativoFacturaElectronica(database)
-        assertEquals(7, reservado.numero)
-        // DEFAULT_CORRELATIVO_FORMAT = 8 (privado); por contrato debe ser >= 1.
-        assertTrue(reservado.formato >= 1)
-    }
 
     // ─── 23b. Idempotencia: loadAlreadyIssued ───────────────────────────────
 
     @Test
-    fun `loadAlreadyIssued retorna None cuando la factura no tiene numero fiscal`() = runBlocking {
-        seedFactura(database, invoiceId = "inv-1", numeroDocumentoFiscal = null, numeroControl = null)
-        val result = repository.loadAlreadyIssued(database, "inv-1")
-        assertEquals(VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.None, result)
-    }
+    fun `loadAlreadyIssued retorna None cuando la factura no tiene numero fiscal`() =
+        runBlocking {
+            seedFactura(database, invoiceId = "inv-1", numeroDocumentoFiscal = null, numeroControl = null)
+            val result = repository.loadAlreadyIssued(database, "inv-1")
+            assertEquals(VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.None, result)
+        }
 
     @Test
-    fun `loadAlreadyIssued retorna Complete cuando la factura tiene ambos campos`() = runBlocking {
-        seedFactura(database, invoiceId = "inv-2", numeroDocumentoFiscal = "00000100", numeroControl = "L001P001-100")
-        val result = repository.loadAlreadyIssued(database, "inv-2")
-        val complete = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Complete>(result)
-        assertEquals("00000100", complete.numeroDocumentoFiscal)
-        assertEquals("L001P001-100", complete.numeroControl)
-    }
+    fun `loadAlreadyIssued retorna Complete cuando la factura tiene ambos campos`() =
+        runBlocking {
+            seedFactura(database, invoiceId = "inv-2", numeroDocumentoFiscal = "00000100", numeroControl = "L001P001-100")
+            val result = repository.loadAlreadyIssued(database, "inv-2")
+            val complete = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Complete>(result)
+            assertEquals("00000100", complete.numeroDocumentoFiscal)
+            assertEquals("L001P001-100", complete.numeroControl)
+        }
 
     // ─── FASE 1.1 — Item 1: idempotencia OR (Partial) ─────────────────────
 
     @Test
-    fun `loadAlreadyIssued con OR retorna Partial cuando solo existe numeroDocumentoFiscal`() = runBlocking {
-        seedFactura(database, invoiceId = "inv-or-num", numeroDocumentoFiscal = "00000099", numeroControl = null)
-        val result = repository.loadAlreadyIssued(database, "inv-or-num")
-        val partial = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Partial>(result)
-        assertEquals("00000099", partial.numeroDocumentoFiscal)
-        assertNull(partial.numeroControl)
-    }
+    fun `loadAlreadyIssued con OR retorna Partial cuando solo existe numeroDocumentoFiscal`() =
+        runBlocking {
+            seedFactura(database, invoiceId = "inv-or-num", numeroDocumentoFiscal = "00000099", numeroControl = null)
+            val result = repository.loadAlreadyIssued(database, "inv-or-num")
+            val partial = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Partial>(result)
+            assertEquals("00000099", partial.numeroDocumentoFiscal)
+            assertNull(partial.numeroControl)
+        }
 
     @Test
-    fun `loadAlreadyIssued con OR retorna Partial cuando solo existe numero_control_thka`() = runBlocking {
-        seedFactura(database, invoiceId = "inv-or-ctrl", numeroDocumentoFiscal = null, numeroControl = "L001P001-200")
-        val result = repository.loadAlreadyIssued(database, "inv-or-ctrl")
-        val partial = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Partial>(result)
-        assertNull(partial.numeroDocumentoFiscal)
-        assertEquals("L001P001-200", partial.numeroControl)
-    }
+    fun `loadAlreadyIssued con OR retorna Partial cuando solo existe numero_control_thka`() =
+        runBlocking {
+            seedFactura(database, invoiceId = "inv-or-ctrl", numeroDocumentoFiscal = null, numeroControl = "L001P001-200")
+            val result = repository.loadAlreadyIssued(database, "inv-or-ctrl")
+            val partial = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Partial>(result)
+            assertNull(partial.numeroDocumentoFiscal)
+            assertEquals("L001P001-200", partial.numeroControl)
+        }
 
     @Test
     fun `loadAlreadyIssued lanza cuando la factura no existe`() {
@@ -278,68 +303,77 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     // ─── 24. Persistencia exacta de los tres campos fiscales ───────────────
 
     @Test
-    fun `updateInvoiceWithVEResult escribe unicamente los tres campos fiscales`() = runBlocking {
-        seedFactura(
-            database,
-            invoiceId = "inv-3",
-            numeroDocumentoFiscal = null,
-            numeroControl = null,
-            codFactura = "COD-9",
-        )
-        repository.updateInvoiceWithVEResult(
-            database = database,
-            invoiceId = "inv-3",
-            numeroDocumento = "00000500",
-            numeroControl = "L001P001-500",
-        )
+    fun `updateInvoiceWithVEResult escribe unicamente los tres campos fiscales`() =
+        runBlocking {
+            seedFactura(
+                database,
+                invoiceId = "inv-3",
+                numeroDocumentoFiscal = null,
+                numeroControl = null,
+                codFactura = "COD-9",
+            )
+            repository.updateInvoiceWithVEResult(
+                database = database,
+                invoiceId = "inv-3",
+                numeroDocumento = "00000500",
+                numeroControl = "L001P001-500",
+            )
 
-        val row = transaction(database) {
-            VEFacturaReadTable
-                .selectAll()
-                .where { VEFacturaReadTable.idFactura eq "inv-3" }
-                .single()
+            val row =
+                transaction(database) {
+                    VEFacturaReadTable
+                        .selectAll()
+                        .where { VEFacturaReadTable.idFactura eq "inv-3" }
+                        .single()
+                }
+            assertEquals("00000500", row[VEFacturaReadTable.numeroDocumentoFiscal])
+            assertEquals("00000500", row[VEFacturaReadTable.codFacturaFiscal])
+            assertEquals("L001P001-500", row[VEFacturaReadTable.numeroControlThka])
+            // Otros campos preservados: cod_factura COMERCIAL no se altera.
+            assertEquals("COD-9", row[VEFacturaReadTable.codFactura])
         }
-        assertEquals("00000500", row[VEFacturaReadTable.numeroDocumentoFiscal])
-        assertEquals("00000500", row[VEFacturaReadTable.codFacturaFiscal])
-        assertEquals("L001P001-500", row[VEFacturaReadTable.numeroControlThka])
-        // Otros campos preservados: cod_factura COMERCIAL no se altera.
-        assertEquals("COD-9", row[VEFacturaReadTable.codFactura])
-    }
 
     @Test
-    fun `updateInvoiceWithVEResult con invoiceId inexistente no lanza y reporta 0 filas`() = runBlocking {
-        // No se hace assert estricto de log: solo verificamos que no rompe.
-        repository.updateInvoiceWithVEResult(
-            database = database,
-            invoiceId = "no-existe",
-            numeroDocumento = "00000001",
-            numeroControl = "CTRL",
-        )
-        // La factura inexistente sigue sin numeración fiscal.
-        val stillNull = transaction(database) {
-            VEFacturaReadTable
-                .selectAll()
-                .where { VEFacturaReadTable.idFactura eq "no-existe" }
-                .firstOrNull() == null
+    fun `updateInvoiceWithVEResult con invoiceId inexistente no lanza y reporta 0 filas`() =
+        runBlocking {
+            // No se hace assert estricto de log: solo verificamos que no rompe.
+            repository.updateInvoiceWithVEResult(
+                database = database,
+                invoiceId = "no-existe",
+                numeroDocumento = "00000001",
+                numeroControl = "CTRL",
+            )
+            // La factura inexistente sigue sin numeración fiscal.
+            val stillNull =
+                transaction(database) {
+                    VEFacturaReadTable
+                        .selectAll()
+                        .where { VEFacturaReadTable.idFactura eq "no-existe" }
+                        .firstOrNull() == null
+                }
+            assertTrue(stillNull)
         }
-        assertTrue(stillNull)
-    }
 
     // ─── 24b. Control negativo: sin invocar update no se persiste nada ──────
 
     @Test
-    fun `factura no persistida queda sin numero fiscal tras emision fallida`() = runBlocking {
-        seedFactura(database, invoiceId = "inv-4", numeroDocumentoFiscal = null, numeroControl = null)
-        // Simulamos "emisión fallida": NO llamamos update.
-        val snapshot = repository.loadAlreadyIssued(database, "inv-4")
-        assertEquals(VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.None, snapshot,
-            "Tras emisión fallida la factura NO debe estar marcada como emitida")
-        val row = transaction(database) {
-            VEFacturaReadTable.selectAll().where { VEFacturaReadTable.idFactura eq "inv-4" }.single()
+    fun `factura no persistida queda sin numero fiscal tras emision fallida`() =
+        runBlocking {
+            seedFactura(database, invoiceId = "inv-4", numeroDocumentoFiscal = null, numeroControl = null)
+            // Simulamos "emisión fallida": NO llamamos update.
+            val snapshot = repository.loadAlreadyIssued(database, "inv-4")
+            assertEquals(
+                VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.None,
+                snapshot,
+                "Tras emisión fallida la factura NO debe estar marcada como emitida",
+            )
+            val row =
+                transaction(database) {
+                    VEFacturaReadTable.selectAll().where { VEFacturaReadTable.idFactura eq "inv-4" }.single()
+                }
+            assertNull(row[VEFacturaReadTable.numeroDocumentoFiscal])
+            assertNull(row[VEFacturaReadTable.numeroControlThka])
         }
-        assertNull(row[VEFacturaReadTable.numeroDocumentoFiscal])
-        assertNull(row[VEFacturaReadTable.numeroControlThka])
-    }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
 

@@ -3,9 +3,9 @@ package com.amaxoniaerp.features.electronicinvoice.domain
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClient
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClientException
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaPayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaUltimoDocumentoRequest
-import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClientException
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
@@ -50,7 +50,6 @@ class VenezuelaInvoiceStrategy(
     /** Serie por defecto para Consultar_Ultimo_Documento. Sobreescribible por tenant. */
     private val defaultSerie: String = "L001P001",
 ) : ElectronicInvoiceStrategy {
-
     override val countryCode: String = "VE"
 
     private val log = LoggerFactory.getLogger(VenezuelaInvoiceStrategy::class.java)
@@ -60,16 +59,17 @@ class VenezuelaInvoiceStrategy(
         invoiceId: String,
     ): ElectronicInvoiceResult {
         // 1. Cargar contexto (lectura). Si falla config → NotApplicable/Failure.
-        val context = try {
-            repository.loadInvoiceContext(database, invoiceId)
-        } catch (e: FEInvoiceNotFoundException) {
-            log.error("[VE-FE] factura no encontrada: {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("INVOICE_NOT_FOUND", e.message ?: "Factura no encontrada")
-        } catch (e: FEConfigurationException) {
-            // Sin config FE VE → no aplica HKA. No lanzar excepción al caller.
-            log.warn("[VE-FE] configuración FE VE incompleta para factura {}: {}", invoiceId, e.message)
-            return ElectronicInvoiceResult.NotApplicable(countryCode)
-        }
+        val context =
+            try {
+                repository.loadInvoiceContext(database, invoiceId)
+            } catch (e: FEInvoiceNotFoundException) {
+                log.error("[VE-FE] factura no encontrada: {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("INVOICE_NOT_FOUND", e.message ?: "Factura no encontrada")
+            } catch (e: FEConfigurationException) {
+                // Sin config FE VE → no aplica HKA. No lanzar excepción al caller.
+                log.warn("[VE-FE] configuración FE VE incompleta para factura {}: {}", invoiceId, e.message)
+                return ElectronicInvoiceResult.NotApplicable(countryCode)
+            }
 
         // NOTA FASE 1.1: la decisión de usar HKA20 físico (impresora fiscal local del
         // POS) versus facturación digital Venezuela NO la toma esta strategy a partir
@@ -112,10 +112,11 @@ class VenezuelaInvoiceStrategy(
                 )
                 return ElectronicInvoiceResult.Failure(
                     codigo = "PARTIAL_FISCAL_DATA",
-                    mensaje = "Factura $invoiceId ya posee un campo fiscal parcial " +
-                        "(numeroDocumentoFiscal=${alreadyIssued.numeroDocumentoFiscal}, " +
-                        "numero_control_thka=${alreadyIssued.numeroControl}). " +
-                        "Reemisión bloqueada para evitar duplicados: reconciliar manualmente.",
+                    mensaje =
+                        "Factura $invoiceId ya posee un campo fiscal parcial " +
+                            "(numeroDocumentoFiscal=${alreadyIssued.numeroDocumentoFiscal}, " +
+                            "numero_control_thka=${alreadyIssued.numeroControl}). " +
+                            "Reemisión bloqueada para evitar duplicados: reconciliar manualmente.",
                 )
             }
             AlreadyIssuedResult.None -> Unit // Continuar con el flujo.
@@ -133,22 +134,24 @@ class VenezuelaInvoiceStrategy(
         }
 
         // 5. Autenticación con HKA.
-        val credentials = PacCredentials(
-            usuario = context.config.tokenEmpresa,
-            clave = context.config.tokenPassword,
-            baseUrl = context.config.baseUrl,
-        )
-        val auth = try {
-            hkaClient.authenticate(credentials)
-        } catch (e: VenezuelaHkaClientException) {
-            // Timeout o red en auth: incertidumbre total.
-            log.error("[VE-FE] fallo de red/timeout en Autenticacion factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Uncertain(
-                country = countryCode,
-                codigo = "AUTH_NET_ERROR",
-                mensaje = (e.message ?: "Error de red en autenticación HKA VE"),
+        val credentials =
+            PacCredentials(
+                usuario = context.config.tokenEmpresa,
+                clave = context.config.tokenPassword,
+                baseUrl = context.config.baseUrl,
             )
-        }
+        val auth =
+            try {
+                hkaClient.authenticate(credentials)
+            } catch (e: VenezuelaHkaClientException) {
+                // Timeout o red en auth: incertidumbre total.
+                log.error("[VE-FE] fallo de red/timeout en Autenticacion factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Uncertain(
+                    country = countryCode,
+                    codigo = "AUTH_NET_ERROR",
+                    mensaje = (e.message ?: "Error de red en autenticación HKA VE"),
+                )
+            }
         if (!auth.httpOk || auth.resultado?.token.isNullOrBlank()) {
             log.warn(
                 "[VE-FE] Autenticacion rechazada factura={} http={} codigo={} mensaje={}",
@@ -167,35 +170,46 @@ class VenezuelaInvoiceStrategy(
 
         // 6. Consultar UltimoDocumento para alinear correlativo con el PAC.
         val serie = context.caja.serieSucursal?.ifBlank { null } ?: defaultSerie
-        val ultimoDoc = try {
-            hkaClient.fetchLastDocument(
-                baseUrl = context.config.baseUrl,
-                token = token,
-                request = VenezuelaHkaUltimoDocumentoRequest(
-                    serie = serie,
-                    tipoDocumento = SUPPORTED_TIPO_DOCUMENTO,
-                ),
-            )
-        } catch (e: VenezuelaHkaClientException) {
-            log.error("[VE-FE] fallo de red/timeout en UltimoDocumento factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Uncertain(
-                country = countryCode,
-                codigo = "ULTIMODOC_NET_ERROR",
-                mensaje = (e.message ?: "Error de red consultando último documento HKA VE"),
-            )
-        }
+        val ultimoDoc =
+            try {
+                hkaClient.fetchLastDocument(
+                    baseUrl = context.config.baseUrl,
+                    token = token,
+                    request =
+                        VenezuelaHkaUltimoDocumentoRequest(
+                            serie = serie,
+                            tipoDocumento = SUPPORTED_TIPO_DOCUMENTO,
+                        ),
+                )
+            } catch (e: VenezuelaHkaClientException) {
+                log.error("[VE-FE] fallo de red/timeout en UltimoDocumento factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Uncertain(
+                    country = countryCode,
+                    codigo = "ULTIMODOC_NET_ERROR",
+                    mensaje = (e.message ?: "Error de red consultando último documento HKA VE"),
+                )
+            }
         // Si el PAC respondió 200 con resultado válido, extraemos último número;
         // cualquier otro caso (404, codigo != 200) se interpreta como "sin remoto".
-        val ultimoRemoto: Int? = if (ultimoDoc.fullyOk) {
-            ultimoDoc.resultado?.resultado?.ultimoNumero?.trim()?.takeIf { it.isNotBlank() }?.toIntOrNull()
-                .also { log.info("[VE-FE] UltimoDocumento remoto={} factura={}", it ?: "null", invoiceId) }
-        } else {
-            log.warn(
-                "[VE-FE] UltimoDocumento no concluyente http={} codigo={} mensaje={} factura={}",
-                ultimoDoc.httpStatus, ultimoDoc.codigo, ultimoDoc.mensaje, invoiceId,
-            )
-            null
-        }
+        val ultimoRemoto: Int? =
+            if (ultimoDoc.fullyOk) {
+                ultimoDoc.resultado
+                    ?.resultado
+                    ?.ultimoNumero
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.toIntOrNull()
+                    .also { log.info("[VE-FE] UltimoDocumento remoto={} factura={}", it ?: "null", invoiceId) }
+            } else {
+                log.warn(
+                    "[VE-FE] UltimoDocumento no concluyente http={} codigo={} mensaje={} factura={}",
+                    ultimoDoc.httpStatus,
+                    ultimoDoc.codigo,
+                    ultimoDoc.mensaje,
+                    invoiceId,
+                )
+                null
+            }
 
         // 7. Reserva atómica del correlativo LOCAL (FASE 1.1 — Brief item 3:
         //    reserveAtLeast). El mínimo se calcula a partir del remoto del PAC
@@ -203,15 +217,16 @@ class VenezuelaInvoiceStrategy(
         //    en el Builder. La transacción SQL se abre, reserva y commit en un
         //    solo bloque autocontenido — nunca se mantiene abierta durante HTTP.
         val minimumNextNumber = (ultimoRemoto ?: 0) + 1
-        val reservado = try {
-            repository.reserveAtLeast(database, minimumNextNumber = minimumNextNumber)
-        } catch (e: FEConfigurationException) {
-            log.error("[VE-FE] no se pudo reservar correlativo factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("CORRELATIVO_CONFIG", e.message ?: "Configuración correlativo inválida")
-        } catch (e: Exception) {
-            log.error("[VE-FE] fallo inesperado reservando correlativo factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("CORRELATIVO_LOCK", e.message ?: "No se pudo reservar correlativo")
-        }
+        val reservado =
+            try {
+                repository.reserveAtLeast(database, minimumNextNumber = minimumNextNumber)
+            } catch (e: FEConfigurationException) {
+                log.error("[VE-FE] no se pudo reservar correlativo factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("CORRELATIVO_CONFIG", e.message ?: "Configuración correlativo inválida")
+            } catch (e: Exception) {
+                log.error("[VE-FE] fallo inesperado reservando correlativo factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("CORRELATIVO_LOCK", e.message ?: "No se pudo reservar correlativo")
+            }
 
         // 8. Número efectivo final = número reservado (YA respeta max(local, remoto+1)).
         val numeroFinal = reservado.numeroFormateado()
@@ -224,45 +239,51 @@ class VenezuelaInvoiceStrategy(
         )
 
         // 9. Construcción del payload.
-        val payload = try {
-            payloadBuilder.build(
-                context = context,
-                serie = serie,
-                numeroDocumentoFiscalFinal = numeroFinal,
-            )
-        } catch (e: Exception) {
-            log.error("[VE-FE] fallo construyendo payload factura {}", invoiceId, e)
-            return ElectronicInvoiceResult.Failure("BUILD_ERROR", e.message ?: "Error construyendo payload")
-        }
+        val payload =
+            try {
+                payloadBuilder.build(
+                    context = context,
+                    serie = serie,
+                    numeroDocumentoFiscalFinal = numeroFinal,
+                )
+            } catch (e: Exception) {
+                log.error("[VE-FE] fallo construyendo payload factura {}", invoiceId, e)
+                return ElectronicInvoiceResult.Failure("BUILD_ERROR", e.message ?: "Error construyendo payload")
+            }
 
         // 10. Enviar a Emision.
-        val emission = try {
-            hkaClient.emitDocument(
-                baseUrl = context.config.baseUrl,
-                token = token,
-                payload = payload,
-            )
-        } catch (e: VenezuelaHkaClientException) {
-            // Timeout/incertidumbre: NO persistir, NO marcar exitoso, NO reintentar.
-            log.error(
-                "[VE-FE] TIMEOUT/RED en Emision factura={} numeroFinal={}. NO se persiste nada.",
-                invoiceId,
-                numeroFinal,
-                e,
-            )
-            return ElectronicInvoiceResult.Uncertain(
-                country = countryCode,
-                codigo = if (e is VenezuelaHkaClientException.Timeout) "EMISION_TIMEOUT" else "EMISION_NET_ERROR",
-                mensaje = (e.message ?: "Respuesta incierta del PAC VE"),
-                transaccionId = payload.documento.datosTransaccion.transaccionId,
-            )
-        }
+        val emission =
+            try {
+                hkaClient.emitDocument(
+                    baseUrl = context.config.baseUrl,
+                    token = token,
+                    payload = payload,
+                )
+            } catch (e: VenezuelaHkaClientException) {
+                // Timeout/incertidumbre: NO persistir, NO marcar exitoso, NO reintentar.
+                log.error(
+                    "[VE-FE] TIMEOUT/RED en Emision factura={} numeroFinal={}. NO se persiste nada.",
+                    invoiceId,
+                    numeroFinal,
+                    e,
+                )
+                return ElectronicInvoiceResult.Uncertain(
+                    country = countryCode,
+                    codigo = if (e is VenezuelaHkaClientException.Timeout) "EMISION_TIMEOUT" else "EMISION_NET_ERROR",
+                    mensaje = (e.message ?: "Respuesta incierta del PAC VE"),
+                    transaccionId = payload.documento.datosTransaccion.transaccionId,
+                )
+            }
 
         // 11. Evaluar respuesta con separación estricta de capas.
         //     Exito exacto: HTTP 2xx + codigo == "200" + resultado.numeroDocumento no vacío.
-        val exitoExacto = emission.httpOk
-            && emission.businessOk
-            && !emission.resultado?.resultado?.numeroDocumento.isNullOrBlank()
+        val exitoExacto =
+            emission.httpOk &&
+                emission.businessOk &&
+                !emission.resultado
+                    ?.resultado
+                    ?.numeroDocumento
+                    .isNullOrBlank()
 
         if (!exitoExacto) {
             log.warn(
@@ -275,8 +296,13 @@ class VenezuelaInvoiceStrategy(
                 emission.resultado,
             )
             // Indección: si HTTP fue 5xx o la respuesta es ilegible, es incertidumbre.
-            val esIncierto = emission.httpStatus >= 500 ||
-                emission.businessOk && emission.resultado?.resultado?.numeroDocumento.isNullOrBlank()
+            val esIncierto =
+                emission.httpStatus >= 500 ||
+                    emission.businessOk &&
+                    emission.resultado
+                        ?.resultado
+                        ?.numeroDocumento
+                        .isNullOrBlank()
             return if (esIncierto) {
                 ElectronicInvoiceResult.Uncertain(
                     country = countryCode,
@@ -293,8 +319,16 @@ class VenezuelaInvoiceStrategy(
         }
 
         // 12. Persistencia atómica de los tres campos fiscales.
-        val numDoc = emission.resultado!!.resultado!!.numeroDocumento!!.trim()
-        val numCtrl = emission.resultado.resultado?.numeroControl?.trim().orEmpty()
+        val numDoc =
+            emission.resultado!!
+                .resultado!!
+                .numeroDocumento!!
+                .trim()
+        val numCtrl =
+            emission.resultado.resultado
+                ?.numeroControl
+                ?.trim()
+                .orEmpty()
         try {
             repository.updateInvoiceWithVEResult(
                 database = database,
@@ -308,12 +342,17 @@ class VenezuelaInvoiceStrategy(
             // crítico; el operador debe reconciliar manualmente.
             log.error(
                 "[VE-FE] Emision OK pero fallo al persistir factura={} numDoc={} numCtrl={}",
-                invoiceId, numDoc, numCtrl, e,
+                invoiceId,
+                numDoc,
+                numCtrl,
+                e,
             )
         }
         log.info(
             "[VE-FE] emisión exitosa factura={} numDoc={} numCtrl={}",
-            invoiceId, numDoc, numCtrl,
+            invoiceId,
+            numDoc,
+            numCtrl,
         )
         // FASE 2 (Punto 5): recargar la factura persistida para que el Success
         // se construya EXCLUSIVAMENTE con lo efectivamente guardado en BD y NO con

@@ -38,7 +38,7 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                     if (limit <= 0 || limit > 200 || offset < 0) {
                         return@get call.respond(
                             HttpStatusCode.BadRequest,
-                            mapOf("error" to "Parámetros de paginación inválidos")
+                            mapOf("error" to "Parámetros de paginación inválidos"),
                         )
                     }
 
@@ -51,7 +51,7 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                             search = search,
                             fechaInicio = fechaInicio,
                             fechaFin = fechaFin,
-                        )
+                        ),
                     )
                 } catch (e: CreditNoteValidationException) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
@@ -61,46 +61,48 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
             get("/facturas") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
                 val (database, _) = resolved
-                    val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
-                    val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-                    val search = call.request.queryParameters["search"]
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+                val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+                val search = call.request.queryParameters["search"]
 
-                    if (limit <= 0 || limit > 200 || offset < 0) {
-                        return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Parámetros de paginación inválidos")
-                        )
-                    }
-
-                    call.respond(
-                        creditNoteService.listEligibleInvoices(
-                            database = database,
-                            countryCode = resolved.second.getCountryCode()!!,
-                            limit = limit,
-                            offset = offset,
-                            search = search,
-                        )
+                if (limit <= 0 || limit > 200 || offset < 0) {
+                    return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Parámetros de paginación inválidos"),
                     )
+                }
+
+                call.respond(
+                    creditNoteService.listEligibleInvoices(
+                        database = database,
+                        countryCode = resolved.second.getCountryCode()!!,
+                        limit = limit,
+                        offset = offset,
+                        search = search,
+                    ),
+                )
             }
 
             get("/facturas/{id}") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
                 val (database, principal) = resolved
-                val invoiceId = call.parameters["id"]
-                    ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Factura requerida")
-                    )
+                val invoiceId =
+                    call.parameters["id"]
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Factura requerida"),
+                        )
 
-                val detail = creditNoteService.getInvoiceDetail(
-                    database,
-                    invoiceId,
-                    principal.getCountryCode()!!,
-                )
-                    ?: return@get call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "Factura no encontrada")
+                val detail =
+                    creditNoteService.getInvoiceDetail(
+                        database,
+                        invoiceId,
+                        principal.getCountryCode()!!,
                     )
+                        ?: return@get call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "Factura no encontrada"),
+                        )
 
                 call.respond(detail)
             }
@@ -108,18 +110,20 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
             get("/{id}") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
                 val (database, principal) = resolved
-                val id = call.parameters["id"]
-                    ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Nota de crédito requerida")
-                    )
+                val id =
+                    call.parameters["id"]
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Nota de crédito requerida"),
+                        )
 
                 val countryCode = principal.getCountryCode()!!
-                val detail = creditNoteService.getDetail(database, id, countryCode)
-                    ?: return@get call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "Nota de crédito no encontrada")
-                    )
+                val detail =
+                    creditNoteService.getDetail(database, id, countryCode)
+                        ?: return@get call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "Nota de crédito no encontrada"),
+                        )
 
                 call.respond(detail)
             }
@@ -128,17 +132,23 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val resolved = resolveCompanyDatabase(call) ?: return@post
                 val (database, principal) = resolved
                 val request = call.receive<CreateCreditNoteRequest>()
-                val username = principal.payload.getClaim("username").asString().orEmpty().ifBlank { "POS" }
+                val username =
+                    principal.payload
+                        .getClaim("username")
+                        .asString()
+                        .orEmpty()
+                        .ifBlank { "POS" }
                 val countryCode = principal.getCountryCode()!!
 
                 try {
-                    val response = creditNoteService.create(
-                        database = database,
-                        countryCode = countryCode,
-                        request = request,
-                        username = username,
-                        companyDb = call.request.headers["Company-DB"],
-                    )
+                    val response =
+                        creditNoteService.create(
+                            database = database,
+                            countryCode = countryCode,
+                            request = request,
+                            username = username,
+                            companyDb = call.request.headers["Company-DB"],
+                        )
                     call.respond(HttpStatusCode.Created, response)
                 } catch (e: CreditNoteValidationException) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
@@ -151,11 +161,12 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val resolved = resolveCompanyDatabase(call) ?: return@post
                 val (database, principal) = resolved
                 val countryCode = principal.getCountryCode()!!
-                val id = call.parameters["id"]
-                    ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Nota de crédito requerida")
-                    )
+                val id =
+                    call.parameters["id"]
+                        ?: return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Nota de crédito requerida"),
+                        )
                 val request = call.receive<ConfirmCreditNoteFiscalRequest>()
 
                 try {
@@ -172,11 +183,12 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 }
 
 private suspend fun resolveCompanyDatabase(call: ApplicationCall): Pair<org.jetbrains.exposed.sql.Database, JWTPrincipal>? {
-    val principal = call.principal<JWTPrincipal>()
-        ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-            return null
-        }
+    val principal =
+        call.principal<JWTPrincipal>()
+            ?: run {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
+                return null
+            }
 
     val tokenType = principal.payload.getClaim("token_type").asString()
     if (tokenType != "company") {
@@ -185,11 +197,12 @@ private suspend fun resolveCompanyDatabase(call: ApplicationCall): Pair<org.jetb
     }
 
     val companyDbHeader = call.request.headers["Company-DB"]
-    val adminDb = principal.getAdminDb()
-        ?: run {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
-            return null
-        }
+    val adminDb =
+        principal.getAdminDb()
+            ?: run {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                return null
+            }
 
     if (companyDbHeader.isNullOrBlank()) {
         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Company-DB header is missing"))
@@ -200,16 +213,16 @@ private suspend fun resolveCompanyDatabase(call: ApplicationCall): Pair<org.jetb
         return null
     }
 
-    val countryCode = principal.getCountryCode()
-        ?: run {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-            return null
-        }
+    val countryCode =
+        principal.getCountryCode()
+            ?: run {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                return null
+            }
     val database = DatabaseManager.connectToCompanyDb(countryCode, companyDbHeader)
     return database to principal
 }
 
-private fun parseDateOrBadRequest(value: String): LocalDate {
-    return runCatching { LocalDate.parse(value) }
+private fun parseDateOrBadRequest(value: String): LocalDate =
+    runCatching { LocalDate.parse(value) }
         .getOrElse { throw CreditNoteValidationException("Fecha inválida, usa formato yyyy-MM-dd") }
-}

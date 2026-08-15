@@ -31,7 +31,10 @@ class FacturasPrintPayloadDiscountTest {
     fun setUp() {
         database =
             Database.connect(
-                url = "jdbc:h2:mem:facturas_print_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
+                url = "jdbc:h2:mem:facturas_print_${UUID.randomUUID().toString().replace(
+                    "-",
+                    "",
+                )};MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
                 driver = "org.h2.Driver",
             )
         transaction(database) {
@@ -53,10 +56,14 @@ class FacturasPrintPayloadDiscountTest {
             // discount aggregation path under test.
             exec("CREATE TABLE IF NOT EXISTS parametros_generales (id INT, rif VARCHAR(50))")
             exec("CREATE TABLE IF NOT EXISTS caja (id VARCHAR(36), descripcion VARCHAR(100), codigo VARCHAR(40))")
-            exec("CREATE TABLE IF NOT EXISTS sucursal (id INT, sucursal VARCHAR(100), descripcion VARCHAR(255), codigo_sucursal_emisor VARCHAR(40))")
+            exec(
+                "CREATE TABLE IF NOT EXISTS sucursal (id INT, sucursal VARCHAR(100), descripcion VARCHAR(255), codigo_sucursal_emisor VARCHAR(40))",
+            )
             exec("CREATE TABLE IF NOT EXISTS cliente_sucursal (sucursal_id INT, direccion VARCHAR(255), nombre_sucursal VARCHAR(255))")
             exec("CREATE TABLE IF NOT EXISTS caja_nueva (caja_id VARCHAR(36), id_factura VARCHAR(36))")
-            exec("CREATE TABLE IF NOT EXISTS caja_nueva_detalle (caja_detalle_id INT, caja_id VARCHAR(36), id_forma_pago INT, monto DECIMAL(20,2))")
+            exec(
+                "CREATE TABLE IF NOT EXISTS caja_nueva_detalle (caja_detalle_id INT, caja_id VARCHAR(36), id_forma_pago INT, monto DECIMAL(20,2))",
+            )
             exec("CREATE TABLE IF NOT EXISTS caja_forma_pago (id_forma_pago INT, descripcion VARCHAR(100))")
             exec("CREATE TABLE IF NOT EXISTS factura_detalle_formapago (id_factura VARCHAR(36), totalizar_cambio DECIMAL(20,2))")
             seedClient()

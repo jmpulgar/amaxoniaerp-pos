@@ -41,12 +41,21 @@ data class VenezuelaHkaResponse<T>(
 }
 
 /** Errores lanzados por el cliente HTTP Venezuela. */
-sealed class VenezuelaHkaClientException(message: String, cause: Throwable? = null) :
-    RuntimeException(message, cause) {
+sealed class VenezuelaHkaClientException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause) {
     /** Timeout de red (no necesariamente timeout fiscal). */
-    class Timeout(message: String, cause: Throwable? = null) : VenezuelaHkaClientException(message, cause)
+    class Timeout(
+        message: String,
+        cause: Throwable? = null,
+    ) : VenezuelaHkaClientException(message, cause)
+
     /** Falla de red antes de recibir respuesta (DNS, conexión rechazada, TLS). */
-    class Network(message: String, cause: Throwable? = null) : VenezuelaHkaClientException(message, cause)
+    class Network(
+        message: String,
+        cause: Throwable? = null,
+    ) : VenezuelaHkaClientException(message, cause)
 }
 
 /** Port del PAC Venezuela. Una sola implementación: [VenezuelaHkaRestClient]. */

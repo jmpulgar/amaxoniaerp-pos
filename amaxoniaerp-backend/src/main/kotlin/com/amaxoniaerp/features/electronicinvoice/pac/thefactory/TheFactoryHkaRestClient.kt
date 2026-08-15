@@ -27,34 +27,37 @@ import org.slf4j.LoggerFactory
 class TheFactoryHkaRestClient(
     private val httpClient: HttpClient,
 ) : PanamaElectronicInvoiceClient {
-
     private val logger = LoggerFactory.getLogger(TheFactoryHkaRestClient::class.java)
 
-    override suspend fun authenticate(credentials: PacCredentials): Result<PacAuthToken> {
-        return runCatching {
+    override suspend fun authenticate(credentials: PacCredentials): Result<PacAuthToken> =
+        runCatching {
             val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
             logger.info("Autenticando con The Factory HKA en: {}", url)
 
-            val response: HttpResponse = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(TheFactoryAuthRequest(
-                    usuario = credentials.usuario,
-                    clave = credentials.clave,
-                ))
-            }
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        TheFactoryAuthRequest(
+                            usuario = credentials.usuario,
+                            clave = credentials.clave,
+                        ),
+                    )
+                }
 
             if (!response.status.isSuccess()) {
                 val body = runCatching { response.bodyAsText() }.getOrDefault("")
                 throw PacCommunicationException(
-                    "Autenticación fallida con The Factory HKA: HTTP ${response.status}. Body: $body"
+                    "Autenticación fallida con The Factory HKA: HTTP ${response.status}. Body: $body",
                 )
             }
 
             val body = response.body<TheFactoryAuthResponse>()
-            val token = body.token
-                ?: throw PacCommunicationException(
-                    "Token vacío en respuesta de autenticación: ${body.mensaje ?: "sin mensaje"}"
-                )
+            val token =
+                body.token
+                    ?: throw PacCommunicationException(
+                        "Token vacío en respuesta de autenticación: ${body.mensaje ?: "sin mensaje"}",
+                    )
 
             logger.info("Autenticación exitosa con The Factory HKA")
             PacAuthToken(
@@ -64,29 +67,29 @@ class TheFactoryHkaRestClient(
         }.onFailure { e ->
             logger.error("Error autenticando con The Factory HKA", e)
         }
-    }
 
     override suspend fun sendDocument(
         baseUrl: String,
         token: PacAuthToken,
         payload: TheFactoryHkaDocumentoWrapper,
-    ): Result<PacResponse> {
-        return runCatching {
+    ): Result<PacResponse> =
+        runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/Enviar"
             logger.info("Enviando documento electrónico a The Factory HKA: {}", url)
 
-            val response: HttpResponse = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                header(HttpHeaders.Authorization, "Bearer ${token.token}")
-                setBody(payload)
-            }
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                    setBody(payload)
+                }
 
             val responseText = response.bodyAsText()
             logger.debug("Respuesta de The Factory HKA [HTTP {}]: {}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
                 throw PacCommunicationException(
-                    "Error HTTP ${response.status} al enviar documento a The Factory HKA. Body: $responseText"
+                    "Error HTTP ${response.status} al enviar documento a The Factory HKA. Body: $responseText",
                 )
             }
 
@@ -106,26 +109,26 @@ class TheFactoryHkaRestClient(
         }.onFailure { e ->
             logger.error("Error enviando documento a The Factory HKA", e)
         }
-    }
 
     override suspend fun downloadPdf(
         baseUrl: String,
         token: PacAuthToken,
         cufe: String,
-    ): Result<ByteArray> {
-        return runCatching {
+    ): Result<ByteArray> =
+        runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/DescargaPDF"
             logger.info("Descargando PDF de The Factory HKA para CUFE: {}", cufe)
 
-            val response: HttpResponse = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                header(HttpHeaders.Authorization, "Bearer ${token.token}")
-                setBody(mapOf("cufe" to cufe))
-            }
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                    setBody(mapOf("cufe" to cufe))
+                }
 
             if (!response.status.isSuccess()) {
                 throw PacCommunicationException(
-                    "Error HTTP ${response.status} al descargar PDF de The Factory HKA"
+                    "Error HTTP ${response.status} al descargar PDF de The Factory HKA",
                 )
             }
 
@@ -133,30 +136,30 @@ class TheFactoryHkaRestClient(
         }.onFailure { e ->
             logger.error("Error descargando PDF de The Factory HKA para CUFE: {}", cufe, e)
         }
-    }
 
     override suspend fun sendEmail(
         baseUrl: String,
         token: PacAuthToken,
         cufe: String,
         emails: List<String>,
-    ): Result<TheFactoryEnviarCorreoResponse> {
-        return runCatching {
+    ): Result<TheFactoryEnviarCorreoResponse> =
+        runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/EnvioCorreo"
             logger.info("Enviando factura electrónica por correo desde The Factory HKA. CUFE={}", cufe.take(20))
 
-            val response: HttpResponse = httpClient.post(url) {
-                contentType(ContentType.Application.Json)
-                header(HttpHeaders.Authorization, "Bearer ${token.token}")
-                setBody(TheFactoryEnviarCorreoRequest(cufe = cufe, correos = emails))
-            }
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                    setBody(TheFactoryEnviarCorreoRequest(cufe = cufe, correos = emails))
+                }
 
             val responseText = response.bodyAsText()
             logger.debug("Respuesta EnvioCorreo The Factory HKA [HTTP {}]: {}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
                 throw PacCommunicationException(
-                    "Error HTTP ${response.status} al enviar correo desde The Factory HKA. Body: $responseText"
+                    "Error HTTP ${response.status} al enviar correo desde The Factory HKA. Body: $responseText",
                 )
             }
 
@@ -164,5 +167,4 @@ class TheFactoryHkaRestClient(
         }.onFailure { e ->
             logger.error("Error enviando correo The Factory HKA para CUFE: {}", cufe, e)
         }
-    }
 }

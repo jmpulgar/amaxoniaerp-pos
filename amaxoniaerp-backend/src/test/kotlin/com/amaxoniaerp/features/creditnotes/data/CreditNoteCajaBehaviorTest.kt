@@ -18,111 +18,129 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.junit.Test
 
 class CreditNoteCajaBehaviorTest {
     @Test
-    fun `PA cent partial marks invoice and records negative reversal`() = withDatabase(
-        countryCode = "PA",
-        includeOriginalCash = true,
-    ) {
-        createNote("PA", 0.01)
-
-        val invoiceStatus = transaction(database) {
-            CreditNoteFacturaTable
-                .selectAll()
-                .where { CreditNoteFacturaTable.idFactura eq SOURCE_INVOICE_ID }
-                .single()[CreditNoteFacturaTable.codEstatus]
-        }
-        val reversal = transaction(database) {
-            SalesCajaNuevaDetalleTableFactory.forCountry("PA")
-                .selectAll()
-                .where { SalesCajaNuevaDetalleTableFactory.forCountry("PA").idFormaPago eq 31 }
-                .single()
-        }
-
-        assertEquals(3, invoiceStatus)
-        assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").monto])
-        assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").montoOriginal])
-    }
-
-    @Test
-    fun `PA second partial remains allowed after first marks status 3`() = withDatabase(
-        countryCode = "PA",
-        includeOriginalCash = true,
-    ) {
-        createNote("PA", 0.01)
-        createNote("PA", 0.99)
-
-        val notes = transaction(database) { CreditNoteHeaderTablePA.selectAll().toList() }
-        assertEquals(2, notes.size)
-        assertEquals(3, transaction(database) {
-            CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
-        })
-    }
-
-    @Test
-    fun `PA total return cancels cash and marks receipt AN`() = withDatabase(
-        countryCode = "PA",
-        includeOriginalCash = true,
-    ) {
-        createNote("PA", 1.0)
-
-        val cash = transaction(database) {
-            SalesCajaNuevaTableFactory.forCountry("PA").selectAll().single()
-        }
-        val receipt = transaction(database) {
-            SalesCajaNuevaReciboTableFactory.forCountry("PA").selectAll().single()
-        }
-
-        assertEquals(CajaStatus.Anulada, cash[SalesCajaNuevaTableFactory.forCountry("PA").status])
-        assertEquals("AN", receipt[SalesCajaNuevaReciboTableFactory.forCountry("PA").status])
-    }
-
-    @Test
-    fun `missing active NC payment form fails configuration`() = withDatabase(
-        countryCode = "PA",
-        includeOriginalCash = false,
-        includePaymentForm = false,
-    ) {
-        assertFailsWith<CreditNoteValidationException> {
+    fun `PA cent partial marks invoice and records negative reversal`() =
+        withDatabase(
+            countryCode = "PA",
+            includeOriginalCash = true,
+        ) {
             createNote("PA", 0.01)
+
+            val invoiceStatus =
+                transaction(database) {
+                    CreditNoteFacturaTable
+                        .selectAll()
+                        .where { CreditNoteFacturaTable.idFactura eq SOURCE_INVOICE_ID }
+                        .single()[CreditNoteFacturaTable.codEstatus]
+                }
+            val reversal =
+                transaction(database) {
+                    SalesCajaNuevaDetalleTableFactory
+                        .forCountry("PA")
+                        .selectAll()
+                        .where { SalesCajaNuevaDetalleTableFactory.forCountry("PA").idFormaPago eq 31 }
+                        .single()
+                }
+
+            assertEquals(3, invoiceStatus)
+            assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").monto])
+            assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").montoOriginal])
         }
-    }
 
     @Test
-    fun `VE partial keeps legacy invoice status`() = withDatabase(
-        countryCode = "VE",
-        includeOriginalCash = false,
-    ) {
-        createNote("VE", 0.01)
+    fun `PA second partial remains allowed after first marks status 3`() =
+        withDatabase(
+            countryCode = "PA",
+            includeOriginalCash = true,
+        ) {
+            createNote("PA", 0.01)
+            createNote("PA", 0.99)
 
-        val status = transaction(database) {
-            CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+            val notes = transaction(database) { CreditNoteHeaderTablePA.selectAll().toList() }
+            assertEquals(2, notes.size)
+            assertEquals(
+                3,
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+                },
+            )
         }
-        assertEquals(2, status)
-    }
+
+    @Test
+    fun `PA total return cancels cash and marks receipt AN`() =
+        withDatabase(
+            countryCode = "PA",
+            includeOriginalCash = true,
+        ) {
+            createNote("PA", 1.0)
+
+            val cash =
+                transaction(database) {
+                    SalesCajaNuevaTableFactory.forCountry("PA").selectAll().single()
+                }
+            val receipt =
+                transaction(database) {
+                    SalesCajaNuevaReciboTableFactory.forCountry("PA").selectAll().single()
+                }
+
+            assertEquals(CajaStatus.Anulada, cash[SalesCajaNuevaTableFactory.forCountry("PA").status])
+            assertEquals("AN", receipt[SalesCajaNuevaReciboTableFactory.forCountry("PA").status])
+        }
+
+    @Test
+    fun `missing active NC payment form fails configuration`() =
+        withDatabase(
+            countryCode = "PA",
+            includeOriginalCash = false,
+            includePaymentForm = false,
+        ) {
+            assertFailsWith<CreditNoteValidationException> {
+                createNote("PA", 0.01)
+            }
+        }
+
+    @Test
+    fun `VE partial keeps legacy invoice status`() =
+        withDatabase(
+            countryCode = "VE",
+            includeOriginalCash = false,
+        ) {
+            createNote("VE", 0.01)
+
+            val status =
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
+                }
+            assertEquals(2, status)
+        }
 
     private lateinit var database: Database
     private val repository = CreditNoteRepository()
 
-    private fun createNote(countryCode: String, quantity: Double) = transaction(database) {
+    private fun createNote(
+        countryCode: String,
+        quantity: Double,
+    ) = transaction(database) {
         repository.create(
             countryCode = countryCode,
-            request = CreateCreditNoteRequest(
-                idFactura = SOURCE_INVOICE_ID,
-                fecha = LocalDate.of(2026, 1, 10).toString(),
-                detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, quantity)),
-                devolverStock = false,
-                idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
-                settlementType = CreditNoteSettlementType.NINGUNO,
-            ),
+            request =
+                CreateCreditNoteRequest(
+                    idFactura = SOURCE_INVOICE_ID,
+                    fecha = LocalDate.of(2026, 1, 10).toString(),
+                    detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, quantity)),
+                    devolverStock = false,
+                    idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
+                    settlementType = CreditNoteSettlementType.NINGUNO,
+                ),
             username = "tester",
         )
     }
@@ -133,10 +151,11 @@ class CreditNoteCajaBehaviorTest {
         includePaymentForm: Boolean = true,
         block: CreditNoteCajaBehaviorTest.() -> Unit,
     ) {
-        database = Database.connect(
-            url = "jdbc:h2:mem:credit_note_caja_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            driver = "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                url = "jdbc:h2:mem:credit_note_caja_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)
         val cashTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
         val cashDetailTable = SalesCajaNuevaDetalleTableFactory.forCountry(countryCode)

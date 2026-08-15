@@ -16,10 +16,11 @@ class ClientsRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect(
-            "jdbc:h2:mem:clients_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                "jdbc:h2:mem:clients_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(ClientsTable)
             insertClient(id = "client-credit", permiteCredito = true, dias = 30)
@@ -35,15 +36,16 @@ class ClientsRepositoryTest {
     }
 
     @Test
-    fun `client mapping preserves credit permission and days`() = runBlocking {
-        val clients = repository.listClients(database, limit = 10, offset = 0, search = null, includeTotal = true)
+    fun `client mapping preserves credit permission and days`() =
+        runBlocking {
+            val clients = repository.listClients(database, limit = 10, offset = 0, search = null, includeTotal = true)
 
-        val byId = clients.first.associateBy { it.id }
-        assertEquals(true, byId.getValue("client-credit").permiteCredito)
-        assertEquals(30, byId.getValue("client-credit").diasCredito)
-        assertEquals(false, byId.getValue("client-cash").permiteCredito)
-        assertEquals(0, byId.getValue("client-cash").diasCredito)
-    }
+            val byId = clients.first.associateBy { it.id }
+            assertEquals(true, byId.getValue("client-credit").permiteCredito)
+            assertEquals(30, byId.getValue("client-credit").diasCredito)
+            assertEquals(false, byId.getValue("client-cash").permiteCredito)
+            assertEquals(0, byId.getValue("client-cash").diasCredito)
+        }
 
     private fun insertClient(
         id: String,

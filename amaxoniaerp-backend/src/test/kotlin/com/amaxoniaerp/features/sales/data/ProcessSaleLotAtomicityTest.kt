@@ -12,8 +12,12 @@ import com.amaxoniaerp.features.sales.domain.SaleItemInput
 import com.amaxoniaerp.features.sales.domain.SaleLotInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentSummaryInput
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
-import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import kotlin.test.AfterTest
@@ -21,11 +25,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 
 class ProcessSaleLotAtomicityTest {
     private lateinit var database: Database
@@ -121,10 +120,11 @@ class ProcessSaleLotAtomicityTest {
     }
 
     private fun createDatabase(available: Int): Database {
-        val db = Database.connect(
-            "jdbc:h2:mem:sales_lots_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            "org.h2.Driver",
-        )
+        val db =
+            Database.connect(
+                "jdbc:h2:mem:sales_lots_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(db) {
             SchemaUtils.create(
                 ParametrosGeneralesTablePA,
@@ -204,75 +204,83 @@ class ProcessSaleLotAtomicityTest {
     ): ProcessSaleRequest =
         ProcessSaleRequest(
             idFactura = idFactura,
-            factura = SaleInvoiceInput(
-                idCliente = "client-1",
-                codCliente = "C001",
-                codVendedor = 1,
-                idShop = 1,
-                idSucursal = 1,
-                idCaja = "caja-1",
-                codigoCaja = "CJ01",
-                idCajaSecuencia = "seq-1",
-                serieSucursal = "S01",
-                formaPago = "contado",
-                subtotal = 10.0,
-                ivaTotalFactura = 0.0,
-                totalTotalFactura = 10.0,
-                montoItemsFactura = 10.0,
-                totalizarSubTotal = 10.0,
-                totalizarTotalOperacion = 10.0,
-                totalizarBaseImponible = 10.0,
-                totalizarMontoIva = 0.0,
-                totalizarTotalGeneral = 10.0,
-                usuarioCreacion = "TEST",
-            ),
-            items = listOf(
-                SaleItemInput(
-                    idItem = 1,
-                    itemAlmacen = 1,
-                    itemDescripcion = "ITEM LOT TEST",
-                    itemCantidad = 1.0,
-                    itemPrecioSinIva = 10.0,
-                    itemPIva = 0.0,
-                    itemTotalSinIva = 10.0,
-                    itemTotalConIva = 10.0,
-                    itemCantidadTotal = 1.0,
-                    esProductoFisico = true,
-                    poseeConfiguracionLote = "si",
-                    codigosLote = listOf(
-                        SaleLotInput(
-                            idLoteItem = 1,
-                            codigoLoteItem = "LOT-1",
-                            cantidad = lotQuantity,
-                            idAlmacen = 1,
-                        ),
+            factura =
+                SaleInvoiceInput(
+                    idCliente = "client-1",
+                    codCliente = "C001",
+                    codVendedor = 1,
+                    idShop = 1,
+                    idSucursal = 1,
+                    idCaja = "caja-1",
+                    codigoCaja = "CJ01",
+                    idCajaSecuencia = "seq-1",
+                    serieSucursal = "S01",
+                    formaPago = "contado",
+                    subtotal = 10.0,
+                    ivaTotalFactura = 0.0,
+                    totalTotalFactura = 10.0,
+                    montoItemsFactura = 10.0,
+                    totalizarSubTotal = 10.0,
+                    totalizarTotalOperacion = 10.0,
+                    totalizarBaseImponible = 10.0,
+                    totalizarMontoIva = 0.0,
+                    totalizarTotalGeneral = 10.0,
+                    usuarioCreacion = "TEST",
+                ),
+            items =
+                listOf(
+                    SaleItemInput(
+                        idItem = 1,
+                        itemAlmacen = 1,
+                        itemDescripcion = "ITEM LOT TEST",
+                        itemCantidad = 1.0,
+                        itemPrecioSinIva = 10.0,
+                        itemPIva = 0.0,
+                        itemTotalSinIva = 10.0,
+                        itemTotalConIva = 10.0,
+                        itemCantidadTotal = 1.0,
+                        esProductoFisico = true,
+                        poseeConfiguracionLote = "si",
+                        codigosLote =
+                            listOf(
+                                SaleLotInput(
+                                    idLoteItem = 1,
+                                    codigoLoteItem = "LOT-1",
+                                    cantidad = lotQuantity,
+                                    idAlmacen = 1,
+                                ),
+                            ),
                     ),
                 ),
-            ),
-            pagoResumen = SalePaymentSummaryInput(
-                totalizarMontoCancelar = 10.0,
-                totalizarMontoEfectivo = 10.0,
-                totalizarCambio = 0.0,
-                totalizarSaldoPendiente = 0.0,
-            ),
-            pagos = listOf(
-                SalePaymentInput(
-                    idFormaPago = 1,
-                    tipoMovimiento = "CASH",
-                    monto = 10.0,
-                    montoRecibido = 10.0,
+            pagoResumen =
+                SalePaymentSummaryInput(
+                    totalizarMontoCancelar = 10.0,
+                    totalizarMontoEfectivo = 10.0,
+                    totalizarCambio = 0.0,
+                    totalizarSaldoPendiente = 0.0,
                 ),
-            ),
+            pagos =
+                listOf(
+                    SalePaymentInput(
+                        idFormaPago = 1,
+                        tipoMovimiento = "CASH",
+                        monto = 10.0,
+                        montoRecibido = 10.0,
+                    ),
+                ),
             moneda = SaleCurrencyInput(),
         )
 
-    private fun lotRow() = transaction(database) {
-        ItemLoteTable.selectAll().single()
-    }
+    private fun lotRow() =
+        transaction(database) {
+            ItemLoteTable.selectAll().single()
+        }
 
     private sealed interface LotAttempt {
         data object Success : LotAttempt
 
-        data class Failure(val error: Throwable) : LotAttempt
+        data class Failure(
+            val error: Throwable,
+        ) : LotAttempt
     }
 }

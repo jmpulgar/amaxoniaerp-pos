@@ -1,7 +1,6 @@
 package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 // ─── DTOs del Payload de envío para The Factory HKA ──────────────────────────
@@ -9,12 +8,13 @@ import kotlinx.serialization.json.Json
 // Campos opcionales son nullable con default null → kotlinx-serialization
 // los omite cuando se configura con `encodeDefaults = false`.
 
-val feJson = Json {
-    encodeDefaults = false
-    explicitNulls = false
-    ignoreUnknownKeys = true
-    prettyPrint = false
-}
+val feJson =
+    Json {
+        encodeDefaults = false
+        explicitNulls = false
+        ignoreUnknownKeys = true
+        prettyPrint = false
+    }
 
 /**
  * Wrapper raíz del documento electrónico.

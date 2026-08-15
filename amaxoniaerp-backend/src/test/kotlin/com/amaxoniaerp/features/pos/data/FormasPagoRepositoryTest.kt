@@ -16,10 +16,11 @@ class FormasPagoRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect(
-            "jdbc:h2:mem:formas_pago_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
-            "org.h2.Driver",
-        )
+        database =
+            Database.connect(
+                "jdbc:h2:mem:formas_pago_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(CajaFormaPagoTable)
             CajaFormaPagoTable.insert {
@@ -48,21 +49,23 @@ class FormasPagoRepositoryTest {
     }
 
     @Test
-    fun `mapping preserves a valid tipo moneda`() = runBlocking {
-        val formasPago = repository.listFormasPago(database, cajaId = null, tipoRegistro = emptyList())
+    fun `mapping preserves a valid tipo moneda`() =
+        runBlocking {
+            val formasPago = repository.listFormasPago(database, cajaId = null, tipoRegistro = emptyList())
 
-        assertEquals("D", formasPago.single().tipoMoneda)
-    }
-
-    @Test
-    fun `mapping normalizes legacy null tipo moneda to empty`() = runBlocking {
-        transaction(database) {
-            exec("ALTER TABLE caja_forma_pago ALTER COLUMN tipo_moneda DROP NOT NULL")
-            exec("UPDATE caja_forma_pago SET tipo_moneda = NULL WHERE id_forma_pago = 1")
+            assertEquals("D", formasPago.single().tipoMoneda)
         }
 
-        val formasPago = repository.listFormasPago(database, cajaId = null, tipoRegistro = emptyList())
+    @Test
+    fun `mapping normalizes legacy null tipo moneda to empty`() =
+        runBlocking {
+            transaction(database) {
+                exec("ALTER TABLE caja_forma_pago ALTER COLUMN tipo_moneda DROP NOT NULL")
+                exec("UPDATE caja_forma_pago SET tipo_moneda = NULL WHERE id_forma_pago = 1")
+            }
 
-        assertEquals("", formasPago.single().tipoMoneda)
-    }
+            val formasPago = repository.listFormasPago(database, cajaId = null, tipoRegistro = emptyList())
+
+            assertEquals("", formasPago.single().tipoMoneda)
+        }
 }

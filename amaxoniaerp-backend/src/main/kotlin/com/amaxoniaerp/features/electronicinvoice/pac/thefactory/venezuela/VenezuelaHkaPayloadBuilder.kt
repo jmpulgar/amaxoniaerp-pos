@@ -33,7 +33,6 @@ import java.security.MessageDigest
  * 7. NO se incluyen campos inventados: solo los del Swagger VE.
  */
 open class VenezuelaHkaPayloadBuilder {
-
     companion object {
         private const val ALICUOTA_GENERAL_PCT = "16.00"
         private const val ALICUOTA_REDUCIDO_PCT = "8.00"
@@ -67,70 +66,88 @@ open class VenezuelaHkaPayloadBuilder {
         // Multimoneda: si aplica, se reporta el total en la divisa secundaria.
         val multimoneda = context.factura.multiMoneda.equals("SI", ignoreCase = true)
         val tasa = context.factura.tasa.takeIf { it > BigDecimal.ONE } ?: BigDecimal.ONE
-        val montoTotalMonedaSecundaria = if (multimoneda && tasa > BigDecimal.ONE) {
-            montoTotalFacturaVES.divide(tasa, MONEY_SCALE, RoundingMode.HALF_UP)
-        } else null
+        val montoTotalMonedaSecundaria =
+            if (multimoneda && tasa > BigDecimal.ONE) {
+                montoTotalFacturaVES.divide(tasa, MONEY_SCALE, RoundingMode.HALF_UP)
+            } else {
+                null
+            }
 
-        val transaccionId = transaccionIdDeterminista(
-            idFactura = context.factura.idFactura,
-            numeroFormateado = numeroDocumentoFiscalFinal,
-        )
+        val transaccionId =
+            transaccionIdDeterminista(
+                idFactura = context.factura.idFactura,
+                numeroFormateado = numeroDocumentoFiscalFinal,
+            )
 
         // Total Monto Gravado = base imponible gravada (general + reducido).
-        val totalMontoGravado = porIva.totalGeneral
-            .add(porIva.totalReducido)
-            .bigDecimalMoney()
+        val totalMontoGravado =
+            porIva.totalGeneral
+                .add(porIva.totalReducido)
+                .bigDecimalMoney()
 
         return VenezuelaHkaDocumentoWrapper(
-            documento = VenezuelaHkaDocumento(
-                codigoSucursalEmisor = context.caja.codigoSucursalEmisor,
-                datosTransaccion = VenezuelaHkaDatosTransaccion(
-                    tipoEmision = context.config.tipoEmision,
-                    tipoDocumento = context.factura.tipoDocumento,
-                    numeroDocumentoFiscal = numeroDocumentoFiscalFinal,
-                    puntoFacturacionFiscal = context.caja.puntoFacturacionFiscal,
-                    fechaEmision = formatFechaEmision(context.factura.fechaFactura),
-                    procesoGeneracion = context.config.procesoGeneracion,
-                    transaccionId = transaccionId,
-                    cliente = buildCliente(context),
-                    serie = serie,
-                    sucursal = context.caja.serieSucursal,
+            documento =
+                VenezuelaHkaDocumento(
+                    codigoSucursalEmisor = context.caja.codigoSucursalEmisor,
+                    datosTransaccion =
+                        VenezuelaHkaDatosTransaccion(
+                            tipoEmision = context.config.tipoEmision,
+                            tipoDocumento = context.factura.tipoDocumento,
+                            numeroDocumentoFiscal = numeroDocumentoFiscalFinal,
+                            puntoFacturacionFiscal = context.caja.puntoFacturacionFiscal,
+                            fechaEmision = formatFechaEmision(context.factura.fechaFactura),
+                            procesoGeneracion = context.config.procesoGeneracion,
+                            transaccionId = transaccionId,
+                            cliente = buildCliente(context),
+                            serie = serie,
+                            sucursal = context.caja.serieSucursal,
+                        ),
+                    listaItems = items,
+                    totalesSubTotales =
+                        VenezuelaHkaTotalesSubTotales(
+                            totalPrecioNeto = totalPrecioNeto.format(),
+                            totalIva = totalIva.format(),
+                            totalDescuento = totalDescuento.format(),
+                            totalAlicuotaGeneral = porIva.totalGeneral.format(),
+                            totalAlicuotaReducido = porIva.totalReducido.format(),
+                            totalAlicuotaExento = porIva.totalExento.format(),
+                            totalIsc =
+                                context.detalles
+                                    .sumOf { it.importeIsc ?: BigDecimal.ZERO }
+                                    .takeIf { it > BigDecimal.ZERO }
+                                    ?.format(),
+                            totalAcarreo =
+                                context.detalles
+                                    .sumOf { it.importeAcarreo ?: BigDecimal.ZERO }
+                                    .takeIf { it > BigDecimal.ZERO }
+                                    ?.format(),
+                            totalSeguro =
+                                context.detalles
+                                    .sumOf { it.importeSeguro ?: BigDecimal.ZERO }
+                                    .takeIf { it > BigDecimal.ZERO }
+                                    ?.format(),
+                            totalMontoGravado = totalMontoGravado.format(),
+                            montoTotalFactura = montoTotalFacturaVES.format(),
+                            montoTotalMonedaSecundaria = montoTotalMonedaSecundaria?.format(),
+                            igtf =
+                                igtfCalculado?.let {
+                                    VenezuelaHkaIgtf(
+                                        baseImponible = it.baseImponible.format(),
+                                        porcentaje = it.porcentaje.format(),
+                                        montoIgtf = it.monto.format(),
+                                    )
+                                },
+                            listaFormaPago = buildFormasPago(context),
+                            totalValorRecibido = sumFormasPago(context).format(),
+                            vuelto = calcularVuelto(context)?.format(),
+                            tiempoPago = "1", // Contado - FASE 1 sólo soporta pago inmediato.
+                            nroItems = context.detalles.size.toString(),
+                            totalTodosItems = totalPrecioNeto.add(totalIva).format(),
+                            tasaCambio = if (multimoneda) tasa.format() else null,
+                            transaccionId = transaccionId,
+                            montoEnLetras = montoEnLetras(montoTotalFacturaVES),
+                        ),
                 ),
-                listaItems = items,
-                totalesSubTotales = VenezuelaHkaTotalesSubTotales(
-                    totalPrecioNeto = totalPrecioNeto.format(),
-                    totalIva = totalIva.format(),
-                    totalDescuento = totalDescuento.format(),
-                    totalAlicuotaGeneral = porIva.totalGeneral.format(),
-                    totalAlicuotaReducido = porIva.totalReducido.format(),
-                    totalAlicuotaExento = porIva.totalExento.format(),
-                    totalIsc = context.detalles.sumOf { it.importeIsc ?: BigDecimal.ZERO }
-                        .takeIf { it > BigDecimal.ZERO }?.format(),
-                    totalAcarreo = context.detalles.sumOf { it.importeAcarreo ?: BigDecimal.ZERO }
-                        .takeIf { it > BigDecimal.ZERO }?.format(),
-                    totalSeguro = context.detalles.sumOf { it.importeSeguro ?: BigDecimal.ZERO }
-                        .takeIf { it > BigDecimal.ZERO }?.format(),
-                    totalMontoGravado = totalMontoGravado.format(),
-                    montoTotalFactura = montoTotalFacturaVES.format(),
-                    montoTotalMonedaSecundaria = montoTotalMonedaSecundaria?.format(),
-                    igtf = igtfCalculado?.let {
-                        VenezuelaHkaIgtf(
-                            baseImponible = it.baseImponible.format(),
-                            porcentaje = it.porcentaje.format(),
-                            montoIgtf = it.monto.format(),
-                        )
-                    },
-                    listaFormaPago = buildFormasPago(context),
-                    totalValorRecibido = sumFormasPago(context).format(),
-                    vuelto = calcularVuelto(context)?.format(),
-                    tiempoPago = "1", // Contado - FASE 1 sólo soporta pago inmediato.
-                    nroItems = context.detalles.size.toString(),
-                    totalTodosItems = totalPrecioNeto.add(totalIva).format(),
-                    tasaCambio = if (multimoneda) tasa.format() else null,
-                    transaccionId = transaccionId,
-                    montoEnLetras = montoEnLetras(montoTotalFacturaVES),
-                ),
-            ),
         )
     }
 
@@ -147,7 +164,10 @@ open class VenezuelaHkaPayloadBuilder {
         "La reserva via reserveAtLeast calcula el número final; no uses este max() aquí.",
         level = DeprecationLevel.WARNING,
     )
-    open fun numeroPacFormateado(reservado: VECorrelativoReservado, remoto: Int?): String {
+    open fun numeroPacFormateado(
+        reservado: VECorrelativoReservado,
+        remoto: Int?,
+    ): String {
         val candidato = maxOf(reservado.numero, (remoto ?: 0) + 1)
         return candidato.toString().padStart(reservado.formato.coerceAtLeast(1), '0')
     }
@@ -176,9 +196,12 @@ open class VenezuelaHkaPayloadBuilder {
             unidadMedida = det.unidadEmpaque?.takeIf { it.isNotBlank() } ?: "UND",
             cantidad = det.cantidad.setScale(QTY_SCALE, RoundingMode.HALF_UP).toPlainString(),
             precioUnitario = det.precioSinIva.format(),
-            precioUnitarioDescuento = if (det.cantidad > BigDecimal.ZERO && det.montoDescuento > BigDecimal.ZERO) {
-                det.montoDescuento.divide(det.cantidad, MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
-            } else null,
+            precioUnitarioDescuento =
+                if (det.cantidad > BigDecimal.ZERO && det.montoDescuento > BigDecimal.ZERO) {
+                    det.montoDescuento.divide(det.cantidad, MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
+                } else {
+                    null
+                },
             montoDescuento = det.montoDescuento.takeIf { it > BigDecimal.ZERO }?.format(),
             precioItem = det.totalSinIva.format(),
             valorTotal = det.totalConIva.format(),
@@ -218,11 +241,12 @@ open class VenezuelaHkaPayloadBuilder {
         )
     }
 
-    private fun alicuotaCodigo(piva: BigDecimal): String = when {
-        isAprox(piva, BigDecimal("16")) -> ALICUOTA_GENERAL_PCT
-        isAprox(piva, BigDecimal("8")) -> ALICUOTA_REDUCIDO_PCT
-        else -> ALICUOTA_EXENTO_PCT
-    }
+    private fun alicuotaCodigo(piva: BigDecimal): String =
+        when {
+            isAprox(piva, BigDecimal("16")) -> ALICUOTA_GENERAL_PCT
+            isAprox(piva, BigDecimal("8")) -> ALICUOTA_REDUCIDO_PCT
+            else -> ALICUOTA_EXENTO_PCT
+        }
 
     // ─── IGTF ──────────────────────────────────────────────────────────────────
 
@@ -242,15 +266,17 @@ open class VenezuelaHkaPayloadBuilder {
     private fun calcularIgtf(ctx: InvoiceVEContext): IgtfResult? {
         val pct = ctx.config.igtf.takeIf { it > BigDecimal.ZERO } ?: return null
         val tasa = ctx.factura.tasa.takeIf { it > BigDecimal.ONE } ?: BigDecimal.ONE
-        val baseEnVes = ctx.formasPago
-            .filter { it.esDivisa }
-            .fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto.multiply(tasa)) }
-            .bigDecimalMoney()
+        val baseEnVes =
+            ctx.formasPago
+                .filter { it.esDivisa }
+                .fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto.multiply(tasa)) }
+                .bigDecimalMoney()
         if (baseEnVes <= BigDecimal.ZERO) return null
 
-        val monto = baseEnVes
-            .multiply(pct.divide(BigDecimal("100"), 6, RoundingMode.HALF_UP))
-            .bigDecimalMoney()
+        val monto =
+            baseEnVes
+                .multiply(pct.divide(BigDecimal("100"), 6, RoundingMode.HALF_UP))
+                .bigDecimalMoney()
         return IgtfResult(
             baseImponible = baseEnVes,
             porcentaje = pct.bigDecimalMoney(),
@@ -261,19 +287,26 @@ open class VenezuelaHkaPayloadBuilder {
     // ─── Formas de pago ────────────────────────────────────────────────────────
 
     private fun buildFormasPago(ctx: InvoiceVEContext): List<VenezuelaHkaFormaPago> =
-        ctx.formasPago.map { fp -> buildFormaPago(ctx, fp) }
+        ctx.formasPago
+            .map { fp -> buildFormaPago(ctx, fp) }
             .ifEmpty { listOf(VenezuelaHkaFormaPago(formaPagoFact = "01", montoPagado = BigDecimal.ZERO.format())) }
 
-    private fun buildFormaPago(ctx: InvoiceVEContext, fp: VEFormaPagoData): VenezuelaHkaFormaPago {
+    private fun buildFormaPago(
+        ctx: InvoiceVEContext,
+        fp: VEFormaPagoData,
+    ): VenezuelaHkaFormaPago {
         val cambio = calcularCambioFormaPago(fp)
         return VenezuelaHkaFormaPago(
             formaPagoFact = fp.formaPagoFact ?: "01",
             montoPagado = fp.monto.format(),
             descripcion = fp.descripcion.takeIf { it.isNotBlank() },
             // En pago en divisa se reporta el monto convertido a VES.
-            montoMonedaSecundaria = if (fp.esDivisa) {
-                fp.monto.multiply(ctx.factura.tasa).format()
-            } else null,
+            montoMonedaSecundaria =
+                if (fp.esDivisa) {
+                    fp.monto.multiply(ctx.factura.tasa).format()
+                } else {
+                    null
+                },
             montoRecibido = fp.montoRecibido?.takeIf { it > BigDecimal.ZERO }?.format(),
             cambio = cambio?.format(),
         )
@@ -294,15 +327,19 @@ open class VenezuelaHkaPayloadBuilder {
     // ─── Utilidades ────────────────────────────────────────────────────────────
 
     private fun sumFormasPago(ctx: InvoiceVEContext): BigDecimal =
-        ctx.formasPago.fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto) }
+        ctx.formasPago
+            .fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto) }
             .bigDecimalMoney()
 
     private fun sumPrecioNeto(ctx: InvoiceVEContext): BigDecimal =
-        ctx.detalles.fold(BigDecimal.ZERO) { acc, d -> acc.add(d.totalSinIva) }
+        ctx.detalles
+            .fold(BigDecimal.ZERO) { acc, d -> acc.add(d.totalSinIva) }
             .bigDecimalMoney()
 
-    private fun isAprox(a: BigDecimal, b: BigDecimal): Boolean =
-        a.setScale(2, RoundingMode.HALF_UP) == b.setScale(2, RoundingMode.HALF_UP)
+    private fun isAprox(
+        a: BigDecimal,
+        b: BigDecimal,
+    ): Boolean = a.setScale(2, RoundingMode.HALF_UP) == b.setScale(2, RoundingMode.HALF_UP)
 
     private fun BigDecimal.format(): String = setScale(MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
 
@@ -311,13 +348,17 @@ open class VenezuelaHkaPayloadBuilder {
 
     private fun formatFechaEmision(fecha: String?): String {
         if (fecha.isNullOrBlank()) {
-            return java.time.LocalDate.now().toString() + "T00:00:00"
+            return java.time.LocalDate
+                .now()
+                .toString() + "T00:00:00"
         }
         return try {
             val d = java.time.LocalDate.parse(fecha.trim().take(10))
             d.toString() + "T00:00:00"
         } catch (_: Exception) {
-            java.time.LocalDate.now().toString() + "T00:00:00"
+            java.time.LocalDate
+                .now()
+                .toString() + "T00:00:00"
         }
     }
 
@@ -326,11 +367,16 @@ open class VenezuelaHkaPayloadBuilder {
      * hex truncado a 32 caracteres. Permite idempotencia y trazabilidad sin
      * exponer el idFactura en el PAC.
      */
-    private fun transaccionIdDeterminista(idFactura: String, numeroFormateado: String): String {
+    private fun transaccionIdDeterminista(
+        idFactura: String,
+        numeroFormateado: String,
+    ): String {
         val seed = (idFactura + "|" + numeroFormateado).toByteArray(Charsets.UTF_8)
         val sha = MessageDigest.getInstance("SHA-256").digest(seed)
         // Top 16 bytes → 32 chars hex.
-        return java.util.HexFormat.of().formatHex(sha.copyOfRange(0, 16))
+        return java.util.HexFormat
+            .of()
+            .formatHex(sha.copyOfRange(0, 16))
     }
 
     /**
@@ -361,11 +407,12 @@ open class VenezuelaHkaPayloadBuilder {
         val entero = partes[0].toBigInteger()
         val centavos = partes.getOrElse(1) { "00" }
 
-        val enteroLetras = when {
-            entero == java.math.BigInteger.ZERO -> "CERO"
-            entero == java.math.BigInteger.ONE -> "UN"
-            else -> enterosALetras(entero)
-        }
+        val enteroLetras =
+            when {
+                entero == java.math.BigInteger.ZERO -> "CERO"
+                entero == java.math.BigInteger.ONE -> "UN"
+                else -> enterosALetras(entero)
+            }
         val moneda = if (entero == java.math.BigInteger.ONE) "BOLÍVAR" else "BOLÍVARES"
         return "$enteroLetras $moneda CON $centavos/100"
     }
@@ -373,19 +420,55 @@ open class VenezuelaHkaPayloadBuilder {
     /** Conversión de enteros (1..999 999 999 999) a palabras en español (VE). */
     private fun enterosALetras(n: java.math.BigInteger): String {
         require(n >= java.math.BigInteger.ZERO) { "Solo se soportan enteros no negativos" }
-        val unidades = arrayOf(
-            "", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE",
-            "DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE",
-            "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE",
-        )
-        val decenas = arrayOf(
-            "", "", "VEINTI", "TREINTA", "CUARENTA", "CINCUENTA",
-            "SESENTA", "SETENTA", "OCHENTA", "NOVENTA",
-        )
-        val centenas = arrayOf(
-            "", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS",
-            "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS",
-        )
+        val unidades =
+            arrayOf(
+                "",
+                "UNO",
+                "DOS",
+                "TRES",
+                "CUATRO",
+                "CINCO",
+                "SEIS",
+                "SIETE",
+                "OCHO",
+                "NUEVE",
+                "DIEZ",
+                "ONCE",
+                "DOCE",
+                "TRECE",
+                "CATORCE",
+                "QUINCE",
+                "DIECISÉIS",
+                "DIECISIETE",
+                "DIECIOCHO",
+                "DIECINUEVE",
+            )
+        val decenas =
+            arrayOf(
+                "",
+                "",
+                "VEINTI",
+                "TREINTA",
+                "CUARENTA",
+                "CINCUENTA",
+                "SESENTA",
+                "SETENTA",
+                "OCHENTA",
+                "NOVENTA",
+            )
+        val centenas =
+            arrayOf(
+                "",
+                "CIENTO",
+                "DOSCIENTOS",
+                "TRESCIENTOS",
+                "CUATROCIENTOS",
+                "QUINIENTOS",
+                "SEISCIENTOS",
+                "SETECIENTOS",
+                "OCHOCIENTOS",
+                "NOVECIENTOS",
+            )
 
         val millones = java.math.BigInteger("1000000")
         val mil = java.math.BigInteger("1000")
@@ -400,10 +483,11 @@ open class VenezuelaHkaPayloadBuilder {
         if (n >= millones) {
             val mm = n.divide(millones).mod(millones)
             if (mm.signum() > 0) {
-                parts += when (mm) {
-                    java.math.BigInteger.ONE -> "UN MILLÓN"
-                    else -> "${grupoTres(mm.toInt(), unidades, decenas, centenas)} MILLONES"
-                }
+                parts +=
+                    when (mm) {
+                        java.math.BigInteger.ONE -> "UN MILLÓN"
+                        else -> "${grupoTres(mm.toInt(), unidades, decenas, centenas)} MILLONES"
+                    }
             }
         }
         // Billones no soportados: si n >= 10^12, dejamos al PAC que lo rechace;
@@ -414,11 +498,12 @@ open class VenezuelaHkaPayloadBuilder {
         val miles = restoTrasMillon.divide(mil)
         if (miles.signum() > 0) {
             // "MIL" es invariable; "UN MIL" esprefrible evitar (se omite "UN").
-            val milesLetras = if (miles == java.math.BigInteger.ONE) {
-                "MIL"
-            } else {
-                "${grupoTres(miles.toInt(), unidades, decenas, centenas)} MIL"
-            }
+            val milesLetras =
+                if (miles == java.math.BigInteger.ONE) {
+                    "MIL"
+                } else {
+                    "${grupoTres(miles.toInt(), unidades, decenas, centenas)} MIL"
+                }
             parts += milesLetras
         }
 

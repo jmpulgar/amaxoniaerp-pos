@@ -1,7 +1,5 @@
 package com.amaxoniaerp
 
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -24,12 +22,14 @@ import org.slf4j.event.*
 fun Application.configureFrameworks() {
     install(Koin) {
         slf4jLogger()
-        modules(module {
-            single<HelloService> {
-                HelloService {
-                    println(environment.log.info("Hello, World!"))
+        modules(
+            module {
+                single<HelloService> {
+                    HelloService {
+                        println(environment.log.info("Hello, World!"))
+                    }
                 }
-            }
-        })
+            },
+        )
     }
 }

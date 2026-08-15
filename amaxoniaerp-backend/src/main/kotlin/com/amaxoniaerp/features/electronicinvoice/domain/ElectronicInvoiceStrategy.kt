@@ -11,7 +11,6 @@ import org.jetbrains.exposed.sql.Database
  * Cada implementación es independiente y no modifica la lógica del otro país.
  */
 interface ElectronicInvoiceStrategy {
-
     val countryCode: String
 
     /**
