@@ -1,0 +1,119 @@
+name: Backend Quality Fix
+
+on:
+  push:
+    branches:
+      - architecture-block1-validation
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: architecture-block1-validation
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Apply remaining explicit ktlint fixes
+        working-directory: amaxoniaerp-backend
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old in text:
+                  p.write_text(text.replace(old, new))
+
+          replace(
+              'src/main/kotlin/com/amaxoniaerp/features/clients/route/ClientTypesRoute.kt',
+              'import io.ktor.server.request.*\n',
+              '',
+          )
+          replace(
+              'src/main/kotlin/com/amaxoniaerp/features/geography/route/GeographyRoutes.kt',
+              'import io.ktor.server.request.*\n',
+              '',
+          )
+          replace(
+              'src/main/kotlin/Routing.kt',
+              'import io.ktor.client.plugins.contentnegotiation.*\n',
+              'import io.ktor.client.plugins.contentnegotiation.ContentNegotiation\n',
+          )
+          replace(
+              'src/main/kotlin/Routing.kt',
+              'import io.ktor.server.application.hooks.*\n',
+              'import io.ktor.server.application.hooks.ApplicationStopped\n',
+          )
+          replace(
+              'src/main/kotlin/Serialization.kt',
+              'import io.ktor.server.plugins.contentnegotiation.*\n',
+              'import io.ktor.server.plugins.contentnegotiation.ContentNegotiation\n',
+          )
+
+          panama = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/application/PanamaInvoiceProcessor.kt')
+          text = panama.read_text()
+          old = '''        logger.info(\n            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} cufe=${pacResponse.cufe?.take(\n                20,\n            )}",\n        )'''
+          new = '''        logger.info(\n            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} " +\n                "codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} " +\n                "cufe=${pacResponse.cufe?.take(20)}",\n        )'''
+          if old in text:
+              panama.write_text(text.replace(old, new))
+
+          routes = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/route/ElectronicInvoiceRoutes.kt')
+          text = routes.read_text()
+          old = '''                                    "message" to "Tipo de documento '${result.tipoDocumento}' no implementado en ${result.country} (FASE 1)",'''
+          new = '''                                    "message" to\n                                        "Tipo de documento '${result.tipoDocumento}' no implementado " +\n                                        "en ${result.country} (FASE 1)",'''
+          if old in text:
+              routes.write_text(text.replace(old, new))
+
+          repo = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/data/VenezuelaElectronicInvoiceRepository.kt')
+          text = repo.read_text().replace('CAMPO_CORRELATIVO_FE', 'campoCorrelativoFe')
+          text = text.replace(
+              '// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n        /** Código de entorno demo',
+              '// por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.\n\n        /** Código de entorno demo',
+          )
+          repo.write_text(text)
+
+          test_repo = Path('src/test/kotlin/com/amaxoniaerp/features/electronicinvoice/data/VenezuelaElectronicInvoiceRepositoryTest.kt')
+          if test_repo.exists():
+              test_repo.write_text(test_repo.read_text().replace('CAMPO_CORRELATIVO_FE', 'campoCorrelativoFe'))
+
+          exceptions = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceExceptions.kt')
+          text = exceptions.read_text()
+          text = text.replace('/**\n * Excepciones específicas del módulo de facturación electrónica.\n */\n\n', '')
+          exceptions.write_text(text)
+
+          models = Path('src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceModels.kt')
+          text = models.read_text().replace(
+              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n        /** `resultado.numeroDocumento`',
+              '        // ─── Venezuela digital (HKA): campos propios - FASE 2 Punto 1 ─\n\n        /** `resultado.numeroDocumento`',
+          )
+          models.write_text(text)
+          PY
+          if [ -f src/main/kotlin/com/amaxoniaerp/features/items/domain/Models.kt ]; then
+            git mv src/main/kotlin/com/amaxoniaerp/features/items/domain/Models.kt src/main/kotlin/com/amaxoniaerp/features/items/domain/ItemSummary.kt
+          fi
+          chmod +x gradlew
+          ./gradlew ktlintFormat --no-daemon --console=plain || true
+      - name: Commit quality-only fixes
+        run: |
+          if git diff --quiet -- amaxoniaerp-backend; then
+            echo "No additional quality fixes required"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add amaxoniaerp-backend
+            git commit -m "Fix remaining backend ktlint debt"
+            git push origin HEAD:architecture-block1-validation
+          fi
+      - name: Verify backend quality
+        working-directory: amaxoniaerp-backend
+        run: ./gradlew ktlintCheck detekt test build --no-daemon --console=plain
