@@ -195,9 +195,9 @@ class PaymentViewModel(
                 if (failure != null) {
                     _state.update { it.copy(paymentError = failure.message) }
                 } else {
-                    val request = currentState.toPaymentOperationRequest(details)
                     beginProcessing(details)
                     viewModelScope.launch {
+                        val request = currentState.toPaymentOperationRequest(details)
                         val result = paymentOperation.execute(request, ::handlePaymentFlowEvent)
                         applyPaymentResult(result)
                     }
