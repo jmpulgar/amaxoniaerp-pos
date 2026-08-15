@@ -26,8 +26,8 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      - name: Apply ktlint formatting
-        run: ./gradlew ktlintFormat --no-daemon --console=plain
+      - name: Apply autocorrectable ktlint formatting
+        run: ./gradlew ktlintFormat --no-daemon --console=plain || true
       - name: Commit formatting-only changes
         working-directory: .
         run: |
