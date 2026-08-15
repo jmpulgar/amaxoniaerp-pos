@@ -1,7 +1,13 @@
 name: Architecture Coverage Audit
 
 on:
+  push:
+    branches:
+      - architecture-block1-validation
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   android-coverage-baseline:
