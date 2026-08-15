@@ -1,9 +1,18 @@
 package com.amaxoniaerp.features.assets.route
 
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.parameters
+import io.ktor.http.path
+import io.ktor.server.application.call
+import io.ktor.server.application.log
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondRedirect
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.path
+import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 import java.io.File
 

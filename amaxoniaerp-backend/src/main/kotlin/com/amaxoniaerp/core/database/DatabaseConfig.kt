@@ -2,7 +2,8 @@ package com.amaxoniaerp.core.database
 
 import com.amaxoniaerp.loadConfigValue
 import com.amaxoniaerp.loadDotEnv
-import io.ktor.server.application.*
+import io.ktor.server.application.Application
+import io.ktor.server.application.log
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 

@@ -5,12 +5,18 @@ import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.clients.data.ClientsRepository
 import com.amaxoniaerp.features.clients.domain.ClientsListResponse
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.parameters
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import io.ktor.server.routing.route
 
 fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
     authenticate {

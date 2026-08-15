@@ -7,12 +7,16 @@ import com.amaxoniaerp.features.auth.domain.LoginRequest
 import com.amaxoniaerp.features.auth.domain.NotFoundException
 import com.amaxoniaerp.features.companies.domain.CompanySelectRequest
 import com.amaxoniaerp.features.companies.domain.CompanyService
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headers
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 
 /**
  * Rutas de autenticación Multi-Tenant con arquitectura Two-Tier.

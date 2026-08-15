@@ -5,11 +5,15 @@ import com.amaxoniaerp.features.auth.route.getAdminDb
 import com.amaxoniaerp.features.auth.route.getCountryCode
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.parameters
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
 /**
