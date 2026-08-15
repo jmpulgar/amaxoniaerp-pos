@@ -1,38 +1,66 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/main/kotlin` contains Ktor application code (entry point in `Application.kt`).
-- `src/main/resources` holds configuration (`application.yaml`), logging (`logback.xml`), and OpenAPI docs (`openapi/documentation.yaml`).
-- `src/test/kotlin` contains unit/integration tests (example: `ApplicationTest.kt`).
-- Build tooling lives at the repo root: `build.gradle.kts`, `settings.gradle.kts`, `gradlew`/`gradlew.bat`.
+- `src/main/kotlin` contains the Ktor application and feature packages.
+- `src/main/resources` contains runtime configuration, logging and OpenAPI resources.
+- `src/test/kotlin` mirrors production packages for unit/integration tests.
+- Architecture policy: `../doc/ARCHITECTURE.md`; ADRs: `../doc/adr/`.
+- Build tooling: `build.gradle.kts`, `settings.gradle.kts`, Gradle wrapper.
 
-## Build, Test, and Development Commands
-- `./gradlew run` starts the Ktor server locally on port `8080`.
-- `./gradlew test` runs the Kotlin/JUnit test suite.
-- `./gradlew build` compiles and packages the application.
-- `./gradlew buildFatJar` creates an executable fat JAR.
-- `./gradlew buildImage` or `./gradlew runDocker` builds/runs the Docker image.
+## Build, Test, and Quality Commands
+Run from `amaxoniaerp-backend/` with Java 21:
+- `./gradlew run` — starts the Ktor application locally.
+- `./gradlew test` — backend test suite.
+- `./gradlew detekt` — static-analysis gate.
+- `./gradlew ktlintCheck` — Kotlin formatting gate.
+- `./gradlew build` — compile, test and package.
+- `./gradlew buildFatJar` — executable fat JAR when needed.
 
-## Coding Style & Naming Conventions
-- Kotlin code follows standard Kotlin style: 4-space indentation, no tabs.
-- File and class names use `UpperCamelCase` (e.g., `UsersSchema.kt`); functions/variables use `lowerCamelCase`.
-- Keep Ktor modules organized by concern (e.g., `Routing.kt`, `Security.kt`, `Databases.kt`).
-- No formatter is configured; use IntelliJ/Kotlin default formatting.
+Do not add quality baselines, suppressions, ignores or disabled rules to make a gate green. Fix measured debt explicitly.
+
+## Backend Feature Archetypes
+Use the minimum structure justified by behavior:
+
+1. Query/CRUD simple: `route -> repository` is acceptable when no non-trivial business workflow exists.
+2. Workflow/business operation: `route -> application -> domain ports -> adapters`.
+3. External integration: `application/domain port -> adapter -> PAC/HKA/API`.
+
+Do not add `application/`, interfaces or wrappers for symmetry alone. A deep module is justified by invariants, multi-resource coordination, idempotency/retry, DB + external I/O, country-specific behavior or logic that deserves framework-independent tests.
+
+## Tenancy
+Company/tenant resolution must converge on one typed seam (`CompanyRequestContext`). Do not add new per-route copies of JWT/`token_type`/`admin_db`/`Company-DB`/`country_code` resolution.
+
+All feature tables must use the company database stored in `nomempresa.bd`; never substitute `bd_contabilidad` or `bd_nomina`.
+
+## Error Rules
+Routes should validate HTTP input/context, call the application operation and map its result. Do not expose raw exception, SQL, PAC or stack-trace details to clients. Prefer typed error categories and central `StatusPages` mapping. Do not add generic `catch (Exception)` to routes as a convenience.
+
+## Transaction and External-I/O Rules
+Never perform PAC, HKA, HTTP or other external I/O while a SQL transaction is open. Use staged operations: short DB transaction, external call, short persistence/reconciliation transaction. Moving an existing critical workflow requires characterization tests and must preserve current behavior.
+
+## Coding Style & Composition
+- Kotlin standard style, 4-space indentation, no tabs.
+- `UpperCamelCase` for classes/files; `lowerCamelCase` for functions/properties.
+- Constructor DI manual is the canonical composition strategy. Do not expand Koin into a parallel graph.
+- Routing must not become a service locator or construct feature infrastructure ad hoc.
+- Domain code should remain independent of Ktor and Exposed when the feature is a deep workflow boundary.
 
 ## Testing Guidelines
-- Frameworks: `kotlin.test` with JUnit (`kotlin.test.junit` dependency).
-- Place tests in `src/test/kotlin` mirroring production package structure.
-- Name tests with `*Test` suffix (e.g., `ApplicationTest`).
-- Run locally with `./gradlew test` before opening a PR.
+- Tests use Kotlin test/JUnit as configured by the build.
+- Mirror production package structure and use `*Test` suffix.
+- Prioritize domain/application invariants, money, idempotency, tenancy, contract/security and PA / VE digital / VE HKA-20 behavior.
+- Coverage is ratcheted from measured reality; do not write trivial tests solely to increase percentage.
+
+## Business-Safety Constraints
+Architecture/quality work must not change business rules, calculations, credit/CxC, HTTP/JSON contracts, schema/migrations, PAC, HKA-20, fiscal behavior or multi-country policy unless a separate approved functional TASK explicitly requests it.
+
+Never modify `.env`, `.env.development`, secrets or production configuration for architecture work.
 
 ## Commit & Pull Request Guidelines
-- No Git history is available in this checkout, so commit conventions are unspecified.
-- Suggested default: Conventional Commits (`feat:`, `fix:`, `chore:`) unless the team specifies otherwise.
-- PRs should include a short description, steps to test, and any related issue links.
-- Include screenshots only if API docs or behavior changes are user-visible.
+- Keep commits scoped, reversible and tied to one TASK or guardrail.
+- PRs include commands/evidence and state whether a business decision changed.
+- Required CI checks are listed in `../doc/ARCHITECTURE.md`.
+- Do not force-push shared branches.
 
-## Configuration & Security Tips
-- Runtime config is in `src/main/resources/application.yaml` and sourced from env vars.
-- Example env values live in `.env` (DB and JWT settings); do not commit real secrets.
-- Database settings are under `db.config` and expect `DB_CONFIG_*` variables.
-- All feature tables must be queried from the company database name stored in `nomempresa.bd` (never from `bd_contabilidad` or `bd_nomina`).
+## Configuration & Security
+Runtime configuration is sourced from the existing configuration/env mechanism. Do not commit credentials or change production defaults as part of this plan.
