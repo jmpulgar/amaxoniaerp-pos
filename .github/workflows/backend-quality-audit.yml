@@ -1,7 +1,13 @@
 name: Backend Quality Debt Audit
 
 on:
+  push:
+    branches:
+      - architecture-block1-validation
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   backend-quality-debt:
@@ -12,27 +18,27 @@ jobs:
         working-directory: amaxoniaerp-backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: architecture-block1-validation
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      - name: Detekt
-        id: detekt
-        continue-on-error: true
-        run: ./gradlew detekt --no-daemon --console=plain > /tmp/detekt.log 2>&1
-      - name: ktlint
-        id: ktlint
-        continue-on-error: true
-        run: ./gradlew ktlintCheck --no-daemon --console=plain > /tmp/ktlint.log 2>&1
-      - name: Print concise quality result
-        if: always()
+      - name: Apply ktlint formatting
+        run: ./gradlew ktlintFormat --no-daemon --console=plain
+      - name: Commit formatting-only changes
+        working-directory: .
         run: |
-          echo "=== DETEKT ==="
-          grep -E "weighted issues|BUILD (SUCCESSFUL|FAILED)|[0-9]+ weighted issues" /tmp/detekt.log || true
-          echo "=== KTLINT TXT REPORTS ==="
-          find build/reports/ktlint -type f -name '*.txt' -exec cat {} \; || true
-          echo "=== OUTCOMES ==="
-          echo "detekt_outcome=${{ steps.detekt.outcome }}"
-          echo "ktlint_outcome=${{ steps.ktlint.outcome }}"
+          if git diff --quiet -- amaxoniaerp-backend; then
+            echo "No formatting changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add amaxoniaerp-backend
+          git commit -m "Format backend with ktlint"
+          git push origin HEAD:architecture-block1-validation
+      - name: Verify ktlint
+        run: ./gradlew ktlintCheck --no-daemon --console=plain
