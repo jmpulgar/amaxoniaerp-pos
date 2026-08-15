@@ -116,9 +116,9 @@ class PanamaInvoiceProcessor(
 
         // ── 5. Evaluar respuesta ─────────────────────────────────────────────
         logger.info(
-            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} cufe=${pacResponse.cufe?.take(
-                20,
-            )}",
+            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} " +
+                "codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} " +
+                "cufe=${pacResponse.cufe?.take(20)}",
         )
         if (!pacResponse.exitoso || pacResponse.cufe.isNullOrBlank()) {
             logger.warn(

@@ -9,7 +9,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.request.*
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get

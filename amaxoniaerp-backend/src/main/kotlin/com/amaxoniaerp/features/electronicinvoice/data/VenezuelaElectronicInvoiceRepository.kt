@@ -44,7 +44,7 @@ open class VenezuelaElectronicInvoiceRepository {
     private val log = LoggerFactory.getLogger(VenezuelaElectronicInvoiceRepository::class.java)
 
     /** Campo de `correlativos` que indica el contador de FE Venezuela. */
-    val CAMPO_CORRELATIVO_FE = "correlativo_factura_electronica"
+    val campoCorrelativoFe = "correlativo_factura_electronica"
 
     /**
      * Carga el contexto completo de la factura para enviarla a HKA Venezuela.
@@ -198,17 +198,17 @@ open class VenezuelaElectronicInvoiceRepository {
             val candidatos =
                 VECorrelativosTable
                     .selectAll()
-                    .where { VECorrelativosTable.campo eq CAMPO_CORRELATIVO_FE }
+                    .where { VECorrelativosTable.campo eq campoCorrelativoFe }
                     .toList()
 
             if (candidatos.isEmpty()) {
                 throw FEConfigurationException(
-                    "Falta fila en `correlativos` con campo='$CAMPO_CORRELATIVO_FE'. No se puede reservar correlativo FE Venezuela.",
+                    "Falta fila en `correlativos` con campo='$campoCorrelativoFe'. No se puede reservar correlativo FE Venezuela.",
                 )
             }
             if (candidatos.size > 1) {
                 throw FEConfigurationException(
-                    "Existen ${candidatos.size} filas en `correlativos` con campo='$CAMPO_CORRELATIVO_FE'. Se esperaba exactamente una.",
+                    "Existen ${candidatos.size} filas en `correlativos` con campo='$campoCorrelativoFe'. Se esperaba exactamente una.",
                 )
             }
             val fila = candidatos.single()
@@ -622,6 +622,7 @@ open class VenezuelaElectronicInvoiceRepository {
         // ─── Entornos The Factory HKA Venezuela (FASE 1.1 cleanup) ─────────
         // La URL base del PAC NO se persiste en la base del tenant. Se deriva
         // por configuración de aplicación desde `parametros_generales.tipo_entorno_ve`.
+
         /** Código de entorno demo en `parametros_generales.tipo_entorno_ve`. */
         private const val ENV_DEMO = 0
 

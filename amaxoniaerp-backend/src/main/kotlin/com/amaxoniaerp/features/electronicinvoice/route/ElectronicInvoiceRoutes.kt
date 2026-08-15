@@ -115,7 +115,9 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
                                 HttpStatusCode.OK,
                                 mapOf(
                                     "success" to true,
-                                    "message" to "Tipo de documento '${result.tipoDocumento}' no implementado en ${result.country} (FASE 1)",
+                                    "message" to
+                                        "Tipo de documento '${result.tipoDocumento}' no implementado " +
+                                        "en ${result.country} (FASE 1)",
                                 ),
                             )
                         }

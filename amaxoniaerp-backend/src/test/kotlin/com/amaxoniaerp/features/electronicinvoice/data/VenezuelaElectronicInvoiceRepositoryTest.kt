@@ -72,7 +72,7 @@ class VenezuelaElectronicInvoiceRepositoryTest {
             transaction(database) {
                 VECorrelativosTable.insert {
                     it[id] = 1
-                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[campo] = repository.campoCorrelativoFe
                     it[contador] = 1
                     it[formato] = 8
                 }
@@ -130,7 +130,7 @@ class VenezuelaElectronicInvoiceRepositoryTest {
             transaction(database) {
                 VECorrelativosTable.insert {
                     it[id] = 1
-                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[campo] = repository.campoCorrelativoFe
                     it[contador] = 1
                     it[formato] = 8
                 }
@@ -172,7 +172,7 @@ class VenezuelaElectronicInvoiceRepositoryTest {
             transaction(database) {
                 VECorrelativosTable.insert {
                     it[id] = 1
-                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[campo] = repository.campoCorrelativoFe
                     it[contador] = 500
                     it[formato] = 8
                 }
@@ -202,13 +202,13 @@ class VenezuelaElectronicInvoiceRepositoryTest {
         transaction(database) {
             VECorrelativosTable.insert {
                 it[id] = 1
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
+                it[campo] = repository.campoCorrelativoFe
                 it[contador] = 1
                 it[formato] = 8
             }
             VECorrelativosTable.insert {
                 it[id] = 2
-                it[campo] = repository.CAMPO_CORRELATIVO_FE
+                it[campo] = repository.campoCorrelativoFe
                 it[contador] = 99
                 it[formato] = 8
             }
@@ -240,7 +240,7 @@ class VenezuelaElectronicInvoiceRepositoryTest {
             transaction(database) {
                 VECorrelativosTable.insert {
                     it[id] = 1
-                    it[campo] = repository.CAMPO_CORRELATIVO_FE
+                    it[campo] = repository.campoCorrelativoFe
                     it[contador] = 7
                     it[formato] = null
                 }

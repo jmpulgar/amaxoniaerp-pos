@@ -1,9 +1,5 @@
 package com.amaxoniaerp.features.electronicinvoice.domain
 
-/**
- * Excepciones específicas del módulo de facturación electrónica.
- */
-
 /** Error de comunicación con el PAC (timeout, conexión rechazada, etc.) */
 class PacCommunicationException(
     message: String,

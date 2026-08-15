@@ -50,14 +50,14 @@ import com.amaxoniaerp.features.sales.route.salesRoutes
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.engine.cio.requestTimeout
-import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
-import io.ktor.server.application.hooks.*
+import io.ktor.server.application.hooks.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.plugins.statuspages.exception
 import io.ktor.server.request.httpMethod
