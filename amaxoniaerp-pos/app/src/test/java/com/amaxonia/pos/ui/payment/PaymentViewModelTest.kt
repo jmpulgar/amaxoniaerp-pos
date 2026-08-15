@@ -5,6 +5,8 @@ import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CurrencyConfig
 import com.amaxonia.pos.domain.model.payment.FormaPago
+import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
+import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.PaymentCountryReader
@@ -12,12 +14,15 @@ import com.amaxonia.pos.domain.usecase.payment.BuildPaymentDetailsUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
 import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
+import com.amaxonia.pos.domain.usecase.payment.PaymentFlowEvent
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.PaymentOperation
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -109,7 +114,10 @@ class PaymentViewModelTest {
 
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, ""))
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
+            assertTrue(
+                viewModel.state.value.nonCashAmountsInput
+                    .isEmpty(),
+            )
         }
 
     @Test
@@ -147,8 +155,14 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "10.00"))
 
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertFalse(viewModel.state.value.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
-            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
+            assertFalse(
+                viewModel.state.value.formasPagoTarjetaOtro
+                    .any { it.siglas == "CXC" },
+            )
+            assertTrue(
+                viewModel.state.value.nonCashAmountsInput
+                    .isEmpty(),
+            )
         }
 
     @Test
@@ -162,7 +176,10 @@ class PaymentViewModelTest {
                 )
 
             runCurrent()
-            assertTrue(viewModel.state.value.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
+            assertTrue(
+                viewModel.state.value.formasPagoTarjetaOtro
+                    .any { it.siglas == "CXC" },
+            )
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
 
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "5.00"))
@@ -186,8 +203,18 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "60.00"))
 
             assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
-            assertEquals(40.0, viewModel.state.value.tenderedAmountMoney.toDouble(), 0.001)
-            assertEquals(60.0, viewModel.state.value.cxcAssignedMoney.toDouble(), 0.001)
+            assertEquals(
+                40.0,
+                viewModel.state.value.tenderedAmountMoney
+                    .toDouble(),
+                0.001,
+            )
+            assertEquals(
+                60.0,
+                viewModel.state.value.cxcAssignedMoney
+                    .toDouble(),
+                0.001,
+            )
         }
 
     @Test
@@ -212,7 +239,10 @@ class PaymentViewModelTest {
             runCurrent()
 
             assertEquals(PaymentCondition.CONTADO, viewModel.state.value.paymentCondition)
-            assertTrue(viewModel.state.value.nonCashAmountsInput.isEmpty())
+            assertTrue(
+                viewModel.state.value.nonCashAmountsInput
+                    .isEmpty(),
+            )
         }
 
     @Test
@@ -231,7 +261,12 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.SetTotalAmount(50.0))
             viewModel.onAction(PaymentUiAction.SetNonCashAmount(2, "50.00"))
             assertEquals(PaymentCondition.CREDITO, viewModel.state.value.paymentCondition)
-            assertEquals(50.0, viewModel.state.value.cxcAssignedMoney.toDouble(), 0.001)
+            assertEquals(
+                50.0,
+                viewModel.state.value.cxcAssignedMoney
+                    .toDouble(),
+                0.001,
+            )
 
             clientFlow.value = Client(permiteCredito = false)
             runCurrent()
@@ -245,7 +280,8 @@ class PaymentViewModelTest {
                 stateAfterSwitch.nonCashAmountsInput.none { (methodId) ->
                     viewModel.state.value.formasPago
                         .firstOrNull { it.idFormaPago == methodId }
-                        ?.siglas?.equals("CXC", ignoreCase = true) == true
+                        ?.siglas
+                        ?.equals("CXC", ignoreCase = true) == true
                 },
             )
             assertFalse(stateAfterSwitch.formasPagoTarjetaOtro.any { it.siglas == "CXC" })
@@ -329,7 +365,12 @@ class PaymentViewModelTest {
             viewModel.onAction(PaymentUiAction.KeyPadInput("5"))
 
             assertEquals("0.25", viewModel.state.value.tenderedAmountInput)
-            assertEquals(0.25, viewModel.state.value.tenderedAmountMoney.toDouble(), 0.0)
+            assertEquals(
+                0.25,
+                viewModel.state.value.tenderedAmountMoney
+                    .toDouble(),
+                0.0,
+            )
         }
 
     @Test
@@ -348,7 +389,9 @@ class PaymentViewModelTest {
                     methods = Result.success(methods),
                     operation =
                         PaymentOperation { request, _ ->
-                            capturedAmounts = request.payment.details.payload.detalle.map { it.monto }
+                            capturedAmounts =
+                                request.payment.details.payload.detalle
+                                    .map { it.monto }
                             PaymentFlowResult.Failure("test stop")
                         },
                 )
@@ -362,6 +405,149 @@ class PaymentViewModelTest {
             advanceUntilIdle()
 
             assertEquals(listOf(2.25, 3.25, 4.5), capturedAmounts)
+        }
+
+    @Test
+    fun `success result updates ui state with payload and receipt message`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val payload =
+                PaymentSuccessPayload(
+                    changeDue = 0.0,
+                    paymentMethodsLabel = "Efectivo",
+                    codFactura = "INV-1",
+                    transactionId = "remote-1",
+                    receiptPrintMessage = "Impresa",
+                )
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation = PaymentOperation { _, _ -> PaymentFlowResult.Success(payload, receiptPrintMessage = "Factura impresa") },
+                )
+            runCurrent()
+
+            payExactCash(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertTrue(state.isSuccess)
+            assertFalse(state.isProcessingPayment)
+            assertEquals(payload, state.successPayload)
+            assertEquals("Factura impresa", state.receiptPrintMessage)
+            assertEquals(null, state.paymentError)
+            assertEquals(null, state.gatewayStatusMessage)
+        }
+
+    @Test
+    fun `failure result surfaces the payment error and stops processing`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation = PaymentOperation { _, _ -> PaymentFlowResult.Failure("backend unavailable") },
+                )
+            runCurrent()
+
+            payExactCash(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertFalse(state.isSuccess)
+            assertFalse(state.isProcessingPayment)
+            assertEquals("backend unavailable", state.paymentError)
+            assertEquals(null, state.gatewayStatusMessage)
+            assertEquals(null, state.successPayload)
+        }
+
+    @Test
+    fun `duplicate invoice result prompts with correlation id and reason`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation =
+                        PaymentOperation { _, _ ->
+                            PaymentFlowResult.DuplicateInvoice(
+                                clientCorrelationId = "flow-id",
+                                reason = "Factura duplicada y no se pudo reconciliar con el backend",
+                            )
+                        },
+                )
+            runCurrent()
+
+            payExactCash(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertFalse(state.isProcessingPayment)
+            assertEquals(
+                DuplicateInvoicePrompt(
+                    clientCorrelationId = "flow-id",
+                    reason = "Factura duplicada y no se pudo reconciliar con el backend",
+                ),
+                state.duplicateInvoice,
+            )
+            assertEquals(null, state.gatewayStatusMessage)
+        }
+
+    @Test
+    fun `gateway launch event emits the launch effect`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val payload = gatewayPayload()
+            val effects = mutableListOf<PaymentUiEffect>()
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation =
+                        PaymentOperation { _, onEvent ->
+                            onEvent(PaymentFlowEvent.LaunchGateway(payload))
+                            PaymentFlowResult.Failure("gateway stop")
+                        },
+                )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.effects.collect { effects += it }
+            }
+            runCurrent()
+
+            payExactCash(viewModel)
+            advanceUntilIdle()
+
+            assertEquals(listOf(PaymentUiEffect.LaunchGateway(payload)), effects)
+        }
+
+    @Test
+    fun `fiscal confirmation failure event keeps the successful payment state`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val payload =
+                PaymentSuccessPayload(
+                    changeDue = 0.0,
+                    paymentMethodsLabel = "Efectivo",
+                    codFactura = "INV-1",
+                    transactionId = "remote-1",
+                )
+            val viewModel =
+                viewModel(
+                    caja = null,
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation =
+                        PaymentOperation { _, onEvent ->
+                            onEvent(PaymentFlowEvent.FiscalConfirmationFailed)
+                            PaymentFlowResult.Success(payload, receiptPrintMessage = null)
+                        },
+                )
+            runCurrent()
+
+            payExactCash(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertTrue(state.isSuccess)
+            assertFalse(state.isProcessingPayment)
+            assertEquals(null, state.paymentError)
+            assertEquals(payload, state.successPayload)
         }
 
     private fun viewModel(
@@ -396,6 +582,22 @@ class PaymentViewModelTest {
             cartFinancialSnapshot = MutableStateFlow(snapshot),
         )
     }
+
+    private fun payExactCash(viewModel: PaymentViewModel) {
+        viewModel.onAction(PaymentUiAction.SetTotalAmount(10.0))
+        listOf("1", "0").forEach { viewModel.onAction(PaymentUiAction.KeyPadInput(it)) }
+        viewModel.onAction(PaymentUiAction.ProcessPayment)
+    }
+
+    private fun gatewayPayload() =
+        GatewayLaunchPayload(
+            packageName = "gateway.package",
+            activityClassName = "GatewayActivity",
+            encryptedCommand = byteArrayOf(1),
+            backgroundColor = "background",
+            textColor = "text",
+            message = "processing",
+        )
 
     private fun method(
         id: Int,
