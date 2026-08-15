@@ -1,9 +1,6 @@
 name: Android Kover Task Audit
 
 on:
-  push:
-    branches:
-      - architecture-block1-validation
   workflow_dispatch:
 
 jobs:
