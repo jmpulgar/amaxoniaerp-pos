@@ -2,59 +2,6 @@ package com.amaxoniaerp.features.items.data
 
 import org.jetbrains.exposed.sql.Table
 
-private const val SCHEMA_CANTIDAD_BULTO_PRECISION = 9
-private const val SCHEMA_CODIGO_BARRAS2_MAX_LENGTH = 50
-private const val SCHEMA_CODIGO_BARRAS3_MAX_LENGTH = 50
-private const val SCHEMA_CODIGO_BARRAS_MAX_LENGTH = 50
-private const val SCHEMA_CODIGO_FABRICANTE_MAX_LENGTH = 50
-private const val SCHEMA_COD_ITEM_MAX_LENGTH = 20
-private const val SCHEMA_CONIVA1_PRECISION = 10
-private const val SCHEMA_CONIVA2_PRECISION = 10
-private const val SCHEMA_CONIVA3_PRECISION = 10
-private const val SCHEMA_CONIVA4_PRECISION = 10
-private const val SCHEMA_CONIVA5_PRECISION = 10
-private const val SCHEMA_COSTO_ACTUAL_PRECISION = 10
-private const val SCHEMA_COSTO_ANTERIOR_PRECISION = 10
-private const val SCHEMA_COSTO_PROMEDIO_PRECISION = 10
-private const val SCHEMA_DESCRIPCION1_MAX_LENGTH = 150
-private const val SCHEMA_DESCRIPCION3_MAX_LENGTH = 500
-private const val SCHEMA_DESCUENTO1_PRECISION = 10
-private const val SCHEMA_DESCUENTO2_PRECISION = 10
-private const val SCHEMA_DESCUENTO3_PRECISION = 10
-private const val SCHEMA_DESCUENTO4_PRECISION = 10
-private const val SCHEMA_DESCUENTO5_PRECISION = 10
-private const val SCHEMA_FECHA_CREACION_MAX_LENGTH = 20
-private const val SCHEMA_FOTO1_MAX_LENGTH = 60
-private const val SCHEMA_FOTO2_MAX_LENGTH = 60
-private const val SCHEMA_FOTO3_MAX_LENGTH = 60
-private const val SCHEMA_FOTO4_MAX_LENGTH = 60
-private const val SCHEMA_FOTO_MAX_LENGTH = 60
-private const val SCHEMA_IVA_PRECISION = 10
-private const val SCHEMA_PRECIO1_EXTRA_PRECISION = 10
-private const val SCHEMA_PRECIO1_PRECISION = 10
-private const val SCHEMA_PRECIO2_EXTRA_PRECISION = 10
-private const val SCHEMA_PRECIO2_PRECISION = 10
-private const val SCHEMA_PRECIO3_EXTRA_PRECISION = 10
-private const val SCHEMA_PRECIO3_PRECISION = 10
-private const val SCHEMA_PRECIO4_EXTRA_PRECISION = 10
-private const val SCHEMA_PRECIO4_PRECISION = 10
-private const val SCHEMA_PRECIO5_EXTRA_PRECISION = 10
-private const val SCHEMA_PRECIO5_PRECISION = 10
-private const val SCHEMA_REFERENCIA_MAX_LENGTH = 50
-private const val SCHEMA_TIPO_ITEM_MAX_LENGTH = 50
-private const val SCHEMA_UBICACION1_MAX_LENGTH = 50
-private const val SCHEMA_UBICACION2_MAX_LENGTH = 50
-private const val SCHEMA_UBICACION3_MAX_LENGTH = 50
-private const val SCHEMA_UNIDAD_EMPAQUE_MAX_LENGTH = 40
-private const val SCHEMA_UNIDAD_O_EMPAQUE_MAX_LENGTH = 40
-private const val SCHEMA_UNIDAD_PORCION_MAX_LENGTH = 15
-private const val SCHEMA_USUARIO_CREACION_MAX_LENGTH = 60
-private const val SCHEMA_UTILIDAD1_PRECISION = 10
-private const val SCHEMA_UTILIDAD2_PRECISION = 10
-private const val SCHEMA_UTILIDAD3_PRECISION = 10
-private const val SCHEMA_UTILIDAD4_PRECISION = 10
-private const val SCHEMA_UTILIDAD5_PRECISION = 10
-
 /**
  * Tabla base abstracta con campos comunes de item para todos los países.
  * Define el core de la entidad Item que es idéntico en VE y PA.
@@ -64,23 +11,23 @@ abstract class BaseItemsTable(
 ) : Table(tableName) {
     // Identificación
     val idItem = integer("id_item").autoIncrement()
-    val codItem = varchar("cod_item", SCHEMA_COD_ITEM_MAX_LENGTH)
-    val referencia = varchar("referencia", SCHEMA_REFERENCIA_MAX_LENGTH).nullable()
-    val descripcion1 = varchar("descripcion1", SCHEMA_DESCRIPCION1_MAX_LENGTH)
+    val codItem = varchar("cod_item", 20)
+    val referencia = varchar("referencia", 50).nullable()
+    val descripcion1 = varchar("descripcion1", 150)
     val descripcion2 = text("descripcion2").nullable()
-    val descripcion3 = varchar("descripcion3", SCHEMA_DESCRIPCION3_MAX_LENGTH).nullable()
+    val descripcion3 = varchar("descripcion3", 500).nullable()
 
     // Códigos de barras
-    val codigoBarras = varchar("codigo_barras", SCHEMA_CODIGO_BARRAS_MAX_LENGTH).default("")
-    val codigoBarras2 = varchar("codigo_barras2", SCHEMA_CODIGO_BARRAS2_MAX_LENGTH).default("")
-    val codigoBarras3 = varchar("codigo_barras3", SCHEMA_CODIGO_BARRAS3_MAX_LENGTH).default("")
+    val codigoBarras = varchar("codigo_barras", 50).default("")
+    val codigoBarras2 = varchar("codigo_barras2", 50).default("")
+    val codigoBarras3 = varchar("codigo_barras3", 50).default("")
 
     // Multimedia
-    val foto = varchar("foto", SCHEMA_FOTO_MAX_LENGTH).nullable()
-    val foto1 = varchar("foto1", SCHEMA_FOTO1_MAX_LENGTH).default("")
-    val foto2 = varchar("foto2", SCHEMA_FOTO2_MAX_LENGTH).default("")
-    val foto3 = varchar("foto3", SCHEMA_FOTO3_MAX_LENGTH).default("")
-    val foto4 = varchar("foto4", SCHEMA_FOTO4_MAX_LENGTH).default("")
+    val foto = varchar("foto", 60).nullable()
+    val foto1 = varchar("foto1", 60).default("")
+    val foto2 = varchar("foto2", 60).default("")
+    val foto3 = varchar("foto3", 60).default("")
+    val foto4 = varchar("foto4", 60).default("")
 
     // Categorización (cod_departamento o departamento_id según BD; filtro por departmentId usa el que exista)
     val codDepartamento = integer("cod_departamento").default(0)
@@ -97,48 +44,48 @@ abstract class BaseItemsTable(
 
     // Impuestos
     val montoExento = bool("monto_exento").default(false)
-    val iva = decimal("iva", SCHEMA_IVA_PRECISION, 2).default(0.0.toBigDecimal())
+    val iva = decimal("iva", 10, 2).default(0.0.toBigDecimal())
 
     // Costos
-    val costoActual = decimal("costo_actual", SCHEMA_COSTO_ACTUAL_PRECISION, 2).default(0.0.toBigDecimal())
-    val costoPromedio = decimal("costo_promedio", SCHEMA_COSTO_PROMEDIO_PRECISION, 2).default(0.0.toBigDecimal())
-    val costoAnterior = decimal("costo_anterior", SCHEMA_COSTO_ANTERIOR_PRECISION, 2).default(0.0.toBigDecimal())
+    val costoActual = decimal("costo_actual", 10, 2).default(0.0.toBigDecimal())
+    val costoPromedio = decimal("costo_promedio", 10, 2).default(0.0.toBigDecimal())
+    val costoAnterior = decimal("costo_anterior", 10, 2).default(0.0.toBigDecimal())
 
     // Precios nivel 1
-    val precio1 = decimal("precio1", SCHEMA_PRECIO1_PRECISION, 2).default(0.0.toBigDecimal())
-    val utilidad1 = decimal("utilidad1", SCHEMA_UTILIDAD1_PRECISION, 2).default(0.0.toBigDecimal())
-    val coniva1 = decimal("coniva1", SCHEMA_CONIVA1_PRECISION, 2).default(0.0.toBigDecimal())
-    val descuento1 = decimal("descuento1", SCHEMA_DESCUENTO1_PRECISION, 2).default(0.0.toBigDecimal())
+    val precio1 = decimal("precio1", 10, 2).default(0.0.toBigDecimal())
+    val utilidad1 = decimal("utilidad1", 10, 2).default(0.0.toBigDecimal())
+    val coniva1 = decimal("coniva1", 10, 2).default(0.0.toBigDecimal())
+    val descuento1 = decimal("descuento1", 10, 2).default(0.0.toBigDecimal())
 
     // Precios nivel 2
-    val precio2 = decimal("precio2", SCHEMA_PRECIO2_PRECISION, 2).default(0.0.toBigDecimal())
-    val utilidad2 = decimal("utilidad2", SCHEMA_UTILIDAD2_PRECISION, 2).default(0.0.toBigDecimal())
-    val coniva2 = decimal("coniva2", SCHEMA_CONIVA2_PRECISION, 2).default(0.0.toBigDecimal())
-    val descuento2 = decimal("descuento2", SCHEMA_DESCUENTO2_PRECISION, 2).default(0.0.toBigDecimal())
+    val precio2 = decimal("precio2", 10, 2).default(0.0.toBigDecimal())
+    val utilidad2 = decimal("utilidad2", 10, 2).default(0.0.toBigDecimal())
+    val coniva2 = decimal("coniva2", 10, 2).default(0.0.toBigDecimal())
+    val descuento2 = decimal("descuento2", 10, 2).default(0.0.toBigDecimal())
 
     // Precios nivel 3
-    val precio3 = decimal("precio3", SCHEMA_PRECIO3_PRECISION, 2).default(0.0.toBigDecimal())
-    val utilidad3 = decimal("utilidad3", SCHEMA_UTILIDAD3_PRECISION, 2).default(0.0.toBigDecimal())
-    val coniva3 = decimal("coniva3", SCHEMA_CONIVA3_PRECISION, 2).default(0.0.toBigDecimal())
-    val descuento3 = decimal("descuento3", SCHEMA_DESCUENTO3_PRECISION, 2).default(0.0.toBigDecimal())
+    val precio3 = decimal("precio3", 10, 2).default(0.0.toBigDecimal())
+    val utilidad3 = decimal("utilidad3", 10, 2).default(0.0.toBigDecimal())
+    val coniva3 = decimal("coniva3", 10, 2).default(0.0.toBigDecimal())
+    val descuento3 = decimal("descuento3", 10, 2).default(0.0.toBigDecimal())
 
     // Precios nivel 4
-    val precio4 = decimal("precio4", SCHEMA_PRECIO4_PRECISION, 2).default(0.0.toBigDecimal())
-    val utilidad4 = decimal("utilidad4", SCHEMA_UTILIDAD4_PRECISION, 2).default(0.0.toBigDecimal())
-    val coniva4 = decimal("coniva4", SCHEMA_CONIVA4_PRECISION, 2).default(0.0.toBigDecimal())
-    val descuento4 = decimal("descuento4", SCHEMA_DESCUENTO4_PRECISION, 2).default(0.0.toBigDecimal())
+    val precio4 = decimal("precio4", 10, 2).default(0.0.toBigDecimal())
+    val utilidad4 = decimal("utilidad4", 10, 2).default(0.0.toBigDecimal())
+    val coniva4 = decimal("coniva4", 10, 2).default(0.0.toBigDecimal())
+    val descuento4 = decimal("descuento4", 10, 2).default(0.0.toBigDecimal())
 
     // Precios nivel 5
-    val precio5 = decimal("precio5", SCHEMA_PRECIO5_PRECISION, 2).default(0.0.toBigDecimal())
-    val utilidad5 = decimal("utilidad5", SCHEMA_UTILIDAD5_PRECISION, 2).default(0.0.toBigDecimal())
-    val coniva5 = decimal("coniva5", SCHEMA_CONIVA5_PRECISION, 2).default(0.0.toBigDecimal())
-    val descuento5 = decimal("descuento5", SCHEMA_DESCUENTO5_PRECISION, 2).default(0.0.toBigDecimal())
+    val precio5 = decimal("precio5", 10, 2).default(0.0.toBigDecimal())
+    val utilidad5 = decimal("utilidad5", 10, 2).default(0.0.toBigDecimal())
+    val coniva5 = decimal("coniva5", 10, 2).default(0.0.toBigDecimal())
+    val descuento5 = decimal("descuento5", 10, 2).default(0.0.toBigDecimal())
 
-    val precio1Extra = decimal("precio1_extra", SCHEMA_PRECIO1_EXTRA_PRECISION, 2).nullable()
-    val precio2Extra = decimal("precio2_extra", SCHEMA_PRECIO2_EXTRA_PRECISION, 2).nullable()
-    val precio3Extra = decimal("precio3_extra", SCHEMA_PRECIO3_EXTRA_PRECISION, 2).nullable()
-    val precio4Extra = decimal("precio4_extra", SCHEMA_PRECIO4_EXTRA_PRECISION, 2).nullable()
-    val precio5Extra = decimal("precio5_extra", SCHEMA_PRECIO5_EXTRA_PRECISION, 2).nullable()
+    val precio1Extra = decimal("precio1_extra", 10, 2).nullable()
+    val precio2Extra = decimal("precio2_extra", 10, 2).nullable()
+    val precio3Extra = decimal("precio3_extra", 10, 2).nullable()
+    val precio4Extra = decimal("precio4_extra", 10, 2).nullable()
+    val precio5Extra = decimal("precio5_extra", 10, 2).nullable()
 
     // Estado
     val estatus = varchar("estatus", 1).default("A")
@@ -146,8 +93,8 @@ abstract class BaseItemsTable(
     val tipoProd = integer("tipo_prod").default(2)
 
     // Auditoría
-    val usuarioCreacion = varchar("usuario_creacion", SCHEMA_USUARIO_CREACION_MAX_LENGTH).default("API")
-    val fechaCreacion = varchar("fecha_creacion", SCHEMA_FECHA_CREACION_MAX_LENGTH).nullable()
+    val usuarioCreacion = varchar("usuario_creacion", 60).default("API")
+    val fechaCreacion = varchar("fecha_creacion", 20).nullable()
 
     // Configuración
     val seriales = bool("seriales").default(false)
@@ -161,16 +108,16 @@ abstract class BaseItemsTable(
     val existenciaMax = integer("existencia_max").default(0)
 
     // Campos adicionales base
-    val codigoFabricante = varchar("codigo_fabricante", SCHEMA_CODIGO_FABRICANTE_MAX_LENGTH).nullable()
-    val unidadEmpaque = varchar("unidad_empaque", SCHEMA_UNIDAD_EMPAQUE_MAX_LENGTH).nullable()
-    val cantidadBulto = decimal("cantidad_bulto", SCHEMA_CANTIDAD_BULTO_PRECISION, 2).nullable()
-    val unidadPorcion = varchar("unidad_porcion", SCHEMA_UNIDAD_PORCION_MAX_LENGTH).nullable()
-    val unidadOEmpaque = varchar("unidad_o_empaque", SCHEMA_UNIDAD_O_EMPAQUE_MAX_LENGTH).nullable()
+    val codigoFabricante = varchar("codigo_fabricante", 50).nullable()
+    val unidadEmpaque = varchar("unidad_empaque", 40).nullable()
+    val cantidadBulto = decimal("cantidad_bulto", 9, 2).nullable()
+    val unidadPorcion = varchar("unidad_porcion", 15).nullable()
+    val unidadOEmpaque = varchar("unidad_o_empaque", 40).nullable()
     val cantidad = integer("cantidad").default(0)
-    val tipoItem = varchar("tipo_item", SCHEMA_TIPO_ITEM_MAX_LENGTH).nullable()
-    val ubicacion1 = varchar("ubicacion1", SCHEMA_UBICACION1_MAX_LENGTH).nullable()
-    val ubicacion2 = varchar("ubicacion2", SCHEMA_UBICACION2_MAX_LENGTH).nullable()
-    val ubicacion3 = varchar("ubicacion3", SCHEMA_UBICACION3_MAX_LENGTH).nullable()
+    val tipoItem = varchar("tipo_item", 50).nullable()
+    val ubicacion1 = varchar("ubicacion1", 50).nullable()
+    val ubicacion2 = varchar("ubicacion2", 50).nullable()
+    val ubicacion3 = varchar("ubicacion3", 50).nullable()
 
     override val primaryKey = PrimaryKey(idItem)
 }

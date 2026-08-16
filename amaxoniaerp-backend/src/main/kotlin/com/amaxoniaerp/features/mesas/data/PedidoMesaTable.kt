@@ -3,25 +3,6 @@ package com.amaxoniaerp.features.mesas.data
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 
-private const val SCHEMA_CANTIDAD_FACTURADA_PRECISION = 32
-private const val SCHEMA_CANTIDAD_FACTURADA_SCALE = 3
-private const val SCHEMA_ESTADO_MAX_LENGTH = 30
-private const val SCHEMA_ITEM_CANTIDAD_PRECISION = 32
-private const val SCHEMA_ITEM_CANTIDAD_SCALE = 3
-private const val SCHEMA_ITEM_CODIGO_MAX_LENGTH = 80
-private const val SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH = 500
-private const val SCHEMA_ITEM_DESCUENTO_PRECISION = 10
-private const val SCHEMA_ITEM_MONTODESCUENTO_PRECISION = 20
-private const val SCHEMA_ITEM_PIVA_PRECISION = 10
-private const val SCHEMA_ITEM_PRECIOSINIVA_PRECISION = 20
-private const val SCHEMA_ITEM_TOTALCONIVA_PRECISION = 20
-private const val SCHEMA_ITEM_TOTALSINIVA_PRECISION = 20
-private const val SCHEMA_NOTAS_MAX_LENGTH = 300
-private const val SCHEMA_PROMOCION_DETALLE_ID_MAX_LENGTH = 40
-private const val SCHEMA_PROMOCION_ID_MAX_LENGTH = 40
-private const val SCHEMA_PROMOCION_TIPO_MAX_LENGTH = 40
-private const val SCHEMA_UNIDAD_EMPAQUE_MAX_LENGTH = 40
-
 /**
  * Pedidos y comandas ligados a una sesión operativa de mesa.
  *
@@ -51,34 +32,29 @@ object PedidoMesaTable : Table("pedido_mesa") {
     val comandaSecuencia = integer("comanda_secuencia").nullable()
     val productoId = integer("producto_id")
     val itemAlmacen = integer("item_almacen").default(1)
-    val itemCodigo = varchar("item_codigo", SCHEMA_ITEM_CODIGO_MAX_LENGTH).default("")
-    val itemDescripcion = varchar("item_descripcion", SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH)
-    val itemCantidad = decimal("item_cantidad", SCHEMA_ITEM_CANTIDAD_PRECISION, SCHEMA_ITEM_CANTIDAD_SCALE)
-    val itemPrecioSinIva = decimal("item_preciosiniva", SCHEMA_ITEM_PRECIOSINIVA_PRECISION, 2)
-    val itemDescuento = decimal("item_descuento", SCHEMA_ITEM_DESCUENTO_PRECISION, 2).default(0.toBigDecimal())
-    val itemMontoDescuento = decimal("item_montodescuento", SCHEMA_ITEM_MONTODESCUENTO_PRECISION, 2).default(0.toBigDecimal())
-    val itemPIva = decimal("item_piva", SCHEMA_ITEM_PIVA_PRECISION, 2).default(0.toBigDecimal())
-    val itemTotalSinIva = decimal("item_totalsiniva", SCHEMA_ITEM_TOTALSINIVA_PRECISION, 2)
-    val itemTotalConIva = decimal("item_totalconiva", SCHEMA_ITEM_TOTALCONIVA_PRECISION, 2)
+    val itemCodigo = varchar("item_codigo", 80).default("")
+    val itemDescripcion = varchar("item_descripcion", 500)
+    val itemCantidad = decimal("item_cantidad", 32, 3)
+    val itemPrecioSinIva = decimal("item_preciosiniva", 20, 2)
+    val itemDescuento = decimal("item_descuento", 10, 2).default(0.toBigDecimal())
+    val itemMontoDescuento = decimal("item_montodescuento", 20, 2).default(0.toBigDecimal())
+    val itemPIva = decimal("item_piva", 10, 2).default(0.toBigDecimal())
+    val itemTotalSinIva = decimal("item_totalsiniva", 20, 2)
+    val itemTotalConIva = decimal("item_totalconiva", 20, 2)
     val cantidadBulto = integer("cantidad_bulto").default(1)
-    val unidadEmpaque = varchar("unidad_empaque", SCHEMA_UNIDAD_EMPAQUE_MAX_LENGTH).default("UNIDAD")
-    val notas = varchar("notas", SCHEMA_NOTAS_MAX_LENGTH).nullable()
-    val promocionId = varchar("promocion_id", SCHEMA_PROMOCION_ID_MAX_LENGTH).nullable()
-    val promocionTipo = varchar("promocion_tipo", SCHEMA_PROMOCION_TIPO_MAX_LENGTH).nullable()
-    val promocionDetalleId = varchar("promocion_detalle_id", SCHEMA_PROMOCION_DETALLE_ID_MAX_LENGTH).nullable()
-    val estado = varchar("estado", SCHEMA_ESTADO_MAX_LENGTH).default(EstadoPedidoMesaDefault.PENDIENTE)
+    val unidadEmpaque = varchar("unidad_empaque", 40).default("UNIDAD")
+    val notas = varchar("notas", 300).nullable()
+    val promocionId = varchar("promocion_id", 40).nullable()
+    val promocionTipo = varchar("promocion_tipo", 40).nullable()
+    val promocionDetalleId = varchar("promocion_detalle_id", 40).nullable()
+    val estado = varchar("estado", 30).default(EstadoPedidoMesaDefault.PENDIENTE)
     val fechaCreacion = datetime("fecha_creacion")
     val fechaEnvio = datetime("fecha_envio").nullable()
     val fechaEntrega = datetime("fecha_entrega").nullable()
 
     /** Cantidad acumulada ya asociada a cuentas facturadas. Evita cobrar 2x y permite
      *  divisiones parciales: `saldoPendiente = itemCantidad - cantidadFacturada`. */
-    val cantidadFacturada =
-        decimal(
-            "cantidad_facturada",
-            SCHEMA_CANTIDAD_FACTURADA_PRECISION,
-            SCHEMA_CANTIDAD_FACTURADA_SCALE,
-        ).default(0.toBigDecimal())
+    val cantidadFacturada = decimal("cantidad_facturada", 32, 3).default(0.toBigDecimal())
     val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)

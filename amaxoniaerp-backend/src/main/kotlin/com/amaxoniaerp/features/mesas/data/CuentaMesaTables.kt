@@ -3,29 +3,6 @@ package com.amaxoniaerp.features.mesas.data
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 
-private const val SCHEMA_CANTIDAD_PRECISION = 32
-private const val SCHEMA_CANTIDAD_SCALE = 3
-private const val SCHEMA_COD_FACTURA_MAX_LENGTH = 64
-private const val SCHEMA_COD_FACTURA_RESULTADO_MAX_LENGTH = 64
-private const val SCHEMA_DESCUENTO_PRECISION = 20
-private const val SCHEMA_ERROR_MENSAJE_MAX_LENGTH = 500
-private const val SCHEMA_ESTADO_MAX_LENGTH = 20
-private const val SCHEMA_IDEMPOTENCY_KEY_MAX_LENGTH = 64
-private const val SCHEMA_ID_FACTURA_MAX_LENGTH = 64
-private const val SCHEMA_ID_FACTURA_RESULTADO_MAX_LENGTH = 64
-private const val SCHEMA_IMPUESTO_PRECISION = 20
-private const val SCHEMA_ITEM_CODIGO_MAX_LENGTH = 80
-private const val SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH = 500
-private const val SCHEMA_ITEM_DESCUENTO_PRECISION = 10
-private const val SCHEMA_ITEM_MONTODESCUENTO_PRECISION = 20
-private const val SCHEMA_ITEM_PIVA_PRECISION = 10
-private const val SCHEMA_ITEM_PRECIOSINIVA_PRECISION = 20
-private const val SCHEMA_ITEM_TOTALCONIVA_PRECISION = 20
-private const val SCHEMA_ITEM_TOTALSINIVA_PRECISION = 20
-private const val SCHEMA_SALDO_RESTANTE_PRECISION = 20
-private const val SCHEMA_SUBTOTAL_PRECISION = 20
-private const val SCHEMA_TOTAL_PRECISION = 20
-
 /**
  * Cuenta de mesa (o división de cuenta). Cada fila representa un "ticket" pendiente de pago
  * dentro de una sesión: la cuenta completa o una división por producto/cantidad.
@@ -45,14 +22,14 @@ object CuentaMesaTable : Table("cuenta_mesa") {
     val id = integer("id").autoIncrement("seq_cuenta_mesa")
     val sesionMesaId = integer("sesion_mesa_id")
     val numeroCuenta = integer("numero_cuenta").default(1)
-    val estado = varchar("estado", SCHEMA_ESTADO_MAX_LENGTH).default(EstadoCuentaMesaDefault.ACTIVA)
-    val subtotal = decimal("subtotal", SCHEMA_SUBTOTAL_PRECISION, 2).default(0.toBigDecimal())
-    val descuento = decimal("descuento", SCHEMA_DESCUENTO_PRECISION, 2).default(0.toBigDecimal())
-    val impuesto = decimal("impuesto", SCHEMA_IMPUESTO_PRECISION, 2).default(0.toBigDecimal())
-    val total = decimal("total", SCHEMA_TOTAL_PRECISION, 2).default(0.toBigDecimal())
-    val saldoRestante = decimal("saldo_restante", SCHEMA_SALDO_RESTANTE_PRECISION, 2).default(0.toBigDecimal())
-    val idFactura = varchar("id_factura", SCHEMA_ID_FACTURA_MAX_LENGTH).nullable()
-    val codFactura = varchar("cod_factura", SCHEMA_COD_FACTURA_MAX_LENGTH).nullable()
+    val estado = varchar("estado", 20).default(EstadoCuentaMesaDefault.ACTIVA)
+    val subtotal = decimal("subtotal", 20, 2).default(0.toBigDecimal())
+    val descuento = decimal("descuento", 20, 2).default(0.toBigDecimal())
+    val impuesto = decimal("impuesto", 20, 2).default(0.toBigDecimal())
+    val total = decimal("total", 20, 2).default(0.toBigDecimal())
+    val saldoRestante = decimal("saldo_restante", 20, 2).default(0.toBigDecimal())
+    val idFactura = varchar("id_factura", 64).nullable()
+    val codFactura = varchar("cod_factura", 64).nullable()
     val fechaFactura = datetime("fecha_factura").nullable()
     val fechaCreacion = datetime("fecha_creacion")
     val fechaCierre = datetime("fecha_cierre").nullable()
@@ -83,15 +60,15 @@ object CuentaMesaDetalleTable : Table("cuenta_mesa_detalle") {
     val pedidoMesaId = integer("pedido_mesa_id")
     val productoId = integer("producto_id")
     val itemAlmacen = integer("item_almacen").default(1)
-    val itemCodigo = varchar("item_codigo", SCHEMA_ITEM_CODIGO_MAX_LENGTH).default("")
-    val itemDescripcion = varchar("item_descripcion", SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH)
-    val cantidad = decimal("cantidad", SCHEMA_CANTIDAD_PRECISION, SCHEMA_CANTIDAD_SCALE)
-    val itemPrecioSinIva = decimal("item_preciosiniva", SCHEMA_ITEM_PRECIOSINIVA_PRECISION, 2)
-    val itemDescuento = decimal("item_descuento", SCHEMA_ITEM_DESCUENTO_PRECISION, 2).default(0.toBigDecimal())
-    val itemMontoDescuento = decimal("item_montodescuento", SCHEMA_ITEM_MONTODESCUENTO_PRECISION, 2).default(0.toBigDecimal())
-    val itemPIva = decimal("item_piva", SCHEMA_ITEM_PIVA_PRECISION, 2).default(0.toBigDecimal())
-    val itemTotalSinIva = decimal("item_totalsiniva", SCHEMA_ITEM_TOTALSINIVA_PRECISION, 2)
-    val itemTotalConIva = decimal("item_totalconiva", SCHEMA_ITEM_TOTALCONIVA_PRECISION, 2)
+    val itemCodigo = varchar("item_codigo", 80).default("")
+    val itemDescripcion = varchar("item_descripcion", 500)
+    val cantidad = decimal("cantidad", 32, 3)
+    val itemPrecioSinIva = decimal("item_preciosiniva", 20, 2)
+    val itemDescuento = decimal("item_descuento", 10, 2).default(0.toBigDecimal())
+    val itemMontoDescuento = decimal("item_montodescuento", 20, 2).default(0.toBigDecimal())
+    val itemPIva = decimal("item_piva", 10, 2).default(0.toBigDecimal())
+    val itemTotalSinIva = decimal("item_totalsiniva", 20, 2)
+    val itemTotalConIva = decimal("item_totalconiva", 20, 2)
     val facturado = integer("facturado").default(0)
     val fechaCreacion = datetime("fecha_creacion")
 
@@ -116,13 +93,13 @@ object CuentaMesaDetalleTable : Table("cuenta_mesa_detalle") {
  * 409 por factura duplicada y reconcilia el registro autoritativo sin crear otra venta.
  */
 object CuentaMesaIdempotenciaTable : Table("cuenta_mesa_idempotencia") {
-    val idempotencyKey = varchar("idempotency_key", SCHEMA_IDEMPOTENCY_KEY_MAX_LENGTH)
+    val idempotencyKey = varchar("idempotency_key", 64)
     val cuentaMesaId = integer("cuenta_mesa_id")
     val sesionMesaId = integer("sesion_mesa_id")
-    val estado = varchar("estado", SCHEMA_ESTADO_MAX_LENGTH).default(EstadoCuentaIdempotenciaDefault.SENDING)
-    val idFacturaResultado = varchar("id_factura_resultado", SCHEMA_ID_FACTURA_RESULTADO_MAX_LENGTH).nullable()
-    val codFacturaResultado = varchar("cod_factura_resultado", SCHEMA_COD_FACTURA_RESULTADO_MAX_LENGTH).nullable()
-    val errorMensaje = varchar("error_mensaje", SCHEMA_ERROR_MENSAJE_MAX_LENGTH).nullable()
+    val estado = varchar("estado", 20).default(EstadoCuentaIdempotenciaDefault.SENDING)
+    val idFacturaResultado = varchar("id_factura_resultado", 64).nullable()
+    val codFacturaResultado = varchar("cod_factura_resultado", 64).nullable()
+    val errorMensaje = varchar("error_mensaje", 500).nullable()
     val intentos = integer("intentos").default(0)
     val fechaPrimerIntento = datetime("fecha_primer_intento")
     val fechaUltimoIntento = datetime("fecha_ultimo_intento").nullable()
