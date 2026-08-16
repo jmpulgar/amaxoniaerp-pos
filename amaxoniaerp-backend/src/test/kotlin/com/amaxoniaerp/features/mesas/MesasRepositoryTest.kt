@@ -38,7 +38,11 @@ class MesasRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect("jdbc:h2:mem:mesas_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1", "org.h2.Driver")
+        database =
+            Database.connect(
+                "jdbc:h2:mem:mesas_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(SucursalTable, CajaTable, VendedorTable, PlantasTable, MesasTable)
             seedSucursales()
@@ -165,7 +169,10 @@ class MesasRepositoryTest {
     fun `caja no asignada al usuario es rechazada`() =
         runBlocking {
             // El usuario 10 solo tiene `caja-a` en vendedor.id_cajas.
-            assertEquals(CajaScopeResult.AccessDenied, repository.resolveCajaScope(database, userId = 10, cajaId = CAJA_B))
+            assertEquals(
+                CajaScopeResult.AccessDenied,
+                repository.resolveCajaScope(database, userId = 10, cajaId = CAJA_B),
+            )
         }
 
     @Test
