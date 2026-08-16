@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.mesas.data
 
+import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 
@@ -18,12 +19,12 @@ import org.jetbrains.exposed.sql.javatime.datetime
 object SesionMesaTable : Table("sesion_mesa") {
     val id = integer("id").autoIncrement("seq_sesion_mesa")
     val sucursalId = integer("sucursal_id")
-    val cajaId = varchar("caja_id", 36)
+    val cajaId = varchar("caja_id", SchemaDimensions.VARCHAR_LENGTH_36)
     val areaId = integer("area_id")
     val mesaId = integer("mesa_id")
     val usuarioId = integer("usuario_id")
     val cantidadPersonas = integer("cantidad_personas").default(1)
-    val estado = varchar("estado", 30)
+    val estado = varchar("estado", SchemaDimensions.VARCHAR_LENGTH_30)
     val fechaApertura = datetime("fecha_apertura")
     val fechaCierre = datetime("fecha_cierre").nullable()
     val activo = integer("activo").default(1)

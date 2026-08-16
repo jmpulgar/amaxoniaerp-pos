@@ -1,14 +1,15 @@
 package com.amaxoniaerp.features.pos.data
 
+import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 
 object CajaFormaPagoTable : Table("caja_forma_pago") {
     val idFormaPago = integer("id_forma_pago")
-    val siglas = varchar("siglas", 80).nullable()
+    val siglas = varchar("siglas", SchemaDimensions.VARCHAR_LENGTH_80).nullable()
     val codigo = integer("codigo").nullable()
-    val descripcion = varchar("descripcion", 80).nullable()
+    val descripcion = varchar("descripcion", SchemaDimensions.VARCHAR_LENGTH_80).nullable()
     val idCajaTpConcepto = integer("id_caja_tp_concepto").nullable()
-    val cuentaContable = varchar("cuenta_contable", 80).nullable()
+    val cuentaContable = varchar("cuenta_contable", SchemaDimensions.VARCHAR_LENGTH_80).nullable()
     val idCajaTpRegistro = integer("id_caja_tp_registro").nullable()
     val formaPagoFact = varchar("FormaPagoFact", 2).nullable()
     val activo = integer("activo")
@@ -24,7 +25,7 @@ object CajaFormaPagoTable : Table("caja_forma_pago") {
 }
 
 object CajaFormaTable : Table("caja_forma") {
-    val idCaja = varchar("id_caja", 36)
+    val idCaja = varchar("id_caja", SchemaDimensions.VARCHAR_LENGTH_36)
     val idFormaPago = integer("id_forma_pago")
     val activo = integer("activo").nullable()
 

@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.items.data
 
+import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 
 /**
@@ -7,8 +8,8 @@ import org.jetbrains.exposed.sql.Table
  */
 object DepartamentoTable : Table("departamento") {
     val id = integer("id").autoIncrement()
-    val codigo = varchar("codigo", 10).nullable()
-    val descripcion = varchar("descripcion", 100).nullable()
+    val codigo = varchar("codigo", SchemaDimensions.VARCHAR_LENGTH_10).nullable()
+    val descripcion = varchar("descripcion", SchemaDimensions.VARCHAR_LENGTH_100).nullable()
     val visible = bool("visible").default(true)
 
     override val primaryKey = PrimaryKey(id)

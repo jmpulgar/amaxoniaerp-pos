@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.mesas.data
 
+import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 
@@ -32,29 +33,34 @@ object PedidoMesaTable : Table("pedido_mesa") {
     val comandaSecuencia = integer("comanda_secuencia").nullable()
     val productoId = integer("producto_id")
     val itemAlmacen = integer("item_almacen").default(1)
-    val itemCodigo = varchar("item_codigo", 80).default("")
-    val itemDescripcion = varchar("item_descripcion", 500)
-    val itemCantidad = decimal("item_cantidad", 32, 3)
-    val itemPrecioSinIva = decimal("item_preciosiniva", 20, 2)
-    val itemDescuento = decimal("item_descuento", 10, 2).default(0.toBigDecimal())
-    val itemMontoDescuento = decimal("item_montodescuento", 20, 2).default(0.toBigDecimal())
-    val itemPIva = decimal("item_piva", 10, 2).default(0.toBigDecimal())
-    val itemTotalSinIva = decimal("item_totalsiniva", 20, 2)
-    val itemTotalConIva = decimal("item_totalconiva", 20, 2)
+    val itemCodigo = varchar("item_codigo", SchemaDimensions.VARCHAR_LENGTH_80).default("")
+    val itemDescripcion = varchar("item_descripcion", SchemaDimensions.VARCHAR_LENGTH_500)
+    val itemCantidad = decimal("item_cantidad", SchemaDimensions.DECIMAL_PRECISION_32, SchemaDimensions.DECIMAL_SCALE_3)
+    val itemPrecioSinIva = decimal("item_preciosiniva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
+    val itemDescuento = decimal("item_descuento", SchemaDimensions.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
+    val itemMontoDescuento = decimal("item_montodescuento", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val itemPIva = decimal("item_piva", SchemaDimensions.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
+    val itemTotalSinIva = decimal("item_totalsiniva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
+    val itemTotalConIva = decimal("item_totalconiva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
     val cantidadBulto = integer("cantidad_bulto").default(1)
-    val unidadEmpaque = varchar("unidad_empaque", 40).default("UNIDAD")
-    val notas = varchar("notas", 300).nullable()
-    val promocionId = varchar("promocion_id", 40).nullable()
-    val promocionTipo = varchar("promocion_tipo", 40).nullable()
-    val promocionDetalleId = varchar("promocion_detalle_id", 40).nullable()
-    val estado = varchar("estado", 30).default(EstadoPedidoMesaDefault.PENDIENTE)
+    val unidadEmpaque = varchar("unidad_empaque", SchemaDimensions.VARCHAR_LENGTH_40).default("UNIDAD")
+    val notas = varchar("notas", SchemaDimensions.VARCHAR_LENGTH_300).nullable()
+    val promocionId = varchar("promocion_id", SchemaDimensions.VARCHAR_LENGTH_40).nullable()
+    val promocionTipo = varchar("promocion_tipo", SchemaDimensions.VARCHAR_LENGTH_40).nullable()
+    val promocionDetalleId = varchar("promocion_detalle_id", SchemaDimensions.VARCHAR_LENGTH_40).nullable()
+    val estado = varchar("estado", SchemaDimensions.VARCHAR_LENGTH_30).default(EstadoPedidoMesaDefault.PENDIENTE)
     val fechaCreacion = datetime("fecha_creacion")
     val fechaEnvio = datetime("fecha_envio").nullable()
     val fechaEntrega = datetime("fecha_entrega").nullable()
 
     /** Cantidad acumulada ya asociada a cuentas facturadas. Evita cobrar 2x y permite
      *  divisiones parciales: `saldoPendiente = itemCantidad - cantidadFacturada`. */
-    val cantidadFacturada = decimal("cantidad_facturada", 32, 3).default(0.toBigDecimal())
+    val cantidadFacturada =
+        decimal(
+            "cantidad_facturada",
+            SchemaDimensions.DECIMAL_PRECISION_32,
+            SchemaDimensions.DECIMAL_SCALE_3,
+        ).default(0.toBigDecimal())
     val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)

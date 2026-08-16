@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.mesas.data
 
+import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 
 /**
@@ -13,7 +14,7 @@ import org.jetbrains.exposed.sql.Table
 object PlantasTable : Table("plantas") {
     val id = integer("id")
     val sucursalId = integer("sucursal_id")
-    val nombre = varchar("nombre", 255)
+    val nombre = varchar("nombre", SchemaDimensions.VARCHAR_LENGTH_255)
     val descripcion = text("descripcion").nullable()
     val imagen = text("imagen").nullable()
     val orden = integer("orden").nullable()
@@ -33,15 +34,15 @@ object PlantasTable : Table("plantas") {
 object MesasTable : Table("mesas") {
     val id = integer("id")
     val plantaId = integer("planta_id")
-    val codigo = varchar("codigo", 100).nullable()
-    val nombre = varchar("nombre", 255).nullable()
+    val codigo = varchar("codigo", SchemaDimensions.VARCHAR_LENGTH_100).nullable()
+    val nombre = varchar("nombre", SchemaDimensions.VARCHAR_LENGTH_255).nullable()
     val capacidad = integer("capacidad").nullable()
-    val forma = varchar("forma", 50).nullable()
-    val posicionX = decimal("posicion_x", 14, 2).nullable()
-    val posicionY = decimal("posicion_y", 14, 2).nullable()
-    val ancho = decimal("ancho", 14, 2).nullable()
-    val alto = decimal("alto", 14, 2).nullable()
-    val rotacion = decimal("rotacion", 14, 2).nullable()
+    val forma = varchar("forma", SchemaDimensions.VARCHAR_LENGTH_50).nullable()
+    val posicionX = decimal("posicion_x", SchemaDimensions.DECIMAL_PRECISION_14, 2).nullable()
+    val posicionY = decimal("posicion_y", SchemaDimensions.DECIMAL_PRECISION_14, 2).nullable()
+    val ancho = decimal("ancho", SchemaDimensions.DECIMAL_PRECISION_14, 2).nullable()
+    val alto = decimal("alto", SchemaDimensions.DECIMAL_PRECISION_14, 2).nullable()
+    val rotacion = decimal("rotacion", SchemaDimensions.DECIMAL_PRECISION_14, 2).nullable()
     val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)
