@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path("amaxoniaerp-backend/src/test/kotlin/com/amaxoniaerp")
 
 replacements = {
-    ROOT / "features/creditnotes/CreditNoteRepositoryEligibilityTest.kt": [
+    ROOT / "features/creditnotes/data/CreditNoteRepositoryEligibilityTest.kt": [
         (
             '                url = "jdbc:h2:mem:credit_note_eligibility_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",\n',
             '                url =\n'
@@ -11,7 +11,7 @@ replacements = {
             '                        "MODE=MySQL;DB_CLOSE_DELAY=-1",\n',
         ),
     ],
-    ROOT / "features/creditnotes/CreditNotePanamaStagedFlowTest.kt": [
+    ROOT / "features/creditnotes/data/CreditNotePanamaStagedFlowTest.kt": [
         (
             '                url = "jdbc:h2:mem:credit_note_staged_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",\n',
             '                url =\n'
