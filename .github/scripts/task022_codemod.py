@@ -2,94 +2,110 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/sales/data/SalesTables.kt"
+SOURCE_ROOT = ROOT / "amaxoniaerp-backend/src/main/kotlin"
+IGNORED = {"0", "1", "2"}
 
-text = TARGET.read_text(encoding="utf-8")
-marker = "import org.jetbrains.exposed.sql.javatime.datetime\n"
-if marker not in text:
-    raise RuntimeError("SalesTables import marker not found")
+VARCHAR = re.compile(r'varchar\("([^"]+)",\s*(\d+)\)')
+DECIMAL = re.compile(r'decimal\("([^"]+)",\s*(\d+)\s*,\s*(\d+)\)')
+ENUM = re.compile(r'enumerationByName\("([^"]+)",\s*(\d+)\s*,')
 
-constants = """
-private const val UUID_LENGTH = 36
-private const val LEGACY_IDENTIFIER_LENGTH = 32
-private const val SHORT_CODE_LENGTH = 10
-private const val TYPE_CODE_LENGTH = 20
-private const val SHORT_TOKEN_LENGTH = 5
-private const val VERY_SHORT_CODE_LENGTH = 4
-private const val RECEIPT_TYPE_LENGTH = 3
-private const val COMPACT_CODE_LENGTH = 15
-private const val REFERENCE_LENGTH = 30
-private const val USER_LENGTH = 40
-private const val STANDARD_CODE_LENGTH = 50
-private const val AUDIT_USER_LENGTH = 60
-private const val CONTACT_REFERENCE_LENGTH = 80
-private const val STANDARD_TEXT_LENGTH = 100
-private const val DISPLAY_NAME_LENGTH = 200
-private const val ADDRESS_LENGTH = 250
-private const val LONG_TEXT_LENGTH = 300
-private const val ITEM_DESCRIPTION_LENGTH = 500
-private const val OBSERVATION_LENGTH = 600
-private const val MONEY_PRECISION = 20
-private const val LEGACY_AMOUNT_PRECISION = 10
-private const val QUANTITY_PRECISION = 32
-private const val STOCK_PRECISION = 18
-private const val KARDEX_PRICE_PRECISION = 9
-private const val QUANTITY_SCALE = 3
-private const val STOCK_SCALE = 4
-"""
-text = text.replace(marker, marker + constants, 1)
 
-varchar_lengths = {
-    36: "UUID_LENGTH",
-    32: "LEGACY_IDENTIFIER_LENGTH",
-    10: "SHORT_CODE_LENGTH",
-    20: "TYPE_CODE_LENGTH",
-    5: "SHORT_TOKEN_LENGTH",
-    4: "VERY_SHORT_CODE_LENGTH",
-    3: "RECEIPT_TYPE_LENGTH",
-    15: "COMPACT_CODE_LENGTH",
-    30: "REFERENCE_LENGTH",
-    40: "USER_LENGTH",
-    50: "STANDARD_CODE_LENGTH",
-    60: "AUDIT_USER_LENGTH",
-    80: "CONTACT_REFERENCE_LENGTH",
-    100: "STANDARD_TEXT_LENGTH",
-    200: "DISPLAY_NAME_LENGTH",
-    250: "ADDRESS_LENGTH",
-    300: "LONG_TEXT_LENGTH",
-    500: "ITEM_DESCRIPTION_LENGTH",
-    600: "OBSERVATION_LENGTH",
-}
-for value, name in varchar_lengths.items():
-    text = re.sub(rf'(varchar\([^\n,]+,\s*){value}(\))', rf'\1{name}\2', text)
+def identifier(value: str) -> str:
+    value = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', value)
+    value = re.sub(r'[^A-Za-z0-9]+', '_', value).strip('_').upper()
+    return value or "FIELD"
 
-text = text.replace(
-    'enumerationByName("status", 10, CajaStatus::class)',
-    'enumerationByName("status", SHORT_CODE_LENGTH, CajaStatus::class)',
-)
 
-precisions = {
-    20: "MONEY_PRECISION",
-    10: "LEGACY_AMOUNT_PRECISION",
-    32: "QUANTITY_PRECISION",
-    18: "STOCK_PRECISION",
-    9: "KARDEX_PRICE_PRECISION",
-}
-for value, name in precisions.items():
-    text = re.sub(rf'(decimal\([^\n,]+,\s*){value}(\s*,)', rf'\1{name}\2', text)
-text = re.sub(r'(decimal\([^\n]+,\s*)3(\))', r'\1QUANTITY_SCALE\2', text)
-text = re.sub(r'(decimal\([^\n]+,\s*)4(\))', r'\1STOCK_SCALE\2', text)
+def add_requirement(requirements: dict[str, set[int]], base: str, numeric: str) -> None:
+    if numeric not in IGNORED:
+        requirements.setdefault(base, set()).add(int(numeric))
 
-# Guard: every non-ignored numeric literal outside strings/comments after the constants must be gone.
-body = text.split("private const val STOCK_SCALE = 4", 1)[1]
-for line_number, line in enumerate(body.splitlines(), 1):
-    code = re.sub(r'"(?:\\.|[^"\\])*"', '', line).split("//", 1)[0]
-    remaining = [
-        token
-        for token in re.findall(r'(?<![\w.])-?\d+(?:\.\d+)?', code)
-        if token not in {"-1", "0", "1", "2"}
-    ]
-    if remaining:
-        raise RuntimeError(f"Unmapped SalesTables numeric literal(s) {remaining} near body line {line_number}")
 
-TARGET.write_text(text, encoding="utf-8")
+def constant_name(requirements: dict[str, set[int]], base: str, numeric: str) -> str:
+    values = requirements[base]
+    return f"{base}_{numeric}" if len(values) > 1 else base
+
+
+def transform(path: Path) -> int:
+    text = path.read_text(encoding="utf-8")
+    requirements: dict[str, set[int]] = {}
+
+    for match in VARCHAR.finditer(text):
+        add_requirement(requirements, f"SCHEMA_{identifier(match.group(1))}_MAX_LENGTH", match.group(2))
+    for match in DECIMAL.finditer(text):
+        column = identifier(match.group(1))
+        add_requirement(requirements, f"SCHEMA_{column}_PRECISION", match.group(2))
+        add_requirement(requirements, f"SCHEMA_{column}_SCALE", match.group(3))
+    for match in ENUM.finditer(text):
+        add_requirement(requirements, f"SCHEMA_{identifier(match.group(1))}_ENUM_LENGTH", match.group(2))
+
+    if not requirements:
+        return 0
+
+    replacements = 0
+
+    def replace_varchar(match: re.Match[str]) -> str:
+        nonlocal replacements
+        column, length = match.groups()
+        if length in IGNORED:
+            return match.group(0)
+        replacements += 1
+        name = constant_name(requirements, f"SCHEMA_{identifier(column)}_MAX_LENGTH", length)
+        return f'varchar("{column}", {name})'
+
+    def replace_decimal(match: re.Match[str]) -> str:
+        nonlocal replacements
+        column, precision, scale = match.groups()
+        column_id = identifier(column)
+        precision_expr = precision
+        scale_expr = scale
+        if precision not in IGNORED:
+            replacements += 1
+            precision_expr = constant_name(requirements, f"SCHEMA_{column_id}_PRECISION", precision)
+        if scale not in IGNORED:
+            replacements += 1
+            scale_expr = constant_name(requirements, f"SCHEMA_{column_id}_SCALE", scale)
+        return f'decimal("{column}", {precision_expr}, {scale_expr})'
+
+    def replace_enum(match: re.Match[str]) -> str:
+        nonlocal replacements
+        column, length = match.groups()
+        if length in IGNORED:
+            return match.group(0)
+        replacements += 1
+        name = constant_name(requirements, f"SCHEMA_{identifier(column)}_ENUM_LENGTH", length)
+        return f'enumerationByName("{column}", {name},'
+
+    updated = VARCHAR.sub(replace_varchar, text)
+    updated = DECIMAL.sub(replace_decimal, updated)
+    updated = ENUM.sub(replace_enum, updated)
+
+    constants: list[str] = []
+    for base in sorted(requirements):
+        for value in sorted(requirements[base]):
+            name = f"{base}_{value}" if len(requirements[base]) > 1 else base
+            constants.append(f"private const val {name} = {value}")
+
+    lines = updated.splitlines()
+    last_import = max((index for index, line in enumerate(lines) if line.startswith("import ")), default=-1)
+    if last_import < 0:
+        raise RuntimeError(f"Cannot place schema constants in {path}")
+    insertion = [""] + constants + [""]
+    lines[last_import + 1:last_import + 1] = insertion
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return replacements
+
+
+total = 0
+changed_files = 0
+for path in SOURCE_ROOT.rglob("*.kt"):
+    count = transform(path)
+    if count:
+        total += count
+        changed_files += 1
+
+# SalesTables was normalized in the immediately preceding slice; the remaining schema debt is still large.
+if total < 500 or changed_files < 10:
+    raise RuntimeError(f"Unexpected schema cleanup scope: {total} replacements across {changed_files} files")
+
+print(f"Named {total} schema numeric constraints across {changed_files} files")
