@@ -32,6 +32,11 @@ replace_exact(
 )
 replace_exact(
     ve_repo,
+    """    private fun loadFactura(\n        invoiceId: String,\n    ): FacturaCargada {\n""",
+    "    private fun loadFactura(invoiceId: String): FacturaCargada {\n",
+)
+replace_exact(
+    ve_repo,
     "    private fun loadConfig(database: Database): VEConfigData {",
     "    private fun loadConfig(): VEConfigData {",
 )
@@ -64,6 +69,11 @@ replace_exact(
     items,
     """    suspend fun listDepartments(\n        database: Database,\n        countryCode: String,\n""",
     """    suspend fun listDepartments(\n        database: Database,\n""",
+)
+replace_exact(
+    items,
+    """    suspend fun listDepartments(\n        database: Database,\n    ): List<Pair<Int, String>> =\n""",
+    "    suspend fun listDepartments(database: Database): List<Pair<Int, String>> =\n",
 )
 items_routes = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/items/route/ItemsRoutes.kt"
 replace_exact(
