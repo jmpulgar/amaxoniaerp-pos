@@ -5,6 +5,8 @@ import io.ktor.server.config.ApplicationConfigurationException
 import io.ktor.server.config.propertyOrNull
 import java.io.File
 
+private const val DOTENV_SEARCH_PARENT_LEVELS = 4
+
 internal fun Application.loadConfigValue(
     key: String,
     path: String,
@@ -95,7 +97,7 @@ private fun findDotEnvFile(): File? {
     if (development.exists()) return development
 
     var current: File? = cwd
-    repeat(4) {
+    repeat(DOTENV_SEARCH_PARENT_LEVELS) {
         val candidate = File(current, ".env")
         if (candidate.exists()) return candidate
         val devCandidate = File(current, ".env.development")

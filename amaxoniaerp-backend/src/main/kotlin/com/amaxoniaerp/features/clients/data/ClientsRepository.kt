@@ -21,6 +21,10 @@ import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
+private const val CLIENT_PHOTO_LOG_SAMPLE_SIZE = 3
+private const val PHOTO_FILENAME_LOG_LENGTH = 80
+private const val CLIENT_CODE_LENGTH = 9
+
 class ClientsRepository {
     private val log = LoggerFactory.getLogger(ClientsRepository::class.java)
 
@@ -53,8 +57,8 @@ class ClientsRepository {
                     .offset(offset)
                     .map { row -> mapRowToClient(row) }
 
-            data.take(3).forEach { c ->
-                log.info("[CLIENTE FOTO] id=${c.id} photoFilename=${c.photoFilename?.take(80) ?: "null"}")
+            data.take(CLIENT_PHOTO_LOG_SAMPLE_SIZE).forEach { c ->
+                log.info("[CLIENTE FOTO] id=${c.id} photoFilename=${c.photoFilename?.take(PHOTO_FILENAME_LOG_LENGTH) ?: "null"}")
             }
             data to total
         }
@@ -172,7 +176,7 @@ class ClientsRepository {
                 ClientsTable
                     .select(ClientsTable.codCliente)
                     .where { ClientsTable.idCliente eq clientId }
-                    .map { it[ClientsTable.codCliente].take(9) }
+                    .map { it[ClientsTable.codCliente].take(CLIENT_CODE_LENGTH) }
                     .singleOrNull()
                     ?: return@dbQuery emptyList()
 
@@ -231,7 +235,7 @@ class ClientsRepository {
                 .mapNotNull { it[ClientsTable.codCliente].toIntOrNull() }
                 .maxOrNull() ?: 0
 
-        return (maxCode + 1).toString().padStart(9, '0')
+        return (maxCode + 1).toString().padStart(CLIENT_CODE_LENGTH, '0')
     }
 
     private fun mapRowToClient(row: ResultRow): Client =

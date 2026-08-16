@@ -18,6 +18,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
+private const val DEFAULT_PAGE_LIMIT = 100
+private const val MAX_PAGE_LIMIT = 1_000
+
 fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
     authenticate {
         route("/clients") {
@@ -54,13 +57,13 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
 
                 val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
                 val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-                val limit = limitParam ?: 100
+                val limit = limitParam ?: DEFAULT_PAGE_LIMIT
                 val offset = offsetParam ?: 0L
                 val search = call.request.queryParameters["search"]
                 val includeTotalParam = call.request.queryParameters["includeTotal"]
                 val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
 
-                if (limit <= 0 || limit > 1000 || offset < 0) {
+                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Invalid pagination parameters"),

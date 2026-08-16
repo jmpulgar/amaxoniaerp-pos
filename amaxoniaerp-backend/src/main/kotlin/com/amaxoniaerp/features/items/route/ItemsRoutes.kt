@@ -23,6 +23,12 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
+private const val DEFAULT_PAGE_LIMIT = 100
+private const val MAX_PAGE_LIMIT = 1_000
+private const val MIN_BEST_SELLERS_LIMIT = 1
+private const val MAX_BEST_SELLERS_LIMIT = 50
+private const val DEFAULT_BEST_SELLERS_LIMIT = 20
+
 /**
  * Rutas de items Multi-Tenant con Safe Parsing.
  * Utiliza claims del JWT para routing dinámico a la BD correcta.
@@ -67,14 +73,14 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
 
                 val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
                 val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-                val limit = limitParam ?: 100
+                val limit = limitParam ?: DEFAULT_PAGE_LIMIT
                 val offset = offsetParam ?: 0L
                 val search = call.request.queryParameters["search"]
                 val includeTotalParam = call.request.queryParameters["includeTotal"]
                 val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
                 val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
 
-                if (limit <= 0 || limit > 1000 || offset < 0) {
+                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Parámetros de paginación inválidos"),
@@ -263,7 +269,7 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 val limit =
                     call.request.queryParameters["limit"]
                         ?.toIntOrNull()
-                        ?.coerceIn(1, 50) ?: 20
+                        ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val quantities =
                     com.amaxoniaerp.features.facturas.data

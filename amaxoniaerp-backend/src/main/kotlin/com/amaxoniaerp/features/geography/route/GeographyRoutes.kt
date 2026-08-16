@@ -15,6 +15,10 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 
+private const val DEFAULT_PAGE_LIMIT = 100
+private const val MAX_PAGE_LIMIT = 1_000
+private const val ADDRESS_LEVEL_THREE = 3
+
 fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
     authenticate {
         get("/countries") {
@@ -50,12 +54,12 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
 
             val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
             val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-            val limit = limitParam ?: 100
+            val limit = limitParam ?: DEFAULT_PAGE_LIMIT
             val offset = offsetParam ?: 0L
             val includeTotalParam = call.request.queryParameters["includeTotal"]
             val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
 
-            if (limit <= 0 || limit > 1000 || offset < 0) {
+            if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                 return@get call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf("error" to "Invalid pagination parameters"),
@@ -123,7 +127,7 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
                     when (level) {
                         1 -> "direccion_nivel1"
                         2 -> "direccion_nivel2"
-                        3 -> "direccion_nivel3"
+                        ADDRESS_LEVEL_THREE -> "direccion_nivel3"
                         else -> null
                     } ?: return@get call.respond(
                         HttpStatusCode.BadRequest,
@@ -132,12 +136,12 @@ fun Route.geographyRoutes(geographyRepository: GeographyRepository) {
 
                 val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
                 val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-                val limit = limitParam ?: 100
+                val limit = limitParam ?: DEFAULT_PAGE_LIMIT
                 val offset = offsetParam ?: 0L
                 val includeTotalParam = call.request.queryParameters["includeTotal"]
                 val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
 
-                if (limit <= 0 || limit > 1000 || offset < 0) {
+                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Invalid pagination parameters"),

@@ -6,6 +6,8 @@ import java.time.LocalDateTime
 import java.time.Year
 import java.time.ZoneId
 
+private const val TWO_DIGIT_YEAR_MODULUS = 100
+
 /**
  * Única fuente de verdad para fecha/hora de negocio por país (reloj de pared local).
  *
@@ -29,5 +31,5 @@ object BusinessClock {
     fun todayForCountry(countryCode: String): LocalDate = nowForCountry(countryCode).toLocalDate()
 
     /** Año de dos dígitos (p. ej. 26) según la fecha civil en la zona del país. */
-    fun yearTwoDigitsForCountry(countryCode: String): Int = Year.from(todayForCountry(countryCode)).value % 100
+    fun yearTwoDigitsForCountry(countryCode: String): Int = Year.from(todayForCountry(countryCode)).value % TWO_DIGIT_YEAR_MODULUS
 }

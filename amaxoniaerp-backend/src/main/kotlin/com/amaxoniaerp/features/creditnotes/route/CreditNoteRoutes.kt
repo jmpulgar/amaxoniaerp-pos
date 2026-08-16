@@ -21,6 +21,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.time.LocalDate
 
+private const val DEFAULT_CREDIT_NOTE_PAGE_LIMIT = 50
+private const val MAX_CREDIT_NOTE_PAGE_LIMIT = 200
+
 fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
     authenticate {
         route("/api/pos/notas-credito") {
@@ -29,13 +32,13 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
                 val (database, principal) = resolved
                 val countryCode = principal.getCountryCode()!!
                 try {
-                    val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+                    val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
                     val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
                     val search = call.request.queryParameters["search"]
                     val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
                     val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
 
-                    if (limit <= 0 || limit > 200 || offset < 0) {
+                    if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
                         return@get call.respond(
                             HttpStatusCode.BadRequest,
                             mapOf("error" to "Parámetros de paginación inválidos"),
@@ -61,11 +64,11 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
             get("/facturas") {
                 val resolved = resolveCompanyDatabase(call) ?: return@get
                 val (database, _) = resolved
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
                 val search = call.request.queryParameters["search"]
 
-                if (limit <= 0 || limit > 200 || offset < 0) {
+                if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Parámetros de paginación inválidos"),

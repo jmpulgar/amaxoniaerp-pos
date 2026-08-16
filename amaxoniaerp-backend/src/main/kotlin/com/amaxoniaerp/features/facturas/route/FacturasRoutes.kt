@@ -23,6 +23,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.time.LocalDate
 
+private const val DEFAULT_PAGE_LIMIT = 100
+private const val MAX_PAGE_LIMIT = 1_000
+
 fun Route.facturasRoutes(
     facturasRepository: FacturasRepository,
     panamaInvoiceProcessor: PanamaInvoiceProcessor,
@@ -60,10 +63,10 @@ fun Route.facturasRoutes(
                             mapOf("error" to "Country code not found"),
                         )
 
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
 
-                if (limit <= 0 || limit > 1000 || offset < 0) {
+                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                     return@get call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "Invalid pagination parameters"),

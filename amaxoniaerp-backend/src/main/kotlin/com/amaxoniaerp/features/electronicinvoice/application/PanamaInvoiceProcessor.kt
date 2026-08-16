@@ -14,6 +14,11 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPa
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
+private const val PAC_FISCAL_TYPE_THRESHOLD = 3
+private const val LOG_CREDENTIAL_PREFIX_LENGTH = 8
+private const val CUFE_LOG_PREFIX_LENGTH = 20
+private const val ITEM_DESCRIPTION_LOG_LENGTH = 80
+
 /**
  * Orquestador del flujo de Facturación Electrónica para Panamá.
  *
@@ -57,14 +62,16 @@ class PanamaInvoiceProcessor(
         // tipo_facturacion: 0=PDF, 1=FISCAL, 2=FORMA LIBRE, 3=The Factory HKA (FE)
         val tipoFact = context.config.tipoFacturacion
         logger.info("[FE] tipo_facturacion=$tipoFact para factura $invoiceId")
-        if (tipoFact < 3) {
+        if (tipoFact < PAC_FISCAL_TYPE_THRESHOLD) {
             logger.info("[FE] tipo_facturacion=$tipoFact no requiere FE electrónica. Retornando NotApplicable.")
             return ElectronicInvoiceResult.NotApplicable(countryCode)
         }
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
         logger.info(
-            "[FE] Autenticando con PAC: baseUrl=${context.config.apiTheFactoryHka} usuario=${context.config.tokenEmpresa.take(8)}...",
+            "[FE] Autenticando con PAC: baseUrl=${context.config.apiTheFactoryHka} usuario=${context.config.tokenEmpresa.take(
+                LOG_CREDENTIAL_PREFIX_LENGTH,
+            )}...",
         )
         val credentials =
             PacCredentials(
@@ -118,7 +125,7 @@ class PanamaInvoiceProcessor(
         logger.info(
             "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} " +
                 "codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} " +
-                "cufe=${pacResponse.cufe?.take(20)}",
+                "cufe=${pacResponse.cufe?.take(CUFE_LOG_PREFIX_LENGTH)}",
         )
         if (!pacResponse.exitoso || pacResponse.cufe.isNullOrBlank()) {
             logger.warn(
@@ -201,7 +208,7 @@ class PanamaInvoiceProcessor(
     ): Result<TheFactoryEnviarCorreoResponse> =
         runCatching {
             val context = repository.loadInvoiceContext(database, invoiceId)
-            if (context.config.tipoFacturacion < 3) {
+            if (context.config.tipoFacturacion < PAC_FISCAL_TYPE_THRESHOLD) {
                 throw FEConfigurationException("La factura no usa FEL The Factory HKA")
             }
 
@@ -262,7 +269,7 @@ class PanamaInvoiceProcessor(
             logger.info(
                 "[FE][PAYLOAD][ITEM {}] desc='{}' codigo='{}' cantidad={} precioUnitario={} precioItem={} valorTotal={} tasaITBMS={} valorITBMS={} descuentoUnit={} CPBS={}/{} rawCantidad={} rawPrecioSinIva={} rawTotalSinIva={} rawTotalConIva={} rawDescuento={} rawPiva={}",
                 index + 1,
-                item.descripcion.take(80),
+                item.descripcion.take(ITEM_DESCRIPTION_LOG_LENGTH),
                 item.codigo,
                 item.cantidad,
                 item.precioUnitario,

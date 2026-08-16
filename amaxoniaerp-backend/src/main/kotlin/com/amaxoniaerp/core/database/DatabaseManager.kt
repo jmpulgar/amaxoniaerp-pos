@@ -7,6 +7,11 @@ import org.slf4j.Logger
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
+private const val DATABASE_POOL_MAX_SIZE = 10
+private const val DATABASE_POOL_IDLE_TIMEOUT_MS = 300_000L
+private const val DATABASE_CONNECTION_TIMEOUT_MS = 20_000L
+private const val DATABASE_CONNECTION_MAX_LIFETIME_MS = 1_200_000L
+
 /**
  * Parámetros JDBC comunes para MySQL (fechas 0000-00-00 convertidas a null), **sin** `serverTimezone`.
  *
@@ -191,11 +196,11 @@ object DatabaseManager {
                 this.username = username
                 this.password = password
                 driverClassName = "com.mysql.cj.jdbc.Driver"
-                maximumPoolSize = 10
+                maximumPoolSize = DATABASE_POOL_MAX_SIZE
                 minimumIdle = 2
-                idleTimeout = 300000 // 5 minutos
-                connectionTimeout = 20000 // 20 segundos
-                maxLifetime = 1200000 // 20 minutos
+                idleTimeout = DATABASE_POOL_IDLE_TIMEOUT_MS // 5 minutos
+                connectionTimeout = DATABASE_CONNECTION_TIMEOUT_MS // 20 segundos
+                maxLifetime = DATABASE_CONNECTION_MAX_LIFETIME_MS // 20 minutos
                 isAutoCommit = false
                 transactionIsolation = "TRANSACTION_READ_COMMITTED"
                 addDataSourceProperty("cachePrepStmts", "true")
