@@ -114,9 +114,10 @@ class FacturasRepositoryFilterTest {
         )
 
     private fun withSeededDatabase(block: suspend FacturasRepositoryFilterTest.() -> Unit) {
+        val databaseName = UUID.randomUUID().toString().replace("-", "")
         database =
             Database.connect(
-                url = "jdbc:h2:mem:facturas_filter_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                url = "jdbc:h2:mem:facturas_filter_$databaseName;MODE=MySQL;DB_CLOSE_DELAY=-1",
                 driver = "org.h2.Driver",
             )
         transaction(database) {
