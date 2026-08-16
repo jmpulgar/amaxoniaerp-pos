@@ -12,11 +12,17 @@ import com.amaxoniaerp.features.electronicinvoice.domain.PanamaCreditNotePayload
 class TheFactoryHkaCreditNotePayloadBuilder(
     private val invoicePayloadBuilder: TheFactoryHkaPayloadBuilder = TheFactoryHkaPayloadBuilder(),
 ) {
+    companion object {
+        private const val CUFE_LENGTH = 66
+        private const val FISCAL_NUMBER_LENGTH = 10
+        private const val BILLING_POINT_LENGTH = 3
+    }
+
     fun build(context: PanamaCreditNotePayloadContext): TheFactoryHkaDocumentoWrapper {
         require(context.originalInvoiceCufe.isNotBlank()) {
             "La factura original electrónica debe tener CUFE"
         }
-        require(context.originalInvoiceCufe.length == 66) {
+        require(context.originalInvoiceCufe.length == CUFE_LENGTH) {
             "El CUFE de la factura original debe tener 66 caracteres"
         }
         require(context.originalInvoiceDate.isNotBlank()) {
@@ -53,23 +59,23 @@ class TheFactoryHkaCreditNotePayloadBuilder(
 
     private fun normalizeFiscalNumber(value: String): String {
         val normalized = value.trim()
-        require(normalized.isNotBlank() && normalized.all(Char::isDigit) && normalized.length <= 10) {
+        require(normalized.isNotBlank() && normalized.all(Char::isDigit) && normalized.length <= FISCAL_NUMBER_LENGTH) {
             "El número fiscal de la nota de crédito debe ser numérico de hasta 10 dígitos"
         }
         require(normalized.any { it != '0' }) {
             "El número fiscal de la nota de crédito no puede ser cero"
         }
-        return normalized.padStart(10, '0')
+        return normalized.padStart(FISCAL_NUMBER_LENGTH, '0')
     }
 
     private fun normalizeBillingPoint(value: String): String {
         val normalized = value.trim()
-        require(normalized.isNotBlank() && normalized.all(Char::isDigit) && normalized.length <= 3) {
+        require(normalized.isNotBlank() && normalized.all(Char::isDigit) && normalized.length <= BILLING_POINT_LENGTH) {
             "El punto de facturación fiscal debe ser numérico de hasta 3 dígitos"
         }
         require(normalized.any { it != '0' }) {
             "El punto de facturación fiscal no puede ser cero"
         }
-        return normalized.padStart(3, '0')
+        return normalized.padStart(BILLING_POINT_LENGTH, '0')
     }
 }

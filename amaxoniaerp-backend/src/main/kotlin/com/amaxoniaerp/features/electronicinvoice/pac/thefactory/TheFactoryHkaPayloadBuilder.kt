@@ -32,6 +32,15 @@ class TheFactoryHkaPayloadBuilder {
         private const val DEFAULT_CPBS_ABREV = "54"
         private const val MIN_DESCRIPTION_LENGTH = 5
         private const val MIN_FORMA_PAGO_DESC_LENGTH = 10
+        private const val MIN_IDENTIFICATION_LENGTH = 5
+        private const val EMAIL_MIN_LENGTH = 7
+        private const val ADDRESS_MIN_LENGTH = 4
+        private const val DISCOUNT_SCALE = 4
+        private const val QUANTITY_SCALE = 3
+        private const val ITBMS_RATE_7 = 7.0
+        private const val ITBMS_RATE_10 = 10.0
+        private const val ITBMS_RATE_15 = 15.0
+        private const val ISO_DATE_LENGTH = 10
 
         // Siglas de formas de pago a ignorar
         private val IGNORED_PAYMENT_SIGLAS = setOf("CRED", "NC", "RETITBMSINGRE")
@@ -129,7 +138,7 @@ class TheFactoryHkaPayloadBuilder {
         val ruc =
             when {
                 esExtranjero -> null
-                cliente.identificacion.length < 5 -> DEFAULT_RUC
+                cliente.identificacion.length < MIN_IDENTIFICATION_LENGTH -> DEFAULT_RUC
                 else -> cliente.identificacion
             }
 
@@ -147,9 +156,9 @@ class TheFactoryHkaPayloadBuilder {
                 null
             } else {
                 val validated = if (correoBase.matches(EMAIL_PATTERN)) correoBase else DEFAULT_EMAIL
-                validated.padStart(7, '0')
+                validated.padStart(EMAIL_MIN_LENGTH, '0')
             }
-        val direccion = (cliente.direccion?.takeIf { it.isNotBlank() } ?: " ").padStart(4, '-')
+        val direccion = (cliente.direccion?.takeIf { it.isNotBlank() } ?: " ").padStart(ADDRESS_MIN_LENGTH, '-')
 
         return TheFactoryHkaCliente(
             tipoClienteFE = tipoClienteFE,
@@ -193,7 +202,7 @@ class TheFactoryHkaPayloadBuilder {
             // Descuento por unidad: montoDescuento / cantidad (4 decimales)
             val precioUnitarioDescuento =
                 if (det.cantidad > 0 && det.montoDescuento > 0) {
-                    (det.montoDescuento / det.cantidad).formatDecimals(4)
+                    (det.montoDescuento / det.cantidad).formatDecimals(DISCOUNT_SCALE)
                 } else {
                     null
                 }
@@ -225,7 +234,7 @@ class TheFactoryHkaPayloadBuilder {
                 descripcion = descripcion,
                 codigo = det.codigo,
                 unidadMedida = det.unidadMedida?.takeIf { it.isNotBlank() } ?: "und",
-                cantidad = det.cantidad.formatDecimals(3),
+                cantidad = det.cantidad.formatDecimals(QUANTITY_SCALE),
                 precioUnitario = det.precioSinIva.formatDecimals(2),
                 precioUnitarioDescuento = precioUnitarioDescuento,
                 precioItem = det.totalSinIva.formatDecimals(2),
@@ -386,9 +395,9 @@ class TheFactoryHkaPayloadBuilder {
      */
     private fun mapTasaITBMS(piva: Double): String =
         when {
-            piva == 7.0 || isApprox(piva, 7.0) -> "01"
-            piva == 10.0 || isApprox(piva, 10.0) -> "02"
-            piva == 15.0 || isApprox(piva, 15.0) -> "03"
+            piva == ITBMS_RATE_7 || isApprox(piva, ITBMS_RATE_7) -> "01"
+            piva == ITBMS_RATE_10 || isApprox(piva, ITBMS_RATE_10) -> "02"
+            piva == ITBMS_RATE_15 || isApprox(piva, ITBMS_RATE_15) -> "03"
             else -> "00"
         }
 
@@ -420,7 +429,7 @@ class TheFactoryHkaPayloadBuilder {
             return LocalDate.now().format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
         }
         return try {
-            val localDate = LocalDate.parse(fecha.trim().take(10))
+            val localDate = LocalDate.parse(fecha.trim().take(ISO_DATE_LENGTH))
             localDate.format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
         } catch (_: Exception) {
             LocalDate.now().format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"

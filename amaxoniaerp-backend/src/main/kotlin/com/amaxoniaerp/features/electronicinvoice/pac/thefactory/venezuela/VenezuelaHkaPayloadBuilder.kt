@@ -39,6 +39,14 @@ open class VenezuelaHkaPayloadBuilder {
         private const val ALICUOTA_EXENTO_PCT = "0.00"
         private const val MONEY_SCALE = 2
         private const val QTY_SCALE = 3
+        private const val PERCENT_CALCULATION_SCALE = 6
+        private const val ISO_DATE_LENGTH = 10
+        private const val TRANSACTION_ID_HASH_BYTES = 16
+        private const val HUNDRED = 100
+        private const val TWENTY = 20
+        private const val TWENTY_ONE = 21
+        private const val TWENTY_NINE = 29
+        private const val DECIMAL_BASE = 10
     }
 
     /**
@@ -275,7 +283,7 @@ open class VenezuelaHkaPayloadBuilder {
 
         val monto =
             baseEnVes
-                .multiply(pct.divide(BigDecimal("100"), 6, RoundingMode.HALF_UP))
+                .multiply(pct.divide(BigDecimal("100"), PERCENT_CALCULATION_SCALE, RoundingMode.HALF_UP))
                 .bigDecimalMoney()
         return IgtfResult(
             baseImponible = baseEnVes,
@@ -353,7 +361,7 @@ open class VenezuelaHkaPayloadBuilder {
                 .toString() + "T00:00:00"
         }
         return try {
-            val d = java.time.LocalDate.parse(fecha.trim().take(10))
+            val d = java.time.LocalDate.parse(fecha.trim().take(ISO_DATE_LENGTH))
             d.toString() + "T00:00:00"
         } catch (_: Exception) {
             java.time.LocalDate
@@ -376,7 +384,7 @@ open class VenezuelaHkaPayloadBuilder {
         // Top 16 bytes → 32 chars hex.
         return java.util.HexFormat
             .of()
-            .formatHex(sha.copyOfRange(0, 16))
+            .formatHex(sha.copyOfRange(0, TRANSACTION_ID_HASH_BYTES))
     }
 
     /**
@@ -524,20 +532,20 @@ open class VenezuelaHkaPayloadBuilder {
         centenas: Array<String>,
     ): String {
         if (n == 0) return ""
-        if (n == 100) return "CIEN"
+        if (n == HUNDRED) return "CIEN"
         val sb = StringBuilder()
         var resto = n
-        if (resto >= 100) {
-            sb.append(centenas[resto / 100]).append(' ')
-            resto %= 100
+        if (resto >= HUNDRED) {
+            sb.append(centenas[resto / HUNDRED]).append(' ')
+            resto %= HUNDRED
         }
         when {
-            resto < 20 -> sb.append(unidades[resto])
-            resto == 20 -> sb.append("VEINTE")
-            resto in 21..29 -> sb.append(decenas[2]).append(unidades[resto - 20]) // VEINTIUNO..VEINTINUEVE
+            resto < TWENTY -> sb.append(unidades[resto])
+            resto == TWENTY -> sb.append("VEINTE")
+            resto in TWENTY_ONE..TWENTY_NINE -> sb.append(decenas[2]).append(unidades[resto - TWENTY]) // VEINTIUNO..VEINTINUEVE
             else -> {
-                val d = resto / 10
-                val u = resto % 10
+                val d = resto / DECIMAL_BASE
+                val u = resto % DECIMAL_BASE
                 sb.append(decenas[d])
                 if (u > 0) sb.append(" Y ").append(unidades[u])
             }
