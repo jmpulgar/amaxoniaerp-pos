@@ -20,6 +20,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private typealias MockRequestHandler = suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData
+
 /**
  * Tests del cliente HTTP [VenezuelaHkaRestClient] con [MockEngine].
  *
@@ -44,7 +46,7 @@ class VenezuelaHkaRestClientTest {
             baseUrl = "https://demo.thefactoryhka.com.ve",
         )
 
-    private fun cliente(handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData): VenezuelaHkaRestClient =
+    private fun cliente(handler: MockRequestHandler): VenezuelaHkaRestClient =
         VenezuelaHkaRestClient(
             HttpClient(MockEngine { request -> handler(request) }) {
                 install(io.ktor.client.plugins.HttpTimeout) {

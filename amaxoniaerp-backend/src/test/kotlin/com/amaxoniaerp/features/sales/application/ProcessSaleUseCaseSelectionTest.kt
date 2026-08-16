@@ -51,7 +51,10 @@ import kotlin.test.assertTrue
  */
 class ProcessSaleUseCaseSelectionTest {
     private val db: Database =
-        Database.connect("jdbc:h2:mem:process_sale_sel_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1", "org.h2.Driver")
+        Database.connect(
+            "jdbc:h2:mem:process_sale_sel_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+            "org.h2.Driver",
+        )
 
     @Test
     fun `1 - VE con useHka20=true NO llama a la strategy digital y confirma la venta`() =
@@ -259,7 +262,11 @@ class ProcessSaleUseCaseSelectionTest {
     fun `FASE 1_1 item 2 - reintento del mismo idFactura cambiando useHka20 a false no emite digitalmente`() =
         runBlocking {
             val saleRepo = DuplicateAwareSaleRepo()
-            val digital = RecordingStrategy("VE", result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "DOC-LEAK"))
+            val digital =
+                RecordingStrategy(
+                    "VE",
+                    result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "DOC-LEAK"),
+                )
             val factory = SingleStrategyFactory(digital)
             val useCase = ProcessSaleUseCase(saleRepo, factory)
 
@@ -299,7 +306,11 @@ class ProcessSaleUseCaseSelectionTest {
     fun `FASE 1_1 item 5 - reintento del mismo idFactura cambiando useHka20 a true tampoco inicia HKA20`() =
         runBlocking {
             val saleRepo = DuplicateAwareSaleRepo()
-            val digital = RecordingStrategy("VE", result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "DOC-EMIT"))
+            val digital =
+                RecordingStrategy(
+                    "VE",
+                    result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "DOC-EMIT"),
+                )
             val factory = SingleStrategyFactory(digital)
             val useCase = ProcessSaleUseCase(saleRepo, factory)
 
@@ -345,7 +356,11 @@ class ProcessSaleUseCaseSelectionTest {
             val digital =
                 RecordingStrategy(
                     "VE",
-                    result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "00001234", numeroControlThka = "001-00001"),
+                    result =
+                        ElectronicInvoiceResult.Success(
+                            numeroDocumentoFiscal = "00001234",
+                            numeroControlThka = "001-00001",
+                        ),
                 )
             val useCase = ProcessSaleUseCase(saleRepo, SingleStrategyFactory(digital))
 
@@ -366,7 +381,11 @@ class ProcessSaleUseCaseSelectionTest {
             val digital =
                 RecordingStrategy(
                     "VE",
-                    result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "00001234", numeroControlThka = "001-00001"),
+                    result =
+                        ElectronicInvoiceResult.Success(
+                            numeroDocumentoFiscal = "00001234",
+                            numeroControlThka = "001-00001",
+                        ),
                 )
             val useCase = ProcessSaleUseCase(saleRepo, SingleStrategyFactory(digital))
 
@@ -409,7 +428,11 @@ class ProcessSaleUseCaseSelectionTest {
             val digital =
                 RecordingStrategy(
                     "VE",
-                    result = ElectronicInvoiceResult.Success(numeroDocumentoFiscal = "DOC-ONLY", numeroControlThka = null),
+                    result =
+                        ElectronicInvoiceResult.Success(
+                            numeroDocumentoFiscal = "DOC-ONLY",
+                            numeroControlThka = null,
+                        ),
                 )
             val useCase = ProcessSaleUseCase(saleRepo, SingleStrategyFactory(digital))
 
