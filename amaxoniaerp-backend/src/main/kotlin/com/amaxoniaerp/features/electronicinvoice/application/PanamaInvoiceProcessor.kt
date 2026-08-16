@@ -64,13 +64,13 @@ class PanamaInvoiceProcessor(
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
         logger.info(
-            "[FE] Autenticando con PAC: baseUrl=${context.config.api_thefactoryhka} usuario=${context.config.tokenEmpresa.take(8)}...",
+            "[FE] Autenticando con PAC: baseUrl=${context.config.apiTheFactoryHka} usuario=${context.config.tokenEmpresa.take(8)}...",
         )
         val credentials =
             PacCredentials(
                 usuario = context.config.tokenEmpresa,
                 clave = context.config.tokenPassword,
-                baseUrl = context.config.api_thefactoryhka,
+                baseUrl = context.config.apiTheFactoryHka,
             )
 
         val token =
@@ -103,7 +103,7 @@ class PanamaInvoiceProcessor(
         val pacResponse =
             pacClient
                 .sendDocument(
-                    baseUrl = context.config.api_thefactoryhka,
+                    baseUrl = context.config.apiTheFactoryHka,
                     token = token,
                     payload = payload,
                 ).getOrElse { e ->
@@ -213,7 +213,7 @@ class PanamaInvoiceProcessor(
                 PacCredentials(
                     usuario = context.config.tokenEmpresa,
                     clave = context.config.tokenPassword,
-                    baseUrl = context.config.api_thefactoryhka,
+                    baseUrl = context.config.apiTheFactoryHka,
                 )
             val token = pacClient.authenticate(credentials).getOrThrow()
 
@@ -232,7 +232,7 @@ class PanamaInvoiceProcessor(
                 ?: return Result.failure(FEConfigurationException("El cliente no tiene correo configurado"))
 
         return pacClient.sendEmail(
-            baseUrl = context.config.api_thefactoryhka,
+            baseUrl = context.config.apiTheFactoryHka,
             token = token,
             cufe = cufe,
             emails = listOf(email),
