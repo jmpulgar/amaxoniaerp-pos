@@ -26,10 +26,22 @@ fun Route.promotionsRoutes(repository: PromotionsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf(
+                                "error" to "Falta country_code " +
+                                    "en token",
+                            ),
+                        )
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                        ?: return@get call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf(
+                                "error" to "Falta admin_db " +
+                                    "en token",
+                            ),
+                        )
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 call.respond(PromotionsListResponse(repository.listPromotions(companyDb)))
             }

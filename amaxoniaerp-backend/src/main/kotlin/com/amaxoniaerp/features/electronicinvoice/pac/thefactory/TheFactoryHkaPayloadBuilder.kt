@@ -83,7 +83,13 @@ class TheFactoryHkaPayloadBuilder {
         // En modo "02" el flujo legacy usa la fecha actual y motivo fijo.
         val esContingencia = config.tipoEmision == "02" || config.tipoEmision == "04"
         val fechaInicioContingencia = if (config.tipoEmision == "02") fechaEmision else config.fechaInicioContingencia
-        val motivoContingencia = if (config.tipoEmision == "02") "Problemas de comunicación interna." else config.motivoContingencia
+        val motivoContingencia =
+            if (config.tipoEmision == "02") {
+                "Problemas de comunicación " +
+                    "interna."
+            } else {
+                config.motivoContingencia
+            }
 
         return TheFactoryHkaDatosTransaccion(
             tipoEmision = config.tipoEmision,

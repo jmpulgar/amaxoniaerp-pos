@@ -54,7 +54,8 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     val idCajaSecuencia = varchar("id", 36)
     val idCaja = varchar("id_caja", 36)
 
-    // Y la columna estado no se llamaba estado sino "contabilizado" o simplemente no tiene "estado" pero sí tiene "activo"
+    // Y la columna estado no se llamaba estado sino "contabilizado" o simplemente no tiene "estado" pero sí tiene
+    // "activo"
     // Según tu esquema SQL enviado la llave se llama id.
     val idVendedor = integer("id_vendedor").nullable()
     val secuencia = varchar("secuencia", 10).nullable()

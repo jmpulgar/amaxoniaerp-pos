@@ -235,7 +235,10 @@ class CreditNoteRepository {
             }
 
         if (request.anular && !allReturnedAfterOperation) {
-            throw CreditNoteValidationException("Para anular la factura debes devolver la totalidad de las líneas restantes")
+            throw CreditNoteValidationException(
+                "Para anular la factura debes devolver la totalidad de las líneas " +
+                    "restantes",
+            )
         }
 
         // Valida la configuración necesaria antes de reservar la NC.
@@ -567,7 +570,10 @@ class CreditNoteRepository {
             }
 
         if (request.anular && !allReturnedAfterOperation) {
-            throw CreditNoteValidationException("Para anular la factura debes devolver la totalidad de las líneas restantes")
+            throw CreditNoteValidationException(
+                "Para anular la factura debes devolver la totalidad de las líneas " +
+                    "restantes",
+            )
         }
 
         val previousTotals = loadPreviousCreditNoteTotals(countryCode, invoice.idFactura)
@@ -724,7 +730,11 @@ class CreditNoteRepository {
                     creditNoteCode = creditNoteCode,
                     total = totals.total,
                     idFormaPago =
-                        request.idFormaPagoReintegro ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                        request.idFormaPagoReintegro ?: throw CreditNoteValidationException(
+                            "Forma de pago de " +
+                                "reintegro " +
+                                "requerida",
+                        ),
                     username = username,
                     now = now,
                     date = creditNoteDate,
@@ -1072,10 +1082,14 @@ class CreditNoteRepository {
             .map { (idDetalleFactura, quantity) ->
                 val sourceLine =
                     linesById[idDetalleFactura]
-                        ?: throw CreditNoteValidationException("La línea $idDetalleFactura no pertenece a la factura origen")
+                        ?: throw CreditNoteValidationException(
+                            "La línea $idDetalleFactura no pertenece a la factura " +
+                                "origen",
+                        )
                 if (quantity > sourceLine.availableQuantity) {
                     throw CreditNoteValidationException(
-                        "La cantidad a devolver para ${sourceLine.descripcion} excede lo disponible (${sourceLine.availableQuantity.toDouble()})",
+                        "La cantidad a devolver para ${sourceLine.descripcion} excede lo disponible " +
+                            "(${sourceLine.availableQuantity.toDouble()})",
                     )
                 }
 
@@ -1331,7 +1345,11 @@ class CreditNoteRepository {
     private fun normalizeFiscalDocumentNumber(value: String): String {
         val normalized = value.trim()
         if (normalized.isBlank() || !normalized.all(Char::isDigit) || normalized.length > 10) {
-            throw CreditNoteValidationException("El número fiscal de la nota de crédito debe ser numérico de hasta 10 dígitos")
+            throw CreditNoteValidationException(
+                "El número fiscal de la nota de crédito debe ser numérico de " +
+                    "hasta 10 " +
+                    "dígitos",
+            )
         }
         if (normalized.all { it == '0' }) {
             throw CreditNoteValidationException("El número fiscal de la nota de crédito no puede ser cero")

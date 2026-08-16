@@ -16,7 +16,9 @@ suspend fun getBestSellerItemQuantities(
         val safeLimit = limit.coerceIn(1, 100)
         @Suppress("SqlSourceToSinkFlow") // safeLimit es Int acotado
         TransactionManager.current().exec(
-            "SELECT id_item, SUM(_item_cantidad) AS total FROM factura_detalle WHERE (anulado = 0 OR anulado IS NULL) AND id_item IS NOT NULL GROUP BY id_item ORDER BY total DESC LIMIT $safeLimit",
+            "SELECT id_item, SUM(_item_cantidad) AS total FROM factura_detalle WHERE (anulado = 0 OR anulado IS " +
+                "NULL) " +
+                "AND id_item IS NOT NULL GROUP BY id_item ORDER BY total DESC LIMIT $safeLimit",
         ) { result ->
             val list = mutableListOf<Pair<Int, Long>>()
             while (result.next()) {

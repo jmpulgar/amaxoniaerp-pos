@@ -108,7 +108,12 @@ class CreditNoteService(
                                 repository.recordPanamaDiagnostic(prepared.id, diagnostic)
                             }
                         }.onFailure { error ->
-                            logger.error("NC PA {} confirmada, pero no se pudo guardar el diagnóstico del PDF", prepared.id, error)
+                            logger.error(
+                                "NC PA {} confirmada, pero no se pudo guardar el diagnóstico " +
+                                    "del PDF",
+                                prepared.id,
+                                error,
+                            )
                         }
                         response.copy(fiscalMessage = diagnostic)
                     }

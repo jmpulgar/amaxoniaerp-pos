@@ -88,9 +88,20 @@ class CajaRepository {
                         idCajaSecuencia = row[CajaSecuenciaTable.idCajaSecuencia],
                         idCaja = row[CajaSecuenciaTable.idCaja],
                         fechaApertura =
-                            row[CajaSecuenciaTable.fechaApertura]?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) ?: "",
+                            row[CajaSecuenciaTable.fechaApertura]?.format(
+                                DateTimeFormatter.ofPattern(
+                                    "yyyy-MM-dd " +
+                                        "HH:mm:ss",
+                                ),
+                            ) ?: "",
                         montoApertura = row[CajaSecuenciaTable.montoEfectivoApertura].toDouble(),
-                        fechaCierre = row[CajaSecuenciaTable.fechaCierre]?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                        fechaCierre =
+                            row[CajaSecuenciaTable.fechaCierre]?.format(
+                                DateTimeFormatter.ofPattern(
+                                    "yyyy-MM-dd " +
+                                        "HH:mm:ss",
+                                ),
+                            ),
                         montoCierre = row[CajaSecuenciaTable.montoEfectivoCierre]?.toDouble(),
                         estatus = if (row[CajaSecuenciaTable.fechaCierre] == null) 1 else 0,
                         usuarioApertura = row[CajaSecuenciaTable.usuario] ?: "",
@@ -530,7 +541,11 @@ class CajaRepository {
                             val available = stockDisponible[itemId] ?: 0.0
                             CajaInventarioItem(
                                 codigo = first[SalesFacturaDetalleTable.itemCodigo].ifBlank { itemId.toString() },
-                                descripcion = first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
+                                descripcion =
+                                    first[SalesFacturaDetalleTable.itemDescripcion].ifBlank {
+                                        "Producto " +
+                                            "$itemId"
+                                    },
                                 existenciaInicial = available + sold,
                                 cantidadVendida = sold,
                                 existenciaDisponible = available,

@@ -75,7 +75,14 @@ fun Route.sesionMesaRouting(
                                 mapOf("error" to "Área no encontrada en la sucursal de la caja"),
                             )
 
-                        else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Respuesta inesperada"))
+                        else ->
+                            call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf(
+                                    "error" to "Respuesta " +
+                                        "inesperada",
+                                ),
+                            )
                     }
                 } catch (e: Exception) {
                     log.error("Error listando estados. adminDb={} cajaId={} areaId={}", ctx.adminDb, cajaId, areaId, e)
@@ -250,14 +257,35 @@ private suspend fun respondAbrir(
 ) {
     when (result) {
         is SesionMesaResult.Opened -> call.respond(HttpStatusCode.Created, AbrirSesionResponse(true, sesion = result.sesion))
-        SesionMesaResult.SesionYaAbierta -> call.respond(HttpStatusCode.Conflict, mapOf("error" to "La mesa ya tiene una sesión activa"))
+        SesionMesaResult.SesionYaAbierta ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to "La mesa ya tiene " +
+                        "una sesión activa",
+                ),
+            )
         SesionMesaResult.AreaNoPerteneceSucursal ->
             call.respond(
                 HttpStatusCode.NotFound,
                 mapOf("error" to "Área no encontrada en la sucursal de la caja"),
             )
-        SesionMesaResult.MesaNoPerteneceArea -> call.respond(HttpStatusCode.NotFound, mapOf("error" to "Mesa no encontrada en el área"))
-        SesionMesaResult.MesaInactiva -> call.respond(HttpStatusCode.Conflict, mapOf("error" to "La mesa no está activa"))
+        SesionMesaResult.MesaNoPerteneceArea ->
+            call.respond(
+                HttpStatusCode.NotFound,
+                mapOf(
+                    "error" to "Mesa no " +
+                        "encontrada en el área",
+                ),
+            )
+        SesionMesaResult.MesaInactiva ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to "La mesa no está " +
+                        "activa",
+                ),
+            )
         SesionMesaResult.CantidadPersonasInvalida ->
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "La cantidad de personas es inválida"))
         else -> {
@@ -275,8 +303,22 @@ private suspend fun respondMutacion(
     when (result) {
         is SesionMesaResult.Closed -> call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
         is SesionMesaResult.Cancelled -> call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
-        SesionMesaResult.SesionNoEncontrada -> call.respond(HttpStatusCode.NotFound, mapOf("error" to "Sesión no encontrada"))
-        SesionMesaResult.SesionYaFinalizada -> call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión ya no está abierta"))
+        SesionMesaResult.SesionNoEncontrada ->
+            call.respond(
+                HttpStatusCode.NotFound,
+                mapOf(
+                    "error" to "Sesión no " +
+                        "encontrada",
+                ),
+            )
+        SesionMesaResult.SesionYaFinalizada ->
+            call.respond(
+                HttpStatusCode.Conflict,
+                mapOf(
+                    "error" to "La sesión ya " +
+                        "no está abierta",
+                ),
+            )
         SesionMesaResult.SesionConOperaciones ->
             call.respond(
                 HttpStatusCode.Conflict,

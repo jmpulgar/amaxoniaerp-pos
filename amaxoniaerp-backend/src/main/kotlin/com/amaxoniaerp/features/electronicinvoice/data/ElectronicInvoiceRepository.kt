@@ -99,7 +99,8 @@ class ElectronicInvoiceRepository {
                 )
 
             logger.info(
-                "[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal puntoFacturacionFiscal=$puntoFacturacion",
+                "[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal " +
+                    "puntoFacturacionFiscal=$puntoFacturacion",
             )
 
             // 4. Leer número de documento fiscal desde tabla correlativos
@@ -112,7 +113,8 @@ class ElectronicInvoiceRepository {
             // 6. Mapear cliente (JOIN con paises)
             val cliente = mapCliente(facturaRow, paisLocal, paisExtranjero)
             logger.info(
-                "[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} nombre=${cliente.nombre} pais=${cliente.paisIso}",
+                "[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} " +
+                    "nombre=${cliente.nombre} pais=${cliente.paisIso}",
             )
 
             // 7. Leer detalle de factura con JOIN a unidad de medida
@@ -129,7 +131,10 @@ class ElectronicInvoiceRepository {
 
             // 9. Leer retención y totales de pago
             val retencion = loadRetencion(invoiceId)
-            logger.info("[FE] retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}")
+            logger.info(
+                "[FE] " +
+                    "retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}",
+            )
 
             val montoCancelar = loadMontoCancelar(invoiceId)
             logger.info("[FE] montoCancelar=$montoCancelar")
@@ -637,12 +642,14 @@ class ElectronicInvoiceRepository {
 
         if (codigoFromCaja == null && codigoFromSucursal == null) {
             logger.warn(
-                "[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: $codigoSucursalFallback",
+                "[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: " +
+                    "$codigoSucursalFallback",
             )
         }
         if (puntoFromCaja == null) {
             logger.warn(
-                "[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: $puntoFacturacionFallback",
+                "[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: " +
+                    "$puntoFacturacionFallback",
             )
         }
 

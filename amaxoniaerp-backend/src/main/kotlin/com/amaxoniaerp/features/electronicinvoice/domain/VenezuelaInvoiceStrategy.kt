@@ -90,7 +90,8 @@ class VenezuelaInvoiceStrategy(
         when (alreadyIssued) {
             is AlreadyIssuedResult.Complete -> {
                 log.info(
-                    "[VE-FE] factura {} ya emitida (Complete) numeroDocumentoFiscal={} numero_control_thka={}. No se llama HKA.",
+                    "[VE-FE] factura {} ya emitida (Complete) numeroDocumentoFiscal={} numero_control_thka={}. No se " +
+                        "llama HKA.",
                     invoiceId,
                     alreadyIssued.numeroDocumentoFiscal,
                     alreadyIssued.numeroControl,
@@ -222,10 +223,18 @@ class VenezuelaInvoiceStrategy(
                 repository.reserveAtLeast(database, minimumNextNumber = minimumNextNumber)
             } catch (e: FEConfigurationException) {
                 log.error("[VE-FE] no se pudo reservar correlativo factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("CORRELATIVO_CONFIG", e.message ?: "Configuración correlativo inválida")
+                return ElectronicInvoiceResult.Failure(
+                    "CORRELATIVO_CONFIG",
+                    e.message ?: "Configuración correlativo " +
+                        "inválida",
+                )
             } catch (e: Exception) {
                 log.error("[VE-FE] fallo inesperado reservando correlativo factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("CORRELATIVO_LOCK", e.message ?: "No se pudo reservar correlativo")
+                return ElectronicInvoiceResult.Failure(
+                    "CORRELATIVO_LOCK",
+                    e.message ?: "No se pudo reservar " +
+                        "correlativo",
+                )
             }
 
         // 8. Número efectivo final = número reservado (YA respeta max(local, remoto+1)).
