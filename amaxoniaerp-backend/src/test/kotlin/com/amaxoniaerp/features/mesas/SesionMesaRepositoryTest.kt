@@ -5,7 +5,6 @@ import com.amaxoniaerp.features.caja.data.CajaTable
 import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.mesas.data.AbrirSesionScope
-import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.data.MesasTable
 import com.amaxoniaerp.features.mesas.data.PlantasTable
 import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
@@ -38,7 +37,6 @@ import kotlin.test.assertTrue
 class SesionMesaRepositoryTest {
     private lateinit var database: Database
     private val repository = SesionMesaRepository()
-    private val mesasRepository = MesasRepository()
 
     @BeforeTest
     fun setUp() {

@@ -51,7 +51,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
             get {
                 val ctx = call.resolvePosContext() ?: return@get
                 val cajaId = call.requireCajaId() ?: return@get
-                val areaId = call.requireAreaId() ?: return@get
+                call.requireAreaId() ?: return@get
                 val mesaId = call.requireMesaId() ?: return@get
                 val sesionId = call.requireSesionId() ?: return@get
 
@@ -103,7 +103,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
             post {
                 val ctx = call.resolvePosContext() ?: return@post
                 call.requireCajaId() ?: return@post
-                val areaId = call.requireAreaId() ?: return@post
+                call.requireAreaId() ?: return@post
                 val mesaId = call.requireMesaId() ?: return@post
                 val sesionId = call.requireSesionId() ?: return@post
 

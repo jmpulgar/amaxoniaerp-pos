@@ -761,16 +761,6 @@ class CuentaMesaRepository(
             }.limit(1)
             .singleOrNull() != null
 
-    private fun existePedidoPendienteEnSesion(sesionId: Int): Boolean =
-        PedidoMesaTable
-            .selectAll()
-            .where {
-                (PedidoMesaTable.sesionMesaId eq sesionId) and
-                    (PedidoMesaTable.activo eq ACTIVE) and
-                    (PedidoMesaTable.estado notInList ESTADOS_NO_IMPiden_CIERRE)
-            }.limit(1)
-            .singleOrNull() != null
-
     private fun existeSaldoPendienteEnSesion(sesionId: Int): Boolean =
         PedidoMesaTable
             .selectAll()
