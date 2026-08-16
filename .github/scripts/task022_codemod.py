@@ -1,31 +1,84 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+TARGET = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/mesas/CuentaMesaRouting.kt"
 
+text = TARGET.read_text(encoding="utf-8")
 
-def replace_exact(path: Path, old: str, new: str, expected: int) -> None:
-    text = path.read_text(encoding="utf-8")
-    actual = text.count(old)
-    if actual != expected:
-        raise RuntimeError(f"{path}: expected {expected}, found {actual}: {old!r}")
-    path.write_text(text.replace(old, new), encoding="utf-8")
+replacements = {
+    " * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=`                                     crear cuenta (completa o división).":
+        " * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=` crear cuenta (completa o división).",
+    "CuentasMesaListResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuentas),": """CuentasMesaListResponse(
+                                        success = true,
+                                        sesionMesaId = tri.sesionId,
+                                        data = result.cuentas,
+                                    ),""",
+    "CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),": """CuentaCreadaResponse(
+                                            success = true,
+                                            sesionMesaId = tri.sesionId,
+                                            data = result.cuenta,
+                                        ),""",
+    "call.respond(HttpStatusCode.NotFound, mapOf(\"error\" to \"La sesión no pertenece a esa mesa\"))": """call.respond(
+                                    HttpStatusCode.NotFound,
+                                    mapOf("error" to "La sesión no pertenece a esa mesa"),
+                                )""",
+    "call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"Respuesta inesperada\"))": """call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "Respuesta inesperada"),
+                            )""",
+    "call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"No se pudieron listar las cuentas\"))": """call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to "No se pudieron listar las cuentas"),
+                        )""",
+    "call.respond(HttpStatusCode.Conflict, mapOf(\"error\" to \"La sesión no admite cuentas (estado final)\"))": """call.respond(
+                                    HttpStatusCode.Conflict,
+                                    mapOf("error" to "La sesión no admite cuentas (estado final)"),
+                                )""",
+    "mapOf(\"error\" to \"Un pedido seleccionado no existe, no está entregado o ya no tiene saldo\"),": """mapOf(
+                                        "error" to
+                                            "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo",
+                                    ),""",
+    "else -> call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"No se pudo crear la cuenta\"))": """else -> call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "No se pudo crear la cuenta"),
+                            )""",
+    "call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"No se pudo obtener la cuenta\"))": """call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "No se pudo obtener la cuenta"),
+                            )""",
+    "else -> call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"No se pudo cancelar la cuenta\"))": """else -> call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "No se pudo cancelar la cuenta"),
+                            )""",
+    "call.respond(HttpStatusCode.InternalServerError, mapOf(\"error\" to \"No se pudo cancelar la cuenta\"))": """call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to "No se pudo cancelar la cuenta"),
+                            )""",
+    "if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@get": """if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
+                                return@get
+                            }""",
+    "if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post": """if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
+                                return@post
+                            }""",
+    "val result = cuentaMesaRepository.obtenerCuenta(database, tri.sesionId, tri.mesaId, cuentaId)": """val result =
+                                cuentaMesaRepository.obtenerCuenta(
+                                    database,
+                                    tri.sesionId,
+                                    tri.mesaId,
+                                    cuentaId,
+                                )""",
+    "val result = cuentaMesaRepository.cancelarCuenta(database, tri.sesionId, tri.mesaId, cuentaId)": """val result =
+                                cuentaMesaRepository.cancelarCuenta(
+                                    database,
+                                    tri.sesionId,
+                                    tri.mesaId,
+                                    cuentaId,
+                                )""",
+}
 
+for old, new in replacements.items():
+    if old not in text:
+        raise RuntimeError(f"Expected text not found: {old}")
+    text = text.replace(old, new)
 
-models = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceModels.kt"
-replace_exact(models, "val api_thefactoryhka: String,", "val apiTheFactoryHka: String,", 1)
-
-processor = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/application/PanamaInvoiceProcessor.kt"
-replace_exact(processor, ".api_thefactoryhka", ".apiTheFactoryHka", 5)
-
-repository = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/electronicinvoice/data/ElectronicInvoiceRepository.kt"
-replace_exact(repository, "config.api_thefactoryhka", "config.apiTheFactoryHka", 1)
-replace_exact(repository, "api_thefactoryhka = apiTheFactoryHka.trimEnd('/')", "apiTheFactoryHka = apiTheFactoryHka.trimEnd('/')", 1)
-
-credit_note = ROOT / "amaxoniaerp-backend/src/main/kotlin/com/amaxoniaerp/features/creditnotes/application/PanamaCreditNoteProcessor.kt"
-replace_exact(credit_note, ".api_thefactoryhka", ".apiTheFactoryHka", 3)
-
-payload_test = ROOT / "amaxoniaerp-backend/src/test/kotlin/com/amaxoniaerp/features/electronicinvoice/pac/thefactory/TheFactoryHkaPayloadBuilderTest.kt"
-replace_exact(payload_test, "api_thefactoryhka =", "apiTheFactoryHka =", 1)
-
-credit_note_test = ROOT / "amaxoniaerp-backend/src/test/kotlin/com/amaxoniaerp/features/electronicinvoice/pac/thefactory/TheFactoryHkaCreditNotePayloadBuilderTest.kt"
-replace_exact(credit_note_test, "api_thefactoryhka =", "apiTheFactoryHka =", 1)
+TARGET.write_text(text, encoding="utf-8")
