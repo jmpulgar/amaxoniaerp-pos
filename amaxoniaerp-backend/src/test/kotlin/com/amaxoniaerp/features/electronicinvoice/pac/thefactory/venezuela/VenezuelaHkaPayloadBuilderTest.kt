@@ -529,7 +529,10 @@ class VenezuelaHkaPayloadBuilderTest {
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
-    private fun VenezuelaHkaFormaPago.esDivisaMoneda(): Boolean = descripcion?.contains("DIVISA", ignoreCase = true) == true
+    private fun VenezuelaHkaFormaPago.esDivisaMoneda(): Boolean {
+        val paymentDescription = descripcion
+        return paymentDescription?.contains("DIVISA", ignoreCase = true) == true
+    }
 
     private fun context(
         idFactura: String = "factura-1",

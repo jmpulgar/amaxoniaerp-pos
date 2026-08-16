@@ -37,7 +37,8 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
                 """"tipoContribuyente":"1","numeroRUC":"155-001-001","digitoVerificadorRUC":"1",""" +
                 """"razonSocial":"CLIENTE PRUEBA","direccion":"Calle 1","telefono1":"6000-0000",""" +
                 """"correoElectronico1":"cliente@example.com","pais":"PA"},""" +
-                """"listaDocsFiscalReferenciados":[{"fechaEmisionDocFiscalReferenciado":"2026-08-01T00:00:00-05:00",""" +
+                """"listaDocsFiscalReferenciados":[{""" +
+                """"fechaEmisionDocFiscalReferenciado":"2026-08-01T00:00:00-05:00",""" +
                 """"cufeFEReferenciada":"$ORIGINAL_CUFE"}]},"listaItems":[{"descripcion":"Producto devuelto",""" +
                 """"codigo":"P-001","cantidad":"1.000","precioUnitario":"9.35","precioItem":"9.35",""" +
                 """"valorTotal":"10.00","tasaITBMS":"01","valorITBMS":"0.65","codigoCPBSAbrev":"54",""" +
