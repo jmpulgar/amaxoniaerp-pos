@@ -141,81 +141,46 @@ data class CajaSecuenciaGetResponse(
 @Serializable
 data class CajaSecuenciaData(
     val id: String,
-    @SerialName("id_caja")
-    val idCaja: String,
-    @SerialName("id_vendedor")
-    val idVendedor: Int? = null,
+    val id_caja: String,
+    val id_vendedor: Int? = null,
     val secuencia: String? = null,
-    @SerialName("fecha_apertura")
-    val fechaApertura: String? = null,
-    @SerialName("fecha_cierre")
-    val fechaCierre: String? = null,
-    @SerialName("fecha_creacion")
-    val fechaCreacion: String? = null,
+    val fecha_apertura: String? = null,
+    val fecha_cierre: String? = null,
+    val fecha_creacion: String? = null,
     val usuario: String? = null,
-    @SerialName("observacion_apertura")
-    val observacionApertura: String? = null,
-    @SerialName("observacion_cierre")
-    val observacionCierre: String? = null,
-    @SerialName("monto_efectivo_apertura")
-    val montoEfectivoApertura: Double = 0.0,
-    @SerialName("monto_efectivo_ventas")
-    val montoEfectivoVentas: Double = 0.0,
-    @SerialName("monto_efectivo_entrada")
-    val montoEfectivoEntrada: Double = 0.0,
-    @SerialName("monto_efectivo_salida")
-    val montoEfectivoSalida: Double = 0.0,
-    @SerialName("monto_efectivo_total")
-    val montoEfectivoTotal: Double = 0.0,
-    @SerialName("monto_efectivo_cierre")
-    val montoEfectivoCierre: Double = 0.0,
-    @SerialName("monto_efectivo_diferencia")
-    val montoEfectivoDiferencia: Double = 0.0,
-    @SerialName("monto_otros_total")
-    val montoOtrosTotal: Double = 0.0,
-    @SerialName("monto_otros_cierre")
-    val montoOtrosCierre: Double = 0.0,
-    @SerialName("monto_otros_diferencia")
-    val montoOtrosDiferencia: Double = 0.0,
-    @SerialName("monto_total")
-    val montoTotal: Double = 0.0,
-    @SerialName("monto_cierre")
-    val montoCierre: Double = 0.0,
-    @SerialName("monto_diferencia")
-    val montoDiferencia: Double = 0.0,
-    @SerialName("total_ventas")
-    val totalVentas: Double = 0.0,
-    @SerialName("cantidad_transacciones")
-    val cantidadTransacciones: Int = 0,
-    @SerialName("numero_cierre_fiscal")
-    val numeroCierreFiscal: String? = null,
-    @SerialName("serie_sucursal")
-    val serieSucursal: String? = null,
-    @SerialName("serial_fiscal")
-    val serialFiscal: String? = null,
+    val observacion_apertura: String? = null,
+    val observacion_cierre: String? = null,
+    val monto_efectivo_apertura: Double = 0.0,
+    val monto_efectivo_ventas: Double = 0.0,
+    val monto_efectivo_entrada: Double = 0.0,
+    val monto_efectivo_salida: Double = 0.0,
+    val monto_efectivo_total: Double = 0.0,
+    val monto_efectivo_cierre: Double = 0.0,
+    val monto_efectivo_diferencia: Double = 0.0,
+    val monto_otros_total: Double = 0.0,
+    val monto_otros_cierre: Double = 0.0,
+    val monto_otros_diferencia: Double = 0.0,
+    val monto_total: Double = 0.0,
+    val monto_cierre: Double = 0.0,
+    val monto_diferencia: Double = 0.0,
+    val total_ventas: Double = 0.0,
+    val cantidad_transacciones: Int = 0,
+    val numero_cierre_fiscal: String? = null,
+    val serie_sucursal: String? = null,
+    val serial_fiscal: String? = null,
     val contabilizado: Int = 0,
-    @SerialName("ffecha_apertura")
-    val ffechaApertura: String = "",
-    @SerialName("ffecha_cierre")
-    val ffechaCierre: String = "",
-    @SerialName("caja_codigo")
-    val cajaCodigo: String? = null,
+    val ffecha_apertura: String = "",
+    val ffecha_cierre: String = "",
+    val caja_codigo: String? = null,
     val caja: String? = null,
-    @SerialName("fondo_apertura")
-    val fondoApertura: Double = 0.0,
-    @SerialName("nombre_modelo")
-    val nombreModelo: String? = null,
+    val fondo_apertura: Double = 0.0,
+    val nombre_modelo: String? = null,
     val vendedor: String? = null,
-    @SerialName("detalle_apertura")
-    val detalleApertura: List<CajaDetalleAperturaItem> = emptyList(),
-    @SerialName("forma_pago")
-    val formaPago: List<CajaFormaPagoItem> = emptyList(),
-    @SerialName("forma_pago_devolucion")
-    val formaPagoDevolucion: List<CajaFormaPagoDevolucionItem> = emptyList(),
-    @SerialName("total_anulado")
-    val totalAnulado: Double = 0.0,
-    @SerialName("verificar_facturas_temporales")
-    val verificarFacturasTemporales: Int = 0,
+    val detalle_apertura: List<CajaDetalleAperturaItem> = emptyList(),
+    val forma_pago: List<CajaFormaPagoItem> = emptyList(),
+    val forma_pago_devolucion: List<CajaFormaPagoDevolucionItem> = emptyList(),
+    val total_anulado: Double = 0.0,
+    val verificar_facturas_temporales: Int = 0,
     val inventario: List<CajaInventarioItem> = emptyList(),
 )
 
@@ -223,21 +188,16 @@ data class CajaSecuenciaData(
 data class CajaInventarioItem(
     val codigo: String,
     val descripcion: String,
-    @SerialName("existencia_inicial")
-    val existenciaInicial: Double,
-    @SerialName("cantidad_vendida")
-    val cantidadVendida: Double,
-    @SerialName("existencia_disponible")
-    val existenciaDisponible: Double,
+    val existencia_inicial: Double,
+    val cantidad_vendida: Double,
+    val existencia_disponible: Double,
 )
 
 @Serializable
 data class CajaDetalleAperturaItem(
     val id: String,
-    @SerialName("id_secuencia")
-    val idSecuencia: String,
-    @SerialName("id_moneda_denominacion")
-    val idMonedaDenominacion: Int? = null,
+    val id_secuencia: String,
+    val id_moneda_denominacion: Int? = null,
     val cantidad: Int = 0,
     val valor: Double = 0.0,
     val monto: Double = 0.0,
@@ -247,31 +207,23 @@ data class CajaDetalleAperturaItem(
 @Serializable
 data class CajaFormaPagoItem(
     val id: Int,
-    @SerialName("forma_pago")
-    val formaPago: String? = null,
+    val forma_pago: String? = null,
     val siglas: String? = null,
     val grupo: Int? = null,
     val imagen: String? = null,
-    @SerialName("id_caja_tp_concepto")
-    val idCajaTpConcepto: Int? = null,
-    @SerialName("tipo_moneda")
-    val tipoMoneda: String? = null,
+    val id_caja_tp_concepto: Int? = null,
+    val tipo_moneda: String? = null,
     val estatus: Int = 0,
-    @SerialName("grupo_nombre")
-    val grupoNombre: String? = null,
-    @SerialName("grupo_imagen")
-    val grupoImagen: String? = null,
-    @SerialName("grupo_orden")
-    val grupoOrden: Int? = null,
-    @SerialName("grupo_activo")
-    val grupoActivo: Int? = null,
+    val grupo_nombre: String? = null,
+    val grupo_imagen: String? = null,
+    val grupo_orden: Int? = null,
+    val grupo_activo: Int? = null,
     val monto: Double = 0.0,
 )
 
 @Serializable
 data class CajaFormaPagoDevolucionItem(
-    @SerialName("id_forma_pago")
-    val idFormaPago: Int,
+    val id_forma_pago: Int,
     val siglas: String? = null,
     val descripcion: String? = null,
     val monto: Double = 0.0,
@@ -280,43 +232,27 @@ data class CajaFormaPagoDevolucionItem(
 @Serializable
 data class CajaCierreSaveRequest(
     val id: String,
-    @SerialName("monto_efectivo_ventas")
-    val montoEfectivoVentas: Double,
-    @SerialName("monto_efectivo_entrada")
-    val montoEfectivoEntrada: Double,
-    @SerialName("monto_efectivo_salida")
-    val montoEfectivoSalida: Double,
-    @SerialName("monto_efectivo_total")
-    val montoEfectivoTotal: Double,
-    @SerialName("monto_efectivo_cierre")
-    val montoEfectivoCierre: Double,
-    @SerialName("monto_efectivo_diferencia")
-    val montoEfectivoDiferencia: Double,
-    @SerialName("monto_otros_total")
-    val montoOtrosTotal: Double,
-    @SerialName("monto_otros_cierre")
-    val montoOtrosCierre: Double,
-    @SerialName("monto_otros_diferencia")
-    val montoOtrosDiferencia: Double,
-    @SerialName("monto_total")
-    val montoTotal: Double,
-    @SerialName("monto_cierre")
-    val montoCierre: Double,
-    @SerialName("monto_diferencia")
-    val montoDiferencia: Double,
+    val monto_efectivo_ventas: Double,
+    val monto_efectivo_entrada: Double,
+    val monto_efectivo_salida: Double,
+    val monto_efectivo_total: Double,
+    val monto_efectivo_cierre: Double,
+    val monto_efectivo_diferencia: Double,
+    val monto_otros_total: Double,
+    val monto_otros_cierre: Double,
+    val monto_otros_diferencia: Double,
+    val monto_total: Double,
+    val monto_cierre: Double,
+    val monto_diferencia: Double,
     val detalle: List<CajaCierreDetalleRequest> = emptyList(),
-    @SerialName("detalle_formapago")
-    val detalleFormaPago: List<CajaCierreFormaPagoRequest> = emptyList(),
-    @SerialName("observacion_cierre")
-    val observacionCierre: String? = null,
-    @SerialName("numero_cierre_fiscal")
-    val numeroCierreFiscal: String? = null,
+    val detalle_formapago: List<CajaCierreFormaPagoRequest> = emptyList(),
+    val observacion_cierre: String? = null,
+    val numero_cierre_fiscal: String? = null,
 )
 
 @Serializable
 data class CajaCierreDetalleRequest(
-    @SerialName("id_moneda_denominacion")
-    val idMonedaDenominacion: Int? = null,
+    val id_moneda_denominacion: Int? = null,
     val cantidad: Int = 0,
     val valor: Double = 0.0,
     val monto: Double = 0.0,
@@ -324,13 +260,10 @@ data class CajaCierreDetalleRequest(
 
 @Serializable
 data class CajaCierreFormaPagoRequest(
-    @SerialName("id_forma_pago")
-    val idFormaPago: Int,
+    val id_forma_pago: Int,
     val monto: Double,
-    @SerialName("monto_cierre")
-    val montoCierre: Double,
-    @SerialName("monto_diferencia")
-    val montoDiferencia: Double,
+    val monto_cierre: Double,
+    val monto_diferencia: Double,
 )
 
 @Serializable
