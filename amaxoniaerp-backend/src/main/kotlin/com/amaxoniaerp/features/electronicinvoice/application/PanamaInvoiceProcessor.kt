@@ -64,14 +64,13 @@ class PanamaInvoiceProcessor(
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
         logger.info(
-            "[FE] Autenticando con PAC: baseUrl=${context.config.apiTheFactoryHka} " +
-                "usuario=${context.config.tokenEmpresa.take(8)}...",
+            "[FE] Autenticando con PAC: baseUrl=${context.config.api_thefactoryhka} usuario=${context.config.tokenEmpresa.take(8)}...",
         )
         val credentials =
             PacCredentials(
                 usuario = context.config.tokenEmpresa,
                 clave = context.config.tokenPassword,
-                baseUrl = context.config.apiTheFactoryHka,
+                baseUrl = context.config.api_thefactoryhka,
             )
 
         val token =
@@ -84,10 +83,7 @@ class PanamaInvoiceProcessor(
             }
 
         // ── 3. Construir el payload ──────────────────────────────────────────
-        logger.info(
-            "[FE] Token PAC obtenido OK (longitud=${token.token.length}). Construyendo payload para factura " +
-                "$invoiceId...",
-        )
+        logger.info("[FE] Token PAC obtenido OK (longitud=${token.token.length}). Construyendo payload para factura $invoiceId...")
         val payload =
             try {
                 payloadBuilder.build(context)
@@ -102,14 +98,12 @@ class PanamaInvoiceProcessor(
 
         // ── 4. Enviar al PAC ─────────────────────────────────────────────────
         logger.info(
-            "[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} " +
-                "numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} " +
-                "formasPago=${context.formasPago.size}",
+            "[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} items=${context.detalles.size} formasPago=${context.formasPago.size}",
         )
         val pacResponse =
             pacClient
                 .sendDocument(
-                    baseUrl = context.config.apiTheFactoryHka,
+                    baseUrl = context.config.api_thefactoryhka,
                     token = token,
                     payload = payload,
                 ).getOrElse { e ->
@@ -219,7 +213,7 @@ class PanamaInvoiceProcessor(
                 PacCredentials(
                     usuario = context.config.tokenEmpresa,
                     clave = context.config.tokenPassword,
-                    baseUrl = context.config.apiTheFactoryHka,
+                    baseUrl = context.config.api_thefactoryhka,
                 )
             val token = pacClient.authenticate(credentials).getOrThrow()
 
@@ -238,7 +232,7 @@ class PanamaInvoiceProcessor(
                 ?: return Result.failure(FEConfigurationException("El cliente no tiene correo configurado"))
 
         return pacClient.sendEmail(
-            baseUrl = context.config.apiTheFactoryHka,
+            baseUrl = context.config.api_thefactoryhka,
             token = token,
             cufe = cufe,
             emails = listOf(email),
@@ -252,9 +246,7 @@ class PanamaInvoiceProcessor(
     ) {
         val totales = payload.documento.totalesSubTotales
         logger.info(
-            "[FE][PAYLOAD] factura={} totalFactura={} totalValorRecibido={} vuelto={} totalPrecioNeto={} " +
-                "totalITBMS={} " +
-                "totalMontoGravado={} totalTodosItems={}",
+            "[FE][PAYLOAD] factura={} totalFactura={} totalValorRecibido={} vuelto={} totalPrecioNeto={} totalITBMS={} totalMontoGravado={} totalTodosItems={}",
             invoiceId,
             totales.totalFactura,
             totales.totalValorRecibido,
@@ -268,10 +260,7 @@ class PanamaInvoiceProcessor(
         payload.documento.listaItems.forEachIndexed { index, item ->
             val raw = context.detalles.getOrNull(index)
             logger.info(
-                "[FE][PAYLOAD][ITEM {}] desc='{}' codigo='{}' cantidad={} precioUnitario={} precioItem={} " +
-                    "valorTotal={} " +
-                    "tasaITBMS={} valorITBMS={} descuentoUnit={} CPBS={}/{} rawCantidad={} rawPrecioSinIva={} " +
-                    "rawTotalSinIva={} rawTotalConIva={} rawDescuento={} rawPiva={}",
+                "[FE][PAYLOAD][ITEM {}] desc='{}' codigo='{}' cantidad={} precioUnitario={} precioItem={} valorTotal={} tasaITBMS={} valorITBMS={} descuentoUnit={} CPBS={}/{} rawCantidad={} rawPrecioSinIva={} rawTotalSinIva={} rawTotalConIva={} rawDescuento={} rawPiva={}",
                 index + 1,
                 item.descripcion.take(80),
                 item.codigo,

@@ -86,7 +86,7 @@ class ElectronicInvoiceRepository {
             logger.info(
                 "[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(
                     8,
-                )}... api_thefactoryhka=${config.apiTheFactoryHka} tipoEmision=${config.tipoEmision}",
+                )}... api_thefactoryhka=${config.api_thefactoryhka} tipoEmision=${config.tipoEmision}",
             )
 
             // 3. Resolver código sucursal emisor y punto facturación fiscal
@@ -99,8 +99,7 @@ class ElectronicInvoiceRepository {
                 )
 
             logger.info(
-                "[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal " +
-                    "puntoFacturacionFiscal=$puntoFacturacion",
+                "[FE] cajaId=$cajaId idSucursal=$idSucursal -> codigoSucursalEmisor=$codigoSucursal puntoFacturacionFiscal=$puntoFacturacion",
             )
 
             // 4. Leer número de documento fiscal desde tabla correlativos
@@ -113,8 +112,7 @@ class ElectronicInvoiceRepository {
             // 6. Mapear cliente (JOIN con paises)
             val cliente = mapCliente(facturaRow, paisLocal, paisExtranjero)
             logger.info(
-                "[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} " +
-                    "nombre=${cliente.nombre} pais=${cliente.paisIso}",
+                "[FE] cliente: tipoClienteFE=${cliente.tipoClienteFE} identificacion=${cliente.identificacion} nombre=${cliente.nombre} pais=${cliente.paisIso}",
             )
 
             // 7. Leer detalle de factura con JOIN a unidad de medida
@@ -131,10 +129,7 @@ class ElectronicInvoiceRepository {
 
             // 9. Leer retención y totales de pago
             val retencion = loadRetencion(invoiceId)
-            logger.info(
-                "[FE] " +
-                    "retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}",
-            )
+            logger.info("[FE] retencion=${retencion?.codigoRetencion ?: "none"} monto=${retencion?.montoRetencion ?: 0.0}")
 
             val montoCancelar = loadMontoCancelar(invoiceId)
             logger.info("[FE] montoCancelar=$montoCancelar")
@@ -407,7 +402,7 @@ class ElectronicInvoiceRepository {
         return FEConfigData(
             tokenEmpresa = tokenEmpresa,
             tokenPassword = tokenPassword,
-            apiTheFactoryHka = apiTheFactoryHka.trimEnd('/'),
+            api_thefactoryhka = apiTheFactoryHka.trimEnd('/'),
             tipoEmision = row[FEParametrosReadTable.tipoEmision] ?: "01",
             destinoOperacion = row[FEParametrosReadTable.destinoOperacion] ?: "1",
             procesoGeneracion = row[FEParametrosReadTable.procesoGeneracion] ?: "01",
@@ -642,14 +637,12 @@ class ElectronicInvoiceRepository {
 
         if (codigoFromCaja == null && codigoFromSucursal == null) {
             logger.warn(
-                "[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: " +
-                    "$codigoSucursalFallback",
+                "[FE] codigoSucursalEmisor no encontrado ni en caja ni en sucursal, usando fallback de parametros_generales: $codigoSucursalFallback",
             )
         }
         if (puntoFromCaja == null) {
             logger.warn(
-                "[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: " +
-                    "$puntoFacturacionFallback",
+                "[FE] puntoFacturacionFiscal no encontrado en caja, usando fallback de parametros_generales: $puntoFacturacionFallback",
             )
         }
 

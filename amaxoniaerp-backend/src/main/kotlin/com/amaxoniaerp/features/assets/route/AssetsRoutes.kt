@@ -92,8 +92,7 @@ fun Route.assetsRoutes(
             if (!dataBasePath.isNullOrBlank()) {
                 val file = File(dataBasePath, "$companyDb/cliente_foto/$idCliente/$filename")
                 log.info(
-                    "[CLIENTE_FOTO] dataBasePath=$dataBasePath path=${file.absolutePath} exists=${file.exists()} " +
-                        "isFile=${file.isFile}",
+                    "[CLIENTE_FOTO] dataBasePath=$dataBasePath path=${file.absolutePath} exists=${file.exists()} isFile=${file.isFile}",
                 )
                 if (file.exists() && file.isFile) {
                     call.respondBytes(file.readBytes(), contentTypeForFilename(filename))

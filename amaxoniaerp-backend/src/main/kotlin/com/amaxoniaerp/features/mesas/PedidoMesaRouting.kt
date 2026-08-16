@@ -88,23 +88,11 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                             )
 
                         else ->
-                            call.respond(
-                                HttpStatusCode.InternalServerError,
-                                mapOf(
-                                    "error" to "No se pudieron listar " +
-                                        "los pedidos",
-                                ),
-                            )
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron listar los pedidos"))
                     }
                 } catch (e: Exception) {
                     log.error("Error listando pedidos. adminDb={} sesionId={}", ctx.adminDb, sesionId, e)
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        mapOf(
-                            "error" to "No se pudieron listar los " +
-                                "pedidos",
-                        ),
-                    )
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron listar los pedidos"))
                 }
             }
 
@@ -150,32 +138,13 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                             call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión ya no está abierta"))
 
                         PedidoMesaResult.SinItemsParaCrear ->
-                            call.respond(
-                                HttpStatusCode.BadRequest,
-                                mapOf(
-                                    "error" to "La petición no trae items para " +
-                                        "agregar",
-                                ),
-                            )
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "La petición no trae items para agregar"))
 
-                        else ->
-                            call.respond(
-                                HttpStatusCode.InternalServerError,
-                                mapOf(
-                                    "error" to "No se pudieron " +
-                                        "crear los pedidos",
-                                ),
-                            )
+                        else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron crear los pedidos"))
                     }
                 } catch (e: Exception) {
                     log.error("Error creando pedido. adminDb={} sesionId={}", ctx.adminDb, sesionId, e)
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        mapOf(
-                            "error" to "No se pudieron crear los " +
-                                "pedidos",
-                        ),
-                    )
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron crear los pedidos"))
                 }
             }
 
@@ -224,14 +193,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                                 mapOf("error" to "No hay pedidos pendientes para enviar"),
                             )
 
-                        else ->
-                            call.respond(
-                                HttpStatusCode.InternalServerError,
-                                mapOf(
-                                    "error" to "No se pudo enviar " +
-                                        "la comanda",
-                                ),
-                            )
+                        else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo enviar la comanda"))
                     }
                 } catch (e: Exception) {
                     log.error("Error enviando comanda. adminDb={} sesionId={}", ctx.adminDb, sesionId, e)
@@ -250,13 +212,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                 val sesionId = call.requireSesionId() ?: return@patch
                 val pedidoId =
                     call.parameters["pedidoId"]?.toIntOrNull()?.takeIf { it > 0 } ?: run {
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "El identificador de pedido es " +
-                                    "inválido",
-                            ),
-                        )
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de pedido es inválido"))
                         return@patch
                     }
 
@@ -284,14 +240,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                             )
 
                         PedidoMesaResult.PedidoNoEncontrado ->
-                            call.respond(
-                                HttpStatusCode.NotFound,
-                                mapOf(
-                                    "error" to "El pedido no existe o no " +
-                                        "pertenece " +
-                                        "a la sesión",
-                                ),
-                            )
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to "El pedido no existe o no pertenece a la sesión"))
 
                         PedidoMesaResult.EstadoInvalido ->
                             call.respond(
@@ -310,13 +259,7 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                     }
                 } catch (e: Exception) {
                     log.error("Error cambiando estado. adminDb={} pedidoId={}", ctx.adminDb, pedidoId, e)
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        mapOf(
-                            "error" to "No se pudo cambiar el estado " +
-                                "del pedido",
-                        ),
-                    )
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cambiar el estado del pedido"))
                 }
             }
         }

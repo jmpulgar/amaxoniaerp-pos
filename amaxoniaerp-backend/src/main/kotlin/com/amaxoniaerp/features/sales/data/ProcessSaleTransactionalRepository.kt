@@ -1185,9 +1185,7 @@ open class ProcessSaleTransactionalRepository(
         val clienteNombre = request.factura.facturarA.ifBlank { "CLIENTE MOSTRADOR" }
         val fechaTexto = today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
         val montoTexto = totalBase.setScale(2, RoundingMode.HALF_UP).toPlainString()
-        val conceptoCaja =
-            "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre, Monto: " +
-                "$montoTexto."
+        val conceptoCaja = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre, Monto: $montoTexto."
 
         val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(monetaryContext.countryCode)
         val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(monetaryContext.countryCode)
@@ -1229,8 +1227,7 @@ open class ProcessSaleTransactionalRepository(
             it[cajaReciboTable.nroRecibo] = "FACT/$invoiceCode"
             it[cajaReciboTable.fecha] = today
             it[cajaReciboTable.monto] = totalBase
-            it[cajaReciboTable.observacion] = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: " +
-                "$clienteNombre"
+            it[cajaReciboTable.observacion] = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre"
             it[cajaReciboTable.codVendedor] = request.factura.codVendedor
             it[cajaReciboTable.idCliente] = request.factura.idCliente
             it[cajaReciboTable.idProveedor] = ""

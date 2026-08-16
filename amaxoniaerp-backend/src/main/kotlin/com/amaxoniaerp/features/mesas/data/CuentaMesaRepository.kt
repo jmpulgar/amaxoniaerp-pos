@@ -515,10 +515,7 @@ class CuentaMesaRepository {
                 .groupBy { Triple(it.idItem, it.itemAlmacen, dinero(it.itemPrecioSinIva)) }
                 .mapValues { (_, lineas) -> cantidad(lineas.sumOf { it.itemCantidadTotal }) }
         if (esperado != recibido) {
-            throw InvalidSaleRequestException(
-                "Los productos o cantidades de la venta no coinciden con la cuenta " +
-                    "de mesa",
-            )
+            throw InvalidSaleRequestException("Los productos o cantidades de la venta no coinciden con la cuenta de mesa")
         }
 
         cuenta.detalle.forEach { detalle ->
@@ -603,10 +600,7 @@ class CuentaMesaRepository {
                     it[cantidadFacturada] = nueva
                 }
             if (updated != 1) {
-                throw InvalidSaleRequestException(
-                    "La cuenta cambió durante el cobro; reintenta con el saldo " +
-                        "actualizado",
-                )
+                throw InvalidSaleRequestException("La cuenta cambió durante el cobro; reintenta con el saldo actualizado")
             }
         }
         CuentaMesaDetalleTable.update({

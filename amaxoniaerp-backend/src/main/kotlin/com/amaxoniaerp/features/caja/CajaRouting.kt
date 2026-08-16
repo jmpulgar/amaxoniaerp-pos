@@ -162,12 +162,7 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                     onFailure = { error ->
                         call.respond(
                             HttpStatusCode.BadRequest,
-                            CajaSecuenciaGetResponse(
-                                success = false,
-                                error =
-                                    error.message ?: "No se pudo consultar " +
-                                        "la secuencia",
-                            ),
+                            CajaSecuenciaGetResponse(success = false, error = error.message ?: "No se pudo consultar la secuencia"),
                         )
                     },
                 )
@@ -187,16 +182,7 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                         call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                     },
                     onFailure = { error ->
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to (
-                                    error.message ?: "No se pudo " +
-                                        "calcular " +
-                                        "secuencia"
-                                ),
-                            ),
-                        )
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: "No se pudo calcular secuencia")))
                     },
                 )
             }

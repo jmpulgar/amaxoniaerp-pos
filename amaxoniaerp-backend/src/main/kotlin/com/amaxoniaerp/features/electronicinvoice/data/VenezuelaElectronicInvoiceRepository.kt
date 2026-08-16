@@ -203,14 +203,12 @@ open class VenezuelaElectronicInvoiceRepository {
 
             if (candidatos.isEmpty()) {
                 throw FEConfigurationException(
-                    "Falta fila en `correlativos` con campo='$campoCorrelativoFe'. No se puede reservar correlativo " +
-                        "FE Venezuela.",
+                    "Falta fila en `correlativos` con campo='$campoCorrelativoFe'. No se puede reservar correlativo FE Venezuela.",
                 )
             }
             if (candidatos.size > 1) {
                 throw FEConfigurationException(
-                    "Existen ${candidatos.size} filas en `correlativos` con campo='$campoCorrelativoFe'. Se esperaba " +
-                        "exactamente una.",
+                    "Existen ${candidatos.size} filas en `correlativos` con campo='$campoCorrelativoFe'. Se esperaba exactamente una.",
                 )
             }
             val fila = candidatos.single()
@@ -240,14 +238,11 @@ open class VenezuelaElectronicInvoiceRepository {
                 }
             if (updated != 1) {
                 throw FEConfigurationException(
-                    "No se pudo actualizar la fila de correlativo id=$idFila (updated=$updated). No se reservó " +
-                        "ningún " +
-                        "número.",
+                    "No se pudo actualizar la fila de correlativo id=$idFila (updated=$updated). No se reservó ningún número.",
                 )
             }
             log.info(
-                "[VE-FE] reserveAtLeast reservado numero={} formato={} (minimumNextNumber={} contadorActual={} " +
-                    "proximo={})",
+                "[VE-FE] reserveAtLeast reservado numero={} formato={} (minimumNextNumber={} contadorActual={} proximo={})",
                 reservado.numeroFormateado(),
                 formato,
                 minimumNextNumber,

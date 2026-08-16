@@ -116,22 +116,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val list = itemsRepository.listDepartments(database = companyDb)
                 val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
@@ -147,22 +135,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val departmentId =
                     call.request.queryParameters["departmentId"]?.toIntOrNull()
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "departmentId inválido"))
@@ -182,22 +158,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val sectionId =
                     call.request.queryParameters["sectionId"]?.toIntOrNull()
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "sectionId inválido"))
@@ -217,22 +181,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val familyId =
                     call.request.queryParameters["familyId"]?.toIntOrNull()
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "familyId inválido"))
@@ -252,22 +204,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
 
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val list = itemsRepository.listBrands(database = companyDb)
@@ -284,22 +224,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val brandId =
                     call.request.queryParameters["brandId"]?.toIntOrNull()
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "brandId inválido"))
@@ -328,22 +256,10 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta country_code " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to "Falta admin_db " +
-                                    "en token",
-                            ),
-                        )
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val limit =
                     call.request.queryParameters["limit"]
                         ?.toIntOrNull()

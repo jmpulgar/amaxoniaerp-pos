@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory
  *
  * - `GET    .../sesiones/{sesionId}/cuenta?cajaId=`                                     lista todas las cuentas.
  * - `GET    .../sesiones/{sesionId}/cuenta/{cuentaId}?cajaId=`                          detalle de una cuenta.
- * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=` crear cuenta (completa o división).
+ * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=`                                     crear cuenta (completa o división).
  * - `POST   .../sesiones/{sesionId}/cuenta/{cuentaId}/cancelar?cajaId=`                 cancelar cuenta sin pagar.
  * - `POST   .../sesiones/{sesionId}/cuenta/{cuentaId}/marcar-facturada?cajaId=`         confirmar facturación.
  *
@@ -59,9 +59,7 @@ fun Route.cuentaMesaRouting(
                 val tri = call.extractRoutingIds() ?: return@post
                 try {
                     val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                    if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                        return@post
-                    }
+                    if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post
                     val result = sesionMesaRepository.solicitarCuenta(database, tri.sesionId)
                     respondSesionMutacion(call, log, result, okMessage = "Cuenta solicitada")
                 } catch (e: Exception) {
@@ -80,9 +78,7 @@ fun Route.cuentaMesaRouting(
                 val tri = call.extractRoutingIds() ?: return@post
                 try {
                     val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                    if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                        return@post
-                    }
+                    if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post
                     val result = sesionMesaRepository.cancelarSolicitudCuenta(database, tri.sesionId)
                     respondSesionMutacion(call, log, result, okMessage = "Solicitud de cuenta cancelada")
                 } catch (e: Exception) {
@@ -102,39 +98,23 @@ fun Route.cuentaMesaRouting(
                     val tri = call.extractRoutingIds() ?: return@get
                     try {
                         val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                        if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                            return@get
-                        }
+                        if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@get
                         val result = cuentaMesaRepository.listarCuentas(database, tri.sesionId, tri.mesaId)
                         when (result) {
                             is CuentaMesaResult.Listada ->
                                 call.respond(
                                     HttpStatusCode.OK,
-                                    CuentasMesaListResponse(
-                                        success = true,
-                                        sesionMesaId = tri.sesionId,
-                                        data = result.cuentas,
-                                    ),
+                                    CuentasMesaListResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuentas),
                                 )
 
                             CuentaMesaResult.SesionNoPerteneceMesa ->
-                                call.respond(
-                                    HttpStatusCode.NotFound,
-                                    mapOf("error" to "La sesión no pertenece a esa mesa"),
-                                )
+                                call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
-                            else ->
-                                call.respond(
-                                    HttpStatusCode.InternalServerError,
-                                    mapOf("error" to "Respuesta inesperada"),
-                                )
+                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Respuesta inesperada"))
                         }
                     } catch (e: Exception) {
                         log.error("Error listando cuentas. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId, e)
-                        call.respond(
-                            HttpStatusCode.InternalServerError,
-                            mapOf("error" to "No se pudieron listar las cuentas"),
-                        )
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron listar las cuentas"))
                     }
                 }
 
@@ -147,32 +127,20 @@ fun Route.cuentaMesaRouting(
                     val body = call.receive<CrearCuentaRequest>()
                     try {
                         val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                        if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                            return@post
-                        }
+                        if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post
                         val result = cuentaMesaRepository.crear(database, tri.sesionId, tri.mesaId, body)
                         when (result) {
                             is CuentaMesaResult.Creada ->
                                 call.respond(
                                     HttpStatusCode.Created,
-                                    CuentaCreadaResponse(
-                                        success = true,
-                                        sesionMesaId = tri.sesionId,
-                                        data = result.cuenta,
-                                    ),
+                                    CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
                                 )
 
                             CuentaMesaResult.SesionNoPerteneceMesa ->
-                                call.respond(
-                                    HttpStatusCode.NotFound,
-                                    mapOf("error" to "La sesión no pertenece a esa mesa"),
-                                )
+                                call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
                             CuentaMesaResult.SesionNoActiva ->
-                                call.respond(
-                                    HttpStatusCode.Conflict,
-                                    mapOf("error" to "La sesión no admite cuentas (estado final)"),
-                                )
+                                call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión no admite cuentas (estado final)"))
 
                             CuentaMesaResult.CantidadSuperaSaldo ->
                                 call.respond(
@@ -183,10 +151,7 @@ fun Route.cuentaMesaRouting(
                             CuentaMesaResult.PedidoNoEncontrado ->
                                 call.respond(
                                     HttpStatusCode.BadRequest,
-                                    mapOf(
-                                        "error" to
-                                            "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo",
-                                    ),
+                                    mapOf("error" to "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo"),
                                 )
 
                             CuentaMesaResult.SinItemsParaCrear ->
@@ -201,11 +166,7 @@ fun Route.cuentaMesaRouting(
                                     mapOf("error" to "Hay pedidos pendientes en cocina que impiden facturar"),
                                 )
 
-                            else ->
-                                call.respond(
-                                    HttpStatusCode.InternalServerError,
-                                    mapOf("error" to "No se pudo crear la cuenta"),
-                                )
+                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo crear la cuenta"))
                         }
                     } catch (e: Exception) {
                         log.error("Error creando cuenta. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId, e)
@@ -222,48 +183,26 @@ fun Route.cuentaMesaRouting(
                         val cuentaId = call.requireCuentaId() ?: return@get
                         try {
                             val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                                return@get
-                            }
-                            val result =
-                                cuentaMesaRepository.obtenerCuenta(
-                                    database,
-                                    tri.sesionId,
-                                    tri.mesaId,
-                                    cuentaId,
-                                )
+                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@get
+                            val result = cuentaMesaRepository.obtenerCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
                             when (result) {
                                 is CuentaMesaResult.Creada ->
                                     call.respond(
                                         HttpStatusCode.OK,
-                                        CuentaCreadaResponse(
-                                            success = true,
-                                            sesionMesaId = tri.sesionId,
-                                            data = result.cuenta,
-                                        ),
+                                        CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
                                     )
 
                                 CuentaMesaResult.SesionNoPerteneceMesa ->
-                                    call.respond(
-                                        HttpStatusCode.NotFound,
-                                        mapOf("error" to "La sesión no pertenece a esa mesa"),
-                                    )
+                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
                                 CuentaMesaResult.CuentaNoEncontrada ->
                                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
-                                else ->
-                                    call.respond(
-                                        HttpStatusCode.InternalServerError,
-                                        mapOf("error" to "Respuesta inesperada"),
-                                    )
+                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Respuesta inesperada"))
                             }
                         } catch (e: Exception) {
                             log.error("Error obteniendo cuenta. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId, e)
-                            call.respond(
-                                HttpStatusCode.InternalServerError,
-                                mapOf("error" to "No se pudo obtener la cuenta"),
-                            )
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo obtener la cuenta"))
                         }
                     }
 
@@ -275,32 +214,17 @@ fun Route.cuentaMesaRouting(
                         val cuentaId = call.requireCuentaId() ?: return@post
                         try {
                             val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                                return@post
-                            }
-                            val result =
-                                cuentaMesaRepository.cancelarCuenta(
-                                    database,
-                                    tri.sesionId,
-                                    tri.mesaId,
-                                    cuentaId,
-                                )
+                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post
+                            val result = cuentaMesaRepository.cancelarCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
                             when (result) {
                                 is CuentaMesaResult.Creada ->
                                     call.respond(
                                         HttpStatusCode.OK,
-                                        CuentaCreadaResponse(
-                                            success = true,
-                                            sesionMesaId = tri.sesionId,
-                                            data = result.cuenta,
-                                        ),
+                                        CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
                                     )
 
                                 CuentaMesaResult.SesionNoPerteneceMesa ->
-                                    call.respond(
-                                        HttpStatusCode.NotFound,
-                                        mapOf("error" to "La sesión no pertenece a esa mesa"),
-                                    )
+                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
                                 CuentaMesaResult.CuentaNoEncontrada ->
                                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
@@ -311,18 +235,11 @@ fun Route.cuentaMesaRouting(
                                         mapOf("error" to "La cuenta ya no está activa y no se puede cancelar"),
                                     )
 
-                                else ->
-                                    call.respond(
-                                        HttpStatusCode.InternalServerError,
-                                        mapOf("error" to "No se pudo cancelar la cuenta"),
-                                    )
+                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cancelar la cuenta"))
                             }
                         } catch (e: Exception) {
                             log.error("Error cancelando cuenta. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId, e)
-                            call.respond(
-                                HttpStatusCode.InternalServerError,
-                                mapOf("error" to "No se pudo cancelar la cuenta"),
-                            )
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cancelar la cuenta"))
                         }
                     }
 
@@ -342,9 +259,7 @@ fun Route.cuentaMesaRouting(
                         val body = call.receive<MarcarCuentaFacturadaRequest>()
                         try {
                             val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) {
-                                return@post
-                            }
+                            if (!call.ensureCuentaScope(cuentaMesaRepository, mesasRepository, database, tri)) return@post
                             val result =
                                 cuentaMesaRepository.marcarFacturada(
                                     database = database,
@@ -495,10 +410,7 @@ private suspend fun respondMarcarFacturada(
             )
 
         CuentaMesaResult.SesionNoPerteneceMesa ->
-            call.respond(
-                HttpStatusCode.NotFound,
-                mapOf("error" to "La sesión no pertenece a esa mesa"),
-            )
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
 
         CuentaMesaResult.CuentaNoEncontrada ->
             call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))

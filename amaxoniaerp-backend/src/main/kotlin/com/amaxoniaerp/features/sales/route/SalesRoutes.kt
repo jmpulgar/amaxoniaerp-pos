@@ -90,13 +90,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                         request.factura.idCliente,
                         e,
                     )
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        mapOf(
-                            "error" to "Error interno al procesar " +
-                                "venta",
-                        ),
-                    )
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Error interno al procesar venta"))
                 }
             }
         }
