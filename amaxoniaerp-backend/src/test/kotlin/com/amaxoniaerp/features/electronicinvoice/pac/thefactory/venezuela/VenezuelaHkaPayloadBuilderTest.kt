@@ -37,7 +37,12 @@ class VenezuelaHkaPayloadBuilderTest {
             context(
                 detalles =
                     listOf(
-                        detalle(precioSinIva = "100.00", totalSinIva = "100.00", totalConIva = "116.00", piva = "16.00"),
+                        detalle(
+                            precioSinIva = "100.00",
+                            totalSinIva = "100.00",
+                            totalConIva = "116.00",
+                            piva = "16.00",
+                        ),
                     ),
                 ivaTotalFactura = "16.00",
                 totalizarTotalGeneral = "116.00",
@@ -120,7 +125,12 @@ class VenezuelaHkaPayloadBuilderTest {
             context(
                 detalles =
                     listOf(
-                        detalle(precioSinIva = "100.00", totalSinIva = "100.00", totalConIva = "116.00", piva = "16.00"),
+                        detalle(
+                            precioSinIva = "100.00",
+                            totalSinIva = "100.00",
+                            totalConIva = "116.00",
+                            piva = "16.00",
+                        ),
                         detalle(
                             descripcion = "Reducer",
                             precioSinIva = "100.00",
@@ -381,7 +391,17 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `cliente sin datos se completa con consumidor final`() {
-        val ctx = context(comprador = VECompradorData(nombreRazonSocial = "", rif = "", direccion = null, telefono = null, email = null))
+        val ctx =
+            context(
+                comprador =
+                    VECompradorData(
+                        nombreRazonSocial = "",
+                        rif = "",
+                        direccion = null,
+                        telefono = null,
+                        email = null,
+                    ),
+            )
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("CONSUMIDOR FINAL", payload.documento.datosTransaccion.cliente.nombreRazonSocial)
         assertEquals("V000000000", payload.documento.datosTransaccion.cliente.numeroRif)
@@ -414,7 +434,12 @@ class VenezuelaHkaPayloadBuilderTest {
             context(
                 detalles =
                     listOf(
-                        detalle(precioSinIva = "100.005", totalSinIva = "100.005", totalConIva = "116.006", piva = "16.00"),
+                        detalle(
+                            precioSinIva = "100.005",
+                            totalSinIva = "100.005",
+                            totalConIva = "116.006",
+                            piva = "16.00",
+                        ),
                     ),
             )
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")

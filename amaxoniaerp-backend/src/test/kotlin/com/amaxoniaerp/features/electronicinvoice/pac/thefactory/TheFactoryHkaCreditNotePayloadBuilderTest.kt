@@ -17,9 +17,10 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
         val transaction = payload.documento.datosTransaccion
         val totals = payload.documento.totalesSubTotales
 
+        val referencedDocument = transaction.listaDocsFiscalReferenciados?.single()
         assertEquals("04", transaction.tipoDocumento)
-        assertEquals("2026-08-01T00:00:00-05:00", transaction.listaDocsFiscalReferenciados?.single()?.fechaEmisionDocFiscalReferenciado)
-        assertEquals(ORIGINAL_CUFE, transaction.listaDocsFiscalReferenciados?.single()?.cufeFEReferenciada)
+        assertEquals("2026-08-01T00:00:00-05:00", referencedDocument?.fechaEmisionDocFiscalReferenciado)
+        assertEquals(ORIGINAL_CUFE, referencedDocument?.cufeFEReferenciada)
         assertEquals("9.35", totals.totalPrecioNeto)
         assertEquals("0.65", totals.totalITBMS)
         assertEquals("10.00", totals.totalFactura)
@@ -27,7 +28,25 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
 
         val goldenJson = feJson.encodeToString(payload)
         assertEquals(
-            """{"documento":{"codigoSucursalEmisor":"0000","datosTransaccion":{"tipoEmision":"01","tipoDocumento":"04","numeroDocumentoFiscal":"0000009001","puntoFacturacionFiscal":"001","fechaEmision":"2026-08-12T00:00:00-05:00","naturalezaOperacion":"01","tipoOperacion":"1","destinoOperacion":"1","formatoCAFE":"1","entregaCAFE":"1","envioContenedor":"1","procesoGeneracion":"1","tipoVenta":"1","informacionInteres":"Devolución parcial","cliente":{"tipoClienteFE":"02","tipoContribuyente":"1","numeroRUC":"155-001-001","digitoVerificadorRUC":"1","razonSocial":"CLIENTE PRUEBA","direccion":"Calle 1","telefono1":"6000-0000","correoElectronico1":"cliente@example.com","pais":"PA"},"listaDocsFiscalReferenciados":[{"fechaEmisionDocFiscalReferenciado":"2026-08-01T00:00:00-05:00","cufeFEReferenciada":"$ORIGINAL_CUFE"}]},"listaItems":[{"descripcion":"Producto devuelto","codigo":"P-001","cantidad":"1.000","precioUnitario":"9.35","precioItem":"9.35","valorTotal":"10.00","tasaITBMS":"01","valorITBMS":"0.65","codigoCPBSAbrev":"54","codigoCPBS":"5411"}],"totalesSubTotales":{"totalPrecioNeto":"9.35","totalITBMS":"0.65","totalMontoGravado":"0.65","totalDescuento":"0.65","totalFactura":"10.00","totalValorRecibido":"10.00","tiempoPago":"1","nroItems":"1","totalTodosItems":"10.65","listaDescBonificacion":[{"descDescuento":"Descuento Global","montoDescuento":"0.65"}],"listaFormaPago":[{"formaPagoFact":"99","descFormaPago":"Otro medio de pago","valorCuotaPagada":"0.00"}]}}}""",
+            """{"documento":{"codigoSucursalEmisor":"0000","datosTransaccion":{"tipoEmision":"01",""" +
+                """"tipoDocumento":"04","numeroDocumentoFiscal":"0000009001","puntoFacturacionFiscal":"001",""" +
+                """"fechaEmision":"2026-08-12T00:00:00-05:00","naturalezaOperacion":"01",""" +
+                """"tipoOperacion":"1","destinoOperacion":"1","formatoCAFE":"1","entregaCAFE":"1",""" +
+                """"envioContenedor":"1","procesoGeneracion":"1","tipoVenta":"1",""" +
+                """"informacionInteres":"Devolución parcial","cliente":{"tipoClienteFE":"02",""" +
+                """"tipoContribuyente":"1","numeroRUC":"155-001-001","digitoVerificadorRUC":"1",""" +
+                """"razonSocial":"CLIENTE PRUEBA","direccion":"Calle 1","telefono1":"6000-0000",""" +
+                """"correoElectronico1":"cliente@example.com","pais":"PA"},""" +
+                """"listaDocsFiscalReferenciados":[{"fechaEmisionDocFiscalReferenciado":"2026-08-01T00:00:00-05:00",""" +
+                """"cufeFEReferenciada":"$ORIGINAL_CUFE"}]},"listaItems":[{"descripcion":"Producto devuelto",""" +
+                """"codigo":"P-001","cantidad":"1.000","precioUnitario":"9.35","precioItem":"9.35",""" +
+                """"valorTotal":"10.00","tasaITBMS":"01","valorITBMS":"0.65","codigoCPBSAbrev":"54",""" +
+                """"codigoCPBS":"5411"}],"totalesSubTotales":{"totalPrecioNeto":"9.35","totalITBMS":"0.65",""" +
+                """"totalMontoGravado":"0.65","totalDescuento":"0.65","totalFactura":"10.00",""" +
+                """"totalValorRecibido":"10.00","tiempoPago":"1","nroItems":"1","totalTodosItems":"10.65",""" +
+                """"listaDescBonificacion":[{"descDescuento":"Descuento Global","montoDescuento":"0.65"}],""" +
+                """"listaFormaPago":[{"formaPagoFact":"99","descFormaPago":"Otro medio de pago",""" +
+                """"valorCuotaPagada":"0.00"}]}}}""",
             goldenJson,
         )
     }

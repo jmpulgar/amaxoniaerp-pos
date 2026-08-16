@@ -120,7 +120,11 @@ class VenezuelaInvoiceStrategyTest {
             val repo =
                 fakeRepo(
                     tipoFacturacion = 5,
-                    alreadyIssued = AlreadyIssuedResult.Partial(numeroDocumentoFiscal = "00000099", numeroControl = null),
+                    alreadyIssued =
+                        AlreadyIssuedResult.Partial(
+                            numeroDocumentoFiscal = "00000099",
+                            numeroControl = null,
+                        ),
                 )
             val client = CountingClient()
             val strategy = strategy(repo, client)
@@ -138,7 +142,11 @@ class VenezuelaInvoiceStrategyTest {
             val repo =
                 fakeRepo(
                     tipoFacturacion = 5,
-                    alreadyIssued = AlreadyIssuedResult.Partial(numeroDocumentoFiscal = null, numeroControl = "L001P001-200"),
+                    alreadyIssued =
+                        AlreadyIssuedResult.Partial(
+                            numeroDocumentoFiscal = null,
+                            numeroControl = "L001P001-200",
+                        ),
                 )
             val client = CountingClient()
             val strategy = strategy(repo, client)
@@ -201,7 +209,9 @@ class VenezuelaInvoiceStrategyTest {
                     emision =
                         VenezuelaHkaResponse(
                             httpStatus = 200,
-                            rawBody = """{"codigo":"200","resultado":{"numeroDocumento":"00000060","numeroControl":"L001P001-60"}}""",
+                            rawBody =
+                                """{"codigo":"200","resultado":{"numeroDocumento":"00000060",""" +
+                                    """"numeroControl":"L001P001-60"}}""",
                             codigo = "200",
                             mensaje = "OK",
                             validaciones = emptyList(),
@@ -279,7 +289,12 @@ class VenezuelaInvoiceStrategyTest {
                             codigo = "422",
                             mensaje = "RIF invalido",
                             validaciones = listOf("rif"),
-                            resultado = VenezuelaHkaEmisionResponse(codigo = "422", mensaje = "RIF invalido", resultado = null),
+                            resultado =
+                                VenezuelaHkaEmisionResponse(
+                                    codigo = "422",
+                                    mensaje = "RIF invalido",
+                                    resultado = null,
+                                ),
                         ),
                 )
             val strategy = strategy(repo, client)
@@ -462,7 +477,9 @@ class VenezuelaInvoiceStrategyTest {
     private fun okEmision(numDoc: String) =
         VenezuelaHkaResponse(
             httpStatus = 200,
-            rawBody = """{"codigo":"200","resultado":{"numeroDocumento":"$numDoc","numeroControl":"L001P001-$numDoc"}}""",
+            rawBody =
+                """{"codigo":"200","resultado":{"numeroDocumento":"$numDoc",""" +
+                    """"numeroControl":"L001P001-$numDoc"}}""",
             codigo = "200",
             mensaje = "OK",
             validaciones = emptyList(),
