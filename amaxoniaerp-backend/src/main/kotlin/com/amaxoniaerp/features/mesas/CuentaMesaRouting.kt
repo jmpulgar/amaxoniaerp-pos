@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory
  *
  * - `GET    .../sesiones/{sesionId}/cuenta?cajaId=`                                     lista todas las cuentas.
  * - `GET    .../sesiones/{sesionId}/cuenta/{cuentaId}?cajaId=`                          detalle de una cuenta.
- * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=`                                     crear cuenta (completa o división).
+ * - `POST   .../sesiones/{sesionId}/cuenta?cajaId=` crear cuenta
+ *   (completa o división).
  * - `POST   .../sesiones/{sesionId}/cuenta/{cuentaId}/cancelar?cajaId=`                 cancelar cuenta sin pagar.
  * - `POST   .../sesiones/{sesionId}/cuenta/{cuentaId}/marcar-facturada?cajaId=`         confirmar facturación.
  *
