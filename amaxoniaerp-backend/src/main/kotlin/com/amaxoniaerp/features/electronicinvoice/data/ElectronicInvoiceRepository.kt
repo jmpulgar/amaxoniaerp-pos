@@ -86,7 +86,7 @@ class ElectronicInvoiceRepository {
             logger.info(
                 "[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(
                     8,
-                )}... api_thefactoryhka=${config.api_thefactoryhka} tipoEmision=${config.tipoEmision}",
+                )}... api_thefactoryhka=${config.apiTheFactoryHka} tipoEmision=${config.tipoEmision}",
             )
 
             // 3. Resolver código sucursal emisor y punto facturación fiscal
@@ -402,7 +402,7 @@ class ElectronicInvoiceRepository {
         return FEConfigData(
             tokenEmpresa = tokenEmpresa,
             tokenPassword = tokenPassword,
-            api_thefactoryhka = apiTheFactoryHka.trimEnd('/'),
+            apiTheFactoryHka = apiTheFactoryHka.trimEnd('/'),
             tipoEmision = row[FEParametrosReadTable.tipoEmision] ?: "01",
             destinoOperacion = row[FEParametrosReadTable.destinoOperacion] ?: "1",
             procesoGeneracion = row[FEParametrosReadTable.procesoGeneracion] ?: "01",

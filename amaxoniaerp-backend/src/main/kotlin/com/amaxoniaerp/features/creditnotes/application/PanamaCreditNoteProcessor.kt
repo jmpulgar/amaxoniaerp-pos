@@ -56,7 +56,7 @@ class PanamaCreditNoteProcessor(
             PacCredentials(
                 usuario = context.invoice.config.tokenEmpresa,
                 clave = context.invoice.config.tokenPassword,
-                baseUrl = context.invoice.config.api_thefactoryhka,
+                baseUrl = context.invoice.config.apiTheFactoryHka,
             )
         val token =
             pacClient.authenticate(credentials).getOrElse { error ->
@@ -81,7 +81,7 @@ class PanamaCreditNoteProcessor(
         val response =
             pacClient
                 .sendDocument(
-                    baseUrl = context.invoice.config.api_thefactoryhka,
+                    baseUrl = context.invoice.config.apiTheFactoryHka,
                     token = token,
                     payload = payload,
                 ).getOrElse { error ->
@@ -105,7 +105,7 @@ class PanamaCreditNoteProcessor(
             } else {
                 pacClient
                     .downloadPdf(
-                        baseUrl = context.invoice.config.api_thefactoryhka,
+                        baseUrl = context.invoice.config.apiTheFactoryHka,
                         token = token,
                         cufe = response.cufe,
                     ).fold(

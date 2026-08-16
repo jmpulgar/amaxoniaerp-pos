@@ -60,7 +60,7 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
                         FEConfigData(
                             tokenEmpresa = "usuario",
                             tokenPassword = "clave",
-                            api_thefactoryhka = "https://example.com",
+                            apiTheFactoryHka = "https://example.com",
                             tipoEmision = "01",
                             destinoOperacion = "1",
                             procesoGeneracion = "1",
