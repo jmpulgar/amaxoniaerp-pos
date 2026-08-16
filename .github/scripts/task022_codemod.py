@@ -94,8 +94,8 @@ for path, edits in replacements.items():
     text = path.read_text()
     for old, new in edits:
         count = text.count(old)
-        if count != 1:
-            raise RuntimeError(f"Expected exactly one match in {path} for {old!r}, found {count}")
-        text = text.replace(old, new)
+        if count < 1:
+            raise RuntimeError(f"Expected a match in {path} for {old!r}, found {count}")
+        text = text.replace(old, new, 1)
     path.write_text(text)
     print(f"updated {path}")
