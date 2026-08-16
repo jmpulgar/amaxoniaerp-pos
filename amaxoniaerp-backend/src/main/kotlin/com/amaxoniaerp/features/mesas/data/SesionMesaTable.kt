@@ -3,6 +3,9 @@ package com.amaxoniaerp.features.mesas.data
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 
+private const val SCHEMA_CAJA_ID_MAX_LENGTH = 36
+private const val SCHEMA_ESTADO_MAX_LENGTH = 30
+
 /**
  * Sesión operativa de una mesa: el lapso durante el cual una mesa está siendo atendida.
  *
@@ -18,12 +21,12 @@ import org.jetbrains.exposed.sql.javatime.datetime
 object SesionMesaTable : Table("sesion_mesa") {
     val id = integer("id").autoIncrement("seq_sesion_mesa")
     val sucursalId = integer("sucursal_id")
-    val cajaId = varchar("caja_id", 36)
+    val cajaId = varchar("caja_id", SCHEMA_CAJA_ID_MAX_LENGTH)
     val areaId = integer("area_id")
     val mesaId = integer("mesa_id")
     val usuarioId = integer("usuario_id")
     val cantidadPersonas = integer("cantidad_personas").default(1)
-    val estado = varchar("estado", 30)
+    val estado = varchar("estado", SCHEMA_ESTADO_MAX_LENGTH)
     val fechaApertura = datetime("fecha_apertura")
     val fechaCierre = datetime("fecha_cierre").nullable()
     val activo = integer("activo").default(1)

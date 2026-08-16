@@ -2,6 +2,16 @@ package com.amaxoniaerp.features.companies.data
 
 import org.jetbrains.exposed.sql.Table
 
+private const val SCHEMA_DEFAULT_COD_CLIENTE_FACTURA_MAX_LENGTH = 80
+private const val SCHEMA_IGTF_PRECISION = 10
+private const val SCHEMA_IGTF_SCALE = 6
+private const val SCHEMA_MONEDA_MAX_LENGTH = 50
+private const val SCHEMA_MONEDA_SECUNDARIA_ABR_MAX_LENGTH = 50
+private const val SCHEMA_PORCENTAJE_IMPUESTO_PRINCIPAL_PRECISION = 10
+private const val SCHEMA_RIF_MAX_LENGTH = 50
+private const val SCHEMA_TASA_INVERSA_PRECISION = 20
+private const val SCHEMA_TASA_INVERSA_SCALE = 8
+
 /**
  * Columnas comunes a VE y PA en parametros_generales.
  */
@@ -9,16 +19,16 @@ abstract class BaseParametrosGeneralesTable(
     name: String = "parametros_generales",
 ) : Table(name) {
     val codEmpresa = integer("cod_empresa")
-    val defaultCodClienteFactura = varchar("default_cod_cliente_factura", 80)
+    val defaultCodClienteFactura = varchar("default_cod_cliente_factura", SCHEMA_DEFAULT_COD_CLIENTE_FACTURA_MAX_LENGTH)
     val defaultIdFormaPagoFactura = integer("default_id_formapago_factura")
-    val porcentajeImpuestoPrincipal = decimal("porcentaje_impuesto_principal", 10, 2)
+    val porcentajeImpuestoPrincipal = decimal("porcentaje_impuesto_principal", SCHEMA_PORCENTAJE_IMPUESTO_PRINCIPAL_PRECISION, 2)
     val validarStock = varchar("validar_stock", 2)
     val diasVencimiento = integer("dias_vencimiento")
     val codAlmacen = integer("cod_almacen")
-    val rif = varchar("rif", 50).nullable()
+    val rif = varchar("rif", SCHEMA_RIF_MAX_LENGTH).nullable()
 
     // moneda base existe en ambos pero con nombre de columna distinto en cada esquema
-    val abrMonedaBase = varchar("moneda", 50)
+    val abrMonedaBase = varchar("moneda", SCHEMA_MONEDA_MAX_LENGTH)
     val monedaBase = integer("moneda_base").nullable()
 }
 
@@ -26,8 +36,8 @@ abstract class BaseParametrosGeneralesTable(
 object ParametrosGeneralesTableVE : BaseParametrosGeneralesTable() {
     val multiMoneda = varchar("multi_moneda", 2)
     val monedaSecundaria = integer("moneda_secundaria")
-    val abrMonedaSecundaria = varchar("moneda_secundaria_abr", 50)
-    val igtf = decimal("igtf", 10, 6).nullable()
+    val abrMonedaSecundaria = varchar("moneda_secundaria_abr", SCHEMA_MONEDA_SECUNDARIA_ABR_MAX_LENGTH)
+    val igtf = decimal("igtf", SCHEMA_IGTF_PRECISION, SCHEMA_IGTF_SCALE).nullable()
     val impresionDirecta = varchar("impresion_directa", 2) // "Si" / "No"
 }
 
@@ -60,7 +70,7 @@ abstract class BaseTasasCambioTable(
     name: String = "tasas_cambio",
 ) : Table(name) {
     val id = long("id")
-    val tasaInversa = decimal("tasa_inversa", 20, 8)
+    val tasaInversa = decimal("tasa_inversa", SCHEMA_TASA_INVERSA_PRECISION, SCHEMA_TASA_INVERSA_SCALE)
     override val primaryKey = PrimaryKey(id)
 }
 

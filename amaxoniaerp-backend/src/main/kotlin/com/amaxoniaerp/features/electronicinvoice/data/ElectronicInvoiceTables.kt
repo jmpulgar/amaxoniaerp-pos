@@ -2,6 +2,75 @@ package com.amaxoniaerp.features.electronicinvoice.data
 
 import org.jetbrains.exposed.sql.Table
 
+private const val SCHEMA_APELLIDO_MAX_LENGTH = 20
+private const val SCHEMA_API_THEFACTORYHKA_MAX_LENGTH = 500
+private const val SCHEMA_CAJA_DETALLE_ID_MAX_LENGTH = 36
+private const val SCHEMA_CAJA_ID_MAX_LENGTH = 36
+private const val SCHEMA_CAMPO_MAX_LENGTH = 100
+private const val SCHEMA_CODIGO_SUCURSAL_EMISOR_MAX_LENGTH = 20
+private const val SCHEMA_COD_FACTURA_DETALLE_FORMAPAGO_MAX_LENGTH = 36
+private const val SCHEMA_COD_FACTURA_FISCAL_MAX_LENGTH = 10
+private const val SCHEMA_COD_FACTURA_MAX_LENGTH = 32
+private const val SCHEMA_DESTINO_OPERACION_MAX_LENGTH = 5
+private const val SCHEMA_DIRECCION_ENVIO_MAX_LENGTH = 500
+private const val SCHEMA_DIRECCION_MAX_LENGTH = 200
+private const val SCHEMA_DIRECCION_NIVEL3_MAX_LENGTH = 100
+private const val SCHEMA_DV_MAX_LENGTH = 255
+private const val SCHEMA_EMAIL_MAX_LENGTH = 50
+private const val SCHEMA_ENTREGA_CAFE_MAX_LENGTH = 5
+private const val SCHEMA_ENVIO_CONTENEDOR_MAX_LENGTH = 5
+private const val SCHEMA_FECHA_FACTURA_MAX_LENGTH = 20
+private const val SCHEMA_FECHA_INICIO_CONTINGENCIA_MAX_LENGTH = 30
+private const val SCHEMA_FORMAPAGO_MAX_LENGTH = 20
+private const val SCHEMA_FORMATO_CAFE_MAX_LENGTH = 5
+private const val SCHEMA_ID_CAJA_MAX_LENGTH = 36
+private const val SCHEMA_ID_CLIENTE_MAX_LENGTH = 36
+private const val SCHEMA_ID_DETALLE_FACTURA_MAX_LENGTH = 36
+private const val SCHEMA_ID_FACTURA_MAX_LENGTH = 36
+private const val SCHEMA_ID_MAX_LENGTH = 36
+private const val SCHEMA_IMPORTE_ISC_PRECISION = 20
+private const val SCHEMA_IMPORTE_OTI_PRECISION = 20
+private const val SCHEMA_ISO_MAX_LENGTH = 5
+private const val SCHEMA_ITEM_CANTIDAD_PRECISION = 32
+private const val SCHEMA_ITEM_CANTIDAD_SCALE = 3
+private const val SCHEMA_ITEM_CANTIDAD_TOTAL_PRECISION = 32
+private const val SCHEMA_ITEM_CODIGO_MAX_LENGTH = 50
+private const val SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH = 500
+private const val SCHEMA_ITEM_MONTODESCUENTO_PRECISION = 20
+private const val SCHEMA_ITEM_PIVA_PRECISION = 10
+private const val SCHEMA_ITEM_PRECIOSINIVA_PRECISION = 20
+private const val SCHEMA_ITEM_TOTALCONIVA_PRECISION = 20
+private const val SCHEMA_ITEM_TOTALSINIVA_PRECISION = 20
+private const val SCHEMA_ITEM_UNIDAD_EMPAQUE_MAX_LENGTH = 15
+private const val SCHEMA_IVA_TOTAL_FACTURA_PRECISION = 20
+private const val SCHEMA_MONTO_ITEMS_FACTURA_PRECISION = 20
+private const val SCHEMA_MONTO_PRECISION = 10
+private const val SCHEMA_MOTIVO_CONTINGENCIA_MAX_LENGTH = 300
+private const val SCHEMA_NATURALEZA_OPERACION_MAX_LENGTH = 5
+private const val SCHEMA_NOMBRE_MAX_LENGTH = 100
+private const val SCHEMA_NUMERO_DOCUMENTO_FISCAL_MAX_LENGTH = 20
+private const val SCHEMA_OBSERVACION_MAX_LENGTH = 300
+private const val SCHEMA_PORCENTAJE_ISC_PRECISION = 10
+private const val SCHEMA_PROCESO_GENERACION_MAX_LENGTH = 5
+private const val SCHEMA_PUNTO_FACTURACION_FISCAL_MAX_LENGTH = 10
+private const val SCHEMA_RIF_MAX_LENGTH = 50
+private const val SCHEMA_SIMBOLO_MAX_LENGTH = 20
+private const val SCHEMA_TELEFONOS_MAX_LENGTH = 50
+private const val SCHEMA_TIPO_CLIENTE_FE_MAX_LENGTH = 5
+private const val SCHEMA_TIPO_DOCUMENTO_MAX_LENGTH = 5
+private const val SCHEMA_TIPO_EMISION_MAX_LENGTH = 5
+private const val SCHEMA_TIPO_FACTURA_MAX_LENGTH = 50
+private const val SCHEMA_TIPO_OPERACION_MAX_LENGTH = 5
+private const val SCHEMA_TIPO_VENTA_MAX_LENGTH = 5
+private const val SCHEMA_TOKEN_EMPRESA_MAX_LENGTH = 500
+private const val SCHEMA_TOKEN_PASSWORD_MAX_LENGTH = 500
+private const val SCHEMA_TOTALIZAR_CAMBIO_PRECISION = 10
+private const val SCHEMA_TOTALIZAR_DESCUENTO_GLOBAL_PRECISION = 20
+private const val SCHEMA_TOTALIZAR_MONTO_CANCELAR_PRECISION = 10
+private const val SCHEMA_TOTALIZAR_MONTO_RETENCION_PRECISION = 10
+private const val SCHEMA_TOTALIZAR_TOTAL_GENERAL_PRECISION = 20
+private const val SCHEMA_TOTAL_TOTAL_FACTURA_PRECISION = 20
+
 // ─── Tablas de SOLO LECTURA para Facturación Electrónica ─────────────────────
 // Estas tablas mapean columnas adicionales que existen en la DB de Panamá
 // pero que las tablas principales del ORM no exponen.
@@ -13,44 +82,44 @@ import org.jetbrains.exposed.sql.Table
  * Complementa a [FacturasTablePA] y [BaseSalesFacturaTable] sin duplicarlas.
  */
 object FEFacturaReadTable : Table("factura") {
-    val idFactura = varchar("id_factura", 36)
-    val codFactura = varchar("cod_factura", 32)
-    val codFacturaFiscal = varchar("cod_factura_fiscal", 10)
-    val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", 20).nullable()
-    val idCliente = varchar("id_cliente", 36)
-    val idCaja = varchar("id_caja", 36)
+    val idFactura = varchar("id_factura", SCHEMA_ID_FACTURA_MAX_LENGTH)
+    val codFactura = varchar("cod_factura", SCHEMA_COD_FACTURA_MAX_LENGTH)
+    val codFacturaFiscal = varchar("cod_factura_fiscal", SCHEMA_COD_FACTURA_FISCAL_MAX_LENGTH)
+    val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", SCHEMA_NUMERO_DOCUMENTO_FISCAL_MAX_LENGTH).nullable()
+    val idCliente = varchar("id_cliente", SCHEMA_ID_CLIENTE_MAX_LENGTH)
+    val idCaja = varchar("id_caja", SCHEMA_ID_CAJA_MAX_LENGTH)
     val idSucursal = integer("id_sucursal")
-    val fechaFactura = varchar("fechaFactura", 20).nullable()
-    val totalTotalFactura = decimal("TotalTotalFactura", 20, 2)
-    val montoItemsFactura = decimal("montoItemsFactura", 20, 2)
-    val ivaTotalFactura = decimal("ivaTotalFactura", 20, 2)
-    val totalizarDescuentoGlobal = decimal("totalizar_descuento_global", 20, 2)
-    val totalizarTotalGeneral = decimal("totalizar_total_general", 20, 2)
-    val formaPago = varchar("formapago", 20)
-    val observacion = varchar("observacion", 300).nullable()
+    val fechaFactura = varchar("fechaFactura", SCHEMA_FECHA_FACTURA_MAX_LENGTH).nullable()
+    val totalTotalFactura = decimal("TotalTotalFactura", SCHEMA_TOTAL_TOTAL_FACTURA_PRECISION, 2)
+    val montoItemsFactura = decimal("montoItemsFactura", SCHEMA_MONTO_ITEMS_FACTURA_PRECISION, 2)
+    val ivaTotalFactura = decimal("ivaTotalFactura", SCHEMA_IVA_TOTAL_FACTURA_PRECISION, 2)
+    val totalizarDescuentoGlobal = decimal("totalizar_descuento_global", SCHEMA_TOTALIZAR_DESCUENTO_GLOBAL_PRECISION, 2)
+    val totalizarTotalGeneral = decimal("totalizar_total_general", SCHEMA_TOTALIZAR_TOTAL_GENERAL_PRECISION, 2)
+    val formaPago = varchar("formapago", SCHEMA_FORMAPAGO_MAX_LENGTH)
+    val observacion = varchar("observacion", SCHEMA_OBSERVACION_MAX_LENGTH).nullable()
 
-    val tipoDocumento = varchar("tipo_documento", 5).nullable()
-    val naturalezaOperacion = varchar("NaturalezaOperacion", 5).nullable()
-    val tipoOperacion = varchar("tipoOperacion", 5).nullable()
-    val formatoCAFE = varchar("formatoCAFE", 5).nullable()
-    val entregaCAFE = varchar("entregaCAFE", 5).nullable()
-    val envioContenedor = varchar("envioContenedor", 5).nullable()
-    val tipoVenta = varchar("tipoVenta", 5).nullable()
-    val tipoFactura = varchar("tipo_factura", 50)
+    val tipoDocumento = varchar("tipo_documento", SCHEMA_TIPO_DOCUMENTO_MAX_LENGTH).nullable()
+    val naturalezaOperacion = varchar("NaturalezaOperacion", SCHEMA_NATURALEZA_OPERACION_MAX_LENGTH).nullable()
+    val tipoOperacion = varchar("tipoOperacion", SCHEMA_TIPO_OPERACION_MAX_LENGTH).nullable()
+    val formatoCAFE = varchar("formatoCAFE", SCHEMA_FORMATO_CAFE_MAX_LENGTH).nullable()
+    val entregaCAFE = varchar("entregaCAFE", SCHEMA_ENTREGA_CAFE_MAX_LENGTH).nullable()
+    val envioContenedor = varchar("envioContenedor", SCHEMA_ENVIO_CONTENEDOR_MAX_LENGTH).nullable()
+    val tipoVenta = varchar("tipoVenta", SCHEMA_TIPO_VENTA_MAX_LENGTH).nullable()
+    val tipoFactura = varchar("tipo_factura", SCHEMA_TIPO_FACTURA_MAX_LENGTH)
 
     override val primaryKey = PrimaryKey(idFactura)
 }
 
 object FECientesReadTable : Table("clientes") {
-    val idCliente = varchar("id_cliente", 36)
-    val rif = varchar("rif", 50)
-    val dv = varchar("dv", 255)
-    val nombre = varchar("nombre", 100)
-    val apellido = varchar("apellido", 20)
-    val direccion = varchar("direccion", 200)
-    val direccionNivel3 = varchar("direccion_nivel3", 100).nullable()
-    val telefonos = varchar("telefonos", 50)
-    val email = varchar("email", 50)
+    val idCliente = varchar("id_cliente", SCHEMA_ID_CLIENTE_MAX_LENGTH)
+    val rif = varchar("rif", SCHEMA_RIF_MAX_LENGTH)
+    val dv = varchar("dv", SCHEMA_DV_MAX_LENGTH)
+    val nombre = varchar("nombre", SCHEMA_NOMBRE_MAX_LENGTH)
+    val apellido = varchar("apellido", SCHEMA_APELLIDO_MAX_LENGTH)
+    val direccion = varchar("direccion", SCHEMA_DIRECCION_MAX_LENGTH)
+    val direccionNivel3 = varchar("direccion_nivel3", SCHEMA_DIRECCION_NIVEL3_MAX_LENGTH).nullable()
+    val telefonos = varchar("telefonos", SCHEMA_TELEFONOS_MAX_LENGTH)
+    val email = varchar("email", SCHEMA_EMAIL_MAX_LENGTH)
     val pais = integer("pais")
     val paisExtranjero = integer("paisExtranjero").nullable()
     val codTipoCliente = integer("cod_tipo_cliente")
@@ -61,15 +130,15 @@ object FECientesReadTable : Table("clientes") {
 
 object FETipoClienteReadTable : Table("tipo_cliente") {
     val codTipoCliente = integer("cod_tipo_cliente")
-    val tipoClienteFE = varchar("TipoClienteFE", 5).nullable()
+    val tipoClienteFE = varchar("TipoClienteFE", SCHEMA_TIPO_CLIENTE_FE_MAX_LENGTH).nullable()
 
     override val primaryKey = PrimaryKey(codTipoCliente)
 }
 
 object FEPaisesReadTable : Table("paises") {
     val id = integer("id")
-    val iso = varchar("iso", 5)
-    val nombre = varchar("nombre", 100)
+    val iso = varchar("iso", SCHEMA_ISO_MAX_LENGTH)
+    val nombre = varchar("nombre", SCHEMA_NOMBRE_MAX_LENGTH)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -79,17 +148,17 @@ object FEPaisesReadTable : Table("paises") {
  */
 object FEParametrosReadTable : Table("parametros_generales") {
     val codEmpresa = integer("cod_empresa")
-    val tokenEmpresa = varchar("token_empresa", 500).nullable()
-    val tokenPassword = varchar("token_password", 500).nullable()
-    val direccionEnvio = varchar("direccion_envio", 500).nullable()
-    val api_thefactoryhka = varchar("api_thefactoryhka", 500).nullable()
-    val tipoEmision = varchar("tipoEmision", 5).nullable()
-    val destinoOperacion = varchar("destinoOperacion", 5).nullable()
-    val procesoGeneracion = varchar("procesoGeneracion", 5).nullable()
-    val codigoSucursalEmisor = varchar("codigoSucursalEmisor", 20).nullable()
-    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", 10).nullable()
-    val fechaInicioContingencia = varchar("fechaInicioContingencia", 30).nullable()
-    val motivoContingencia = varchar("motivoContingencia", 300).nullable()
+    val tokenEmpresa = varchar("token_empresa", SCHEMA_TOKEN_EMPRESA_MAX_LENGTH).nullable()
+    val tokenPassword = varchar("token_password", SCHEMA_TOKEN_PASSWORD_MAX_LENGTH).nullable()
+    val direccionEnvio = varchar("direccion_envio", SCHEMA_DIRECCION_ENVIO_MAX_LENGTH).nullable()
+    val api_thefactoryhka = varchar("api_thefactoryhka", SCHEMA_API_THEFACTORYHKA_MAX_LENGTH).nullable()
+    val tipoEmision = varchar("tipoEmision", SCHEMA_TIPO_EMISION_MAX_LENGTH).nullable()
+    val destinoOperacion = varchar("destinoOperacion", SCHEMA_DESTINO_OPERACION_MAX_LENGTH).nullable()
+    val procesoGeneracion = varchar("procesoGeneracion", SCHEMA_PROCESO_GENERACION_MAX_LENGTH).nullable()
+    val codigoSucursalEmisor = varchar("codigoSucursalEmisor", SCHEMA_CODIGO_SUCURSAL_EMISOR_MAX_LENGTH).nullable()
+    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", SCHEMA_PUNTO_FACTURACION_FISCAL_MAX_LENGTH).nullable()
+    val fechaInicioContingencia = varchar("fechaInicioContingencia", SCHEMA_FECHA_INICIO_CONTINGENCIA_MAX_LENGTH).nullable()
+    val motivoContingencia = varchar("motivoContingencia", SCHEMA_MOTIVO_CONTINGENCIA_MAX_LENGTH).nullable()
     val tipoFacturacion = integer("tipo_facturacion").default(0)
 }
 
@@ -98,7 +167,7 @@ object FEParametrosReadTable : Table("parametros_generales") {
  */
 object FESucursalReadTable : Table("sucursal") {
     val id = integer("id")
-    val codigoSucursalEmisor = varchar("codigo_sucursal_emisor", 20).nullable()
+    val codigoSucursalEmisor = varchar("codigo_sucursal_emisor", SCHEMA_CODIGO_SUCURSAL_EMISOR_MAX_LENGTH).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -107,10 +176,10 @@ object FESucursalReadTable : Table("sucursal") {
  * Vista de lectura sobre `caja` para punto de facturación fiscal.
  */
 object FECajaReadTable : Table("caja") {
-    val id = varchar("id", 36)
+    val id = varchar("id", SCHEMA_ID_MAX_LENGTH)
     val idSucursal = integer("id_sucursal").nullable()
-    val codigoSucursalEmisor = varchar("CodigoSucursalEmisor", 20).nullable()
-    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", 10).nullable()
+    val codigoSucursalEmisor = varchar("CodigoSucursalEmisor", SCHEMA_CODIGO_SUCURSAL_EMISOR_MAX_LENGTH).nullable()
+    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", SCHEMA_PUNTO_FACTURACION_FISCAL_MAX_LENGTH).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -132,7 +201,7 @@ object FEItemReadTable : Table("item") {
  */
 object FEUnidadEmpaquesReadTable : Table("unidad_empaques") {
     val codUnidad = integer("cod_unidad")
-    val simbolo = varchar("simbolo", 20).nullable()
+    val simbolo = varchar("simbolo", SCHEMA_SIMBOLO_MAX_LENGTH).nullable()
 
     override val primaryKey = PrimaryKey(codUnidad)
 }
@@ -141,27 +210,27 @@ object FEUnidadEmpaquesReadTable : Table("unidad_empaques") {
  * Vista de lectura sobre `factura_detalle` con campos extra para FE (ISC, OTI).
  */
 object FEFacturaDetalleReadTable : Table("factura_detalle") {
-    val idDetalleFactura = varchar("id_detalle_factura", 36)
-    val idFactura = varchar("id_factura", 36)
+    val idDetalleFactura = varchar("id_detalle_factura", SCHEMA_ID_DETALLE_FACTURA_MAX_LENGTH)
+    val idFactura = varchar("id_factura", SCHEMA_ID_FACTURA_MAX_LENGTH)
     val idItem = integer("id_item").nullable()
-    val itemDescripcion = varchar("_item_descripcion", 500)
-    val itemCodigo = varchar("_item_codigo", 50)
+    val itemDescripcion = varchar("_item_descripcion", SCHEMA_ITEM_DESCRIPCION_MAX_LENGTH)
+    val itemCodigo = varchar("_item_codigo", SCHEMA_ITEM_CODIGO_MAX_LENGTH)
     val idSegmento = integer("id_segmento").nullable()
     val idFamilia = integer("id_familia").nullable()
-    val itemCantidad = decimal("_item_cantidad", 32, 3)
-    val itemCantidadTotal = decimal("_item_cantidad_total", 32, 0)
-    val itemPrecioSinIva = decimal("_item_preciosiniva", 20, 2)
-    val itemMontoDescuento = decimal("_item_montodescuento", 20, 2)
-    val itemPiva = decimal("_item_piva", 10, 2)
-    val itemTotalSinIva = decimal("_item_totalsiniva", 20, 2)
-    val itemTotalConIva = decimal("_item_totalconiva", 20, 2)
-    val itemUnidadEmpaque = varchar("_item_unidad_empaque", 15).nullable()
+    val itemCantidad = decimal("_item_cantidad", SCHEMA_ITEM_CANTIDAD_PRECISION, SCHEMA_ITEM_CANTIDAD_SCALE)
+    val itemCantidadTotal = decimal("_item_cantidad_total", SCHEMA_ITEM_CANTIDAD_TOTAL_PRECISION, 0)
+    val itemPrecioSinIva = decimal("_item_preciosiniva", SCHEMA_ITEM_PRECIOSINIVA_PRECISION, 2)
+    val itemMontoDescuento = decimal("_item_montodescuento", SCHEMA_ITEM_MONTODESCUENTO_PRECISION, 2)
+    val itemPiva = decimal("_item_piva", SCHEMA_ITEM_PIVA_PRECISION, 2)
+    val itemTotalSinIva = decimal("_item_totalsiniva", SCHEMA_ITEM_TOTALSINIVA_PRECISION, 2)
+    val itemTotalConIva = decimal("_item_totalconiva", SCHEMA_ITEM_TOTALCONIVA_PRECISION, 2)
+    val itemUnidadEmpaque = varchar("_item_unidad_empaque", SCHEMA_ITEM_UNIDAD_EMPAQUE_MAX_LENGTH).nullable()
 
     // Campos FE adicionales que existen en la DB de Panamá
-    val porcentajeIsc = decimal("porcentaje_isc", 10, 2).nullable()
-    val importeIsc = decimal("importe_isc", 20, 2).nullable()
+    val porcentajeIsc = decimal("porcentaje_isc", SCHEMA_PORCENTAJE_ISC_PRECISION, 2).nullable()
+    val importeIsc = decimal("importe_isc", SCHEMA_IMPORTE_ISC_PRECISION, 2).nullable()
     val idOti = integer("id_oti").nullable()
-    val importeOti = decimal("importe_oti", 20, 2).nullable()
+    val importeOti = decimal("importe_oti", SCHEMA_IMPORTE_OTI_PRECISION, 2).nullable()
 
     override val primaryKey = PrimaryKey(idDetalleFactura)
 }
@@ -172,7 +241,7 @@ object FEFacturaDetalleReadTable : Table("factura_detalle") {
  */
 object FECorrelativosTable : Table("correlativos") {
     val id = integer("id")
-    val campo = varchar("campo", 100)
+    val campo = varchar("campo", SCHEMA_CAMPO_MAX_LENGTH)
     val contador = integer("contador")
 
     override val primaryKey = PrimaryKey(id)
@@ -183,10 +252,10 @@ object FECorrelativosTable : Table("correlativos") {
  * Se lee desde caja_nueva_detalle y se cruza con caja_forma_pago.
  */
 object FECajaNuevaDetalleReadTable : Table("caja_nueva_detalle") {
-    val cajaDetalleId = varchar("caja_detalle_id", 36)
-    val cajaId = varchar("caja_id", 36)
+    val cajaDetalleId = varchar("caja_detalle_id", SCHEMA_CAJA_DETALLE_ID_MAX_LENGTH)
+    val cajaId = varchar("caja_id", SCHEMA_CAJA_ID_MAX_LENGTH)
     val idFormaPago = integer("id_forma_pago").nullable()
-    val monto = decimal("monto", 10, 2).nullable()
+    val monto = decimal("monto", SCHEMA_MONTO_PRECISION, 2).nullable()
 
     override val primaryKey = PrimaryKey(cajaDetalleId)
 }
@@ -195,8 +264,8 @@ object FECajaNuevaDetalleReadTable : Table("caja_nueva_detalle") {
  * Vista de lectura sobre caja_nueva para vincular con la factura.
  */
 object FECajaNuevaReadTable : Table("caja_nueva") {
-    val cajaId = varchar("caja_id", 36)
-    val idFactura = varchar("id_factura", 36)
+    val cajaId = varchar("caja_id", SCHEMA_CAJA_ID_MAX_LENGTH)
+    val idFactura = varchar("id_factura", SCHEMA_ID_FACTURA_MAX_LENGTH)
 
     override val primaryKey = PrimaryKey(cajaId)
 }
@@ -206,12 +275,12 @@ object FECajaNuevaReadTable : Table("caja_nueva") {
  * para obtener el cambio (vuelto) del efectivo.
  */
 object FEFacturaDetalleFormaPagoReadTable : Table("factura_detalle_formapago") {
-    val codFacturaDetalleFormaPago = varchar("cod_factura_detalle_formapago", 36)
-    val idFactura = varchar("id_factura", 36)
+    val codFacturaDetalleFormaPago = varchar("cod_factura_detalle_formapago", SCHEMA_COD_FACTURA_DETALLE_FORMAPAGO_MAX_LENGTH)
+    val idFactura = varchar("id_factura", SCHEMA_ID_FACTURA_MAX_LENGTH)
     val codigoRetencion = integer("codigo_retencion").nullable()
-    val totalizarMontoRetencion = decimal("totalizar_monto_retencion", 10, 2).nullable()
-    val totalizarMontoCancelar = decimal("totalizar_monto_cancelar", 10, 2).nullable()
-    val totalizarCambio = decimal("totalizar_cambio", 10, 2)
+    val totalizarMontoRetencion = decimal("totalizar_monto_retencion", SCHEMA_TOTALIZAR_MONTO_RETENCION_PRECISION, 2).nullable()
+    val totalizarMontoCancelar = decimal("totalizar_monto_cancelar", SCHEMA_TOTALIZAR_MONTO_CANCELAR_PRECISION, 2).nullable()
+    val totalizarCambio = decimal("totalizar_cambio", SCHEMA_TOTALIZAR_CAMBIO_PRECISION, 2)
 
     override val primaryKey = PrimaryKey(codFacturaDetalleFormaPago)
 }

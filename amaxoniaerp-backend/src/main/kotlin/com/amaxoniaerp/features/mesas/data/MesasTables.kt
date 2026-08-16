@@ -2,6 +2,15 @@ package com.amaxoniaerp.features.mesas.data
 
 import org.jetbrains.exposed.sql.Table
 
+private const val SCHEMA_ALTO_PRECISION = 14
+private const val SCHEMA_ANCHO_PRECISION = 14
+private const val SCHEMA_CODIGO_MAX_LENGTH = 100
+private const val SCHEMA_FORMA_MAX_LENGTH = 50
+private const val SCHEMA_NOMBRE_MAX_LENGTH = 255
+private const val SCHEMA_POSICION_X_PRECISION = 14
+private const val SCHEMA_POSICION_Y_PRECISION = 14
+private const val SCHEMA_ROTACION_PRECISION = 14
+
 /**
  * Áreas de una sucursal. La tabla física se sigue llamando `plantas` (nombre heredado del
  * administrativo); en el contrato público del POS y en la UI el concepto es "Área".
@@ -13,7 +22,7 @@ import org.jetbrains.exposed.sql.Table
 object PlantasTable : Table("plantas") {
     val id = integer("id")
     val sucursalId = integer("sucursal_id")
-    val nombre = varchar("nombre", 255)
+    val nombre = varchar("nombre", SCHEMA_NOMBRE_MAX_LENGTH)
     val descripcion = text("descripcion").nullable()
     val imagen = text("imagen").nullable()
     val orden = integer("orden").nullable()
@@ -33,15 +42,15 @@ object PlantasTable : Table("plantas") {
 object MesasTable : Table("mesas") {
     val id = integer("id")
     val plantaId = integer("planta_id")
-    val codigo = varchar("codigo", 100).nullable()
-    val nombre = varchar("nombre", 255).nullable()
+    val codigo = varchar("codigo", SCHEMA_CODIGO_MAX_LENGTH).nullable()
+    val nombre = varchar("nombre", SCHEMA_NOMBRE_MAX_LENGTH).nullable()
     val capacidad = integer("capacidad").nullable()
-    val forma = varchar("forma", 50).nullable()
-    val posicionX = decimal("posicion_x", 14, 2).nullable()
-    val posicionY = decimal("posicion_y", 14, 2).nullable()
-    val ancho = decimal("ancho", 14, 2).nullable()
-    val alto = decimal("alto", 14, 2).nullable()
-    val rotacion = decimal("rotacion", 14, 2).nullable()
+    val forma = varchar("forma", SCHEMA_FORMA_MAX_LENGTH).nullable()
+    val posicionX = decimal("posicion_x", SCHEMA_POSICION_X_PRECISION, 2).nullable()
+    val posicionY = decimal("posicion_y", SCHEMA_POSICION_Y_PRECISION, 2).nullable()
+    val ancho = decimal("ancho", SCHEMA_ANCHO_PRECISION, 2).nullable()
+    val alto = decimal("alto", SCHEMA_ALTO_PRECISION, 2).nullable()
+    val rotacion = decimal("rotacion", SCHEMA_ROTACION_PRECISION, 2).nullable()
     val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)
