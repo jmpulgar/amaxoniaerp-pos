@@ -264,7 +264,12 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     @Test
     fun `loadAlreadyIssued retorna Complete cuando la factura tiene ambos campos`() =
         runBlocking {
-            seedFactura(database, invoiceId = "inv-2", numeroDocumentoFiscal = "00000100", numeroControl = "L001P001-100")
+            seedFactura(
+                database,
+                invoiceId = "inv-2",
+                numeroDocumentoFiscal = "00000100",
+                numeroControl = "L001P001-100",
+            )
             val result = repository.loadAlreadyIssued(database, "inv-2")
             val complete = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Complete>(result)
             assertEquals("00000100", complete.numeroDocumentoFiscal)
@@ -286,7 +291,12 @@ class VenezuelaElectronicInvoiceRepositoryTest {
     @Test
     fun `loadAlreadyIssued con OR retorna Partial cuando solo existe numero_control_thka`() =
         runBlocking {
-            seedFactura(database, invoiceId = "inv-or-ctrl", numeroDocumentoFiscal = null, numeroControl = "L001P001-200")
+            seedFactura(
+                database,
+                invoiceId = "inv-or-ctrl",
+                numeroDocumentoFiscal = null,
+                numeroControl = "L001P001-200",
+            )
             val result = repository.loadAlreadyIssued(database, "inv-or-ctrl")
             val partial = assertIs<VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult.Partial>(result)
             assertNull(partial.numeroDocumentoFiscal)

@@ -53,7 +53,10 @@ class CreditNoteCajaBehaviorTest {
 
             assertEquals(3, invoiceStatus)
             assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").monto])
-            assertEquals(BigDecimal("-0.01"), reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").montoOriginal])
+            assertEquals(
+                BigDecimal("-0.01"),
+                reversal[SalesCajaNuevaDetalleTableFactory.forCountry("PA").montoOriginal],
+            )
         }
 
     @Test
@@ -153,7 +156,9 @@ class CreditNoteCajaBehaviorTest {
     ) {
         database =
             Database.connect(
-                url = "jdbc:h2:mem:credit_note_caja_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                url =
+                    "jdbc:h2:mem:credit_note_caja_${UUID.randomUUID().toString().replace("-", "")};" +
+                        "MODE=MySQL;DB_CLOSE_DELAY=-1",
                 driver = "org.h2.Driver",
             )
         val headerTable = CreditNoteHeaderTableFactory.forCountry(countryCode)

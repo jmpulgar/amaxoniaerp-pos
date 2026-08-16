@@ -141,7 +141,9 @@ class VenezuelaHkaRestClientTest {
             val client =
                 cliente {
                     respond(
-                        content = """{"codigo":"422","mensaje":"Serie no configurada","resultado":null,"validaciones":["serie"]}""",
+                        content =
+                            "{\"codigo\":\"422\",\"mensaje\":\"Serie no configurada\",\"resultado\":null," +
+                                "\"validaciones\":[\"serie\"]}",
                         status = HttpStatusCode.OK,
                         headers = jsonHeaders,
                     )
@@ -339,7 +341,10 @@ class VenezuelaHkaRestClientTest {
                             totalAlicuotaExento = "0.00",
                             totalMontoGravado = "100.00",
                             montoTotalFactura = "116.00",
-                            listaFormaPago = listOf(VenezuelaHkaFormaPago(formaPagoFact = "01", montoPagado = "116.00")),
+                            listaFormaPago =
+                                listOf(
+                                    VenezuelaHkaFormaPago(formaPagoFact = "01", montoPagado = "116.00"),
+                                ),
                             totalValorRecibido = "116.00",
                             tiempoPago = "1",
                             nroItems = "1",

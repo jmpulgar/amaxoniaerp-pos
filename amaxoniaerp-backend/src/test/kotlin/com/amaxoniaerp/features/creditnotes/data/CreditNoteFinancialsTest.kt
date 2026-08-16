@@ -170,7 +170,9 @@ class CreditNoteFinancialsTest {
     ) {
         database =
             Database.connect(
-                url = "jdbc:h2:mem:credit_note_financials_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                url =
+                    "jdbc:h2:mem:credit_note_financials_${UUID.randomUUID().toString().replace("-", "")};" +
+                        "MODE=MySQL;DB_CLOSE_DELAY=-1",
                 driver = "org.h2.Driver",
             )
         transaction(database) {
@@ -284,7 +286,12 @@ class CreditNoteFinancialsTest {
                 it[itemAlmacen] = 1
                 it[itemDescripcion] = "Producto ${index + 1}"
                 it[itemCantidad] = line.quantity.toBigDecimal()
-                it[itemPrecioSinIva] = line.base.toBigDecimal().divide(line.quantity.toBigDecimal(), 2, RoundingMode.HALF_UP)
+                it[itemPrecioSinIva] =
+                    line.base.toBigDecimal().divide(
+                        line.quantity.toBigDecimal(),
+                        2,
+                        RoundingMode.HALF_UP,
+                    )
                 it[itemDescuento] = BigDecimal.ZERO
                 it[itemMontoDescuento] = BigDecimal.ZERO
                 it[itemPIva] = line.taxRate.toBigDecimal()

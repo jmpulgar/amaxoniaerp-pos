@@ -59,7 +59,11 @@ class CuentaMesaRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect("jdbc:h2:mem:cuenta_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1", "org.h2.Driver")
+        database =
+            Database.connect(
+                "jdbc:h2:mem:cuenta_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 SucursalTable,
