@@ -48,9 +48,11 @@ data class CountryDbConfig(
     val configDbName: String,
     val displayName: String,
 ) {
-    fun buildConfigJdbcUrl(): String = "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
+    fun buildConfigJdbcUrl(): String =
+        "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
 
-    fun buildCompanyJdbcUrl(companyDbName: String): String = "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
+    fun buildCompanyJdbcUrl(companyDbName: String): String =
+        "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
 }
 
 /**
