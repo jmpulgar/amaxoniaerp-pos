@@ -23,13 +23,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Apply deterministic mechanical cleanup
         run: python .github/scripts/task022_codemod.py
+      - name: Format touched Kotlin sources
+        working-directory: amaxoniaerp-backend
+        run: |
+          chmod +x gradlew
+          ./gradlew ktlintFormat --no-daemon
       - name: Check patch whitespace
         run: git diff --check
       - name: Verify tests and ktlint before commit
         working-directory: amaxoniaerp-backend
-        run: |
-          chmod +x gradlew
-          ./gradlew test ktlintCheck --no-daemon
+        run: ./gradlew test ktlintCheck --no-daemon
       - name: Commit verified cleanup
         run: |
           if git diff --quiet; then
