@@ -58,6 +58,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
       - run: ./gradlew detekt --no-daemon
+      - name: Upload Detekt reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-detekt-reports
+          path: amaxoniaerp-backend/build/reports/detekt/
+          if-no-files-found: warn
+          retention-days: 14
 
   backend-ktlint:
     runs-on: ubuntu-latest
