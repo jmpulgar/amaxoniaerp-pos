@@ -14,6 +14,9 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 
+private const val ERR_MISSING_COUNTRY = "Falta country_code en token"
+private const val ERR_MISSING_ADMIN_DB = "Falta admin_db en token"
+
 fun Route.promotionsRoutes(repository: PromotionsRepository) {
     authenticate {
         route("/promociones") {
@@ -26,10 +29,10 @@ fun Route.promotionsRoutes(repository: PromotionsRepository) {
                 }
                 val countryCode =
                     principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
                 val adminDb =
                     principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 call.respond(PromotionsListResponse(repository.listPromotions(companyDb)))
             }

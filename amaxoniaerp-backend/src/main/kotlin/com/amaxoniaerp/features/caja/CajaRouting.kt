@@ -23,6 +23,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
+private const val ERR_QUERY_SEQUENCE = "No se pudo consultar la secuencia"
+private const val ERR_CALCULATE_SEQUENCE = "No se pudo calcular secuencia"
+
 fun Route.cajaRouting(cajaRepository: CajaRepository) {
     val log = LoggerFactory.getLogger("CajaRouting")
 
@@ -162,7 +165,7 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                     onFailure = { error ->
                         call.respond(
                             HttpStatusCode.BadRequest,
-                            CajaSecuenciaGetResponse(success = false, error = error.message ?: "No se pudo consultar la secuencia"),
+                            CajaSecuenciaGetResponse(success = false, error = error.message ?: ERR_QUERY_SEQUENCE),
                         )
                     },
                 )
@@ -182,7 +185,7 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                         call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                     },
                     onFailure = { error ->
-                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: "No se pudo calcular secuencia")))
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: ERR_CALCULATE_SEQUENCE)))
                     },
                 )
             }

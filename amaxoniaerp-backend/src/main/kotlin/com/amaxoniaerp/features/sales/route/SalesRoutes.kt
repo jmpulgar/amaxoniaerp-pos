@@ -19,6 +19,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
+private const val ERR_PROCESS_SALE = "Error interno al procesar venta"
+
 fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
     val log = LoggerFactory.getLogger("SalesRoutes")
 
@@ -90,7 +92,7 @@ fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
                         request.factura.idCliente,
                         e,
                     )
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Error interno al procesar venta"))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_PROCESS_SALE))
                 }
             }
         }

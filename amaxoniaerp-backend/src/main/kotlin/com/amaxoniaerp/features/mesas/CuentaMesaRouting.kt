@@ -23,6 +23,15 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
+private const val ERR_SESSION_SCOPE = "La sesión no pertenece a esa mesa"
+private const val ERR_UNEXPECTED = "Respuesta inesperada"
+private const val ERR_LIST_ACCOUNTS = "No se pudieron listar las cuentas"
+private const val ERR_ACCOUNT_FINAL_STATE = "La sesión no admite cuentas (estado final)"
+private const val ERR_SELECTED_ORDER_BALANCE = "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo"
+private const val ERR_CREATE_ACCOUNT = "No se pudo crear la cuenta"
+private const val ERR_GET_ACCOUNT = "No se pudo obtener la cuenta"
+private const val ERR_CANCEL_ACCOUNT = "No se pudo cancelar la cuenta"
+
 /**
  * Cuenta de mesa y división para el POS.
  *
@@ -109,13 +118,13 @@ fun Route.cuentaMesaRouting(
                                 )
 
                             CuentaMesaResult.SesionNoPerteneceMesa ->
-                                call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
+                                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Respuesta inesperada"))
+                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
                         }
                     } catch (e: Exception) {
                         log.error("Error listando cuentas. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId, e)
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudieron listar las cuentas"))
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_LIST_ACCOUNTS))
                     }
                 }
 
@@ -138,10 +147,10 @@ fun Route.cuentaMesaRouting(
                                 )
 
                             CuentaMesaResult.SesionNoPerteneceMesa ->
-                                call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
+                                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
                             CuentaMesaResult.SesionNoActiva ->
-                                call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión no admite cuentas (estado final)"))
+                                call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_ACCOUNT_FINAL_STATE))
 
                             CuentaMesaResult.CantidadSuperaSaldo ->
                                 call.respond(
@@ -152,7 +161,7 @@ fun Route.cuentaMesaRouting(
                             CuentaMesaResult.PedidoNoEncontrado ->
                                 call.respond(
                                     HttpStatusCode.BadRequest,
-                                    mapOf("error" to "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo"),
+                                    mapOf("error" to ERR_SELECTED_ORDER_BALANCE),
                                 )
 
                             CuentaMesaResult.SinItemsParaCrear ->
@@ -167,11 +176,11 @@ fun Route.cuentaMesaRouting(
                                     mapOf("error" to "Hay pedidos pendientes en cocina que impiden facturar"),
                                 )
 
-                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo crear la cuenta"))
+                            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CREATE_ACCOUNT))
                         }
                     } catch (e: Exception) {
                         log.error("Error creando cuenta. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId, e)
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo crear la cuenta"))
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CREATE_ACCOUNT))
                     }
                 }
 
@@ -194,16 +203,16 @@ fun Route.cuentaMesaRouting(
                                     )
 
                                 CuentaMesaResult.SesionNoPerteneceMesa ->
-                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
+                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
                                 CuentaMesaResult.CuentaNoEncontrada ->
                                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
-                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Respuesta inesperada"))
+                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
                             }
                         } catch (e: Exception) {
                             log.error("Error obteniendo cuenta. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId, e)
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo obtener la cuenta"))
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_GET_ACCOUNT))
                         }
                     }
 
@@ -225,7 +234,7 @@ fun Route.cuentaMesaRouting(
                                     )
 
                                 CuentaMesaResult.SesionNoPerteneceMesa ->
-                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
+                                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
                                 CuentaMesaResult.CuentaNoEncontrada ->
                                     call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
@@ -236,11 +245,11 @@ fun Route.cuentaMesaRouting(
                                         mapOf("error" to "La cuenta ya no está activa y no se puede cancelar"),
                                     )
 
-                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cancelar la cuenta"))
+                                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CANCEL_ACCOUNT))
                             }
                         } catch (e: Exception) {
                             log.error("Error cancelando cuenta. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId, e)
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo cancelar la cuenta"))
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CANCEL_ACCOUNT))
                         }
                     }
 
@@ -411,7 +420,7 @@ private suspend fun respondMarcarFacturada(
             )
 
         CuentaMesaResult.SesionNoPerteneceMesa ->
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "La sesión no pertenece a esa mesa"))
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
         CuentaMesaResult.CuentaNoEncontrada ->
             call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
