@@ -106,7 +106,7 @@ class FacturasRepository {
                     .orderBy(tabla.fechaFactura to SortOrder.DESC)
                     .limit(limit)
                     .offset(offset)
-                    .map { row -> mapRowToFacturaSummary(row, tabla, countryCode) }
+                    .map { row -> mapRowToFacturaSummary(row, tabla) }
 
             data to total
         }
@@ -573,7 +573,6 @@ class FacturasRepository {
     private fun mapRowToFacturaSummary(
         row: ResultRow,
         tabla: BaseFacturasTable,
-        countryCode: String,
     ): FacturaSummary {
         val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")

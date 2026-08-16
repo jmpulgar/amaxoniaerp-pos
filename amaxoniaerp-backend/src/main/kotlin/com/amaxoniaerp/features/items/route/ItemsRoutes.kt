@@ -121,7 +121,7 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
                     principal.getAdminDb()
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listDepartments(database = companyDb, countryCode = countryCode)
+                val list = itemsRepository.listDepartments(database = companyDb)
                 val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
                 call.respond(DepartmentsApiResponse(data = data))
             }

@@ -55,7 +55,7 @@ class CuentaMesaRepositoryTest {
     private lateinit var database: Database
     private val pedidoRepository = PedidoMesaRepository()
     private val sesionRepository = SesionMesaRepository(pedidoRepository::tieneOperaciones)
-    private val cuentaRepository = CuentaMesaRepository(sesionRepository, pedidoRepository)
+    private val cuentaRepository = CuentaMesaRepository()
 
     @BeforeTest
     fun setUp() {

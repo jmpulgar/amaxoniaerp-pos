@@ -183,7 +183,7 @@ fun Application.configureRouting() {
         val sesionMesaRepository = SesionMesaRepository(pedidoMesaRepository::tieneOperaciones)
         // CuentaMesaRepository depende de ambos: sesion (para transiciones ABIERTA ->
         // CUENTA_SOLICITADA -> CERRADA_PAGADA) y pedidos (para saldos facturables).
-        val cuentaMesaRepository = CuentaMesaRepository(sesionMesaRepository, pedidoMesaRepository)
+        val cuentaMesaRepository = CuentaMesaRepository()
         val processSaleUseCase =
             ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feFactory)
         sesionMesaRouting(mesasRepository, sesionMesaRepository)

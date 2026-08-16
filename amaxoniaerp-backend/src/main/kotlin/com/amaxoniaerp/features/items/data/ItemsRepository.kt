@@ -131,10 +131,7 @@ class ItemsRepository {
             data to total
         }
 
-    suspend fun listDepartments(
-        database: Database,
-        countryCode: String,
-    ): List<Pair<Int, String>> =
+    suspend fun listDepartments(database: Database): List<Pair<Int, String>> =
         dbQuery(database) {
             DepartamentoTable
                 .selectAll()

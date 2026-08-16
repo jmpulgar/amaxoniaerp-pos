@@ -54,12 +54,12 @@ open class VenezuelaElectronicInvoiceRepository {
         invoiceId: String,
     ): InvoiceVEContext =
         dbQuery(database) {
-            val factura = loadFactura(database, invoiceId)
-            val config = loadConfig(database)
-            val comprador = loadComprador(database, factura.idClienteComprador, factura.facturaData)
+            val factura = loadFactura(invoiceId)
+            val config = loadConfig()
+            val comprador = loadComprador(factura.idClienteComprador, factura.facturaData)
             val detalles = loadDetalles(invoiceId)
-            val formasPago = loadFormasPago(database, factura.idCaja, invoiceId)
-            val caja = loadCaja(database, factura.idCaja, factura.idSucursal, config)
+            val formasPago = loadFormasPago(factura.idCaja, invoiceId)
+            val caja = loadCaja(factura.idCaja, factura.idSucursal, config)
             val reservado = VECorrelativoReservado(0, 8) // placeholder, lo asigna stratégie
             InvoiceVEContext(
                 config = config,
@@ -334,10 +334,7 @@ open class VenezuelaElectronicInvoiceRepository {
         val idClienteComprador: String?,
     )
 
-    private fun loadFactura(
-        database: Database,
-        invoiceId: String,
-    ): FacturaCargada {
+    private fun loadFactura(invoiceId: String): FacturaCargada {
         val row =
             VEFacturaReadTable
                 .selectAll()
@@ -403,7 +400,7 @@ open class VenezuelaElectronicInvoiceRepository {
             )
         }
 
-    private fun loadConfig(database: Database): VEConfigData {
+    private fun loadConfig(): VEConfigData {
         val row =
             VEParametrosReadTable
                 .selectAll()
@@ -459,7 +456,6 @@ open class VenezuelaElectronicInvoiceRepository {
     }
 
     private fun loadComprador(
-        database: Database,
         idClienteComprador: String?,
         factura: VEFacturaData,
     ): VECompradorData {
@@ -532,7 +528,6 @@ open class VenezuelaElectronicInvoiceRepository {
      * que `tipo_moneda != abr_moneda_base` es divisa.
      */
     private fun loadFormasPago(
-        database: Database,
         cajaId: String,
         invoiceId: String,
     ): List<VEFormaPagoData> {
@@ -581,7 +576,6 @@ open class VenezuelaElectronicInvoiceRepository {
     }
 
     private fun loadCaja(
-        database: Database,
         cajaId: String,
         idSucursal: Int,
         config: VEConfigData,

@@ -54,10 +54,7 @@ import java.time.format.DateTimeFormatter
  * - La tabla `cuenta_mesa_idempotencia` y el `idFactura` determinista garantizan que un reintento
  *   del POS (timeout/doble tap) no duplique efectos. Su confirmación ocurre con la factura.
  */
-class CuentaMesaRepository(
-    private val sesiones: SesionMesaRepository,
-    private val pedidos: PedidoMesaRepository,
-) {
+class CuentaMesaRepository {
     suspend fun scopeValido(
         database: Database,
         sesionId: Int,
