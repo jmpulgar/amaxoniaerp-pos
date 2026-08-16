@@ -88,7 +88,9 @@ class CreditNoteRepositoryEligibilityTest {
     private fun withSeededDatabase(block: suspend CreditNoteRepositoryEligibilityTest.() -> Unit) {
         database =
             Database.connect(
-                url = "jdbc:h2:mem:credit_note_eligibility_${UUID.randomUUID().toString().replace("-", "")};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                url =
+                    "jdbc:h2:mem:credit_note_eligibility_${UUID.randomUUID().toString().replace("-", "")};" +
+                        "MODE=MySQL;DB_CLOSE_DELAY=-1",
                 driver = "org.h2.Driver",
             )
         transaction(database) {

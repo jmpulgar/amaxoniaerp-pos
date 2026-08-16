@@ -90,7 +90,11 @@ class ProcessSaleCreditTest {
         assertEquals("credito", invoiceFormaPago())
         assertEquals(CajaStatus.Pendiente, cajaStatus())
         assertEquals(100.0, paymentDetail()[SalesFacturaDetalleFormaPagoTablePA.totalizarMontoCxc].toDouble(), 0.0)
-        assertEquals(100.0, paymentDetail()[SalesFacturaDetalleFormaPagoTablePA.totalizarSaldoPendiente].toDouble(), 0.0)
+        assertEquals(
+            100.0,
+            paymentDetail()[SalesFacturaDetalleFormaPagoTablePA.totalizarSaldoPendiente].toDouble(),
+            0.0,
+        )
     }
 
     @Test

@@ -40,7 +40,11 @@ class SesionMesaRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect("jdbc:h2:mem:sesion_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1", "org.h2.Driver")
+        database =
+            Database.connect(
+                "jdbc:h2:mem:sesion_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 SucursalTable,
@@ -259,7 +263,11 @@ class SesionMesaRepositoryTest {
         cajaId: String,
         mesaId: Int,
         cantidadPersonas: Int = 4,
-    ): SesionMesaResult = repository.abrir(database, abrirScope(cajaId = cajaId, mesaId = mesaId, cantidadPersonas = cantidadPersonas))
+    ): SesionMesaResult =
+        repository.abrir(
+            database,
+            abrirScope(cajaId = cajaId, mesaId = mesaId, cantidadPersonas = cantidadPersonas),
+        )
 
     private fun abrirScope(
         cajaId: String,

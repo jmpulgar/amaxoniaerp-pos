@@ -45,7 +45,11 @@ class PedidoMesaRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        database = Database.connect("jdbc:h2:mem:pedidos_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1", "org.h2.Driver")
+        database =
+            Database.connect(
+                "jdbc:h2:mem:pedidos_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                "org.h2.Driver",
+            )
         transaction(database) {
             SchemaUtils.create(
                 SucursalTable,
@@ -228,7 +232,11 @@ class PedidoMesaRepositoryTest {
                 ) as PedidoMesaResult.Creado
             val pedidoId = creada.pedidos.first().id
 
-            listOf(EstadoPedidoMesa.EN_PREPARACION, EstadoPedidoMesa.LISTA, EstadoPedidoMesa.ENTREGADA).forEach { destino ->
+            listOf(
+                EstadoPedidoMesa.EN_PREPARACION,
+                EstadoPedidoMesa.LISTA,
+                EstadoPedidoMesa.ENTREGADA,
+            ).forEach { destino ->
                 val r = pedidoRepository.cambiarEstado(database, sesionId, 1001, pedidoId, destino)
                 assertTrue(r is PedidoMesaResult.EstadoActualizado, "Esperaba actualización a $destino, fue $r")
                 assertEquals(destino.codigo, r.pedido.estado)
