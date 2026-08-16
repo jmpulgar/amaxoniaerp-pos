@@ -204,40 +204,40 @@ class CajaRepository {
                         .values
                         .sumOf { it.monto }
                 val montoEfectivoTotal =
-                    data.monto_efectivo_apertura +
+                    data.montoEfectivoApertura +
                         montoEfectivoVentas +
-                        data.monto_efectivo_entrada -
-                        data.monto_efectivo_salida
+                        data.montoEfectivoEntrada -
+                        data.montoEfectivoSalida
                 val montoTotal = montoEfectivoTotal + montoOtrosTotal
 
                 val request =
                     CajaCierreSaveRequest(
                         id = data.id,
-                        monto_efectivo_ventas = montoEfectivoVentas,
-                        monto_efectivo_entrada = data.monto_efectivo_entrada,
-                        monto_efectivo_salida = data.monto_efectivo_salida,
-                        monto_efectivo_total = montoEfectivoTotal,
-                        monto_efectivo_cierre = montoEfectivoTotal,
-                        monto_efectivo_diferencia = 0.0,
-                        monto_otros_total = montoOtrosTotal,
-                        monto_otros_cierre = montoOtrosTotal,
-                        monto_otros_diferencia = 0.0,
-                        monto_total = montoTotal,
-                        monto_cierre = montoTotal,
-                        monto_diferencia = 0.0,
+                        montoEfectivoVentas = montoEfectivoVentas,
+                        montoEfectivoEntrada = data.montoEfectivoEntrada,
+                        montoEfectivoSalida = data.montoEfectivoSalida,
+                        montoEfectivoTotal = montoEfectivoTotal,
+                        montoEfectivoCierre = montoEfectivoTotal,
+                        montoEfectivoDiferencia = 0.0,
+                        montoOtrosTotal = montoOtrosTotal,
+                        montoOtrosCierre = montoOtrosTotal,
+                        montoOtrosDiferencia = 0.0,
+                        montoTotal = montoTotal,
+                        montoCierre = montoTotal,
+                        montoDiferencia = 0.0,
                         detalle = emptyList(),
-                        detalle_formapago =
+                        detalleFormaPago =
                             formaPagoTotals
                                 .map { (idFormaPago, item) ->
                                     CajaCierreFormaPagoRequest(
-                                        id_forma_pago = idFormaPago,
+                                        idFormaPago = idFormaPago,
                                         monto = item.monto,
-                                        monto_cierre = item.monto,
-                                        monto_diferencia = 0.0,
+                                        montoCierre = item.monto,
+                                        montoDiferencia = 0.0,
                                     )
                                 },
-                        observacion_cierre = "Cierre automático por nueva apertura",
-                        numero_cierre_fiscal = "",
+                        observacionCierre = "Cierre automático por nueva apertura",
+                        numeroCierreFiscal = "",
                     )
 
                 saveCajaCierreInternal(
@@ -303,8 +303,8 @@ class CajaRepository {
                         .map { row ->
                             CajaDetalleAperturaItem(
                                 id = row[CajaDetalleAperturaTable.idDetalleApertura],
-                                id_secuencia = row[CajaDetalleAperturaTable.idCajaSecuencia],
-                                id_moneda_denominacion = row[CajaDetalleAperturaTable.idMonedaDenominacion],
+                                idSecuencia = row[CajaDetalleAperturaTable.idCajaSecuencia],
+                                idMonedaDenominacion = row[CajaDetalleAperturaTable.idMonedaDenominacion],
                                 cantidad = row[CajaDetalleAperturaTable.cantidad],
                                 valor = row[CajaDetalleAperturaTable.valor].toDouble(),
                                 monto = row[CajaDetalleAperturaTable.monto].toDouble(),
@@ -353,17 +353,17 @@ class CajaRepository {
                             val row = formasActivas[idForma] ?: catalogoFormas[idForma] ?: return@mapNotNull null
                             CajaFormaPagoItem(
                                 id = idForma,
-                                forma_pago = row.getOrNull(CajaFormaPagoTable.descripcion),
+                                formaPago = row.getOrNull(CajaFormaPagoTable.descripcion),
                                 siglas = row.getOrNull(CajaFormaPagoTable.siglas),
                                 grupo = row.getOrNull(CajaFormaPagoTable.grupo),
                                 imagen = row.getOrNull(CajaFormaPagoTable.imagen)?.takeIf { it.isNotBlank() },
-                                id_caja_tp_concepto = row.getOrNull(CajaFormaPagoTable.idCajaTpConcepto),
-                                tipo_moneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda),
+                                idCajaTpConcepto = row.getOrNull(CajaFormaPagoTable.idCajaTpConcepto),
+                                tipoMoneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda),
                                 estatus = row.getOrNull(CajaFormaPagoTable.activo) ?: 0,
-                                grupo_nombre = row.getOrNull(CajaFormaPagoGrupoTable.grupo),
-                                grupo_imagen = row.getOrNull(CajaFormaPagoGrupoTable.imagen),
-                                grupo_orden = row.getOrNull(CajaFormaPagoGrupoTable.orden),
-                                grupo_activo = row.getOrNull(CajaFormaPagoGrupoTable.activo),
+                                grupoNombre = row.getOrNull(CajaFormaPagoGrupoTable.grupo),
+                                grupoImagen = row.getOrNull(CajaFormaPagoGrupoTable.imagen),
+                                grupoOrden = row.getOrNull(CajaFormaPagoGrupoTable.orden),
+                                grupoActivo = row.getOrNull(CajaFormaPagoGrupoTable.activo),
                                 monto = montosPorForma[idForma] ?: 0.0,
                             )
                         }.toMutableList()
@@ -392,7 +392,7 @@ class CajaRepository {
                     formaPagoItems +=
                         CajaFormaPagoItem(
                             id = -100,
-                            forma_pago = "ENTRADAS",
+                            formaPago = "ENTRADAS",
                             siglas = "E",
                             monto = montoEntrada,
                             estatus = 1,
@@ -402,7 +402,7 @@ class CajaRepository {
                     formaPagoItems +=
                         CajaFormaPagoItem(
                             id = -101,
-                            forma_pago = "SALIDAS",
+                            formaPago = "SALIDAS",
                             siglas = "S",
                             monto = montoSalida,
                             estatus = 1,
@@ -437,7 +437,7 @@ class CajaRepository {
                             devolucionesPorForma.map { (idForma, monto) ->
                                 val row = meta[idForma]
                                 CajaFormaPagoDevolucionItem(
-                                    id_forma_pago = idForma,
+                                    idFormaPago = idForma,
                                     siglas = row?.get(CajaFormaPagoTable.siglas) ?: if (idForma == 30) "NC" else null,
                                     descripcion =
                                         row?.get(CajaFormaPagoTable.descripcion) ?: if (idForma ==
@@ -454,15 +454,15 @@ class CajaRepository {
                     }.getOrDefault(emptyList())
 
                 formaPagoDevolucion.forEach { devolucion ->
-                    val index = formaPagoItems.indexOfFirst { it.id == devolucion.id_forma_pago }
+                    val index = formaPagoItems.indexOfFirst { it.id == devolucion.idFormaPago }
                     if (index >= 0) {
                         val current = formaPagoItems[index]
                         formaPagoItems[index] = current.copy(monto = current.monto + devolucion.monto)
                     } else {
                         formaPagoItems +=
                             CajaFormaPagoItem(
-                                id = devolucion.id_forma_pago,
-                                forma_pago = devolucion.descripcion ?: "NOTA DE CREDITO",
+                                id = devolucion.idFormaPago,
+                                formaPago = devolucion.descripcion ?: "NOTA DE CREDITO",
                                 siglas = devolucion.siglas ?: "NC",
                                 estatus = 1,
                                 monto = devolucion.monto,
@@ -531,9 +531,9 @@ class CajaRepository {
                             CajaInventarioItem(
                                 codigo = first[SalesFacturaDetalleTable.itemCodigo].ifBlank { itemId.toString() },
                                 descripcion = first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
-                                existencia_inicial = available + sold,
-                                cantidad_vendida = sold,
-                                existencia_disponible = available,
+                                existenciaInicial = available + sold,
+                                cantidadVendida = sold,
+                                existenciaDisponible = available,
                             )
                         }.sortedBy { it.descripcion }
 
@@ -568,46 +568,46 @@ class CajaRepository {
 
                 CajaSecuenciaData(
                     id = secuenciaRow[CajaSecuenciaTable.idCajaSecuencia],
-                    id_caja = idCaja,
-                    id_vendedor = secuenciaRow[CajaSecuenciaTable.idVendedor],
+                    idCaja = idCaja,
+                    idVendedor = secuenciaRow[CajaSecuenciaTable.idVendedor],
                     secuencia = secuenciaRow[CajaSecuenciaTable.secuencia],
-                    fecha_apertura = fechaApertura?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                    fecha_cierre = fechaCierre?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                    fecha_creacion = fechaCreacion?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    fechaApertura = fechaApertura?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    fechaCierre = fechaCierre?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    fechaCreacion = fechaCreacion?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
                     usuario = secuenciaRow[CajaSecuenciaTable.usuario],
-                    observacion_apertura = secuenciaRow[CajaSecuenciaTable.observacionApertura],
-                    observacion_cierre = secuenciaRow[CajaSecuenciaTable.observacionCierre],
-                    monto_efectivo_apertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble(),
-                    monto_efectivo_ventas = montoEfectivoVentasCalc,
-                    monto_efectivo_entrada = montoEntrada,
-                    monto_efectivo_salida = montoSalida,
-                    monto_efectivo_total = montoEfectivoTotalCalc,
-                    monto_efectivo_cierre = montoEfectivoTotalCalc,
-                    monto_efectivo_diferencia = 0.0,
-                    monto_otros_total = montoOtrosTotalCalc,
-                    monto_otros_cierre = montoOtrosTotalCalc,
-                    monto_otros_diferencia = 0.0,
-                    monto_total = montoTotalCalc,
-                    monto_cierre = montoCierreCalc,
-                    monto_diferencia = 0.0,
-                    total_ventas = totalVentas,
-                    cantidad_transacciones = cantidadTransacciones,
-                    numero_cierre_fiscal = secuenciaRow[CajaSecuenciaTable.numeroCierreFiscal],
-                    serie_sucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal],
-                    serial_fiscal = secuenciaRow[CajaSecuenciaTable.serialFiscal],
+                    observacionApertura = secuenciaRow[CajaSecuenciaTable.observacionApertura],
+                    observacionCierre = secuenciaRow[CajaSecuenciaTable.observacionCierre],
+                    montoEfectivoApertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble(),
+                    montoEfectivoVentas = montoEfectivoVentasCalc,
+                    montoEfectivoEntrada = montoEntrada,
+                    montoEfectivoSalida = montoSalida,
+                    montoEfectivoTotal = montoEfectivoTotalCalc,
+                    montoEfectivoCierre = montoEfectivoTotalCalc,
+                    montoEfectivoDiferencia = 0.0,
+                    montoOtrosTotal = montoOtrosTotalCalc,
+                    montoOtrosCierre = montoOtrosTotalCalc,
+                    montoOtrosDiferencia = 0.0,
+                    montoTotal = montoTotalCalc,
+                    montoCierre = montoCierreCalc,
+                    montoDiferencia = 0.0,
+                    totalVentas = totalVentas,
+                    cantidadTransacciones = cantidadTransacciones,
+                    numeroCierreFiscal = secuenciaRow[CajaSecuenciaTable.numeroCierreFiscal],
+                    serieSucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal],
+                    serialFiscal = secuenciaRow[CajaSecuenciaTable.serialFiscal],
                     contabilizado = secuenciaRow[CajaSecuenciaTable.contabilizado],
-                    ffecha_apertura = fechaApertura?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
-                    ffecha_cierre = fechaCierre?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
-                    caja_codigo = cajaRow?.get(CajaTable.codCaja),
+                    ffechaApertura = fechaApertura?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
+                    ffechaCierre = fechaCierre?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
+                    cajaCodigo = cajaRow?.get(CajaTable.codCaja),
                     caja = cajaRow?.get(CajaTable.caja) ?: cajaRow?.get(CajaTable.descripcion),
-                    fondo_apertura = cajaRow?.get(CajaTable.fondoApertura)?.toDouble() ?: 0.0,
-                    nombre_modelo = cajaRow?.get(CajaTable.impresoraModelo),
+                    fondoApertura = cajaRow?.get(CajaTable.fondoApertura)?.toDouble() ?: 0.0,
+                    nombreModelo = cajaRow?.get(CajaTable.impresoraModelo),
                     vendedor = vendedorNombre,
-                    detalle_apertura = detalleApertura,
-                    forma_pago = formaPagoItems,
-                    forma_pago_devolucion = formaPagoDevolucion,
-                    total_anulado = totalAnulado,
-                    verificar_facturas_temporales = verificarTemporales,
+                    detalleApertura = detalleApertura,
+                    formaPago = formaPagoItems,
+                    formaPagoDevolucion = formaPagoDevolucion,
+                    totalAnulado = totalAnulado,
+                    verificarFacturasTemporales = verificarTemporales,
                     inventario = inventario,
                 )
             }
@@ -667,20 +667,20 @@ class CajaRepository {
 
                 CajaSecuenciaTable.update({ CajaSecuenciaTable.idCajaSecuencia eq request.id }) {
                     it[fechaCierre] = now
-                    it[montoEfectivoVentas] = request.monto_efectivo_ventas.toMoney()
-                    it[montoEfectivoEntrada] = request.monto_efectivo_entrada.toMoney()
-                    it[montoEfectivoSalida] = request.monto_efectivo_salida.toMoney()
-                    it[montoEfectivoTotal] = request.monto_efectivo_total.toMoney()
-                    it[montoEfectivoCierre] = request.monto_efectivo_cierre.toMoney()
-                    it[montoEfectivoDiferencia] = request.monto_efectivo_diferencia.toMoney()
-                    it[montoOtrosTotal] = request.monto_otros_total.toMoney()
-                    it[montoOtrosCierre] = request.monto_otros_cierre.toMoney()
-                    it[montoOtrosDiferencia] = request.monto_otros_diferencia.toMoney()
-                    it[montoTotal] = request.monto_total.toMoney()
-                    it[montoCierre] = request.monto_cierre.toMoney()
-                    it[montoDiferencia] = request.monto_diferencia.toMoney()
-                    it[observacionCierre] = request.observacion_cierre.orEmpty()
-                    it[numeroCierreFiscal] = request.numero_cierre_fiscal
+                    it[montoEfectivoVentas] = request.montoEfectivoVentas.toMoney()
+                    it[montoEfectivoEntrada] = request.montoEfectivoEntrada.toMoney()
+                    it[montoEfectivoSalida] = request.montoEfectivoSalida.toMoney()
+                    it[montoEfectivoTotal] = request.montoEfectivoTotal.toMoney()
+                    it[montoEfectivoCierre] = request.montoEfectivoCierre.toMoney()
+                    it[montoEfectivoDiferencia] = request.montoEfectivoDiferencia.toMoney()
+                    it[montoOtrosTotal] = request.montoOtrosTotal.toMoney()
+                    it[montoOtrosCierre] = request.montoOtrosCierre.toMoney()
+                    it[montoOtrosDiferencia] = request.montoOtrosDiferencia.toMoney()
+                    it[montoTotal] = request.montoTotal.toMoney()
+                    it[montoCierre] = request.montoCierre.toMoney()
+                    it[montoDiferencia] = request.montoDiferencia.toMoney()
+                    it[observacionCierre] = request.observacionCierre.orEmpty()
+                    it[numeroCierreFiscal] = request.numeroCierreFiscal
                 }
 
                 CajaDetalleCierreTable.deleteWhere { CajaDetalleCierreTable.idSecuencia eq request.id }
@@ -692,7 +692,7 @@ class CajaRepository {
                         insertCajaDetalleCierre(request.id, serieSucursal, detalle)
                     }
 
-                request.detalle_formapago.forEach { detalle ->
+                request.detalleFormaPago.forEach { detalle ->
                     insertCajaDetalleCierreFormaPago(request.id, serieSucursal, detalle)
                 }
 
@@ -1140,7 +1140,7 @@ class CajaRepository {
         CajaDetalleCierreTable.insert {
             it[id] = UUID.randomUUID().toString()
             it[CajaDetalleCierreTable.idSecuencia] = idSecuencia
-            it[idMonedaDenominacion] = detalle.id_moneda_denominacion
+            it[idMonedaDenominacion] = detalle.idMonedaDenominacion
             it[cantidad] = detalle.cantidad
             it[valor] = detalle.valor.toMoney()
             it[monto] = detalle.monto.toMoney()
@@ -1156,10 +1156,10 @@ class CajaRepository {
         CajaDetalleCierreFormaPagoTable.insert {
             it[id] = UUID.randomUUID().toString()
             it[CajaDetalleCierreFormaPagoTable.idSecuencia] = idSecuencia
-            it[idFormaPago] = detalle.id_forma_pago
+            it[idFormaPago] = detalle.idFormaPago
             it[montoVentas] = detalle.monto.toMoney()
-            it[montoCierre] = detalle.monto_cierre.toMoney()
-            it[montoDiferencia] = detalle.monto_diferencia.toMoney()
+            it[montoCierre] = detalle.montoCierre.toMoney()
+            it[montoDiferencia] = detalle.montoDiferencia.toMoney()
             it[CajaDetalleCierreFormaPagoTable.serieSucursal] = serieSucursal
         }
     }
@@ -1169,7 +1169,7 @@ class CajaRepository {
     private fun buildAutoCloseFormaPagoTotals(data: CajaSecuenciaData): Map<Int, FormaPagoCloseTotal> {
         val totals = linkedMapOf<Int, FormaPagoCloseTotal>()
 
-        data.forma_pago
+        data.formaPago
             .asSequence()
             .filter { it.id > 0 && it.monto != 0.0 }
             .forEach { line ->
@@ -1181,12 +1181,12 @@ class CajaRepository {
                 }
             }
 
-        data.forma_pago_devolucion
+        data.formaPagoDevolucion
             .asSequence()
-            .filter { it.id_forma_pago > 0 && it.monto != 0.0 }
+            .filter { it.idFormaPago > 0 && it.monto != 0.0 }
             .forEach { line ->
                 totals.merge(
-                    line.id_forma_pago,
+                    line.idFormaPago,
                     FormaPagoCloseTotal(sigla = line.siglas, monto = line.monto),
                 ) { current, incoming ->
                     current.copy(monto = current.monto + incoming.monto)
