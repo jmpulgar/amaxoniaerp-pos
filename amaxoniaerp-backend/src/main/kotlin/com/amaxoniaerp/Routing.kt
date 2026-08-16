@@ -69,6 +69,8 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
+private const val HTTP_REQUEST_TIMEOUT_MS = 30_000L
+
 private val routingLog = LoggerFactory.getLogger("Routing")
 
 fun Application.configureRouting() {
@@ -123,7 +125,7 @@ fun Application.configureRouting() {
                 level = LogLevel.INFO
             }
             engine {
-                requestTimeout = 30_000
+                requestTimeout = HTTP_REQUEST_TIMEOUT_MS
             }
         }
     environment.monitor.subscribe(ApplicationStopped) {

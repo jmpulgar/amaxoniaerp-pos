@@ -54,6 +54,10 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+private const val RETURN_PAYMENT_FORM_FALLBACK = 30
+private const val ANNULLED_INVOICE_STATUS = 3
+private const val CASH_SEQUENCE_LENGTH = 6
+
 class CajaRepository {
     private val log = LoggerFactory.getLogger(CajaRepository::class.java)
 
@@ -419,7 +423,7 @@ class CajaRepository {
 
                         val devolucionesPorForma =
                             devolucionRows
-                                .groupBy { it[FacturaDevolucionTable.idFormaPago] ?: 30 }
+                                .groupBy { it[FacturaDevolucionTable.idFormaPago] ?: RETURN_PAYMENT_FORM_FALLBACK }
                                 .mapValues { (_, rows) ->
                                     rows.sumOf { row -> row[FacturaDevolucionTable.totalTotalFactura]?.toDouble() ?: 0.0 }
                                 }
@@ -486,14 +490,14 @@ class CajaRepository {
                         .select(facturaTable.totalTotalFactura)
                         .where {
                             (facturaTable.idCajaSecuencia eq idSecuencia) and
-                                (facturaTable.codEstatus eq 3)
+                                (facturaTable.codEstatus eq ANNULLED_INVOICE_STATUS)
                         }.sumOf { it[facturaTable.totalTotalFactura].toDouble() }
 
                 val facturasValidas =
                     facturaTable
                         .select(facturaTable.idFactura, facturaTable.totalTotalFactura, facturaTable.codEstatus)
                         .where { facturaTable.idCajaSecuencia eq idSecuencia }
-                        .filter { row -> (row[facturaTable.codEstatus] ?: 0) != 3 }
+                        .filter { row -> (row[facturaTable.codEstatus] ?: 0) != ANNULLED_INVOICE_STATUS }
                 val totalVentas = facturasValidas.sumOf { it[facturaTable.totalTotalFactura].toDouble() }
                 val cantidadTransacciones = facturasValidas.size
                 val facturaIds = facturasValidas.map { it[facturaTable.idFactura] }
@@ -1129,7 +1133,7 @@ class CajaRepository {
                 .maxOrNull()
                 ?: 0
         val next = max + 1
-        return next.toString().padStart(6, '0')
+        return next.toString().padStart(CASH_SEQUENCE_LENGTH, '0')
     }
 
     private fun insertCajaDetalleCierre(

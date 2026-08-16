@@ -19,6 +19,8 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import org.slf4j.LoggerFactory
 
+private const val CUFE_LOG_PREFIX_LENGTH = 20
+
 /**
  * Adapter Pattern: implementación concreta de [PanamaElectronicInvoiceClient]
  * para el PAC "The Factory HKA" usando su API REST.
@@ -152,7 +154,7 @@ class TheFactoryHkaRestClient(
     ): Result<TheFactoryEnviarCorreoResponse> =
         runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/EnvioCorreo"
-            logger.info("Enviando factura electrónica por correo desde The Factory HKA. CUFE={}", cufe.take(20))
+            logger.info("Enviando factura electrónica por correo desde The Factory HKA. CUFE={}", cufe.take(CUFE_LOG_PREFIX_LENGTH))
 
             val response: HttpResponse =
                 httpClient.post(url) {

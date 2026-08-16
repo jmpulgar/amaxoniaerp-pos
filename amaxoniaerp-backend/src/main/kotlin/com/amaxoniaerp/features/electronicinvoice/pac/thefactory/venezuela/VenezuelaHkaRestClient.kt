@@ -17,6 +17,10 @@ import io.ktor.serialization.JsonConvertException
 import kotlinx.serialization.json.Json
 import java.net.UnknownHostException
 
+private const val LOG_CREDENTIAL_PREFIX_LENGTH = 8
+private const val HTTP_SUCCESS_MIN = 200
+private const val HTTP_SUCCESS_MAX = 299
+
 /**
  * Implementación REST concreta de [VenezuelaHkaClient] para The Factory HKA.
  *
@@ -43,7 +47,7 @@ class VenezuelaHkaRestClient(
 
     override suspend fun authenticate(credentials: PacCredentials): VenezuelaHkaResponse<VenezuelaHkaAuthResponse> {
         val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
-        log.info("[VE-HKA] Autenticacion usuario={} host={}", credentials.usuario.take(8), hostOf(url))
+        log.info("[VE-HKA] Autenticacion usuario={} host={}", credentials.usuario.take(LOG_CREDENTIAL_PREFIX_LENGTH), hostOf(url))
         val raw =
             postRaw(url, token = null) {
                 setBody(
@@ -103,7 +107,7 @@ class VenezuelaHkaRestClient(
         val status: Int,
         val text: String,
     ) {
-        val httpOk: Boolean get() = status in 200..299
+        val httpOk: Boolean get() = status in HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX
         val codigo: String get() = if (httpOk) "200" else "HTTP_$status"
         val bodyIfOk: String get() = if (httpOk) text else ""
     }

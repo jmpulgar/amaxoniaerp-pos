@@ -33,6 +33,9 @@ import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 
+private const val LOG_TOKEN_PREFIX_LENGTH = 8
+private const val SQL_DATETIME_TEXT_LENGTH = 19
+
 /**
  * Repositorio de solo-lectura + actualización post-envío para Facturación Electrónica.
  *
@@ -85,7 +88,7 @@ class ElectronicInvoiceRepository {
 
             logger.info(
                 "[FE] config loaded: tokenEmpresa=${config.tokenEmpresa.take(
-                    8,
+                    LOG_TOKEN_PREFIX_LENGTH,
                 )}... api_thefactoryhka=${config.apiTheFactoryHka} tipoEmision=${config.tipoEmision}",
             )
 
@@ -671,9 +674,9 @@ class ElectronicInvoiceRepository {
                 .substringBefore("-05:00")
                 .substringBefore("-04:00")
                 .replace("T", " ")
-                .take(19)
+                .take(SQL_DATETIME_TEXT_LENGTH)
         } catch (_: Exception) {
-            isoDate.take(19).replace("T", " ")
+            isoDate.take(SQL_DATETIME_TEXT_LENGTH).replace("T", " ")
         }
 
     private fun String?.safeIntOrZero(): Int =

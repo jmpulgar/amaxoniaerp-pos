@@ -30,6 +30,9 @@ import java.math.RoundingMode
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+private const val UNIT_CALCULATION_SCALE = 6
+private const val QUANTITY_SCALE = 3
+
 /**
  * Operaciones de cuenta/división de mesa.
  *
@@ -184,7 +187,7 @@ class CuentaMesaRepository {
                 val cantidad = detalle.cantidad
                 val row = detalle.pedido
                 val factorCantidad =
-                    cantidad.divide(row[PedidoMesaTable.itemCantidad], 6, RoundingMode.HALF_EVEN)
+                    cantidad.divide(row[PedidoMesaTable.itemCantidad], UNIT_CALCULATION_SCALE, RoundingMode.HALF_EVEN)
                 val detalleSub = row[PedidoMesaTable.itemTotalSinIva].multiply(factorCantidad)
                 val detalleDesc = row[PedidoMesaTable.itemMontoDescuento].multiply(factorCantidad)
                 val detalleIva =
@@ -838,7 +841,7 @@ class CuentaMesaRepository {
 
     private fun dinero(value: Double): BigDecimal = BigDecimal.valueOf(value).setScale(SCALE, RoundingMode.HALF_EVEN)
 
-    private fun cantidad(value: Double): BigDecimal = BigDecimal.valueOf(value).setScale(3, RoundingMode.HALF_EVEN)
+    private fun cantidad(value: Double): BigDecimal = BigDecimal.valueOf(value).setScale(QUANTITY_SCALE, RoundingMode.HALF_EVEN)
 
     private companion object {
         const val ACTIVE = 1

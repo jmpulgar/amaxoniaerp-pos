@@ -9,6 +9,8 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.Venez
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
+private const val HTTP_SERVER_ERROR_MIN = 500
+
 /**
  * Estrategia concreta [ElectronicInvoiceStrategy] para Venezuela con The Factory
  * HKA Facturación Electrónica (FASE 1 - solo facturas tipoDocumento "01").
@@ -297,7 +299,7 @@ class VenezuelaInvoiceStrategy(
             )
             // Indección: si HTTP fue 5xx o la respuesta es ilegible, es incertidumbre.
             val esIncierto =
-                emission.httpStatus >= 500 ||
+                emission.httpStatus >= HTTP_SERVER_ERROR_MIN ||
                     emission.businessOk &&
                     emission.resultado
                         ?.resultado

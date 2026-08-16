@@ -14,6 +14,8 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 
+private const val SECOND_DEFAULT_REGISTRATION_TYPE = 3
+
 fun Route.posRouting(formasPagoRepository: FormasPagoRepository) {
     authenticate {
         route("/api/pos") {
@@ -52,7 +54,7 @@ fun Route.posRouting(formasPagoRepository: FormasPagoRepository) {
                     call.request.queryParameters["tipoRegistro"]
                         ?.split(',')
                         ?.mapNotNull { it.trim().toIntOrNull() }
-                        ?: listOf(1, 3)
+                        ?: listOf(1, SECOND_DEFAULT_REGISTRATION_TYPE)
 
                 val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
                 val formasPago =

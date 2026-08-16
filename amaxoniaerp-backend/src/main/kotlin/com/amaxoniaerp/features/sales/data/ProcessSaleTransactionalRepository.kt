@@ -35,6 +35,25 @@ import java.time.Year
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+private const val SHORT_CODE_LENGTH = 10
+private const val EXCHANGE_RATE_SCALE = 8
+private const val CLIENT_CODE_LENGTH = 9
+private const val CORRELATIVE_RETRY_ATTEMPTS = 10
+private const val INVOICE_SEQUENCE_LENGTH = 5
+private const val DEFAULT_TERM_PAYMENT_ID = 3
+private const val INVOICE_USER_LENGTH = 32
+private const val QUANTITY_SCALE = 3
+private const val PERCENT_BASE = 100.0
+private const val PACKAGING_UNIT_LENGTH = 15
+private const val PROMOTION_CODE_LENGTH = 15
+private const val PROMOTION_IDENTIFIER_LENGTH = 36
+private const val PROMOTION_TYPE_LENGTH = 20
+private const val PROMOTION_NAME_LENGTH = 200
+private const val PAYMENT_USER_LENGTH = 60
+private const val INVENTORY_QUANTITY_SCALE = 4
+private const val TWO_DIGIT_YEAR_MODULUS = 100
+private const val STANDARD_USER_LENGTH = 20
+
 /**
  * Repositorio transaccional de procesamiento de ventas.
  *
@@ -133,7 +152,7 @@ open class ProcessSaleTransactionalRepository(
                 idSucursal = context.idSucursal ?: request.factura.idSucursal,
                 serieSucursal =
                     context.serieSucursal
-                        ?: request.factura.serieSucursal.take(10),
+                        ?: request.factura.serieSucursal.take(SHORT_CODE_LENGTH),
             )
         val normalizedPayments =
             request.pagos.map { payment ->
@@ -405,7 +424,7 @@ open class ProcessSaleTransactionalRepository(
         val multiMoneda = if (paramsMulti) "SI" else "NO"
 
         val monedaBase = params[pgTable.monedaBase] ?: 1
-        val abrMonedaBase = params[pgTable.abrMonedaBase].take(10)
+        val abrMonedaBase = params[pgTable.abrMonedaBase].take(SHORT_CODE_LENGTH)
 
         val monedaSecundaria =
             if (pgTable is ParametrosGeneralesTableVE) {
@@ -415,7 +434,7 @@ open class ProcessSaleTransactionalRepository(
             }
         val abrMonedaSecundaria =
             if (pgTable is ParametrosGeneralesTableVE) {
-                params[pgTable.abrMonedaSecundaria].take(10)
+                params[pgTable.abrMonedaSecundaria].take(SHORT_CODE_LENGTH)
             } else {
                 abrMonedaBase
             }
@@ -460,7 +479,7 @@ open class ProcessSaleTransactionalRepository(
         return MonetaryContext(
             countryCode = countryCode,
             multiMoneda = multiMoneda,
-            tasa = BigDecimal.valueOf(tasa).setScale(8, RoundingMode.HALF_UP),
+            tasa = BigDecimal.valueOf(tasa).setScale(EXCHANGE_RATE_SCALE, RoundingMode.HALF_UP),
             idTasa = idTasa,
             monedaBase = monedaBase,
             abrMonedaBase = abrMonedaBase,
@@ -576,7 +595,7 @@ open class ProcessSaleTransactionalRepository(
         request: ProcessSaleRequest,
     ) {
         if (!countryCode.equals("PA", ignoreCase = true)) return
-        val clientCode = request.factura.codCliente.take(9)
+        val clientCode = request.factura.codCliente.take(CLIENT_CODE_LENGTH)
         if (clientCode.isBlank()) return
 
         val sucursales =
@@ -651,7 +670,7 @@ open class ProcessSaleTransactionalRepository(
         idCaja: String,
         fallbackCodigoCaja: String,
     ): String {
-        repeat(10) {
+        repeat(CORRELATIVE_RETRY_ATTEMPTS) {
             val row =
                 SalesCajaTable
                     .select(SalesCajaTable.codigo, SalesCajaTable.facturaCorrelativo)
@@ -679,7 +698,7 @@ open class ProcessSaleTransactionalRepository(
     }
 
     private fun consumeCorrelativoCaja(idCaja: String) {
-        repeat(10) {
+        repeat(CORRELATIVE_RETRY_ATTEMPTS) {
             val current =
                 SalesCajaTable
                     .select(SalesCajaTable.facturaCorrelativo)
@@ -709,7 +728,7 @@ open class ProcessSaleTransactionalRepository(
         if (codigoCaja.isBlank()) {
             throw InvalidSaleRequestException("codigo de caja inválido para construir cod_factura")
         }
-        return "${codigoCaja.trim()}-${correlativo.toString().padStart(5, '0')}"
+        return "${codigoCaja.trim()}-${correlativo.toString().padStart(INVOICE_SEQUENCE_LENGTH, '0')}"
     }
 
     private fun insertFactura(
@@ -739,7 +758,7 @@ open class ProcessSaleTransactionalRepository(
             creditDecision.fechaVencimiento
                 ?: today.plusDays(monetaryContext.diasVencimiento.toLong())
         val totalBultosQty = request.items.sumOf { it.itemCantidadTotal }
-        val serieSucursalValue = f.serieSucursal.take(10)
+        val serieSucursalValue = f.serieSucursal.take(SHORT_CODE_LENGTH)
         val cajaSecuenciaValue = resolveCajaSecuenciaCodigo(f.idCajaSecuencia)
 
         val facturaTable = SalesFacturaTableFactory.forCountry(monetaryContext.countryCode)
@@ -772,7 +791,7 @@ open class ProcessSaleTransactionalRepository(
             it[facturaTable.usuarioCreacion] = f.usuarioCreacion
             it[facturaTable.tipoFactura] = "factura_pos"
             it[facturaTable.modeloFactura] = "pos"
-            it[facturaTable.terminoPagoId] = monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: 3
+            it[facturaTable.terminoPagoId] = monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: DEFAULT_TERM_PAYMENT_ID
             it[facturaTable.facturarA] = f.facturarA
             it[facturaTable.facturarARuc] = f.facturarARuc
             it[facturaTable.facturarADireccion] = f.facturarADireccion
@@ -830,7 +849,7 @@ open class ProcessSaleTransactionalRepository(
         monetaryContext: MonetaryContext,
     ): List<String> {
         val vendedorPorDefecto = request.factura.codVendedor
-        val usuario = request.factura.usuarioCreacion.take(32)
+        val usuario = request.factura.usuarioCreacion.take(INVOICE_USER_LENGTH)
         val detalleIds = mutableListOf<String>()
 
         request.items.forEach { item ->
@@ -849,7 +868,7 @@ open class ProcessSaleTransactionalRepository(
                 it[idItem] = item.idItem
                 it[itemAlmacen] = item.itemAlmacen
                 it[itemDescripcion] = item.itemDescripcion
-                it[itemCantidad] = item.itemCantidad.toScaledBigDecimal(3)
+                it[itemCantidad] = item.itemCantidad.toScaledBigDecimal(QUANTITY_SCALE)
                 it[itemPrecioSinIva] = itemPriceSinIvaBase
                 it[itemDescuento] = item.itemDescuento.toMoney()
                 it[itemMontoDescuento] = monetaryContext.toBase(item.itemMontoDescuento)
@@ -858,21 +877,21 @@ open class ProcessSaleTransactionalRepository(
                 it[itemTotalConIva] = itemTotalConIvaBase
                 it[cantidadBulto] = item.cantidadBulto.coerceAtLeast(1)
                 it[gananciaItemIndividual] = itemTotalSinIvaBase
-                it[porcentajeGanancia] = BigDecimal.valueOf(100.0).setScale(2)
+                it[porcentajeGanancia] = BigDecimal.valueOf(PERCENT_BASE).setScale(2)
                 it[poseeSerial] = "NO"
                 it[serialesSeleccionados] = ""
                 it[usuarioCreacion] = usuario
                 it[fechaCreacion] = now
                 it[itemListaPrecio] = "BASE"
-                it[itemUnidadEmpaque] = item.itemUnidadEmpaque.take(15).ifBlank { "UNIDAD" }
+                it[itemUnidadEmpaque] = item.itemUnidadEmpaque.take(PACKAGING_UNIT_LENGTH).ifBlank { "UNIDAD" }
                 it[itemCantidadTotal] = item.itemCantidadTotal.toScaledBigDecimal(0)
-                it[promocionId] = item.promocionId.take(36)
-                it[promocionTipo] = item.promocionTipo.take(20)
-                it[promocionCodigo] = item.promocionCodigo.take(15)
-                it[promocionNombre] = item.promocionNombre.take(200)
-                it[promocionGrupo] = item.promocionGrupo.take(36)
-                it[promocionDetalleId] = item.promocionDetalleId.take(36)
-                it[promocionCantidad] = item.promocionCantidad.toScaledBigDecimal(3)
+                it[promocionId] = item.promocionId.take(PROMOTION_IDENTIFIER_LENGTH)
+                it[promocionTipo] = item.promocionTipo.take(PROMOTION_TYPE_LENGTH)
+                it[promocionCodigo] = item.promocionCodigo.take(PROMOTION_CODE_LENGTH)
+                it[promocionNombre] = item.promocionNombre.take(PROMOTION_NAME_LENGTH)
+                it[promocionGrupo] = item.promocionGrupo.take(PROMOTION_IDENTIFIER_LENGTH)
+                it[promocionDetalleId] = item.promocionDetalleId.take(PROMOTION_IDENTIFIER_LENGTH)
+                it[promocionCantidad] = item.promocionCantidad.toScaledBigDecimal(QUANTITY_SCALE)
                 it[grupo] = 1
                 it[descuentoAutorizacion] = ""
                 it[codVendedor] = vendedorLinea
@@ -1036,7 +1055,7 @@ open class ProcessSaleTransactionalRepository(
             it[fpgTable.totalizarNroOtroDocumento] = 0
             it[fpgTable.totalizarBancoOtroDocumento] = 0
             it[fpgTable.fechaCreacion] = now
-            it[fpgTable.usuarioCreacion] = request.factura.usuarioCreacion.take(60)
+            it[fpgTable.usuarioCreacion] = request.factura.usuarioCreacion.take(PAYMENT_USER_LENGTH)
             it[fpgTable.totalizarMontoCredito] = monetaryContext.toBase(montoCredito)
             it[fpgTable.totalizarMontoDebito] = monetaryContext.toBase(montoDebito)
             it[fpgTable.totalizarMontoTransferencia] = monetaryContext.toBase(montoTransferencia)
@@ -1100,7 +1119,7 @@ open class ProcessSaleTransactionalRepository(
                         it[codAlmacen] = item.itemAlmacen
                         it[cantidad] = requested.negate().toFloat()
                         if (monetaryContext.countryCode.uppercase() == "PA") {
-                            it[cantidadMuestra] = BigDecimal.ZERO.setScale(4)
+                            it[cantidadMuestra] = BigDecimal.ZERO.setScale(INVENTORY_QUANTITY_SCALE)
                             it[minimo] = 0L
                             it[maximo] = 0L
                         }
@@ -1124,7 +1143,7 @@ open class ProcessSaleTransactionalRepository(
             it[kardexTable.idDocumento] = invoiceId
             it[kardexTable.codProveedor] = 0
             it[kardexTable.comprobante] = "FACT"
-            it[kardexTable.anio] = Year.from(today).value % 100
+            it[kardexTable.anio] = Year.from(today).value % TWO_DIGIT_YEAR_MODULUS
             it[kardexTable.tipoCosto] = "PROM"
             it[kardexTable.estatus] = 1
             it[kardexTable.entregadoACodigo] = "POS"
@@ -1137,7 +1156,7 @@ open class ProcessSaleTransactionalRepository(
             it[kardexTable.idAlmacenSalida] = physicalItems.first().itemAlmacen
             it[kardexTable.idSucursal] = request.factura.idSucursal
             it[kardexTable.validadoFecha] = today
-            it[kardexTable.validadoUsuario] = request.factura.usuarioCreacion.take(20)
+            it[kardexTable.validadoUsuario] = request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
             it[kardexTable.validadoObservacion] = "Salida por Ventas"
             if (kardexTable is SalesKardexTablePA) {
                 it[kardexTable.controlaStock] = 0
@@ -1208,7 +1227,7 @@ open class ProcessSaleTransactionalRepository(
                     CajaStatus.Pagada
                 }
             it[cajaNuevaTable.sucursalId] = request.factura.idSucursal
-            it[cajaNuevaTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+            it[cajaNuevaTable.usuarioCreacion] = request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
             it[cajaNuevaTable.fechaCreacion] = now
             it[cajaNuevaTable.idCompra] = ""
             it[cajaNuevaTable.idProveedor] = ""
@@ -1231,7 +1250,7 @@ open class ProcessSaleTransactionalRepository(
             it[cajaReciboTable.codVendedor] = request.factura.codVendedor
             it[cajaReciboTable.idCliente] = request.factura.idCliente
             it[cajaReciboTable.idProveedor] = ""
-            it[cajaReciboTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+            it[cajaReciboTable.usuarioCreacion] = request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
             it[cajaReciboTable.fechaCreacion] = now
             it[cajaReciboTable.status] = "AC"
             it[cajaReciboTable.contabilizado] = 0
@@ -1262,7 +1281,7 @@ open class ProcessSaleTransactionalRepository(
                 it[cajaNuevaDetalleTable.monto] = montoPagoBase
                 it[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
                 it[cajaNuevaDetalleTable.concepto] = null
-                it[cajaNuevaDetalleTable.usuarioCreacion] = request.factura.usuarioCreacion.take(20)
+                it[cajaNuevaDetalleTable.usuarioCreacion] = request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
                 it[cajaNuevaDetalleTable.fechaCreacion] = now
                 it[cajaNuevaDetalleTable.retencionTipo] = ""
                 it[cajaNuevaDetalleTable.retencionPorcentaje] = ""
@@ -1337,7 +1356,7 @@ open class ProcessSaleTransactionalRepository(
             .firstOrNull()
             ?.get(SalesCajaSecuenciaTable.secuencia)
             ?.takeIf { it.isNotBlank() }
-            ?.take(10)
+            ?.take(SHORT_CODE_LENGTH)
             ?: "000001"
 
     private fun Double.toMoney(): BigDecimal = toScaledBigDecimal(2)

@@ -3,6 +3,9 @@ package com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
 
+private const val HTTP_SUCCESS_MIN = 200
+private const val HTTP_SUCCESS_MAX = 299
+
 // ─── Port: contrato del cliente HTTP de The Factory HKA Venezuela ────────────
 // Independiente del cliente Panamá: las rutas, DTOs y semántica del JSON son
 // distintas y NO se comparten con `PanamaElectronicInvoiceClient`.
@@ -31,7 +34,7 @@ data class VenezuelaHkaResponse<T>(
     val resultado: T?,
 ) {
     /** HTTP en rango 2xx. El éxito de negocio se evalúa aparte. */
-    val httpOk: Boolean get() = httpStatus in 200..299
+    val httpOk: Boolean get() = httpStatus in HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX
 
     /** codigo == "200" (codigo de negocio exitoso del PAC VE). */
     val businessOk: Boolean get() = codigo == "200"

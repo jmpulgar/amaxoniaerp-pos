@@ -61,6 +61,18 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+private const val ANNULLED_INVOICE_STATUS = 3
+private const val QUANTITY_SCALE = 3
+private const val UNIT_CALCULATION_SCALE = 6
+private const val FINANCIAL_DIVISION_SCALE = 12
+private const val CORRELATIVE_CODE_LENGTH = 5
+private const val MAX_FISCAL_DOCUMENT_NUMBER = 9_999_999_999L
+private const val FISCAL_DOCUMENT_LENGTH = 10
+private const val CREDIT_NOTE_KARDEX_MOVEMENT_TYPE = 14
+private const val KARDEX_RECIPIENT_CODE_LENGTH = 10
+private const val KARDEX_RECIPIENT_NAME_LENGTH = 30
+private const val INVENTORY_QUANTITY_SCALE = 4
+
 class CreditNoteRepository {
     fun listCreditNotes(
         countryCode: String,
@@ -146,7 +158,7 @@ class CreditNoteRepository {
                 .selectAll()
 
         if (!countryCode.equals("PA", ignoreCase = true)) {
-            query.andWhere { CreditNoteFacturaTable.codEstatus neq 3 }
+            query.andWhere { CreditNoteFacturaTable.codEstatus neq ANNULLED_INVOICE_STATUS }
         }
         query.andWhere { CreditNoteFacturaTable.totalTotalFactura greater BigDecimal.ZERO }
 
@@ -399,7 +411,7 @@ class CreditNoteRepository {
         }
 
         CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoice.idFactura }) {
-            it[codEstatus] = 3
+            it[codEstatus] = ANNULLED_INVOICE_STATUS
         }
 
         if (allReturnedAfterOperation) {
@@ -654,7 +666,7 @@ class CreditNoteRepository {
                 it[idDetalleFactura] = line.sourceLine.idDetalleFactura
                 it[idItem] = line.sourceLine.idItem
                 it[itemAlmacen] = line.sourceLine.almacen
-                it[itemCantidad] = line.quantity.setScale(3, RoundingMode.HALF_UP)
+                it[itemCantidad] = line.quantity.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
                 it[itemPrecioSinIva] = line.sourceLine.precioSinIva
                 it[itemDescuento] = line.sourceLine.descuentoPorcentaje
                 it[itemMontoDescuento] = line.discountAmount
@@ -681,7 +693,7 @@ class CreditNoteRepository {
 
         if (countryCode.equals("PA", ignoreCase = true)) {
             CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoice.idFactura }) {
-                it[codEstatus] = 3
+                it[codEstatus] = ANNULLED_INVOICE_STATUS
             }
         }
 
@@ -997,17 +1009,18 @@ class CreditNoteRepository {
                 .mapValues { (_, rows) ->
                     rows.fold(
                         BigDecimal.ZERO,
-                    ) { acc, row -> acc + row[CreditNoteDetailTable.itemCantidad].setScale(3, RoundingMode.HALF_UP) }
+                    ) { acc, row -> acc + row[CreditNoteDetailTable.itemCantidad].setScale(QUANTITY_SCALE, RoundingMode.HALF_UP) }
                 }
 
         return detailRows.map { row ->
-            val quantityOriginal = row[CreditNoteFacturaDetalleTable.itemCantidadTotal].setScale(3, RoundingMode.HALF_UP)
+            val quantityOriginal = row[CreditNoteFacturaDetalleTable.itemCantidadTotal].setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
             val returned =
-                returnedByDetail[row[CreditNoteFacturaDetalleTable.idDetalleFactura]] ?: BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)
-            val available = quantityOriginal.subtract(returned).coerceAtLeastZero(3)
-            val unitTotalSinIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalSinIva], quantityOriginal, 6)
-            val unitTotalConIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalConIva], quantityOriginal, 6)
-            val unitDiscount = divideSafe(row[CreditNoteFacturaDetalleTable.itemMontoDescuento], quantityOriginal, 6)
+                returnedByDetail[row[CreditNoteFacturaDetalleTable.idDetalleFactura]]
+                    ?: BigDecimal.ZERO.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
+            val available = quantityOriginal.subtract(returned).coerceAtLeastZero(QUANTITY_SCALE)
+            val unitTotalSinIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalSinIva], quantityOriginal, UNIT_CALCULATION_SCALE)
+            val unitTotalConIva = divideSafe(row[CreditNoteFacturaDetalleTable.itemTotalConIva], quantityOriginal, UNIT_CALCULATION_SCALE)
+            val unitDiscount = divideSafe(row[CreditNoteFacturaDetalleTable.itemMontoDescuento], quantityOriginal, UNIT_CALCULATION_SCALE)
 
             SourceInvoiceLine(
                 idDetalleFactura = row[CreditNoteFacturaDetalleTable.idDetalleFactura],
@@ -1054,7 +1067,7 @@ class CreditNoteRepository {
             .groupBy { it.idDetalleFactura }
             .mapValues { (_, rows) ->
                 rows.fold(BigDecimal.ZERO) { acc, line ->
-                    val quantity = BigDecimal.valueOf(line.cantidad).setScale(3, RoundingMode.HALF_UP)
+                    val quantity = BigDecimal.valueOf(line.cantidad).setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
                     if (quantity <= BigDecimal.ZERO) {
                         throw CreditNoteValidationException("Las cantidades a devolver deben ser mayores a cero")
                     }
@@ -1079,8 +1092,8 @@ class CreditNoteRepository {
                     )
                 }
 
-                val unitTotalSinIva = divideSafe(sourceLine.totalSinIvaOriginal, sourceLine.quantityOriginal, 6)
-                val unitTotalConIva = divideSafe(sourceLine.totalConIvaOriginal, sourceLine.quantityOriginal, 6)
+                val unitTotalSinIva = divideSafe(sourceLine.totalSinIvaOriginal, sourceLine.quantityOriginal, UNIT_CALCULATION_SCALE)
+                val unitTotalConIva = divideSafe(sourceLine.totalConIvaOriginal, sourceLine.quantityOriginal, UNIT_CALCULATION_SCALE)
 
                 ProcessedLine(
                     sourceLine = sourceLine,
@@ -1155,7 +1168,7 @@ class CreditNoteRepository {
                             minBigDecimal(
                                 currentGlobalDiscount
                                     .multiply(line.totalSinIva)
-                                    .divide(processedBase, 12, RoundingMode.HALF_UP)
+                                    .divide(processedBase, FINANCIAL_DIVISION_SCALE, RoundingMode.HALF_UP)
                                     .setScale(2, RoundingMode.HALF_UP),
                                 currentGlobalDiscount - allocatedGlobalDiscount,
                             )
@@ -1216,7 +1229,7 @@ class CreditNoteRepository {
         val boundedNumerator = minBigDecimal(numerator, denominator)
         return amount
             .multiply(boundedNumerator)
-            .divide(denominator, 12, RoundingMode.HALF_UP)
+            .divide(denominator, FINANCIAL_DIVISION_SCALE, RoundingMode.HALF_UP)
             .setScale(2, RoundingMode.HALF_UP)
     }
 
@@ -1229,7 +1242,7 @@ class CreditNoteRepository {
         }
         return subtotal
             .multiply(taxRate)
-            .divide(BigDecimal("100"), 12, RoundingMode.HALF_UP)
+            .divide(BigDecimal("100"), FINANCIAL_DIVISION_SCALE, RoundingMode.HALF_UP)
             .setScale(2, RoundingMode.HALF_UP)
     }
 
@@ -1293,7 +1306,7 @@ class CreditNoteRepository {
     private fun buildCreditNoteCode(
         codigoCaja: String,
         nextCorrelative: Int,
-    ): String = "${codigoCaja.takeIf { it.isNotBlank() } ?: "NC"}-${nextCorrelative.toString().padStart(5, '0')}"
+    ): String = "${codigoCaja.takeIf { it.isNotBlank() } ?: "NC"}-${nextCorrelative.toString().padStart(CORRELATIVE_CODE_LENGTH, '0')}"
 
     private fun validateCreateRequest(request: CreateCreditNoteRequest) {
         if (request.idCajaSecuencia.isBlank()) {
@@ -1314,7 +1327,7 @@ class CreditNoteRepository {
                 ?: throw CreditNoteValidationException("No existe correlativo fiscal para numeroDocumentoFiscal")
 
         val next = row[FECorrelativosTable.contador].toLong() + 1L
-        if (next <= 0L || next > 9_999_999_999L) {
+        if (next <= 0L || next > MAX_FISCAL_DOCUMENT_NUMBER) {
             throw CreditNoteValidationException("El correlativo fiscal excede el rango permitido")
         }
 
@@ -1325,18 +1338,18 @@ class CreditNoteRepository {
         if (updated != 1) {
             throw CreditNoteValidationException("No se pudo reservar el correlativo fiscal")
         }
-        return next.toString().padStart(10, '0')
+        return next.toString().padStart(FISCAL_DOCUMENT_LENGTH, '0')
     }
 
     private fun normalizeFiscalDocumentNumber(value: String): String {
         val normalized = value.trim()
-        if (normalized.isBlank() || !normalized.all(Char::isDigit) || normalized.length > 10) {
+        if (normalized.isBlank() || !normalized.all(Char::isDigit) || normalized.length > FISCAL_DOCUMENT_LENGTH) {
             throw CreditNoteValidationException("El número fiscal de la nota de crédito debe ser numérico de hasta 10 dígitos")
         }
         if (normalized.all { it == '0' }) {
             throw CreditNoteValidationException("El número fiscal de la nota de crédito no puede ser cero")
         }
-        return normalized.padStart(10, '0')
+        return normalized.padStart(FISCAL_DOCUMENT_LENGTH, '0')
     }
 
     private fun parsePacDate(value: String?): LocalDateTime? {
@@ -1359,7 +1372,7 @@ class CreditNoteRepository {
                 it[idDetalleFactura] = line.sourceLine.idDetalleFactura
                 it[idItem] = line.sourceLine.idItem
                 it[itemAlmacen] = line.sourceLine.almacen
-                it[itemCantidad] = line.quantity.setScale(3, RoundingMode.HALF_UP)
+                it[itemCantidad] = line.quantity.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
                 it[itemPrecioSinIva] = line.sourceLine.precioSinIva
                 it[itemDescuento] = line.sourceLine.descuentoPorcentaje
                 it[itemMontoDescuento] = line.discountAmount
@@ -1438,7 +1451,7 @@ class CreditNoteRepository {
         now: LocalDateTime,
     ) {
         CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoiceId }) {
-            it[codEstatus] = 3
+            it[codEstatus] = ANNULLED_INVOICE_STATUS
         }
 
         val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
@@ -1557,7 +1570,7 @@ class CreditNoteRepository {
         val kardexTable = SalesKardexTableFactory.forCountry(countryCode)
         kardexTable.insert {
             it[kardexTable.idTransaccion] = kardexId
-            it[kardexTable.tipoMovimientoAlmacen] = 14
+            it[kardexTable.tipoMovimientoAlmacen] = CREDIT_NOTE_KARDEX_MOVEMENT_TYPE
             it[kardexTable.autorizadoPor] = username.take(MAX_USERNAME_LENGTH)
             it[kardexTable.observacion] = "Entrada por nota de crédito $creditNoteCode"
             it[kardexTable.fecha] = date
@@ -1570,8 +1583,8 @@ class CreditNoteRepository {
             it[kardexTable.anio] = date.year
             it[kardexTable.tipoCosto] = "PEPS"
             it[kardexTable.estatus] = 1
-            it[kardexTable.entregadoACodigo] = invoice.facturarARuc.take(10)
-            it[kardexTable.entregadoANombre] = invoice.facturarA.take(30)
+            it[kardexTable.entregadoACodigo] = invoice.facturarARuc.take(KARDEX_RECIPIENT_CODE_LENGTH)
+            it[kardexTable.entregadoANombre] = invoice.facturarA.take(KARDEX_RECIPIENT_NAME_LENGTH)
             it[kardexTable.codDocumento] = creditNoteCode
             it[kardexTable.subtipoMovimientoAlmacen] = 0
             it[kardexTable.contabilizado] = 0
@@ -1624,17 +1637,17 @@ class CreditNoteRepository {
                     it[idItem] = line.sourceLine.idItem
                     it[codAlmacen] = line.sourceLine.almacen
                     it[cantidad] = quantity
-                    it[cantidadMuestra] = BigDecimal.ZERO.setScale(4)
-                    it[minimo] = BigDecimal.ZERO.setScale(4)
-                    it[maximo] = BigDecimal.ZERO.setScale(4)
+                    it[cantidadMuestra] = BigDecimal.ZERO.setScale(INVENTORY_QUANTITY_SCALE)
+                    it[minimo] = BigDecimal.ZERO.setScale(INVENTORY_QUANTITY_SCALE)
+                    it[maximo] = BigDecimal.ZERO.setScale(INVENTORY_QUANTITY_SCALE)
                 }
             } else {
-                val currentQuantity = stockRow[ItemExistenciaAlmacenTable.cantidad] ?: BigDecimal.ZERO.setScale(4)
+                val currentQuantity = stockRow[ItemExistenciaAlmacenTable.cantidad] ?: BigDecimal.ZERO.setScale(INVENTORY_QUANTITY_SCALE)
                 ItemExistenciaAlmacenTable.update({
                     (ItemExistenciaAlmacenTable.idItem eq line.sourceLine.idItem) and
                         (ItemExistenciaAlmacenTable.codAlmacen eq line.sourceLine.almacen)
                 }) {
-                    it[cantidad] = currentQuantity.add(quantity).setScale(4, RoundingMode.HALF_UP)
+                    it[cantidad] = currentQuantity.add(quantity).setScale(INVENTORY_QUANTITY_SCALE, RoundingMode.HALF_UP)
                 }
             }
 
@@ -1792,7 +1805,7 @@ class CreditNoteRepository {
 
         CreditNoteAbonoTable.insert {
             it[idAbono] = UUID.randomUUID().toString()
-            it[codAbono] = "AB-${cajaContext.codigoCaja}-${next.toString().padStart(5, '0')}"
+            it[codAbono] = "AB-${cajaContext.codigoCaja}-${next.toString().padStart(CORRELATIVE_CODE_LENGTH, '0')}"
             it[fecha] = now
             it[vencimiento] = 0
             it[fechaVencimiento] = now
@@ -1844,7 +1857,7 @@ class CreditNoteRepository {
 
         CreditNoteGiftCertificateTable.insert {
             it[idCertificado] = UUID.randomUUID().toString()
-            it[codigo] = "CG-${cajaContext.codigoCaja}-${next.toString().padStart(5, '0')}"
+            it[codigo] = "CG-${cajaContext.codigoCaja}-${next.toString().padStart(CORRELATIVE_CODE_LENGTH, '0')}"
             it[monto] = total
             it[saldo] = total
             it[idCliente] = client.idCliente
@@ -2253,4 +2266,4 @@ private fun BigDecimal.coerceAtLeastZero(scale: Int): BigDecimal =
     if (this < BigDecimal.ZERO) BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP) else setScale(scale, RoundingMode.HALF_UP)
 
 private fun BigDecimal.isEffectivelyZero(): Boolean =
-    setScale(3, RoundingMode.HALF_UP).compareTo(BigDecimal.ZERO.setScale(3, RoundingMode.HALF_UP)) == 0
+    setScale(QUANTITY_SCALE, RoundingMode.HALF_UP).compareTo(BigDecimal.ZERO.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)) == 0

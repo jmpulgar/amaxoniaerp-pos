@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.sql.Connection
 
+private const val PLACEHOLDER_FISCAL_NUMBER_LENGTH = 8
+
 /**
  * Repositorio FE Venezuela con ciclo de vida:
  *
@@ -60,7 +62,7 @@ open class VenezuelaElectronicInvoiceRepository {
             val detalles = loadDetalles(invoiceId)
             val formasPago = loadFormasPago(factura.idCaja, invoiceId)
             val caja = loadCaja(factura.idCaja, factura.idSucursal, config)
-            val reservado = VECorrelativoReservado(0, 8) // placeholder, lo asigna stratégie
+            val reservado = VECorrelativoReservado(0, PLACEHOLDER_FISCAL_NUMBER_LENGTH) // placeholder, lo asigna stratégie
             InvoiceVEContext(
                 config = config,
                 factura = factura.facturaData,

@@ -20,6 +20,8 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 
+private const val PERCENT_BASE = 100.0
+
 /**
  * Repositorio de items Multi-Tenant con Safe Parsing.
  */
@@ -653,7 +655,7 @@ class ItemsRepository {
         val isExempt = storedTaxRate <= 0.0 && !hasTaxInPrices
 
         fun unitPriceWithTax(unitPrice: Double): Double =
-            if (unitPrice <= 0.0 || isExempt) unitPrice else unitPrice * (1.0 + (storedTaxRate / 100.0))
+            if (unitPrice <= 0.0 || isExempt) unitPrice else unitPrice * (1.0 + (storedTaxRate / PERCENT_BASE))
 
         val unitPrice1 = row.getOrNull(table.precio1Extra)?.toDouble() ?: 0.0
         val unitPrice2 = row.getOrNull(table.precio2Extra)?.toDouble() ?: 0.0
