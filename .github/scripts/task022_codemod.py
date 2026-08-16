@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 
+# Temporary deterministic TASK-022 migration helper. Remove after the static-analysis gate is green.
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "amaxoniaerp-backend/src/main/kotlin"
 IGNORED = {"0", "1", "2"}
