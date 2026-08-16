@@ -1,8 +1,8 @@
 package com.amaxoniaerp.features.mesas.data
 
-import com.amaxoniaerp.core.database.SchemaDimensions
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
+import com.amaxoniaerp.core.database.SchemaDimensions as S
 
 /**
  * Cuenta de mesa (o división de cuenta). Cada fila representa un "ticket" pendiente de pago
@@ -23,14 +23,14 @@ object CuentaMesaTable : Table("cuenta_mesa") {
     val id = integer("id").autoIncrement("seq_cuenta_mesa")
     val sesionMesaId = integer("sesion_mesa_id")
     val numeroCuenta = integer("numero_cuenta").default(1)
-    val estado = varchar("estado", SchemaDimensions.VARCHAR_LENGTH_20).default(EstadoCuentaMesaDefault.ACTIVA)
-    val subtotal = decimal("subtotal", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val descuento = decimal("descuento", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val impuesto = decimal("impuesto", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val total = decimal("total", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val saldoRestante = decimal("saldo_restante", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val idFactura = varchar("id_factura", SchemaDimensions.VARCHAR_LENGTH_64).nullable()
-    val codFactura = varchar("cod_factura", SchemaDimensions.VARCHAR_LENGTH_64).nullable()
+    val estado = varchar("estado", S.VARCHAR_LENGTH_20).default(EstadoCuentaMesaDefault.ACTIVA)
+    val subtotal = decimal("subtotal", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val descuento = decimal("descuento", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val impuesto = decimal("impuesto", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val total = decimal("total", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val saldoRestante = decimal("saldo_restante", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val idFactura = varchar("id_factura", S.VARCHAR_LENGTH_64).nullable()
+    val codFactura = varchar("cod_factura", S.VARCHAR_LENGTH_64).nullable()
     val fechaFactura = datetime("fecha_factura").nullable()
     val fechaCreacion = datetime("fecha_creacion")
     val fechaCierre = datetime("fecha_cierre").nullable()
@@ -61,15 +61,15 @@ object CuentaMesaDetalleTable : Table("cuenta_mesa_detalle") {
     val pedidoMesaId = integer("pedido_mesa_id")
     val productoId = integer("producto_id")
     val itemAlmacen = integer("item_almacen").default(1)
-    val itemCodigo = varchar("item_codigo", SchemaDimensions.VARCHAR_LENGTH_80).default("")
-    val itemDescripcion = varchar("item_descripcion", SchemaDimensions.VARCHAR_LENGTH_500)
-    val cantidad = decimal("cantidad", SchemaDimensions.DECIMAL_PRECISION_32, SchemaDimensions.DECIMAL_SCALE_3)
-    val itemPrecioSinIva = decimal("item_preciosiniva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
-    val itemDescuento = decimal("item_descuento", SchemaDimensions.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
-    val itemMontoDescuento = decimal("item_montodescuento", SchemaDimensions.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
-    val itemPIva = decimal("item_piva", SchemaDimensions.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
-    val itemTotalSinIva = decimal("item_totalsiniva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
-    val itemTotalConIva = decimal("item_totalconiva", SchemaDimensions.DECIMAL_PRECISION_20, 2)
+    val itemCodigo = varchar("item_codigo", S.VARCHAR_LENGTH_80).default("")
+    val itemDescripcion = varchar("item_descripcion", S.VARCHAR_LENGTH_500)
+    val cantidad = decimal("cantidad", S.DECIMAL_PRECISION_32, S.DECIMAL_SCALE_3)
+    val itemPrecioSinIva = decimal("item_preciosiniva", S.DECIMAL_PRECISION_20, 2)
+    val itemDescuento = decimal("item_descuento", S.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
+    val itemMontoDescuento = decimal("item_montodescuento", S.DECIMAL_PRECISION_20, 2).default(0.toBigDecimal())
+    val itemPIva = decimal("item_piva", S.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
+    val itemTotalSinIva = decimal("item_totalsiniva", S.DECIMAL_PRECISION_20, 2)
+    val itemTotalConIva = decimal("item_totalconiva", S.DECIMAL_PRECISION_20, 2)
     val facturado = integer("facturado").default(0)
     val fechaCreacion = datetime("fecha_creacion")
 
@@ -94,13 +94,13 @@ object CuentaMesaDetalleTable : Table("cuenta_mesa_detalle") {
  * 409 por factura duplicada y reconcilia el registro autoritativo sin crear otra venta.
  */
 object CuentaMesaIdempotenciaTable : Table("cuenta_mesa_idempotencia") {
-    val idempotencyKey = varchar("idempotency_key", SchemaDimensions.VARCHAR_LENGTH_64)
+    val idempotencyKey = varchar("idempotency_key", S.VARCHAR_LENGTH_64)
     val cuentaMesaId = integer("cuenta_mesa_id")
     val sesionMesaId = integer("sesion_mesa_id")
-    val estado = varchar("estado", SchemaDimensions.VARCHAR_LENGTH_20).default(EstadoCuentaIdempotenciaDefault.SENDING)
-    val idFacturaResultado = varchar("id_factura_resultado", SchemaDimensions.VARCHAR_LENGTH_64).nullable()
-    val codFacturaResultado = varchar("cod_factura_resultado", SchemaDimensions.VARCHAR_LENGTH_64).nullable()
-    val errorMensaje = varchar("error_mensaje", SchemaDimensions.VARCHAR_LENGTH_500).nullable()
+    val estado = varchar("estado", S.VARCHAR_LENGTH_20).default(EstadoCuentaIdempotenciaDefault.SENDING)
+    val idFacturaResultado = varchar("id_factura_resultado", S.VARCHAR_LENGTH_64).nullable()
+    val codFacturaResultado = varchar("cod_factura_resultado", S.VARCHAR_LENGTH_64).nullable()
+    val errorMensaje = varchar("error_mensaje", S.VARCHAR_LENGTH_500).nullable()
     val intentos = integer("intentos").default(0)
     val fechaPrimerIntento = datetime("fecha_primer_intento")
     val fechaUltimoIntento = datetime("fecha_ultimo_intento").nullable()
