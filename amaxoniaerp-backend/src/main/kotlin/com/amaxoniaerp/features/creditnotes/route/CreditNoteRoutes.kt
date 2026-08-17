@@ -51,150 +51,157 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 internal class CreditNoteHandlers(
     private val creditNoteService: CreditNoteService,
 ) {
-    suspend fun listar(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
-        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-        val search = call.request.queryParameters["search"]
-        val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
-        val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
+    suspend fun listar(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+            val search = call.request.queryParameters["search"]
+            val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
+            val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
 
-        if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
-            return@run
+            if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
+                return@run
+            }
+
+            try {
+                call.respond(
+                    creditNoteService.list(
+                        database = scope.database,
+                        countryCode = scope.countryCode,
+                        limit = limit,
+                        offset = offset,
+                        search = search,
+                        fechaInicio = fechaInicio,
+                        fechaFin = fechaFin,
+                    ),
+                )
+            } catch (e: CreditNoteValidationException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
+            }
         }
 
-        try {
+    suspend fun listarFacturasElegibles(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+            val search = call.request.queryParameters["search"]
+
+            if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
+                return@run
+            }
+
             call.respond(
-                creditNoteService.list(
+                creditNoteService.listEligibleInvoices(
                     database = scope.database,
                     countryCode = scope.countryCode,
                     limit = limit,
                     offset = offset,
                     search = search,
-                    fechaInicio = fechaInicio,
-                    fechaFin = fechaFin,
                 ),
             )
-        } catch (e: CreditNoteValidationException) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-        }
-    }
-
-    suspend fun listarFacturasElegibles(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
-        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-        val search = call.request.queryParameters["search"]
-
-        if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
-            return@run
         }
 
-        call.respond(
-            creditNoteService.listEligibleInvoices(
-                database = scope.database,
-                countryCode = scope.countryCode,
-                limit = limit,
-                offset = offset,
-                search = search,
-            ),
-        )
-    }
+    suspend fun detalleFactura(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val invoiceId = call.parameters["id"]
+            if (invoiceId == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Factura requerida"))
+                return@run
+            }
 
-    suspend fun detalleFactura(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val invoiceId = call.parameters["id"]
-        if (invoiceId == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Factura requerida"))
-            return@run
+            val detail =
+                creditNoteService.getInvoiceDetail(scope.database, invoiceId, scope.countryCode)
+            if (detail == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
+                return@run
+            }
+
+            call.respond(detail)
         }
 
-        val detail =
-            creditNoteService.getInvoiceDetail(scope.database, invoiceId, scope.countryCode)
-        if (detail == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
-            return@run
+    suspend fun detalle(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val id = call.parameters["id"]
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
+                return@run
+            }
+
+            val detail =
+                creditNoteService.getDetail(scope.database, id, scope.countryCode)
+            if (detail == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Nota de crédito no encontrada"))
+                return@run
+            }
+
+            call.respond(detail)
         }
 
-        call.respond(detail)
-    }
+    suspend fun crear(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val request = call.receive<CreateCreditNoteRequest>()
 
-    suspend fun detalle(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val id = call.parameters["id"]
-        if (id == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
-            return@run
+            try {
+                val response =
+                    creditNoteService.create(
+                        database = scope.database,
+                        countryCode = scope.countryCode,
+                        request = request,
+                        username = scope.username,
+                        companyDb = call.request.headers["Company-DB"],
+                    )
+                call.respond(HttpStatusCode.Created, response)
+            } catch (e: CreditNoteValidationException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
+            } catch (e: CreditNoteNotFoundException) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
+            }
         }
 
-        val detail =
-            creditNoteService.getDetail(scope.database, id, scope.countryCode)
-        if (detail == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Nota de crédito no encontrada"))
-            return@run
+    suspend fun confirmarFiscal(call: ApplicationCall) =
+        run {
+            val scope = resolveScope(call) ?: return@run
+            val id = call.parameters["id"]
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
+                return@run
+            }
+            val request = call.receive<ConfirmCreditNoteFiscalRequest>()
+
+            try {
+                val response = creditNoteService.confirmFiscal(scope.database, scope.countryCode, id, request)
+                call.respond(response)
+            } catch (e: CreditNoteValidationException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
+            } catch (e: CreditNoteNotFoundException) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
+            }
         }
-
-        call.respond(detail)
-    }
-
-    suspend fun crear(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val request = call.receive<CreateCreditNoteRequest>()
-
-        try {
-            val response =
-                creditNoteService.create(
-                    database = scope.database,
-                    countryCode = scope.countryCode,
-                    request = request,
-                    username = scope.username,
-                    companyDb = call.request.headers["Company-DB"],
-                )
-            call.respond(HttpStatusCode.Created, response)
-        } catch (e: CreditNoteValidationException) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-        } catch (e: CreditNoteNotFoundException) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
-        }
-    }
-
-    suspend fun confirmarFiscal(call: ApplicationCall) = run {
-        val scope = resolveScope(call) ?: return@run
-        val id = call.parameters["id"]
-        if (id == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
-            return@run
-        }
-        val request = call.receive<ConfirmCreditNoteFiscalRequest>()
-
-        try {
-            val response = creditNoteService.confirmFiscal(scope.database, scope.countryCode, id, request)
-            call.respond(response)
-        } catch (e: CreditNoteValidationException) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-        } catch (e: CreditNoteNotFoundException) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
-        }
-    }
 
     /**
      * Misma regla que caja / ventas POS: token de empresa, `Company-DB` = `admin_db`,
      * `country_code` en JWT. Delega en el seam canónico y conecta la base de la empresa.
      */
-    private suspend fun resolveScope(call: ApplicationCall): CreditNoteRequestScope? = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run null
-        val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run null
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-        val username =
-            ctx.principal.payload
-                .getClaim("username")
-                .asString()
-                .orEmpty()
-                .ifBlank { "POS" }
-        CreditNoteRequestScope(database = database, countryCode = ctx.countryCode, username = username)
-    }
+    private suspend fun resolveScope(call: ApplicationCall): CreditNoteRequestScope? =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run null
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run null
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val username =
+                ctx.principal.payload
+                    .getClaim("username")
+                    .asString()
+                    .orEmpty()
+                    .ifBlank { "POS" }
+            CreditNoteRequestScope(database = database, countryCode = ctx.countryCode, username = username)
+        }
 }
 
 private fun parseDateOrBadRequest(value: String): LocalDate =

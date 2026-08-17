@@ -213,57 +213,58 @@ class SesionMesaRepository(
      * Cuerpo transaccional de [abrir]. Cada rama devuelve un [SesionMesaResult]; el wrapper
      * `newSuspendedTransaction` propaga ese valor fuera de la transacción.
      */
-    private fun abrirInterno(scope: AbrirSesionScope): SesionMesaResult {
-        val sucursalId =
-            sucursalDeCaja(scope.cajaId)
-                ?: return SesionMesaResult.AreaNoPerteneceSucursal
+    private fun abrirInterno(scope: AbrirSesionScope): SesionMesaResult =
+        run {
+            val sucursalId =
+                sucursalDeCaja(scope.cajaId)
+                    ?: return@run SesionMesaResult.AreaNoPerteneceSucursal
 
-        if (!areaActivaPerteneceASucursal(scope.areaId, sucursalId)) {
-            return SesionMesaResult.AreaNoPerteneceSucursal
+            if (!areaActivaPerteneceASucursal(scope.areaId, sucursalId)) {
+                return@run SesionMesaResult.AreaNoPerteneceSucursal
+            }
+
+            val mesaOk = mesaActivaPerteneceAArea(scope.mesaId, scope.areaId)
+            when {
+                !mesaOk.first -> return@run SesionMesaResult.MesaNoPerteneceArea
+                !mesaOk.second -> return@run SesionMesaResult.MesaInactiva
+            }
+
+            if (existeSesionActiva(scope.mesaId)) {
+                return@run SesionMesaResult.SesionYaAbierta
+            }
+
+            val ahora = LocalDateTime.now()
+            val id =
+                SesionMesaTable.insert {
+                    it[SesionMesaTable.sucursalId] = sucursalId
+                    it[SesionMesaTable.cajaId] = scope.cajaId
+                    it[SesionMesaTable.areaId] = scope.areaId
+                    it[SesionMesaTable.mesaId] = scope.mesaId
+                    it[SesionMesaTable.usuarioId] = scope.usuarioId
+                    it[SesionMesaTable.cantidadPersonas] = scope.cantidadPersonas
+                    it[SesionMesaTable.estado] = EstadoSesionMesa.ABIERTA.codigo
+                    it[SesionMesaTable.fechaApertura] = ahora
+                    it[SesionMesaTable.activo] = ACTIVE
+                }[SesionMesaTable.id]
+
+            val usuariosById = usuariosById()
+            val response =
+                sessionRowToResponse(
+                    id = id,
+                    sucursalId = sucursalId,
+                    cajaId = scope.cajaId,
+                    areaId = scope.areaId,
+                    mesaId = scope.mesaId,
+                    usuarioId = scope.usuarioId,
+                    usuarioNombre = usuariosById[scope.usuarioId],
+                    cantidadPersonas = scope.cantidadPersonas,
+                    estado = EstadoSesionMesa.ABIERTA.codigo,
+                    fechaApertura = ahora,
+                    fechaCierre = null,
+                    activo = true,
+                )
+            SesionMesaResult.Opened(response)
         }
-
-        val mesaOk = mesaActivaPerteneceAArea(scope.mesaId, scope.areaId)
-        when {
-            !mesaOk.first -> return SesionMesaResult.MesaNoPerteneceArea
-            !mesaOk.second -> return SesionMesaResult.MesaInactiva
-        }
-
-        if (existeSesionActiva(scope.mesaId)) {
-            return SesionMesaResult.SesionYaAbierta
-        }
-
-        val ahora = LocalDateTime.now()
-        val id =
-            SesionMesaTable.insert {
-                it[SesionMesaTable.sucursalId] = sucursalId
-                it[SesionMesaTable.cajaId] = scope.cajaId
-                it[SesionMesaTable.areaId] = scope.areaId
-                it[SesionMesaTable.mesaId] = scope.mesaId
-                it[SesionMesaTable.usuarioId] = scope.usuarioId
-                it[SesionMesaTable.cantidadPersonas] = scope.cantidadPersonas
-                it[SesionMesaTable.estado] = EstadoSesionMesa.ABIERTA.codigo
-                it[SesionMesaTable.fechaApertura] = ahora
-                it[SesionMesaTable.activo] = ACTIVE
-            }[SesionMesaTable.id]
-
-        val usuariosById = usuariosById()
-        val response =
-            sessionRowToResponse(
-                id = id,
-                sucursalId = sucursalId,
-                cajaId = scope.cajaId,
-                areaId = scope.areaId,
-                mesaId = scope.mesaId,
-                usuarioId = scope.usuarioId,
-                usuarioNombre = usuariosById[scope.usuarioId],
-                cantidadPersonas = scope.cantidadPersonas,
-                estado = EstadoSesionMesa.ABIERTA.codigo,
-                fechaApertura = ahora,
-                fechaCierre = null,
-                activo = true,
-            )
-        return SesionMesaResult.Opened(response)
-    }
 
     /**
      * Transición de ciclo de cuenta entre `ABIERTA` y `CUENTA_SOLICITADA` (biye). El
@@ -273,30 +274,31 @@ class SesionMesaRepository(
     private fun transicionarSesionCuenta(
         sesionId: Int,
         destino: EstadoSesionMesa,
-    ): SesionMesaResult {
-        require(destino == EstadoSesionMesa.ABIERTA || destino == EstadoSesionMesa.CUENTA_SOLICITADA) {
-            "transicionarSesionCuenta solo admite ABIERTA<->CUENTA_SOLICITADA, no $destino"
-        }
-        val sesion =
-            SesionMesaTable
-                .selectAll()
-                .where { SesionMesaTable.id eq sesionId }
-                .singleOrNull()
-                ?: return SesionMesaResult.SesionNoEncontrada
+    ): SesionMesaResult =
+        run {
+            require(destino == EstadoSesionMesa.ABIERTA || destino == EstadoSesionMesa.CUENTA_SOLICITADA) {
+                "transicionarSesionCuenta solo admite ABIERTA<->CUENTA_SOLICITADA, no $destino"
+            }
+            val sesion =
+                SesionMesaTable
+                    .selectAll()
+                    .where { SesionMesaTable.id eq sesionId }
+                    .singleOrNull()
+                    ?: return@run SesionMesaResult.SesionNoEncontrada
 
-        val estadoActual =
-            EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
-                ?: return SesionMesaResult.SesionYaFinalizada
-        val valido =
-            (estadoActual == EstadoSesionMesa.ABIERTA && destino == EstadoSesionMesa.CUENTA_SOLICITADA) ||
-                (estadoActual == EstadoSesionMesa.CUENTA_SOLICITADA && destino == EstadoSesionMesa.ABIERTA)
-        if (!valido) return SesionMesaResult.SesionYaFinalizada
+            val estadoActual =
+                EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
+                    ?: return@run SesionMesaResult.SesionYaFinalizada
+            val valido =
+                (estadoActual == EstadoSesionMesa.ABIERTA && destino == EstadoSesionMesa.CUENTA_SOLICITADA) ||
+                    (estadoActual == EstadoSesionMesa.CUENTA_SOLICITADA && destino == EstadoSesionMesa.ABIERTA)
+            if (!valido) return@run SesionMesaResult.SesionYaFinalizada
 
-        SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
-            it[SesionMesaTable.estado] = destino.codigo
+            SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
+                it[SesionMesaTable.estado] = destino.codigo
+            }
+            SesionMesaResult.Closed(sesion.toSesionMesaResponse().copy(estado = destino.codigo))
         }
-        return SesionMesaResult.Closed(sesion.toSesionMesaResponse().copy(estado = destino.codigo))
-    }
 
     /**
      * Cierra la sesión por pago completo: transiciona `ABIERTA` o `CUENTA_SOLICITADA` hacia
@@ -305,93 +307,95 @@ class SesionMesaRepository(
      * cuentas activas es 0 y no queda ninguna cantidad no cancelada sin facturar. Por eso una
      * línea todavía no entregada sí mantiene abierta la mesa.
      */
-    private fun cerrarPorPagoInterno(sesionId: Int): SesionMesaResult {
-        val sesion =
-            SesionMesaTable
-                .selectAll()
-                .where { SesionMesaTable.id eq sesionId }
-                .singleOrNull()
-                ?: return SesionMesaResult.SesionNoEncontrada
+    private fun cerrarPorPagoInterno(sesionId: Int): SesionMesaResult =
+        run {
+            val sesion =
+                SesionMesaTable
+                    .selectAll()
+                    .where { SesionMesaTable.id eq sesionId }
+                    .singleOrNull()
+                    ?: return@run SesionMesaResult.SesionNoEncontrada
 
-        val estadoActual =
-            EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
-                ?: return SesionMesaResult.SesionYaFinalizada
-        if (estadoActual.esFinal) return SesionMesaResult.SesionYaFinalizada
+            val estadoActual =
+                EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
+                    ?: return@run SesionMesaResult.SesionYaFinalizada
+            if (estadoActual.esFinal) return@run SesionMesaResult.SesionYaFinalizada
 
-        val ahora = LocalDateTime.now()
-        SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
-            it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
-            it[SesionMesaTable.fechaCierre] = ahora
-            it[SesionMesaTable.activo] = INACTIVE
+            val ahora = LocalDateTime.now()
+            SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
+                it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
+                it[SesionMesaTable.fechaCierre] = ahora
+                it[SesionMesaTable.activo] = INACTIVE
+            }
+            SesionMesaResult.Closed(
+                sesion.toSesionMesaResponse().copy(
+                    estado = EstadoSesionMesa.CERRADA_PAGADA.codigo,
+                    fechaCierre = ahora.formatIso(),
+                    activo = false,
+                ),
+            )
         }
-        return SesionMesaResult.Closed(
-            sesion.toSesionMesaResponse().copy(
-                estado = EstadoSesionMesa.CERRADA_PAGADA.codigo,
-                fechaCierre = ahora.formatIso(),
-                activo = false,
-            ),
-        )
-    }
 
     private fun mutarSesionInterno(
         sesionId: Int,
         destino: EstadoSesionMesa,
         isCancel: Boolean,
-    ): SesionMesaResult {
-        val sesion =
-            SesionMesaTable
-                .selectAll()
-                .where { SesionMesaTable.id eq sesionId }
-                .singleOrNull()
-                ?: return SesionMesaResult.SesionNoEncontrada
+    ): SesionMesaResult =
+        run {
+            val sesion =
+                SesionMesaTable
+                    .selectAll()
+                    .where { SesionMesaTable.id eq sesionId }
+                    .singleOrNull()
+                    ?: return@run SesionMesaResult.SesionNoEncontrada
 
-        val estadoCodigo = sesion[SesionMesaTable.estado]
-        val estadoActual =
-            EstadoSesionMesa.fromCodigo(estadoCodigo)
-                ?: return SesionMesaResult.SesionYaFinalizada
-        // Cerrar/Cancelar directo: solo se permite si la sesión está ABIERTA o CUENTA_SOLICITADA
-        // (noexistentente pagada). El paso por caja real (pago completo) usa cerrarPorPago.
-        if (estadoActual != EstadoSesionMesa.ABIERTA && estadoActual != EstadoSesionMesa.CUENTA_SOLICITADA) {
-            return SesionMesaResult.SesionYaFinalizada
-        }
-
-        val mesaId = sesion[SesionMesaTable.mesaId]
-        if (tieneOperaciones(sesionId, mesaId)) {
-            return SesionMesaResult.SesionConOperaciones
-        }
-
-        val ahora = LocalDateTime.now()
-        if (isCancel) {
-            // Cancelación: se elimina físicamente la sesión para que la mesa pueda
-            // reabrirse sin dejar histórico de "apertura accidental". El índice único
-            // (mesa_id, activo) sigue siendo respetado por el flujo normal.
-            SesionMesaTable.deleteWhere { SesionMesaTable.id eq sesionId }
-        } else {
-            SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
-                it[SesionMesaTable.estado] = destino.codigo
-                it[SesionMesaTable.fechaCierre] = ahora
-                it[SesionMesaTable.activo] = INACTIVE
+            val estadoCodigo = sesion[SesionMesaTable.estado]
+            val estadoActual =
+                EstadoSesionMesa.fromCodigo(estadoCodigo)
+                    ?: return@run SesionMesaResult.SesionYaFinalizada
+            // Cerrar/Cancelar directo: solo se permite si la sesión está ABIERTA o CUENTA_SOLICITADA
+            // (noexistentente pagada). El paso por caja real (pago completo) usa cerrarPorPago.
+            if (estadoActual != EstadoSesionMesa.ABIERTA && estadoActual != EstadoSesionMesa.CUENTA_SOLICITADA) {
+                return@run SesionMesaResult.SesionYaFinalizada
             }
-        }
 
-        val usuarioNombre = usuarioNombre(sesion[SesionMesaTable.usuarioId])
-        val response =
-            sessionRowToResponse(
-                id = sesionId,
-                sucursalId = sesion[SesionMesaTable.sucursalId],
-                cajaId = sesion[SesionMesaTable.cajaId],
-                areaId = sesion[SesionMesaTable.areaId],
-                mesaId = mesaId,
-                usuarioId = sesion[SesionMesaTable.usuarioId],
-                usuarioNombre = usuarioNombre,
-                cantidadPersonas = sesion[SesionMesaTable.cantidadPersonas],
-                estado = destino.codigo,
-                fechaApertura = sesion[SesionMesaTable.fechaApertura],
-                fechaCierre = ahora,
-                activo = false,
-            )
-        return if (isCancel) SesionMesaResult.Cancelled(response) else SesionMesaResult.Closed(response)
-    }
+            val mesaId = sesion[SesionMesaTable.mesaId]
+            if (tieneOperaciones(sesionId, mesaId)) {
+                return@run SesionMesaResult.SesionConOperaciones
+            }
+
+            val ahora = LocalDateTime.now()
+            if (isCancel) {
+                // Cancelación: se elimina físicamente la sesión para que la mesa pueda
+                // reabrirse sin dejar histórico de "apertura accidental". El índice único
+                // (mesa_id, activo) sigue siendo respetado por el flujo normal.
+                SesionMesaTable.deleteWhere { SesionMesaTable.id eq sesionId }
+            } else {
+                SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
+                    it[SesionMesaTable.estado] = destino.codigo
+                    it[SesionMesaTable.fechaCierre] = ahora
+                    it[SesionMesaTable.activo] = INACTIVE
+                }
+            }
+
+            val usuarioNombre = usuarioNombre(sesion[SesionMesaTable.usuarioId])
+            val response =
+                sessionRowToResponse(
+                    id = sesionId,
+                    sucursalId = sesion[SesionMesaTable.sucursalId],
+                    cajaId = sesion[SesionMesaTable.cajaId],
+                    areaId = sesion[SesionMesaTable.areaId],
+                    mesaId = mesaId,
+                    usuarioId = sesion[SesionMesaTable.usuarioId],
+                    usuarioNombre = usuarioNombre,
+                    cantidadPersonas = sesion[SesionMesaTable.cantidadPersonas],
+                    estado = destino.codigo,
+                    fechaApertura = sesion[SesionMesaTable.fechaApertura],
+                    fechaCierre = ahora,
+                    activo = false,
+                )
+            if (isCancel) SesionMesaResult.Cancelled(response) else SesionMesaResult.Closed(response)
+        }
 
     /**
      * Hook de fases anteriores que ahora consulta operaciones reales de [PedidoMesaRepository]:

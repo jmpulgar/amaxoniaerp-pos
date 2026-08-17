@@ -97,84 +97,87 @@ internal class SesionMesaHandlers(
 ) {
     private val log = LoggerFactory.getLogger("SesionMesaRouting")
 
-    suspend fun estados(call: ApplicationCall) = run {
-        val ctx = call.resolvePosContext() ?: return@run
-        val cajaId = call.requireCajaId() ?: return@run
-        val areaId = call.requireAreaId() ?: return@run
+    suspend fun estados(call: ApplicationCall) =
+        run {
+            val ctx = call.resolvePosContext() ?: return@run
+            val cajaId = call.requireCajaId() ?: return@run
+            val areaId = call.requireAreaId() ?: return@run
 
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
 
-        val result = sesionMesaRepository.listarEstados(database, scope.sucursalId, areaId)
-        when (result) {
-            is SesionMesaResult.States ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    MesasEstadosListResponse(success = true, areaId = areaId, data = result.estados),
-                )
+            val result = sesionMesaRepository.listarEstados(database, scope.sucursalId, areaId)
+            when (result) {
+                is SesionMesaResult.States ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        MesasEstadosListResponse(success = true, areaId = areaId, data = result.estados),
+                    )
 
-            SesionMesaResult.AreaNoPerteneceSucursal ->
-                call.respond(
-                    HttpStatusCode.NotFound,
-                    mapOf("error" to "Área no encontrada en la sucursal de la caja"),
-                )
+                SesionMesaResult.AreaNoPerteneceSucursal ->
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        mapOf("error" to "Área no encontrada en la sucursal de la caja"),
+                    )
 
-            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
-        }
-        log.debug("Estados de mesas respondidos. adminDb={} areaId={}", ctx.adminDb, areaId)
-    }
-
-    suspend fun abrir(call: ApplicationCall) = run {
-        val ctx = call.resolvePosContext() ?: return@run
-        val cajaId = call.requireCajaId() ?: return@run
-        val areaId = call.requireAreaId() ?: return@run
-        val mesaId = call.requireMesaId() ?: return@run
-
-        val body =
-            runCatching { call.receive<AbrirSesionRequest>() }.getOrElse { e ->
-                if (e is Error) throw e
-                log.debug("Cuerpo inválido al abrir sesión: {}", e.message)
-                AbrirSesionRequest()
+                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
             }
-        if (body.cantidadPersonas <= 0) {
-            call.respond(
-                HttpStatusCode.BadRequest,
-                mapOf("error" to "La cantidad de personas debe ser mayor que cero"),
-            )
-            return@run
+            log.debug("Estados de mesas respondidos. adminDb={} areaId={}", ctx.adminDb, areaId)
         }
 
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+    suspend fun abrir(call: ApplicationCall) =
+        run {
+            val ctx = call.resolvePosContext() ?: return@run
+            val cajaId = call.requireCajaId() ?: return@run
+            val areaId = call.requireAreaId() ?: return@run
+            val mesaId = call.requireMesaId() ?: return@run
 
-        val result =
-            sesionMesaRepository.abrir(
-                database,
-                com.amaxoniaerp.features.mesas.data.AbrirSesionScope(
-                    cajaId = cajaId,
-                    areaId = areaId,
-                    mesaId = mesaId,
-                    usuarioId = ctx.userId,
-                    cantidadPersonas = body.cantidadPersonas,
-                ),
-            )
-        respondAbrir(call, result)
-    }
+            val body =
+                runCatching { call.receive<AbrirSesionRequest>() }.getOrElse { e ->
+                    if (e is Error) throw e
+                    log.debug("Cuerpo inválido al abrir sesión: {}", e.message)
+                    AbrirSesionRequest()
+                }
+            if (body.cantidadPersonas <= 0) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "La cantidad de personas debe ser mayor que cero"),
+                )
+                return@run
+            }
 
-    suspend fun activa(call: ApplicationCall) = run {
-        val ctx = call.resolvePosContext() ?: return@run
-        val cajaId = call.requireCajaId() ?: return@run
-        call.requireAreaId() ?: return@run
-        val mesaId = call.requireMesaId() ?: return@run
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
 
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+            val result =
+                sesionMesaRepository.abrir(
+                    database,
+                    com.amaxoniaerp.features.mesas.data.AbrirSesionScope(
+                        cajaId = cajaId,
+                        areaId = areaId,
+                        mesaId = mesaId,
+                        usuarioId = ctx.userId,
+                        cantidadPersonas = body.cantidadPersonas,
+                    ),
+                )
+            respondAbrir(call, result)
+        }
 
-        val result = sesionMesaRepository.sesionActiva(database, mesaId)
-        val sesion = (result as? SesionMesaResult.Found)?.sesion
-        call.respond(HttpStatusCode.OK, SesionActivaResponse(success = true, sesion = sesion))
-        log.debug("Sesión activa respondida. adminDb={} mesaId={}", ctx.adminDb, mesaId)
-    }
+    suspend fun activa(call: ApplicationCall) =
+        run {
+            val ctx = call.resolvePosContext() ?: return@run
+            val cajaId = call.requireCajaId() ?: return@run
+            call.requireAreaId() ?: return@run
+            val mesaId = call.requireMesaId() ?: return@run
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+
+            val result = sesionMesaRepository.sesionActiva(database, mesaId)
+            val sesion = (result as? SesionMesaResult.Found)?.sesion
+            call.respond(HttpStatusCode.OK, SesionActivaResponse(success = true, sesion = sesion))
+            log.debug("Sesión activa respondida. adminDb={} mesaId={}", ctx.adminDb, mesaId)
+        }
 
     suspend fun mutarCierre(
         call: ApplicationCall,
@@ -254,29 +257,32 @@ internal class SesionMesaHandlers(
 // Helpers de extracción de parámetros compartidos con Mesas
 // ============================================================
 
-internal suspend fun ApplicationCall.requireAreaId(): Int? = run {
-    val v = parameters["areaId"]?.toIntOrNull()
-    if (v == null || v <= 0) {
-        respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de área es inválido"))
-        return@run null
+internal suspend fun ApplicationCall.requireAreaId(): Int? =
+    run {
+        val v = parameters["areaId"]?.toIntOrNull()
+        if (v == null || v <= 0) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de área es inválido"))
+            return@run null
+        }
+        v
     }
-    v
-}
 
-internal suspend fun ApplicationCall.requireMesaId(): Int? = run {
-    val v = parameters["mesaId"]?.toIntOrNull()
-    if (v == null || v <= 0) {
-        respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de mesa es inválido"))
-        return@run null
+internal suspend fun ApplicationCall.requireMesaId(): Int? =
+    run {
+        val v = parameters["mesaId"]?.toIntOrNull()
+        if (v == null || v <= 0) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de mesa es inválido"))
+            return@run null
+        }
+        v
     }
-    v
-}
 
-internal suspend fun ApplicationCall.requireSesionId(): Int? = run {
-    val v = parameters["sesionId"]?.toIntOrNull()
-    if (v == null || v <= 0) {
-        respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de sesión es inválido"))
-        return@run null
+internal suspend fun ApplicationCall.requireSesionId(): Int? =
+    run {
+        val v = parameters["sesionId"]?.toIntOrNull()
+        if (v == null || v <= 0) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de sesión es inválido"))
+            return@run null
+        }
+        v
     }
-    v
-}

@@ -36,38 +36,39 @@ internal class SalesHandlers(
 ) {
     private val log = LoggerFactory.getLogger("SalesRoutes")
 
-    suspend fun procesar(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
+    suspend fun procesar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-        val request = call.receive<ProcessSaleRequest>()
-        log.info(
-            "Processing POS sale. country={} adminDb={} idCaja={} idCliente={} items={} pagos={} total={}",
-            ctx.countryCode,
-            ctx.adminDb,
-            request.factura.idCaja,
-            request.factura.idCliente,
-            request.items.size,
-            request.pagos.size,
-            request.factura.totalTotalFactura,
-        )
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-
-        try {
-            val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
+            val request = call.receive<ProcessSaleRequest>()
             log.info(
-                "POS sale processed. country={} idFactura={} codFactura={} status={}",
+                "Processing POS sale. country={} adminDb={} idCaja={} idCliente={} items={} pagos={} total={}",
                 ctx.countryCode,
-                result.idFactura,
-                result.codFactura,
-                result.codEstatus,
+                ctx.adminDb,
+                request.factura.idCaja,
+                request.factura.idCliente,
+                request.items.size,
+                request.pagos.size,
+                request.factura.totalTotalFactura,
             )
-            call.respond(HttpStatusCode.Created, result)
-        } catch (e: DuplicateInvoiceException) {
-            call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))
-        } catch (e: InsufficientStockException) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Stock insuficiente")))
-        } catch (e: InvalidSaleRequestException) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+            try {
+                val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
+                log.info(
+                    "POS sale processed. country={} idFactura={} codFactura={} status={}",
+                    ctx.countryCode,
+                    result.idFactura,
+                    result.codFactura,
+                    result.codEstatus,
+                )
+                call.respond(HttpStatusCode.Created, result)
+            } catch (e: DuplicateInvoiceException) {
+                call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))
+            } catch (e: InsufficientStockException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Stock insuficiente")))
+            } catch (e: InvalidSaleRequestException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
+            }
         }
-    }
 }

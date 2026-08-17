@@ -790,27 +790,28 @@ class CuentaMesaRepository {
      * Devuelve la respuesta sintética de la sesión cerrada para auditoría; el caller
      * (`marcarFacturada`) lo usa solo para señalizar `sesionCerrada = true` al POS.
      */
-    private fun runCerradoPorPago(sesionId: Int): Boolean {
-        val row =
-            SesionMesaTable
-                .selectAll()
-                .where {
-                    (SesionMesaTable.id eq sesionId) and
-                        (SesionMesaTable.activo eq ACTIVE)
-                }.singleOrNull()
-                ?: return false
-        val estadoActual =
-            EstadoSesionMesa.fromCodigo(row[SesionMesaTable.estado])
-                ?: return false
-        if (estadoActual.esFinal) return false
-        val ahora = LocalDateTime.now()
-        SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
-            it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
-            it[SesionMesaTable.fechaCierre] = ahora
-            it[SesionMesaTable.activo] = INACTIVE
+    private fun runCerradoPorPago(sesionId: Int): Boolean =
+        run {
+            val row =
+                SesionMesaTable
+                    .selectAll()
+                    .where {
+                        (SesionMesaTable.id eq sesionId) and
+                            (SesionMesaTable.activo eq ACTIVE)
+                    }.singleOrNull()
+                    ?: return false
+            val estadoActual =
+                EstadoSesionMesa.fromCodigo(row[SesionMesaTable.estado])
+                    ?: return false
+            if (estadoActual.esFinal) return false
+            val ahora = LocalDateTime.now()
+            SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
+                it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
+                it[SesionMesaTable.fechaCierre] = ahora
+                it[SesionMesaTable.activo] = INACTIVE
+            }
+            return true
         }
-        return true
-    }
 
     private fun ResultRow.toCuentaMesaResponse(
         detalles: List<CuentaDetalleResponse> = emptyList(),

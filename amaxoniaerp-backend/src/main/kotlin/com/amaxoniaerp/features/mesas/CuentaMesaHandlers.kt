@@ -64,190 +64,195 @@ internal class CuentaMesaHandlers(
         respondSesionMutacion(call, result, okMessage)
     }
 
-    suspend fun listar(call: ApplicationCall) = run {
-        val tri = call.extractRoutingIds() ?: return@run
-        val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-        if (!call.ensureCuentaScope(database, tri)) return@run
-        val result = cuentaMesaRepository.listarCuentas(database, tri.sesionId, tri.mesaId)
-        when (result) {
-            is CuentaMesaResult.Listada ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    CuentasMesaListResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuentas),
-                )
+    suspend fun listar(call: ApplicationCall) =
+        run {
+            val tri = call.extractRoutingIds() ?: return@run
+            val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
+            if (!call.ensureCuentaScope(database, tri)) return@run
+            val result = cuentaMesaRepository.listarCuentas(database, tri.sesionId, tri.mesaId)
+            when (result) {
+                is CuentaMesaResult.Listada ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        CuentasMesaListResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuentas),
+                    )
 
-            CuentaMesaResult.SesionNoPerteneceMesa ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
+                CuentaMesaResult.SesionNoPerteneceMesa ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
+                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
+            }
+            log.debug("Cuentas listadas. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId)
         }
-        log.debug("Cuentas listadas. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId)
-    }
 
-    suspend fun crear(call: ApplicationCall) = run {
-        val tri = call.extractRoutingIds() ?: return@run
-        val body = call.receive<CrearCuentaRequest>()
-        val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-        if (!call.ensureCuentaScope(database, tri)) return@run
-        val result = cuentaMesaRepository.crear(database, tri.sesionId, tri.mesaId, body)
-        when (result) {
-            is CuentaMesaResult.Creada ->
-                call.respond(
-                    HttpStatusCode.Created,
-                    CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
-                )
+    suspend fun crear(call: ApplicationCall) =
+        run {
+            val tri = call.extractRoutingIds() ?: return@run
+            val body = call.receive<CrearCuentaRequest>()
+            val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
+            if (!call.ensureCuentaScope(database, tri)) return@run
+            val result = cuentaMesaRepository.crear(database, tri.sesionId, tri.mesaId, body)
+            when (result) {
+                is CuentaMesaResult.Creada ->
+                    call.respond(
+                        HttpStatusCode.Created,
+                        CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
+                    )
 
-            CuentaMesaResult.SesionNoPerteneceMesa ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
+                CuentaMesaResult.SesionNoPerteneceMesa ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-            CuentaMesaResult.SesionNoActiva ->
-                call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_ACCOUNT_FINAL_STATE))
+                CuentaMesaResult.SesionNoActiva ->
+                    call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_ACCOUNT_FINAL_STATE))
 
-            CuentaMesaResult.CantidadSuperaSaldo ->
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "La cantidad solicitada supera el saldo pendiente del pedido"),
-                )
+                CuentaMesaResult.CantidadSuperaSaldo ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "La cantidad solicitada supera el saldo pendiente del pedido"),
+                    )
 
-            CuentaMesaResult.PedidoNoEncontrado ->
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to ERR_SELECTED_ORDER_BALANCE),
-                )
+                CuentaMesaResult.PedidoNoEncontrado ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to ERR_SELECTED_ORDER_BALANCE),
+                    )
 
-            CuentaMesaResult.SinItemsParaCrear ->
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "No hay pedidos entregados pendientes de facturar"),
-                )
+                CuentaMesaResult.SinItemsParaCrear ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "No hay pedidos entregados pendientes de facturar"),
+                    )
 
-            CuentaMesaResult.PedidosPendientesImpidenPago ->
-                call.respond(
-                    HttpStatusCode.Conflict,
-                    mapOf("error" to "Hay pedidos pendientes en cocina que impiden facturar"),
-                )
+                CuentaMesaResult.PedidosPendientesImpidenPago ->
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        mapOf("error" to "Hay pedidos pendientes en cocina que impiden facturar"),
+                    )
 
-            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CREATE_ACCOUNT))
+                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CREATE_ACCOUNT))
+            }
+            log.debug("Cuenta creada. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId)
         }
-        log.debug("Cuenta creada. adminDb={} sesionId={}", tri.ctx.adminDb, tri.sesionId)
-    }
 
-    suspend fun detalle(call: ApplicationCall) = run {
-        val tri = call.extractRoutingIds() ?: return@run
-        val cuentaId = call.requireCuentaId() ?: return@run
-        val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-        if (!call.ensureCuentaScope(database, tri)) return@run
-        val result = cuentaMesaRepository.obtenerCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
-        when (result) {
-            is CuentaMesaResult.Creada ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
-                )
+    suspend fun detalle(call: ApplicationCall) =
+        run {
+            val tri = call.extractRoutingIds() ?: return@run
+            val cuentaId = call.requireCuentaId() ?: return@run
+            val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
+            if (!call.ensureCuentaScope(database, tri)) return@run
+            val result = cuentaMesaRepository.obtenerCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
+            when (result) {
+                is CuentaMesaResult.Creada ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
+                    )
 
-            CuentaMesaResult.SesionNoPerteneceMesa ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
+                CuentaMesaResult.SesionNoPerteneceMesa ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-            CuentaMesaResult.CuentaNoEncontrada ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
+                CuentaMesaResult.CuentaNoEncontrada ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
-            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
+                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_UNEXPECTED))
+            }
+            log.debug("Cuenta obtenida. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId)
         }
-        log.debug("Cuenta obtenida. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId)
-    }
 
-    suspend fun cancelar(call: ApplicationCall) = run {
-        val tri = call.extractRoutingIds() ?: return@run
-        val cuentaId = call.requireCuentaId() ?: return@run
-        val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-        if (!call.ensureCuentaScope(database, tri)) return@run
-        val result = cuentaMesaRepository.cancelarCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
-        when (result) {
-            is CuentaMesaResult.Creada ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
-                )
+    suspend fun cancelar(call: ApplicationCall) =
+        run {
+            val tri = call.extractRoutingIds() ?: return@run
+            val cuentaId = call.requireCuentaId() ?: return@run
+            val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
+            if (!call.ensureCuentaScope(database, tri)) return@run
+            val result = cuentaMesaRepository.cancelarCuenta(database, tri.sesionId, tri.mesaId, cuentaId)
+            when (result) {
+                is CuentaMesaResult.Creada ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        CuentaCreadaResponse(success = true, sesionMesaId = tri.sesionId, data = result.cuenta),
+                    )
 
-            CuentaMesaResult.SesionNoPerteneceMesa ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
+                CuentaMesaResult.SesionNoPerteneceMesa ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-            CuentaMesaResult.CuentaNoEncontrada ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
+                CuentaMesaResult.CuentaNoEncontrada ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
-            CuentaMesaResult.CuentaNoActiva ->
-                call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_ACCOUNT_NOT_ACTIVE))
+                CuentaMesaResult.CuentaNoActiva ->
+                    call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_ACCOUNT_NOT_ACTIVE))
 
-            else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CANCEL_ACCOUNT))
+                else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_CANCEL_ACCOUNT))
+            }
+            log.debug("Cuenta cancelada. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId)
         }
-        log.debug("Cuenta cancelada. adminDb={} cuentaId={}", tri.ctx.adminDb, cuentaId)
-    }
 
-    suspend fun marcarFacturada(call: ApplicationCall) = run {
-        val tri = call.extractRoutingIds() ?: return@run
-        val cuentaId = call.requireCuentaId() ?: return@run
-        val body = call.receive<MarcarCuentaFacturadaRequest>()
-        val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
-        if (!call.ensureCuentaScope(database, tri)) return@run
-        val result =
-            cuentaMesaRepository.marcarFacturada(
-                database = database,
-                sesionId = tri.sesionId,
-                mesaId = tri.mesaId,
-                cuentaId = cuentaId,
-                idempotencyKey = body.idempotencyKey,
-                idFactura = body.idFactura,
-                codFactura = body.codFactura,
-            )
-        when (result) {
-            is CuentaMesaResult.Facturada ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    MarcarCuentaFacturadaResponse(
-                        success = true,
-                        sesionMesaId = tri.sesionId,
-                        cuentaMesaId = cuentaId,
-                        data = result.cuenta,
-                        sesionCerrada = result.sesionCerrada,
-                    ),
+    suspend fun marcarFacturada(call: ApplicationCall) =
+        run {
+            val tri = call.extractRoutingIds() ?: return@run
+            val cuentaId = call.requireCuentaId() ?: return@run
+            val body = call.receive<MarcarCuentaFacturadaRequest>()
+            val database = DatabaseManager.connectToCompanyDb(tri.ctx.countryCode, tri.ctx.adminDb)
+            if (!call.ensureCuentaScope(database, tri)) return@run
+            val result =
+                cuentaMesaRepository.marcarFacturada(
+                    database = database,
+                    sesionId = tri.sesionId,
+                    mesaId = tri.mesaId,
+                    cuentaId = cuentaId,
+                    idempotencyKey = body.idempotencyKey,
+                    idFactura = body.idFactura,
+                    codFactura = body.codFactura,
                 )
+            when (result) {
+                is CuentaMesaResult.Facturada ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        MarcarCuentaFacturadaResponse(
+                            success = true,
+                            sesionMesaId = tri.sesionId,
+                            cuentaMesaId = cuentaId,
+                            data = result.cuenta,
+                            sesionCerrada = result.sesionCerrada,
+                        ),
+                    )
 
-            CuentaMesaResult.IdempotenciaDuplicada ->
-                // 200 OK + flag `success=true` pero con detalle: el POS debe leer que ya estaba
-                // confirmado y no repetir el `procesar venta`. El campo `error` trae el motivo.
-                call.respond(
-                    HttpStatusCode.OK,
-                    MarcarCuentaFacturadaResponse(
-                        success = true,
-                        sesionMesaId = tri.sesionId,
-                        cuentaMesaId = cuentaId,
-                        data = CuentaMesaResponse(),
-                        sesionCerrada = false,
-                        error = "Intento idempotente ya confirmado",
-                    ),
-                )
+                CuentaMesaResult.IdempotenciaDuplicada ->
+                    // 200 OK + flag `success=true` pero con detalle: el POS debe leer que ya estaba
+                    // confirmado y no repetir el `procesar venta`. El campo `error` trae el motivo.
+                    call.respond(
+                        HttpStatusCode.OK,
+                        MarcarCuentaFacturadaResponse(
+                            success = true,
+                            sesionMesaId = tri.sesionId,
+                            cuentaMesaId = cuentaId,
+                            data = CuentaMesaResponse(),
+                            sesionCerrada = false,
+                            error = "Intento idempotente ya confirmado",
+                        ),
+                    )
 
-            CuentaMesaResult.SesionNoPerteneceMesa ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
+                CuentaMesaResult.SesionNoPerteneceMesa ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_SCOPE))
 
-            CuentaMesaResult.CuentaNoEncontrada ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
+                CuentaMesaResult.CuentaNoEncontrada ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
-            CuentaMesaResult.CuentaNoActiva ->
-                call.respond(HttpStatusCode.Conflict, mapOf("error" to "La cuenta ya no está activa"))
+                CuentaMesaResult.CuentaNoActiva ->
+                    call.respond(HttpStatusCode.Conflict, mapOf("error" to "La cuenta ya no está activa"))
 
-            CuentaMesaResult.SesionNoActiva ->
-                call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión no admite esta operación"))
+                CuentaMesaResult.SesionNoActiva ->
+                    call.respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión no admite esta operación"))
 
-            else -> {
-                log.warn("Respuesta no esperada al marcar facturada: {}", result)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    mapOf("error" to "No se pudo confirmar la facturación"),
-                )
+                else -> {
+                    log.warn("Respuesta no esperada al marcar facturada: {}", result)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to "No se pudo confirmar la facturación"),
+                    )
+                }
             }
         }
-    }
 
     private suspend fun respondSesionMutacion(
         call: ApplicationCall,
@@ -277,14 +282,15 @@ internal class CuentaMesaHandlers(
         }
     }
 
-    private suspend fun ApplicationCall.extractRoutingIds(): CuentaRoutingIds? = run {
-        val ctx = resolvePosContext() ?: return@run null
-        val cajaId = requireCajaId() ?: return@run null
-        val areaId = requireAreaId() ?: return@run null
-        val mesaId = requireMesaId() ?: return@run null
-        val sesionId = requireSesionId() ?: return@run null
-        CuentaRoutingIds(ctx = ctx, cajaId = cajaId, areaId = areaId, mesaId = mesaId, sesionId = sesionId)
-    }
+    private suspend fun ApplicationCall.extractRoutingIds(): CuentaRoutingIds? =
+        run {
+            val ctx = resolvePosContext() ?: return@run null
+            val cajaId = requireCajaId() ?: return@run null
+            val areaId = requireAreaId() ?: return@run null
+            val mesaId = requireMesaId() ?: return@run null
+            val sesionId = requireSesionId() ?: return@run null
+            CuentaRoutingIds(ctx = ctx, cajaId = cajaId, areaId = areaId, mesaId = mesaId, sesionId = sesionId)
+        }
 
     private suspend fun ApplicationCall.ensureCuentaScope(
         database: org.jetbrains.exposed.sql.Database,
@@ -311,12 +317,13 @@ internal class CuentaMesaHandlers(
         return valid
     }
 
-    private suspend fun ApplicationCall.requireCuentaId(): Int? = run {
-        val v = parameters["cuentaId"]?.toIntOrNull()
-        if (v == null || v <= 0) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de cuenta es inválido"))
-            return@run null
+    private suspend fun ApplicationCall.requireCuentaId(): Int? =
+        run {
+            val v = parameters["cuentaId"]?.toIntOrNull()
+            if (v == null || v <= 0) {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de cuenta es inválido"))
+                return@run null
+            }
+            v
         }
-        v
-    }
 }

@@ -599,7 +599,7 @@ open class ProcessSaleTransactionalRepository(
     private fun validateClientSucursalIfRequired(
         countryCode: String,
         request: ProcessSaleRequest,
-    ) {
+    ) = run {
         if (!countryCode.equals("PA", ignoreCase = true)) return
         val clientCode = request.factura.codCliente.take(CLIENT_CODE_LENGTH)
         if (clientCode.isBlank()) return

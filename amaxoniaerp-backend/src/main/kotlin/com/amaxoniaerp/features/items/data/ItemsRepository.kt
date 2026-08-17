@@ -735,13 +735,14 @@ private fun resolveBrandIdByLineId(lineId: Int): Int {
     } ?: 0
 }
 
-private fun isSaleWarehouse(tipo: String?): Boolean {
-    val normalized = tipo?.trim()?.uppercase().orEmpty()
-    if (normalized.isBlank()) return true
-    if (normalized.contains("MERMA")) return false
-    if (normalized.contains("DESPERDICIO")) return false
-    if (normalized.contains("NO_VENTA")) return false
-    return normalized !in setOf("M", "MERMA", "WASTE")
-}
+private fun isSaleWarehouse(tipo: String?): Boolean =
+    run {
+        val normalized = tipo?.trim()?.uppercase().orEmpty()
+        if (normalized.isBlank()) return true
+        if (normalized.contains("MERMA")) return false
+        if (normalized.contains("DESPERDICIO")) return false
+        if (normalized.contains("NO_VENTA")) return false
+        return normalized !in setOf("M", "MERMA", "WASTE")
+    }
 
 private fun BigDecimal?.toSafeDouble(): Double = this?.toDouble() ?: 0.0

@@ -517,31 +517,32 @@ class ElectronicInvoiceRepository {
                 )
             }
 
-    private fun loadRetencion(invoiceId: String): FERetencionData? {
-        val safeInvoiceId = invoiceId.replace("'", "''")
-        val result =
-            TransactionManager.current().exec(
-                """
-                SELECT codigo_retencion, totalizar_monto_retencion
-                FROM factura_detalle_formapago
-                WHERE id_factura = '$safeInvoiceId'
-                LIMIT 1
-                """.trimIndent(),
-            ) { rs ->
-                if (!rs.next()) return@exec null
-                val codigo = rs.getString("codigo_retencion").safeIntOrZero()
-                val monto = rs.getString("totalizar_monto_retencion").safeDoubleOrZero()
-                codigo to monto
-            } ?: return null
+    private fun loadRetencion(invoiceId: String): FERetencionData? =
+        run {
+            val safeInvoiceId = invoiceId.replace("'", "''")
+            val result =
+                TransactionManager.current().exec(
+                    """
+                    SELECT codigo_retencion, totalizar_monto_retencion
+                    FROM factura_detalle_formapago
+                    WHERE id_factura = '$safeInvoiceId'
+                    LIMIT 1
+                    """.trimIndent(),
+                ) { rs ->
+                    if (!rs.next()) return@exec null
+                    val codigo = rs.getString("codigo_retencion").safeIntOrZero()
+                    val monto = rs.getString("totalizar_monto_retencion").safeDoubleOrZero()
+                    codigo to monto
+                } ?: return null
 
-        val (codigo, monto) = result
-        if (codigo == 0 || monto <= 0.0) return null
+            val (codigo, monto) = result
+            if (codigo == 0 || monto <= 0.0) return null
 
-        return FERetencionData(
-            codigoRetencion = codigo.toString(),
-            montoRetencion = monto,
-        )
-    }
+            return FERetencionData(
+                codigoRetencion = codigo.toString(),
+                montoRetencion = monto,
+            )
+        }
 
     private fun loadFormasPago(invoiceId: String): List<FEFormaPagoData> {
         // Buscar el caja_id asociado a esta factura en caja_nueva

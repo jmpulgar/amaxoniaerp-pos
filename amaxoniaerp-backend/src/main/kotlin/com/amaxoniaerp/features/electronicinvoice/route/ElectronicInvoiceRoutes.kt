@@ -41,87 +41,88 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
 internal class ElectronicInvoiceHandlers(
     private val factory: ElectronicInvoiceProcessorFactory,
 ) {
-    suspend fun enviar(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
+    suspend fun enviar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-        val invoiceId = call.parameters["invoiceId"]
-        if (invoiceId == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta invoiceId en la URL"))
-            return@run
+            val invoiceId = call.parameters["invoiceId"]
+            if (invoiceId == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta invoiceId en la URL"))
+                return@run
+            }
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val processor = factory.forCountry(ctx.countryCode)
+
+            when (val result = processor.processElectronicInvoice(database, invoiceId)) {
+                is ElectronicInvoiceResult.Success ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        mapOf(
+                            "success" to true,
+                            "cufe" to result.cufe,
+                            "qr" to (result.qr ?: ""),
+                            "fechaRecepcionDGI" to (result.fechaRecepcionDGI ?: ""),
+                            "nroProtocoloAutorizacion" to (result.nroProtocoloAutorizacion ?: ""),
+                        ),
+                    )
+
+                is ElectronicInvoiceResult.Failure ->
+                    call.respond(
+                        HttpStatusCode.BadGateway,
+                        mapOf(
+                            "success" to false,
+                            "codigo" to result.codigo,
+                            "mensaje" to result.mensaje,
+                        ),
+                    )
+
+                is ElectronicInvoiceResult.NotApplicable ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        mapOf(
+                            "success" to true,
+                            "message" to "Facturación electrónica no aplica para ${result.country}",
+                        ),
+                    )
+
+                is ElectronicInvoiceResult.UnsupportedDocumentType ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        mapOf(
+                            "success" to true,
+                            "message" to
+                                "Tipo de documento '${result.tipoDocumento}' no implementado " +
+                                "en ${result.country} (FASE 1)",
+                        ),
+                    )
+
+                is ElectronicInvoiceResult.AlreadyIssued ->
+                    call.respond(
+                        HttpStatusCode.OK,
+                        mapOf(
+                            "success" to true,
+                            "message" to "La factura ya posee numeración fiscal " +
+                                "(${result.numeroDocumentoFiscal})",
+                            "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
+                            "numeroControl" to (result.numeroControl ?: ""),
+                        ),
+                    )
+
+                is ElectronicInvoiceResult.Uncertain ->
+                    // Resultado incierto: el PAC pudo haber creado el
+                    // documento. No se puede afirmar fallo ni éxito.
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        mapOf(
+                            "success" to false,
+                            "codigo" to result.codigo,
+                            "mensaje" to result.mensaje,
+                            "incierta" to true,
+                            "transaccionId" to (result.transaccionId ?: ""),
+                            "action" to "Requiere conciliación manual",
+                        ),
+                    )
+            }
         }
-
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val processor = factory.forCountry(ctx.countryCode)
-
-        when (val result = processor.processElectronicInvoice(database, invoiceId)) {
-            is ElectronicInvoiceResult.Success ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "success" to true,
-                        "cufe" to result.cufe,
-                        "qr" to (result.qr ?: ""),
-                        "fechaRecepcionDGI" to (result.fechaRecepcionDGI ?: ""),
-                        "nroProtocoloAutorizacion" to (result.nroProtocoloAutorizacion ?: ""),
-                    ),
-                )
-
-            is ElectronicInvoiceResult.Failure ->
-                call.respond(
-                    HttpStatusCode.BadGateway,
-                    mapOf(
-                        "success" to false,
-                        "codigo" to result.codigo,
-                        "mensaje" to result.mensaje,
-                    ),
-                )
-
-            is ElectronicInvoiceResult.NotApplicable ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "success" to true,
-                        "message" to "Facturación electrónica no aplica para ${result.country}",
-                    ),
-                )
-
-            is ElectronicInvoiceResult.UnsupportedDocumentType ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "success" to true,
-                        "message" to
-                            "Tipo de documento '${result.tipoDocumento}' no implementado " +
-                            "en ${result.country} (FASE 1)",
-                    ),
-                )
-
-            is ElectronicInvoiceResult.AlreadyIssued ->
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf(
-                        "success" to true,
-                        "message" to "La factura ya posee numeración fiscal " +
-                            "(${result.numeroDocumentoFiscal})",
-                        "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
-                        "numeroControl" to (result.numeroControl ?: ""),
-                    ),
-                )
-
-            is ElectronicInvoiceResult.Uncertain ->
-                // Resultado incierto: el PAC pudo haber creado el
-                // documento. No se puede afirmar fallo ni éxito.
-                call.respond(
-                    HttpStatusCode.Conflict,
-                    mapOf(
-                        "success" to false,
-                        "codigo" to result.codigo,
-                        "mensaje" to result.mensaje,
-                        "incierta" to true,
-                        "transaccionId" to (result.transaccionId ?: ""),
-                        "action" to "Requiere conciliación manual",
-                    ),
-                )
-        }
-    }
 }

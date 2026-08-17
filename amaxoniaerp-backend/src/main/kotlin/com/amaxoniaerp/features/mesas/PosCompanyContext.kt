@@ -26,11 +26,12 @@ internal data class PosCompanyContext(
  * tomados del JWT firmado, nunca del cliente. Delega en el seam canónico de tenant
  * y añade el claim `user_id`.
  */
-internal suspend fun ApplicationCall.resolvePosContext(): PosCompanyContext? = run {
-    val ctx = resolveCompanyRequestContext() ?: return@run null
-    val userId = ctx.requireUserId(this) ?: return@run null
-    PosCompanyContext(countryCode = ctx.countryCode, adminDb = ctx.adminDb, userId = userId)
-}
+internal suspend fun ApplicationCall.resolvePosContext(): PosCompanyContext? =
+    run {
+        val ctx = resolveCompanyRequestContext() ?: return@run null
+        val userId = ctx.requireUserId(this) ?: return@run null
+        PosCompanyContext(countryCode = ctx.countryCode, adminDb = ctx.adminDb, userId = userId)
+    }
 
 /** Lee `cajaId` del query string y responde 400 si no viene. */
 internal suspend fun ApplicationCall.requireCajaId(): String? =

@@ -271,26 +271,27 @@ open class VenezuelaHkaPayloadBuilder {
      * NO se aplica automáticamente 3 %: respeta el dato del tenant. Si la base
      * sale en cero (no hubo pago en divisa) el nodo IGTF no se emite.
      */
-    private fun calcularIgtf(ctx: InvoiceVEContext): IgtfResult? {
-        val pct = ctx.config.igtf.takeIf { it > BigDecimal.ZERO } ?: return null
-        val tasa = ctx.factura.tasa.takeIf { it > BigDecimal.ONE } ?: BigDecimal.ONE
-        val baseEnVes =
-            ctx.formasPago
-                .filter { it.esDivisa }
-                .fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto.multiply(tasa)) }
-                .bigDecimalMoney()
-        if (baseEnVes <= BigDecimal.ZERO) return null
+    private fun calcularIgtf(ctx: InvoiceVEContext): IgtfResult? =
+        run {
+            val pct = ctx.config.igtf.takeIf { it > BigDecimal.ZERO } ?: return null
+            val tasa = ctx.factura.tasa.takeIf { it > BigDecimal.ONE } ?: BigDecimal.ONE
+            val baseEnVes =
+                ctx.formasPago
+                    .filter { it.esDivisa }
+                    .fold(BigDecimal.ZERO) { acc, fp -> acc.add(fp.monto.multiply(tasa)) }
+                    .bigDecimalMoney()
+            if (baseEnVes <= BigDecimal.ZERO) return null
 
-        val monto =
-            baseEnVes
-                .multiply(pct.divide(BigDecimal("100"), PERCENT_CALCULATION_SCALE, RoundingMode.HALF_UP))
-                .bigDecimalMoney()
-        return IgtfResult(
-            baseImponible = baseEnVes,
-            porcentaje = pct.bigDecimalMoney(),
-            monto = monto,
-        )
-    }
+            val monto =
+                baseEnVes
+                    .multiply(pct.divide(BigDecimal("100"), PERCENT_CALCULATION_SCALE, RoundingMode.HALF_UP))
+                    .bigDecimalMoney()
+            return IgtfResult(
+                baseImponible = baseEnVes,
+                porcentaje = pct.bigDecimalMoney(),
+                monto = monto,
+            )
+        }
 
     // ─── Formas de pago ────────────────────────────────────────────────────────
 
@@ -426,103 +427,104 @@ open class VenezuelaHkaPayloadBuilder {
     }
 
     /** Conversión de enteros (1..999 999 999 999) a palabras en español (VE). */
-    private fun enterosALetras(n: java.math.BigInteger): String {
-        require(n >= java.math.BigInteger.ZERO) { "Solo se soportan enteros no negativos" }
-        val unidades =
-            arrayOf(
-                "",
-                "UNO",
-                "DOS",
-                "TRES",
-                "CUATRO",
-                "CINCO",
-                "SEIS",
-                "SIETE",
-                "OCHO",
-                "NUEVE",
-                "DIEZ",
-                "ONCE",
-                "DOCE",
-                "TRECE",
-                "CATORCE",
-                "QUINCE",
-                "DIECISÉIS",
-                "DIECISIETE",
-                "DIECIOCHO",
-                "DIECINUEVE",
-            )
-        val decenas =
-            arrayOf(
-                "",
-                "",
-                "VEINTI",
-                "TREINTA",
-                "CUARENTA",
-                "CINCUENTA",
-                "SESENTA",
-                "SETENTA",
-                "OCHENTA",
-                "NOVENTA",
-            )
-        val centenas =
-            arrayOf(
-                "",
-                "CIENTO",
-                "DOSCIENTOS",
-                "TRESCIENTOS",
-                "CUATROCIENTOS",
-                "QUINIENTOS",
-                "SEISCIENTOS",
-                "SETECIENTOS",
-                "OCHOCIENTOS",
-                "NOVECIENTOS",
-            )
+    private fun enterosALetras(n: java.math.BigInteger): String =
+        run {
+            require(n >= java.math.BigInteger.ZERO) { "Solo se soportan enteros no negativos" }
+            val unidades =
+                arrayOf(
+                    "",
+                    "UNO",
+                    "DOS",
+                    "TRES",
+                    "CUATRO",
+                    "CINCO",
+                    "SEIS",
+                    "SIETE",
+                    "OCHO",
+                    "NUEVE",
+                    "DIEZ",
+                    "ONCE",
+                    "DOCE",
+                    "TRECE",
+                    "CATORCE",
+                    "QUINCE",
+                    "DIECISÉIS",
+                    "DIECISIETE",
+                    "DIECIOCHO",
+                    "DIECINUEVE",
+                )
+            val decenas =
+                arrayOf(
+                    "",
+                    "",
+                    "VEINTI",
+                    "TREINTA",
+                    "CUARENTA",
+                    "CINCUENTA",
+                    "SESENTA",
+                    "SETENTA",
+                    "OCHENTA",
+                    "NOVENTA",
+                )
+            val centenas =
+                arrayOf(
+                    "",
+                    "CIENTO",
+                    "DOSCIENTOS",
+                    "TRESCIENTOS",
+                    "CUATROCIENTOS",
+                    "QUINIENTOS",
+                    "SEISCIENTOS",
+                    "SETECIENTOS",
+                    "OCHOCIENTOS",
+                    "NOVECIENTOS",
+                )
 
-        val millones = java.math.BigInteger("1000000")
-        val mil = java.math.BigInteger("1000")
-        val cien = java.math.BigInteger("100")
+            val millones = java.math.BigInteger("1000000")
+            val mil = java.math.BigInteger("1000")
+            val cien = java.math.BigInteger("100")
 
-        if (n == java.math.BigInteger.ZERO) return "CERO"
-        if (n == cien) return "CIEN" // excepción: 100 → "CIEN", no "CIENTO"
+            if (n == java.math.BigInteger.ZERO) return "CERO"
+            if (n == cien) return "CIEN" // excepción: 100 → "CIEN", no "CIENTO"
 
-        val parts = mutableListOf<String>()
+            val parts = mutableListOf<String>()
 
-        // Millones (1..999)
-        if (n >= millones) {
-            val mm = n.divide(millones).mod(millones)
-            if (mm.signum() > 0) {
-                parts +=
-                    when (mm) {
-                        java.math.BigInteger.ONE -> "UN MILLÓN"
-                        else -> "${grupoTres(mm.toInt(), unidades, decenas, centenas)} MILLONES"
-                    }
-            }
-        }
-        // Billones no soportados: si n >= 10^12, dejamos al PAC que lo rechace;
-        // no ocurre con escala monetaria VE (DECIMAL 20,2).
-
-        // Miles (1..999 999)
-        val restoTrasMillon = n.mod(millones)
-        val miles = restoTrasMillon.divide(mil)
-        if (miles.signum() > 0) {
-            // "MIL" es invariable; "UN MIL" esprefrible evitar (se omite "UN").
-            val milesLetras =
-                if (miles == java.math.BigInteger.ONE) {
-                    "MIL"
-                } else {
-                    "${grupoTres(miles.toInt(), unidades, decenas, centenas)} MIL"
+            // Millones (1..999)
+            if (n >= millones) {
+                val mm = n.divide(millones).mod(millones)
+                if (mm.signum() > 0) {
+                    parts +=
+                        when (mm) {
+                            java.math.BigInteger.ONE -> "UN MILLÓN"
+                            else -> "${grupoTres(mm.toInt(), unidades, decenas, centenas)} MILLONES"
+                        }
                 }
-            parts += milesLetras
-        }
+            }
+            // Billones no soportados: si n >= 10^12, dejamos al PAC que lo rechace;
+            // no ocurre con escala monetaria VE (DECIMAL 20,2).
 
-        // Unidad final (1..999)
-        val unidad = restoTrasMillon.mod(mil)
-        if (unidad.signum() > 0) {
-            parts += grupoTres(unidad.toInt(), unidades, decenas, centenas)
-        }
+            // Miles (1..999 999)
+            val restoTrasMillon = n.mod(millones)
+            val miles = restoTrasMillon.divide(mil)
+            if (miles.signum() > 0) {
+                // "MIL" es invariable; "UN MIL" esprefrible evitar (se omite "UN").
+                val milesLetras =
+                    if (miles == java.math.BigInteger.ONE) {
+                        "MIL"
+                    } else {
+                        "${grupoTres(miles.toInt(), unidades, decenas, centenas)} MIL"
+                    }
+                parts += milesLetras
+            }
 
-        return parts.joinToString(" ").trim()
-    }
+            // Unidad final (1..999)
+            val unidad = restoTrasMillon.mod(mil)
+            if (unidad.signum() > 0) {
+                parts += grupoTres(unidad.toInt(), unidades, decenas, centenas)
+            }
+
+            return parts.joinToString(" ").trim()
+        }
 
     /** Convierte un bloque de 3 dígitos (0..999) a letras. */
     private fun grupoTres(
@@ -530,27 +532,28 @@ open class VenezuelaHkaPayloadBuilder {
         unidades: Array<String>,
         decenas: Array<String>,
         centenas: Array<String>,
-    ): String {
-        if (n == 0) return ""
-        if (n == HUNDRED) return "CIEN"
-        val sb = StringBuilder()
-        var resto = n
-        if (resto >= HUNDRED) {
-            sb.append(centenas[resto / HUNDRED]).append(' ')
-            resto %= HUNDRED
-        }
-        when {
-            resto < TWENTY -> sb.append(unidades[resto])
-            resto == TWENTY -> sb.append("VEINTE")
-            // VEINTIUNO..VEINTINUEVE
-            resto in TWENTY_ONE..TWENTY_NINE -> sb.append(decenas[2]).append(unidades[resto - TWENTY])
-            else -> {
-                val d = resto / DECIMAL_BASE
-                val u = resto % DECIMAL_BASE
-                sb.append(decenas[d])
-                if (u > 0) sb.append(" Y ").append(unidades[u])
+    ): String =
+        run {
+            if (n == 0) return ""
+            if (n == HUNDRED) return "CIEN"
+            val sb = StringBuilder()
+            var resto = n
+            if (resto >= HUNDRED) {
+                sb.append(centenas[resto / HUNDRED]).append(' ')
+                resto %= HUNDRED
             }
+            when {
+                resto < TWENTY -> sb.append(unidades[resto])
+                resto == TWENTY -> sb.append("VEINTE")
+                // VEINTIUNO..VEINTINUEVE
+                resto in TWENTY_ONE..TWENTY_NINE -> sb.append(decenas[2]).append(unidades[resto - TWENTY])
+                else -> {
+                    val d = resto / DECIMAL_BASE
+                    val u = resto % DECIMAL_BASE
+                    sb.append(decenas[d])
+                    if (u > 0) sb.append(" Y ").append(unidades[u])
+                }
+            }
+            return sb.toString().trim()
         }
-        return sb.toString().trim()
-    }
 }

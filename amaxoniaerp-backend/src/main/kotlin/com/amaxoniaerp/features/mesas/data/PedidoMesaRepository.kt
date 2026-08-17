@@ -369,14 +369,15 @@ class PedidoMesaRepository {
     private fun transicionValida(
         actual: EstadoPedidoMesa,
         destino: EstadoPedidoMesa,
-    ): Boolean {
-        if (actual.esFinal) return false
-        if (destino == EstadoPedidoMesa.CANCELADA) return true
-        // Avance hacia adelante; nunca retroceder a PENDIENTE una vez enviado.
-        val ordenActual = ORDEN_ESTADOS.getValue(actual)
-        val ordenDestino = ORDEN_ESTADOS.getValue(destino)
-        return ordenDestino > ordenActual && destino != EstadoPedidoMesa.PENDIENTE
-    }
+    ): Boolean =
+        run {
+            if (actual.esFinal) return false
+            if (destino == EstadoPedidoMesa.CANCELADA) return true
+            // Avance hacia adelante; nunca retroceder a PENDIENTE una vez enviado.
+            val ordenActual = ORDEN_ESTADOS.getValue(actual)
+            val ordenDestino = ORDEN_ESTADOS.getValue(destino)
+            return ordenDestino > ordenActual && destino != EstadoPedidoMesa.PENDIENTE
+        }
 
     private fun LocalDateTime.formatIso(): String = ISO_FORMATTER.format(this)
 

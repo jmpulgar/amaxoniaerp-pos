@@ -42,62 +42,64 @@ internal class MesasHandlers(
 ) {
     private val log = LoggerFactory.getLogger("MesasRouting")
 
-    suspend fun listarAreas(call: ApplicationCall) = run {
-        val ctx = call.resolvePosContext() ?: return@run
-        val cajaId = call.requireCajaId() ?: return@run
+    suspend fun listarAreas(call: ApplicationCall) =
+        run {
+            val ctx = call.resolvePosContext() ?: return@run
+            val cajaId = call.requireCajaId() ?: return@run
 
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
-        val areas = mesasRepository.listAreas(database, scope.sucursalId)
-        call.respond(
-            HttpStatusCode.OK,
-            AreasListResponse(success = true, sucursalId = scope.sucursalId, data = areas),
-        )
-    }
-
-    suspend fun listarMesas(call: ApplicationCall) = run {
-        val ctx = call.resolvePosContext() ?: return@run
-        val cajaId = call.requireCajaId() ?: return@run
-
-        val areaId = call.parameters["areaId"]?.toIntOrNull()
-        if (areaId == null || areaId <= 0) {
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+            val areas = mesasRepository.listAreas(database, scope.sucursalId)
             call.respond(
-                HttpStatusCode.BadRequest,
-                mapOf("error" to "El identificador de área es inválido"),
+                HttpStatusCode.OK,
+                AreasListResponse(success = true, sucursalId = scope.sucursalId, data = areas),
             )
-            return@run
         }
 
-        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
-        val plan = mesasRepository.listMesas(database, scope.sucursalId, areaId)
+    suspend fun listarMesas(call: ApplicationCall) =
+        run {
+            val ctx = call.resolvePosContext() ?: return@run
+            val cajaId = call.requireCajaId() ?: return@run
 
-        if (plan == null) {
-            log.warn(
-                "Área fuera de la sucursal activa. adminDb={} cajaId={} sucursalId={} areaId={}",
-                ctx.adminDb,
-                cajaId,
-                scope.sucursalId,
-                areaId,
-            )
+            val areaId = call.parameters["areaId"]?.toIntOrNull()
+            if (areaId == null || areaId <= 0) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "El identificador de área es inválido"),
+                )
+                return@run
+            }
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val scope = call.resolveScopeOrRespond(mesasRepository, database, ctx, cajaId) ?: return@run
+            val plan = mesasRepository.listMesas(database, scope.sucursalId, areaId)
+
+            if (plan == null) {
+                log.warn(
+                    "Área fuera de la sucursal activa. adminDb={} cajaId={} sucursalId={} areaId={}",
+                    ctx.adminDb,
+                    cajaId,
+                    scope.sucursalId,
+                    areaId,
+                )
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    mapOf("error" to AREA_NOT_FOUND),
+                )
+                return@run
+            }
+
             call.respond(
-                HttpStatusCode.NotFound,
-                mapOf("error" to AREA_NOT_FOUND),
+                HttpStatusCode.OK,
+                MesasListResponse(
+                    success = true,
+                    areaId = areaId,
+                    lienzo = plan.lienzo,
+                    imagenUrl = plan.imagenUrl,
+                    data = plan.mesas,
+                ),
             )
-            return@run
         }
-
-        call.respond(
-            HttpStatusCode.OK,
-            MesasListResponse(
-                success = true,
-                areaId = areaId,
-                lienzo = plan.lienzo,
-                imagenUrl = plan.imagenUrl,
-                data = plan.mesas,
-            ),
-        )
-    }
 }
 
 // resolvePosContext, requireCajaId y resolveScopeOrRespond viven en PosRoutingCommon.kt

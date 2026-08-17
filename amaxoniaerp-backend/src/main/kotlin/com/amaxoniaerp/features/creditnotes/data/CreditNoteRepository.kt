@@ -339,152 +339,153 @@ class CreditNoteRepository {
         request: CreateCreditNoteRequest,
         pacResponse: PacResponse,
         numeroDocumentoFiscal: String,
-    ): CreateCreditNoteResponse {
-        val header = CreditNoteHeaderTablePA
-        val headerRow =
-            header
-                .selectAll()
-                .where { header.idDevolucion eq id }
-                .forUpdate()
-                .singleOrNull()
-                ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
+    ): CreateCreditNoteResponse =
+        run {
+            val header = CreditNoteHeaderTablePA
+            val headerRow =
+                header
+                    .selectAll()
+                    .where { header.idDevolucion eq id }
+                    .forUpdate()
+                    .singleOrNull()
+                    ?: throw CreditNoteNotFoundException("Nota de crédito no encontrada")
 
-        val currentStatus =
-            resolveFiscalStatus(
-                headerRow[header.codDevolucionFiscal].orEmpty(),
-                headerRow[header.numeroDocumentoFiscal].orEmpty(),
-            )
-        if (currentStatus == CreditNoteFiscalStatus.CONFIRMADA) {
-            return buildCreationResponse(id, true)
-        }
-        if (currentStatus == CreditNoteFiscalStatus.RECHAZADA) {
-            return buildCreationResponse(id, false, "La nota de crédito ya fue rechazada")
-        }
+            val currentStatus =
+                resolveFiscalStatus(
+                    headerRow[header.codDevolucionFiscal].orEmpty(),
+                    headerRow[header.numeroDocumentoFiscal].orEmpty(),
+                )
+            if (currentStatus == CreditNoteFiscalStatus.CONFIRMADA) {
+                return buildCreationResponse(id, true)
+            }
+            if (currentStatus == CreditNoteFiscalStatus.RECHAZADA) {
+                return buildCreationResponse(id, false, "La nota de crédito ya fue rechazada")
+            }
 
-        val invoiceId = headerRow[header.codFactura]
-        lockInvoiceForCreditNote(invoiceId)
-            ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
-        val invoice =
-            loadInvoiceHeader(invoiceId)
+            val invoiceId = headerRow[header.codFactura]
+            lockInvoiceForCreditNote(invoiceId)
                 ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
-        val client = loadClient(invoice.idCliente)
-        val invoiceLines = loadInvoiceLines("PA", invoice.idFactura)
-        val processedLines = loadPreparedLines(id, invoiceLines)
-        if (processedLines.isEmpty()) {
-            throw CreditNoteValidationException("La nota de crédito no tiene líneas preparadas")
-        }
-        val allReturnedAfterOperation = invoiceLines.all { it.availableQuantity.isEffectivelyZero() }
-        val now = BusinessClock.nowForCountry("PA")
-        val creditNoteDate = headerRow[header.fechaDevolucion]
-        val cajaContext = resolveCajaContext(headerRow[header.idCajaSecuencia] ?: request.idCajaSecuencia)
-        val username = headerRow[header.usuarioCreacion]
-        val reservedDocumentNumber =
-            normalizeFiscalDocumentNumber(
-                headerRow[header.numeroDocumentoFiscal].orEmpty(),
-            )
-        val normalizedDocumentNumber = normalizeFiscalDocumentNumber(numeroDocumentoFiscal)
-        if (normalizedDocumentNumber != reservedDocumentNumber) {
-            throw CreditNoteValidationException("El número fiscal no coincide con la reserva de la nota de crédito")
-        }
-        val cufe = pacResponse.cufe?.trim().orEmpty()
-        if (cufe.isBlank()) {
-            throw CreditNoteValidationException("El PAC aceptó la NC sin CUFE")
-        }
+            val invoice =
+                loadInvoiceHeader(invoiceId)
+                    ?: throw CreditNoteNotFoundException("Factura origen no encontrada")
+            val client = loadClient(invoice.idCliente)
+            val invoiceLines = loadInvoiceLines("PA", invoice.idFactura)
+            val processedLines = loadPreparedLines(id, invoiceLines)
+            if (processedLines.isEmpty()) {
+                throw CreditNoteValidationException("La nota de crédito no tiene líneas preparadas")
+            }
+            val allReturnedAfterOperation = invoiceLines.all { it.availableQuantity.isEffectivelyZero() }
+            val now = BusinessClock.nowForCountry("PA")
+            val creditNoteDate = headerRow[header.fechaDevolucion]
+            val cajaContext = resolveCajaContext(headerRow[header.idCajaSecuencia] ?: request.idCajaSecuencia)
+            val username = headerRow[header.usuarioCreacion]
+            val reservedDocumentNumber =
+                normalizeFiscalDocumentNumber(
+                    headerRow[header.numeroDocumentoFiscal].orEmpty(),
+                )
+            val normalizedDocumentNumber = normalizeFiscalDocumentNumber(numeroDocumentoFiscal)
+            if (normalizedDocumentNumber != reservedDocumentNumber) {
+                throw CreditNoteValidationException("El número fiscal no coincide con la reserva de la nota de crédito")
+            }
+            val cufe = pacResponse.cufe?.trim().orEmpty()
+            if (cufe.isBlank()) {
+                throw CreditNoteValidationException("El PAC aceptó la NC sin CUFE")
+            }
 
-        header.update({ header.idDevolucion eq id }) {
-            it[codDevolucionFiscal] = CONFIRMED_FISCAL_CODE
-            it[header.numeroDocumentoFiscal] = normalizedDocumentNumber
-            it[header.cufe] = cufe
-            pacResponse.qr?.let { value -> it[header.qr] = value }
-            pacResponse.nroProtocoloAutorizacion?.let { value -> it[header.nroProtocoloAutorizacion] = value }
-            parsePacDate(pacResponse.fechaRecepcionDGI)?.let { value -> it[header.fechaRecepcionDGI] = value }
-            parsePacDate(pacResponse.fechaLimite)?.let { value -> it[header.fechaLimite] = value }
-            it[header.informacionInteres] = ""
-        }
+            header.update({ header.idDevolucion eq id }) {
+                it[codDevolucionFiscal] = CONFIRMED_FISCAL_CODE
+                it[header.numeroDocumentoFiscal] = normalizedDocumentNumber
+                it[header.cufe] = cufe
+                pacResponse.qr?.let { value -> it[header.qr] = value }
+                pacResponse.nroProtocoloAutorizacion?.let { value -> it[header.nroProtocoloAutorizacion] = value }
+                parsePacDate(pacResponse.fechaRecepcionDGI)?.let { value -> it[header.fechaRecepcionDGI] = value }
+                parsePacDate(pacResponse.fechaLimite)?.let { value -> it[header.fechaLimite] = value }
+                it[header.informacionInteres] = ""
+            }
 
-        processedLines.forEach { line ->
-            if (line.sourceLine.availableQuantity.isEffectivelyZero()) {
-                CreditNoteFacturaDetalleTable.update(
-                    { CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura },
-                ) {
-                    it[anulado] = true
+            processedLines.forEach { line ->
+                if (line.sourceLine.availableQuantity.isEffectivelyZero()) {
+                    CreditNoteFacturaDetalleTable.update(
+                        { CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura },
+                    ) {
+                        it[anulado] = true
+                    }
                 }
             }
-        }
 
-        CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoice.idFactura }) {
-            it[codEstatus] = ANNULLED_INVOICE_STATUS
-        }
+            CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq invoice.idFactura }) {
+                it[codEstatus] = ANNULLED_INVOICE_STATUS
+            }
 
-        if (allReturnedAfterOperation) {
-            cancelInvoiceAndOriginalCash("PA", invoice.idFactura, username, creditNoteDate, now)
-        } else {
-            registerPartialCreditNoteOnOriginalCash(
-                countryCode = "PA",
-                invoice = invoice,
-                creditNoteId = id,
-                creditNoteCode = headerRow[header.codDevolucion],
-                total = headerRow[header.total],
-                paymentFormId = resolveCreditNotePaymentFormId(),
-                username = username,
-                now = now,
-            )
-        }
-
-        if (request.devolverStock) {
-            restoreInventory(
-                countryCode = "PA",
-                invoice = invoice,
-                creditNoteId = id,
-                creditNoteCode = headerRow[header.codDevolucion],
-                lines = processedLines,
-                username = username,
-                date = creditNoteDate,
-                now = now,
-                idSucursal = cajaContext.idSucursal,
-            )
-        }
-
-        when (request.settlementType) {
-            CreditNoteSettlementType.NINGUNO -> Unit
-            CreditNoteSettlementType.REINTEGRO ->
-                registerRefundCashEgress(
+            if (allReturnedAfterOperation) {
+                cancelInvoiceAndOriginalCash("PA", invoice.idFactura, username, creditNoteDate, now)
+            } else {
+                registerPartialCreditNoteOnOriginalCash(
                     countryCode = "PA",
                     invoice = invoice,
                     creditNoteId = id,
                     creditNoteCode = headerRow[header.codDevolucion],
                     total = headerRow[header.total],
-                    idFormaPago =
-                        request.idFormaPagoReintegro
-                            ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                    paymentFormId = resolveCreditNotePaymentFormId(),
                     username = username,
                     now = now,
-                    date = creditNoteDate,
-                    cajaContext = cajaContext,
                 )
-            CreditNoteSettlementType.ABONO ->
-                registerAbono(
-                    creditNoteId = id,
-                    total = headerRow[header.total],
-                    invoice = invoice,
-                    client = client,
-                    username = username,
-                    now = now,
-                    cajaContext = cajaContext,
-                )
-            CreditNoteSettlementType.CERTIFICADO_REGALO ->
-                registerGiftCertificate(
-                    creditNoteId = id,
-                    total = headerRow[header.total],
-                    client = client,
-                    username = username,
-                    now = now,
-                    cajaContext = cajaContext,
-                )
-        }
+            }
 
-        return buildCreationResponse(id, true)
-    }
+            if (request.devolverStock) {
+                restoreInventory(
+                    countryCode = "PA",
+                    invoice = invoice,
+                    creditNoteId = id,
+                    creditNoteCode = headerRow[header.codDevolucion],
+                    lines = processedLines,
+                    username = username,
+                    date = creditNoteDate,
+                    now = now,
+                    idSucursal = cajaContext.idSucursal,
+                )
+            }
+
+            when (request.settlementType) {
+                CreditNoteSettlementType.NINGUNO -> Unit
+                CreditNoteSettlementType.REINTEGRO ->
+                    registerRefundCashEgress(
+                        countryCode = "PA",
+                        invoice = invoice,
+                        creditNoteId = id,
+                        creditNoteCode = headerRow[header.codDevolucion],
+                        total = headerRow[header.total],
+                        idFormaPago =
+                            request.idFormaPagoReintegro
+                                ?: throw CreditNoteValidationException("Forma de pago de reintegro requerida"),
+                        username = username,
+                        now = now,
+                        date = creditNoteDate,
+                        cajaContext = cajaContext,
+                    )
+                CreditNoteSettlementType.ABONO ->
+                    registerAbono(
+                        creditNoteId = id,
+                        total = headerRow[header.total],
+                        invoice = invoice,
+                        client = client,
+                        username = username,
+                        now = now,
+                        cajaContext = cajaContext,
+                    )
+                CreditNoteSettlementType.CERTIFICADO_REGALO ->
+                    registerGiftCertificate(
+                        creditNoteId = id,
+                        total = headerRow[header.total],
+                        client = client,
+                        username = username,
+                        now = now,
+                        cajaContext = cajaContext,
+                    )
+            }
+
+            return buildCreationResponse(id, true)
+        }
 
     fun markPanamaFiscalStatus(
         id: String,
@@ -854,44 +855,45 @@ class CreditNoteRepository {
     private fun buildSourceInvoiceDetail(
         invoiceId: String,
         countryCode: String,
-    ): CreditNoteSourceInvoiceDetailResponse? {
-        val invoice = loadInvoiceHeader(invoiceId) ?: return null
-        val client = loadClient(invoice.idCliente)
-        val lines = loadInvoiceLines(countryCode, invoiceId)
-        if (lines.isEmpty()) return null
+    ): CreditNoteSourceInvoiceDetailResponse? =
+        run {
+            val invoice = loadInvoiceHeader(invoiceId) ?: return null
+            val client = loadClient(invoice.idCliente)
+            val lines = loadInvoiceLines(countryCode, invoiceId)
+            if (lines.isEmpty()) return null
 
-        val remainingAmount = lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.availableTotalConIva }
+            val remainingAmount = lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.availableTotalConIva }
 
-        val totalOriginal = invoice.totalTotalFactura.toDouble()
-        val totalRef = invoice.totalRef?.toDouble() ?: 0.0
-        val isBs = invoice.moneda.equals("BS", ignoreCase = true) || invoice.moneda.equals("Bs.", ignoreCase = true)
+            val totalOriginal = invoice.totalTotalFactura.toDouble()
+            val totalRef = invoice.totalRef?.toDouble() ?: 0.0
+            val isBs = invoice.moneda.equals("BS", ignoreCase = true) || invoice.moneda.equals("Bs.", ignoreCase = true)
 
-        val totalBs = if (isBs) totalOriginal else totalRef
-        val totalUsd = if (!isBs) totalOriginal else totalRef
+            val totalBs = if (isBs) totalOriginal else totalRef
+            val totalUsd = if (!isBs) totalOriginal else totalRef
 
-        return CreditNoteSourceInvoiceDetailResponse(
-            id = invoice.idFactura,
-            codigo = invoice.codFactura,
-            codigoFiscal = invoice.codFacturaFiscal,
-            numeroDocumentoFiscal = invoice.numeroDocumentoFiscal,
-            fecha = formatDate(invoice.fechaFactura),
-            clienteId = invoice.idCliente,
-            clienteNombre = client.nombreCompleto,
-            clienteIdentificacion = client.identificacion,
-            clienteDireccion = client.direccion,
-            clienteTelefono = client.telefono,
-            codVendedor = invoice.codVendedor,
-            totalOriginal = totalOriginal,
-            subtotalOriginal = invoice.totalizarSubTotal.toDouble(),
-            impuestoOriginal = invoice.totalizarMontoIva.toDouble(),
-            remainingAmount = remainingAmount.toDouble(),
-            moneda = invoice.moneda,
-            tasa = invoice.tasa?.toDouble(),
-            totalBs = totalBs,
-            totalUsd = totalUsd,
-            lines = lines.map { it.toResponseLine() },
-        )
-    }
+            return CreditNoteSourceInvoiceDetailResponse(
+                id = invoice.idFactura,
+                codigo = invoice.codFactura,
+                codigoFiscal = invoice.codFacturaFiscal,
+                numeroDocumentoFiscal = invoice.numeroDocumentoFiscal,
+                fecha = formatDate(invoice.fechaFactura),
+                clienteId = invoice.idCliente,
+                clienteNombre = client.nombreCompleto,
+                clienteIdentificacion = client.identificacion,
+                clienteDireccion = client.direccion,
+                clienteTelefono = client.telefono,
+                codVendedor = invoice.codVendedor,
+                totalOriginal = totalOriginal,
+                subtotalOriginal = invoice.totalizarSubTotal.toDouble(),
+                impuestoOriginal = invoice.totalizarMontoIva.toDouble(),
+                remainingAmount = remainingAmount.toDouble(),
+                moneda = invoice.moneda,
+                tasa = invoice.tasa?.toDouble(),
+                totalBs = totalBs,
+                totalUsd = totalUsd,
+                lines = lines.map { it.toResponseLine() },
+            )
+        }
 
     private fun loadInvoiceHeader(invoiceId: String): InvoiceHeader? {
         val row =
@@ -2096,13 +2098,14 @@ class CreditNoteRepository {
             .firstOrNull(::isValidFiscalValue)
             .orEmpty()
 
-    private fun isValidFiscalValue(value: String): Boolean {
-        val normalized = value.trim()
-        if (normalized.isBlank()) return false
-        if (normalized == PENDING_FISCAL_CODE) return false
-        val digits = normalized.filter(Char::isDigit)
-        return digits.isNotEmpty() && digits.any { it != '0' }
-    }
+    private fun isValidFiscalValue(value: String): Boolean =
+        run {
+            val normalized = value.trim()
+            if (normalized.isBlank()) return false
+            if (normalized == PENDING_FISCAL_CODE) return false
+            val digits = normalized.filter(Char::isDigit)
+            return digits.isNotEmpty() && digits.any { it != '0' }
+        }
 
     private fun parseDate(value: String): LocalDate =
         runCatching { LocalDate.parse(value) }

@@ -95,183 +95,197 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
 internal class ItemsHandlers(
     private val itemsRepository: ItemsRepository,
 ) {
-    suspend fun listar(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
+    suspend fun listar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
-        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-        val search = call.request.queryParameters["search"]
-        val includeTotal = call.request.queryParameters["includeTotal"]?.toBooleanStrictOrNull() ?: true
-        val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+            val search = call.request.queryParameters["search"]
+            val includeTotal = call.request.queryParameters["includeTotal"]?.toBooleanStrictOrNull() ?: true
+            val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
 
-        if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
-            return@run
-        }
-
-        // Conectar a BD de empresa usando Two-Tier routing
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-
-        val (items, total) =
-            itemsRepository.listItems(
-                database = companyDb,
-                countryCode = ctx.countryCode,
-                limit = limit,
-                offset = offset,
-                search = search,
-                includeTotal = includeTotal,
-                departmentId = departmentIdParam,
-            )
-
-        call.respond(ProductsListResponse(data = items, total = total))
-    }
-
-    suspend fun departamentos(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val list = itemsRepository.listDepartments(database = database)
-        call.respondDepartments(list)
-    }
-
-    suspend fun secciones(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val departmentId = call.requireIntQuery("departmentId", "departmentId inválido") ?: return@run
-        val list = itemsRepository.listSections(database = database, departmentId = departmentId)
-        call.respondDepartments(list)
-    }
-
-    suspend fun familias(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val sectionId = call.requireIntQuery("sectionId", "sectionId inválido") ?: return@run
-        val list = itemsRepository.listFamilies(database = database, sectionId = sectionId)
-        call.respondDepartments(list)
-    }
-
-    suspend fun subfamilias(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val familyId = call.requireIntQuery("familyId", "familyId inválido") ?: return@run
-        val list = itemsRepository.listSubFamilies(database = database, familyId = familyId)
-        call.respondDepartments(list)
-    }
-
-    suspend fun marcas(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val list = itemsRepository.listBrands(database = database)
-        call.respondDepartments(list)
-    }
-
-    suspend fun lineas(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val brandId = call.requireIntQuery("brandId", "brandId inválido") ?: return@run
-        val list = itemsRepository.listLines(database = database, brandId = brandId)
-        call.respondDepartments(list)
-    }
-
-    suspend fun masVendidos(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val limit =
-            call.request.queryParameters["limit"]
-                ?.toIntOrNull()
-                ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val quantities = getBestSellerItemQuantities(companyDb, limit)
-        val ids = quantities.map { it.first }
-        val products = itemsRepository.getItemsByIds(companyDb, ctx.countryCode, ids)
-        val productMap = products.associateBy { it.id.toIntOrNull() ?: 0 }
-        val data =
-            quantities.mapNotNull { (id, salesCount) ->
-                productMap[id]?.let { p ->
-                    BestSellerItemResponse(
-                        id = p.id,
-                        name = p.description,
-                        price = p.prices.firstOrNull()?.pricePlusTax ?: 0.0,
-                        salesCount = salesCount.toInt(),
-                        photoUrl = p.photoUrl,
-                    )
-                }
+            if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
+                return@run
             }
-        call.respond(BestSellersApiResponse(data = data))
-    }
 
-    suspend fun crear(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
+            // Conectar a BD de empresa usando Two-Tier routing
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
 
-        val request = call.receive<CreateProductRequest>()
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val (items, total) =
+                itemsRepository.listItems(
+                    database = companyDb,
+                    countryCode = ctx.countryCode,
+                    limit = limit,
+                    offset = offset,
+                    search = search,
+                    includeTotal = includeTotal,
+                    departmentId = departmentIdParam,
+                )
 
-        val product =
-            itemsRepository.createItem(
-                database = companyDb,
-                countryCode = ctx.countryCode,
-                request = request,
-            )
-
-        call.respond(HttpStatusCode.Created, product)
-    }
-
-    suspend fun actualizar(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
-
-        val request = call.receive<CreateProductRequest>()
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-
-        val product =
-            itemsRepository.updateItem(
-                database = companyDb,
-                countryCode = ctx.countryCode,
-                id = id,
-                request = request,
-            )
-        if (product == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
-            return@run
+            call.respond(ProductsListResponse(data = items, total = total))
         }
 
-        call.respond(product)
-    }
-
-    suspend fun detalle(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
-
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-
-        val product =
-            itemsRepository.getItemById(
-                database = companyDb,
-                countryCode = ctx.countryCode,
-                id = id,
-            )
-        if (product == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
-            return@run
+    suspend fun departamentos(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val list = itemsRepository.listDepartments(database = database)
+            call.respondDepartments(list)
         }
 
-        call.respond(product)
-    }
+    suspend fun secciones(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val departmentId = call.requireIntQuery("departmentId", "departmentId inválido") ?: return@run
+            val list = itemsRepository.listSections(database = database, departmentId = departmentId)
+            call.respondDepartments(list)
+        }
 
-    suspend fun lotes(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+    suspend fun familias(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val sectionId = call.requireIntQuery("sectionId", "sectionId inválido") ?: return@run
+            val list = itemsRepository.listFamilies(database = database, sectionId = sectionId)
+            call.respondDepartments(list)
+        }
 
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val lots = itemsRepository.getItemLots(companyDb, id)
-        call.respond(lots)
-    }
+    suspend fun subfamilias(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val familyId = call.requireIntQuery("familyId", "familyId inválido") ?: return@run
+            val list = itemsRepository.listSubFamilies(database = database, familyId = familyId)
+            call.respondDepartments(list)
+        }
 
-    suspend fun stock(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+    suspend fun marcas(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val list = itemsRepository.listBrands(database = database)
+            call.respondDepartments(list)
+        }
 
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
-        call.respond(stock)
-    }
+    suspend fun lineas(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val brandId = call.requireIntQuery("brandId", "brandId inválido") ?: return@run
+            val list = itemsRepository.listLines(database = database, brandId = brandId)
+            call.respondDepartments(list)
+        }
 
-    private suspend fun resolveDatabase(call: ApplicationCall): org.jetbrains.exposed.sql.Database? = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run null
-        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-    }
+    suspend fun masVendidos(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val limit =
+                call.request.queryParameters["limit"]
+                    ?.toIntOrNull()
+                    ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val quantities = getBestSellerItemQuantities(companyDb, limit)
+            val ids = quantities.map { it.first }
+            val products = itemsRepository.getItemsByIds(companyDb, ctx.countryCode, ids)
+            val productMap = products.associateBy { it.id.toIntOrNull() ?: 0 }
+            val data =
+                quantities.mapNotNull { (id, salesCount) ->
+                    productMap[id]?.let { p ->
+                        BestSellerItemResponse(
+                            id = p.id,
+                            name = p.description,
+                            price = p.prices.firstOrNull()?.pricePlusTax ?: 0.0,
+                            salesCount = salesCount.toInt(),
+                            photoUrl = p.photoUrl,
+                        )
+                    }
+                }
+            call.respond(BestSellersApiResponse(data = data))
+        }
+
+    suspend fun crear(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+            val request = call.receive<CreateProductRequest>()
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+            val product =
+                itemsRepository.createItem(
+                    database = companyDb,
+                    countryCode = ctx.countryCode,
+                    request = request,
+                )
+
+            call.respond(HttpStatusCode.Created, product)
+        }
+
+    suspend fun actualizar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+            val request = call.receive<CreateProductRequest>()
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+            val product =
+                itemsRepository.updateItem(
+                    database = companyDb,
+                    countryCode = ctx.countryCode,
+                    id = id,
+                    request = request,
+                )
+            if (product == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
+                return@run
+            }
+
+            call.respond(product)
+        }
+
+    suspend fun detalle(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+            val product =
+                itemsRepository.getItemById(
+                    database = companyDb,
+                    countryCode = ctx.countryCode,
+                    id = id,
+                )
+            if (product == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
+                return@run
+            }
+
+            call.respond(product)
+        }
+
+    suspend fun lotes(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val lots = itemsRepository.getItemLots(companyDb, id)
+            call.respond(lots)
+        }
+
+    suspend fun stock(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
+            call.respond(stock)
+        }
+
+    private suspend fun resolveDatabase(call: ApplicationCall): org.jetbrains.exposed.sql.Database? =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run null
+            DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        }
 
     private suspend fun ApplicationCall.respondDepartments(list: List<Pair<Int, String>>) {
         val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
@@ -281,24 +295,26 @@ internal class ItemsHandlers(
     private suspend fun ApplicationCall.requireIntQuery(
         name: String,
         errorMessage: String,
-    ): Int? = run {
-        val value = request.queryParameters[name]?.toIntOrNull()
-        if (value == null) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
-            return@run null
+    ): Int? =
+        run {
+            val value = request.queryParameters[name]?.toIntOrNull()
+            if (value == null) {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+                return@run null
+            }
+            value
         }
-        value
-    }
 
     private suspend fun ApplicationCall.requireIntParam(
         name: String,
         errorMessage: String,
-    ): Int? = run {
-        val value = parameters[name]?.toIntOrNull()
-        if (value == null) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
-            return@run null
+    ): Int? =
+        run {
+            val value = parameters[name]?.toIntOrNull()
+            if (value == null) {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+                return@run null
+            }
+            value
         }
-        value
-    }
 }

@@ -55,53 +55,55 @@ internal class AssetsHandlers(
 ) {
     private val log = LoggerFactory.getLogger("AssetsRoutes")
 
-    suspend fun servirItem(call: ApplicationCall) = run {
-        val scope = call.resolveAssetScope() ?: return@run
-        val pathSegments = call.parameters.getAll("path") ?: emptyList()
-        val path = pathSegments.joinToString("/")
-        if (path.isBlank() || path.contains("..")) {
-            call.respond(HttpStatusCode.BadRequest, "path inválido")
-            return@run
-        }
-        val filename = path.substringAfterLast('/').ifBlank { path }
-        if (filename.isBlank()) {
-            call.respond(HttpStatusCode.BadRequest, "filename inválido")
-            return@run
+    suspend fun servirItem(call: ApplicationCall) =
+        run {
+            val scope = call.resolveAssetScope() ?: return@run
+            val pathSegments = call.parameters.getAll("path") ?: emptyList()
+            val path = pathSegments.joinToString("/")
+            if (path.isBlank() || path.contains("..")) {
+                call.respond(HttpStatusCode.BadRequest, "path inválido")
+                return@run
+            }
+            val filename = path.substringAfterLast('/').ifBlank { path }
+            if (filename.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, "filename inválido")
+                return@run
+            }
+
+            val localFile = localFile(File(dataBasePath ?: "", "${scope.companyDb}/item/$filename"))
+            if (localFile != null) {
+                call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
+                return@run
+            }
+
+            redirectToAssetsBase(call, scope, "item/$filename")
         }
 
-        val localFile = localFile(File(dataBasePath ?: "", "${scope.companyDb}/item/$filename"))
-        if (localFile != null) {
-            call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
-            return@run
-        }
+    suspend fun servirClienteFoto(call: ApplicationCall) =
+        run {
+            val scope = call.resolveAssetScope() ?: return@run
+            val idCliente =
+                call.parameters["idCliente"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+            if (idCliente == null) {
+                call.respond(HttpStatusCode.BadRequest, "idCliente inválido")
+                return@run
+            }
+            val filename =
+                call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+            if (filename == null) {
+                call.respond(HttpStatusCode.BadRequest, "filename inválido")
+                return@run
+            }
 
-        redirectToAssetsBase(call, scope, "item/$filename")
-    }
+            val localFile =
+                localFile(File(dataBasePath ?: "", "${scope.companyDb}/cliente_foto/$idCliente/$filename"))
+            if (localFile != null) {
+                call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
+                return@run
+            }
 
-    suspend fun servirClienteFoto(call: ApplicationCall) = run {
-        val scope = call.resolveAssetScope() ?: return@run
-        val idCliente =
-            call.parameters["idCliente"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-        if (idCliente == null) {
-            call.respond(HttpStatusCode.BadRequest, "idCliente inválido")
-            return@run
+            redirectToAssetsBase(call, scope, "cliente_foto/$idCliente/$filename")
         }
-        val filename =
-            call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-        if (filename == null) {
-            call.respond(HttpStatusCode.BadRequest, "filename inválido")
-            return@run
-        }
-
-        val localFile =
-            localFile(File(dataBasePath ?: "", "${scope.companyDb}/cliente_foto/$idCliente/$filename"))
-        if (localFile != null) {
-            call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
-            return@run
-        }
-
-        redirectToAssetsBase(call, scope, "cliente_foto/$idCliente/$filename")
-    }
 
     private fun localFile(file: File): File? {
         if (dataBasePath.isNullOrBlank()) return null
@@ -132,19 +134,20 @@ internal class AssetsHandlers(
         call.respondRedirect(redirectUrl, permanent = false)
     }
 
-    private suspend fun ApplicationCall.resolveAssetScope(): AssetRequestScope? = run {
-        val countryCode = parameters["countryCode"]?.takeIf { it.length == 2 }?.uppercase()
-        if (countryCode == null) {
-            respond(HttpStatusCode.BadRequest, "countryCode inválido")
-            return@run null
+    private suspend fun ApplicationCall.resolveAssetScope(): AssetRequestScope? =
+        run {
+            val countryCode = parameters["countryCode"]?.takeIf { it.length == 2 }?.uppercase()
+            if (countryCode == null) {
+                respond(HttpStatusCode.BadRequest, "countryCode inválido")
+                return@run null
+            }
+            val companyDb = parameters["companyDb"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+            if (companyDb == null) {
+                respond(HttpStatusCode.BadRequest, "companyDb inválido")
+                return@run null
+            }
+            AssetRequestScope(countryCode = countryCode, companyDb = companyDb)
         }
-        val companyDb = parameters["companyDb"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-        if (companyDb == null) {
-            respond(HttpStatusCode.BadRequest, "companyDb inválido")
-            return@run null
-        }
-        AssetRequestScope(countryCode = countryCode, companyDb = companyDb)
-    }
 }
 
 private fun contentTypeForFilename(filename: String): ContentType {

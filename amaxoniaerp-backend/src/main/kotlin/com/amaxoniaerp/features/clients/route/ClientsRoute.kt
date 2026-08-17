@@ -41,108 +41,116 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
 internal class ClientsHandlers(
     private val clientsRepository: ClientsRepository,
 ) {
-    suspend fun listar(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
+    suspend fun listar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
-        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-        val search = call.request.queryParameters["search"]
-        val includeTotalParam = call.request.queryParameters["includeTotal"]
-        val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+            val search = call.request.queryParameters["search"]
+            val includeTotalParam = call.request.queryParameters["includeTotal"]
+            val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
 
-        if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid pagination parameters"))
-            return@run
-        }
-        if (includeTotalParam != null && includeTotalParam.toBooleanStrictOrNull() == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid includeTotal parameter"))
-            return@run
-        }
+            if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid pagination parameters"))
+                return@run
+            }
+            if (includeTotalParam != null && includeTotalParam.toBooleanStrictOrNull() == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid includeTotal parameter"))
+                return@run
+            }
 
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
-        call.respond(ClientsListResponse(data = clients, total = total))
-    }
-
-    suspend fun clientePorDefecto(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode)
-        if (defaultClient == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Default client not configured"))
-            return@run
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
+            call.respond(ClientsListResponse(data = clients, total = total))
         }
 
-        call.respond(defaultClient)
-    }
+    suspend fun clientePorDefecto(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-    suspend fun detalle(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val id = call.requireClientId() ?: return@run
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode)
+            if (defaultClient == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Default client not configured"))
+                return@run
+            }
 
-        val client = clientsRepository.getClientById(database, id)
-        if (client == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
-            return@run
+            call.respond(defaultClient)
         }
 
-        call.respond(client)
-    }
+    suspend fun detalle(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val id = call.requireClientId() ?: return@run
 
-    suspend fun sucursales(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-        val id = call.requireClientId() ?: return@run
+            val client = clientsRepository.getClientById(database, id)
+            if (client == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
+                return@run
+            }
 
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val sucursales = clientsRepository.listClientSucursales(companyDb, ctx.countryCode, id)
-        call.respond(sucursales)
-    }
-
-    suspend fun crear(call: ApplicationCall) = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run
-
-        val request = call.receive<CreateClientRequest>()
-        if (request.identification.isBlank() || request.name.isBlank()) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
-            return@run
+            call.respond(client)
         }
 
-        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        val client = clientsRepository.createClient(companyDb, ctx.countryCode, request)
-        call.respond(HttpStatusCode.Created, client)
-    }
+    suspend fun sucursales(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireClientId() ?: return@run
 
-    suspend fun actualizar(call: ApplicationCall) = run {
-        val database = resolveDatabase(call) ?: return@run
-        val id = call.requireClientId() ?: return@run
-
-        val request = call.receive<CreateClientRequest>()
-        if (request.identification.isBlank() || request.name.isBlank()) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
-            return@run
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val sucursales = clientsRepository.listClientSucursales(companyDb, ctx.countryCode, id)
+            call.respond(sucursales)
         }
 
-        val client = clientsRepository.updateClient(database, id, request)
-        if (client == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
-            return@run
+    suspend fun crear(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+            val request = call.receive<CreateClientRequest>()
+            if (request.identification.isBlank() || request.name.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
+                return@run
+            }
+
+            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val client = clientsRepository.createClient(companyDb, ctx.countryCode, request)
+            call.respond(HttpStatusCode.Created, client)
         }
 
-        call.respond(client)
-    }
+    suspend fun actualizar(call: ApplicationCall) =
+        run {
+            val database = resolveDatabase(call) ?: return@run
+            val id = call.requireClientId() ?: return@run
 
-    private suspend fun resolveDatabase(call: ApplicationCall): Database? = run {
-        val ctx = call.resolveCompanyRequestContext() ?: return@run null
-        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-    }
+            val request = call.receive<CreateClientRequest>()
+            if (request.identification.isBlank() || request.name.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
+                return@run
+            }
 
-    private suspend fun ApplicationCall.requireClientId(): String? = run {
-        val id = parameters["id"]
-        if (id == null) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid client id"))
-            return@run null
+            val client = clientsRepository.updateClient(database, id, request)
+            if (client == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
+                return@run
+            }
+
+            call.respond(client)
         }
-        id
-    }
+
+    private suspend fun resolveDatabase(call: ApplicationCall): Database? =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run null
+            DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        }
+
+    private suspend fun ApplicationCall.requireClientId(): String? =
+        run {
+            val id = parameters["id"]
+            if (id == null) {
+                respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid client id"))
+                return@run null
+            }
+            id
+        }
 }

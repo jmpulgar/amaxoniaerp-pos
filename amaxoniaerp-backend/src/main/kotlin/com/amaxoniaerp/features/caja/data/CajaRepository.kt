@@ -1231,28 +1231,29 @@ class CajaRepository {
         tipoMovimiento: String?,
         siglas: String?,
         descripcion: String?,
-    ): PaymentCategory {
-        val normalizedSigla = siglas.orEmpty().trim().uppercase()
-        val normalizedTipo = tipoMovimiento.orEmpty().trim().uppercase()
-        val normalizedDescripcion = descripcion.orEmpty().trim().uppercase()
+    ): PaymentCategory =
+        run {
+            val normalizedSigla = siglas.orEmpty().trim().uppercase()
+            val normalizedTipo = tipoMovimiento.orEmpty().trim().uppercase()
+            val normalizedDescripcion = descripcion.orEmpty().trim().uppercase()
 
-        val isCash =
-            normalizedSigla in CASH_CODES ||
-                normalizedTipo in CASH_CODES ||
-                normalizedDescripcion.contains("EFECTIVO")
-        if (isCash) {
-            return PaymentCategory.CASH
+            val isCash =
+                normalizedSigla in CASH_CODES ||
+                    normalizedTipo in CASH_CODES ||
+                    normalizedDescripcion.contains("EFECTIVO")
+            if (isCash) {
+                return@run PaymentCategory.CASH
+            }
+            val descripcionHints = listOf("TARJETA", "DEBITO", "CREDITO")
+            val isCard =
+                normalizedSigla in CARD_CODES ||
+                    normalizedTipo in CARD_CODES ||
+                    descripcionHints.any { normalizedDescripcion.contains(it) }
+            if (isCard) {
+                return@run PaymentCategory.CARD
+            }
+            PaymentCategory.OTHER
         }
-        val descripcionHints = listOf("TARJETA", "DEBITO", "CREDITO")
-        val isCard =
-            normalizedSigla in CARD_CODES ||
-                normalizedTipo in CARD_CODES ||
-                descripcionHints.any { normalizedDescripcion.contains(it) }
-        if (isCard) {
-            return PaymentCategory.CARD
-        }
-        return PaymentCategory.OTHER
-    }
 
     private enum class PaymentCategory {
         CASH,
