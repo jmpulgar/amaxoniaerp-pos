@@ -31,26 +31,8 @@ class CompanyService(
         val authRepository = AuthRepository(configDatabase)
         val companyRepository = CompanyRepository(configDatabase)
 
-        // Cargar usuario
-        val user =
-            authRepository.loadUserById(userId)
-                ?: throw AuthenticationException("Token inválido o usuario no encontrado")
-
-        // Validar acceso a empresa
-        val companyCodes = parseCompanyCodes(user.companyCodesRaw)
-        if (!companyCodes.contains(companyId)) {
-            throw AuthorizationException("Usuario no tiene acceso a esta empresa")
-        }
-
-        // Cargar configuración de la empresa
-        val company =
-            companyRepository.loadCompanyConfig(companyId)
-                ?: throw NotFoundException("Empresa no encontrada")
-        val rif = companyRepository.loadCompanyRifByAdminDb(company.adminDb, countryCode)
-
-        if (!company.admisActivo) {
-            throw AuthorizationException("Empresa no disponible para POS")
-        }
+        val user = loadAuthorizedUser(authRepository, userId, companyId)
+        val (company, rif) = loadSelectableCompany(companyRepository, companyId, countryCode)
 
         // Crear token de empresa
         val token = createCompanyToken(user, company, countryCode)
@@ -70,6 +52,38 @@ class CompanyService(
             countryCode = countryCode,
             schemaType = getSchemaTypeForCountry(countryCode),
         )
+    }
+
+    private suspend fun loadAuthorizedUser(
+        authRepository: AuthRepository,
+        userId: Int,
+        companyId: Int,
+    ): com.amaxoniaerp.features.auth.domain.UserRecord {
+        val user =
+            authRepository.loadUserById(userId)
+                ?: throw AuthenticationException("Token inválido o usuario no encontrado")
+
+        val companyCodes = parseCompanyCodes(user.companyCodesRaw)
+        if (!companyCodes.contains(companyId)) {
+            throw AuthorizationException("Usuario no tiene acceso a esta empresa")
+        }
+        return user
+    }
+
+    private suspend fun loadSelectableCompany(
+        companyRepository: CompanyRepository,
+        companyId: Int,
+        countryCode: String,
+    ): Pair<CompanyConfig, String?> {
+        val company =
+            companyRepository.loadCompanyConfig(companyId)
+                ?: throw NotFoundException("Empresa no encontrada")
+        val rif = companyRepository.loadCompanyRifByAdminDb(company.adminDb, countryCode)
+
+        if (!company.admisActivo) {
+            throw AuthorizationException("Empresa no disponible para POS")
+        }
+        return company to rif
     }
 
     private fun createCompanyToken(
