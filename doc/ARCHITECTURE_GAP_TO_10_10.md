@@ -232,11 +232,11 @@ Leyenda de estado:
 | TASK-012 AGENTS | CUMPLIDO | Medio | Bajo | 010-011 | Ambos | No. |
 | TASK-020 GitHub Actions Android | CUMPLIDO | Alto | Bajo | 000 | Android | No; mantener gates. |
 | TASK-021 GitHub Actions Backend | CUMPLIDO | Alto | Bajo | 000 | Backend | No como infraestructura; el gate Detekt sigue rojo por deuda. |
-| TASK-022 Static analysis Backend | PENDIENTE | Muy alto | Bajo-Medio | 021 | Backend | **Sí**. 1.415 findings. |
+| TASK-022 Static analysis Backend | PARCIAL (1415→114) | Muy alto | Bajo-Medio | 021 | Backend | **Sí**. 114 findings restantes: LongMethod 50, LongParameterList 19, TooManyFunctions 14, CyclomaticComplexMethod 13, ThrowsCount 11, LargeClass 6, NestedBlockDepth 1. Sin baseline/suppressions. |
 | TASK-023 Coverage ratchets/gates | CUMPLIDO | Alto | Bajo | 020-021 | Ambos | No; completada. |
 | TASK-024 Branch protection | ANULADO | — | — | — | Ambos | **No**. |
 | TASK-025 Repo hygiene | CUMPLIDO | Medio | Bajo | 000 | Ambos | No; completada. |
-| TASK-030 Tenant seam | PENDIENTE | Muy alto | Medio | 040 | Backend | **Sí**. 12 duplicaciones. |
+| TASK-030 Tenant seam | PARCIAL | Muy alto | Medio | 040 | Backend | Seam canónico `core.tenant.CompanyRequestContext` creado y adoptado por todas las rutas; falta guard automatizado. |
 | TASK-031 Error model | PENDIENTE | Muy alto | Medio | 040 | Backend | **Sí**. 10 catches genéricos. |
 | TASK-032 Composition root Backend | PENDIENTE | Muy alto | Medio | 040 | Backend | **Sí**. Wiring híbrido en `Routing.kt`. |
 | TASK-033 Observability | PENDIENTE | Alto | Bajo-Medio | 031-032 | Backend | **Sí**. |

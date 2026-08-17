@@ -495,7 +495,15 @@ backend-build
 
 ### TASK-022 — Static analysis backend
 
-> **ESTADO: PENDIENTE.** Detekt backend permanece en ROJO: `1.415` findings preexistentes (idénticos en HEAD `0d63a45` y tras TASK-023/025 — cero findings nuevos). El saneamiento pertenece al siguiente bloque de deuda técnica. NO se considera Detekt Backend "verde"; no se creó baseline ni suppression alguna.
+> **ESTADO: EN PROGRESO (2026-08-16).** Detekt backend reducido de `1.415` a `114` weighted findings
+> sin baseline, sin `@Suppress`, sin reglas desactivadas y sin cambios de negocio (tests GREEN,
+> ktlint GREEN, JaCoCo ratchet GREEN en cada slice; commits `20aff34..f1ab5ef`).
+> Saneamiento aplicado: MaxLineLength 116→0, TooGenericExceptionCaught 39→0, SwallowedException 2→0,
+> UseCheckOrError/UseRequire 6→0, ComplexCondition 5→0, ReturnCount 25→0, InstanceOfCheckForException 1→0,
+> conversión de routes a handlers + seam canónico de tenant, extracción de pasos en processors FE PA/VE.
+> **PENDIENTE para cerrar:** 50 LongMethod, 19 LongParameterList, 14 TooManyFunctions, 13
+> CyclomaticComplexMethod, 11 ThrowsCount, 6 LargeClass, 1 NestedBlockDepth (repositorios y builders).
+> `.\gradlew.bat build` NO está verde hasta que Detekt llegue a 0.
 
 Agregar Detekt + ktlint.
 No crear baseline masivo permanente.
@@ -552,6 +560,17 @@ No tocar `.env*`.
 ## FASE 3 — BACKEND CORE: TENANCY, ERRORS Y COMPOSITION
 
 ### TASK-030 — Deep tenant seam
+
+> **ESTADO: EN PROGRESO (2026-08-16).** Creado seam canónico `com.amaxoniaerp.core.tenant.CompanyRequestContext`
+> con `resolveCompanyRequestContext`/`requireUserId`/`requireCompanyDbHeader` y extensiones de claims
+> (`getCountryCode`/`getAdminDb`/`getSchemaType`) movidas fuera de features. Migradas todas las rutas
+> backend al seam (sales, caja, credit notes, FE, facturas, items, clients, client-types, geography,
+> pos, promotions, mesas vía `PosCompanyContext` que ahora delega en el seam). Los handlers por feature
+> (`CajaHandlers`, `ClientsHandlers`, `ItemsHandlers`, `FacturasHandlers`, `GeographyHandlers`,
+> `SesionMesaHandlers`, `PedidoMesaHandlers`, `CuentaMesaHandlers`, `MesasHandlers`, `SalesHandlers`,
+> `ElectronicInvoiceHandlers`, `CreditNoteHandlers`, `AssetsHandlers`) eliminan la resolución manual
+> duplicada de JWT/tenant por endpoint. **PENDIENTE para cerrar:** verificación automatizada de
+> duplicación = 0 y architecture test que congele el seam.
 
 Crear concepto canónico:
 
