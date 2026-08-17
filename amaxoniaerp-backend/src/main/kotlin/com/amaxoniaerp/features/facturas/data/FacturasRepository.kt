@@ -331,8 +331,8 @@ class FacturasRepository {
         dbQuery(database) {
             val isPanama = countryCode.equals("PA", ignoreCase = true)
             val isVenezuela = countryCode.equals("VE", ignoreCase = true)
-            if (!isPanama && !isVenezuela) {
-                throw IllegalArgumentException("El payload de impresión solo está disponible para Panamá y Venezuela")
+            require(isPanama || isVenezuela) {
+                "El payload de impresión solo está disponible para Panamá y Venezuela"
             }
             val countrySpecificFields =
                 if (isPanama) {
@@ -496,7 +496,8 @@ class FacturasRepository {
                         ruc = factura.stringOrNull("empresa_ruc"),
                         direccion = null,
                         telefono = null,
-                        tienda = factura.stringOrNull("sucursal_nombre") ?: factura.stringOrNull("sucursal_descripcion"),
+                        tienda =
+                            factura.stringOrNull("sucursal_nombre") ?: factura.stringOrNull("sucursal_descripcion"),
                         caja = factura.stringOrNull("caja_descripcion") ?: factura.stringOrNull("caja_codigo"),
                     ),
                 cliente =

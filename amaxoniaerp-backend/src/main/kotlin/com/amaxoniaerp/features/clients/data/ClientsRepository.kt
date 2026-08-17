@@ -58,7 +58,10 @@ class ClientsRepository {
                     .map { row -> mapRowToClient(row) }
 
             data.take(CLIENT_PHOTO_LOG_SAMPLE_SIZE).forEach { c ->
-                log.info("[CLIENTE FOTO] id=${c.id} photoFilename=${c.photoFilename?.take(PHOTO_FILENAME_LOG_LENGTH) ?: "null"}")
+                log.info(
+                    "[CLIENTE FOTO] id=${c.id} " +
+                        "photoFilename=${c.photoFilename?.take(PHOTO_FILENAME_LOG_LENGTH) ?: "null"}",
+                )
             }
             data to total
         }

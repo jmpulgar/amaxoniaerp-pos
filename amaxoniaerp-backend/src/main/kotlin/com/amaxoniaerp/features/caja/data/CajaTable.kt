@@ -72,15 +72,30 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
             S.DECIMAL_PRECISION_10,
             2,
         ).default(java.math.BigDecimal.ZERO)
-    val montoEfectivoVentas = decimal("monto_efectivo_ventas", S.DECIMAL_PRECISION_10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoVentas =
+        decimal(
+            "monto_efectivo_ventas",
+            S.DECIMAL_PRECISION_10,
+            2,
+        ).default(java.math.BigDecimal.ZERO)
     val montoEfectivoEntrada =
         decimal(
             "monto_efectivo_entrada",
             S.DECIMAL_PRECISION_10,
             2,
         ).default(java.math.BigDecimal.ZERO)
-    val montoEfectivoSalida = decimal("monto_efectivo_salida", S.DECIMAL_PRECISION_10, 2).default(java.math.BigDecimal.ZERO)
-    val montoEfectivoTotal = decimal("monto_efectivo_total", S.DECIMAL_PRECISION_10, 2).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoSalida =
+        decimal(
+            "monto_efectivo_salida",
+            S.DECIMAL_PRECISION_10,
+            2,
+        ).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoTotal =
+        decimal(
+            "monto_efectivo_total",
+            S.DECIMAL_PRECISION_10,
+            2,
+        ).default(java.math.BigDecimal.ZERO)
     val montoEfectivoCierre =
         decimal(
             "monto_efectivo_cierre",
@@ -116,7 +131,10 @@ object CajaSecuenciaTable : Table("caja_secuencia") {
     val observacionApertura = varchar("observacion_apertura", S.VARCHAR_LENGTH_300).default("")
     val observacionCierre = varchar("observacion_cierre", S.VARCHAR_LENGTH_300).default("")
     val usuarioContabilizacion = varchar("usuario_contabilizacion", S.VARCHAR_LENGTH_50).default("")
-    val fechaContabilizacion = datetime("fecha_contabilizacion").defaultExpression(org.jetbrains.exposed.sql.javatime.CurrentDateTime)
+    val fechaContabilizacion =
+        datetime(
+            "fecha_contabilizacion",
+        ).defaultExpression(org.jetbrains.exposed.sql.javatime.CurrentDateTime)
 
     override val primaryKey = PrimaryKey(idCajaSecuencia)
 }

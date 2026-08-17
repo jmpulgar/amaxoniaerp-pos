@@ -256,8 +256,10 @@ private suspend fun respondAbrir(
     result: SesionMesaResult,
 ) {
     when (result) {
-        is SesionMesaResult.Opened -> call.respond(HttpStatusCode.Created, AbrirSesionResponse(true, sesion = result.sesion))
-        SesionMesaResult.SesionYaAbierta -> call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_SESSION_ALREADY_OPEN))
+        is SesionMesaResult.Opened ->
+            call.respond(HttpStatusCode.Created, AbrirSesionResponse(true, sesion = result.sesion))
+        SesionMesaResult.SesionYaAbierta ->
+            call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_SESSION_ALREADY_OPEN))
         SesionMesaResult.AreaNoPerteneceSucursal ->
             call.respond(
                 HttpStatusCode.NotFound,
@@ -280,10 +282,14 @@ private suspend fun respondMutacion(
     result: SesionMesaResult,
 ) {
     when (result) {
-        is SesionMesaResult.Closed -> call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
-        is SesionMesaResult.Cancelled -> call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
-        SesionMesaResult.SesionNoEncontrada -> call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_NOT_FOUND))
-        SesionMesaResult.SesionYaFinalizada -> call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_SESSION_CLOSED))
+        is SesionMesaResult.Closed ->
+            call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
+        is SesionMesaResult.Cancelled ->
+            call.respond(HttpStatusCode.OK, SesionMutacionResponse(true, sesion = result.sesion))
+        SesionMesaResult.SesionNoEncontrada ->
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_SESSION_NOT_FOUND))
+        SesionMesaResult.SesionYaFinalizada ->
+            call.respond(HttpStatusCode.Conflict, mapOf("error" to ERR_SESSION_CLOSED))
         SesionMesaResult.SesionConOperaciones ->
             call.respond(
                 HttpStatusCode.Conflict,

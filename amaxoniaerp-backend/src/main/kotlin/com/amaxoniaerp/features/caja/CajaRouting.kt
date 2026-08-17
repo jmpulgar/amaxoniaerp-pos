@@ -185,7 +185,10 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
                         call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                     },
                     onFailure = { error ->
-                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: ERR_CALCULATE_SEQUENCE)))
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (error.message ?: ERR_CALCULATE_SEQUENCE)),
+                        )
                     },
                 )
             }

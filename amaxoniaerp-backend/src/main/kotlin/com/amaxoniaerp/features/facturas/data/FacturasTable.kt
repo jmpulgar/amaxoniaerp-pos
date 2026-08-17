@@ -18,7 +18,8 @@ abstract class BaseFacturasTable(
     val fechaFactura = varchar("fechaFactura", S.VARCHAR_LENGTH_20).nullable()
     val fechaCreacion = varchar("fecha_creacion", S.VARCHAR_LENGTH_25).nullable()
     val totalTotalFactura = decimal("TotalTotalFactura", S.DECIMAL_PRECISION_10, 2).default(0.0.toBigDecimal())
-    val totalizarTotalGeneral = decimal("totalizar_total_general", S.DECIMAL_PRECISION_10, 2).default(0.0.toBigDecimal())
+    val totalizarTotalGeneral =
+        decimal("totalizar_total_general", S.DECIMAL_PRECISION_10, 2).default(0.0.toBigDecimal())
     val formaPago = varchar("formapago", S.VARCHAR_LENGTH_20)
     val tipoFactura = varchar("tipo_factura", S.VARCHAR_LENGTH_50)
     val usuarioCreacion = varchar("usuario_creacion", S.VARCHAR_LENGTH_40)

@@ -92,7 +92,8 @@ class VenezuelaInvoiceStrategy(
         when (alreadyIssued) {
             is AlreadyIssuedResult.Complete -> {
                 log.info(
-                    "[VE-FE] factura {} ya emitida (Complete) numeroDocumentoFiscal={} numero_control_thka={}. No se llama HKA.",
+                    "[VE-FE] factura {} ya emitida (Complete) numeroDocumentoFiscal={} numero_control_thka={}. " +
+                        "No se llama HKA.",
                     invoiceId,
                     alreadyIssued.numeroDocumentoFiscal,
                     alreadyIssued.numeroControl,
@@ -106,7 +107,8 @@ class VenezuelaInvoiceStrategy(
             is AlreadyIssuedResult.Partial -> {
                 // OR semántico: aun con un sólo campo presente NO se debe reemitir.
                 log.warn(
-                    "[VE-FE] factura {} con datos fiscales parciales numeroDocumentoFiscal={} numero_control_thka={}. " +
+                    "[VE-FE] factura {} con datos fiscales parciales numeroDocumentoFiscal={} " +
+                        "numero_control_thka={}. " +
                         "Reemisión Bloqueada: requiere reconciliación manual.",
                     invoiceId,
                     alreadyIssued.numeroDocumentoFiscal,
@@ -224,10 +226,16 @@ class VenezuelaInvoiceStrategy(
                 repository.reserveAtLeast(database, minimumNextNumber = minimumNextNumber)
             } catch (e: FEConfigurationException) {
                 log.error("[VE-FE] no se pudo reservar correlativo factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("CORRELATIVO_CONFIG", e.message ?: "Configuración correlativo inválida")
+                return ElectronicInvoiceResult.Failure(
+                    "CORRELATIVO_CONFIG",
+                    e.message ?: "Configuración correlativo inválida",
+                )
             } catch (e: Exception) {
                 log.error("[VE-FE] fallo inesperado reservando correlativo factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("CORRELATIVO_LOCK", e.message ?: "No se pudo reservar correlativo")
+                return ElectronicInvoiceResult.Failure(
+                    "CORRELATIVO_LOCK",
+                    e.message ?: "No se pudo reservar correlativo",
+                )
             }
 
         // 8. Número efectivo final = número reservado (YA respeta max(local, remoto+1)).
@@ -261,17 +269,19 @@ class VenezuelaInvoiceStrategy(
                     token = token,
                     payload = payload,
                 )
-            } catch (e: VenezuelaHkaClientException) {
-                // Timeout/incertidumbre: NO persistir, NO marcar exitoso, NO reintentar.
-                log.error(
-                    "[VE-FE] TIMEOUT/RED en Emision factura={} numeroFinal={}. NO se persiste nada.",
-                    invoiceId,
-                    numeroFinal,
-                    e,
-                )
+            } catch (e: VenezuelaHkaClientException.Timeout) {
+                logEmisionUncertain(invoiceId, numeroFinal, e)
                 return ElectronicInvoiceResult.Uncertain(
                     country = countryCode,
-                    codigo = if (e is VenezuelaHkaClientException.Timeout) "EMISION_TIMEOUT" else "EMISION_NET_ERROR",
+                    codigo = "EMISION_TIMEOUT",
+                    mensaje = (e.message ?: "Respuesta incierta del PAC VE"),
+                    transaccionId = payload.documento.datosTransaccion.transaccionId,
+                )
+            } catch (e: VenezuelaHkaClientException) {
+                logEmisionUncertain(invoiceId, numeroFinal, e)
+                return ElectronicInvoiceResult.Uncertain(
+                    country = countryCode,
+                    codigo = "EMISION_NET_ERROR",
                     mensaje = (e.message ?: "Respuesta incierta del PAC VE"),
                     transaccionId = payload.documento.datosTransaccion.transaccionId,
                 )
@@ -376,6 +386,20 @@ class VenezuelaInvoiceStrategy(
             // Venezuela digital: valores efectivamente persistidos en factura.
             numeroDocumentoFiscal = persisted.numeroDocumentoFiscal,
             numeroControlThka = persisted.numeroControlThka,
+        )
+    }
+
+    // Timeout/incertidumbre: NO persistir, NO marcar exitoso, NO reintentar.
+    private fun logEmisionUncertain(
+        invoiceId: String,
+        numeroFinal: String,
+        e: VenezuelaHkaClientException,
+    ) {
+        log.error(
+            "[VE-FE] TIMEOUT/RED en Emision factura={} numeroFinal={}. NO se persiste nada.",
+            invoiceId,
+            numeroFinal,
+            e,
         )
     }
 

@@ -79,30 +79,23 @@ private fun loadDotEnv(file: File): Map<String, String> {
 
             val key = trimmed.substring(0, separatorIndex).trim()
             var value = trimmed.substring(separatorIndex + 1).trim()
-            if (
-                (value.startsWith("\"") && value.endsWith("\"")) ||
-                (value.startsWith("'") && value.endsWith("'"))
-            ) {
+            val isDoubleQuoted = value.startsWith("\"") && value.endsWith("\"")
+            val isSingleQuoted = value.startsWith("'") && value.endsWith("'")
+            if (isDoubleQuoted || isSingleQuoted) {
                 value = value.substring(1, value.length - 1)
             }
             key to value
         }.toMap()
 }
 
-private fun findDotEnvFile(): File? {
-    val cwd = File(System.getProperty("user.dir"))
-    val direct = File(".env")
-    if (direct.exists()) return direct
-    val development = File(".env.development")
-    if (development.exists()) return development
-
-    var current: File? = cwd
-    repeat(DOTENV_SEARCH_PARENT_LEVELS) {
-        val candidate = File(current, ".env")
-        if (candidate.exists()) return candidate
-        val devCandidate = File(current, ".env.development")
-        if (devCandidate.exists()) return devCandidate
-        current = current?.parentFile
-    }
-    return null
-}
+private fun findDotEnvFile(): File? =
+    sequence {
+        yield(File(".env"))
+        yield(File(".env.development"))
+        var current: File? = File(System.getProperty("user.dir"))
+        repeat(DOTENV_SEARCH_PARENT_LEVELS) {
+            yield(File(current, ".env"))
+            yield(File(current, ".env.development"))
+            current = current?.parentFile
+        }
+    }.firstOrNull { it.exists() }

@@ -74,7 +74,8 @@ class ItemsRepository {
                                 almacenTipo = result.getString("almacenTipo"),
                                 cantidad = result.getBigDecimal("cantidad").toSafeDouble(),
                                 cantidadMuestra = result.getBigDecimal("cantidadMuestra").toSafeDouble(),
-                                cantidadPrecomprometida = result.getBigDecimal("cantidadPrecomprometida").toSafeDouble(),
+                                cantidadPrecomprometida =
+                                    result.getBigDecimal("cantidadPrecomprometida").toSafeDouble(),
                                 cantidadDisponible = result.getBigDecimal("cantidadDisponible").toSafeDouble(),
                                 stockMinimo = result.getBigDecimal("stockMinimo").toSafeDouble(),
                                 stockMaximo = result.getBigDecimal("stockMaximo").toSafeDouble(),

@@ -50,7 +50,9 @@ data class CountryDbConfig(
 ) {
     fun buildConfigJdbcUrl(): String = "jdbc:mysql://$host:$port/$configDbName?${mysqlJdbcQueryString(countryCode)}"
 
-    fun buildCompanyJdbcUrl(companyDbName: String): String = "jdbc:mysql://$host:$port/$companyDbName?${mysqlJdbcQueryString(countryCode)}"
+    fun buildCompanyJdbcUrl(companyDbName: String): String =
+        "jdbc:mysql://$host:$port/$companyDbName" +
+            "?${mysqlJdbcQueryString(countryCode)}"
 }
 
 /**

@@ -154,7 +154,10 @@ class TheFactoryHkaRestClient(
     ): Result<TheFactoryEnviarCorreoResponse> =
         runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/EnvioCorreo"
-            logger.info("Enviando factura electrónica por correo desde The Factory HKA. CUFE={}", cufe.take(CUFE_LOG_PREFIX_LENGTH))
+            logger.info(
+                "Enviando factura electrónica por correo desde The Factory HKA. CUFE={}",
+                cufe.take(CUFE_LOG_PREFIX_LENGTH),
+            )
 
             val response: HttpResponse =
                 httpClient.post(url) {

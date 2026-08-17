@@ -105,7 +105,8 @@ open class ProcessSaleTransactionalRepository(
         insertFacturaDetalleFormaPago(preparedRequest, invoiceId, now, monetaryContext, creditDecision)
 
         val shouldAffectInventory =
-            (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) && !preparedRequest.esCobroCreditoPrevio
+            (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) &&
+                !preparedRequest.esCobroCreditoPrevio
         if (shouldAffectInventory) {
             updateInventoryAndKardex(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext)
             insertCajaEntries(preparedRequest, invoiceId, invoiceCode, now, today, monetaryContext, creditDecision)
@@ -330,7 +331,10 @@ open class ProcessSaleTransactionalRepository(
             request.factura.formaPago
                 .trim()
                 .lowercase()
-        val isCredit = formaPagoSolicitada == "credito" || totalCxc > BigDecimal.ZERO || saldoDeclarado > BigDecimal.ZERO
+        val isCredit =
+            formaPagoSolicitada == "credito" ||
+                totalCxc > BigDecimal.ZERO ||
+                saldoDeclarado > BigDecimal.ZERO
 
         if (totalGeneral < BigDecimal.ZERO || pagos.any { (_, amount) -> amount < BigDecimal.ZERO }) {
             throw InvalidSaleRequestException("Los montos de la venta no pueden ser negativos")
@@ -444,8 +448,10 @@ open class ProcessSaleTransactionalRepository(
         val idTasaFromRequest = providedMoneda?.idTasa?.takeIf { it > 0 }
 
         val tasasTable = TasasCambioTableFactory.forCountry(countryCode)
+        val faltaParametrosTasa =
+            paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null)
         val tasaRow =
-            if (paramsMulti && (tasaFromRequest == null || idTasaFromRequest == null) && tasasTable is TasasCambioTableVE) {
+            if (faltaParametrosTasa && tasasTable is TasasCambioTableVE) {
                 tasasTable
                     .select(tasasTable.id, tasasTable.tasaInversa)
                     .where {
@@ -791,7 +797,8 @@ open class ProcessSaleTransactionalRepository(
             it[facturaTable.usuarioCreacion] = f.usuarioCreacion
             it[facturaTable.tipoFactura] = "factura_pos"
             it[facturaTable.modeloFactura] = "pos"
-            it[facturaTable.terminoPagoId] = monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: DEFAULT_TERM_PAYMENT_ID
+            it[facturaTable.terminoPagoId] =
+                monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: DEFAULT_TERM_PAYMENT_ID
             it[facturaTable.facturarA] = f.facturarA
             it[facturaTable.facturarARuc] = f.facturarARuc
             it[facturaTable.facturarADireccion] = f.facturarADireccion
@@ -1204,7 +1211,9 @@ open class ProcessSaleTransactionalRepository(
         val clienteNombre = request.factura.facturarA.ifBlank { "CLIENTE MOSTRADOR" }
         val fechaTexto = today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
         val montoTexto = totalBase.setScale(2, RoundingMode.HALF_UP).toPlainString()
-        val conceptoCaja = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre, Monto: $montoTexto."
+        val conceptoCaja =
+            "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, " +
+                "Cliente: $clienteNombre, Monto: $montoTexto."
 
         val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(monetaryContext.countryCode)
         val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(monetaryContext.countryCode)
@@ -1246,7 +1255,9 @@ open class ProcessSaleTransactionalRepository(
             it[cajaReciboTable.nroRecibo] = "FACT/$invoiceCode"
             it[cajaReciboTable.fecha] = today
             it[cajaReciboTable.monto] = totalBase
-            it[cajaReciboTable.observacion] = "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, Cliente: $clienteNombre"
+            it[cajaReciboTable.observacion] =
+                "Ingreso por Factura #$invoiceCode, Fecha: $fechaTexto, " +
+                "Cliente: $clienteNombre"
             it[cajaReciboTable.codVendedor] = request.factura.codVendedor
             it[cajaReciboTable.idCliente] = request.factura.idCliente
             it[cajaReciboTable.idProveedor] = ""
@@ -1361,5 +1372,6 @@ open class ProcessSaleTransactionalRepository(
 
     private fun Double.toMoney(): BigDecimal = toScaledBigDecimal(2)
 
-    private fun Double.toScaledBigDecimal(scale: Int): BigDecimal = BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
+    private fun Double.toScaledBigDecimal(scale: Int): BigDecimal =
+        BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
 }

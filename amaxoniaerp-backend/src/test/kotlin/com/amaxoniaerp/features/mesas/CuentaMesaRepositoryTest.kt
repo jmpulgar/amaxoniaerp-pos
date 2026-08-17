@@ -357,7 +357,11 @@ class CuentaMesaRepositoryTest {
             // La cantidad_facturada del pedido habría de quedar en 2.0
             val facturada =
                 transaction(database) {
-                    PedidoMesaTable.selectAll().where { PedidoMesaTable.id eq ped }.single()[PedidoMesaTable.cantidadFacturada]
+                    PedidoMesaTable
+                        .selectAll()
+                        .where {
+                            PedidoMesaTable.id eq ped
+                        }.single()[PedidoMesaTable.cantidadFacturada]
                 }
             assertEquals(0, facturada.compareTo(BigDecimal("2.000")))
         }
@@ -405,7 +409,11 @@ class CuentaMesaRepositoryTest {
             // La cantidad_facturada sigue siendo 2.0 (no 4.0)
             val facturada =
                 transaction(database) {
-                    PedidoMesaTable.selectAll().where { PedidoMesaTable.id eq ped }.single()[PedidoMesaTable.cantidadFacturada]
+                    PedidoMesaTable
+                        .selectAll()
+                        .where {
+                            PedidoMesaTable.id eq ped
+                        }.single()[PedidoMesaTable.cantidadFacturada]
                 }
             assertEquals(0, facturada.compareTo(BigDecimal("2.000")))
         }
@@ -442,7 +450,11 @@ class CuentaMesaRepositoryTest {
 
             val estado =
                 transaction(database) {
-                    SesionMesaTable.selectAll().where { SesionMesaTable.id eq sesionId }.single()[SesionMesaTable.estado]
+                    SesionMesaTable
+                        .selectAll()
+                        .where {
+                            SesionMesaTable.id eq sesionId
+                        }.single()[SesionMesaTable.estado]
                 }
             assertEquals(EstadoSesionMesa.CERRADA_PAGADA.codigo, estado)
         }
@@ -604,7 +616,11 @@ class CuentaMesaRepositoryTest {
             }
             val facturada =
                 transaction(database) {
-                    PedidoMesaTable.selectAll().where { PedidoMesaTable.id eq pedido }.single()[PedidoMesaTable.cantidadFacturada]
+                    PedidoMesaTable
+                        .selectAll()
+                        .where {
+                            PedidoMesaTable.id eq pedido
+                        }.single()[PedidoMesaTable.cantidadFacturada]
                 }
             assertEquals(0, facturada.compareTo(BigDecimal.ZERO))
         }

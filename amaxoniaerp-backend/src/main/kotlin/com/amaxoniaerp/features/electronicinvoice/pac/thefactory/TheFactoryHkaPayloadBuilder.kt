@@ -92,7 +92,12 @@ class TheFactoryHkaPayloadBuilder {
         // En modo "02" el flujo legacy usa la fecha actual y motivo fijo.
         val esContingencia = config.tipoEmision == "02" || config.tipoEmision == "04"
         val fechaInicioContingencia = if (config.tipoEmision == "02") fechaEmision else config.fechaInicioContingencia
-        val motivoContingencia = if (config.tipoEmision == "02") "Problemas de comunicación interna." else config.motivoContingencia
+        val motivoContingencia =
+            if (config.tipoEmision == "02") {
+                "Problemas de comunicación interna."
+            } else {
+                config.motivoContingencia
+            }
 
         return TheFactoryHkaDatosTransaccion(
             tipoEmision = config.tipoEmision,
@@ -194,7 +199,8 @@ class TheFactoryHkaPayloadBuilder {
                     det.descripcion
                 }
             val codigoCPBS = if (esGobierno) det.codigoCPBS?.takeIf { it.isNotBlank() } else DEFAULT_CPBS
-            val codigoCPBSAbrev = if (esGobierno) det.codigoCPBSAbrev?.takeIf { it.isNotBlank() } else DEFAULT_CPBS_ABREV
+            val codigoCPBSAbrev =
+                if (esGobierno) det.codigoCPBSAbrev?.takeIf { it.isNotBlank() } else DEFAULT_CPBS_ABREV
 
             // Tasa ITBMS: mapear porcentaje a código catálogo
             val tasaITBMS = mapTasaITBMS(det.piva)
@@ -218,8 +224,10 @@ class TheFactoryHkaPayloadBuilder {
             val valorISC = det.importeIsc?.takeIf { it > 0 }?.formatDecimals(2)
 
             // OTI
+            val hasValidOti = det.idOti != null && det.idOti > 0
+            val hasImporteOti = det.importeOti != null && det.importeOti > 0
             val listaOTI =
-                if (det.idOti != null && det.idOti > 0 && det.importeOti != null && det.importeOti > 0) {
+                if (hasValidOti && hasImporteOti) {
                     listOf(
                         TheFactoryHkaItemOTI(
                             tasaOTI = det.idOti.toString(),
@@ -299,7 +307,8 @@ class TheFactoryHkaPayloadBuilder {
                     if (it > 0) it.formatDecimals(2) else "0.00"
                 },
             totalFactura = factura.totalTotalFactura.formatDecimals(2),
-            totalValorRecibido = ((ctx.montoCancelar ?: factura.totalTotalFactura) + (ctx.vuelto ?: 0.0)).formatDecimals(2),
+            totalValorRecibido =
+                ((ctx.montoCancelar ?: factura.totalTotalFactura) + (ctx.vuelto ?: 0.0)).formatDecimals(2),
             vuelto = ctx.vuelto?.formatDecimals(2),
             tiempoPago = tiempoPago,
             nroItems = ctx.detalles.size.toString(),
@@ -311,7 +320,9 @@ class TheFactoryHkaPayloadBuilder {
         )
     }
 
-    private fun buildRetencion(retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?): TheFactoryHkaRetencion? =
+    private fun buildRetencion(
+        retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?,
+    ): TheFactoryHkaRetencion? =
         retencion?.let {
             TheFactoryHkaRetencion(
                 codigoRetencion = it.codigoRetencion,
@@ -370,7 +381,9 @@ class TheFactoryHkaPayloadBuilder {
     private fun buildTotalOTI(detalles: List<FEDetalleData>): List<TheFactoryHkaTotalOTI>? {
         val otiMap = mutableMapOf<Int, Double>()
         for (det in detalles) {
-            if (det.idOti != null && det.idOti > 0 && det.importeOti != null && det.importeOti > 0) {
+            val hasValidOti = det.idOti != null && det.idOti > 0
+            val hasImporteOti = det.importeOti != null && det.importeOti > 0
+            if (hasValidOti && hasImporteOti) {
                 otiMap[det.idOti] = (otiMap[det.idOti] ?: 0.0) + det.importeOti
             }
         }

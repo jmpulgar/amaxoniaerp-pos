@@ -406,12 +406,9 @@ private fun Parameters.toFacturasFilter(): Result<FacturasFilter> =
         val fechaFin = this["fecha_fin"]?.let(::parseFacturasDate)
         val sucursalValue = this["sucursal_id"]?.takeIf(String::isNotBlank)
         val sucursalId =
-            sucursalValue?.toIntOrNull()
-                ?: if (sucursalValue != null) {
-                    throw IllegalArgumentException("Invalid sucursal_id")
-                } else {
-                    null
-                }
+            sucursalValue?.let { value ->
+                requireNotNull(value.toIntOrNull()) { "Invalid sucursal_id" }
+            }
         val estatusList =
             this["estatus"]
                 ?.takeIf(String::isNotBlank)

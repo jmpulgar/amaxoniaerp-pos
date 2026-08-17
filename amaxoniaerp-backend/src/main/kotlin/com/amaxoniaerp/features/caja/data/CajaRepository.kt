@@ -92,9 +92,14 @@ class CajaRepository {
                         idCajaSecuencia = row[CajaSecuenciaTable.idCajaSecuencia],
                         idCaja = row[CajaSecuenciaTable.idCaja],
                         fechaApertura =
-                            row[CajaSecuenciaTable.fechaApertura]?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) ?: "",
+                            row[CajaSecuenciaTable.fechaApertura]?.format(
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+                            ) ?: "",
                         montoApertura = row[CajaSecuenciaTable.montoEfectivoApertura].toDouble(),
-                        fechaCierre = row[CajaSecuenciaTable.fechaCierre]?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                        fechaCierre =
+                            row[CajaSecuenciaTable.fechaCierre]?.format(
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+                            ),
                         montoCierre = row[CajaSecuenciaTable.montoEfectivoCierre]?.toDouble(),
                         estatus = if (row[CajaSecuenciaTable.fechaCierre] == null) 1 else 0,
                         usuarioApertura = row[CajaSecuenciaTable.usuario] ?: "",
@@ -172,7 +177,7 @@ class CajaRepository {
             Result.success(Unit)
         }.mapCatching {
             getCajaStatus(countryCode, dbName, request.idCaja)
-                ?: throw Exception("Failed to retrieve open caja.")
+                ?: error("Failed to retrieve open caja.")
         }
     }
 
@@ -271,7 +276,7 @@ class CajaRepository {
                         .where { CajaSecuenciaTable.idCajaSecuencia eq idSecuencia }
                         .limit(1)
                         .firstOrNull()
-                        ?: throw IllegalStateException("Secuencia de caja no encontrada")
+                        ?: error("Secuencia de caja no encontrada")
 
                 val idCaja = secuenciaRow[CajaSecuenciaTable.idCaja]
                 val idVendedor = secuenciaRow[CajaSecuenciaTable.idVendedor]
@@ -425,7 +430,9 @@ class CajaRepository {
                             devolucionRows
                                 .groupBy { it[FacturaDevolucionTable.idFormaPago] ?: RETURN_PAYMENT_FORM_FALLBACK }
                                 .mapValues { (_, rows) ->
-                                    rows.sumOf { row -> row[FacturaDevolucionTable.totalTotalFactura]?.toDouble() ?: 0.0 }
+                                    rows.sumOf { row ->
+                                        row[FacturaDevolucionTable.totalTotalFactura]?.toDouble() ?: 0.0
+                                    }
                                 }
 
                         if (devolucionesPorForma.isEmpty()) {
@@ -434,8 +441,11 @@ class CajaRepository {
                             val ids = devolucionesPorForma.keys.toList()
                             val meta =
                                 CajaFormaPagoTable
-                                    .select(CajaFormaPagoTable.idFormaPago, CajaFormaPagoTable.siglas, CajaFormaPagoTable.descripcion)
-                                    .where { CajaFormaPagoTable.idFormaPago inList ids }
+                                    .select(
+                                        CajaFormaPagoTable.idFormaPago,
+                                        CajaFormaPagoTable.siglas,
+                                        CajaFormaPagoTable.descripcion,
+                                    ).where { CajaFormaPagoTable.idFormaPago inList ids }
                                     .associateBy { it[CajaFormaPagoTable.idFormaPago] }
 
                             devolucionesPorForma.map { (idForma, monto) ->
@@ -534,7 +544,8 @@ class CajaRepository {
                             val available = stockDisponible[itemId] ?: 0.0
                             CajaInventarioItem(
                                 codigo = first[SalesFacturaDetalleTable.itemCodigo].ifBlank { itemId.toString() },
-                                descripcion = first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
+                                descripcion =
+                                    first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
                                 existenciaInicial = available + sold,
                                 cantidadVendida = sold,
                                 existenciaDisponible = available,
@@ -645,10 +656,10 @@ class CajaRepository {
                         .where { CajaSecuenciaTable.idCajaSecuencia eq request.id }
                         .limit(1)
                         .firstOrNull()
-                        ?: throw IllegalStateException("Secuencia de caja no encontrada")
+                        ?: error("Secuencia de caja no encontrada")
 
                 if (secuenciaRow[CajaSecuenciaTable.fechaCierre] != null) {
-                    throw IllegalStateException("La secuencia de caja ya se encuentra cerrada")
+                    error("La secuencia de caja ya se encuentra cerrada")
                 }
 
                 if (validateFacturasTemporales) {
@@ -662,7 +673,7 @@ class CajaRepository {
                             }.count { row -> !row[facturaTable.formaPago].equals("credito", ignoreCase = true) }
 
                     if (temporales > 0) {
-                        throw IllegalStateException("Existen facturas temporales pendientes por procesar")
+                        error("Existen facturas temporales pendientes por procesar")
                     }
                 }
 
@@ -688,7 +699,9 @@ class CajaRepository {
                 }
 
                 CajaDetalleCierreTable.deleteWhere { CajaDetalleCierreTable.idSecuencia eq request.id }
-                CajaDetalleCierreFormaPagoTable.deleteWhere { CajaDetalleCierreFormaPagoTable.idSecuencia eq request.id }
+                CajaDetalleCierreFormaPagoTable.deleteWhere {
+                    CajaDetalleCierreFormaPagoTable.idSecuencia eq request.id
+                }
 
                 request.detalle
                     .filter { it.cantidad > 0 }
@@ -793,7 +806,8 @@ class CajaRepository {
                         CajaFormaPagoTable.descripcion,
                     ).toList()
                     .associate { row ->
-                        row[CajaFormaPagoTable.idFormaPago] to (row[CajaFormaPagoTable.siglas] to row[CajaFormaPagoTable.descripcion])
+                        row[CajaFormaPagoTable.idFormaPago] to
+                            (row[CajaFormaPagoTable.siglas] to row[CajaFormaPagoTable.descripcion])
                     }
 
             val formaRows =
@@ -1222,16 +1236,19 @@ class CajaRepository {
         val normalizedTipo = tipoMovimiento.orEmpty().trim().uppercase()
         val normalizedDescripcion = descripcion.orEmpty().trim().uppercase()
 
-        if (normalizedSigla in CASH_CODES || normalizedTipo in CASH_CODES || normalizedDescripcion.contains("EFECTIVO")) {
+        val isCash =
+            normalizedSigla in CASH_CODES ||
+                normalizedTipo in CASH_CODES ||
+                normalizedDescripcion.contains("EFECTIVO")
+        if (isCash) {
             return PaymentCategory.CASH
         }
-        if (
+        val descripcionHints = listOf("TARJETA", "DEBITO", "CREDITO")
+        val isCard =
             normalizedSigla in CARD_CODES ||
-            normalizedTipo in CARD_CODES ||
-            normalizedDescripcion.contains("TARJETA") ||
-            normalizedDescripcion.contains("DEBITO") ||
-            normalizedDescripcion.contains("CREDITO")
-        ) {
+                normalizedTipo in CARD_CODES ||
+                descripcionHints.any { normalizedDescripcion.contains(it) }
+        if (isCard) {
             return PaymentCategory.CARD
         }
         return PaymentCategory.OTHER

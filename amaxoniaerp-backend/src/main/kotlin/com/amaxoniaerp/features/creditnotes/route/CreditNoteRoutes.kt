@@ -185,7 +185,9 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
     }
 }
 
-private suspend fun resolveCompanyDatabase(call: ApplicationCall): Pair<org.jetbrains.exposed.sql.Database, JWTPrincipal>? {
+private suspend fun resolveCompanyDatabase(
+    call: ApplicationCall,
+): Pair<org.jetbrains.exposed.sql.Database, JWTPrincipal>? {
     val principal =
         call.principal<JWTPrincipal>()
             ?: run {

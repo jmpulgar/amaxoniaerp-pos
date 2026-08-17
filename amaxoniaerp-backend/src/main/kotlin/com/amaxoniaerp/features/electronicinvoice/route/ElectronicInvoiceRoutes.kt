@@ -127,7 +127,8 @@ fun Route.electronicInvoiceRoutes(factory: ElectronicInvoiceProcessorFactory) {
                                 HttpStatusCode.OK,
                                 mapOf(
                                     "success" to true,
-                                    "message" to "La factura ya posee numeración fiscal (${result.numeroDocumentoFiscal})",
+                                    "message" to "La factura ya posee numeración fiscal " +
+                                        "(${result.numeroDocumentoFiscal})",
                                     "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
                                     "numeroControl" to (result.numeroControl ?: ""),
                                 ),

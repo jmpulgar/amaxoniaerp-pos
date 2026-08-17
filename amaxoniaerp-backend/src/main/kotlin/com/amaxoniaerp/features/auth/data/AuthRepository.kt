@@ -19,8 +19,11 @@ class AuthRepository(
             val passwordMd5 = md5Hash(passwordPlain)
             UsersTable
                 .selectAll()
-                .where { (UsersTable.usuario eq username) and (UsersTable.clave eq passwordMd5) and (UsersTable.status eq "A") }
-                .map { row ->
+                .where {
+                    (UsersTable.usuario eq username) and
+                        (UsersTable.clave eq passwordMd5) and
+                        (UsersTable.status eq "A")
+                }.map { row ->
                     UserRecord(
                         id = row[UsersTable.codUsuario],
                         username = row[UsersTable.usuario],

@@ -542,7 +542,8 @@ open class VenezuelaHkaPayloadBuilder {
         when {
             resto < TWENTY -> sb.append(unidades[resto])
             resto == TWENTY -> sb.append("VEINTE")
-            resto in TWENTY_ONE..TWENTY_NINE -> sb.append(decenas[2]).append(unidades[resto - TWENTY]) // VEINTIUNO..VEINTINUEVE
+            // VEINTIUNO..VEINTINUEVE
+            resto in TWENTY_ONE..TWENTY_NINE -> sb.append(decenas[2]).append(unidades[resto - TWENTY])
             else -> {
                 val d = resto / DECIMAL_BASE
                 val u = resto % DECIMAL_BASE

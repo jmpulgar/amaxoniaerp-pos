@@ -47,7 +47,11 @@ class VenezuelaHkaRestClient(
 
     override suspend fun authenticate(credentials: PacCredentials): VenezuelaHkaResponse<VenezuelaHkaAuthResponse> {
         val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
-        log.info("[VE-HKA] Autenticacion usuario={} host={}", credentials.usuario.take(LOG_CREDENTIAL_PREFIX_LENGTH), hostOf(url))
+        log.info(
+            "[VE-HKA] Autenticacion usuario={} host={}",
+            credentials.usuario.take(LOG_CREDENTIAL_PREFIX_LENGTH),
+            hostOf(url),
+        )
         val raw =
             postRaw(url, token = null) {
                 setBody(
@@ -199,5 +203,6 @@ class VenezuelaHkaRestClient(
         )
     }
 
-    private fun hostOf(url: String): String = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
+    private fun hostOf(url: String): String =
+        runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
 }

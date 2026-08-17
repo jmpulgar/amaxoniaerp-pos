@@ -167,9 +167,8 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                 val sesionId = call.requireSesionId() ?: return@post
 
                 val body =
-                    try {
-                        call.receive<EnviarComandaRequest>()
-                    } catch (e: Exception) {
+                    runCatching { call.receive<EnviarComandaRequest>() }.getOrElse { e ->
+                        if (e is Error) throw e
                         // Cuerpo vacío es válido: enviar TODOS los pendientes.
                         EnviarComandaRequest()
                     }
@@ -225,9 +224,8 @@ fun Route.pedidoMesaRouting(pedidoMesaRepository: PedidoMesaRepository) {
                     }
 
                 val body =
-                    try {
-                        call.receive<CambiarEstadoPedidoRequest>()
-                    } catch (e: Exception) {
+                    runCatching { call.receive<CambiarEstadoPedidoRequest>() }.getOrElse { e ->
+                        if (e is Error) throw e
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cuerpo de la petición inválido"))
                         return@patch
                     }

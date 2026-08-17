@@ -85,7 +85,9 @@ class PedidoMesaRepository {
         if (request.items.isEmpty()) return PedidoMesaResult.SinItemsParaCrear
 
         return newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
-            val sesion = sesionActivaPorMesa(sesionId, mesaId) ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
+            val sesion =
+                sesionActivaPorMesa(sesionId, mesaId)
+                    ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
             if (EstadoSesionMesa.fromCodigo(sesion.estado)?.admitePedidos != true) {
                 return@newSuspendedTransaction PedidoMesaResult.SesionNoActiva
             }
@@ -143,7 +145,9 @@ class PedidoMesaRepository {
         pedidoIds: List<Int>,
     ): PedidoMesaResult =
         newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
-            val sesion = sesionActivaPorMesa(sesionId, mesaId) ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
+            val sesion =
+                sesionActivaPorMesa(sesionId, mesaId)
+                    ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
             if (EstadoSesionMesa.fromCodigo(sesion.estado)?.admitePedidos != true) {
                 return@newSuspendedTransaction PedidoMesaResult.SesionNoActiva
             }
@@ -206,7 +210,9 @@ class PedidoMesaRepository {
         destino: EstadoPedidoMesa,
     ): PedidoMesaResult =
         newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
-            val sesion = sesionActivaPorMesa(sesionId, mesaId) ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
+            val sesion =
+                sesionActivaPorMesa(sesionId, mesaId)
+                    ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
             val linea =
                 PedidoMesaTable
                     .selectAll()
@@ -218,7 +224,8 @@ class PedidoMesaRepository {
                     ?: return@newSuspendedTransaction PedidoMesaResult.PedidoNoEncontrado
 
             val actual =
-                EstadoPedidoMesa.fromCodigo(linea[PedidoMesaTable.estado]) ?: return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
+                EstadoPedidoMesa.fromCodigo(linea[PedidoMesaTable.estado])
+                    ?: return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
             if (!transicionValida(actual, destino)) return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
 
             val ahora = LocalDateTime.now()
