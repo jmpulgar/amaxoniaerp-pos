@@ -109,13 +109,12 @@ class PedidoMesaRepository {
             val nuevos =
                 request.items.map { item ->
                     val id =
-                        insertarLinea(
+                        item.insertarComoLinea(
                             sesionId = sesion.id,
                             comandaSecuencia = secuencia,
                             estado = estadoCodigo,
                             fechaCreacion = ahora,
                             fechaEnvio = fechaEnvio,
-                            item = item,
                         )
                     PedidoMesaTable
                         .selectAll()
@@ -333,39 +332,6 @@ class PedidoMesaRepository {
             fechaEntrega = this[PedidoMesaTable.fechaEntrega]?.formatIso(),
         )
 
-    private fun insertarLinea(
-        sesionId: Int,
-        comandaSecuencia: Int?,
-        estado: String,
-        fechaCreacion: LocalDateTime,
-        fechaEnvio: LocalDateTime?,
-        item: CrearPedidoMesaItemRequest,
-    ): Int =
-        PedidoMesaTable.insert {
-            it[PedidoMesaTable.sesionMesaId] = sesionId
-            it[PedidoMesaTable.comandaSecuencia] = comandaSecuencia
-            it[PedidoMesaTable.productoId] = item.productoId
-            it[PedidoMesaTable.itemAlmacen] = item.itemAlmacen
-            it[PedidoMesaTable.itemCodigo] = item.itemCodigo
-            it[PedidoMesaTable.itemDescripcion] = item.itemDescripcion
-            it[PedidoMesaTable.itemCantidad] = item.itemCantidad.toBigDecimal()
-            it[PedidoMesaTable.itemPrecioSinIva] = item.itemPrecioSinIva.toBigDecimal()
-            it[PedidoMesaTable.itemDescuento] = item.itemDescuento.toBigDecimal()
-            it[PedidoMesaTable.itemMontoDescuento] = item.itemMontoDescuento.toBigDecimal()
-            it[PedidoMesaTable.itemPIva] = item.itemPIva.toBigDecimal()
-            it[PedidoMesaTable.itemTotalSinIva] = item.itemTotalSinIva.toBigDecimal()
-            it[PedidoMesaTable.itemTotalConIva] = item.itemTotalConIva.toBigDecimal()
-            it[PedidoMesaTable.cantidadBulto] = item.cantidadBulto
-            it[PedidoMesaTable.unidadEmpaque] = item.unidadEmpaque
-            it[PedidoMesaTable.notas] = item.notas
-            it[PedidoMesaTable.promocionId] = item.promocionId
-            it[PedidoMesaTable.promocionTipo] = item.promocionTipo
-            it[PedidoMesaTable.promocionDetalleId] = item.promocionDetalleId
-            it[PedidoMesaTable.estado] = estado
-            it[PedidoMesaTable.fechaCreacion] = fechaCreacion
-            it[PedidoMesaTable.fechaEnvio] = fechaEnvio
-        }[PedidoMesaTable.id]
-
     private fun transicionValida(
         actual: EstadoPedidoMesa,
         destino: EstadoPedidoMesa,
@@ -399,3 +365,37 @@ class PedidoMesaRepository {
             )
     }
 }
+
+private fun CrearPedidoMesaItemRequest.insertarComoLinea(
+    sesionId: Int,
+    comandaSecuencia: Int?,
+    estado: String,
+    fechaCreacion: LocalDateTime,
+    fechaEnvio: LocalDateTime?,
+): Int =
+    PedidoMesaTable.insert {
+        val stmt = it
+        val item = this@insertarComoLinea
+        stmt[PedidoMesaTable.sesionMesaId] = sesionId
+        stmt[PedidoMesaTable.comandaSecuencia] = comandaSecuencia
+        stmt[PedidoMesaTable.productoId] = item.productoId
+        stmt[PedidoMesaTable.itemAlmacen] = item.itemAlmacen
+        stmt[PedidoMesaTable.itemCodigo] = item.itemCodigo
+        stmt[PedidoMesaTable.itemDescripcion] = item.itemDescripcion
+        stmt[PedidoMesaTable.itemCantidad] = item.itemCantidad.toBigDecimal()
+        stmt[PedidoMesaTable.itemPrecioSinIva] = item.itemPrecioSinIva.toBigDecimal()
+        stmt[PedidoMesaTable.itemDescuento] = item.itemDescuento.toBigDecimal()
+        stmt[PedidoMesaTable.itemMontoDescuento] = item.itemMontoDescuento.toBigDecimal()
+        stmt[PedidoMesaTable.itemPIva] = item.itemPIva.toBigDecimal()
+        stmt[PedidoMesaTable.itemTotalSinIva] = item.itemTotalSinIva.toBigDecimal()
+        stmt[PedidoMesaTable.itemTotalConIva] = item.itemTotalConIva.toBigDecimal()
+        stmt[PedidoMesaTable.cantidadBulto] = item.cantidadBulto
+        stmt[PedidoMesaTable.unidadEmpaque] = item.unidadEmpaque
+        stmt[PedidoMesaTable.notas] = item.notas
+        stmt[PedidoMesaTable.promocionId] = item.promocionId
+        stmt[PedidoMesaTable.promocionTipo] = item.promocionTipo
+        stmt[PedidoMesaTable.promocionDetalleId] = item.promocionDetalleId
+        stmt[PedidoMesaTable.estado] = estado
+        stmt[PedidoMesaTable.fechaCreacion] = fechaCreacion
+        stmt[PedidoMesaTable.fechaEnvio] = fechaEnvio
+    }[PedidoMesaTable.id]

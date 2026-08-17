@@ -8,12 +8,14 @@ import com.amaxoniaerp.features.mesas.data.CuentaMesaDetalleTable
 import com.amaxoniaerp.features.mesas.data.CuentaMesaIdempotenciaTable
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.CuentaMesaTable
+import com.amaxoniaerp.features.mesas.data.MarcarFacturadaCommand
 import com.amaxoniaerp.features.mesas.data.MesasTable
 import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
 import com.amaxoniaerp.features.mesas.data.PedidoMesaTable
 import com.amaxoniaerp.features.mesas.data.PlantasTable
 import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
 import com.amaxoniaerp.features.mesas.data.SesionMesaTable
+import com.amaxoniaerp.features.mesas.data.validarVentaEnTransaccion
 import com.amaxoniaerp.features.mesas.domain.CrearCuentaItemRequest
 import com.amaxoniaerp.features.mesas.domain.CrearCuentaRequest
 import com.amaxoniaerp.features.mesas.domain.CuentaMesaResult
@@ -44,9 +46,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Cobertura del ciclo de cuenta de mesa: creación (completa y por división), idempotencia
- * del marcar-facturada (doble-intento), cierre de sesión cuando se liquida todo, y bloqueos
- * de negocio (cantidad superior al saldo, cuenta no activa, sesión no encontrada).
+ * Cobertura del ciclo de cuenta de mesa: creaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n (completa y por divisiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n), idempotencia
+ * del marcar-facturada (doble-intento), cierre de sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n cuando se liquida todo, y bloqueos
+ * de negocio (cantidad superior al saldo, cuenta no activa, sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no encontrada).
  *
  * Se ejecuta sobre H2 en modo MySQL para reproducir el dialecto productivo de Exposed sin
  * necesidad de un servidor MySQL levantado.
@@ -103,7 +105,7 @@ class CuentaMesaRepositoryTest {
         }
     }
 
-    // ---------- Creación de cuenta ----------
+    // ---------- CreaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de cuenta ----------
 
     @Test
     fun `crear cuenta completa agrega todos los pedidos ENTREGADOS con saldo`() =
@@ -252,7 +254,7 @@ class CuentaMesaRepositoryTest {
             assertTrue(cuentas.cuentas.isEmpty())
         }
 
-    // ---------- Solicitud de cuenta en sesión ----------
+    // ---------- Solicitud de cuenta en sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ----------
 
     @Test
     fun `solicitar cuenta transiciona sesion a CUENTA_SOLICITADA y sigue admitiendo pedidos`() =
@@ -262,7 +264,7 @@ class CuentaMesaRepositoryTest {
             assertTrue(result is SesionMesaResult.Closed)
             assertEquals(EstadoSesionMesa.CUENTA_SOLICITADA.codigo, result.sesion.estado)
 
-            // Tras CUENTA_SOLICITADA todavía podemos crear pedido (modo cuenta abierta):
+            // Tras CUENTA_SOLICITADA todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a podemos crear pedido (modo cuenta abierta):
             val pedido =
                 pedidoRepository.crear(
                     database,
@@ -342,19 +344,22 @@ class CuentaMesaRepositoryTest {
             val result =
                 cuentaRepository.marcarFacturada(
                     database = database,
-                    sesionId = sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta.id,
-                    idempotencyKey = "key-1",
-                    idFactura = "F-0001",
-                    codFactura = "FAC-0001",
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta.id,
+                            idempotencyKey = "key-1",
+                            idFactura = "F-0001",
+                            codFactura = "FAC-0001",
+                        ),
                 )
             assertTrue(result is CuentaMesaResult.Facturada)
             assertEquals(EstadoCuentaMesa.PAGADA.codigo, result.cuenta.estado)
             assertEquals("F-0001", result.cuenta.idFactura)
             assertTrue(result.cuenta.detalle.all { it.facturado })
 
-            // La cantidad_facturada del pedido habría de quedar en 2.0
+            // La cantidad_facturada del pedido habrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a de quedar en 2.0
             val facturada =
                 transaction(database) {
                     PedidoMesaTable
@@ -383,25 +388,31 @@ class CuentaMesaRepositoryTest {
 
             val primera =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta.id,
-                    idempotencyKey = "k-dup",
-                    idFactura = "F-1",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta.id,
+                            idempotencyKey = "k-dup",
+                            idFactura = "F-1",
+                            codFactura = null,
+                        ),
                 )
             assertTrue(primera is CuentaMesaResult.Facturada)
 
             val segunda =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta.id,
-                    idempotencyKey = "k-dup",
-                    idFactura = "F-2",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta.id,
+                            idempotencyKey = "k-dup",
+                            idFactura = "F-2",
+                            codFactura = null,
+                        ),
                 )
             // Aunque la segunda lleva idFactura="F-2", el resultado es duplicado (no doble efecto).
             assertEquals(CuentaMesaResult.IdempotenciaDuplicada, segunda)
@@ -418,7 +429,7 @@ class CuentaMesaRepositoryTest {
             assertEquals(0, facturada.compareTo(BigDecimal("2.000")))
         }
 
-    // ---------- Cierre de sesión al liquidar todo ----------
+    // ---------- Cierre de sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n al liquidar todo ----------
 
     @Test
     fun `marcar facturada cierra la sesion en CERRADA_PAGADA cuando se liquida todo`() =
@@ -437,13 +448,16 @@ class CuentaMesaRepositoryTest {
 
             val result =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta.id,
-                    idempotencyKey = "k-liquidacion",
-                    idFactura = "F-LIQ",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta.id,
+                            idempotencyKey = "k-liquidacion",
+                            idFactura = "F-LIQ",
+                            codFactura = null,
+                        ),
                 )
             assertTrue(result is CuentaMesaResult.Facturada)
             assertTrue(result.sesionCerrada)
@@ -495,26 +509,32 @@ class CuentaMesaRepositoryTest {
 
             val r1 =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta1.id,
-                    idempotencyKey = "k-parcial",
-                    idFactura = "F-1",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta1.id,
+                            idempotencyKey = "k-parcial",
+                            idFactura = "F-1",
+                            codFactura = null,
+                        ),
                 ) as CuentaMesaResult.Facturada
-            assertFalse(r1.sesionCerrada) // todavía hay una cuenta2 ACTIVA
+            assertFalse(r1.sesionCerrada) // todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a hay una cuenta2 ACTIVA
 
-            // Segundo pago: ahora sí debería cerrar.
+            // Segundo pago: ahora sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ deberÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a cerrar.
             val r2 =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta2.id,
-                    idempotencyKey = "k-total",
-                    idFactura = "F-2",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta2.id,
+                            idempotencyKey = "k-total",
+                            idFactura = "F-2",
+                            codFactura = null,
+                        ),
                 ) as CuentaMesaResult.Facturada
             assertTrue(r2.sesionCerrada)
         }
@@ -538,12 +558,14 @@ class CuentaMesaRepositoryTest {
             val result =
                 cuentaRepository.marcarFacturada(
                     database,
-                    sesionId,
-                    1001,
-                    cuenta.id,
-                    "k-con-pendiente",
-                    "F-CON-PENDIENTE",
-                    null,
+                    MarcarFacturadaCommand(
+                        sesionId = sesionId,
+                        mesaId = 1001,
+                        cuentaId = cuenta.id,
+                        idempotencyKey = "k-con-pendiente",
+                        idFactura = "F-CON-PENDIENTE",
+                        codFactura = null,
+                    ),
                 ) as CuentaMesaResult.Facturada
 
             assertFalse(result.sesionCerrada)
@@ -625,7 +647,7 @@ class CuentaMesaRepositoryTest {
             assertEquals(0, facturada.compareTo(BigDecimal.ZERO))
         }
 
-    // ---------- Fallos de facturación ----------
+    // ---------- Fallos de facturaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ----------
 
     @Test
     fun `registrar idempotencia fallida deja el intento FAILED y permite reintento`() =
@@ -661,13 +683,16 @@ class CuentaMesaRepositoryTest {
             // Reintento con misma key permitido:
             val remarcada =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta.id,
-                    idempotencyKey = "k-fallido",
-                    idFactura = "F-retry",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta.id,
+                            idempotencyKey = "k-fallido",
+                            idFactura = "F-retry",
+                            codFactura = null,
+                        ),
                 )
             assertTrue(remarcada is CuentaMesaResult.Facturada)
         }
@@ -676,7 +701,7 @@ class CuentaMesaRepositoryTest {
     fun `marcar facturada en cuenta no activa devuelve CuentaNoActiva`() =
         runBlocking {
             val sesionId = abrirSesion(mesaId = 1001)
-            // Dos pedidos entregados → dos cuentas independientes; así marcar la 1ª NO cierra la sesión.
+            // Dos pedidos entregados -> dos cuentas independientes; pagar la 1a NO cierra la sesion.
             val ped1 = crearPedidoEntregado(sesionId, productoId = 501, cantidad = 1.0, precioSinIva = 5.0, iva = 0.0)
             crearPedidoEntregado(sesionId, productoId = 502, cantidad = 1.0, precioSinIva = 3.0, iva = 0.0)
             val cuenta1 =
@@ -692,7 +717,7 @@ class CuentaMesaRepositoryTest {
                             ),
                     ) as CuentaMesaResult.Creada
                 ).cuenta
-            // Creamos cuenta2 previa para que la sesión NO se cierre al pagar cuenta1.
+            // Creamos cuenta2 previa para que la sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n NO se cierre al pagar cuenta1.
             cuentaRepository.crear(
                 database,
                 sesionId,
@@ -700,27 +725,33 @@ class CuentaMesaRepositoryTest {
                 request = CrearCuentaRequest(items = emptyList(), incluirTodoPendiente = true),
             )
 
-            // Marcarla una vez (queda PAGADA; no cierra sesión porque todavía hay cuenta2 ACTIVA).
+            // Marcarla una vez (queda PAGADA; no cierra sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n porque todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a hay cuenta2 ACTIVA).
             cuentaRepository.marcarFacturada(
-                database,
-                sesionId,
-                mesaId = 1001,
-                cuentaId = cuenta1.id,
-                idempotencyKey = "k-1",
-                idFactura = "F-1",
-                codFactura = null,
+                database = database,
+                command =
+                    MarcarFacturadaCommand(
+                        sesionId = sesionId,
+                        mesaId = 1001,
+                        cuentaId = cuenta1.id,
+                        idempotencyKey = "k-1",
+                        idFactura = "F-1",
+                        codFactura = null,
+                    ),
             )
 
             // Segundo intento con otra key (no idempotente): state debe ser CuentaNoActiva.
             val segundo =
                 cuentaRepository.marcarFacturada(
-                    database,
-                    sesionId,
-                    mesaId = 1001,
-                    cuentaId = cuenta1.id,
-                    idempotencyKey = "k-2",
-                    idFactura = "F-2",
-                    codFactura = null,
+                    database = database,
+                    command =
+                        MarcarFacturadaCommand(
+                            sesionId = sesionId,
+                            mesaId = 1001,
+                            cuentaId = cuenta1.id,
+                            idempotencyKey = "k-2",
+                            idFactura = "F-2",
+                            codFactura = null,
+                        ),
                 )
             assertEquals(CuentaMesaResult.CuentaNoActiva, segundo)
         }
@@ -733,7 +764,7 @@ class CuentaMesaRepositoryTest {
             val sesionA = abrirSesion(mesaId = 1001)
             crearPedidoEntregado(sesionA, productoId = 501, cantidad = 1.0, precioSinIva = 5.0, iva = 0.0)
 
-            // Mismo sesionId pero la mesa 1002 también existe (abrir sesión en 1002 NO consume el id 1).
+            // Mismo sesionId pero la mesa 1002 tambiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©n existe (abrir sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n en 1002 NO consume el id 1).
             val result =
                 cuentaRepository.crear(
                     database,
@@ -760,7 +791,7 @@ class CuentaMesaRepositoryTest {
     }
 
     /**
-     * Crea un pedido entregado directamente con estado `ENTREGADA` (salta la transición normal
+     * Crea un pedido entregado directamente con estado `ENTREGADA` (salta la transiciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n normal
      * para aislar el SUT de la cuenta). Retorna el id del pedido.
      *
      * `iva` es la TASA (0.10 = 10%); se calcula `totalCon = totalSin * (1 + iva)` para que el
@@ -936,7 +967,7 @@ class CuentaMesaRepositoryTest {
         PlantasTable.insert {
             it[PlantasTable.id] = 100
             it[sucursalId] = 1
-            it[PlantasTable.nombre] = "Salón principal"
+            it[PlantasTable.nombre] = "SalÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n principal"
             it[PlantasTable.orden] = 1
             it[activo] = 1
         }

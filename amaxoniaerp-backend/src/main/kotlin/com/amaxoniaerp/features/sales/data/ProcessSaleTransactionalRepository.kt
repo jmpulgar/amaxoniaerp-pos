@@ -10,6 +10,7 @@ import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.items.data.FacturaDetalleProductoLoteTable
 import com.amaxoniaerp.features.items.data.ItemLoteTable
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
+import com.amaxoniaerp.features.mesas.data.validarVentaEnTransaccion
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
@@ -57,13 +58,13 @@ private const val STANDARD_USER_LENGTH = 20
 /**
  * Repositorio transaccional de procesamiento de ventas.
  *
- * **FASE 1.1 — Brief item 8 (deuda técnica anotada):** esta clase se mantiene
- * `open` únicamente para que los tests de `ProcessSaleUseCaseSelectionTest`
+ * **FASE 1.1 â€” Brief item 8 (deuda tÃ©cnica anotada):** esta clase se mantiene
+ * `open` Ãºnicamente para que los tests de `ProcessSaleUseCaseSelectionTest`
  * puedan inyectar fakes (`FakeSaleRepo`, `DuplicateAwareSaleRepo`) sin tocar la
- * DB real. La opción preferida por el brief sería extraer un puerto
+ * DB real. La opciÃ³n preferida por el brief serÃ­a extraer un puerto
  * `interface SaleProcessor { fun process(...): ProcessSaleResponse }` y dejar
- * esta clase final, pero esa refactorización queda fuera del alcance de FASE 1.1
- * (el brief prohíbe refactor general).
+ * esta clase final, pero esa refactorizaciÃ³n queda fuera del alcance de FASE 1.1
+ * (el brief prohÃ­be refactor general).
  *
  * Cuando se aborde, mover estos overrides a una clase propia de tests y cerrar
  * esta clase.
@@ -93,7 +94,7 @@ open class ProcessSaleTransactionalRepository(
             preparedRequest.cuentaMesa?.let { context ->
                 val repository =
                     cuentaMesaRepository
-                        ?: throw InvalidSaleRequestException("La integración de cuenta de mesa no está configurada")
+                        ?: throw InvalidSaleRequestException("La integraciÃ³n de cuenta de mesa no estÃ¡ configurada")
                 repository.validarVentaEnTransaccion(context, preparedRequest, invoiceId)
             }
         val invoiceCode = resolveInvoiceCode(countryCode, preparedRequest)
@@ -194,7 +195,7 @@ open class ProcessSaleTransactionalRepository(
                 .where { SalesCajaTable.id eq cajaId }
                 .limit(1)
                 .firstOrNull()
-                ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$cajaId")
+                ?: throw InvalidSaleRequestException("No se encontrÃ³ caja para id_caja=$cajaId")
 
         val cajaWarehouseId =
             if (isVE) {
@@ -241,7 +242,7 @@ open class ProcessSaleTransactionalRepository(
         val defaultWarehouseId =
             cajaWarehouseId ?: sucursalDefaultWarehouse ?: globalWarehouseId
                 ?: throw InvalidSaleRequestException(
-                    "No se pudo resolver almacén por defecto para caja=$cajaId (caja/sucursal/parámetros generales)",
+                    "No se pudo resolver almacÃ©n por defecto para caja=$cajaId (caja/sucursal/parÃ¡metros generales)",
                 )
 
         val allowedWarehouseIds = mutableSetOf<Int>()
@@ -366,7 +367,7 @@ open class ProcessSaleTransactionalRepository(
                 throw InvalidSaleRequestException("El saldo pendiente no coincide con los pagos recibidos")
             }
             if (totalCxc == BigDecimal.ZERO && saldoDeclarado == BigDecimal.ZERO && saldoEsperado > BigDecimal.ZERO) {
-                throw InvalidSaleRequestException("Debe indicar el saldo pendiente de la venta a crédito")
+                throw InvalidSaleRequestException("Debe indicar el saldo pendiente de la venta a crÃ©dito")
             }
         }
 
@@ -378,15 +379,17 @@ open class ProcessSaleTransactionalRepository(
                         .where { ClientsTable.idCliente eq request.factura.idCliente }
                         .limit(1)
                         .firstOrNull()
-                        ?: throw InvalidSaleRequestException("No se encontró el cliente para la venta a crédito")
+                        ?: throw InvalidSaleRequestException("No se encontrÃ³ el cliente para la venta a crÃ©dito")
 
                 if (!client[ClientsTable.permiteCredito]) {
-                    throw InvalidSaleRequestException("El cliente no permite ventas a crédito")
+                    throw InvalidSaleRequestException("El cliente no permite ventas a crÃ©dito")
                 }
 
                 client[ClientsTable.dias].also { dias ->
                     if (dias < 0) {
-                        throw InvalidSaleRequestException("La configuración de días de crédito del cliente es inválida")
+                        throw InvalidSaleRequestException(
+                            "La configuraciÃ³n de dÃ­as de crÃ©dito del cliente es invÃ¡lida",
+                        )
                     }
                 }
             } else {
@@ -416,7 +419,7 @@ open class ProcessSaleTransactionalRepository(
                 .orderBy(pgTable.codEmpresa)
                 .limit(1)
                 .firstOrNull()
-                ?: throw InvalidSaleRequestException("No se encontró parametros_generales")
+                ?: throw InvalidSaleRequestException("No se encontrÃ³ parametros_generales")
 
         // multiMoneda y monedaSecundaria solo existen en VE
         val paramsMulti =
@@ -468,7 +471,7 @@ open class ProcessSaleTransactionalRepository(
             if (paramsMulti) {
                 tasaFromRequest
                     ?: tasaRow?.get(tasasTable.tasaInversa)?.toDouble()
-                    ?: throw InvalidSaleRequestException("No se encontró tasa de cambio vigente")
+                    ?: throw InvalidSaleRequestException("No se encontrÃ³ tasa de cambio vigente")
             } else {
                 1.0
             }
@@ -477,7 +480,7 @@ open class ProcessSaleTransactionalRepository(
             if (paramsMulti) {
                 idTasaFromRequest
                     ?: tasaRow?.get(tasasTable.id)?.toInt()
-                    ?: throw InvalidSaleRequestException("No se encontró id de tasa vigente")
+                    ?: throw InvalidSaleRequestException("No se encontrÃ³ id de tasa vigente")
             } else {
                 0
             }
@@ -553,7 +556,7 @@ open class ProcessSaleTransactionalRepository(
 
         val status = existing[t.codEstatus] ?: 0
         if (status == 2) {
-            throw DuplicateInvoiceException("La factura ya existe y está procesada (cod_estatus=2)")
+            throw DuplicateInvoiceException("La factura ya existe y estÃ¡ procesada (cod_estatus=2)")
         }
         throw DuplicateInvoiceException("La factura ya existe con estado pendiente, no se puede reprocesar")
     }
@@ -665,7 +668,7 @@ open class ProcessSaleTransactionalRepository(
                 .where { SalesCajaTable.id eq idCaja }
                 .limit(1)
                 .firstOrNull()
-                ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
+                ?: throw InvalidSaleRequestException("No se encontrÃ³ caja para id_caja=$idCaja")
 
         val codigoCaja = row[SalesCajaTable.codigo]?.takeIf { it.isNotBlank() } ?: fallbackCodigoCaja
         val correlativo = row[SalesCajaTable.facturaCorrelativo] + 1
@@ -683,7 +686,7 @@ open class ProcessSaleTransactionalRepository(
                     .where { SalesCajaTable.id eq idCaja }
                     .limit(1)
                     .firstOrNull()
-                    ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
+                    ?: throw InvalidSaleRequestException("No se encontrÃ³ caja para id_caja=$idCaja")
 
             val current = row[SalesCajaTable.facturaCorrelativo]
             val next = current + 1
@@ -712,7 +715,7 @@ open class ProcessSaleTransactionalRepository(
                     .limit(1)
                     .firstOrNull()
                     ?.get(SalesCajaTable.facturaCorrelativo)
-                    ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$idCaja")
+                    ?: throw InvalidSaleRequestException("No se encontrÃ³ caja para id_caja=$idCaja")
 
             val updated =
                 SalesCajaTable.update({
@@ -732,7 +735,7 @@ open class ProcessSaleTransactionalRepository(
         correlativo: Int,
     ): String {
         if (codigoCaja.isBlank()) {
-            throw InvalidSaleRequestException("codigo de caja inválido para construir cod_factura")
+            throw InvalidSaleRequestException("codigo de caja invÃ¡lido para construir cod_factura")
         }
         return "${codigoCaja.trim()}-${correlativo.toString().padStart(INVOICE_SEQUENCE_LENGTH, '0')}"
     }
