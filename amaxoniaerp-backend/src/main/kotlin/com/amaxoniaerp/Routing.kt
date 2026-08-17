@@ -64,6 +64,7 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
@@ -99,6 +100,38 @@ fun Application.configureRouting() {
     val companyService = CompanyService(jwtConfig)
 
     // Repositorios
+    val repositories = Repositories()
+    val feHttpClient = buildFeHttpClient()
+    environment.monitor.subscribe(ApplicationStopped) {
+        feHttpClient.close()
+    }
+
+    val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
+    val creditNoteDependencies = buildCreditNoteDependencies(feDependencies, dataBasePath)
+    val routingConfig =
+        RoutingConfig(
+            dataBasePath = dataBasePath,
+            assetsBaseUrls = this.resolveAssetsBaseUrls(dotenv),
+        )
+
+    routing {
+        installCoreRoutes()
+        authRoutes(authService, companyService)
+        installPosRoutes(
+            repositories,
+            feDependencies,
+            creditNoteDependencies,
+            routingConfig,
+        )
+    }
+}
+
+private class RoutingConfig(
+    val dataBasePath: String?,
+    val assetsBaseUrls: MutableMap<String, String>,
+)
+
+private class Repositories {
     val itemsRepository = ItemsRepository()
     val clientsRepository = ClientsRepository()
     val clientTypesRepository = ClientTypesRepository()
@@ -108,57 +141,53 @@ fun Application.configureRouting() {
     val formasPagoRepository = FormasPagoRepository()
     val promotionsRepository = PromotionsRepository()
     val mesasRepository = MesasRepository()
+}
 
-    val feHttpClient = buildFeHttpClient()
-    environment.monitor.subscribe(ApplicationStopped) {
-        feHttpClient.close()
+private fun Route.installCoreRoutes() {
+    get("/") {
+        call.respondText("Amaxonia ERP API - Multi-Tenant Ready")
     }
 
-    val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
-    val creditNoteDependencies = buildCreditNoteDependencies(feDependencies, dataBasePath)
-
-    routing {
-        get("/") {
-            call.respondText("Amaxonia ERP API - Multi-Tenant Ready")
-        }
-
-        get("/health") {
-            call.respond(mapOf("status" to "UP"))
-        }
-
-        authRoutes(authService, companyService)
-        itemsRoutes(itemsRepository)
-        cajaRouting(cajaRepository)
-        posRouting(formasPagoRepository)
-        mesasRouting(mesasRepository)
-
-        // PedidoMesaRepository se inicializa primero: SesionMesaRepository lo usa como
-        // lookup de operaciones para decidir si la sesión se puede cerrar/cancelar.
-        val pedidoMesaRepository = PedidoMesaRepository()
-        val sesionMesaRepository = SesionMesaRepository(pedidoMesaRepository::tieneOperaciones)
-        // CuentaMesaRepository depende de ambos: sesion (para transiciones ABIERTA ->
-        // CUENTA_SOLICITADA -> CERRADA_PAGADA) y pedidos (para saldos facturables).
-        val cuentaMesaRepository = CuentaMesaRepository()
-        val processSaleUseCase =
-            ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feDependencies.feFactory)
-        sesionMesaRouting(mesasRepository, sesionMesaRepository)
-        pedidoMesaRouting(pedidoMesaRepository)
-        cuentaMesaRouting(cuentaMesaRepository, sesionMesaRepository, mesasRepository)
-
-        promotionsRoutes(promotionsRepository)
-        salesRoutes(processSaleUseCase)
-        creditNoteRoutes(creditNoteDependencies.creditNoteService)
-        electronicInvoiceRoutes(feDependencies.feFactory)
-
-        val assetsBaseUrls = resolveAssetsBaseUrls(dotenv)
-        assetsRoutes(assetsBaseUrls = assetsBaseUrls, dataBasePath = dataBasePath)
-
-        // Rutas auxiliares que aún podrían necesitar refactoring
-        clientsRoutes(clientsRepository)
-        clientTypesRoutes(clientTypesRepository)
-        facturasRoutes(facturasRepository, feDependencies.panamaProcessor)
-        geographyRoutes(geographyRepository)
+    get("/health") {
+        call.respond(mapOf("status" to "UP"))
     }
+}
+
+private fun Route.installPosRoutes(
+    repositories: Repositories,
+    feDependencies: FeDependencies,
+    creditNoteDependencies: CreditNoteDependencies,
+    config: RoutingConfig,
+) {
+    itemsRoutes(repositories.itemsRepository)
+    cajaRouting(repositories.cajaRepository)
+    posRouting(repositories.formasPagoRepository)
+    mesasRouting(repositories.mesasRepository)
+
+    // PedidoMesaRepository se inicializa primero: SesionMesaRepository lo usa como
+    // lookup de operaciones para decidir si la sesión se puede cerrar/cancelar.
+    val pedidoMesaRepository = PedidoMesaRepository()
+    val sesionMesaRepository = SesionMesaRepository(pedidoMesaRepository::tieneOperaciones)
+    // CuentaMesaRepository depende de ambos: sesion (para transiciones ABIERTA ->
+    // CUENTA_SOLICITADA -> CERRADA_PAGADA) y pedidos (para saldos facturables).
+    val cuentaMesaRepository = CuentaMesaRepository()
+    val processSaleUseCase =
+        ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feDependencies.feFactory)
+    sesionMesaRouting(repositories.mesasRepository, sesionMesaRepository)
+    pedidoMesaRouting(pedidoMesaRepository)
+    cuentaMesaRouting(cuentaMesaRepository, sesionMesaRepository, repositories.mesasRepository)
+
+    promotionsRoutes(repositories.promotionsRepository)
+    salesRoutes(processSaleUseCase)
+    creditNoteRoutes(creditNoteDependencies.creditNoteService)
+    electronicInvoiceRoutes(feDependencies.feFactory)
+
+    assetsRoutes(assetsBaseUrls = config.assetsBaseUrls, dataBasePath = config.dataBasePath)
+    // Rutas auxiliares que aún podrían necesitar refactoring
+    clientsRoutes(repositories.clientsRepository)
+    clientTypesRoutes(repositories.clientTypesRepository)
+    facturasRoutes(repositories.facturasRepository, feDependencies.panamaProcessor)
+    geographyRoutes(repositories.geographyRepository)
 }
 
 private fun buildFeHttpClient(): HttpClient =
@@ -236,12 +265,8 @@ private fun buildCreditNoteDependencies(
 
 private fun Application.resolveAssetsBaseUrls(dotenv: Map<String, String>): MutableMap<String, String> {
     val genericAssetsUrl = loadConfigValue("ASSETS_BASE_URL", "assets.baseUrl", dotenv)
-    val veAssetsUrl =
-        loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv)
-            ?: genericAssetsUrl
-    val paAssetsUrl =
-        loadConfigValue("ASSETS_BASE_URL_PA", "assets.baseUrlPA", dotenv)
-            ?: genericAssetsUrl
+    val veAssetsUrl = loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv) ?: genericAssetsUrl
+    val paAssetsUrl = loadConfigValue("ASSETS_BASE_URL_PA", "assets.baseUrlPA", dotenv) ?: genericAssetsUrl
     val assetsBaseUrls = mutableMapOf<String, String>()
     if (!veAssetsUrl.isNullOrBlank()) assetsBaseUrls["VE"] = veAssetsUrl.trimEnd('/')
     if (!paAssetsUrl.isNullOrBlank()) assetsBaseUrls["PA"] = paAssetsUrl.trimEnd('/')
