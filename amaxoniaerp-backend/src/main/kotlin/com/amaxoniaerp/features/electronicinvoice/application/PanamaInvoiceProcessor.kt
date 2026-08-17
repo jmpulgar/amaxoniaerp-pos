@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.electronicinvoice.application
 
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
+import com.amaxoniaerp.features.electronicinvoice.data.FeResponseUpdate
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigurationException
@@ -253,14 +254,17 @@ class PanamaInvoiceProcessor(
         runCatching {
             repository.updateInvoiceWithFEResponse(
                 database = database,
-                invoiceId = invoiceId,
-                numeroDocumentoFiscal = context.factura.numeroDocumentoFiscal,
-                puntoFacturacionFiscal = context.puntoFacturacionFiscal,
-                cufe = cufe,
-                qr = pacResponse.qr,
-                fechaRecepcionDGI = pacResponse.fechaRecepcionDGI,
-                nroProtocolo = pacResponse.nroProtocoloAutorizacion,
-                fechaLimite = pacResponse.fechaLimite,
+                update =
+                    FeResponseUpdate(
+                        invoiceId = invoiceId,
+                        numeroDocumentoFiscal = context.factura.numeroDocumentoFiscal,
+                        puntoFacturacionFiscal = context.puntoFacturacionFiscal,
+                        cufe = cufe,
+                        qr = pacResponse.qr,
+                        fechaRecepcionDGI = pacResponse.fechaRecepcionDGI,
+                        nroProtocolo = pacResponse.nroProtocoloAutorizacion,
+                        fechaLimite = pacResponse.fechaLimite,
+                    ),
             )
         }.onFailure { e ->
             if (e is Error) throw e

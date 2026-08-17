@@ -54,7 +54,7 @@ internal fun isAprox(
 
 internal fun BigDecimal.format(): String = setScale(MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
 
-/** Normaliza cualquier BigDecimal a escala monetaria estándar (2). */
+/** Normaliza cualquier BigDecimal a escala monetaria estÃ¡ndar (2). */
 internal fun BigDecimal.bigDecimalMoney(): BigDecimal = setScale(MONEY_SCALE, RoundingMode.HALF_UP)
 
 internal fun formatFechaEmision(fecha: String?): String {
@@ -84,7 +84,7 @@ internal fun transaccionIdDeterminista(
 ): String {
     val seed = (idFactura + "|" + numeroFormateado).toByteArray(Charsets.UTF_8)
     val sha = MessageDigest.getInstance("SHA-256").digest(seed)
-    // Top 16 bytes → 32 chars hex.
+    // Top 16 bytes â†’ 32 chars hex.
     return java.util.HexFormat
         .of()
         .formatHex(sha.copyOfRange(0, TRANSACTION_ID_HASH_BYTES))
@@ -100,40 +100,3 @@ internal fun sumPrecioNeto(ctx: InvoiceVEContext): BigDecimal =
         .fold(BigDecimal.ZERO) { acc, d -> acc.add(d.totalSinIva) }
         .bigDecimalMoney()
 
-internal fun buildClienteVE(ctx: InvoiceVEContext): VenezuelaHkaCliente =
-    ctx.comprador.let { c ->
-        VenezuelaHkaCliente(
-            nombreRazonSocial = c.nombreRazonSocial.ifBlank { "CONSUMIDOR FINAL" },
-            numeroRif = c.rif.ifBlank { "V000000000" },
-            direccion = c.direccion?.takeIf { it.isNotBlank() },
-            telefono = c.telefono?.takeIf { it.isNotBlank() },
-            correoElectronico = c.email?.takeIf { it.isNotBlank() },
-        )
-    }
-
-internal fun buildItemVE(det: VEDetalleData): VenezuelaHkaItem {
-    val valorIva = det.totalConIva.subtract(det.totalSinIva).max(BigDecimal.ZERO)
-    return VenezuelaHkaItem(
-        descripcion = det.descripcion,
-        codigo = det.codigo,
-        referencia = det.referencia?.takeIf { it.isNotBlank() },
-        unidadMedida = det.unidadEmpaque?.takeIf { it.isNotBlank() } ?: "UND",
-        cantidad = det.cantidad.setScale(QTY_SCALE, RoundingMode.HALF_UP).toPlainString(),
-        precioUnitario = det.precioSinIva.format(),
-        precioUnitarioDescuento =
-            if (det.cantidad > BigDecimal.ZERO && det.montoDescuento > BigDecimal.ZERO) {
-                det.montoDescuento.divide(det.cantidad, MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
-            } else {
-                null
-            },
-        montoDescuento = det.montoDescuento.takeIf { it > BigDecimal.ZERO }?.format(),
-        precioItem = det.totalSinIva.format(),
-        valorTotal = det.totalConIva.format(),
-        alicuotaIva = alicuotaCodigo(det.piva),
-        valorIva = valorIva.format(),
-        valorAcarreo = det.importeAcarreo?.takeIf { it > BigDecimal.ZERO }?.format(),
-        valorSeguro = det.importeSeguro?.takeIf { it > BigDecimal.ZERO }?.format(),
-        valorIsc = det.importeIsc?.takeIf { it > BigDecimal.ZERO }?.format(),
-        porcentajeIsc = det.porcentajeIsc?.takeIf { it > BigDecimal.ZERO }?.format(),
-    )
-}
