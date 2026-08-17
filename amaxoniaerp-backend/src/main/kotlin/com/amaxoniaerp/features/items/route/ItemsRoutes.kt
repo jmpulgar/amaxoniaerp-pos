@@ -3,7 +3,14 @@ package com.amaxoniaerp.features.items.route
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.facturas.data.getBestSellerItemQuantities
+import com.amaxoniaerp.features.items.data.ItemsListQuery
 import com.amaxoniaerp.features.items.data.ItemsRepository
+import com.amaxoniaerp.features.items.data.listBrands
+import com.amaxoniaerp.features.items.data.listDepartments
+import com.amaxoniaerp.features.items.data.listFamilies
+import com.amaxoniaerp.features.items.data.listLines
+import com.amaxoniaerp.features.items.data.listSections
+import com.amaxoniaerp.features.items.data.listSubFamilies
 import com.amaxoniaerp.features.items.domain.BestSellerItemResponse
 import com.amaxoniaerp.features.items.domain.BestSellersApiResponse
 import com.amaxoniaerp.features.items.domain.CreateProductRequest
@@ -36,6 +43,7 @@ private const val ERR_PRODUCT_NOT_FOUND = "Producto no encontrado"
  */
 fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
     val handlers = ItemsHandlers(itemsRepository)
+    val taxonomyHandlers = ItemsTaxonomyHandlers(itemsRepository)
 
     authenticate {
         route("/items") {
@@ -47,13 +55,13 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
             get { handlers.listar(call) }
 
             /** GET /items/departments - Lista departamentos con productos. */
-            get("departments") { handlers.departamentos(call) }
+            get("departments") { taxonomyHandlers.departamentos(call) }
 
-            get("sections") { handlers.secciones(call) }
-            get("families") { handlers.familias(call) }
-            get("subfamilies") { handlers.subfamilias(call) }
-            get("brands") { handlers.marcas(call) }
-            get("lines") { handlers.lineas(call) }
+            get("sections") { taxonomyHandlers.secciones(call) }
+            get("families") { taxonomyHandlers.familias(call) }
+            get("subfamilies") { taxonomyHandlers.subfamilias(call) }
+            get("brands") { taxonomyHandlers.marcas(call) }
+            get("lines") { taxonomyHandlers.lineas(call) }
 
             /**
              * GET /items/best-sellers - Productos más vendidos desde factura_detalle.
@@ -89,6 +97,60 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
 }
 
 /**
+ * Handlers de endpoints de taxonomía de items (jerarquía departamento ->
+ * sección -> familia -> subfamilia y catálogos marca/línea).
+ */
+internal class ItemsTaxonomyHandlers(
+    private val itemsRepository: ItemsRepository,
+) {
+    suspend fun departamentos(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val list = itemsRepository.listDepartments(database = database)
+            call.respondDepartments(list)
+        }
+
+    suspend fun secciones(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val departmentId = call.requireIntQuery("departmentId", "departmentId inválido") ?: return@run
+            val list = itemsRepository.listSections(database = database, departmentId = departmentId)
+            call.respondDepartments(list)
+        }
+
+    suspend fun familias(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val sectionId = call.requireIntQuery("sectionId", "sectionId inválido") ?: return@run
+            val list = itemsRepository.listFamilies(database = database, sectionId = sectionId)
+            call.respondDepartments(list)
+        }
+
+    suspend fun subfamilias(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val familyId = call.requireIntQuery("familyId", "familyId inválido") ?: return@run
+            val list = itemsRepository.listSubFamilies(database = database, familyId = familyId)
+            call.respondDepartments(list)
+        }
+
+    suspend fun marcas(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val list = itemsRepository.listBrands(database = database)
+            call.respondDepartments(list)
+        }
+
+    suspend fun lineas(call: ApplicationCall) =
+        run {
+            val database = call.resolveDatabase() ?: return@run
+            val brandId = call.requireIntQuery("brandId", "brandId inválido") ?: return@run
+            val list = itemsRepository.listLines(database = database, brandId = brandId)
+            call.respondDepartments(list)
+        }
+}
+
+/**
  * Handlers de los endpoints de items. Resuelven tenant por el seam canónico,
  * delegan en el repositorio y mapean los resultados a HTTP.
  */
@@ -117,60 +179,17 @@ internal class ItemsHandlers(
                 itemsRepository.listItems(
                     database = companyDb,
                     countryCode = ctx.countryCode,
-                    limit = limit,
-                    offset = offset,
-                    search = search,
-                    includeTotal = includeTotal,
-                    departmentId = departmentIdParam,
+                    query =
+                        ItemsListQuery(
+                            limit = limit,
+                            offset = offset,
+                            search = search,
+                            includeTotal = includeTotal,
+                            departmentId = departmentIdParam,
+                        ),
                 )
 
             call.respond(ProductsListResponse(data = items, total = total))
-        }
-
-    suspend fun departamentos(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val list = itemsRepository.listDepartments(database = database)
-            call.respondDepartments(list)
-        }
-
-    suspend fun secciones(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val departmentId = call.requireIntQuery("departmentId", "departmentId inválido") ?: return@run
-            val list = itemsRepository.listSections(database = database, departmentId = departmentId)
-            call.respondDepartments(list)
-        }
-
-    suspend fun familias(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val sectionId = call.requireIntQuery("sectionId", "sectionId inválido") ?: return@run
-            val list = itemsRepository.listFamilies(database = database, sectionId = sectionId)
-            call.respondDepartments(list)
-        }
-
-    suspend fun subfamilias(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val familyId = call.requireIntQuery("familyId", "familyId inválido") ?: return@run
-            val list = itemsRepository.listSubFamilies(database = database, familyId = familyId)
-            call.respondDepartments(list)
-        }
-
-    suspend fun marcas(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val list = itemsRepository.listBrands(database = database)
-            call.respondDepartments(list)
-        }
-
-    suspend fun lineas(call: ApplicationCall) =
-        run {
-            val database = resolveDatabase(call) ?: return@run
-            val brandId = call.requireIntQuery("brandId", "brandId inválido") ?: return@run
-            val list = itemsRepository.listLines(database = database, brandId = brandId)
-            call.respondDepartments(list)
         }
 
     suspend fun masVendidos(call: ApplicationCall) =
@@ -280,41 +299,41 @@ internal class ItemsHandlers(
             val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
             call.respond(stock)
         }
+}
 
-    private suspend fun resolveDatabase(call: ApplicationCall): org.jetbrains.exposed.sql.Database? =
-        run {
-            val ctx = call.resolveCompanyRequestContext() ?: return@run null
-            DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
-        }
-
-    private suspend fun ApplicationCall.respondDepartments(list: List<Pair<Int, String>>) {
-        val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-        respond(DepartmentsApiResponse(data = data))
+private suspend fun ApplicationCall.resolveDatabase(): org.jetbrains.exposed.sql.Database? =
+    run {
+        val ctx = resolveCompanyRequestContext() ?: return@run null
+        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
     }
 
-    private suspend fun ApplicationCall.requireIntQuery(
-        name: String,
-        errorMessage: String,
-    ): Int? =
-        run {
-            val value = request.queryParameters[name]?.toIntOrNull()
-            if (value == null) {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
-                return@run null
-            }
-            value
-        }
-
-    private suspend fun ApplicationCall.requireIntParam(
-        name: String,
-        errorMessage: String,
-    ): Int? =
-        run {
-            val value = parameters[name]?.toIntOrNull()
-            if (value == null) {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
-                return@run null
-            }
-            value
-        }
+private suspend fun ApplicationCall.respondDepartments(list: List<Pair<Int, String>>) {
+    val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+    respond(DepartmentsApiResponse(data = data))
 }
+
+private suspend fun ApplicationCall.requireIntQuery(
+    name: String,
+    errorMessage: String,
+): Int? =
+    run {
+        val value = request.queryParameters[name]?.toIntOrNull()
+        if (value == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+            return@run null
+        }
+        value
+    }
+
+private suspend fun ApplicationCall.requireIntParam(
+    name: String,
+    errorMessage: String,
+): Int? =
+    run {
+        val value = parameters[name]?.toIntOrNull()
+        if (value == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+            return@run null
+        }
+        value
+    }
