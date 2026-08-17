@@ -45,9 +45,7 @@ class TheFactoryHkaCreditNotePayloadBuilder(
             )
         val referencedDocument =
             TheFactoryHkaDocFiscalRef(
-                fechaEmisionDocFiscalReferenciado =
-                    invoicePayloadBuilder
-                        .formatFechaEmisionForPayload(context.originalInvoiceDate),
+                fechaEmisionDocFiscalReferenciado = formatFechaEmisionForPayload(context.originalInvoiceDate),
                 cufeFEReferenciada = context.originalInvoiceCufe,
             )
 
