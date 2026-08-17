@@ -1,15 +1,13 @@
 ﻿package com.amaxoniaerp.features.clients.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.core.tenant.getCountryCode
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.clients.data.ClientsRepository
 import com.amaxoniaerp.features.clients.domain.ClientsListResponse
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.parameters
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -17,304 +15,134 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
+import org.jetbrains.exposed.sql.Database
 
 private const val DEFAULT_PAGE_LIMIT = 100
 private const val MAX_PAGE_LIMIT = 1_000
 
 fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
+    val handlers = ClientsHandlers(clientsRepository)
+
     authenticate {
         route("/clients") {
-            get {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
-                val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-                val limit = limitParam ?: DEFAULT_PAGE_LIMIT
-                val offset = offsetParam ?: 0L
-                val search = call.request.queryParameters["search"]
-                val includeTotalParam = call.request.queryParameters["includeTotal"]
-                val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
-
-                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Invalid pagination parameters"),
-                    )
-                }
-                if (includeTotalParam != null && includeTotalParam.toBooleanStrictOrNull() == null) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Invalid includeTotal parameter"),
-                    )
-                }
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
-                call.respond(ClientsListResponse(data = clients, total = total))
-            }
-
-            get("/default") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val defaultClient =
-                    clientsRepository.getDefaultClient(companyDb, countryCode)
-                        ?: return@get call.respond(
-                            HttpStatusCode.NotFound,
-                            mapOf("error" to "Default client not configured"),
-                        )
-
-                call.respond(defaultClient)
-            }
-
-            get("/{id}") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val id =
-                    call.parameters["id"]
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Invalid client id"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val client =
-                    clientsRepository.getClientById(companyDb, id)
-                        ?: return@get call.respond(
-                            HttpStatusCode.NotFound,
-                            mapOf("error" to "Client not found"),
-                        )
-
-                call.respond(client)
-            }
-
-            get("/{id}/sucursales") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val id =
-                    call.parameters["id"]
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Invalid client id"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val sucursales = clientsRepository.listClientSucursales(companyDb, countryCode, id)
-                call.respond(sucursales)
-            }
-
-            post {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@post call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@post call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val request = call.receive<CreateClientRequest>()
-                if (request.identification.isBlank() || request.name.isBlank()) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "RUC and Name are required"),
-                    )
-                }
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val client = clientsRepository.createClient(companyDb, countryCode, request)
-                call.respond(HttpStatusCode.Created, client)
-            }
-
-            put("/{id}") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@put call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid or missing token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@put call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.payload.getClaim("admin_db").asString()
-                if (adminDb.isNullOrBlank()) {
-                    return@put call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Company database not found in token"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
-
-                val id =
-                    call.parameters["id"]
-                        ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Invalid client id"),
-                        )
-
-                val request = call.receive<CreateClientRequest>()
-                if (request.identification.isBlank() || request.name.isBlank()) {
-                    return@put call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "RUC and Name are required"),
-                    )
-                }
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val client =
-                    clientsRepository.updateClient(companyDb, id, request)
-                        ?: return@put call.respond(
-                            HttpStatusCode.NotFound,
-                            mapOf("error" to "Client not found"),
-                        )
-
-                call.respond(client)
-            }
+            get { handlers.listar(call) }
+            get("/default") { handlers.clientePorDefecto(call) }
+            get("/{id}") { handlers.detalle(call) }
+            get("/{id}/sucursales") { handlers.sucursales(call) }
+            post { handlers.crear(call) }
+            put("/{id}") { handlers.actualizar(call) }
         }
+    }
+}
+
+/**
+ * Handlers de los endpoints de clientes. CRUD/query simple: `route -> repository`.
+ */
+internal class ClientsHandlers(
+    private val clientsRepository: ClientsRepository,
+) {
+    suspend fun listar(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
+        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+        val search = call.request.queryParameters["search"]
+        val includeTotalParam = call.request.queryParameters["includeTotal"]
+        val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
+
+        if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid pagination parameters"))
+            return@run
+        }
+        if (includeTotalParam != null && includeTotalParam.toBooleanStrictOrNull() == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid includeTotal parameter"))
+            return@run
+        }
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
+        call.respond(ClientsListResponse(data = clients, total = total))
+    }
+
+    suspend fun clientePorDefecto(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode)
+        if (defaultClient == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Default client not configured"))
+            return@run
+        }
+
+        call.respond(defaultClient)
+    }
+
+    suspend fun detalle(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val id = call.requireClientId() ?: return@run
+
+        val client = clientsRepository.getClientById(database, id)
+        if (client == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
+            return@run
+        }
+
+        call.respond(client)
+    }
+
+    suspend fun sucursales(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val id = call.requireClientId() ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val sucursales = clientsRepository.listClientSucursales(companyDb, ctx.countryCode, id)
+        call.respond(sucursales)
+    }
+
+    suspend fun crear(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val request = call.receive<CreateClientRequest>()
+        if (request.identification.isBlank() || request.name.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
+            return@run
+        }
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val client = clientsRepository.createClient(companyDb, ctx.countryCode, request)
+        call.respond(HttpStatusCode.Created, client)
+    }
+
+    suspend fun actualizar(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val id = call.requireClientId() ?: return@run
+
+        val request = call.receive<CreateClientRequest>()
+        if (request.identification.isBlank() || request.name.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
+            return@run
+        }
+
+        val client = clientsRepository.updateClient(database, id, request)
+        if (client == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Client not found"))
+            return@run
+        }
+
+        call.respond(client)
+    }
+
+    private suspend fun resolveDatabase(call: ApplicationCall): Database? = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run null
+        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+    }
+
+    private suspend fun ApplicationCall.requireClientId(): String? = run {
+        val id = parameters["id"]
+        if (id == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid client id"))
+            return@run null
+        }
+        id
     }
 }

@@ -2,16 +2,12 @@ package com.amaxoniaerp.features.assets.route
 
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.parameters
-import io.ktor.http.path
-import io.ktor.server.application.call
-import io.ktor.server.application.log
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
-import io.ktor.server.routing.path
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -29,89 +25,125 @@ fun Route.assetsRoutes(
     assetsBaseUrls: Map<String, String>,
     dataBasePath: String?,
 ) {
-    val log = LoggerFactory.getLogger("AssetsRoutes")
+    val handlers = AssetsHandlers(assetsBaseUrls, dataBasePath)
     route("/api/data/{countryCode}/{companyDb}") {
         /**
          * Imagen de producto.
          * Path en BD: "fotos/1_foto.jpeg" -> archivo en item/1_foto.jpeg
          */
-        get("/item/{path...}") {
-            val countryCode =
-                call.parameters["countryCode"]?.takeIf { it.length == 2 }?.uppercase()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "countryCode inválido")
-            val companyDb =
-                call.parameters["companyDb"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "companyDb inválido")
-            val pathSegments = call.parameters.getAll("path") ?: emptyList()
-            val path = pathSegments.joinToString("/")
-            if (path.isBlank() || path.contains("..")) {
-                return@get call.respond(HttpStatusCode.BadRequest, "path inválido")
-            }
-            val filename = path.substringAfterLast('/').ifBlank { path }
-            if (filename.isBlank()) {
-                return@get call.respond(HttpStatusCode.BadRequest, "filename inválido")
-            }
-
-            if (!dataBasePath.isNullOrBlank()) {
-                val file = File(dataBasePath, "$companyDb/item/$filename")
-                if (file.exists() && file.isFile) {
-                    call.respondBytes(file.readBytes(), contentTypeForFilename(filename))
-                    return@get
-                }
-            }
-
-            val base =
-                assetsBaseUrls[countryCode]
-                    ?: assetsBaseUrls.entries.firstOrNull()?.value
-                    ?: return@get call.respond(
-                        HttpStatusCode.NotImplemented,
-                        "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes",
-                    )
-            val redirectUrl = "$base/$companyDb/item/$filename"
-            call.respondRedirect(redirectUrl, permanent = false)
-        }
+        get("/item/{path...}") { handlers.servirItem(call) }
 
         /**
          * Imagen de cliente.
          * URL: .../cliente_foto/{idCliente}/{filename} (ej. .../46726248-.../46726248-..._foto.jpeg)
          */
-        get("/cliente_foto/{idCliente}/{filename}") {
-            val countryCode =
-                call.parameters["countryCode"]?.takeIf { it.length == 2 }?.uppercase()
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "countryCode inválido")
-            val companyDb =
-                call.parameters["companyDb"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "companyDb inválido")
-            val idCliente =
-                call.parameters["idCliente"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "idCliente inválido")
-            val filename =
-                call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "filename inválido")
+        get("/cliente_foto/{idCliente}/{filename}") { handlers.servirClienteFoto(call) }
+    }
+}
 
-            if (!dataBasePath.isNullOrBlank()) {
-                val file = File(dataBasePath, "$companyDb/cliente_foto/$idCliente/$filename")
-                log.info(
-                    "[CLIENTE_FOTO] dataBasePath=$dataBasePath path=${file.absolutePath} " +
-                        "exists=${file.exists()} isFile=${file.isFile}",
-                )
-                if (file.exists() && file.isFile) {
-                    call.respondBytes(file.readBytes(), contentTypeForFilename(filename))
-                    return@get
-                }
-            }
+private data class AssetRequestScope(
+    val countryCode: String,
+    val companyDb: String,
+)
 
-            val base =
-                assetsBaseUrls[countryCode]
-                    ?: assetsBaseUrls.entries.firstOrNull()?.value
-                    ?: return@get call.respond(
-                        HttpStatusCode.NotImplemented,
-                        "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes",
-                    )
-            val redirectUrl = "$base/$companyDb/cliente_foto/$idCliente/$filename"
-            log.info("[CLIENTE_FOTO] redirect idCliente=$idCliente filename=$filename redirectUrl=$redirectUrl")
-            call.respondRedirect(redirectUrl, permanent = false)
+/**
+ * Handlers de los endpoints de assets (imágenes de productos y clientes).
+ */
+internal class AssetsHandlers(
+    private val assetsBaseUrls: Map<String, String>,
+    private val dataBasePath: String?,
+) {
+    private val log = LoggerFactory.getLogger("AssetsRoutes")
+
+    suspend fun servirItem(call: ApplicationCall) = run {
+        val scope = call.resolveAssetScope() ?: return@run
+        val pathSegments = call.parameters.getAll("path") ?: emptyList()
+        val path = pathSegments.joinToString("/")
+        if (path.isBlank() || path.contains("..")) {
+            call.respond(HttpStatusCode.BadRequest, "path inválido")
+            return@run
         }
+        val filename = path.substringAfterLast('/').ifBlank { path }
+        if (filename.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, "filename inválido")
+            return@run
+        }
+
+        val localFile = localFile(File(dataBasePath ?: "", "${scope.companyDb}/item/$filename"))
+        if (localFile != null) {
+            call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
+            return@run
+        }
+
+        redirectToAssetsBase(call, scope, "item/$filename")
+    }
+
+    suspend fun servirClienteFoto(call: ApplicationCall) = run {
+        val scope = call.resolveAssetScope() ?: return@run
+        val idCliente =
+            call.parameters["idCliente"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+        if (idCliente == null) {
+            call.respond(HttpStatusCode.BadRequest, "idCliente inválido")
+            return@run
+        }
+        val filename =
+            call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+        if (filename == null) {
+            call.respond(HttpStatusCode.BadRequest, "filename inválido")
+            return@run
+        }
+
+        val localFile =
+            localFile(File(dataBasePath ?: "", "${scope.companyDb}/cliente_foto/$idCliente/$filename"))
+        if (localFile != null) {
+            call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
+            return@run
+        }
+
+        redirectToAssetsBase(call, scope, "cliente_foto/$idCliente/$filename")
+    }
+
+    private fun localFile(file: File): File? {
+        if (dataBasePath.isNullOrBlank()) return null
+        log.info(
+            "[ASSETS] dataBasePath=$dataBasePath path=${file.absolutePath} " +
+                "exists=${file.exists()} isFile=${file.isFile}",
+        )
+        return file.takeIf { it.exists() && it.isFile }
+    }
+
+    private suspend fun redirectToAssetsBase(
+        call: ApplicationCall,
+        scope: AssetRequestScope,
+        relativePath: String,
+    ) {
+        val base =
+            assetsBaseUrls[scope.countryCode]
+                ?: assetsBaseUrls.entries.firstOrNull()?.value
+        if (base == null) {
+            call.respond(
+                HttpStatusCode.NotImplemented,
+                "Configure ASSETS_BASE_URL o DATA_BASE_PATH para servir imágenes",
+            )
+            return
+        }
+        val redirectUrl = "$base/${scope.companyDb}/$relativePath"
+        log.info("[ASSETS] redirect path=$relativePath redirectUrl=$redirectUrl")
+        call.respondRedirect(redirectUrl, permanent = false)
+    }
+
+    private suspend fun ApplicationCall.resolveAssetScope(): AssetRequestScope? = run {
+        val countryCode = parameters["countryCode"]?.takeIf { it.length == 2 }?.uppercase()
+        if (countryCode == null) {
+            respond(HttpStatusCode.BadRequest, "countryCode inválido")
+            return@run null
+        }
+        val companyDb = parameters["companyDb"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+        if (companyDb == null) {
+            respond(HttpStatusCode.BadRequest, "companyDb inválido")
+            return@run null
+        }
+        AssetRequestScope(countryCode = countryCode, companyDb = companyDb)
     }
 }
 

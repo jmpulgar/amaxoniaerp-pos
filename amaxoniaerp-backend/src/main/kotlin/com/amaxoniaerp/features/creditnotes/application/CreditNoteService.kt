@@ -89,7 +89,7 @@ class CreditNoteService(
 
         return when (val result = processor.process(database, prepared, companyDb)) {
             is PanamaCreditNotePacResult.Accepted -> {
-                try {
+                runCatching {
                     val response =
                         dbQuery(database) {
                             repository.finalizePanamaAccepted(
@@ -116,7 +116,8 @@ class CreditNoteService(
                         }
                         response.copy(fiscalMessage = diagnostic)
                     }
-                } catch (e: Exception) {
+                }.getOrElse { e ->
+                    if (e is Error) throw e
                     logger.error("PAC aceptó NC PA {}, pero falló la persistencia local", prepared.id, e)
                     val diagnostic =
                         buildString {

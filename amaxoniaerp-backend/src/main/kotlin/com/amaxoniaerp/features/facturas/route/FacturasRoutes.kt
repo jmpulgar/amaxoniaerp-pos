@@ -1,8 +1,7 @@
 package com.amaxoniaerp.features.facturas.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.core.tenant.getAdminDb
-import com.amaxoniaerp.core.tenant.getCountryCode
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
 import com.amaxoniaerp.features.facturas.data.FacturasFilter
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
@@ -10,10 +9,8 @@ import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
-import io.ktor.http.parameters
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -30,373 +27,177 @@ fun Route.facturasRoutes(
     facturasRepository: FacturasRepository,
     panamaInvoiceProcessor: PanamaInvoiceProcessor,
 ) {
+    val handlers = FacturasHandlers(facturasRepository, panamaInvoiceProcessor)
+
     authenticate {
         route("/facturas") {
-            get {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
-                val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
-
-                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Invalid pagination parameters"),
-                    )
-                }
-
-                val filter =
-                    call.request.queryParameters.toFacturasFilter().getOrElse { error ->
-                        return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to (error.message ?: "Invalid invoice filters")),
-                        )
-                    }
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val (facturas, total) =
-                    facturasRepository.listFacturas(
-                        database = companyDb,
-                        countryCode = countryCode,
-                        limit = limit,
-                        offset = offset,
-                        filter = filter,
-                    )
-
-                call.respond(FacturasListResponse(data = facturas, total = total))
-            }
-
-            get("/resumen") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                val filter =
-                    call.request.queryParameters.toFacturasFilter().getOrElse { error ->
-                        return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to (error.message ?: "Invalid invoice filters")),
-                        )
-                    }
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val resumen = facturasRepository.getResumen(companyDb, countryCode, filter)
-                call.respond(resumen)
-            }
-
-            get("/by-id-factura/{idFactura}") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-                val adminDb =
-                    principal.getAdminDb()?.takeIf(String::isNotBlank)
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Database not found"),
-                        )
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-                val idFactura =
-                    call.parameters["idFactura"]?.takeIf(String::isNotBlank)
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Missing idFactura"),
-                        )
-                val database = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val factura = facturasRepository.findByCorrelationId(database, countryCode, idFactura)
-                if (factura == null) {
-                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
-                } else {
-                    call.respond(factura)
-                }
-            }
-
-            get("/{id}/detalle") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                val facturaId =
-                    call.parameters["id"]
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Missing factura ID"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val detalle = facturasRepository.getFacturaDetalle(companyDb, countryCode, facturaId)
-
-                if (detalle == null) {
-                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
-                } else {
-                    call.respond(detalle)
-                }
-            }
-
-            get("/{id}/print-payload") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                val facturaId =
-                    call.parameters["id"]
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Missing factura ID"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                // El repositorio valida internamente los países soportados (PA/VE) y
-                // omite los campos fiscales propios de Panamá cuando corresponde.
-                // No bloquear el país aquí: si la configuración del POS permite el
-                // driver/payload, debe aceptarse a lo largo de toda la cadena.
-                val payload =
-                    try {
-                        facturasRepository.getPrintPayload(
-                            database = companyDb,
-                            countryCode = countryCode,
-                            facturaId = facturaId,
-                            companyNameFallback = adminDb,
-                        )
-                    } catch (e: IllegalArgumentException) {
-                        return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to (e.message ?: "Payload de impresión no disponible")),
-                        )
-                    }
-
-                if (payload == null) {
-                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
-                } else {
-                    call.respond(payload)
-                }
-            }
-
-            patch("/{id}/confirmacion-fiscal") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@patch call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@patch call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@patch call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@patch call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                val facturaId =
-                    call.parameters["id"]
-                        ?: return@patch call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Missing factura ID"),
-                        )
-
-                val request = call.receive<ConfirmFacturaFiscalRequest>()
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                try {
-                    val response = facturasRepository.confirmFiscal(companyDb, countryCode, facturaId, request)
-                    call.respond(response)
-                } catch (e: NoSuchElementException) {
-                    call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Factura no encontrada")))
-                }
-            }
-
-            post("/{id}/enviar-correo") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@post call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Invalid token"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@post call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Company token required"),
-                    )
-                }
-
-                val adminDb = principal.getAdminDb()
-                if (adminDb.isNullOrBlank()) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Database not found"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Country code not found"),
-                        )
-
-                if (!countryCode.equals("PA", ignoreCase = true)) {
-                    return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "El envío por correo FEL solo está disponible para Panamá"),
-                    )
-                }
-
-                val facturaId =
-                    call.parameters["id"]
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Missing factura ID"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                panamaInvoiceProcessor.resendInvoiceEmail(companyDb, facturaId).fold(
-                    onSuccess = { call.respond(it) },
-                    onFailure = { throwable ->
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to (throwable.message ?: "No se pudo enviar el correo")),
-                        )
-                    },
-                )
-            }
+            get { handlers.listar(call) }
+            get("/resumen") { handlers.resumen(call) }
+            get("/by-id-factura/{idFactura}") { handlers.porIdFactura(call) }
+            get("/{id}/detalle") { handlers.detalle(call) }
+            get("/{id}/print-payload") { handlers.printPayload(call) }
+            patch("/{id}/confirmacion-fiscal") { handlers.confirmarFiscal(call) }
+            post("/{id}/enviar-correo") { handlers.enviarCorreo(call) }
         }
+    }
+}
+
+/**
+ * Handlers de los endpoints de facturas. Resuelven tenant por el seam canónico,
+ * delegan en el repositorio/processor y mapean los resultados a HTTP.
+ */
+internal class FacturasHandlers(
+    private val facturasRepository: FacturasRepository,
+    private val panamaInvoiceProcessor: PanamaInvoiceProcessor,
+) {
+    suspend fun listar(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
+        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+
+        if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid pagination parameters"))
+            return@run
+        }
+
+        val filter =
+            call.request.queryParameters.toFacturasFilter().getOrElse { error ->
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: "Invalid invoice filters")))
+                return@run
+            }
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val (facturas, total) =
+            facturasRepository.listFacturas(
+                database = companyDb,
+                countryCode = ctx.countryCode,
+                limit = limit,
+                offset = offset,
+                filter = filter,
+            )
+
+        call.respond(FacturasListResponse(data = facturas, total = total))
+    }
+
+    suspend fun resumen(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val filter =
+            call.request.queryParameters.toFacturasFilter().getOrElse { error ->
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (error.message ?: "Invalid invoice filters")))
+                return@run
+            }
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val resumen = facturasRepository.getResumen(companyDb, ctx.countryCode, filter)
+        call.respond(resumen)
+    }
+
+    suspend fun porIdFactura(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val idFactura = call.requireParameter("idFactura", "Missing idFactura") ?: return@run
+
+        val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val factura = facturasRepository.findByCorrelationId(database, ctx.countryCode, idFactura)
+        call.respondFactura(factura)
+    }
+
+    suspend fun detalle(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val detalle = facturasRepository.getFacturaDetalle(companyDb, ctx.countryCode, facturaId)
+        call.respondFactura(detalle)
+    }
+
+    suspend fun printPayload(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        // El repositorio valida internamente los países soportados (PA/VE) y
+        // omite los campos fiscales propios de Panamá cuando corresponde.
+        // No bloquear el país aquí: si la configuración del POS permite el
+        // driver/payload, debe aceptarse a lo largo de toda la cadena.
+        val payload =
+            try {
+                facturasRepository.getPrintPayload(
+                    database = companyDb,
+                    countryCode = ctx.countryCode,
+                    facturaId = facturaId,
+                    companyNameFallback = ctx.adminDb,
+                )
+            } catch (e: IllegalArgumentException) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to (e.message ?: "Payload de impresión no disponible")),
+                )
+                return@run
+            }
+
+        call.respondFactura(payload)
+    }
+
+    suspend fun confirmarFiscal(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+        val request = call.receive<ConfirmFacturaFiscalRequest>()
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        try {
+            val response = facturasRepository.confirmFiscal(companyDb, ctx.countryCode, facturaId, request)
+            call.respond(response)
+        } catch (e: NoSuchElementException) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Factura no encontrada")))
+        }
+    }
+
+    suspend fun enviarCorreo(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        if (!ctx.countryCode.equals("PA", ignoreCase = true)) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to "El envío por correo FEL solo está disponible para Panamá"),
+            )
+            return@run
+        }
+
+        val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        panamaInvoiceProcessor.resendInvoiceEmail(companyDb, facturaId).fold(
+            onSuccess = { call.respond(it) },
+            onFailure = { throwable ->
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to (throwable.message ?: "No se pudo enviar el correo")),
+                )
+            },
+        )
+    }
+
+    private suspend inline fun <reified T> ApplicationCall.respondFactura(value: T?) {
+        if (value == null) {
+            respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
+        } else {
+            respond(value)
+        }
+    }
+
+    private suspend fun ApplicationCall.requireParameter(
+        name: String,
+        errorMessage: String,
+    ): String? = run {
+        val value = parameters[name]?.takeIf(String::isNotBlank)
+        if (value == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+            return@run null
+        }
+        value
     }
 }
 

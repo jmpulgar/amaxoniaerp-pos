@@ -86,11 +86,12 @@ class ProcessSaleUseCase(
         countryCode: String,
         saleResult: ProcessSaleResponse,
     ): ProcessSaleResponse =
-        try {
+        runCatching {
             val processor = feFactory.forCountry(countryCode)
             val feResult = processor.processElectronicInvoice(database, saleResult.idFactura)
             applyFeResult(countryCode, saleResult, feResult)
-        } catch (e: Exception) {
+        }.getOrElse { e ->
+            if (e is Error) throw e
             // Error inesperado en FE. La venta ya está guardada, no se revierte.
             logger.error(
                 "Error inesperado en FE para factura {}. La venta fue procesada correctamente.",

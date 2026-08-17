@@ -57,12 +57,13 @@ public fun verifyDatabaseConnection(
     database: Database,
     log: org.slf4j.Logger,
 ) {
-    try {
+    runCatching {
         transaction(database) {
             exec("SELECT 1")
         }
+    }.onSuccess {
         log.info("Database connection OK")
-    } catch (ex: Exception) {
+    }.onFailure { ex ->
         log.error("Database connection failed: ${ex.message}", ex)
         throw ex
     }

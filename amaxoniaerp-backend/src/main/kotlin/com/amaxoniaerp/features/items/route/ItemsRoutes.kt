@@ -1,8 +1,8 @@
 package com.amaxoniaerp.features.items.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.core.tenant.getAdminDb
-import com.amaxoniaerp.core.tenant.getCountryCode
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
+import com.amaxoniaerp.features.facturas.data.getBestSellerItemQuantities
 import com.amaxoniaerp.features.items.data.ItemsRepository
 import com.amaxoniaerp.features.items.domain.BestSellerItemResponse
 import com.amaxoniaerp.features.items.domain.BestSellersApiResponse
@@ -11,10 +11,8 @@ import com.amaxoniaerp.features.items.domain.DepartmentItemResponse
 import com.amaxoniaerp.features.items.domain.DepartmentsApiResponse
 import com.amaxoniaerp.features.items.domain.ProductsListResponse
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.parameters
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -23,20 +21,22 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
-private const val ERR_MISSING_COUNTRY = "Falta country_code en token"
-private const val ERR_MISSING_ADMIN_DB = "Falta admin_db en token"
-
 private const val DEFAULT_PAGE_LIMIT = 100
 private const val MAX_PAGE_LIMIT = 1_000
 private const val MIN_BEST_SELLERS_LIMIT = 1
 private const val MAX_BEST_SELLERS_LIMIT = 50
 private const val DEFAULT_BEST_SELLERS_LIMIT = 20
 
+private const val ERR_INVALID_PRODUCT_ID = "ID de producto inválido"
+private const val ERR_PRODUCT_NOT_FOUND = "Producto no encontrado"
+
 /**
  * Rutas de items Multi-Tenant con Safe Parsing.
  * Utiliza claims del JWT para routing dinámico a la BD correcta.
  */
 fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
+    val handlers = ItemsHandlers(itemsRepository)
+
     authenticate {
         route("/items") {
             /**
@@ -44,504 +44,261 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
              *
              * Requiere: JWT Company Token con claims country_code y admin_db
              */
-            get {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
+            get { handlers.listar(call) }
 
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
+            /** GET /items/departments - Lista departamentos con productos. */
+            get("departments") { handlers.departamentos(call) }
 
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val limitParam = call.request.queryParameters["limit"]?.toIntOrNull()
-                val offsetParam = call.request.queryParameters["offset"]?.toLongOrNull()
-                val limit = limitParam ?: DEFAULT_PAGE_LIMIT
-                val offset = offsetParam ?: 0L
-                val search = call.request.queryParameters["search"]
-                val includeTotalParam = call.request.queryParameters["includeTotal"]
-                val includeTotal = includeTotalParam?.toBooleanStrictOrNull() ?: true
-                val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
-
-                if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
-                    return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Parámetros de paginación inválidos"),
-                    )
-                }
-
-                // Conectar a BD de empresa usando Two-Tier routing
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-
-                val (items, total) =
-                    itemsRepository.listItems(
-                        database = companyDb,
-                        countryCode = countryCode,
-                        limit = limit,
-                        offset = offset,
-                        search = search,
-                        includeTotal = includeTotal,
-                        departmentId = departmentIdParam,
-                    )
-
-                call.respond(ProductsListResponse(data = items, total = total))
-            }
-
-            /**
-             * GET /items/departments - Lista departamentos con productos.
-             */
-            get("departments") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listDepartments(database = companyDb)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
-
-            get("sections") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val departmentId =
-                    call.request.queryParameters["departmentId"]?.toIntOrNull()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "departmentId inválido"))
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listSections(database = companyDb, departmentId = departmentId)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
-
-            get("families") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val sectionId =
-                    call.request.queryParameters["sectionId"]?.toIntOrNull()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "sectionId inválido"))
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listFamilies(database = companyDb, sectionId = sectionId)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
-
-            get("subfamilies") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val familyId =
-                    call.request.queryParameters["familyId"]?.toIntOrNull()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "familyId inválido"))
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listSubFamilies(database = companyDb, familyId = familyId)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
-
-            get("brands") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listBrands(database = companyDb)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
-
-            get("lines") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val brandId =
-                    call.request.queryParameters["brandId"]?.toIntOrNull()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "brandId inválido"))
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val list = itemsRepository.listLines(database = companyDb, brandId = brandId)
-                val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
-                call.respond(DepartmentsApiResponse(data = data))
-            }
+            get("sections") { handlers.secciones(call) }
+            get("families") { handlers.familias(call) }
+            get("subfamilies") { handlers.subfamilias(call) }
+            get("brands") { handlers.marcas(call) }
+            get("lines") { handlers.lineas(call) }
 
             /**
              * GET /items/best-sellers - Productos más vendidos desde factura_detalle.
              */
-            get("best-sellers") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
-                if (principal.payload.getClaim("token_type").asString() != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_COUNTRY))
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_MISSING_ADMIN_DB))
-                val limit =
-                    call.request.queryParameters["limit"]
-                        ?.toIntOrNull()
-                        ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val quantities =
-                    com.amaxoniaerp.features.facturas.data
-                        .getBestSellerItemQuantities(companyDb, limit)
-                val ids = quantities.map { it.first }
-                val products = itemsRepository.getItemsByIds(companyDb, countryCode, ids)
-                val productMap = products.associateBy { it.id.toIntOrNull() ?: 0 }
-                val data =
-                    quantities.mapNotNull { (id, salesCount) ->
-                        productMap[id]?.let { p ->
-                            BestSellerItemResponse(
-                                id = p.id,
-                                name = p.description,
-                                price = p.prices.firstOrNull()?.pricePlusTax ?: 0.0,
-                                salesCount = salesCount.toInt(),
-                                photoUrl = p.photoUrl,
-                            )
-                        }
-                    }
-                call.respond(BestSellersApiResponse(data = data))
-            }
+            get("best-sellers") { handlers.masVendidos(call) }
 
             /**
              * POST /items - Crea un nuevo producto.
              */
-            post {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@post call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@post call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val request = call.receive<CreateProductRequest>()
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-
-                val product =
-                    itemsRepository.createItem(
-                        database = companyDb,
-                        countryCode = countryCode,
-                        request = request,
-                    )
-
-                call.respond(HttpStatusCode.Created, product)
-            }
+            post { handlers.crear(call) }
 
             /**
              * PUT /items/{id} - Actualiza un producto.
              */
-            put("/{id}") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@put call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@put call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val id =
-                    call.parameters["id"]?.toIntOrNull()
-                        ?: return@put call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "ID de producto inválido"),
-                        )
-
-                val request = call.receive<CreateProductRequest>()
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-
-                val product =
-                    itemsRepository.updateItem(
-                        database = companyDb,
-                        countryCode = countryCode,
-                        id = id,
-                        request = request,
-                    ) ?: return@put call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "Producto no encontrado"),
-                    )
-
-                call.respond(product)
-            }
+            put("/{id}") { handlers.actualizar(call) }
 
             /**
              * GET /items/{id} - Obtiene un producto por ID.
              */
-            get("/{id}") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val id =
-                    call.parameters["id"]?.toIntOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "ID de producto inválido"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-
-                val product =
-                    itemsRepository.getItemById(
-                        database = companyDb,
-                        countryCode = countryCode,
-                        id = id,
-                    ) ?: return@get call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "Producto no encontrado"),
-                    )
-
-                call.respond(product)
-            }
+            get("/{id}") { handlers.detalle(call) }
 
             /**
              * GET /items/{id}/lots - Lotes disponibles para un producto (FEFO).
              */
-            get("/{id}/lots") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token invalido"),
-                        )
-
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val id =
-                    call.parameters["id"]?.toIntOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "ID de producto invalido"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val lots = itemsRepository.getItemLots(companyDb, id)
-                call.respond(lots)
-            }
+            get("/{id}/lots") { handlers.lotes(call) }
 
             /**
              * GET /items/{id}/stock - Inventario por almacen con precompromisos.
              */
-            get("/{id}/stock") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@get call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
+            get("/{id}/stock") { handlers.stock(call) }
+        }
+    }
+}
 
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
+/**
+ * Handlers de los endpoints de items. Resuelven tenant por el seam canónico,
+ * delegan en el repositorio y mapean los resultados a HTTP.
+ */
+internal class ItemsHandlers(
+    private val itemsRepository: ItemsRepository,
+) {
+    suspend fun listar(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT
+        val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
+        val search = call.request.queryParameters["search"]
+        val includeTotal = call.request.queryParameters["includeTotal"]?.toBooleanStrictOrNull() ?: true
+        val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
+
+        if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
+            return@run
+        }
+
+        // Conectar a BD de empresa usando Two-Tier routing
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+        val (items, total) =
+            itemsRepository.listItems(
+                database = companyDb,
+                countryCode = ctx.countryCode,
+                limit = limit,
+                offset = offset,
+                search = search,
+                includeTotal = includeTotal,
+                departmentId = departmentIdParam,
+            )
+
+        call.respond(ProductsListResponse(data = items, total = total))
+    }
+
+    suspend fun departamentos(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val list = itemsRepository.listDepartments(database = database)
+        call.respondDepartments(list)
+    }
+
+    suspend fun secciones(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val departmentId = call.requireIntQuery("departmentId", "departmentId inválido") ?: return@run
+        val list = itemsRepository.listSections(database = database, departmentId = departmentId)
+        call.respondDepartments(list)
+    }
+
+    suspend fun familias(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val sectionId = call.requireIntQuery("sectionId", "sectionId inválido") ?: return@run
+        val list = itemsRepository.listFamilies(database = database, sectionId = sectionId)
+        call.respondDepartments(list)
+    }
+
+    suspend fun subfamilias(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val familyId = call.requireIntQuery("familyId", "familyId inválido") ?: return@run
+        val list = itemsRepository.listSubFamilies(database = database, familyId = familyId)
+        call.respondDepartments(list)
+    }
+
+    suspend fun marcas(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val list = itemsRepository.listBrands(database = database)
+        call.respondDepartments(list)
+    }
+
+    suspend fun lineas(call: ApplicationCall) = run {
+        val database = resolveDatabase(call) ?: return@run
+        val brandId = call.requireIntQuery("brandId", "brandId inválido") ?: return@run
+        val list = itemsRepository.listLines(database = database, brandId = brandId)
+        call.respondDepartments(list)
+    }
+
+    suspend fun masVendidos(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val limit =
+            call.request.queryParameters["limit"]
+                ?.toIntOrNull()
+                ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val quantities = getBestSellerItemQuantities(companyDb, limit)
+        val ids = quantities.map { it.first }
+        val products = itemsRepository.getItemsByIds(companyDb, ctx.countryCode, ids)
+        val productMap = products.associateBy { it.id.toIntOrNull() ?: 0 }
+        val data =
+            quantities.mapNotNull { (id, salesCount) ->
+                productMap[id]?.let { p ->
+                    BestSellerItemResponse(
+                        id = p.id,
+                        name = p.description,
+                        price = p.prices.firstOrNull()?.pricePlusTax ?: 0.0,
+                        salesCount = salesCount.toInt(),
+                        photoUrl = p.photoUrl,
                     )
                 }
-
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_COUNTRY),
-                        )
-
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to ERR_MISSING_ADMIN_DB),
-                        )
-
-                val id =
-                    call.parameters["id"]?.toIntOrNull()
-                        ?: return@get call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "ID de producto inválido"),
-                        )
-
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-                val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
-                call.respond(stock)
             }
+        call.respond(BestSellersApiResponse(data = data))
+    }
+
+    suspend fun crear(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+
+        val request = call.receive<CreateProductRequest>()
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+        val product =
+            itemsRepository.createItem(
+                database = companyDb,
+                countryCode = ctx.countryCode,
+                request = request,
+            )
+
+        call.respond(HttpStatusCode.Created, product)
+    }
+
+    suspend fun actualizar(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+        val request = call.receive<CreateProductRequest>()
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+        val product =
+            itemsRepository.updateItem(
+                database = companyDb,
+                countryCode = ctx.countryCode,
+                id = id,
+                request = request,
+            )
+        if (product == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
+            return@run
         }
+
+        call.respond(product)
+    }
+
+    suspend fun detalle(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+
+        val product =
+            itemsRepository.getItemById(
+                database = companyDb,
+                countryCode = ctx.countryCode,
+                id = id,
+            )
+        if (product == null) {
+            call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
+            return@run
+        }
+
+        call.respond(product)
+    }
+
+    suspend fun lotes(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val lots = itemsRepository.getItemLots(companyDb, id)
+        call.respond(lots)
+    }
+
+    suspend fun stock(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
+        val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
+
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
+        call.respond(stock)
+    }
+
+    private suspend fun resolveDatabase(call: ApplicationCall): org.jetbrains.exposed.sql.Database? = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run null
+        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+    }
+
+    private suspend fun ApplicationCall.respondDepartments(list: List<Pair<Int, String>>) {
+        val data = list.map { (id, name) -> DepartmentItemResponse(id = id, name = name) }
+        respond(DepartmentsApiResponse(data = data))
+    }
+
+    private suspend fun ApplicationCall.requireIntQuery(
+        name: String,
+        errorMessage: String,
+    ): Int? = run {
+        val value = request.queryParameters[name]?.toIntOrNull()
+        if (value == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+            return@run null
+        }
+        value
+    }
+
+    private suspend fun ApplicationCall.requireIntParam(
+        name: String,
+        errorMessage: String,
+    ): Int? = run {
+        val value = parameters[name]?.toIntOrNull()
+        if (value == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to errorMessage))
+            return@run null
+        }
+        value
     }
 }

@@ -40,13 +40,14 @@ class PanamaCreditNoteProcessor(
         database: Database,
         prepared: PreparedCreditNote,
         companyDb: String? = null,
-    ): PanamaCreditNotePacResult {
+    ): PanamaCreditNotePacResult = run {
         val context =
-            try {
+            runCatching {
                 repository.loadCreditNoteContext(database, prepared.id, prepared.numeroDocumentoFiscal)
-            } catch (e: Exception) {
+            }.getOrElse { e ->
+                if (e is Error) throw e
                 logger.error("No se pudo construir el contexto de NC PA {}", prepared.id, e)
-                return PanamaCreditNotePacResult.Rejected(
+                return@run PanamaCreditNotePacResult.Rejected(
                     codigo = "BUILD_CONTEXT",
                     mensaje = e.message ?: "No se pudo construir el contexto de la nota de crédito",
                 )
@@ -61,18 +62,19 @@ class PanamaCreditNoteProcessor(
         val token =
             pacClient.authenticate(credentials).getOrElse { error ->
                 logger.error("Error autenticando la NC PA {}", prepared.id, error)
-                return PanamaCreditNotePacResult.Uncertain(
+                return@run PanamaCreditNotePacResult.Uncertain(
                     codigo = "AUTH_ERROR",
                     mensaje = "Error de autenticación con el PAC: ${error.message}",
                 )
             }
 
         val payload =
-            try {
+            runCatching {
                 payloadBuilder.build(context)
-            } catch (e: Exception) {
+            }.getOrElse { e ->
+                if (e is Error) throw e
                 logger.error("Error construyendo payload de NC PA {}", prepared.id, e)
-                return PanamaCreditNotePacResult.Rejected(
+                return@run PanamaCreditNotePacResult.Rejected(
                     codigo = "BUILD_ERROR",
                     mensaje = "Error construyendo documento electrónico: ${e.message}",
                 )
@@ -86,7 +88,7 @@ class PanamaCreditNoteProcessor(
                     payload = payload,
                 ).getOrElse { error ->
                     logger.error("Error enviando NC PA {}", prepared.id, error)
-                    return PanamaCreditNotePacResult.Uncertain(
+                    return@run PanamaCreditNotePacResult.Uncertain(
                         codigo = "SEND_ERROR",
                         mensaje = "Error de comunicación con el PAC: ${error.message}",
                     )
@@ -94,7 +96,7 @@ class PanamaCreditNoteProcessor(
 
         if (!response.exitoso || response.cufe.isNullOrBlank()) {
             logger.warn("PAC rechazó NC PA {}: [{}] {}", prepared.id, response.codigo, response.mensaje)
-            return PanamaCreditNotePacResult.Rejected(response.codigo, response.mensaje)
+            return@run PanamaCreditNotePacResult.Rejected(response.codigo, response.mensaje)
         }
 
         val pdfDiagnostic =
@@ -127,6 +129,6 @@ class PanamaCreditNoteProcessor(
                     )
             }
 
-        return PanamaCreditNotePacResult.Accepted(response, pdfDiagnostic)
+        PanamaCreditNotePacResult.Accepted(response, pdfDiagnostic)
     }
 }

@@ -7,9 +7,11 @@ import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigurationExceptio
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
 import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
+import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
 import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceClient
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
@@ -45,47 +47,21 @@ class PanamaInvoiceProcessor(
     override suspend fun processElectronicInvoice(
         database: Database,
         invoiceId: String,
-    ): ElectronicInvoiceResult {
-        // ── 1. Obtener datos de la DB ────────────────────────────────────────
+    ): ElectronicInvoiceResult = run {
+        // ── 1/1b. Contexto + tipo_facturacion ────────────────────────────────
         val context =
-            try {
-                repository.loadInvoiceContext(database, invoiceId)
-            } catch (e: FEInvoiceNotFoundException) {
-                logger.error("Factura no encontrada para FE: {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("INVOICE_NOT_FOUND", e.message ?: "Factura no encontrada")
-            } catch (e: FEConfigurationException) {
-                logger.error("Configuración FE incompleta para factura: {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure("CONFIG_ERROR", e.message ?: "Configuración FE incompleta")
+            loadContextStep(database, invoiceId).getOrElse { e ->
+                return@run stepFailure(e)
             }
-
-        // ── 1b. Verificar tipo_facturacion ───────────────────────────────────
-        // tipo_facturacion: 0=PDF, 1=FISCAL, 2=FORMA LIBRE, 3=The Factory HKA (FE)
-        val tipoFact = context.config.tipoFacturacion
-        logger.info("[FE] tipo_facturacion=$tipoFact para factura $invoiceId")
-        if (tipoFact < PAC_FISCAL_TYPE_THRESHOLD) {
-            logger.info("[FE] tipo_facturacion=$tipoFact no requiere FE electrónica. Retornando NotApplicable.")
-            return ElectronicInvoiceResult.NotApplicable(countryCode)
-        }
 
         // ── 2. Autenticarse con el PAC ───────────────────────────────────────
         val tokenEmpresaLog = context.config.tokenEmpresa.take(LOG_CREDENTIAL_PREFIX_LENGTH)
         logger.info(
             "[FE] Autenticando con PAC: baseUrl=${context.config.apiTheFactoryHka} usuario=$tokenEmpresaLog...",
         )
-        val credentials =
-            PacCredentials(
-                usuario = context.config.tokenEmpresa,
-                clave = context.config.tokenPassword,
-                baseUrl = context.config.apiTheFactoryHka,
-            )
-
         val token =
-            pacClient.authenticate(credentials).getOrElse { e ->
-                logger.error("Error autenticando con PAC para factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure(
-                    "AUTH_ERROR",
-                    "Error de autenticación con el PAC: ${e.message}",
-                )
+            authenticateStep(invoiceId, context).getOrElse { e ->
+                return@run stepFailure(e)
             }
 
         // ── 3. Construir el payload ──────────────────────────────────────────
@@ -94,14 +70,8 @@ class PanamaInvoiceProcessor(
                 "Construyendo payload para factura $invoiceId...",
         )
         val payload =
-            try {
-                payloadBuilder.build(context)
-            } catch (e: Exception) {
-                logger.error("Error construyendo payload FE para factura {}", invoiceId, e)
-                return ElectronicInvoiceResult.Failure(
-                    "BUILD_ERROR",
-                    "Error construyendo documento electrónico: ${e.message}",
-                )
+            buildPayloadStep(invoiceId, context).getOrElse { e ->
+                return@run stepFailure(e)
             }
         logPayloadDiagnostics(invoiceId, context, payload)
 
@@ -111,78 +81,17 @@ class PanamaInvoiceProcessor(
                 "punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} " +
                 "items=${context.detalles.size} formasPago=${context.formasPago.size}",
         )
-        val pacResponse =
-            pacClient
-                .sendDocument(
-                    baseUrl = context.config.apiTheFactoryHka,
-                    token = token,
-                    payload = payload,
-                ).getOrElse { e ->
-                    logger.error("Error enviando documento al PAC para factura {}", invoiceId, e)
-                    return ElectronicInvoiceResult.Failure(
-                        "SEND_ERROR",
-                        "Error de comunicación con el PAC: ${e.message}",
-                    )
-                }
+        val pacAccepted =
+            sendDocumentStep(invoiceId, context, token, payload).getOrElse { e ->
+                return@run stepFailure(e)
+            }
 
-        // ── 5. Evaluar respuesta ─────────────────────────────────────────────
-        logger.info(
-            "[FE] Respuesta PAC: exitoso=${pacResponse.exitoso} " +
-                "codigo=${pacResponse.codigo} mensaje=${pacResponse.mensaje} " +
-                "cufe=${pacResponse.cufe?.take(CUFE_LOG_PREFIX_LENGTH)}",
-        )
-        if (!pacResponse.exitoso || pacResponse.cufe.isNullOrBlank()) {
-            logger.warn(
-                "PAC rechazó factura {}: [{}] {}",
-                invoiceId,
-                pacResponse.codigo,
-                pacResponse.mensaje,
-            )
-            return ElectronicInvoiceResult.Failure(
-                pacResponse.codigo,
-                pacResponse.mensaje,
-            )
-        }
-
-        // ── 6. Actualizar DB con CUFE, QR, fecha DGI ────────────────────────
-        try {
-            repository.updateInvoiceWithFEResponse(
-                database = database,
-                invoiceId = invoiceId,
-                numeroDocumentoFiscal = context.factura.numeroDocumentoFiscal,
-                puntoFacturacionFiscal = context.puntoFacturacionFiscal,
-                cufe = pacResponse.cufe,
-                qr = pacResponse.qr,
-                fechaRecepcionDGI = pacResponse.fechaRecepcionDGI,
-                nroProtocolo = pacResponse.nroProtocoloAutorizacion,
-                fechaLimite = pacResponse.fechaLimite,
-            )
-        } catch (e: Exception) {
-            // El documento ya fue aceptado por la DGI, pero fallo al guardar.
-            // Loggear como ERROR critico pero retornar Success con advertencia.
-            logger.error(
-                "CUFE={} aceptado por DGI pero error al guardar en DB para factura {}",
-                pacResponse.cufe,
-                invoiceId,
-                e,
-            )
-        }
-
-        // ── 7. Incrementar correlativo fiscal ────────────────────────────────
-        try {
-            repository.incrementNumeroDocumentoFiscal(database)
-        } catch (e: Exception) {
-            logger.error(
-                "Error incrementando correlativo fiscal tras FE exitosa para factura {}",
-                invoiceId,
-                e,
-            )
-        }
-
+        // ── 6/7. Persistencia post-aceptación (best-effort, log crítico) ─────
+        persistAcceptedInvoice(database, invoiceId, context, pacAccepted.response, pacAccepted.cufe)
         sendInvoiceEmailIfPossible(
             context = context,
             token = token,
-            cufe = pacResponse.cufe,
+            cufe = pacAccepted.cufe,
         ).onFailure { e ->
             logger.warn(
                 "FE exitosa para factura {}, pero no se pudo enviar el correo: {}",
@@ -194,17 +103,190 @@ class PanamaInvoiceProcessor(
         logger.info(
             "FE exitosa para factura {}. CUFE={}",
             invoiceId,
-            pacResponse.cufe,
+            pacAccepted.cufe,
         )
 
-        return ElectronicInvoiceResult.Success(
-            cufe = pacResponse.cufe,
-            qr = pacResponse.qr,
-            fechaRecepcionDGI = pacResponse.fechaRecepcionDGI,
-            nroProtocoloAutorizacion = pacResponse.nroProtocoloAutorizacion,
-            fechaLimite = pacResponse.fechaLimite,
+        ElectronicInvoiceResult.Success(
+            cufe = pacAccepted.cufe,
+            qr = pacAccepted.response.qr,
+            fechaRecepcionDGI = pacAccepted.response.fechaRecepcionDGI,
+            nroProtocoloAutorizacion = pacAccepted.response.nroProtocoloAutorizacion,
+            fechaLimite = pacAccepted.response.fechaLimite,
         )
     }
+
+    /** Paso 1/1b: carga el contexto y evalúa si la factura requiere FE. */
+    private suspend fun loadContextStep(
+        database: Database,
+        invoiceId: String,
+    ): Result<InvoiceFEContext> =
+        runCatching {
+            try {
+                repository.loadInvoiceContext(database, invoiceId)
+            } catch (e: FEInvoiceNotFoundException) {
+                logger.error("Factura no encontrada para FE: {}", invoiceId, e)
+                throw FeStepFailure(
+                    ElectronicInvoiceResult.Failure(
+                        "INVOICE_NOT_FOUND",
+                        e.message ?: "Factura no encontrada",
+                    ),
+                )
+            } catch (e: FEConfigurationException) {
+                logger.error("Configuración FE incompleta para factura: {}", invoiceId, e)
+                throw FeStepFailure(
+                    ElectronicInvoiceResult.Failure("CONFIG_ERROR", e.message ?: "Configuración FE incompleta"),
+                )
+            }
+        }.map { ctx ->
+            // tipo_facturacion: 0=PDF, 1=FISCAL, 2=FORMA LIBRE, 3=The Factory HKA (FE)
+            val tipoFact = ctx.config.tipoFacturacion
+            logger.info("[FE] tipo_facturacion=$tipoFact para factura $invoiceId")
+            if (tipoFact < PAC_FISCAL_TYPE_THRESHOLD) {
+                logger.info("[FE] tipo_facturacion=$tipoFact no requiere FE electrónica. Retornando NotApplicable.")
+                throw FeStepFailure(ElectronicInvoiceResult.NotApplicable(countryCode))
+            }
+            ctx
+        }
+
+    /** Paso 2: autenticación con el PAC. */
+    private suspend fun authenticateStep(
+        invoiceId: String,
+        context: InvoiceFEContext,
+    ): Result<PacAuthToken> =
+        pacClient
+            .authenticate(
+                PacCredentials(
+                    usuario = context.config.tokenEmpresa,
+                    clave = context.config.tokenPassword,
+                    baseUrl = context.config.apiTheFactoryHka,
+                ),
+            ).recoverCatching { e ->
+                if (e is FeStepFailure) throw e
+                logger.error("Error autenticando con PAC para factura {}", invoiceId, e)
+                throw FeStepFailure(
+                    ElectronicInvoiceResult.Failure(
+                        "AUTH_ERROR",
+                        "Error de autenticación con el PAC: ${e.message}",
+                    ),
+                )
+            }
+
+    /** Paso 3: construcción del payload. */
+    private fun buildPayloadStep(
+        invoiceId: String,
+        context: InvoiceFEContext,
+    ): Result<TheFactoryHkaDocumentoWrapper> =
+        runCatching {
+            payloadBuilder.build(context)
+        }.recoverCatching { e ->
+            if (e is FeStepFailure) throw e
+            logger.error("Error construyendo payload FE para factura {}", invoiceId, e)
+            throw FeStepFailure(
+                ElectronicInvoiceResult.Failure(
+                    "BUILD_ERROR",
+                    "Error construyendo documento electrónico: ${e.message}",
+                ),
+            )
+        }
+
+    /** Paso 4/5: envío del documento al PAC y evaluación de la respuesta. */
+    private suspend fun sendDocumentStep(
+        invoiceId: String,
+        context: InvoiceFEContext,
+        token: PacAuthToken,
+        payload: TheFactoryHkaDocumentoWrapper,
+    ): Result<PacAccepted> =
+        pacClient
+            .sendDocument(
+                baseUrl = context.config.apiTheFactoryHka,
+                token = token,
+                payload = payload,
+            ).map { response ->
+                logger.info(
+                    "[FE] Respuesta PAC: exitoso=${response.exitoso} " +
+                        "codigo=${response.codigo} mensaje=${response.mensaje} " +
+                        "cufe=${response.cufe?.take(CUFE_LOG_PREFIX_LENGTH)}",
+                )
+                val cufe = response.cufe
+                if (!response.exitoso || cufe.isNullOrBlank()) {
+                    logger.warn(
+                        "PAC rechazó factura {}: [{}] {}",
+                        invoiceId,
+                        response.codigo,
+                        response.mensaje,
+                    )
+                    throw FeStepFailure(ElectronicInvoiceResult.Failure(response.codigo, response.mensaje))
+                }
+                PacAccepted(response = response, cufe = cufe)
+            }.recoverCatching { e ->
+                if (e is FeStepFailure) throw e
+                logger.error("Error enviando documento al PAC para factura {}", invoiceId, e)
+                throw FeStepFailure(
+                    ElectronicInvoiceResult.Failure(
+                        "SEND_ERROR",
+                        "Error de comunicación con el PAC: ${e.message}",
+                    ),
+                )
+            }
+
+    /** Respuesta PAC aceptada con CUFE garantizado no vacío. */
+    private data class PacAccepted(
+        val response: PacResponse,
+        val cufe: String,
+    )
+
+    /**
+     * Pasos 5-7: persistencia de la respuesta fiscal e incremento del
+     * correlativo. Best-effort: el documento ya fue aceptado por la DGI, los
+     * fallos sólo se registran como ERROR crítico.
+     */
+    private suspend fun persistAcceptedInvoice(
+        database: Database,
+        invoiceId: String,
+        context: InvoiceFEContext,
+        pacResponse: PacResponse,
+        cufe: String,
+    ) {
+        runCatching {
+            repository.updateInvoiceWithFEResponse(
+                database = database,
+                invoiceId = invoiceId,
+                numeroDocumentoFiscal = context.factura.numeroDocumentoFiscal,
+                puntoFacturacionFiscal = context.puntoFacturacionFiscal,
+                cufe = cufe,
+                qr = pacResponse.qr,
+                fechaRecepcionDGI = pacResponse.fechaRecepcionDGI,
+                nroProtocolo = pacResponse.nroProtocoloAutorizacion,
+                fechaLimite = pacResponse.fechaLimite,
+            )
+        }.onFailure { e ->
+            if (e is Error) throw e
+            // El documento ya fue aceptado por la DGI, pero fallo al guardar.
+            logger.error(
+                "CUFE={} aceptado por DGI pero error al guardar en DB para factura {}",
+                cufe,
+                invoiceId,
+                e,
+            )
+        }
+        runCatching {
+            repository.incrementNumeroDocumentoFiscal(database)
+        }.onFailure { e ->
+            if (e is Error) throw e
+            logger.error(
+                "Error incrementando correlativo fiscal tras FE exitosa para factura {}",
+                invoiceId,
+                e,
+            )
+        }
+    }
+
+    /** Falla interna de un paso del flujo PA; envuelve el resultado final. */
+    private class FeStepFailure(val result: ElectronicInvoiceResult) : RuntimeException()
+
+    /** Desenvuelve la falla de un paso; si no es esperada, la re-lanza. */
+    private fun stepFailure(e: Throwable): ElectronicInvoiceResult =
+        (e as? FeStepFailure)?.result ?: throw e
 
     suspend fun resendInvoiceEmail(
         database: Database,
