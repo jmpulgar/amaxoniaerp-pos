@@ -1,8 +1,8 @@
-package com.amaxoniaerp.features.clients.route
+﻿package com.amaxoniaerp.features.clients.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.core.tenant.getAdminDb
+import com.amaxoniaerp.core.tenant.getCountryCode
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.domain.ClientTypesListResponse
 import io.ktor.http.HttpStatusCode

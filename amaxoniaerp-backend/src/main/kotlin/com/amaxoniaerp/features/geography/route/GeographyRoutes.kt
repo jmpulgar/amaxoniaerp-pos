@@ -1,8 +1,8 @@
-package com.amaxoniaerp.features.geography.route
+﻿package com.amaxoniaerp.features.geography.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.core.tenant.getAdminDb
+import com.amaxoniaerp.core.tenant.getCountryCode
 import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.geography.domain.AddressLevelsListResponse
 import com.amaxoniaerp.features.geography.domain.CatalogListResponse

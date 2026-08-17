@@ -1,17 +1,15 @@
-package com.amaxoniaerp.features.sales.route
+﻿package com.amaxoniaerp.features.sales.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -19,82 +17,57 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
-private const val ERR_PROCESS_SALE = "Error interno al procesar venta"
-
 fun Route.salesRoutes(processSaleUseCase: ProcessSaleUseCase) {
-    val log = LoggerFactory.getLogger("SalesRoutes")
+    val handlers = SalesHandlers(processSaleUseCase)
 
     authenticate {
         route("/api/pos/ventas") {
-            post("/procesar") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: return@post call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf("error" to "Token inválido"),
-                        )
+            post("/procesar") { handlers.procesar(call) }
+        }
+    }
+}
 
-                val tokenType = principal.payload.getClaim("token_type").asString()
-                if (tokenType != "company") {
-                    return@post call.respond(
-                        HttpStatusCode.Forbidden,
-                        mapOf("error" to "Se requiere token de empresa"),
-                    )
-                }
+/**
+ * Handler del endpoint de procesar venta POS. Resuelve el tenant por el seam
+ * canónico, delega en el caso de uso y mapea los errores de dominio a HTTP.
+ */
+internal class SalesHandlers(
+    private val processSaleUseCase: ProcessSaleUseCase,
+) {
+    private val log = LoggerFactory.getLogger("SalesRoutes")
 
-                val countryCode =
-                    principal.getCountryCode()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta country_code en token"),
-                        )
+    suspend fun procesar(call: ApplicationCall) = run {
+        val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-                val adminDb =
-                    principal.getAdminDb()
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "Falta admin_db en token"),
-                        )
+        val request = call.receive<ProcessSaleRequest>()
+        log.info(
+            "Processing POS sale. country={} adminDb={} idCaja={} idCliente={} items={} pagos={} total={}",
+            ctx.countryCode,
+            ctx.adminDb,
+            request.factura.idCaja,
+            request.factura.idCliente,
+            request.items.size,
+            request.pagos.size,
+            request.factura.totalTotalFactura,
+        )
+        val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
 
-                val request = call.receive<ProcessSaleRequest>()
-                log.info(
-                    "Processing POS sale. country={} adminDb={} idCaja={} idCliente={} items={} pagos={} total={}",
-                    countryCode,
-                    adminDb,
-                    request.factura.idCaja,
-                    request.factura.idCliente,
-                    request.items.size,
-                    request.pagos.size,
-                    request.factura.totalTotalFactura,
-                )
-                val companyDb = DatabaseManager.connectToCompanyDb(countryCode, adminDb)
-
-                try {
-                    val result = processSaleUseCase.execute(companyDb, countryCode, request)
-                    log.info(
-                        "POS sale processed. country={} idFactura={} codFactura={} status={}",
-                        countryCode,
-                        result.idFactura,
-                        result.codFactura,
-                        result.codEstatus,
-                    )
-                    call.respond(HttpStatusCode.Created, result)
-                } catch (e: DuplicateInvoiceException) {
-                    call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))
-                } catch (e: InsufficientStockException) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Stock insuficiente")))
-                } catch (e: InvalidSaleRequestException) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-                } catch (e: Exception) {
-                    log.error(
-                        "Error processing POS sale. idCaja={} idCliente={}",
-                        request.factura.idCaja,
-                        request.factura.idCliente,
-                        e,
-                    )
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to ERR_PROCESS_SALE))
-                }
-            }
+        try {
+            val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
+            log.info(
+                "POS sale processed. country={} idFactura={} codFactura={} status={}",
+                ctx.countryCode,
+                result.idFactura,
+                result.codFactura,
+                result.codEstatus,
+            )
+            call.respond(HttpStatusCode.Created, result)
+        } catch (e: DuplicateInvoiceException) {
+            call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))
+        } catch (e: InsufficientStockException) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Stock insuficiente")))
+        } catch (e: InvalidSaleRequestException) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
         }
     }
 }

@@ -1,14 +1,12 @@
 package com.amaxoniaerp.features.mesas
 
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.core.tenant.requireUserId
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.domain.CajaScopeResult
 import com.amaxoniaerp.features.mesas.domain.CajaSucursalScope
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
 import org.jetbrains.exposed.sql.Database
 
@@ -25,43 +23,13 @@ internal data class PosCompanyContext(
 
 /**
  * Regla compartida con el resto de `/api/pos`: token de empresa, `admin_db`/`country_code`
- * tomados del JWT firmado, nunca del cliente.
+ * tomados del JWT firmado, nunca del cliente. Delega en el seam canónico de tenant
+ * y añade el claim `user_id`.
  */
-internal suspend fun ApplicationCall.resolvePosContext(): PosCompanyContext? {
-    val principal =
-        principal<JWTPrincipal>()
-            ?: run {
-                respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-                return null
-            }
-
-    if (principal.payload.getClaim("token_type").asString() != "company") {
-        respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-        return null
-    }
-
-    val countryCode =
-        principal.getCountryCode()
-            ?: run {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-                return null
-            }
-
-    val adminDb =
-        principal.getAdminDb()?.takeIf { it.isNotBlank() }
-            ?: run {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
-                return null
-            }
-
-    val userId =
-        principal.payload.getClaim("user_id").asInt()
-            ?: run {
-                respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido: falta user_id"))
-                return null
-            }
-
-    return PosCompanyContext(countryCode = countryCode, adminDb = adminDb, userId = userId)
+internal suspend fun ApplicationCall.resolvePosContext(): PosCompanyContext? = run {
+    val ctx = resolveCompanyRequestContext() ?: return@run null
+    val userId = ctx.requireUserId(this) ?: return@run null
+    PosCompanyContext(countryCode = ctx.countryCode, adminDb = ctx.adminDb, userId = userId)
 }
 
 /** Lee `cajaId` del query string y responde 400 si no viene. */

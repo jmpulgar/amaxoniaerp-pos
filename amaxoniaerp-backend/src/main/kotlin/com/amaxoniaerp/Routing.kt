@@ -85,7 +85,7 @@ fun Application.configureRouting() {
             )
             call.respond(
                 HttpStatusCode.InternalServerError,
-                mapOf("error" to (cause.message ?: "Error interno del servidor")),
+                mapOf("error" to "Error interno del servidor"),
             )
         }
     }
@@ -108,61 +108,14 @@ fun Application.configureRouting() {
     val formasPagoRepository = FormasPagoRepository()
     val promotionsRepository = PromotionsRepository()
     val mesasRepository = MesasRepository()
-    // Facturación Electrónica Panamá - HTTP Client + PAC + Strategy
-    val feHttpClient =
-        HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        encodeDefaults = false
-                        explicitNulls = false
-                        ignoreUnknownKeys = true
-                        prettyPrint = false
-                    },
-                )
-            }
-            install(Logging) {
-                level = LogLevel.INFO
-            }
-            engine {
-                requestTimeout = HTTP_REQUEST_TIMEOUT_MS
-            }
-        }
+
+    val feHttpClient = buildFeHttpClient()
     environment.monitor.subscribe(ApplicationStopped) {
         feHttpClient.close()
     }
 
-    val feRepository = ElectronicInvoiceRepository()
-    val pacClient = TheFactoryHkaRestClient(feHttpClient)
-    val payloadBuilder = TheFactoryHkaPayloadBuilder()
-    val panamaProcessor = PanamaInvoiceProcessor(feRepository, pacClient, payloadBuilder)
-
-    // Facturación Electrónica Venezuela (The Factory HKA FE).
-    // Activate cuando parametros_generales.tipo_facturacion == 5; usa el mismo
-    // HttpClient (con TLS+timeouts+hostname verification ya configurados).
-    val veRepository = VenezuelaElectronicInvoiceRepository()
-    val veHkaClient = VenezuelaHkaRestClient(feHttpClient)
-    val vePayloadBuilder = VenezuelaHkaPayloadBuilder()
-    val venezuelaProcessor =
-        VenezuelaInvoiceStrategy(
-            repository = veRepository,
-            hkaClient = veHkaClient,
-            payloadBuilder = vePayloadBuilder,
-        )
-    val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor, venezuelaProcessor)
-
-    val creditNoteRepository = CreditNoteRepository()
-    val creditNoteProcessor =
-        PanamaCreditNoteProcessor(
-            repository = feRepository,
-            pacClient = pacClient,
-            payloadBuilder = TheFactoryHkaCreditNotePayloadBuilder(payloadBuilder),
-            pdfStorage =
-                dataBasePath
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let(::FileSystemPanamaCreditNotePdfStorage),
-        )
-    val creditNoteService = CreditNoteService(creditNoteRepository, creditNoteProcessor)
+    val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
+    val creditNoteDependencies = buildCreditNoteDependencies(feDependencies, dataBasePath)
 
     routing {
         get("/") {
@@ -187,32 +140,110 @@ fun Application.configureRouting() {
         // CUENTA_SOLICITADA -> CERRADA_PAGADA) y pedidos (para saldos facturables).
         val cuentaMesaRepository = CuentaMesaRepository()
         val processSaleUseCase =
-            ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feFactory)
+            ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feDependencies.feFactory)
         sesionMesaRouting(mesasRepository, sesionMesaRepository)
         pedidoMesaRouting(pedidoMesaRepository)
         cuentaMesaRouting(cuentaMesaRepository, sesionMesaRepository, mesasRepository)
 
         promotionsRoutes(promotionsRepository)
         salesRoutes(processSaleUseCase)
-        creditNoteRoutes(creditNoteService)
-        electronicInvoiceRoutes(feFactory)
+        creditNoteRoutes(creditNoteDependencies.creditNoteService)
+        electronicInvoiceRoutes(feDependencies.feFactory)
 
-        val genericAssetsUrl = loadConfigValue("ASSETS_BASE_URL", "assets.baseUrl", dotenv)
-        val veAssetsUrl =
-            loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv)
-                ?: genericAssetsUrl
-        val paAssetsUrl =
-            loadConfigValue("ASSETS_BASE_URL_PA", "assets.baseUrlPA", dotenv)
-                ?: genericAssetsUrl
-        val assetsBaseUrls = mutableMapOf<String, String>()
-        if (!veAssetsUrl.isNullOrBlank()) assetsBaseUrls["VE"] = veAssetsUrl.trimEnd('/')
-        if (!paAssetsUrl.isNullOrBlank()) assetsBaseUrls["PA"] = paAssetsUrl.trimEnd('/')
+        val assetsBaseUrls = resolveAssetsBaseUrls(dotenv)
         assetsRoutes(assetsBaseUrls = assetsBaseUrls, dataBasePath = dataBasePath)
 
         // Rutas auxiliares que aún podrían necesitar refactoring
         clientsRoutes(clientsRepository)
         clientTypesRoutes(clientTypesRepository)
-        facturasRoutes(facturasRepository, panamaProcessor)
+        facturasRoutes(facturasRepository, feDependencies.panamaProcessor)
         geographyRoutes(geographyRepository)
     }
+}
+
+private fun buildFeHttpClient(): HttpClient =
+    HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    encodeDefaults = false
+                    explicitNulls = false
+                    ignoreUnknownKeys = true
+                    prettyPrint = false
+                },
+            )
+        }
+        install(Logging) {
+            level = LogLevel.INFO
+        }
+        engine {
+            requestTimeout = HTTP_REQUEST_TIMEOUT_MS
+        }
+    }
+
+private class FeDependencies(
+    val feFactory: ElectronicInvoiceProcessorFactory,
+    val panamaProcessor: PanamaInvoiceProcessor,
+    val feRepository: ElectronicInvoiceRepository,
+    val pacClient: TheFactoryHkaRestClient,
+    val payloadBuilder: TheFactoryHkaPayloadBuilder,
+)
+
+private fun buildElectronicInvoiceDependencies(feHttpClient: HttpClient): FeDependencies {
+    // Facturación Electrónica Panamá - HTTP Client + PAC + Strategy
+    val feRepository = ElectronicInvoiceRepository()
+    val pacClient = TheFactoryHkaRestClient(feHttpClient)
+    val payloadBuilder = TheFactoryHkaPayloadBuilder()
+    val panamaProcessor = PanamaInvoiceProcessor(feRepository, pacClient, payloadBuilder)
+
+    // Facturación Electrónica Venezuela (The Factory HKA FE).
+    // Activate cuando parametros_generales.tipo_facturacion == 5; usa el mismo
+    // HttpClient (con TLS+timeouts+hostname verification ya configurados).
+    val veRepository = VenezuelaElectronicInvoiceRepository()
+    val veHkaClient = VenezuelaHkaRestClient(feHttpClient)
+    val vePayloadBuilder = VenezuelaHkaPayloadBuilder()
+    val venezuelaProcessor =
+        VenezuelaInvoiceStrategy(
+            repository = veRepository,
+            hkaClient = veHkaClient,
+            payloadBuilder = vePayloadBuilder,
+        )
+    val feFactory = ElectronicInvoiceProcessorFactory(panamaProcessor, venezuelaProcessor)
+    return FeDependencies(feFactory, panamaProcessor, feRepository, pacClient, payloadBuilder)
+}
+
+private class CreditNoteDependencies(
+    val creditNoteService: CreditNoteService,
+)
+
+private fun buildCreditNoteDependencies(
+    fe: FeDependencies,
+    dataBasePath: String?,
+): CreditNoteDependencies {
+    val creditNoteRepository = CreditNoteRepository()
+    val creditNoteProcessor =
+        PanamaCreditNoteProcessor(
+            repository = fe.feRepository,
+            pacClient = fe.pacClient,
+            payloadBuilder = TheFactoryHkaCreditNotePayloadBuilder(fe.payloadBuilder),
+            pdfStorage =
+                dataBasePath
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(::FileSystemPanamaCreditNotePdfStorage),
+        )
+    return CreditNoteDependencies(CreditNoteService(creditNoteRepository, creditNoteProcessor))
+}
+
+private fun Application.resolveAssetsBaseUrls(dotenv: Map<String, String>): MutableMap<String, String> {
+    val genericAssetsUrl = loadConfigValue("ASSETS_BASE_URL", "assets.baseUrl", dotenv)
+    val veAssetsUrl =
+        loadConfigValue("ASSETS_BASE_URL_VE", "assets.baseUrlVE", dotenv)
+            ?: genericAssetsUrl
+    val paAssetsUrl =
+        loadConfigValue("ASSETS_BASE_URL_PA", "assets.baseUrlPA", dotenv)
+            ?: genericAssetsUrl
+    val assetsBaseUrls = mutableMapOf<String, String>()
+    if (!veAssetsUrl.isNullOrBlank()) assetsBaseUrls["VE"] = veAssetsUrl.trimEnd('/')
+    if (!paAssetsUrl.isNullOrBlank()) assetsBaseUrls["PA"] = paAssetsUrl.trimEnd('/')
+    return assetsBaseUrls
 }

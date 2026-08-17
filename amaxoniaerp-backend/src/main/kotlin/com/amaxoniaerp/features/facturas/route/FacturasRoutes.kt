@@ -1,8 +1,8 @@
 package com.amaxoniaerp.features.facturas.route
 
 import com.amaxoniaerp.core.database.DatabaseManager
-import com.amaxoniaerp.features.auth.route.getAdminDb
-import com.amaxoniaerp.features.auth.route.getCountryCode
+import com.amaxoniaerp.core.tenant.getAdminDb
+import com.amaxoniaerp.core.tenant.getCountryCode
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
 import com.amaxoniaerp.features.facturas.data.FacturasFilter
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
