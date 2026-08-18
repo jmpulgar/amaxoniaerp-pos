@@ -18,7 +18,7 @@ private val readersLog = LoggerFactory.getLogger("ElectronicInvoiceContextReader
 
 internal const val SQL_DATETIME_TEXT_LENGTH = 19
 
-/** Cabecera de factura + aliases de paÃƒÂ­ses usados en el JOIN (mismas instancias para lectura). */
+/** Cabecera de factura + aliases de países usados en el JOIN (mismas instancias para lectura). */
 internal class FacturaHeaderRow(
     val row: ResultRow,
     val paisLocal: Alias<FEPaisesReadTable>,
@@ -184,7 +184,7 @@ internal fun resolveCodigoSucursalYPuntoFacturacion(
             .firstOrNull()
 
     if (cajaRow == null) {
-        readersLog.warn("[FE] No se encontrÃƒÂ³ caja con id=$cajaId")
+        readersLog.warn("[FE] No se encontró caja con id=$cajaId")
     }
 
     val codigoFromCaja =
@@ -242,7 +242,7 @@ internal fun resolveNumeroDocumentoFiscal(): String {
             .firstOrNull()
 
     if (row == null) {
-        readersLog.warn("No se encontrÃƒÂ³ registro de correlativos para 'numeroDocumentoFiscal', usando 1")
+        readersLog.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal', usando 1")
         return "1"
     }
 

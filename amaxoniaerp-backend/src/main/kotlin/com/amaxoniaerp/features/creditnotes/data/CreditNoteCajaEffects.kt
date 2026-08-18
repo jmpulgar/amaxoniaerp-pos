@@ -39,7 +39,7 @@ internal data class PartialCashRegistration(
     val now: LocalDateTime,
 )
 
-/** Comando de restauraciÃ³n de inventario por devoluciÃ³n. */
+/** Comando de restauración de inventario por devolución. */
 internal data class InventoryRestore(
     val countryCode: String,
     val invoice: InvoiceHeader,
@@ -206,7 +206,7 @@ private fun insertCreditNoteKardex(cmd: InventoryRestore): String {
         it[kardexTable.idTransaccion] = kardexId
         it[kardexTable.tipoMovimientoAlmacen] = CREDIT_NOTE_KARDEX_MOVEMENT_TYPE
         it[kardexTable.autorizadoPor] = cmd.username.take(MAX_USERNAME_LENGTH)
-        it[kardexTable.observacion] = "Entrada por nota de crÃ©dito ${cmd.creditNoteCode}"
+        it[kardexTable.observacion] = "Entrada por nota de crédito ${cmd.creditNoteCode}"
         it[kardexTable.fecha] = cmd.date
         it[kardexTable.usuarioCreacion] = cmd.username.take(MAX_USERNAME_LENGTH)
         it[kardexTable.fechaCreacion] = cmd.now
@@ -363,7 +363,7 @@ internal fun registerAbono(cmd: AbonoRegistration) {
         it[monto] = cmd.total
         it[saldo] = cmd.total
         it[estatus] = 1
-        it[descripcion] = "Abono generado por nota de crÃ©dito ${cmd.creditNoteId}"
+        it[descripcion] = "Abono generado por nota de crédito ${cmd.creditNoteId}"
         it[observacion] = ""
         it[tipo] = "nota_credito"
         it[idOperacion] = cmd.creditNoteId

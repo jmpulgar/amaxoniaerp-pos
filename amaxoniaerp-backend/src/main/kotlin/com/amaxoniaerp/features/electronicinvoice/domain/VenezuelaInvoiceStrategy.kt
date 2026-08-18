@@ -14,36 +14,36 @@ import org.slf4j.LoggerFactory
 
 /**
  * Estrategia concreta [ElectronicInvoiceStrategy] para Venezuela con The Factory
- * HKA FacturaciÃ³n ElectrÃ³nica (FASE 1 - solo facturas tipoDocumento "01").
+ * HKA Facturación Electrónica (FASE 1 - solo facturas tipoDocumento "01").
  *
- * Flujo (post transacciÃ³n comercial; el `_UseCase_` ya hizo COMMIT):
+ * Flujo (post transacción comercial; el `_UseCase_` ya hizo COMMIT):
  *
- *   1. Cargar contexto (lectura). Si la configuraciÃ³n FE VE falta o es invÃ¡lida
+ *   1. Cargar contexto (lectura). Si la configuración FE VE falta o es inválida
  *      se retorna [ElectronicInvoiceResult.NotApplicable] sin propagar error.
- *   2. Recargar la factura (idempotencia): si ya tiene nÃºmero fiscal o control
+ *   2. Recargar la factura (idempotencia): si ya tiene número fiscal o control
  *      persistidos, retornar [ElectronicInvoiceResult.AlreadyIssued] sin
  *      llamar a HKA.
- *   3. Verificar `tipoDocumento == "01"`. Otro tipo â†’
+ *   3. Verificar `tipoDocumento == "01"`. Otro tipo →
  *      [ElectronicInvoiceResult.UnsupportedDocumentType].
- *   4. Autenticarse con HKA. Si falla credenciales â†’ Failure(AUTH_REJECTED).
+ *   4. Autenticarse con HKA. Si falla credenciales → Failure(AUTH_REJECTED).
  *   5. Consultar UltimoDocumento(serie, "01") para conocer el remoto.
- *   6. Reservar correlativo local ATÃ“MICAMENTE (transacciÃ³n breve y cerrada).
- *   7. Construir el payload con nÃºmero = max(local reservado, remoto+1).
+ *   6. Reservar correlativo local ATÓMICAMENTE (transacción breve y cerrada).
+ *   7. Construir el payload con número = max(local reservado, remoto+1).
  *   8. Enviar al PAC Emision_Procesar.
- *   9. Evaluar respuesta (HTTP, cÃ³digo, resultado, validaciones).
- *  10. En Ã©xito EXACTO (codigo==200 + resultado.numeroDocumento no vacÃ­o):
- *      persistir `numeroDocumentoFiscal` + `numero_control_thka` (atÃ³mico).
+ *   9. Evaluar respuesta (HTTP, código, resultado, validaciones).
+ *  10. En éxito EXACTO (codigo==200 + resultado.numeroDocumento no vacío):
+ *      persistir `numeroDocumentoFiscal` + `numero_control_thka` (atómico).
  *  11. En timeout/red/incertidumbre: NO persistir, retornar Uncertain.
  *      NO reintentar.
  *
- * SELECCIÃ“N HKA20 vs DIGITAL (FASE 1.1)
+ * SELECCIÓN HKA20 vs DIGITAL (FASE 1.1)
  * --------------------------------------
- * La decisiÃ³n entre la impresora fiscal HKA20 fÃ­sica (POS) y la facturaciÃ³n
- * digital Venezuela (PAC) NO se deduce aquÃ­ de `parametros_generales.tipo_facturacion`.
- * La fuente de verdad es el flag explÃ­cito del frontend (`ProcessSaleRequest.useHka20`),
+ * La decisión entre la impresora fiscal HKA20 física (POS) y la facturación
+ * digital Venezuela (PAC) NO se deduce aquí de `parametros_generales.tipo_facturacion`.
+ * La fuente de verdad es el flag explícito del frontend (`ProcessSaleRequest.useHka20`),
  * evaluado en `ProcessSaleUseCase.execute(...)` ANTES de invocar la strategy. Si el
- * uso del HKA20 es `true`, esta strategy **no se llama**: el backend sÃ³lo persiste
- * la venta comercial y el POS continÃºa con su flujo HKA20 existente. Si el flujo
+ * uso del HKA20 es `true`, esta strategy **no se llama**: el backend sólo persiste
+ * la venta comercial y el POS continúa con su flujo HKA20 existente. Si el flujo
  * llega a `processElectronicInvoice` es porque.useHka20 != true.
  */
 class VenezuelaInvoiceStrategy(
@@ -84,22 +84,22 @@ class VenezuelaInvoiceStrategy(
                 return@run stepFailure(e)
             }
 
-            // 5. AutenticaciÃ³n con HKA.
+            // 5. Autenticación con HKA.
             val token =
                 authenticateStep(invoiceId, context).getOrElse { e ->
                     return@run stepFailure(e)
                 }
 
-            // 6. Ãšltimo documento remoto para alinear el correlativo con el PAC.
+            // 6. Último documento remoto para alinear el correlativo con el PAC.
             val serie = context.caja.serieSucursal?.ifBlank { null } ?: defaultSerie
             val ultimoRemoto =
                 fetchLastDocumentStep(invoiceId, context, token, serie).getOrElse { e ->
                     return@run stepFailure(e)
                 }
 
-            // 7-8. Reserva atÃ³mica del correlativo LOCAL + nÃºmero final efectivo
-            //      (FASE 1.1 â€” Brief item 3: reserveAtLeast respeta
-            //      max(local, remoto+1) dentro de una transacciÃ³n autocontenida).
+            // 7-8. Reserva atómica del correlativo LOCAL + número final efectivo
+            //      (FASE 1.1 - Brief item 3: reserveAtLeast respeta
+            //      max(local, remoto+1) dentro de una transacción autocontenida).
             val reservado = reserveCorrelativoStep(database, invoiceId, (ultimoRemoto ?: 0) + 1)
             val numeroFinal = reservado.numeroFormateado()
             log.info(
@@ -110,11 +110,11 @@ class VenezuelaInvoiceStrategy(
                 invoiceId,
             )
 
-            // 9-10. ConstrucciÃ³n del payload y envÃ­o a Emision.
+            // 9-10. Construcción del payload y envío a Emision.
             val payload = buildPayloadStep(invoiceId, context, serie, numeroFinal)
             val emission = emitStep(invoiceId, context, token, payload, numeroFinal)
 
-            // 11-12. Evaluar respuesta y, si es Ã©xito exacto, persistir.
+            // 11-12. Evaluar respuesta y, si es éxito exacto, persistir.
             runCatching {
                 repository.evaluateEmission(database, invoiceId, payload, emission, countryCode)
             }.getOrElse { e ->
@@ -126,11 +126,11 @@ class VenezuelaInvoiceStrategy(
         }
 
     /**
-     * Paso 7: reserva atÃ³mica del correlativo LOCAL (FASE 1.1 â€” Brief item 3:
-     * reserveAtLeast). El mÃ­nimo se calcula a partir del remoto del PAC y se
+     * Paso 7: reserva atómica del correlativo LOCAL (FASE 1.1 — Brief item 3:
+     * reserveAtLeast). El mínimo se calcula a partir del remoto del PAC y se
      * pasa al repositorio; ya NO se hace max() en la Strategy ni en el
-     * Builder. La transacciÃ³n SQL se abre, reserva y commit en un solo bloque
-     * autocontenido â€” nunca se mantiene abierta durante HTTP.
+     * Builder. La transacción SQL se abre, reserva y commit en un solo bloque
+     * autocontenido - nunca se mantiene abierta durante HTTP.
      */
     private suspend fun reserveCorrelativoStep(
         database: Database,
@@ -146,7 +146,7 @@ class VenezuelaInvoiceStrategy(
                 throw VeStepFailure(
                     ElectronicInvoiceResult.Failure(
                         "CORRELATIVO_CONFIG",
-                        e.message ?: "ConfiguraciÃ³n correlativo invÃ¡lida",
+                        e.message ?: "Configuración correlativo inválida",
                     ),
                 )
             }
@@ -159,7 +159,7 @@ class VenezuelaInvoiceStrategy(
             )
         }
 
-    /** Paso 9: construcciÃ³n del payload. */
+    /** Paso 9: construcción del payload. */
     private fun buildPayloadStep(
         invoiceId: String,
         context: InvoiceVEContext,
@@ -180,7 +180,7 @@ class VenezuelaInvoiceStrategy(
             )
         }
 
-    /** Paso 10: envÃ­o a Emision; timeout/red â†’ Uncertain. */
+    /** Paso 10: envío a Emision; timeout/red → Uncertain. */
     private suspend fun emitStep(
         invoiceId: String,
         context: InvoiceVEContext,
@@ -227,21 +227,21 @@ class VenezuelaInvoiceStrategy(
                     e,
                 )
             } catch (e: FEConfigurationException) {
-                // Sin config FE VE â†’ no aplica HKA. No lanzar excepciÃ³n al caller.
-                log.warn("[VE-FE] configuraciÃ³n FE VE incompleta para factura {}: {}", invoiceId, e.message)
+                // Sin config FE VE → no aplica HKA. No lanzar excepción al caller.
+                log.warn("[VE-FE] configuración FE VE incompleta para factura {}: {}", invoiceId, e.message)
                 throw VeStepFailure(ElectronicInvoiceResult.NotApplicable(countryCode), e)
             }
         }
 
     /**
-     * Paso 3: idempotencia con semÃ¡ntica OR (FASE 1.1 â€” Brief item 1).
+     * Paso 3: idempotencia con semántica OR (FASE 1.1 — Brief item 1).
      * Cualquiera de los dos campos fiscales presente implica "ya procesada":
-     * NO se debe llamar al PAC. La condiciÃ³n correcta es OR, no AND.
-     *   - Complete â†’ AlreadyIssued (Ã©xito idempotente).
-     *   - Partial  â†’ Failure(PARTIAL_FISCAL_DATA): no se puede reemitir
-     *                a ciegas porque generarÃ­a duplicado; requiere
-     *                reconciliaciÃ³n manual.
-     *   - None     â†’ continuar con el flujo de emisiÃ³n.
+     * NO se debe llamar al PAC. La condición correcta es OR, no AND.
+     *   - Complete → AlreadyIssued (éxito idempotente).
+     *   - Partial  → Failure(PARTIAL_FISCAL_DATA): no se puede reemitir
+     *                a ciegas porque generaría duplicado; requiere
+     *                reconciliación manual.
+     *   - None     → continuar con el flujo de emisión.
      */
     private suspend fun checkAlreadyIssuedStep(
         database: Database,
@@ -266,11 +266,11 @@ class VenezuelaInvoiceStrategy(
                 )
             }
             is AlreadyIssuedResult.Partial -> {
-                // OR semÃ¡ntico: aun con un sÃ³lo campo presente NO se debe reemitir.
+                // OR semántico: aun con un sólo campo presente NO se debe reemitir.
                 log.warn(
                     "[VE-FE] factura {} con datos fiscales parciales numeroDocumentoFiscal={} " +
                         "numero_control_thka={}. " +
-                        "ReemisiÃ³n Bloqueada: requiere reconciliaciÃ³n manual.",
+                        "Reemisión Bloqueada: requiere reconciliación manual.",
                     invoiceId,
                     alreadyIssued.numeroDocumentoFiscal,
                     alreadyIssued.numeroControl,
@@ -282,7 +282,7 @@ class VenezuelaInvoiceStrategy(
                             "Factura $invoiceId ya posee un campo fiscal parcial " +
                                 "(numeroDocumentoFiscal=${alreadyIssued.numeroDocumentoFiscal}, " +
                                 "numero_control_thka=${alreadyIssued.numeroControl}). " +
-                                "ReemisiÃ³n bloqueada para evitar duplicados: reconciliar manualmente.",
+                                "Reemisión bloqueada para evitar duplicados: reconciliar manualmente.",
                     ),
                 )
             }
@@ -306,7 +306,7 @@ class VenezuelaInvoiceStrategy(
         }
     }
 
-    /** Paso 5: autenticaciÃ³n con HKA. */
+    /** Paso 5: autenticación con HKA. */
     private suspend fun authenticateStep(
         invoiceId: String,
         context: InvoiceVEContext,
@@ -327,7 +327,7 @@ class VenezuelaInvoiceStrategy(
                     ElectronicInvoiceResult.Uncertain(
                         country = countryCode,
                         codigo = "AUTH_NET_ERROR",
-                        mensaje = (e.message ?: "Error de red en autenticaciÃ³n HKA VE"),
+                        mensaje = (e.message ?: "Error de red en autenticación HKA VE"),
                     ),
                     e,
                 )
@@ -344,7 +344,7 @@ class VenezuelaInvoiceStrategy(
                 throw VeStepFailure(
                     ElectronicInvoiceResult.Failure(
                         codigo = if (auth.httpStatus == 401) "AUTH_REJECTED" else auth.codigo,
-                        mensaje = "AutenticaciÃ³n rechazada por HKA VE: ${auth.mensaje}",
+                        mensaje = "Autenticación rechazada por HKA VE: ${auth.mensaje}",
                     ),
                 )
             }
@@ -355,7 +355,7 @@ class VenezuelaInvoiceStrategy(
 
     /**
      * Paso 6: consulta UltimoDocumento para alinear el correlativo con el PAC.
-     * Si el PAC respondiÃ³ 200 con resultado vÃ¡lido se extrae el Ãºltimo nÃºmero;
+     * Si el PAC respondió 200 con resultado válido se extrae el último número;
      * cualquier otro caso (404, codigo != 200) se interpreta como "sin remoto".
      */
     private suspend fun fetchLastDocumentStep(
@@ -381,7 +381,7 @@ class VenezuelaInvoiceStrategy(
                     ElectronicInvoiceResult.Uncertain(
                         country = countryCode,
                         codigo = "ULTIMODOC_NET_ERROR",
-                        mensaje = (e.message ?: "Error de red consultando Ãºltimo documento HKA VE"),
+                        mensaje = (e.message ?: "Error de red consultando último documento HKA VE"),
                     ),
                     e,
                 )
@@ -408,7 +408,7 @@ class VenezuelaInvoiceStrategy(
         }
 
     companion object {
-        /** Ãšnico tipo de documento soportado en FASE 1. */
+        /** Único tipo de documento soportado en FASE 1. */
         const val SUPPORTED_TIPO_DOCUMENTO = "01"
     }
 }

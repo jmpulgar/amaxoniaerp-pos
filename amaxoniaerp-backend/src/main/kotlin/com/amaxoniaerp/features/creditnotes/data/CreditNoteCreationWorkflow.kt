@@ -13,7 +13,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
-/** Contexto comÃºn resuelto al crear/preparar una nota de crÃ©dito. */
+/** Contexto común resuelto al crear/preparar una nota de crédito. */
 internal class CreditNoteCreationContext(
     val invoice: InvoiceHeader,
     val client: ClientContext,
@@ -23,8 +23,8 @@ internal class CreditNoteCreationContext(
 )
 
 /**
- * Bloquea la factura, carga su contexto y valida la solicitud (lÃ­neas,
- * cantidades y regla de anulaciÃ³n). Comparte la resoluciÃ³n entre `create`
+ * Bloquea la factura, carga su contexto y valida la solicitud (líneas,
+ * cantidades y regla de anulación). Comparte la resolución entre `create`
  * (flujo directo VE/legacy) y `preparePanama` (flujo staged PA).
  */
 internal fun resolveCreationContext(
@@ -39,7 +39,7 @@ internal fun resolveCreationContext(
     val client = loadClient(invoice.idCliente)
     val invoiceLines = loadInvoiceLines(countryCode, invoice.idFactura)
     if (invoiceLines.isEmpty()) {
-        throw CreditNoteValidationException("La factura origen no tiene lÃ­neas disponibles")
+        throw CreditNoteValidationException("La factura origen no tiene líneas disponibles")
     }
 
     val requestedLines = normalizeRequestedLines(request, invoiceLines)
@@ -48,7 +48,7 @@ internal fun resolveCreationContext(
 
     if (request.anular && !allReturnedAfterOperation) {
         throw CreditNoteValidationException(
-            "Para anular la factura debes devolver la totalidad de las lÃ­neas restantes",
+            "Para anular la factura debes devolver la totalidad de las líneas restantes",
         )
     }
 
@@ -171,7 +171,7 @@ internal fun insertCreditNoteDetails(
     }
 }
 
-/** Efectos post-confirmaciÃ³n de la NC (caja original, inventario, liquidaciÃ³n). */
+/** Efectos post-confirmación de la NC (caja original, inventario, liquidación). */
 internal data class ApplyCreditNoteEffectsInput(
     val countryCode: String,
     val request: CreateCreditNoteRequest,

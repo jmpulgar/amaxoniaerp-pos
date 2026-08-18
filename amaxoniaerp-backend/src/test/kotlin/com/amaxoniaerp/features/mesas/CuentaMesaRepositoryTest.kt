@@ -46,9 +46,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Cobertura del ciclo de cuenta de mesa: creaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n (completa y por divisiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n), idempotencia
- * del marcar-facturada (doble-intento), cierre de sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n cuando se liquida todo, y bloqueos
- * de negocio (cantidad superior al saldo, cuenta no activa, sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no encontrada).
+ * Cobertura del ciclo de cuenta de mesa: creación (completa y por división), idempotencia
+ * del marcar-facturada (doble-intento), cierre de sesión cuando se liquida todo, y bloqueos
+ * de negocio (cantidad superior al saldo, cuenta no activa, sesión no encontrada).
  *
  * Se ejecuta sobre H2 en modo MySQL para reproducir el dialecto productivo de Exposed sin
  * necesidad de un servidor MySQL levantado.
@@ -105,7 +105,7 @@ class CuentaMesaRepositoryTest {
         }
     }
 
-    // ---------- CreaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n de cuenta ----------
+    // ---------- Creación de cuenta ----------
 
     @Test
     fun `crear cuenta completa agrega todos los pedidos ENTREGADOS con saldo`() =
@@ -254,7 +254,7 @@ class CuentaMesaRepositoryTest {
             assertTrue(cuentas.cuentas.isEmpty())
         }
 
-    // ---------- Solicitud de cuenta en sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ----------
+    // ---------- Solicitud de cuenta en sesión ----------
 
     @Test
     fun `solicitar cuenta transiciona sesion a CUENTA_SOLICITADA y sigue admitiendo pedidos`() =
@@ -264,7 +264,7 @@ class CuentaMesaRepositoryTest {
             assertTrue(result is SesionMesaResult.Closed)
             assertEquals(EstadoSesionMesa.CUENTA_SOLICITADA.codigo, result.sesion.estado)
 
-            // Tras CUENTA_SOLICITADA todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a podemos crear pedido (modo cuenta abierta):
+            // Tras CUENTA_SOLICITADA todavía podemos crear pedido (modo cuenta abierta):
             val pedido =
                 pedidoRepository.crear(
                     database,
@@ -359,7 +359,7 @@ class CuentaMesaRepositoryTest {
             assertEquals("F-0001", result.cuenta.idFactura)
             assertTrue(result.cuenta.detalle.all { it.facturado })
 
-            // La cantidad_facturada del pedido habrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a de quedar en 2.0
+            // La cantidad_facturada del pedido habría de quedar en 2.0
             val facturada =
                 transaction(database) {
                     PedidoMesaTable
@@ -429,7 +429,7 @@ class CuentaMesaRepositoryTest {
             assertEquals(0, facturada.compareTo(BigDecimal("2.000")))
         }
 
-    // ---------- Cierre de sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n al liquidar todo ----------
+    // ---------- Cierre de sesión al liquidar todo ----------
 
     @Test
     fun `marcar facturada cierra la sesion en CERRADA_PAGADA cuando se liquida todo`() =
@@ -520,9 +520,9 @@ class CuentaMesaRepositoryTest {
                             codFactura = null,
                         ),
                 ) as CuentaMesaResult.Facturada
-            assertFalse(r1.sesionCerrada) // todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a hay una cuenta2 ACTIVA
+            assertFalse(r1.sesionCerrada) // todavía hay una cuenta2 ACTIVA
 
-            // Segundo pago: ahora sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ deberÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a cerrar.
+            // Segundo pago: ahora sí debería cerrar.
             val r2 =
                 cuentaRepository.marcarFacturada(
                     database = database,
@@ -647,7 +647,7 @@ class CuentaMesaRepositoryTest {
             assertEquals(0, facturada.compareTo(BigDecimal.ZERO))
         }
 
-    // ---------- Fallos de facturaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n ----------
+    // ---------- Fallos de facturación ----------
 
     @Test
     fun `registrar idempotencia fallida deja el intento FAILED y permite reintento`() =
@@ -717,7 +717,7 @@ class CuentaMesaRepositoryTest {
                             ),
                     ) as CuentaMesaResult.Creada
                 ).cuenta
-            // Creamos cuenta2 previa para que la sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n NO se cierre al pagar cuenta1.
+            // Creamos cuenta2 previa para que la sesión NO se cierre al pagar cuenta1.
             cuentaRepository.crear(
                 database,
                 sesionId,
@@ -725,7 +725,7 @@ class CuentaMesaRepositoryTest {
                 request = CrearCuentaRequest(items = emptyList(), incluirTodoPendiente = true),
             )
 
-            // Marcarla una vez (queda PAGADA; no cierra sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n porque todavÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a hay cuenta2 ACTIVA).
+            // Marcarla una vez (queda PAGADA; no cierra sesión porque aún hay cuenta2 ACTIVA).
             cuentaRepository.marcarFacturada(
                 database = database,
                 command =
@@ -764,7 +764,7 @@ class CuentaMesaRepositoryTest {
             val sesionA = abrirSesion(mesaId = 1001)
             crearPedidoEntregado(sesionA, productoId = 501, cantidad = 1.0, precioSinIva = 5.0, iva = 0.0)
 
-            // Mismo sesionId pero la mesa 1002 tambiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©n existe (abrir sesiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n en 1002 NO consume el id 1).
+            // Mismo sesionId pero la mesa 1002 también existe (abrir sesión en 1002 NO consume el id 1).
             val result =
                 cuentaRepository.crear(
                     database,
@@ -791,7 +791,7 @@ class CuentaMesaRepositoryTest {
     }
 
     /**
-     * Crea un pedido entregado directamente con estado `ENTREGADA` (salta la transiciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n normal
+     * Crea un pedido entregado directamente con estado `ENTREGADA` (salta la transición normal
      * para aislar el SUT de la cuenta). Retorna el id del pedido.
      *
      * `iva` es la TASA (0.10 = 10%); se calcula `totalCon = totalSin * (1 + iva)` para que el
@@ -967,7 +967,7 @@ class CuentaMesaRepositoryTest {
         PlantasTable.insert {
             it[PlantasTable.id] = 100
             it[sucursalId] = 1
-            it[PlantasTable.nombre] = "SalÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n principal"
+            it[PlantasTable.nombre] = "Salón principal"
             it[PlantasTable.orden] = 1
             it[activo] = 1
         }

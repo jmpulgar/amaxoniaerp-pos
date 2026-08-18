@@ -15,7 +15,7 @@ internal fun usuarioNombre(usuarioId: Int): String? =
         ?.get(UsersTable.usuario)
 
 /**
- * Construye una respuesta sintÃ©tica cuando acabamos de insertar/actualizar y tenemos los
+ * Construye una respuesta sintética cuando acabamos de insertar/actualizar y tenemos los
  * datos frescos en memoria. [usuarioNombre] se resuelve fuera cuando interesa (listados
  * por lote) o puntualmente tras abrir/cerrar; nunca se hace N+1.
  */
@@ -57,7 +57,7 @@ internal fun ResultRow.toSesionMesaResponse(usuarioByCod: Map<Int, String> = emp
         areaId = this[SesionMesaTable.areaId],
         mesaId = this[SesionMesaTable.mesaId],
         usuarioId = this[SesionMesaTable.usuarioId],
-        // Primero el mapa cachÃ© (mÃ¡s eficiente en listados); si no estÃ¡, no resolvemos
+        // Primero el mapa caché (más eficiente en listados); si no está, no resolvemos
         // en este path para evitar N+1.
         usuario = usuarioByCod[this[SesionMesaTable.usuarioId]],
         cantidadPersonas = this[SesionMesaTable.cantidadPersonas],

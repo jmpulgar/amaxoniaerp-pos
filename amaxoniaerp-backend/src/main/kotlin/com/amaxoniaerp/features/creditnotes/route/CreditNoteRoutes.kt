@@ -46,8 +46,8 @@ fun Route.creditNoteRoutes(creditNoteService: CreditNoteService) {
 }
 
 /**
- * Handlers de los endpoints de notas de crÃƒÂ©dito. Resuelven tenant por el seam
- * canÃƒÂ³nico (+ header `Company-DB`), ejecutan la operaciÃƒÂ³n y mapean errores.
+ * Handlers de los endpoints de notas de crédito. Resuelven tenant por el seam
+ * canónico (+ header `Company-DB`), ejecutan la operación y mapean errores.
  */
 internal class CreditNoteHandlers(
     private val creditNoteService: CreditNoteService,
@@ -62,7 +62,7 @@ internal class CreditNoteHandlers(
             val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
 
             if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "ParÃƒÂ¡metros de paginaciÃƒÂ³n invÃƒÂ¡lidos"))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
                 return@run
             }
 
@@ -82,7 +82,7 @@ internal class CreditNoteHandlers(
                     ),
                 )
             } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud invÃƒÂ¡lida")))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
             }
         }
 
@@ -94,7 +94,7 @@ internal class CreditNoteHandlers(
             val search = call.request.queryParameters["search"]
 
             if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "ParÃƒÂ¡metros de paginaciÃƒÂ³n invÃƒÂ¡lidos"))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
                 return@run
             }
 
@@ -133,14 +133,14 @@ internal class CreditNoteHandlers(
             val scope = resolveScope(call) ?: return@run
             val id = call.parameters["id"]
             if (id == null) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crÃƒÂ©dito requerida"))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
                 return@run
             }
 
             val detail =
                 creditNoteService.getDetail(scope.database, id, scope.countryCode)
             if (detail == null) {
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Nota de crÃƒÂ©dito no encontrada"))
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Nota de crédito no encontrada"))
                 return@run
             }
 
@@ -163,7 +163,7 @@ internal class CreditNoteHandlers(
                     )
                 call.respond(HttpStatusCode.Created, response)
             } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud invÃƒÂ¡lida")))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
             } catch (e: CreditNoteNotFoundException) {
                 call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
             }
@@ -174,7 +174,7 @@ internal class CreditNoteHandlers(
             val scope = resolveScope(call) ?: return@run
             val id = call.parameters["id"]
             if (id == null) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crÃƒÂ©dito requerida"))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Nota de crédito requerida"))
                 return@run
             }
             val request = call.receive<ConfirmCreditNoteFiscalRequest>()
@@ -183,7 +183,7 @@ internal class CreditNoteHandlers(
                 val response = creditNoteService.confirmFiscal(scope.database, scope.countryCode, id, request)
                 call.respond(response)
             } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud invÃƒÂ¡lida")))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
             } catch (e: CreditNoteNotFoundException) {
                 call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
             }
@@ -191,7 +191,7 @@ internal class CreditNoteHandlers(
 
     /**
      * Misma regla que caja / ventas POS: token de empresa, `Company-DB` = `admin_db`,
-     * `country_code` en JWT. Delega en el seam canÃƒÂ³nico y conecta la base de la empresa.
+     * `country_code` en JWT. Delega en el seam canónico y conecta la base de la empresa.
      */
     private suspend fun resolveScope(call: ApplicationCall): CreditNoteRequestScope? =
         run {
@@ -210,4 +210,4 @@ internal class CreditNoteHandlers(
 
 private fun parseDateOrBadRequest(value: String): LocalDate =
     runCatching { LocalDate.parse(value) }
-        .getOrElse { throw CreditNoteValidationException("Fecha invÃƒÂ¡lida, usa formato yyyy-MM-dd") }
+        .getOrElse { throw CreditNoteValidationException("Fecha inválida, usa formato yyyy-MM-dd") }

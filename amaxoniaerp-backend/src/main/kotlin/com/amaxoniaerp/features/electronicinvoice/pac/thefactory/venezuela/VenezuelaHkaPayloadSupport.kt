@@ -54,7 +54,7 @@ internal fun isAprox(
 
 internal fun BigDecimal.format(): String = setScale(MONEY_SCALE, RoundingMode.HALF_UP).toPlainString()
 
-/** Normaliza cualquier BigDecimal a escala monetaria estÃ¡ndar (2). */
+/** Normaliza cualquier BigDecimal a escala monetaria estándar (2). */
 internal fun BigDecimal.bigDecimalMoney(): BigDecimal = setScale(MONEY_SCALE, RoundingMode.HALF_UP)
 
 internal fun formatFechaEmision(fecha: String?): String {
@@ -84,7 +84,7 @@ internal fun transaccionIdDeterminista(
 ): String {
     val seed = (idFactura + "|" + numeroFormateado).toByteArray(Charsets.UTF_8)
     val sha = MessageDigest.getInstance("SHA-256").digest(seed)
-    // Top 16 bytes â†’ 32 chars hex.
+    // Top 16 bytes → 32 chars hex.
     return java.util.HexFormat
         .of()
         .formatHex(sha.copyOfRange(0, TRANSACTION_ID_HASH_BYTES))

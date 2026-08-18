@@ -28,7 +28,7 @@ private const val PROMOTION_TYPE_LENGTH = 20
 private const val PROMOTION_NAME_LENGTH = 200
 private const val PAYMENT_USER_LENGTH = 60
 
-/** Contexto compartido por las escrituras de factura dentro de la transacciÃ³n de venta. */
+/** Contexto compartido por las escrituras de factura dentro de la transacción de venta. */
 internal data class SaleWriteContext(
     val request: ProcessSaleRequest,
     val invoiceId: String,
@@ -330,7 +330,7 @@ private fun insertFormaPagoCountryFields(
     }
 }
 
-/** Montos agregados por tipo de pago (normalizado a los cÃ³digos del ERP). */
+/** Montos agregados por tipo de pago (normalizado a los códigos del ERP). */
 private data class PaymentBreakdown(
     val efectivo: Double,
     val cheque: Double,

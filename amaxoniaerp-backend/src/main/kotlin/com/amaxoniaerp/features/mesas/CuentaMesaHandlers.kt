@@ -20,14 +20,14 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import org.slf4j.LoggerFactory
 
-private const val ERR_SESSION_SCOPE = "La sesiÃ³n no pertenece a esa mesa"
+private const val ERR_SESSION_SCOPE = "La sesión no pertenece a esa mesa"
 private const val ERR_UNEXPECTED = "Respuesta inesperada"
-private const val ERR_ACCOUNT_FINAL_STATE = "La sesiÃ³n no admite cuentas (estado final)"
+private const val ERR_ACCOUNT_FINAL_STATE = "La sesión no admite cuentas (estado final)"
 private const val ERR_SELECTED_ORDER_BALANCE =
-    "Un pedido seleccionado no existe, no estÃ¡ entregado o ya no tiene saldo"
+    "Un pedido seleccionado no existe, no está entregado o ya no tiene saldo"
 private const val ERR_CREATE_ACCOUNT = "No se pudo crear la cuenta"
 private const val ERR_CANCEL_ACCOUNT = "No se pudo cancelar la cuenta"
-private const val ERR_ACCOUNT_NOT_ACTIVE = "La cuenta ya no estÃ¡ activa y no se puede cancelar"
+private const val ERR_ACCOUNT_NOT_ACTIVE = "La cuenta ya no está activa y no se puede cancelar"
 
 internal data class CuentaRoutingIds(
     val ctx: PosCompanyContext,
@@ -39,7 +39,7 @@ internal data class CuentaRoutingIds(
 
 /**
  * Handlers de los endpoints de cuenta de mesa. Cada endpoint valida contexto y
- * parÃ¡metros, ejecuta la operaciÃ³n del repositorio y mapea el resultado a HTTP.
+ * parámetros, ejecuta la operación del repositorio y mapea el resultado a HTTP.
  */
 internal class CuentaMesaHandlers(
     private val cuentaMesaRepository: CuentaMesaRepository,
@@ -48,7 +48,7 @@ internal class CuentaMesaHandlers(
 ) {
     private val log = LoggerFactory.getLogger("CuentaMesaRouting")
 
-    /** Solicita o cancela la solicitud de cuenta de la sesiÃ³n. */
+    /** Solicita o cancela la solicitud de cuenta de la sesión. */
     suspend fun mutarSolicitudCuenta(
         call: ApplicationCall,
         solicitar: Boolean,
@@ -225,17 +225,17 @@ internal class CuentaMesaHandlers(
                 )
 
             SesionMesaResult.SesionNoEncontrada ->
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "SesiÃ³n no encontrada"))
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Sesión no encontrada"))
 
             SesionMesaResult.SesionYaFinalizada ->
                 call.respond(
                     HttpStatusCode.Conflict,
-                    mapOf("error" to "La sesiÃ³n no admite esta operaciÃ³n (estado final)"),
+                    mapOf("error" to "La sesión no admite esta operación (estado final)"),
                 )
 
             else -> {
                 log.warn("Respuesta no esperada al solicitar/cancelar cuenta: {}", result)
-                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo modificar la sesiÃ³n"))
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "No se pudo modificar la sesión"))
             }
         }
     }
@@ -271,7 +271,7 @@ internal class CuentaMesaHandlers(
         if (!valid) {
             respond(
                 HttpStatusCode.NotFound,
-                mapOf("error" to "La sesiÃ³n no pertenece a la caja, Ã¡rea o mesa indicadas"),
+                mapOf("error" to "La sesión no pertenece a la caja, área o mesa indicadas"),
             )
         }
         return valid
@@ -281,7 +281,7 @@ internal class CuentaMesaHandlers(
         run {
             val v = parameters["cuentaId"]?.toIntOrNull()
             if (v == null || v <= 0) {
-                respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de cuenta es invÃ¡lido"))
+                respond(HttpStatusCode.BadRequest, mapOf("error" to "El identificador de cuenta es inválido"))
                 return@run null
             }
             v
@@ -330,16 +330,16 @@ private suspend fun ApplicationCall.respondMarcarFacturada(
             respond(HttpStatusCode.NotFound, mapOf("error" to "Cuenta no encontrada"))
 
         CuentaMesaResult.CuentaNoActiva ->
-            respond(HttpStatusCode.Conflict, mapOf("error" to "La cuenta ya no estÃ¡ activa"))
+            respond(HttpStatusCode.Conflict, mapOf("error" to "La cuenta ya no está activa"))
 
         CuentaMesaResult.SesionNoActiva ->
-            respond(HttpStatusCode.Conflict, mapOf("error" to "La sesiÃ³n no admite esta operaciÃ³n"))
+            respond(HttpStatusCode.Conflict, mapOf("error" to "La sesión no admite esta operación"))
 
         else -> {
             cuentaHandlersLog.warn("Respuesta no esperada al marcar facturada: {}", result)
             respond(
                 HttpStatusCode.InternalServerError,
-                mapOf("error" to "No se pudo confirmar la facturaciÃ³n"),
+                mapOf("error" to "No se pudo confirmar la facturación"),
             )
         }
     }

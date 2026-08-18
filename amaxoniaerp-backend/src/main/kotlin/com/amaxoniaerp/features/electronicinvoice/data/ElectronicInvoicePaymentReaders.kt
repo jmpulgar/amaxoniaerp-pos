@@ -48,7 +48,7 @@ internal fun loadFormasPago(invoiceId: String): List<FEFormaPagoData> {
             .firstOrNull()
 
     if (cajaRow == null) {
-        paymentReadersLog.warn("No se encontrÃƒÂ³ registro en caja_nueva para factura {}", invoiceId)
+        paymentReadersLog.warn("No se encontró registro en caja_nueva para factura {}", invoiceId)
         return emptyList()
     }
 

@@ -25,7 +25,7 @@ internal data class PedidoFacturable(
     val saldoPendiente: BigDecimal,
 )
 
-/** Propuesta de detalles para `crear`; error != null cuando la solicitud no es vÃƒÂ¡lida. */
+/** Propuesta de detalles para `crear`; error != null cuando la solicitud no es válida. */
 internal class PropuestaDetalles(
     val error: CuentaMesaResult?,
     val detalles: List<DetallePropuesta>,
@@ -159,8 +159,8 @@ internal fun existeSaldoPendienteEnSesion(sesionId: Int): Boolean =
         }.any { row -> row[PedidoMesaTable.cantidadFacturada] < row[PedidoMesaTable.itemCantidad] }
 
 /**
- * Cierra la sesiÃƒÂ³n por pago completo, dentro de la transacciÃƒÂ³n actual. Idempotente: si la
- * sesiÃƒÂ³n ya no es `ABIERTA`/`CUENTA_SOLICITADA` (race con otra caja), lo ignora.
+ * Cierra la sesión por pago completo, dentro de la transacción actual. Idempotente: si la
+ * sesión ya no es `ABIERTA`/`CUENTA_SOLICITADA` (race con otra caja), lo ignora.
  */
 internal fun runCerradoPorPago(sesionId: Int): Boolean =
     run {

@@ -1,11 +1,5 @@
 package com.amaxoniaerp.features.caja.data
 
-internal enum class PaymentCategory {
-    CASH,
-    CARD,
-    OTHER,
-}
-
 private val CASH_CODES = setOf("CASH", "EF", "EFE", "EFECTIVO")
 private val CARD_CODES = setOf("TDC", "TARJETA", "PV", "POS", "NEQ", "DB", "DEBITO", "CR", "CREDITO")
 
