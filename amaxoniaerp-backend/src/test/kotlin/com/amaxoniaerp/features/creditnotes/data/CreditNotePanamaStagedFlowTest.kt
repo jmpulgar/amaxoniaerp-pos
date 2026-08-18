@@ -254,6 +254,18 @@ class CreditNotePanamaStagedFlowTest {
     }
 
     private fun seedInvoice() {
+        insertClient()
+        insertFactura()
+        insertDetalle()
+        insertCajaSecuencia()
+        FECorrelativosTable.insert {
+            it[id] = 1
+            it[campo] = "numeroDocumentoFiscal"
+            it[contador] = 0
+        }
+    }
+
+    private fun insertClient() {
         ClientsTable.insert {
             it[idCliente] = CLIENT_ID
             it[codCliente] = "CLIENT-1"
@@ -278,6 +290,9 @@ class CreditNotePanamaStagedFlowTest {
             it[dias] = 0
             it[foto] = null
         }
+    }
+
+    private fun insertFactura() {
         CreditNoteFacturaTable.insert {
             it[idFactura] = SOURCE_INVOICE_ID
             it[codFactura] = "F-001"
@@ -311,6 +326,9 @@ class CreditNotePanamaStagedFlowTest {
             it[tasa] = BigDecimal.ONE
             it[totalRef] = BigDecimal.ONE
         }
+    }
+
+    private fun insertDetalle() {
         CreditNoteFacturaDetalleTable.insert {
             it[idDetalleFactura] = SOURCE_DETAIL_ID
             it[idFactura] = SOURCE_INVOICE_ID
@@ -330,6 +348,9 @@ class CreditNotePanamaStagedFlowTest {
             it[itemReferencia] = "REF-1"
             it[anulado] = false
         }
+    }
+
+    private fun insertCajaSecuencia() {
         CreditNoteCajaTable.insert {
             it[idCaja] = SOURCE_CAJA_ID
             it[codigo] = "CAJA"
@@ -341,11 +362,6 @@ class CreditNotePanamaStagedFlowTest {
             it[idCaja] = SOURCE_CAJA_ID
             it[secuencia] = "000001"
             it[serieSucursal] = "A"
-        }
-        FECorrelativosTable.insert {
-            it[id] = 1
-            it[campo] = "numeroDocumentoFiscal"
-            it[contador] = 0
         }
     }
 

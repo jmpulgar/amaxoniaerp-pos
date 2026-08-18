@@ -14,6 +14,7 @@ import com.amaxoniaerp.features.sales.domain.SalePaymentInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentSummaryInput
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -144,52 +145,68 @@ class ProcessSaleLotAtomicityTest {
                 SalesKardexTablePA,
                 SalesKardexDetalleTablePA,
             )
-            ParametrosGeneralesTablePA.insert {
-                it[codEmpresa] = 1
-                it[defaultCodClienteFactura] = ""
-                it[defaultIdFormaPagoFactura] = 1
-                it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
-                it[validarStock] = "NO"
-                it[diasVencimiento] = 90
-                it[codAlmacen] = 1
-                it[abrMonedaBase] = "USD"
-                it[monedaBase] = 1
-                it[bloquearItbms] = "NO"
-                it[facturarCero] = false
-                it[impresionDirecta] = false
-                it[tipoFacturacion] = 0
-            }
-            SalesCajaTable.insert {
-                it[id] = "caja-1"
-                it[idSucursal] = null
-                it[codAlmacen] = 1
-                it[codigo] = "CJ01"
-                it[facturaCorrelativo] = 0
-            }
-            SalesCajaSecuenciaTable.insert {
-                it[id] = "seq-1"
-                it[secuencia] = "0001"
-            }
-            SalesStockTable.insert {
-                it[codAlmacen] = 1
-                it[idItem] = 1
-                it[cantidad] = 100f
-                it[cantidadMuestra] = BigDecimal.ZERO.setScale(4)
-                it[minimo] = 0L
-                it[maximo] = 0L
-            }
-            ItemLoteTable.insert {
-                it[idLoteItem] = 1
-                it[codAlmacen] = 1
-                it[idItem] = 1
-                it[codigoLoteItem] = "LOT-1"
-                it[vencimiento] = null
-                it[ItemLoteTable.disponibilidad] = BigDecimal.valueOf(available.toLong()).setScale(2)
-                it[procesamiento] = BigDecimal.ZERO.setScale(2)
-                it[venta] = BigDecimal.ZERO.setScale(2)
-            }
+            insertParametrosGenerales()
+            insertCajaYSecuencia()
+            insertStock()
+            insertLote(available)
         }
         return db.also { database = it }
+    }
+
+    private fun Transaction.insertParametrosGenerales() {
+        ParametrosGeneralesTablePA.insert {
+            it[codEmpresa] = 1
+            it[defaultCodClienteFactura] = ""
+            it[defaultIdFormaPagoFactura] = 1
+            it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
+            it[validarStock] = "NO"
+            it[diasVencimiento] = 90
+            it[codAlmacen] = 1
+            it[abrMonedaBase] = "USD"
+            it[monedaBase] = 1
+            it[bloquearItbms] = "NO"
+            it[facturarCero] = false
+            it[impresionDirecta] = false
+            it[tipoFacturacion] = 0
+        }
+    }
+
+    private fun Transaction.insertCajaYSecuencia() {
+        SalesCajaTable.insert {
+            it[id] = "caja-1"
+            it[idSucursal] = null
+            it[codAlmacen] = 1
+            it[codigo] = "CJ01"
+            it[facturaCorrelativo] = 0
+        }
+        SalesCajaSecuenciaTable.insert {
+            it[id] = "seq-1"
+            it[secuencia] = "0001"
+        }
+    }
+
+    private fun Transaction.insertStock() {
+        SalesStockTable.insert {
+            it[codAlmacen] = 1
+            it[idItem] = 1
+            it[cantidad] = 100f
+            it[cantidadMuestra] = BigDecimal.ZERO.setScale(4)
+            it[minimo] = 0L
+            it[maximo] = 0L
+        }
+    }
+
+    private fun Transaction.insertLote(available: Int) {
+        ItemLoteTable.insert {
+            it[idLoteItem] = 1
+            it[codAlmacen] = 1
+            it[idItem] = 1
+            it[codigoLoteItem] = "LOT-1"
+            it[vencimiento] = null
+            it[ItemLoteTable.disponibilidad] = BigDecimal.valueOf(available.toLong()).setScale(2)
+            it[procesamiento] = BigDecimal.ZERO.setScale(2)
+            it[venta] = BigDecimal.ZERO.setScale(2)
+        }
     }
 
     private fun process(request: ProcessSaleRequest) {
@@ -227,48 +244,52 @@ class ProcessSaleLotAtomicityTest {
                     totalizarTotalGeneral = 10.0,
                     usuarioCreacion = "TEST",
                 ),
-            items =
-                listOf(
-                    SaleItemInput(
-                        idItem = 1,
-                        itemAlmacen = 1,
-                        itemDescripcion = "ITEM LOT TEST",
-                        itemCantidad = 1.0,
-                        itemPrecioSinIva = 10.0,
-                        itemPIva = 0.0,
-                        itemTotalSinIva = 10.0,
-                        itemTotalConIva = 10.0,
-                        itemCantidadTotal = 1.0,
-                        esProductoFisico = true,
-                        poseeConfiguracionLote = "si",
-                        codigosLote =
-                            listOf(
-                                SaleLotInput(
-                                    idLoteItem = 1,
-                                    codigoLoteItem = "LOT-1",
-                                    cantidad = lotQuantity,
-                                    idAlmacen = 1,
-                                ),
-                            ),
-                    ),
-                ),
-            pagoResumen =
-                SalePaymentSummaryInput(
-                    totalizarMontoCancelar = 10.0,
-                    totalizarMontoEfectivo = 10.0,
-                    totalizarCambio = 0.0,
-                    totalizarSaldoPendiente = 0.0,
-                ),
-            pagos =
-                listOf(
-                    SalePaymentInput(
-                        idFormaPago = 1,
-                        tipoMovimiento = "CASH",
-                        monto = 10.0,
-                        montoRecibido = 10.0,
-                    ),
-                ),
+            items = listOf(saleItem(lotQuantity)),
+            pagoResumen = buildPagoResumen(),
+            pagos = buildPagos(),
             moneda = SaleCurrencyInput(),
+        )
+
+    private fun saleItem(lotQuantity: Int) =
+        SaleItemInput(
+            idItem = 1,
+            itemAlmacen = 1,
+            itemDescripcion = "ITEM LOT TEST",
+            itemCantidad = 1.0,
+            itemPrecioSinIva = 10.0,
+            itemPIva = 0.0,
+            itemTotalSinIva = 10.0,
+            itemTotalConIva = 10.0,
+            itemCantidadTotal = 1.0,
+            esProductoFisico = true,
+            poseeConfiguracionLote = "si",
+            codigosLote =
+                listOf(
+                    SaleLotInput(
+                        idLoteItem = 1,
+                        codigoLoteItem = "LOT-1",
+                        cantidad = lotQuantity,
+                        idAlmacen = 1,
+                    ),
+                ),
+        )
+
+    private fun buildPagoResumen() =
+        SalePaymentSummaryInput(
+            totalizarMontoCancelar = 10.0,
+            totalizarMontoEfectivo = 10.0,
+            totalizarCambio = 0.0,
+            totalizarSaldoPendiente = 0.0,
+        )
+
+    private fun buildPagos() =
+        listOf(
+            SalePaymentInput(
+                idFormaPago = 1,
+                tipoMovimiento = "CASH",
+                monto = 10.0,
+                montoRecibido = 10.0,
+            ),
         )
 
     private fun lotRow() =

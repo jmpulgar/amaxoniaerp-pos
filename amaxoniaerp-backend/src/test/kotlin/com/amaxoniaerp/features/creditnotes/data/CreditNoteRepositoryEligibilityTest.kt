@@ -118,6 +118,12 @@ class CreditNoteRepositoryEligibilityTest {
     }
 
     private fun seedSourceInvoice() {
+        insertClient()
+        insertFactura()
+        insertDetalle()
+    }
+
+    private fun insertClient() {
         ClientsTable.insert {
             it[idCliente] = CLIENT_ID
             it[codCliente] = "CLIENT-1"
@@ -142,6 +148,9 @@ class CreditNoteRepositoryEligibilityTest {
             it[dias] = 0
             it[foto] = null
         }
+    }
+
+    private fun insertFactura() {
         CreditNoteFacturaTable.insert {
             it[idFactura] = SOURCE_INVOICE_ID
             it[codFactura] = "F-001"
@@ -175,6 +184,9 @@ class CreditNoteRepositoryEligibilityTest {
             it[tasa] = BigDecimal.ONE
             it[totalRef] = BigDecimal("60.00")
         }
+    }
+
+    private fun insertDetalle() {
         CreditNoteFacturaDetalleTable.insert {
             it[idDetalleFactura] = SOURCE_DETAIL_ID
             it[idFactura] = SOURCE_INVOICE_ID

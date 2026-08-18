@@ -6,6 +6,9 @@ import com.amaxoniaerp.features.creditnotes.domain.CreateCreditNoteRequest
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteSettlementType
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteValidationException
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
+import com.amaxoniaerp.features.sales.data.BaseSalesCajaNuevaDetalleTable
+import com.amaxoniaerp.features.sales.data.BaseSalesCajaNuevaReciboTable
+import com.amaxoniaerp.features.sales.data.BaseSalesCajaNuevaTable
 import com.amaxoniaerp.features.sales.data.CajaIngresoEgreso
 import com.amaxoniaerp.features.sales.data.CajaStatus
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableFactory
@@ -206,6 +209,13 @@ class CreditNoteCajaBehaviorTest {
     }
 
     private fun seedInvoice() {
+        insertClient()
+        insertFactura()
+        insertDetalle()
+        insertCajaSecuencia()
+    }
+
+    private fun insertClient() {
         ClientsTable.insert {
             it[idCliente] = CLIENT_ID
             it[codCliente] = "CLIENT-1"
@@ -230,6 +240,9 @@ class CreditNoteCajaBehaviorTest {
             it[dias] = 0
             it[foto] = null
         }
+    }
+
+    private fun insertFactura() {
         CreditNoteFacturaTable.insert {
             it[idFactura] = SOURCE_INVOICE_ID
             it[codFactura] = "F-001"
@@ -263,6 +276,9 @@ class CreditNoteCajaBehaviorTest {
             it[tasa] = BigDecimal.ONE
             it[totalRef] = BigDecimal.ONE
         }
+    }
+
+    private fun insertDetalle() {
         CreditNoteFacturaDetalleTable.insert {
             it[idDetalleFactura] = SOURCE_DETAIL_ID
             it[idFactura] = SOURCE_INVOICE_ID
@@ -282,6 +298,9 @@ class CreditNoteCajaBehaviorTest {
             it[itemReferencia] = "REF-1"
             it[anulado] = false
         }
+    }
+
+    private fun insertCajaSecuencia() {
         CreditNoteCajaTable.insert {
             it[idCaja] = SOURCE_CAJA_ID
             it[codigo] = "CAJA"
@@ -300,6 +319,12 @@ class CreditNoteCajaBehaviorTest {
         val cashTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
         val cashDetailTable = SalesCajaNuevaDetalleTableFactory.forCountry(countryCode)
         val receiptTable = SalesCajaNuevaReciboTableFactory.forCountry(countryCode)
+        insertCashRow(cashTable)
+        insertCashDetailRow(cashDetailTable)
+        insertReceiptRow(receiptTable)
+    }
+
+    private fun insertCashRow(cashTable: BaseSalesCajaNuevaTable) {
         cashTable.insert {
             it[cajaId] = SOURCE_CASH_ID
             it[idTransaccion] = "transaccion-1"
@@ -324,6 +349,9 @@ class CreditNoteCajaBehaviorTest {
             it[idAbono] = ""
             it[idNotaCredito] = ""
         }
+    }
+
+    private fun insertCashDetailRow(cashDetailTable: BaseSalesCajaNuevaDetalleTable) {
         cashDetailTable.insert {
             it[cajaDetalleId] = "cash-detail-1"
             it[cajaId] = SOURCE_CASH_ID
@@ -351,6 +379,9 @@ class CreditNoteCajaBehaviorTest {
                 it[cashDetailTable.montoMonedaPrincipal] = BigDecimal.ONE
             }
         }
+    }
+
+    private fun insertReceiptRow(receiptTable: BaseSalesCajaNuevaReciboTable) {
         receiptTable.insert {
             it[cajaReciboId] = SOURCE_RECEIPT_ID
             it[tipoRecibo] = "FAC"

@@ -601,50 +601,8 @@ class VenezuelaHkaPayloadBuilderTest {
                     },
                 )
         return InvoiceVEContext(
-            config =
-                VEConfigData(
-                    tipoFacturacion = 5,
-                    tipoEntornoVe = 0,
-                    tokenEmpresa = "USER",
-                    tokenPassword = "PWD",
-                    baseUrl = "https://demo.thefactoryhka.com",
-                    rif = "J123456789",
-                    nombreEmpresa = "EMPRESA TEST",
-                    direccion = "DIR TEST",
-                    telefonos = "0212",
-                    igtf = spec.igtf,
-                    procesoGeneracion = "1",
-                    tipoEmision = "01",
-                    codigoSucursalEmisorFallback = "0000",
-                    puntoFacturacionFiscalFallback = "001",
-                ),
-            factura =
-                VEFacturaData(
-                    idFactura = spec.idFactura,
-                    codFactura = "0000001",
-                    numeroDocumentoFiscal = null,
-                    numeroControlThka = null,
-                    tipoDocumento = "01",
-                    fechaFactura = "2026-08-03",
-                    fechaCreacion = "2026-08-03 10:00:00",
-                    facturarANombre = "CLIENTE PRUEBA",
-                    facturarARuc = "J12345678",
-                    facturarADireccion = "Caracas",
-                    facturarATelefono = "0212-1234567",
-                    totalTotalFactura = BigDecimal(spec.totalizarTotalGeneral),
-                    ivaTotalFactura = BigDecimal(spec.ivaTotalFactura),
-                    descuentosItemFactura = BigDecimal(spec.descuentosItemFactura),
-                    totalizarBaseImponible = BigDecimal("100.00"),
-                    totalizarMontoIva = BigDecimal(spec.ivaTotalFactura),
-                    totalizarTotalGeneral = BigDecimal(spec.totalizarTotalGeneral),
-                    montoItemsFactura = BigDecimal("100.00"),
-                    multiMoneda = spec.multiMoneda,
-                    tasa = spec.tasa,
-                    monedaBase = 1,
-                    abrMonedaBase = "VES",
-                    monedaSecundaria = 2,
-                    abrMonedaSecundaria = "USD",
-                ),
+            config = buildVEConfig(spec),
+            factura = buildVEFactura(spec),
             comprador = spec.comprador,
             detalles = detallesResueltos,
             formasPago = formasPagoResueltas,
@@ -659,6 +617,52 @@ class VenezuelaHkaPayloadBuilderTest {
             correlativoReservado = VECorrelativoReservado(1, 8),
         )
     }
+
+    private fun buildVEConfig(spec: ContextSpec) =
+        VEConfigData(
+            tipoFacturacion = 5,
+            tipoEntornoVe = 0,
+            tokenEmpresa = "USER",
+            tokenPassword = "PWD",
+            baseUrl = "https://demo.thefactoryhka.com",
+            rif = "J123456789",
+            nombreEmpresa = "EMPRESA TEST",
+            direccion = "DIR TEST",
+            telefonos = "0212",
+            igtf = spec.igtf,
+            procesoGeneracion = "1",
+            tipoEmision = "01",
+            codigoSucursalEmisorFallback = "0000",
+            puntoFacturacionFiscalFallback = "001",
+        )
+
+    private fun buildVEFactura(spec: ContextSpec) =
+        VEFacturaData(
+            idFactura = spec.idFactura,
+            codFactura = "0000001",
+            numeroDocumentoFiscal = null,
+            numeroControlThka = null,
+            tipoDocumento = "01",
+            fechaFactura = "2026-08-03",
+            fechaCreacion = "2026-08-03 10:00:00",
+            facturarANombre = "CLIENTE PRUEBA",
+            facturarARuc = "J12345678",
+            facturarADireccion = "Caracas",
+            facturarATelefono = "0212-1234567",
+            totalTotalFactura = BigDecimal(spec.totalizarTotalGeneral),
+            ivaTotalFactura = BigDecimal(spec.ivaTotalFactura),
+            descuentosItemFactura = BigDecimal(spec.descuentosItemFactura),
+            totalizarBaseImponible = BigDecimal("100.00"),
+            totalizarMontoIva = BigDecimal(spec.ivaTotalFactura),
+            totalizarTotalGeneral = BigDecimal(spec.totalizarTotalGeneral),
+            montoItemsFactura = BigDecimal("100.00"),
+            multiMoneda = spec.multiMoneda,
+            tasa = spec.tasa,
+            monedaBase = 1,
+            abrMonedaBase = "VES",
+            monedaSecundaria = 2,
+            abrMonedaSecundaria = "USD",
+        )
 
     private class DetalleSpec {
         var descripcion: String = "Producto de prueba"

@@ -15,6 +15,7 @@ import com.amaxoniaerp.features.sales.domain.SalePaymentInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentSummaryInput
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
@@ -231,98 +232,121 @@ class ProcessSaleCreditTest {
             )
         transaction(db) {
             if (countryCode == "PA") {
-                SchemaUtils.create(
-                    ParametrosGeneralesTablePA,
-                    ClientsTable,
-                    ClientSucursalTable,
-                    SalesCajaTable,
-                    SalesCajaSecuenciaTable,
-                    SalesFacturaTablePA,
-                    SalesFacturaDetalleTable,
-                    SalesFacturaDetalleFormaPagoTablePA,
-                    SalesCajaNuevaTablePA,
-                    SalesCajaNuevaDetalleTablePA,
-                    SalesCajaNuevaDetalleFormaPagoTable,
-                    SalesCajaNuevaReciboTablePA,
-                )
-                ParametrosGeneralesTablePA.insert {
-                    it[codEmpresa] = 1
-                    it[defaultCodClienteFactura] = ""
-                    it[defaultIdFormaPagoFactura] = 1
-                    it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
-                    it[validarStock] = "NO"
-                    it[diasVencimiento] = 90
-                    it[codAlmacen] = 1
-                    it[abrMonedaBase] = "USD"
-                    it[monedaBase] = 1
-                    it[bloquearItbms] = "NO"
-                    it[facturarCero] = false
-                    it[impresionDirecta] = false
-                    it[tipoFacturacion] = 0
-                }
+                createSchemaPA()
+                insertParametrosPA()
             } else {
-                SchemaUtils.create(
-                    ParametrosGeneralesTableVE,
-                    ClientsTable,
-                    SalesCajaTable,
-                    SalesCajaSecuenciaTable,
-                    SalesFacturaTableVE,
-                    SalesFacturaDetalleTable,
-                    SalesFacturaDetalleFormaPagoTableVE,
-                    SalesCajaNuevaTableVE,
-                    SalesCajaNuevaDetalleTableVE,
-                    SalesCajaNuevaDetalleFormaPagoTable,
-                    SalesCajaNuevaReciboTableVE,
-                )
-                ParametrosGeneralesTableVE.insert {
-                    it[codEmpresa] = 1
-                    it[defaultCodClienteFactura] = ""
-                    it[defaultIdFormaPagoFactura] = 1
-                    it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
-                    it[validarStock] = "NO"
-                    it[diasVencimiento] = 90
-                    it[codAlmacen] = 1
-                    it[abrMonedaBase] = "VES"
-                    it[monedaBase] = 1
-                    it[multiMoneda] = "No"
-                    it[monedaSecundaria] = 1
-                    it[abrMonedaSecundaria] = "VES"
-                    it[igtf] = null
-                    it[impresionDirecta] = "No"
-                }
+                createSchemaVE()
+                insertParametrosVE()
             }
-
-            ClientsTable.insert {
-                it[idCliente] = "client-1"
-                it[codCliente] = "C001"
-                it[rif] = "ID-1"
-                it[dv] = ""
-                it[nombre] = "CLIENTE"
-                it[apellido] = "PRUEBA"
-                it[direccion] = "DIRECCION"
-                it[telefonos] = "0000"
-                it[email] = "client@example.invalid"
-                it[estado] = "A"
-                it[pais] = 170
-                it[codTipoCliente] = 1
-                it[tipoContribuyente] = 1
-                it[permiteCredito] = true
-                it[limite] = 0.0
-                it[dias] = 30
-            }
-            SalesCajaTable.insert {
-                it[id] = "caja-1"
-                it[idSucursal] = null
-                it[codAlmacen] = 1
-                it[codigo] = "CJ01"
-                it[facturaCorrelativo] = 0
-            }
-            SalesCajaSecuenciaTable.insert {
-                it[id] = "seq-1"
-                it[secuencia] = "0001"
-            }
+            insertClient()
+            insertCajaYSecuencia()
         }
         return db
+    }
+
+    private fun Transaction.createSchemaPA() {
+        SchemaUtils.create(
+            ParametrosGeneralesTablePA,
+            ClientsTable,
+            ClientSucursalTable,
+            SalesCajaTable,
+            SalesCajaSecuenciaTable,
+            SalesFacturaTablePA,
+            SalesFacturaDetalleTable,
+            SalesFacturaDetalleFormaPagoTablePA,
+            SalesCajaNuevaTablePA,
+            SalesCajaNuevaDetalleTablePA,
+            SalesCajaNuevaDetalleFormaPagoTable,
+            SalesCajaNuevaReciboTablePA,
+        )
+    }
+
+    private fun Transaction.createSchemaVE() {
+        SchemaUtils.create(
+            ParametrosGeneralesTableVE,
+            ClientsTable,
+            SalesCajaTable,
+            SalesCajaSecuenciaTable,
+            SalesFacturaTableVE,
+            SalesFacturaDetalleTable,
+            SalesFacturaDetalleFormaPagoTableVE,
+            SalesCajaNuevaTableVE,
+            SalesCajaNuevaDetalleTableVE,
+            SalesCajaNuevaDetalleFormaPagoTable,
+            SalesCajaNuevaReciboTableVE,
+        )
+    }
+
+    private fun Transaction.insertParametrosPA() {
+        ParametrosGeneralesTablePA.insert {
+            it[codEmpresa] = 1
+            it[defaultCodClienteFactura] = ""
+            it[defaultIdFormaPagoFactura] = 1
+            it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
+            it[validarStock] = "NO"
+            it[diasVencimiento] = 90
+            it[codAlmacen] = 1
+            it[abrMonedaBase] = "USD"
+            it[monedaBase] = 1
+            it[bloquearItbms] = "NO"
+            it[facturarCero] = false
+            it[impresionDirecta] = false
+            it[tipoFacturacion] = 0
+        }
+    }
+
+    private fun Transaction.insertParametrosVE() {
+        ParametrosGeneralesTableVE.insert {
+            it[codEmpresa] = 1
+            it[defaultCodClienteFactura] = ""
+            it[defaultIdFormaPagoFactura] = 1
+            it[porcentajeImpuestoPrincipal] = BigDecimal.ZERO.setScale(2)
+            it[validarStock] = "NO"
+            it[diasVencimiento] = 90
+            it[codAlmacen] = 1
+            it[abrMonedaBase] = "VES"
+            it[monedaBase] = 1
+            it[multiMoneda] = "No"
+            it[monedaSecundaria] = 1
+            it[abrMonedaSecundaria] = "VES"
+            it[igtf] = null
+            it[impresionDirecta] = "No"
+        }
+    }
+
+    private fun Transaction.insertClient() {
+        ClientsTable.insert {
+            it[idCliente] = "client-1"
+            it[codCliente] = "C001"
+            it[rif] = "ID-1"
+            it[dv] = ""
+            it[nombre] = "CLIENTE"
+            it[apellido] = "PRUEBA"
+            it[direccion] = "DIRECCION"
+            it[telefonos] = "0000"
+            it[email] = "client@example.invalid"
+            it[estado] = "A"
+            it[pais] = 170
+            it[codTipoCliente] = 1
+            it[tipoContribuyente] = 1
+            it[permiteCredito] = true
+            it[limite] = 0.0
+            it[dias] = 30
+        }
+    }
+
+    private fun Transaction.insertCajaYSecuencia() {
+        SalesCajaTable.insert {
+            it[id] = "caja-1"
+            it[idSucursal] = null
+            it[codAlmacen] = 1
+            it[codigo] = "CJ01"
+            it[facturaCorrelativo] = 0
+        }
+        SalesCajaSecuenciaTable.insert {
+            it[id] = "seq-1"
+            it[secuencia] = "0001"
+        }
     }
 
     private fun setClientCredit(

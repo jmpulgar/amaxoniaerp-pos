@@ -215,6 +215,14 @@ class CreditNoteFinancialsTest {
         originalTax: Double,
         originalTotal: Double,
     ) {
+        insertClient()
+        val base = lines.sumOf { it.base }
+        insertFactura(base, globalDiscount, originalTax, originalTotal)
+        insertDetalles(lines)
+        insertCajaSecuenciaYFormaPago()
+    }
+
+    private fun insertClient() {
         ClientsTable.insert {
             it[idCliente] = CLIENT_ID
             it[codCliente] = "CLIENT-1"
@@ -239,7 +247,14 @@ class CreditNoteFinancialsTest {
             it[dias] = 0
             it[foto] = null
         }
-        val base = lines.sumOf { it.base }
+    }
+
+    private fun insertFactura(
+        base: Double,
+        globalDiscount: Double,
+        originalTax: Double,
+        originalTotal: Double,
+    ) {
         CreditNoteFacturaTable.insert {
             it[idFactura] = SOURCE_INVOICE_ID
             it[codFactura] = "F-001"
@@ -273,6 +288,9 @@ class CreditNoteFinancialsTest {
             it[tasa] = BigDecimal.ONE
             it[totalRef] = originalTotal.toBigDecimal()
         }
+    }
+
+    private fun insertDetalles(lines: List<LineSpec>) {
         lines.forEachIndexed { index, line ->
             val detailTax =
                 line.base
@@ -304,6 +322,9 @@ class CreditNoteFinancialsTest {
                 it[anulado] = false
             }
         }
+    }
+
+    private fun insertCajaSecuenciaYFormaPago() {
         CreditNoteCajaTable.insert {
             it[idCaja] = SOURCE_CAJA_ID
             it[codigo] = "CAJA"
