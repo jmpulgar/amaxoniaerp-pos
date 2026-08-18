@@ -113,15 +113,7 @@ private fun loadCurrencyConfig(
             monedaBase
         }
 
-    val abrMonedaSecundaria =
-        if (parametrosTableVE != null) {
-            parametrosRow
-                ?.get(parametrosTableVE.abrMonedaSecundaria)
-                ?.takeIf { it.isNotBlank() }
-                ?: abrMonedaBase
-        } else {
-            abrMonedaBase
-        }
+    val abrMonedaSecundaria = resolveAbrMonedaSecundaria(parametrosTableVE, parametrosRow, abrMonedaBase)
 
     val tasasTableVE = TasasCambioTableFactory.forCountry(countryCode) as? TasasCambioTableVE
     val tasaActual =
@@ -138,16 +130,53 @@ private fun loadCurrencyConfig(
             null
         }
 
+    val resolvedTasa = tasaResolvedFromRow(tasaActual, tasasTableVE)
+    val resolvedIdTasa = idTasaResolvedFromRow(tasaActual, tasasTableVE)
+
     return CurrencyConfig(
         multiMoneda = if (multiMonedaFromParams) "SI" else "NO",
-        tasa = tasaActual?.let { it[tasasTableVE!!.tasaInversa]?.toDouble() ?: 1.0 } ?: 1.0,
-        idTasa = tasaActual?.let { it[tasasTableVE!!.id]?.toInt() ?: 0 } ?: 0,
+        tasa = resolvedTasa,
+        idTasa = resolvedIdTasa,
         monedaBase = monedaBase,
         abrMonedaBase = abrMonedaBase,
         monedaSecundaria = monedaSecundaria,
         abrMonedaSecundaria = abrMonedaSecundaria,
     )
 }
+
+private fun resolveAbrMonedaSecundaria(
+    parametrosTableVE: ParametrosGeneralesTableVE?,
+    parametrosRow: ResultRow?,
+    abrMonedaBase: String,
+): String =
+    if (parametrosTableVE != null) {
+        parametrosRow
+            ?.get(parametrosTableVE.abrMonedaSecundaria)
+            ?.takeIf { it.isNotBlank() }
+            ?: abrMonedaBase
+    } else {
+        abrMonedaBase
+    }
+
+private fun tasaResolvedFromRow(
+    tasaActual: ResultRow?,
+    tasasTableVE: TasasCambioTableVE?,
+): Double =
+    if (tasaActual != null && tasasTableVE != null) {
+        tasaActual[tasasTableVE.tasaInversa]?.toDouble() ?: 1.0
+    } else {
+        1.0
+    }
+
+private fun idTasaResolvedFromRow(
+    tasaActual: ResultRow?,
+    tasasTableVE: TasasCambioTableVE?,
+): Int =
+    if (tasaActual != null && tasasTableVE != null) {
+        tasaActual[tasasTableVE.id]?.toInt() ?: 0
+    } else {
+        0
+    }
 
 internal fun loadDefaultWarehouseBySucursal(): Map<Int, Int?> =
     SucursalAlmacenTable

@@ -106,16 +106,6 @@ internal fun parseDate(value: String): LocalDate =
             )
         }
 
-internal fun formatDate(value: LocalDate?): String {
-    if (value == null) return ""
-    return value.format(DATE_FORMATTER)
-}
-
-internal fun formatDateTime(value: LocalDateTime?): String {
-    if (value == null) return ""
-    return value.format(DATE_TIME_FORMATTER)
-}
-
 internal fun divideSafe(
     value: BigDecimal,
     divisor: BigDecimal,

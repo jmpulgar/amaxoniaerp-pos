@@ -128,22 +128,19 @@ private class FormaAccum(
     var total: Double,
 )
 
+private data class FormaItemMetadata(
+    val idFormaPago: Int?,
+    val siglas: String?,
+    val descripcion: String?,
+    val tipoMovimiento: String?,
+)
+
 internal fun loadFormaPagoBreakdown(
     countryCode: String,
     idCajaSecuencia: String,
 ): FormaPagoBreakdown {
     val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(countryCode)
-    val formasCatalogo =
-        CajaFormaPagoTable
-            .select(
-                CajaFormaPagoTable.idFormaPago,
-                CajaFormaPagoTable.siglas,
-                CajaFormaPagoTable.descripcion,
-            ).toList()
-            .associate { row ->
-                row[CajaFormaPagoTable.idFormaPago] to
-                    (row[CajaFormaPagoTable.siglas] to row[CajaFormaPagoTable.descripcion])
-            }
+    val formasCatalogo = loadFormasCatalogo()
 
     val formaRows =
         SalesCajaNuevaDetalleFormaPagoTable
@@ -182,23 +179,11 @@ internal fun loadFormaPagoBreakdown(
             PaymentCategory.OTHER -> totalOther += amount
         }
 
-        val formKey =
-            idFormaPago?.toString()
-                ?: listOf(siglas.orEmpty(), descripcion.orEmpty(), tipoMovimiento.orEmpty())
-                    .joinToString("|")
-
-        val current = formasMap[formKey]
-        if (current == null) {
-            formasMap[formKey] =
-                FormaAccum(
-                    idFormaPago = idFormaPago,
-                    siglas = siglas ?: tipoMovimiento,
-                    descripcion = descripcion,
-                    total = amount,
-                )
-        } else {
-            current.total += amount
-        }
+        accumulateFormaRow(
+            formasMap,
+            FormaItemMetadata(idFormaPago, siglas, descripcion, tipoMovimiento),
+            amount,
+        )
     }
 
     return FormaPagoBreakdown(
@@ -215,6 +200,42 @@ internal fun loadFormaPagoBreakdown(
                 )
             },
     )
+}
+
+private fun loadFormasCatalogo(): Map<Int, Pair<String?, String?>> =
+    CajaFormaPagoTable
+        .select(
+            CajaFormaPagoTable.idFormaPago,
+            CajaFormaPagoTable.siglas,
+            CajaFormaPagoTable.descripcion,
+        ).toList()
+        .associate { row ->
+            row[CajaFormaPagoTable.idFormaPago] to
+                (row[CajaFormaPagoTable.siglas] to row[CajaFormaPagoTable.descripcion])
+        }
+
+private fun accumulateFormaRow(
+    formasMap: MutableMap<String, FormaAccum>,
+    meta: FormaItemMetadata,
+    amount: Double,
+) {
+    val formKey =
+        meta.idFormaPago?.toString()
+            ?: listOf(meta.siglas.orEmpty(), meta.descripcion.orEmpty(), meta.tipoMovimiento.orEmpty())
+                .joinToString("|")
+
+    val current = formasMap[formKey]
+    if (current == null) {
+        formasMap[formKey] =
+            FormaAccum(
+                idFormaPago = meta.idFormaPago,
+                siglas = meta.siglas ?: meta.tipoMovimiento,
+                descripcion = meta.descripcion,
+                total = amount,
+            )
+    } else {
+        current.total += amount
+    }
 }
 
 internal fun buildCajaCierreSummary(

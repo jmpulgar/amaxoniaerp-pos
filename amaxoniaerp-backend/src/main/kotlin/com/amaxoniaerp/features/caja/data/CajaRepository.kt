@@ -14,10 +14,7 @@ import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -119,46 +116,11 @@ class CajaRepository {
             }
 
         return dbQuery(database) {
-            insertApertura(newId, request, username, now, nextSequence)
+            insertAperturaRecord(newId, request, username, now, nextSequence)
             Result.success(Unit)
         }.mapCatching {
             getCajaStatus(countryCode, dbName, request.idCaja)
                 ?: error("Failed to retrieve open caja.")
-        }
-    }
-
-    private fun insertApertura(
-        newId: String,
-        request: AperturaRequest,
-        username: String,
-        now: java.time.LocalDateTime,
-        nextSequence: String,
-    ) {
-        CajaSecuenciaTable.insert {
-            it[idCajaSecuencia] = newId
-            it[idCaja] = request.idCaja
-            it[idVendedor] = request.idVendedor
-            it[fechaApertura] = now
-            it[montoEfectivoApertura] = request.montoApertura.toBigDecimal()
-            it[usuario] = username
-            it[serieSucursal] = request.serieSucursal
-            it[secuencia] = nextSequence
-            it[contabilizado] = 0
-            // EL CAMPO FALTANTE PARA CUMPLIR CON EL ESQUEMA:
-            it[serialFiscal] = ""
-            it[observacionApertura] = "Apertura automática desde App POS"
-            it[observacionCierre] = ""
-            it[usuarioContabilizacion] = ""
-            it[fechaContabilizacion] = now
-        }
-
-        CajaDetalleAperturaTable.insert {
-            it[idDetalleApertura] = UUID.randomUUID().toString()
-            it[idCajaSecuencia] = newId
-            it[cantidad] = 1
-            it[valor] = request.montoApertura.toBigDecimal()
-            it[monto] = request.montoApertura.toBigDecimal()
-            it[serieSucursal] = request.serieSucursal
         }
     }
 
@@ -256,95 +218,6 @@ class CajaRepository {
         }
     }
 
-    private fun readCajaSecuenciaData(
-        countryCode: String,
-        idSecuencia: String,
-        verifyFacturasTemporales: Boolean,
-    ): CajaSecuenciaData {
-        val header = loadCajaSecuenciaHeader(idSecuencia)
-        val secuenciaRow = header.row
-
-        val detalleApertura = loadDetalleApertura(idSecuencia)
-        val montosPorForma = loadMontosPorForma(countryCode, idSecuencia)
-        val formaPagoItems = loadFormaPagoItems(countryCode, header.idCaja, montosPorForma)
-        val montoEntrada = loadMovimientoTotal(idSecuencia, "E")
-        val montoSalida = loadMovimientoTotal(idSecuencia, "S")
-        appendEntradasSalidasItems(formaPagoItems, montoEntrada, montoSalida)
-
-        val formaPagoDevolucion = loadFormaPagoDevolucion(idSecuencia)
-        applyDevolucionesToFormaPago(formaPagoItems, formaPagoDevolucion)
-
-        val montoEfectivoVentasCalc =
-            formaPagoItems
-                .filter { it.id > 0 && isCashSigla(it.siglas) }
-                .sumOf { it.monto }
-        val montoOtrosTotalCalc =
-            formaPagoItems
-                .filter { it.id > 0 && !isCashSigla(it.siglas) }
-                .sumOf { it.monto }
-
-        val totalAnulado = loadTotalAnulado(countryCode, idSecuencia)
-        val (totalVentas, cantidadTransacciones) = loadVentasDeSecuencia(countryCode, idSecuencia)
-        val inventario = loadInventarioVentas(countryCode, idSecuencia)
-        val verificarTemporales =
-            if (verifyFacturasTemporales) countFacturasTemporales(countryCode, idSecuencia) else 0
-
-        val montoEfectivoApertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble()
-        val montoEfectivoTotalCalc = montoEfectivoApertura + montoEfectivoVentasCalc + montoEntrada - montoSalida
-        val montoTotalCalc = montoEfectivoTotalCalc + montoOtrosTotalCalc
-        val montoCierreCalc = montoEfectivoApertura + totalVentas + montoEntrada - montoSalida - totalAnulado
-
-        val fechaApertura = secuenciaRow[CajaSecuenciaTable.fechaApertura]
-        val fechaCierre = secuenciaRow[CajaSecuenciaTable.fechaCierre]
-        val fechaCreacion = secuenciaRow[CajaSecuenciaTable.fechaCreacion]
-        val cajaRow = header.cajaRow
-
-        return CajaSecuenciaData(
-            id = secuenciaRow[CajaSecuenciaTable.idCajaSecuencia],
-            idCaja = header.idCaja,
-            idVendedor = secuenciaRow[CajaSecuenciaTable.idVendedor],
-            secuencia = secuenciaRow[CajaSecuenciaTable.secuencia],
-            fechaApertura = formatCajaDateTime(fechaApertura),
-            fechaCierre = formatCajaDateTime(fechaCierre),
-            fechaCreacion = formatCajaDateTime(fechaCreacion),
-            usuario = secuenciaRow[CajaSecuenciaTable.usuario],
-            observacionApertura = secuenciaRow[CajaSecuenciaTable.observacionApertura],
-            observacionCierre = secuenciaRow[CajaSecuenciaTable.observacionCierre],
-            montoEfectivoApertura = montoEfectivoApertura,
-            montoEfectivoVentas = montoEfectivoVentasCalc,
-            montoEfectivoEntrada = montoEntrada,
-            montoEfectivoSalida = montoSalida,
-            montoEfectivoTotal = montoEfectivoTotalCalc,
-            montoEfectivoCierre = montoEfectivoTotalCalc,
-            montoEfectivoDiferencia = 0.0,
-            montoOtrosTotal = montoOtrosTotalCalc,
-            montoOtrosCierre = montoOtrosTotalCalc,
-            montoOtrosDiferencia = 0.0,
-            montoTotal = montoTotalCalc,
-            montoCierre = montoCierreCalc,
-            montoDiferencia = 0.0,
-            totalVentas = totalVentas,
-            cantidadTransacciones = cantidadTransacciones,
-            numeroCierreFiscal = secuenciaRow[CajaSecuenciaTable.numeroCierreFiscal],
-            serieSucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal],
-            serialFiscal = secuenciaRow[CajaSecuenciaTable.serialFiscal],
-            contabilizado = secuenciaRow[CajaSecuenciaTable.contabilizado],
-            ffechaApertura = fechaApertura?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
-            ffechaCierre = fechaCierre?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
-            cajaCodigo = cajaRow?.get(CajaTable.codCaja),
-            caja = cajaRow?.get(CajaTable.caja) ?: cajaRow?.get(CajaTable.descripcion),
-            fondoApertura = cajaRow?.get(CajaTable.fondoApertura)?.toDouble() ?: 0.0,
-            nombreModelo = cajaRow?.get(CajaTable.impresoraModelo),
-            vendedor = header.vendedorNombre,
-            detalleApertura = detalleApertura,
-            formaPago = formaPagoItems,
-            formaPagoDevolucion = formaPagoDevolucion,
-            totalAnulado = totalAnulado,
-            verificarFacturasTemporales = verificarTemporales,
-            inventario = inventario,
-        )
-    }
-
     suspend fun saveCajaCierre(
         countryCode: String,
         dbName: String,
@@ -387,8 +260,8 @@ class CajaRepository {
                 val now = BusinessClock.nowForCountry(countryCode)
                 val serieSucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal]
 
-                persistCierre(request, now)
-                rewriteCierreDetalles(request, serieSucursal)
+                persistCierreRecord(request, now)
+                rewriteCierreDetallesRecord(request, serieSucursal)
 
                 CajaCierreSaveResponse(
                     success = true,
@@ -396,49 +269,6 @@ class CajaRepository {
                     id = request.id,
                 )
             }
-        }
-    }
-
-    private fun persistCierre(
-        request: CajaCierreSaveRequest,
-        now: java.time.LocalDateTime,
-    ) {
-        CajaSecuenciaTable.update({ CajaSecuenciaTable.idCajaSecuencia eq request.id }) {
-            it[fechaCierre] = now
-            it[montoEfectivoVentas] = request.montoEfectivoVentas.toMoney()
-            it[montoEfectivoEntrada] = request.montoEfectivoEntrada.toMoney()
-            it[montoEfectivoSalida] = request.montoEfectivoSalida.toMoney()
-            it[montoEfectivoTotal] = request.montoEfectivoTotal.toMoney()
-            it[montoEfectivoCierre] = request.montoEfectivoCierre.toMoney()
-            it[montoEfectivoDiferencia] = request.montoEfectivoDiferencia.toMoney()
-            it[montoOtrosTotal] = request.montoOtrosTotal.toMoney()
-            it[montoOtrosCierre] = request.montoOtrosCierre.toMoney()
-            it[montoOtrosDiferencia] = request.montoOtrosDiferencia.toMoney()
-            it[montoTotal] = request.montoTotal.toMoney()
-            it[montoCierre] = request.montoCierre.toMoney()
-            it[montoDiferencia] = request.montoDiferencia.toMoney()
-            it[observacionCierre] = request.observacionCierre.orEmpty()
-            it[numeroCierreFiscal] = request.numeroCierreFiscal
-        }
-    }
-
-    private fun rewriteCierreDetalles(
-        request: CajaCierreSaveRequest,
-        serieSucursal: String,
-    ) {
-        CajaDetalleCierreTable.deleteWhere { CajaDetalleCierreTable.idSecuencia eq request.id }
-        CajaDetalleCierreFormaPagoTable.deleteWhere {
-            CajaDetalleCierreFormaPagoTable.idSecuencia eq request.id
-        }
-
-        request.detalle
-            .filter { it.cantidad > 0 }
-            .forEach { detalle ->
-                insertCajaDetalleCierre(request.id, serieSucursal, detalle)
-            }
-
-        request.detalleFormaPago.forEach { detalle ->
-            insertCajaDetalleCierreFormaPago(request.id, serieSucursal, detalle)
         }
     }
 

@@ -1,6 +1,5 @@
 package com.amaxoniaerp.features.facturas.data
 
-import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigDecimal
 import java.math.RoundingMode

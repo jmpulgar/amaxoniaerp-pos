@@ -5,7 +5,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 /** Partes del payload de impresión ya resueltas (fila cabecera, productos, pagos, cambio). */
-internal class PrintBuildContext(
+internal data class PrintBuildContext(
     val factura: SqlRow,
     val productos: List<com.amaxoniaerp.features.facturas.domain.ProductoPrintResponse>,
     val pagos: List<com.amaxoniaerp.features.facturas.domain.PagoPrintResponse>,
@@ -181,7 +181,11 @@ internal fun buildPrintResponse(ctx: PrintBuildContext): FacturaPrintPayloadResp
             ),
         cliente =
             com.amaxoniaerp.features.facturas.domain.ClientePrintResponse(
-                nombre = ctx.factura.stringOrNull("facturar_a").orEmpty().ifBlank { "Cliente General" },
+                nombre =
+                    ctx.factura
+                        .stringOrNull("facturar_a")
+                        .orEmpty()
+                        .ifBlank { "Cliente General" },
                 documento = ctx.factura.stringOrNull("facturar_a_ruc"),
                 sucursal = ctx.factura.stringOrNull("cliente_sucursal_nombre"),
                 sucursalDireccion = ctx.factura.stringOrNull("cliente_sucursal_direccion"),

@@ -4,14 +4,12 @@ import com.amaxoniaerp.features.caja.domain.CajaDetalleAperturaItem
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoDevolucionItem
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoItem
 import com.amaxoniaerp.features.caja.domain.CajaInventarioItem
+import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.amaxoniaerp.features.pos.data.CajaFormaTable
 import com.amaxoniaerp.features.sales.data.CajaStatus
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTableFactory
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaTableFactory
-import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
-import com.amaxoniaerp.features.sales.data.SalesFacturaTableFactory
-import com.amaxoniaerp.features.sales.data.SalesStockTable
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -105,7 +103,6 @@ internal fun loadMontosPorForma(
 }
 
 internal fun loadFormaPagoItems(
-    countryCode: String,
     idCaja: String,
     montosPorForma: Map<Int?, Double>,
 ): MutableList<CajaFormaPagoItem> {
@@ -153,206 +150,167 @@ internal fun loadFormaPagoItems(
         }.toMutableList()
 }
 
-internal fun loadMovimientoTotal(
-    idSecuencia: String,
-    tipo: String,
-): Double =
-    runCatching {
-        CajaMovimientoTable
-            .select(CajaMovimientoTable.total)
-            .where {
-                (CajaMovimientoTable.idSecuencia eq idSecuencia) and
-                    (CajaMovimientoTable.tipo eq tipo)
-            }.sumOf { it[CajaMovimientoTable.total].toDouble() }
-    }.getOrDefault(0.0)
-
-internal fun appendEntradasSalidasItems(
-    formaPagoItems: MutableList<CajaFormaPagoItem>,
-    montoEntrada: Double,
-    montoSalida: Double,
-) {
-    if (montoEntrada != 0.0) {
-        formaPagoItems +=
-            CajaFormaPagoItem(
-                id = -100,
-                formaPago = "ENTRADAS",
-                siglas = "E",
-                monto = montoEntrada,
-                estatus = 1,
-            )
-    }
-    if (montoSalida != 0.0) {
-        formaPagoItems +=
-            CajaFormaPagoItem(
-                id = -101,
-                formaPago = "SALIDAS",
-                siglas = "S",
-                monto = montoSalida,
-                estatus = 1,
-            )
-    }
-}
-
-internal fun loadFormaPagoDevolucion(idSecuencia: String): List<CajaFormaPagoDevolucionItem> =
-    runCatching {
-        val devolucionRows =
-            FacturaDevolucionTable
-                .selectAll()
-                .where { FacturaDevolucionTable.idCajaSecuencia eq idSecuencia }
-                .toList()
-
-        val devolucionesPorForma =
-            devolucionRows
-                .groupBy { it[FacturaDevolucionTable.idFormaPago] ?: RETURN_PAYMENT_FORM_FALLBACK }
-                .mapValues { (_, rows) ->
-                    rows.sumOf { row ->
-                        row[FacturaDevolucionTable.totalTotalFactura]?.toDouble() ?: 0.0
-                    }
-                }
-
-        if (devolucionesPorForma.isEmpty()) {
-            emptyList()
-        } else {
-            val ids = devolucionesPorForma.keys.toList()
-            val meta =
-                CajaFormaPagoTable
-                    .select(
-                        CajaFormaPagoTable.idFormaPago,
-                        CajaFormaPagoTable.siglas,
-                        CajaFormaPagoTable.descripcion,
-                    ).where { CajaFormaPagoTable.idFormaPago inList ids }
-                    .associateBy { it[CajaFormaPagoTable.idFormaPago] }
-
-            devolucionesPorForma.map { (idForma, monto) ->
-                val row = meta[idForma]
-                CajaFormaPagoDevolucionItem(
-                    idFormaPago = idForma,
-                    siglas = row?.get(CajaFormaPagoTable.siglas) ?: if (idForma == 30) "NC" else null,
-                    descripcion =
-                        row?.get(CajaFormaPagoTable.descripcion) ?: if (idForma ==
-                            30
-                        ) {
-                            "NOTA DE CREDITO"
-                        } else {
-                            null
-                        },
-                    monto = monto,
-                )
-            }
-        }
-    }.getOrDefault(emptyList())
-
-internal fun applyDevolucionesToFormaPago(
-    formaPagoItems: MutableList<CajaFormaPagoItem>,
-    formaPagoDevolucion: List<CajaFormaPagoDevolucionItem>,
-) {
-    formaPagoDevolucion.forEach { devolucion ->
-        val index = formaPagoItems.indexOfFirst { it.id == devolucion.idFormaPago }
-        if (index >= 0) {
-            val current = formaPagoItems[index]
-            formaPagoItems[index] = current.copy(monto = current.monto + devolucion.monto)
-        } else {
-            formaPagoItems +=
-                CajaFormaPagoItem(
-                    id = devolucion.idFormaPago,
-                    formaPago = devolucion.descripcion ?: "NOTA DE CREDITO",
-                    siglas = devolucion.siglas ?: "NC",
-                    estatus = 1,
-                    monto = devolucion.monto,
-                )
-        }
-    }
-}
-
-internal fun loadVentasDeSecuencia(
+internal fun readCajaSecuenciaData(
     countryCode: String,
     idSecuencia: String,
-): Pair<Double, Int> {
-    val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
-    val facturasValidas =
-        facturaTable
-            .select(facturaTable.idFactura, facturaTable.totalTotalFactura, facturaTable.codEstatus)
-            .where { facturaTable.idCajaSecuencia eq idSecuencia }
-            .filter { row -> (row[facturaTable.codEstatus] ?: 0) != ANNULLED_INVOICE_STATUS }
-    return facturasValidas.sumOf { it[facturaTable.totalTotalFactura].toDouble() } to facturasValidas.size
+    verifyFacturasTemporales: Boolean,
+): CajaSecuenciaData {
+    val header = loadCajaSecuenciaHeader(idSecuencia)
+    val secuenciaRow = header.row
+
+    val detalleApertura = loadDetalleApertura(idSecuencia)
+    val montosPorForma = loadMontosPorForma(countryCode, idSecuencia)
+    val formaPagoItems = loadFormaPagoItems(header.idCaja, montosPorForma)
+    val montoEntrada = loadMovimientoTotal(idSecuencia, "E")
+    val montoSalida = loadMovimientoTotal(idSecuencia, "S")
+    appendEntradasSalidasItems(formaPagoItems, montoEntrada, montoSalida)
+
+    val formaPagoDevolucion = loadFormaPagoDevolucion(idSecuencia)
+    applyDevolucionesToFormaPago(formaPagoItems, formaPagoDevolucion)
+
+    val totalAnulado = loadTotalAnulado(countryCode, idSecuencia)
+    val (totalVentas, cantidadTransacciones) = loadVentasDeSecuencia(countryCode, idSecuencia)
+    val inventario = loadInventarioVentas(countryCode, idSecuencia)
+    val verificarTemporales =
+        if (verifyFacturasTemporales) countFacturasTemporales(countryCode, idSecuencia) else 0
+
+    return buildCajaSecuenciaData(
+        CajaSecuenciaContext(
+            header = header,
+            secuenciaRow = secuenciaRow,
+            details =
+                CajaSecuenciaDetails(
+                    detalleApertura = detalleApertura,
+                    formaPagoItems = formaPagoItems,
+                    formaPagoDevolucion = formaPagoDevolucion,
+                    inventario = inventario,
+                ),
+            totals =
+                CajaSecuenciaTotals(
+                    montoEntrada = montoEntrada,
+                    montoSalida = montoSalida,
+                    totalAnulado = totalAnulado,
+                    totalVentas = totalVentas,
+                    cantidadTransacciones = cantidadTransacciones,
+                    verificarTemporales = verificarTemporales,
+                ),
+        ),
+    )
 }
 
-internal fun loadTotalAnulado(
-    countryCode: String,
-    idSecuencia: String,
-): Double {
-    val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
-    return facturaTable
-        .select(facturaTable.totalTotalFactura)
-        .where {
-            (facturaTable.idCajaSecuencia eq idSecuencia) and
-                (facturaTable.codEstatus eq ANNULLED_INVOICE_STATUS)
-        }.sumOf { it[facturaTable.totalTotalFactura].toDouble() }
+private class CajaCalculatedFinancials(
+    val montoEfectivoApertura: Double,
+    val montoEfectivoVentasCalc: Double,
+    val montoEfectivoTotalCalc: Double,
+    val montoOtrosTotalCalc: Double,
+    val montoTotalCalc: Double,
+    val montoCierreCalc: Double,
+)
+
+private class CajaSecuenciaContext(
+    val header: CajaSecuenciaHeader,
+    val secuenciaRow: ResultRow,
+    val details: CajaSecuenciaDetails,
+    val totals: CajaSecuenciaTotals,
+)
+
+private class CajaSecuenciaDetails(
+    val detalleApertura: List<CajaDetalleAperturaItem>,
+    val formaPagoItems: MutableList<CajaFormaPagoItem>,
+    val formaPagoDevolucion: List<CajaFormaPagoDevolucionItem>,
+    val inventario: List<CajaInventarioItem>,
+)
+
+private class CajaSecuenciaTotals(
+    val montoEntrada: Double,
+    val montoSalida: Double,
+    val totalAnulado: Double,
+    val totalVentas: Double,
+    val cantidadTransacciones: Int,
+    val verificarTemporales: Int,
+)
+
+private fun calculateFinancials(ctx: CajaSecuenciaContext): CajaCalculatedFinancials {
+    val secuenciaRow = ctx.secuenciaRow
+    val formaPagoItems = ctx.details.formaPagoItems
+    val montoEntrada = ctx.totals.montoEntrada
+    val montoSalida = ctx.totals.montoSalida
+    val totalVentas = ctx.totals.totalVentas
+    val totalAnulado = ctx.totals.totalAnulado
+    val montoEfectivoVentasCalc =
+        formaPagoItems
+            .filter { it.id > 0 && isCashSigla(it.siglas) }
+            .sumOf { it.monto }
+    val montoOtrosTotalCalc =
+        formaPagoItems
+            .filter { it.id > 0 && !isCashSigla(it.siglas) }
+            .sumOf { it.monto }
+    val montoEfectivoApertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble()
+    val montoEfectivoTotalCalc = montoEfectivoApertura + montoEfectivoVentasCalc + montoEntrada - montoSalida
+    val montoTotalCalc = montoEfectivoTotalCalc + montoOtrosTotalCalc
+    val montoCierreCalc = montoEfectivoApertura + totalVentas + montoEntrada - montoSalida - totalAnulado
+    return CajaCalculatedFinancials(
+        montoEfectivoApertura = montoEfectivoApertura,
+        montoEfectivoVentasCalc = montoEfectivoVentasCalc,
+        montoEfectivoTotalCalc = montoEfectivoTotalCalc,
+        montoOtrosTotalCalc = montoOtrosTotalCalc,
+        montoTotalCalc = montoTotalCalc,
+        montoCierreCalc = montoCierreCalc,
+    )
 }
 
-internal fun countFacturasTemporales(
-    countryCode: String,
-    idSecuencia: String,
-): Int {
-    val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
-    return facturaTable
-        .select(facturaTable.formaPago)
-        .where {
-            (facturaTable.idCajaSecuencia eq idSecuencia) and
-                (facturaTable.codEstatus eq 1)
-        }.count { row -> !row[facturaTable.formaPago].equals("credito", ignoreCase = true) }
-}
+private fun buildCajaSecuenciaData(ctx: CajaSecuenciaContext): CajaSecuenciaData {
+    val fin =
+        calculateFinancials(ctx)
+    val fechaApertura = ctx.secuenciaRow[CajaSecuenciaTable.fechaApertura]
+    val fechaCierre = ctx.secuenciaRow[CajaSecuenciaTable.fechaCierre]
+    val fechaCreacion = ctx.secuenciaRow[CajaSecuenciaTable.fechaCreacion]
+    val cajaRow = ctx.header.cajaRow
 
-internal fun loadInventarioVentas(
-    countryCode: String,
-    idSecuencia: String,
-): List<CajaInventarioItem> {
-    val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
-    val facturasValidas =
-        facturaTable
-            .select(facturaTable.idFactura)
-            .where { facturaTable.idCajaSecuencia eq idSecuencia }
-            .filter { row -> (row[facturaTable.codEstatus] ?: 0) != ANNULLED_INVOICE_STATUS }
-    val facturaIds = facturasValidas.map { it[facturaTable.idFactura] }
-    val detalleVentas =
-        if (facturaIds.isEmpty()) {
-            emptyList()
-        } else {
-            SalesFacturaDetalleTable
-                .select(
-                    SalesFacturaDetalleTable.idItem,
-                    SalesFacturaDetalleTable.itemCodigo,
-                    SalesFacturaDetalleTable.itemDescripcion,
-                    SalesFacturaDetalleTable.itemCantidadTotal,
-                ).where { SalesFacturaDetalleTable.idFactura inList facturaIds }
-                .toList()
-        }
-    val itemIds = detalleVentas.map { it[SalesFacturaDetalleTable.idItem] }.distinct()
-    val stockDisponible =
-        if (itemIds.isEmpty()) {
-            emptyMap()
-        } else {
-            SalesStockTable
-                .select(SalesStockTable.idItem, SalesStockTable.cantidad)
-                .where { SalesStockTable.idItem inList itemIds }
-                .groupBy { it[SalesStockTable.idItem] }
-                .mapValues { (_, rows) -> rows.sumOf { it[SalesStockTable.cantidad].toDouble() } }
-        }
-    return detalleVentas
-        .groupBy { it[SalesFacturaDetalleTable.idItem] }
-        .map { (itemId, rows) ->
-            val first = rows.first()
-            val sold = rows.sumOf { it[SalesFacturaDetalleTable.itemCantidadTotal].toDouble() }
-            val available = stockDisponible[itemId] ?: 0.0
-            CajaInventarioItem(
-                codigo = first[SalesFacturaDetalleTable.itemCodigo].ifBlank { itemId.toString() },
-                descripcion =
-                    first[SalesFacturaDetalleTable.itemDescripcion].ifBlank { "Producto $itemId" },
-                existenciaInicial = available + sold,
-                cantidadVendida = sold,
-                existenciaDisponible = available,
-            )
-        }.sortedBy { it.descripcion }
+    return CajaSecuenciaData(
+        id = ctx.secuenciaRow[CajaSecuenciaTable.idCajaSecuencia],
+        idCaja = ctx.header.idCaja,
+        idVendedor = ctx.secuenciaRow[CajaSecuenciaTable.idVendedor],
+        secuencia = ctx.secuenciaRow[CajaSecuenciaTable.secuencia],
+        fechaApertura = formatCajaDateTime(fechaApertura),
+        fechaCierre = formatCajaDateTime(fechaCierre),
+        fechaCreacion = formatCajaDateTime(fechaCreacion),
+        usuario = ctx.secuenciaRow[CajaSecuenciaTable.usuario],
+        observacionApertura = ctx.secuenciaRow[CajaSecuenciaTable.observacionApertura],
+        observacionCierre = ctx.secuenciaRow[CajaSecuenciaTable.observacionCierre],
+        montoEfectivoApertura = fin.montoEfectivoApertura,
+        montoEfectivoVentas = fin.montoEfectivoVentasCalc,
+        montoEfectivoEntrada = ctx.totals.montoEntrada,
+        montoEfectivoSalida = ctx.totals.montoSalida,
+        montoEfectivoTotal = fin.montoEfectivoTotalCalc,
+        montoEfectivoCierre = fin.montoEfectivoTotalCalc,
+        montoEfectivoDiferencia = 0.0,
+        montoOtrosTotal = fin.montoOtrosTotalCalc,
+        montoOtrosCierre = fin.montoOtrosTotalCalc,
+        montoOtrosDiferencia = 0.0,
+        montoTotal = fin.montoTotalCalc,
+        montoCierre = fin.montoCierreCalc,
+        montoDiferencia = 0.0,
+        totalVentas = ctx.totals.totalVentas,
+        cantidadTransacciones = ctx.totals.cantidadTransacciones,
+        numeroCierreFiscal = ctx.secuenciaRow[CajaSecuenciaTable.numeroCierreFiscal],
+        serieSucursal = ctx.secuenciaRow[CajaSecuenciaTable.serieSucursal],
+        serialFiscal = ctx.secuenciaRow[CajaSecuenciaTable.serialFiscal],
+        contabilizado = ctx.secuenciaRow[CajaSecuenciaTable.contabilizado],
+        ffechaApertura = fechaApertura?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
+        ffechaCierre = fechaCierre?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) ?: "",
+        cajaCodigo = cajaRow?.get(CajaTable.codCaja),
+        caja = cajaRow?.get(CajaTable.caja) ?: cajaRow?.get(CajaTable.descripcion),
+        fondoApertura = cajaRow?.get(CajaTable.fondoApertura)?.toDouble() ?: 0.0,
+        nombreModelo = cajaRow?.get(CajaTable.impresoraModelo),
+        vendedor = ctx.header.vendedorNombre,
+        detalleApertura = ctx.details.detalleApertura,
+        formaPago = ctx.details.formaPagoItems,
+        formaPagoDevolucion = ctx.details.formaPagoDevolucion,
+        totalAnulado = ctx.totals.totalAnulado,
+        verificarFacturasTemporales = ctx.totals.verificarTemporales,
+        inventario = ctx.details.inventario,
+    )
 }
 
 internal fun formatCajaDateTime(value: LocalDateTime?): String? = value?.format(CAJA_DT_FORMAT)

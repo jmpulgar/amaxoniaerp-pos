@@ -1,10 +1,15 @@
 package com.amaxoniaerp.features.caja.data
 
+import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreDetalleRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreFormaPagoRequest
+import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.UUID
@@ -109,49 +114,79 @@ internal fun buildAutoCloseFormaPagoTotals(data: CajaSecuenciaData): Map<Int, Fo
         .toMap()
 }
 
-internal fun isCancelledStatus(description: String?): Boolean {
-    if (description.isNullOrBlank()) return false
-    return description.equals("Anulada", ignoreCase = true) ||
-        description.equals("Anulado", ignoreCase = true)
-}
-
-internal fun isCashSigla(siglas: String?): Boolean {
-    val value = siglas.orEmpty().trim().uppercase()
-    return value == "CASH" || value == "EF" || value == "EFE" || value == "EFECTIVO"
-}
-
-internal enum class PaymentCategory {
-    CASH,
-    CARD,
-    OTHER,
-}
-
-private val CASH_CODES = setOf("CASH", "EF", "EFE", "EFECTIVO")
-private val CARD_CODES = setOf("TDC", "TARJETA", "PV", "POS", "NEQ", "DB", "DEBITO", "CR", "CREDITO")
-
-internal fun classifyPaymentCategory(
-    tipoMovimiento: String?,
-    siglas: String?,
-    descripcion: String?,
-): PaymentCategory {
-    val normalizedSigla = siglas.orEmpty().trim().uppercase()
-    val normalizedTipo = tipoMovimiento.orEmpty().trim().uppercase()
-    val normalizedDescripcion = descripcion.orEmpty().trim().uppercase()
-
-    val isCash =
-        normalizedSigla in CASH_CODES ||
-            normalizedTipo in CASH_CODES ||
-            normalizedDescripcion.contains("EFECTIVO")
-    if (isCash) {
-        return PaymentCategory.CASH
+internal fun insertAperturaRecord(
+    newId: String,
+    request: AperturaRequest,
+    username: String,
+    now: java.time.LocalDateTime,
+    nextSequence: String,
+) {
+    CajaSecuenciaTable.insert {
+        it[idCajaSecuencia] = newId
+        it[idCaja] = request.idCaja
+        it[idVendedor] = request.idVendedor
+        it[fechaApertura] = now
+        it[montoEfectivoApertura] = request.montoApertura.toBigDecimal()
+        it[usuario] = username
+        it[serieSucursal] = request.serieSucursal
+        it[secuencia] = nextSequence
+        it[contabilizado] = 0
+        it[serialFiscal] = ""
+        it[observacionApertura] = "Apertura automática desde App POS"
+        it[observacionCierre] = ""
+        it[usuarioContabilizacion] = ""
+        it[fechaContabilizacion] = now
     }
-    val descripcionHints = listOf("TARJETA", "DEBITO", "CREDITO")
-    val isCard =
-        normalizedSigla in CARD_CODES ||
-            normalizedTipo in CARD_CODES ||
-            descripcionHints.any { normalizedDescripcion.contains(it) }
-    if (isCard) {
-        return PaymentCategory.CARD
+
+    CajaDetalleAperturaTable.insert {
+        it[idDetalleApertura] = UUID.randomUUID().toString()
+        it[idCajaSecuencia] = newId
+        it[cantidad] = 1
+        it[valor] = request.montoApertura.toBigDecimal()
+        it[monto] = request.montoApertura.toBigDecimal()
+        it[serieSucursal] = request.serieSucursal
     }
-    return PaymentCategory.OTHER
+}
+
+internal fun persistCierreRecord(
+    request: CajaCierreSaveRequest,
+    now: java.time.LocalDateTime,
+) {
+    CajaSecuenciaTable.update({ CajaSecuenciaTable.idCajaSecuencia eq request.id }) {
+        it[fechaCierre] = now
+        it[montoEfectivoVentas] = request.montoEfectivoVentas.toMoney()
+        it[montoEfectivoEntrada] = request.montoEfectivoEntrada.toMoney()
+        it[montoEfectivoSalida] = request.montoEfectivoSalida.toMoney()
+        it[montoEfectivoTotal] = request.montoEfectivoTotal.toMoney()
+        it[montoEfectivoCierre] = request.montoEfectivoCierre.toMoney()
+        it[montoEfectivoDiferencia] = request.montoEfectivoDiferencia.toMoney()
+        it[montoOtrosTotal] = request.montoOtrosTotal.toMoney()
+        it[montoOtrosCierre] = request.montoOtrosCierre.toMoney()
+        it[montoOtrosDiferencia] = request.montoOtrosDiferencia.toMoney()
+        it[montoTotal] = request.montoTotal.toMoney()
+        it[montoCierre] = request.montoCierre.toMoney()
+        it[montoDiferencia] = request.montoDiferencia.toMoney()
+        it[observacionCierre] = request.observacionCierre.orEmpty()
+        it[numeroCierreFiscal] = request.numeroCierreFiscal
+    }
+}
+
+internal fun rewriteCierreDetallesRecord(
+    request: CajaCierreSaveRequest,
+    serieSucursal: String,
+) {
+    CajaDetalleCierreTable.deleteWhere { CajaDetalleCierreTable.idSecuencia eq request.id }
+    CajaDetalleCierreFormaPagoTable.deleteWhere {
+        CajaDetalleCierreFormaPagoTable.idSecuencia eq request.id
+    }
+
+    request.detalle
+        .filter { it.cantidad > 0 }
+        .forEach { detalle ->
+            insertCajaDetalleCierre(request.id, serieSucursal, detalle)
+        }
+
+    request.detalleFormaPago.forEach { formaPago ->
+        insertCajaDetalleCierreFormaPago(request.id, serieSucursal, formaPago)
+    }
 }

@@ -11,8 +11,6 @@ import org.slf4j.LoggerFactory
 
 private val paymentReadersLog = LoggerFactory.getLogger("ElectronicInvoicePaymentReaders")
 
-private const val SQL_DATETIME_TEXT_LENGTH = 19
-
 internal fun loadRetencion(invoiceId: String): FERetencionData? =
     run {
         val safeInvoiceId = invoiceId.replace("'", "''")
@@ -50,7 +48,7 @@ internal fun loadFormasPago(invoiceId: String): List<FEFormaPagoData> {
             .firstOrNull()
 
     if (cajaRow == null) {
-        paymentReadersLog.warn("No se encontrÃ³ registro en caja_nueva para factura {}", invoiceId)
+        paymentReadersLog.warn("No se encontrÃƒÂ³ registro en caja_nueva para factura {}", invoiceId)
         return emptyList()
     }
 
@@ -113,4 +111,3 @@ internal fun formatFechaRecepcion(isoDate: String): String =
     } catch (_: Exception) {
         isoDate.take(SQL_DATETIME_TEXT_LENGTH).replace("T", " ")
     }
-

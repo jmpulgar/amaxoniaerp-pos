@@ -99,4 +99,3 @@ internal fun sumPrecioNeto(ctx: InvoiceVEContext): BigDecimal =
     ctx.detalles
         .fold(BigDecimal.ZERO) { acc, d -> acc.add(d.totalSinIva) }
         .bigDecimalMoney()
-

@@ -5,24 +5,20 @@ import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigurationException
 import com.amaxoniaerp.features.electronicinvoice.domain.FEDetalleData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEFacturaData
-import com.amaxoniaerp.features.electronicinvoice.domain.FEFormaPagoData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
-import com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData
-import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import org.jetbrains.exposed.sql.Alias
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.slf4j.LoggerFactory
 
 private val readersLog = LoggerFactory.getLogger("ElectronicInvoiceContextReaders")
 
-private const val SQL_DATETIME_TEXT_LENGTH = 19
+internal const val SQL_DATETIME_TEXT_LENGTH = 19
 
-/** Cabecera de factura + aliases de paÃ­ses usados en el JOIN (mismas instancias para lectura). */
+/** Cabecera de factura + aliases de paÃƒÂ­ses usados en el JOIN (mismas instancias para lectura). */
 internal class FacturaHeaderRow(
     val row: ResultRow,
     val paisLocal: Alias<FEPaisesReadTable>,
@@ -188,7 +184,7 @@ internal fun resolveCodigoSucursalYPuntoFacturacion(
             .firstOrNull()
 
     if (cajaRow == null) {
-        readersLog.warn("[FE] No se encontrÃ³ caja con id=$cajaId")
+        readersLog.warn("[FE] No se encontrÃƒÂ³ caja con id=$cajaId")
     }
 
     val codigoFromCaja =
@@ -246,7 +242,7 @@ internal fun resolveNumeroDocumentoFiscal(): String {
             .firstOrNull()
 
     if (row == null) {
-        readersLog.warn("No se encontrÃ³ registro de correlativos para 'numeroDocumentoFiscal', usando 1")
+        readersLog.warn("No se encontrÃƒÂ³ registro de correlativos para 'numeroDocumentoFiscal', usando 1")
         return "1"
     }
 
