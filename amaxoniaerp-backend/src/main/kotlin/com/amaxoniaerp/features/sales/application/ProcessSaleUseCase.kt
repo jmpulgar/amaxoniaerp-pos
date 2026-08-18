@@ -109,93 +109,110 @@ class ProcessSaleUseCase(
         feResult: ElectronicInvoiceResult,
     ): ProcessSaleResponse =
         when (feResult) {
-            is ElectronicInvoiceResult.Success -> {
-                logger.info(
-                    "FE exitosa para factura {}. CUFE={} numDoc={} numCtrl={}",
-                    saleResult.idFactura,
-                    feResult.cufe,
-                    feResult.numeroDocumentoFiscal,
-                    feResult.numeroControlThka,
-                )
-                // FASE 2 (Punto 1): campos propios por país, sin reutilización.
-                // - Panamá: propaga cufe/qr/fechaRecepcionDGI (intactos).
-                // - Venezuela: propaga numeroDocumentoFiscal/numeroControlThka
-                //   (extras de Success) que ya están persistidos por la Strategy.
-                saleResult.copy(
-                    cufe = feResult.cufe,
-                    qr = feResult.qr,
-                    fechaRecepcionDGI = feResult.fechaRecepcionDGI,
-                    numeroDocumentoFiscal = feResult.numeroDocumentoFiscal,
-                    numeroControlThka = feResult.numeroControlThka,
-                )
-            }
-
-            is ElectronicInvoiceResult.Failure -> {
-                // La venta se procesó correctamente, pero FE falló.
-                // No revierte la venta: el usuario puede reintentar vía endpoint manual.
-                logger.warn(
-                    "FE fallida para factura {}: [{}] {}",
-                    saleResult.idFactura,
-                    feResult.codigo,
-                    feResult.mensaje,
-                )
-                saleResult.copy(
-                    feError = "FE: [${feResult.codigo}] ${feResult.mensaje}",
-                )
-            }
-
-            is ElectronicInvoiceResult.NotApplicable -> {
-                // País sin FE (ej. HKA20 fiscal, o tipo_facturacion != 5).
-                // No hacer nada extra: la venta comercial ya está confirmada.
-                saleResult
-            }
-
-            is ElectronicInvoiceResult.UnsupportedDocumentType -> {
-                // FASE 1 VE solo soporta '01'. Otro tipo no se envía a HKA.
-                logger.info(
-                    "FEVE tipoDoc '{}' no soportado en FASE 1 factura {}",
-                    feResult.tipoDocumento,
-                    saleResult.idFactura,
-                )
-                saleResult
-            }
-
-            is ElectronicInvoiceResult.AlreadyIssued -> {
-                // Idempotencia: la factura ya tiene numeración fiscal persistida.
-                logger.info(
-                    "FE factura {} ya emitida previamente numDoc={}",
-                    saleResult.idFactura,
-                    feResult.numeroDocumentoFiscal,
-                )
-                // FASE 2 (Punto 1): los valores persistidos (Strategy VE los
-                // había guardado en factura.numeroDocumentoFiscal /
-                // factura.numero_control_thka) se devuelven sin llamar al PAC.
-                if (countryCode.equals("VE", ignoreCase = true)) {
-                    saleResult.copy(
-                        numeroDocumentoFiscal = feResult.numeroDocumentoFiscal,
-                        numeroControlThka = feResult.numeroControl,
-                    )
-                } else {
-                    saleResult
-                }
-            }
-
-            is ElectronicInvoiceResult.Uncertain -> {
-                // timeout / respuesta incierta: NO revertir, NO duplicar,
-                // NO marcar como fallo claro. Se reporta al caller para
-                // conciliación manual con código y transaccionId.
-                logger.warn(
-                    "FE incierta para factura {}: [{}] {} transaccionId={}",
-                    saleResult.idFactura,
-                    feResult.codigo,
-                    feResult.mensaje,
-                    feResult.transaccionId,
-                )
-                saleResult.copy(
-                    feError =
-                        "FE INCIERTA [${feResult.codigo}] ${feResult.mensaje}" +
-                            (feResult.transaccionId?.let { " transaccionId=$it" } ?: ""),
-                )
-            }
+            is ElectronicInvoiceResult.Success -> applyFeSuccess(saleResult, feResult)
+            is ElectronicInvoiceResult.Failure -> applyFeFailure(saleResult, feResult)
+            is ElectronicInvoiceResult.NotApplicable -> saleResult
+            is ElectronicInvoiceResult.UnsupportedDocumentType -> applyFeUnsupported(saleResult, feResult)
+            is ElectronicInvoiceResult.AlreadyIssued -> applyFeAlreadyIssued(countryCode, saleResult, feResult)
+            is ElectronicInvoiceResult.Uncertain -> applyFeUncertain(saleResult, feResult)
         }
+
+    private fun applyFeSuccess(
+        saleResult: ProcessSaleResponse,
+        feResult: ElectronicInvoiceResult.Success,
+    ): ProcessSaleResponse {
+        logger.info(
+            "FE exitosa para factura {}. CUFE={} numDoc={} numCtrl={}",
+            saleResult.idFactura,
+            feResult.cufe,
+            feResult.numeroDocumentoFiscal,
+            feResult.numeroControlThka,
+        )
+        // FASE 2 (Punto 1): campos propios por país, sin reutilización.
+        // - Panamá: propaga cufe/qr/fechaRecepcionDGI (intactos).
+        // - Venezuela: propaga numeroDocumentoFiscal/numeroControlThka
+        //   (extras de Success) que ya están persistidos por la Strategy.
+        return saleResult.copy(
+            cufe = feResult.cufe,
+            qr = feResult.qr,
+            fechaRecepcionDGI = feResult.fechaRecepcionDGI,
+            numeroDocumentoFiscal = feResult.numeroDocumentoFiscal,
+            numeroControlThka = feResult.numeroControlThka,
+        )
+    }
+
+    // La venta se procesó correctamente, pero FE falló.
+    // No revierte la venta: el usuario puede reintentar vía endpoint manual.
+    private fun applyFeFailure(
+        saleResult: ProcessSaleResponse,
+        feResult: ElectronicInvoiceResult.Failure,
+    ): ProcessSaleResponse {
+        logger.warn(
+            "FE fallida para factura {}: [{}] {}",
+            saleResult.idFactura,
+            feResult.codigo,
+            feResult.mensaje,
+        )
+        return saleResult.copy(
+            feError = "FE: [${feResult.codigo}] ${feResult.mensaje}",
+        )
+    }
+
+    private fun applyFeUnsupported(
+        saleResult: ProcessSaleResponse,
+        feResult: ElectronicInvoiceResult.UnsupportedDocumentType,
+    ): ProcessSaleResponse {
+        // FASE 1 VE solo soporta '01'. Otro tipo no se envía a HKA.
+        logger.info(
+            "FEVE tipoDoc '{}' no soportado en FASE 1 factura {}",
+            feResult.tipoDocumento,
+            saleResult.idFactura,
+        )
+        return saleResult
+    }
+
+    private fun applyFeAlreadyIssued(
+        countryCode: String,
+        saleResult: ProcessSaleResponse,
+        feResult: ElectronicInvoiceResult.AlreadyIssued,
+    ): ProcessSaleResponse {
+        // Idempotencia: la factura ya tiene numeración fiscal persistida.
+        logger.info(
+            "FE factura {} ya emitida previamente numDoc={}",
+            saleResult.idFactura,
+            feResult.numeroDocumentoFiscal,
+        )
+        // FASE 2 (Punto 1): los valores persistidos (Strategy VE los
+        // había guardado en factura.numeroDocumentoFiscal /
+        // factura.numero_control_thka) se devuelven sin llamar al PAC.
+        return if (countryCode.equals("VE", ignoreCase = true)) {
+            saleResult.copy(
+                numeroDocumentoFiscal = feResult.numeroDocumentoFiscal,
+                numeroControlThka = feResult.numeroControl,
+            )
+        } else {
+            saleResult
+        }
+    }
+
+    // timeout / respuesta incierta: NO revertir, NO duplicar,
+    // NO marcar como fallo claro. Se reporta al caller para
+    // conciliación manual con código y transaccionId.
+    private fun applyFeUncertain(
+        saleResult: ProcessSaleResponse,
+        feResult: ElectronicInvoiceResult.Uncertain,
+    ): ProcessSaleResponse {
+        logger.warn(
+            "FE incierta para factura {}: [{}] {} transaccionId={}",
+            saleResult.idFactura,
+            feResult.codigo,
+            feResult.mensaje,
+            feResult.transaccionId,
+        )
+        return saleResult.copy(
+            feError =
+                "FE INCIERTA [${feResult.codigo}] ${feResult.mensaje}" +
+                    (feResult.transaccionId?.let { " transaccionId=$it" } ?: ""),
+        )
+    }
 }
