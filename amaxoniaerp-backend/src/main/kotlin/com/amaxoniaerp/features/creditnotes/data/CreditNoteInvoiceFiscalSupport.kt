@@ -41,17 +41,23 @@ internal fun reserveFiscalDocumentNumber(): String {
             ?: throw CreditNoteValidationException("No existe correlativo fiscal para numeroDocumentoFiscal")
 
     val next = row[FECorrelativosTable.contador].toLong() + 1L
-    if (next <= 0L || next > MAX_FISCAL_DOCUMENT_NUMBER) {
-        throw CreditNoteValidationException("El correlativo fiscal excede el rango permitido")
-    }
-
     val updated =
-        FECorrelativosTable.update({ FECorrelativosTable.id eq row[FECorrelativosTable.id] }) {
-            it[contador] = next.toInt()
+        if (next <= 0L || next > MAX_FISCAL_DOCUMENT_NUMBER) {
+            -1
+        } else {
+            FECorrelativosTable.update({ FECorrelativosTable.id eq row[FECorrelativosTable.id] }) {
+                it[contador] = next.toInt()
+            }
         }
-    if (updated != 1) {
-        throw CreditNoteValidationException("No se pudo reservar el correlativo fiscal")
-    }
+
+    val error =
+        when {
+            next <= 0L || next > MAX_FISCAL_DOCUMENT_NUMBER -> "El correlativo fiscal excede el rango permitido"
+            updated != 1 -> "No se pudo reservar el correlativo fiscal"
+            else -> null
+        }
+    if (error != null) throw CreditNoteValidationException(error)
+
     return next.toString().padStart(FISCAL_DOCUMENT_LENGTH, '0')
 }
 
