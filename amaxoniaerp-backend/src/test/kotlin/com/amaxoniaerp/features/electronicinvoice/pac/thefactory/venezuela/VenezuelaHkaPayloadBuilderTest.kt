@@ -34,19 +34,20 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `IVA general 16 por ciento se agrupa y totaliza correctamente`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(
-                            precioSinIva = "100.00",
-                            totalSinIva = "100.00",
-                            totalConIva = "116.00",
-                            piva = "16.00",
-                        ),
-                    ),
-                ivaTotalFactura = "16.00",
-                totalizarTotalGeneral = "116.00",
-            )
+                        detalle {
+                            precioSinIva = "100.00"
+                            totalSinIva = "100.00"
+                            totalConIva = "116.00"
+                            piva =
+                                "16.00"
+                        },
+                    )
+                ; ivaTotalFactura = "16.00"
+                totalizarTotalGeneral = "116.00"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -73,14 +74,19 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `IVA reducido 8 por ciento se agrupa separado del general`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(precioSinIva = "100.00", totalSinIva = "100.00", totalConIva = "108.00", piva = "8.00"),
-                    ),
-                ivaTotalFactura = "8.00",
-                totalizarTotalGeneral = "108.00",
-            )
+                        detalle {
+                            precioSinIva = "100.00"
+                            totalSinIva = "100.00"
+                            totalConIva = "108.00"
+                            piva = "8.00"
+                        },
+                    )
+                ; ivaTotalFactura = "8.00"
+                totalizarTotalGeneral = "108.00"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -98,14 +104,19 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `producto exento va a totalAlicuotaExento y no aporta a montoGravado`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(precioSinIva = "50.00", totalSinIva = "50.00", totalConIva = "50.00", piva = "0.00"),
-                    ),
-                ivaTotalFactura = "0.00",
-                totalizarTotalGeneral = "50.00",
-            )
+                        detalle {
+                            precioSinIva = "50.00"
+                            totalSinIva = "50.00"
+                            totalConIva = "50.00"
+                            piva = "0.00"
+                        },
+                    )
+                ; ivaTotalFactura = "0.00"
+                totalizarTotalGeneral = "50.00"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -122,33 +133,36 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `factura mixta con general reducido y exento separa las tres alicuotas`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(
-                            precioSinIva = "100.00",
-                            totalSinIva = "100.00",
-                            totalConIva = "116.00",
-                            piva = "16.00",
-                        ),
-                        detalle(
-                            descripcion = "Reducer",
-                            precioSinIva = "100.00",
-                            totalSinIva = "100.00",
-                            totalConIva = "108.00",
-                            piva = "8.00",
-                        ),
-                        detalle(
-                            descripcion = "Exempt",
-                            precioSinIva = "20.00",
-                            totalSinIva = "20.00",
-                            totalConIva = "20.00",
-                            piva = "0.00",
-                        ),
-                    ),
-                ivaTotalFactura = "24.00",
-                totalizarTotalGeneral = "244.00",
-            )
+                        detalle {
+                            precioSinIva = "100.00"
+                            totalSinIva = "100.00"
+                            totalConIva = "116.00"
+                            piva =
+                                "16.00"
+                        },
+                        detalle {
+                            descripcion = "Reducer"
+                            precioSinIva = "100.00"
+                            totalSinIva = "100.00"
+                            totalConIva =
+                                "108.00"
+                            piva = "8.00"
+                        },
+                        detalle {
+                            descripcion = "Exempt"
+                            precioSinIva = "20.00"
+                            totalSinIva = "20.00"
+                            totalConIva =
+                                "20.00"
+                            piva = "0.00"
+                        },
+                    )
+                ; ivaTotalFactura = "24.00"
+                totalizarTotalGeneral = "244.00"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -168,23 +182,24 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `descuento por linea se reparte y totaliza como totalDescuento`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(
-                            descripcion = "Promo",
-                            cantidad = "2.000",
-                            precioSinIva = "50.00",
-                            montoDescuento = "10.00",
-                            totalSinIva = "90.00",
-                            totalConIva = "104.40",
-                            piva = "16.00",
-                        ),
-                    ),
-                ivaTotalFactura = "14.40",
-                descuentosItemFactura = "10.00",
-                totalizarTotalGeneral = "104.40",
-            )
+                        detalle {
+                            descripcion = "Promo"
+                            cantidad = "2.000"
+                            precioSinIva = "50.00"
+                            montoDescuento =
+                                "10.00"
+                            totalSinIva = "90.00"
+                            totalConIva = "104.40"
+                            piva = "16.00"
+                        },
+                    )
+                ; ivaTotalFactura = "14.40"
+                descuentosItemFactura = "10.00"
+                totalizarTotalGeneral = "104.40"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -202,9 +217,9 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `pago completo en VES no genera nodo IGTF`() {
         val ctx =
-            context(
-                totalizarTotalGeneral = "116.00",
-                ivaTotalFactura = "16.00",
+            context {
+                totalizarTotalGeneral = "116.00"
+                ivaTotalFactura = "16.00"
                 formasPago =
                     listOf(
                         VEFormaPagoData(
@@ -217,8 +232,8 @@ class VenezuelaHkaPayloadBuilderTest {
                             montoRecibido = BigDecimal("120.00"),
                             tipoMoneda = "V",
                         ),
-                    ),
-            )
+                    )
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -245,12 +260,13 @@ class VenezuelaHkaPayloadBuilderTest {
         // Cliente paga 5 USD (500 VES) en divisa + 500 VES en efectivo.
         // Base IGTF = 5 * 100 = 500 VES. IGTF = 3% * 500 = 15 VES.
         val ctx =
-            context(
-                multiMoneda = "SI",
-                tasa = BigDecimal("100"),
-                totalizarTotalGeneral = "1000.00",
-                ivaTotalFactura = "0.00",
-                igtf = BigDecimal("3.000000"),
+            context {
+                multiMoneda = "SI"
+                tasa = BigDecimal("100")
+                totalizarTotalGeneral = "1000.00"
+                ivaTotalFactura =
+                    "0.00"
+                igtf = BigDecimal("3.000000")
                 formasPago =
                     listOf(
                         VEFormaPagoData(
@@ -273,8 +289,8 @@ class VenezuelaHkaPayloadBuilderTest {
                             montoRecibido = null,
                             tipoMoneda = "V",
                         ),
-                    ),
-            )
+                    )
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -295,18 +311,19 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `pago mixto VES mas divisa reporta ambas formas y un solo IGTF`() {
         val ctx =
-            context(
-                multiMoneda = "SI",
-                tasa = BigDecimal("50"),
-                totalizarTotalGeneral = "600.00",
-                ivaTotalFactura = "0.00",
-                igtf = BigDecimal("2.000000"),
+            context {
+                multiMoneda = "SI"
+                tasa = BigDecimal("50")
+                totalizarTotalGeneral = "600.00"
+                ivaTotalFactura =
+                    "0.00"
+                igtf = BigDecimal("2.000000")
                 formasPago =
                     listOf(
                         VEFormaPagoData(1, "EFECTIVO", "EF", "01", BigDecimal("400.00"), false, null, "V"),
                         VEFormaPagoData(2, "ZELLE", "ZL", "02", BigDecimal("4.00"), true, null, "D"),
-                    ),
-            )
+                    )
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         val fps = payload.documento.totalesSubTotales.listaFormaPago
@@ -324,12 +341,13 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `multimoneda SI con tasa mayor a 1 emite montoTotalMonedaSecundaria y tasaCambio`() {
         val ctx =
-            context(
-                multiMoneda = "SI",
-                tasa = BigDecimal("100"),
-                totalizarTotalGeneral = "1160.00",
-                ivaTotalFactura = "160.00",
-            )
+            context {
+                multiMoneda = "SI"
+                tasa = BigDecimal("100")
+                totalizarTotalGeneral = "1160.00"
+                ivaTotalFactura =
+                    "160.00"
+            }
 
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
 
@@ -341,7 +359,11 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `multimoneda NO omite moneda secundaria y tasa`() {
-        val ctx = context(multiMoneda = "NO", tasa = BigDecimal("100"))
+        val ctx =
+            context {
+                multiMoneda = "NO"
+                tasa = BigDecimal("100")
+            }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertNull(payload.documento.totalesSubTotales.montoTotalMonedaSecundaria)
         assertNull(payload.documento.totalesSubTotales.tasaCambio)
@@ -349,7 +371,11 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `multimoneda SI pero tasa 1 omite conversion de moneda secundaria`() {
-        val ctx = context(multiMoneda = "SI", tasa = BigDecimal("1"))
+        val ctx =
+            context {
+                multiMoneda = "SI"
+                tasa = BigDecimal("1")
+            }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertNull(payload.documento.totalesSubTotales.montoTotalMonedaSecundaria)
     }
@@ -358,7 +384,7 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `transaccionId es determinista para mismo idFactura y numero`() {
-        val ctx = context(idFactura = "abc-123")
+        val ctx = context { idFactura = "abc-123" }
         val p1 = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000099")
         val p2 = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000099")
         val p3 = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000100")
@@ -392,7 +418,7 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `cliente sin datos se completa con consumidor final`() {
         val ctx =
-            context(
+            context {
                 comprador =
                     VECompradorData(
                         nombreRazonSocial = "",
@@ -400,8 +426,8 @@ class VenezuelaHkaPayloadBuilderTest {
                         direccion = null,
                         telefono = null,
                         email = null,
-                    ),
-            )
+                    )
+            }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("CONSUMIDOR FINAL", payload.documento.datosTransaccion.cliente.nombreRazonSocial)
         assertEquals("V000000000", payload.documento.datosTransaccion.cliente.numeroRif)
@@ -411,7 +437,7 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `factura sin formas de pago emite una forma por defecto`() {
-        val ctx = context(formasPago = emptyList())
+        val ctx = context { formasPago = emptyList() }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals(1, payload.documento.totalesSubTotales.listaFormaPago.size)
         assertEquals(
@@ -431,17 +457,18 @@ class VenezuelaHkaPayloadBuilderTest {
     @Test
     fun `trip de valorItem respeta escala 2 y rounding HALF_UP`() {
         val ctx =
-            context(
+            context {
                 detalles =
                     listOf(
-                        detalle(
-                            precioSinIva = "100.005",
-                            totalSinIva = "100.005",
-                            totalConIva = "116.006",
-                            piva = "16.00",
-                        ),
-                    ),
-            )
+                        detalle {
+                            precioSinIva = "100.005"
+                            totalSinIva = "100.005"
+                            totalConIva = "116.006"
+                            piva =
+                                "16.00"
+                        },
+                    )
+            }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         val item = payload.documento.listaItems.single()
         assertEquals("100.01", item.precioUnitario) // HALF_UP
@@ -453,7 +480,7 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `montoEnLetras - factura de 116 VES produce la cadena esperada VE`() {
-        val ctx = context(totalizarTotalGeneral = "116.00")
+        val ctx = context { totalizarTotalGeneral = "116.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals(
             "CIENTO DIECISÉIS BOLÍVARES CON 00/100",
@@ -463,42 +490,42 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `montoEnLetras - cero exacto`() {
-        val ctx = context(totalizarTotalGeneral = "0.00")
+        val ctx = context { totalizarTotalGeneral = "0.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("CERO BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - un bolivar exacto usa singular`() {
-        val ctx = context(totalizarTotalGeneral = "1.00")
+        val ctx = context { totalizarTotalGeneral = "1.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("UN BOLÍVAR CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - cien exacto no se confunde con ciento`() {
-        val ctx = context(totalizarTotalGeneral = "100.00")
+        val ctx = context { totalizarTotalGeneral = "100.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("CIEN BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - mil exacto`() {
-        val ctx = context(totalizarTotalGeneral = "1000.00")
+        val ctx = context { totalizarTotalGeneral = "1000.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("MIL BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - un millon exacto usa singular`() {
-        val ctx = context(totalizarTotalGeneral = "1000000.00")
+        val ctx = context { totalizarTotalGeneral = "1000000.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("UN MILLÓN BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - millones plural con miles`() {
-        val ctx = context(totalizarTotalGeneral = "1500000.00")
+        val ctx = context { totalizarTotalGeneral = "1500000.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals(
             "UN MILLÓN QUINIENTOS MIL BOLÍVARES CON 00/100",
@@ -508,21 +535,21 @@ class VenezuelaHkaPayloadBuilderTest {
 
     @Test
     fun `montoEnLetras - centavos distintos de cero`() {
-        val ctx = context(totalizarTotalGeneral = "16.50")
+        val ctx = context { totalizarTotalGeneral = "16.50" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("DIECISÉIS BOLÍVARES CON 50/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - veintiuno a veintinueve usan forma compacta`() {
-        val ctx = context(totalizarTotalGeneral = "21.00")
+        val ctx = context { totalizarTotalGeneral = "21.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("VEINTIUNO BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
 
     @Test
     fun `montoEnLetras - decenas con unidades usan Y`() {
-        val ctx = context(totalizarTotalGeneral = "35.00")
+        val ctx = context { totalizarTotalGeneral = "35.00" }
         val payload = builder.build(ctx, serie = "L001P001", numeroDocumentoFiscalFinal = "00000001")
         assertEquals("TREINTA Y CINCO BOLÍVARES CON 00/100", payload.documento.totalesSubTotales.montoEnLetras)
     }
@@ -534,25 +561,46 @@ class VenezuelaHkaPayloadBuilderTest {
         return paymentDescription?.contains("DIVISA", ignoreCase = true) == true
     }
 
-    private fun context(
-        idFactura: String = "factura-1",
-        detalles: List<VEDetalleData> =
-            listOf(
-                detalle(precioSinIva = "100.00", totalSinIva = "100.00", totalConIva = "116.00", piva = "16.00"),
-            ),
-        ivaTotalFactura: String = "16.00",
-        descuentosItemFactura: String = "0.00",
-        totalizarTotalGeneral: String = "116.00",
-        multiMoneda: String = "NO",
-        tasa: BigDecimal = BigDecimal("1"),
-        igtf: BigDecimal = BigDecimal("3.000000"),
-        formasPago: List<VEFormaPagoData> =
-            listOf(
-                VEFormaPagoData(1, "EFECTIVO", "EF", "01", BigDecimal(totalizarTotalGeneral), false, null, "V"),
-            ),
-        comprador: VECompradorData = VECompradorData("CLIENTE PRUEBA", "J12345678", "Caracas", "0212-1234567", null),
-    ): InvoiceVEContext =
-        InvoiceVEContext(
+    private class ContextSpec {
+        var idFactura: String = "factura-1"
+        var detalles: List<VEDetalleData>? = null
+        var ivaTotalFactura: String = "16.00"
+        var descuentosItemFactura: String = "0.00"
+        var totalizarTotalGeneral: String = "116.00"
+        var multiMoneda: String = "NO"
+        var tasa: BigDecimal = BigDecimal("1")
+        var igtf: BigDecimal = BigDecimal("3.000000")
+        var formasPago: List<VEFormaPagoData>? = null
+        var comprador: VECompradorData = VECompradorData("CLIENTE PRUEBA", "J12345678", "Caracas", "0212-1234567", null)
+    }
+
+    private fun context(configure: ContextSpec.() -> Unit = {}): InvoiceVEContext {
+        val spec = ContextSpec().apply(configure)
+        val formasPagoResueltas =
+            spec.formasPago
+                ?: listOf(
+                    VEFormaPagoData(
+                        1,
+                        "EFECTIVO",
+                        "EF",
+                        "01",
+                        BigDecimal(spec.totalizarTotalGeneral),
+                        false,
+                        null,
+                        "V",
+                    ),
+                )
+        val detallesResueltos =
+            spec.detalles
+                ?: listOf(
+                    detalle {
+                        precioSinIva = "100.00"
+                        totalSinIva = "100.00"
+                        totalConIva = "116.00"
+                        piva = "16.00"
+                    },
+                )
+        return InvoiceVEContext(
             config =
                 VEConfigData(
                     tipoFacturacion = 5,
@@ -564,7 +612,7 @@ class VenezuelaHkaPayloadBuilderTest {
                     nombreEmpresa = "EMPRESA TEST",
                     direccion = "DIR TEST",
                     telefonos = "0212",
-                    igtf = igtf,
+                    igtf = spec.igtf,
                     procesoGeneracion = "1",
                     tipoEmision = "01",
                     codigoSucursalEmisorFallback = "0000",
@@ -572,7 +620,7 @@ class VenezuelaHkaPayloadBuilderTest {
                 ),
             factura =
                 VEFacturaData(
-                    idFactura = idFactura,
+                    idFactura = spec.idFactura,
                     codFactura = "0000001",
                     numeroDocumentoFiscal = null,
                     numeroControlThka = null,
@@ -583,23 +631,23 @@ class VenezuelaHkaPayloadBuilderTest {
                     facturarARuc = "J12345678",
                     facturarADireccion = "Caracas",
                     facturarATelefono = "0212-1234567",
-                    totalTotalFactura = BigDecimal(totalizarTotalGeneral),
-                    ivaTotalFactura = BigDecimal(ivaTotalFactura),
-                    descuentosItemFactura = BigDecimal(descuentosItemFactura),
+                    totalTotalFactura = BigDecimal(spec.totalizarTotalGeneral),
+                    ivaTotalFactura = BigDecimal(spec.ivaTotalFactura),
+                    descuentosItemFactura = BigDecimal(spec.descuentosItemFactura),
                     totalizarBaseImponible = BigDecimal("100.00"),
-                    totalizarMontoIva = BigDecimal(ivaTotalFactura),
-                    totalizarTotalGeneral = BigDecimal(totalizarTotalGeneral),
+                    totalizarMontoIva = BigDecimal(spec.ivaTotalFactura),
+                    totalizarTotalGeneral = BigDecimal(spec.totalizarTotalGeneral),
                     montoItemsFactura = BigDecimal("100.00"),
-                    multiMoneda = multiMoneda,
-                    tasa = tasa,
+                    multiMoneda = spec.multiMoneda,
+                    tasa = spec.tasa,
                     monedaBase = 1,
                     abrMonedaBase = "VES",
                     monedaSecundaria = 2,
                     abrMonedaSecundaria = "USD",
                 ),
-            comprador = comprador,
-            detalles = detalles,
-            formasPago = formasPago,
+            comprador = spec.comprador,
+            detalles = detallesResueltos,
+            formasPago = formasPagoResueltas,
             caja =
                 VECajaData(
                     idCaja = "caja-1",
@@ -610,41 +658,46 @@ class VenezuelaHkaPayloadBuilderTest {
                 ),
             correlativoReservado = VECorrelativoReservado(1, 8),
         )
+    }
 
-    private fun detalle(
-        descripcion: String = "Producto de prueba",
-        codigo: String = "P001",
-        referencia: String? = "REF-1",
-        unidadEmpaque: String? = "UND",
-        cantidad: String = "1.000",
-        precioSinIva: String,
-        descuento: String = "0.00",
-        montoDescuento: String = "0.00",
-        piva: String,
-        totalSinIva: String,
-        totalConIva: String,
-        importeIsc: String? = null,
-        porcentajeIsc: String? = null,
-        importeOti: String? = null,
-        importeAcarreo: String? = null,
-        importeSeguro: String? = null,
-    ): VEDetalleData =
-        VEDetalleData(
-            descripcion = descripcion,
-            codigo = codigo,
-            referencia = referencia,
-            unidadEmpaque = unidadEmpaque,
-            cantidad = BigDecimal(cantidad),
-            precioSinIva = BigDecimal(precioSinIva),
-            descuento = BigDecimal(descuento),
-            montoDescuento = BigDecimal(montoDescuento),
-            piva = BigDecimal(piva),
-            totalSinIva = BigDecimal(totalSinIva),
-            totalConIva = BigDecimal(totalConIva),
-            importeIsc = importeIsc?.let(::BigDecimal),
-            porcentajeIsc = porcentajeIsc?.let(::BigDecimal),
-            importeOti = importeOti?.let(::BigDecimal),
-            importeAcarreo = importeAcarreo?.let(::BigDecimal),
-            importeSeguro = importeSeguro?.let(::BigDecimal),
+    private class DetalleSpec {
+        var descripcion: String = "Producto de prueba"
+        var codigo: String = "P001"
+        var referencia: String? = "REF-1"
+        var unidadEmpaque: String? = "UND"
+        var cantidad: String = "1.000"
+        var precioSinIva: String = "100.00"
+        var descuento: String = "0.00"
+        var montoDescuento: String = "0.00"
+        var piva: String = "16.00"
+        var totalSinIva: String = "100.00"
+        var totalConIva: String = "116.00"
+        var importeIsc: String? = null
+        var porcentajeIsc: String? = null
+        var importeOti: String? = null
+        var importeAcarreo: String? = null
+        var importeSeguro: String? = null
+    }
+
+    private fun detalle(configure: DetalleSpec.() -> Unit): VEDetalleData {
+        val spec = DetalleSpec().apply(configure)
+        return VEDetalleData(
+            descripcion = spec.descripcion,
+            codigo = spec.codigo,
+            referencia = spec.referencia,
+            unidadEmpaque = spec.unidadEmpaque,
+            cantidad = BigDecimal(spec.cantidad),
+            precioSinIva = BigDecimal(spec.precioSinIva),
+            descuento = BigDecimal(spec.descuento),
+            montoDescuento = BigDecimal(spec.montoDescuento),
+            piva = BigDecimal(spec.piva),
+            totalSinIva = BigDecimal(spec.totalSinIva),
+            totalConIva = BigDecimal(spec.totalConIva),
+            importeIsc = spec.importeIsc?.let(::BigDecimal),
+            porcentajeIsc = spec.porcentajeIsc?.let(::BigDecimal),
+            importeOti = spec.importeOti?.let(::BigDecimal),
+            importeAcarreo = spec.importeAcarreo?.let(::BigDecimal),
+            importeSeguro = spec.importeSeguro?.let(::BigDecimal),
         )
+    }
 }

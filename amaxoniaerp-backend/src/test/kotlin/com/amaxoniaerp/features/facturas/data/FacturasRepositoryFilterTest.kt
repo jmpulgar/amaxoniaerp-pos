@@ -155,64 +155,77 @@ class FacturasRepositoryFilterTest {
         }
 
         insertFactura(
-            id = "factura-1",
-            code = "INV-001",
-            clientId = "cliente-1",
-            user = "alice",
-            branchId = 1,
-            createdAt = "2026-01-01 10:00:00",
-            total = 100.0,
+            facturaSeed {
+                id = "factura-1"
+                code = "INV-001"
+                clientId = "cliente-1"
+                user = "alice"
+                branchId =
+                    1
+                createdAt = "2026-01-01 10:00:00"
+                total = 100.0
+            },
         )
         insertFactura(
-            id = "factura-2",
-            code = "INV-002",
-            clientId = "cliente-2",
-            user = "bob",
-            branchId = 2,
-            createdAt = "2026-01-02 23:59:59",
-            total = 200.0,
+            facturaSeed {
+                id = "factura-2"
+                code = "INV-002"
+                clientId = "cliente-2"
+                user = "bob"
+                branchId =
+                    2
+                createdAt = "2026-01-02 23:59:59"
+                total = 200.0
+            },
         )
         insertFactura(
-            id = "factura-3",
-            code = "INV-003",
-            clientId = "cliente-1",
-            user = "alice",
-            branchId = 1,
-            createdAt = "2026-01-03 12:00:00",
-            total = 300.0,
+            facturaSeed {
+                id = "factura-3"
+                code = "INV-003"
+                clientId = "cliente-1"
+                user = "alice"
+                branchId =
+                    1
+                createdAt = "2026-01-03 12:00:00"
+                total = 300.0
+            },
         )
     }
 
-    private fun insertFactura(
-        id: String,
-        code: String,
-        clientId: String,
-        user: String,
-        branchId: Int,
-        createdAt: String,
-        total: Double,
-    ) {
+    private class FacturaSeed {
+        var id: String = ""
+        var code: String = ""
+        var clientId: String = ""
+        var user: String = ""
+        var branchId: Int = 1
+        var createdAt: String = ""
+        var total: Double = 0.0
+    }
+
+    private fun facturaSeed(configure: FacturaSeed.() -> Unit): FacturaSeed = FacturaSeed().apply(configure)
+
+    private fun insertFactura(seed: FacturaSeed) {
         FacturasTableVE.insert {
-            it[idFactura] = id
-            it[codFactura] = code
-            it[codFacturaFiscal] = "CF-$code"
+            it[idFactura] = seed.id
+            it[codFactura] = seed.code
+            it[codFacturaFiscal] = "CF-${seed.code}"
             it[numeroDocumentoFiscal] = null
-            it[idCliente] = clientId
+            it[idCliente] = seed.clientId
             it[codVendedor] = 1
             it[codEstatus] = 1
-            it[idSucursal] = branchId
+            it[idSucursal] = seed.branchId
             it[idCaja] = "caja-1"
-            it[fechaFactura] = createdAt.substringBefore(' ')
-            it[fechaCreacion] = createdAt
-            it[totalTotalFactura] = total.toBigDecimal()
-            it[totalizarTotalGeneral] = total.toBigDecimal()
+            it[fechaFactura] = seed.createdAt.substringBefore(' ')
+            it[fechaCreacion] = seed.createdAt
+            it[totalTotalFactura] = seed.total.toBigDecimal()
+            it[totalizarTotalGeneral] = seed.total.toBigDecimal()
             it[formaPago] = "contado"
             it[tipoFactura] = "VENTA"
-            it[usuarioCreacion] = user
+            it[usuarioCreacion] = seed.user
             it[abrMonedaBase] = "USD"
             it[abrMonedaSecundaria] = null
             it[tasa] = 1.0f
-            it[totalRef] = total.toFloat()
+            it[totalRef] = seed.total.toFloat()
             it[impresoraSerial] = null
         }
     }

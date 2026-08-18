@@ -329,35 +329,46 @@ class MesasRepositoryTest {
     }
 
     private fun seedMesas() {
-        insertMesa(id = 1001, area = 100, codigo = "M01", nombre = "Mesa 01", capacidad = 4)
-        insertMesa(id = 1002, area = 100, codigo = "M02", nombre = "Mesa 02", capacidad = 2)
-        insertMesa(id = 1003, area = 100, codigo = "M03", nombre = "Mesa 03", capacidad = 6, activa = false)
+        insertMesa(MesaSpec(id = 1001, area = 100, codigo = "M01", nombre = "Mesa 01", capacidad = 4, activa = true))
+        insertMesa(MesaSpec(id = 1002, area = 100, codigo = "M02", nombre = "Mesa 02", capacidad = 2, activa = true))
+        insertMesa(MesaSpec(id = 1003, area = 100, codigo = "M03", nombre = "Mesa 03", capacidad = 6, activa = false))
         // Mesas activas colgando de un área inactiva: no deben ser alcanzables.
-        insertMesa(id = 1004, area = AREA_INACTIVA, codigo = "C01", nombre = "Mesa cerrada", capacidad = 4)
-        insertMesa(id = 2001, area = 200, codigo = "P01", nombre = "Patio 01", capacidad = 8)
+        insertMesa(
+            MesaSpec(
+                id = 1004,
+                area = AREA_INACTIVA,
+                codigo = "C01",
+                nombre = "Mesa cerrada",
+                capacidad = 4,
+                activa = true,
+            ),
+        )
+        insertMesa(MesaSpec(id = 2001, area = 200, codigo = "P01", nombre = "Patio 01", capacidad = 8, activa = true))
     }
 
-    private fun insertMesa(
-        id: Int,
-        area: Int,
-        codigo: String,
-        nombre: String,
-        capacidad: Int,
-        activa: Boolean = true,
-    ) {
+    private class MesaSpec(
+        val id: Int,
+        val area: Int,
+        val codigo: String,
+        val nombre: String,
+        val capacidad: Int,
+        val activa: Boolean,
+    )
+
+    private fun insertMesa(spec: MesaSpec) {
         MesasTable.insert {
-            it[MesasTable.id] = id
-            it[plantaId] = area
-            it[MesasTable.codigo] = codigo
-            it[MesasTable.nombre] = nombre
-            it[MesasTable.capacidad] = capacidad
+            it[MesasTable.id] = spec.id
+            it[plantaId] = spec.area
+            it[MesasTable.codigo] = spec.codigo
+            it[MesasTable.nombre] = spec.nombre
+            it[MesasTable.capacidad] = spec.capacidad
             it[forma] = "rectangular"
             it[posicionX] = BigDecimal("120.00")
             it[posicionY] = BigDecimal("80.00")
             it[ancho] = BigDecimal("100.00")
             it[alto] = BigDecimal("60.00")
             it[rotacion] = BigDecimal.ZERO
-            it[activo] = if (activa) 1 else 0
+            it[activo] = if (spec.activa) 1 else 0
         }
     }
 
