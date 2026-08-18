@@ -65,7 +65,8 @@ internal fun resolveMonetaryContext(
     val pgTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
     val params = loadParamsGenerales(pgTable)
 
-    val paramsMulti = pgTable is ParametrosGeneralesTableVE && params[pgTable.multiMoneda].equals("Si", ignoreCase = true)
+    val paramsMulti =
+        pgTable is ParametrosGeneralesTableVE && params[pgTable.multiMoneda].equals("Si", ignoreCase = true)
     val multiMoneda = if (paramsMulti) "SI" else "NO"
 
     val monedaBase = params[pgTable.monedaBase] ?: 1

@@ -11,7 +11,6 @@ import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
-import com.amaxoniaerp.features.sales.domain.SaleItemInput
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
@@ -20,7 +19,6 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.LocalDate
 import java.util.UUID
 
 private const val SHORT_CODE_LENGTH = 10

@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.creditnotes.application
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.creditnotes.data.CreditNoteListQuery
 import com.amaxoniaerp.features.creditnotes.data.CreditNoteRepository
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalRequest
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalResponse
@@ -12,9 +13,9 @@ import com.amaxoniaerp.features.creditnotes.domain.CreditNoteSourceInvoiceDetail
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteSourceInvoiceListResponse
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteValidationException
 import com.amaxoniaerp.features.creditnotes.domain.CreditNotesListResponse
+import com.amaxoniaerp.features.creditnotes.domain.PreparedCreditNote
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
-import java.time.LocalDate
 
 class CreditNoteService(
     private val repository: CreditNoteRepository,
@@ -25,14 +26,10 @@ class CreditNoteService(
     suspend fun list(
         database: Database,
         countryCode: String,
-        limit: Int,
-        offset: Long,
-        search: String?,
-        fechaInicio: LocalDate?,
-        fechaFin: LocalDate?,
+        query: CreditNoteListQuery,
     ): CreditNotesListResponse =
         dbQuery(database) {
-            val (data, total) = repository.listCreditNotes(countryCode, limit, offset, search, fechaInicio, fechaFin)
+            val (data, total) = repository.listCreditNotes(countryCode, query)
             CreditNotesListResponse(data = data, total = total)
         }
 
@@ -88,56 +85,7 @@ class CreditNoteService(
             }
 
         return when (val result = processor.process(database, prepared, companyDb)) {
-            is PanamaCreditNotePacResult.Accepted -> {
-                runCatching {
-                    val response =
-                        dbQuery(database) {
-                            repository.finalizePanamaAccepted(
-                                id = prepared.id,
-                                request = request,
-                                pacResponse = result.response,
-                                numeroDocumentoFiscal = prepared.numeroDocumentoFiscal,
-                            )
-                        }
-                    val diagnostic = result.pdfDiagnostic
-                    if (diagnostic == null) {
-                        response
-                    } else {
-                        runCatching {
-                            dbQuery(database) {
-                                repository.recordPanamaDiagnostic(prepared.id, diagnostic)
-                            }
-                        }.onFailure { error ->
-                            logger.error(
-                                "NC PA {} confirmada, pero no se pudo guardar el diagnóstico del PDF",
-                                prepared.id,
-                                error,
-                            )
-                        }
-                        response.copy(fiscalMessage = diagnostic)
-                    }
-                }.getOrElse { e ->
-                    if (e is Error) throw e
-                    logger.error("PAC aceptó NC PA {}, pero falló la persistencia local", prepared.id, e)
-                    val diagnostic =
-                        buildString {
-                            append("PAC aceptó la NC, pero falló la persistencia local: ")
-                            append(e.message)
-                            result.pdfDiagnostic?.let {
-                                append(". Diagnóstico PDF: ")
-                                append(it)
-                            }
-                        }
-                    dbQuery(database) {
-                        repository.markPanamaFiscalStatus(
-                            id = prepared.id,
-                            status = CreditNoteFiscalStatus.INCIERTA,
-                            message = diagnostic,
-                        )
-                    }
-                }
-            }
-
+            is PanamaCreditNotePacResult.Accepted -> finalizeAccepted(database, prepared, request, result)
             is PanamaCreditNotePacResult.Rejected ->
                 dbQuery(database) {
                     repository.markPanamaFiscalStatus(
@@ -156,6 +104,67 @@ class CreditNoteService(
                     )
                 }
         }
+    }
+
+    private suspend fun finalizeAccepted(
+        database: Database,
+        prepared: PreparedCreditNote,
+        request: CreateCreditNoteRequest,
+        result: PanamaCreditNotePacResult.Accepted,
+    ): CreateCreditNoteResponse =
+        runCatching {
+            val response =
+                dbQuery(database) {
+                    repository.finalizePanamaAccepted(
+                        id = prepared.id,
+                        request = request,
+                        pacResponse = result.response,
+                        numeroDocumentoFiscal = prepared.numeroDocumentoFiscal,
+                    )
+                }
+            appendPdfDiagnostic(database, prepared.id, response, result.pdfDiagnostic)
+        }.getOrElse { e ->
+            if (e is Error) throw e
+            logger.error("PAC aceptó NC PA {}, pero falló la persistencia local", prepared.id, e)
+            val diagnostic =
+                buildString {
+                    append("PAC aceptó la NC, pero falló la persistencia local: ")
+                    append(e.message)
+                    result.pdfDiagnostic?.let {
+                        append(". Diagnóstico PDF: ")
+                        append(it)
+                    }
+                }
+            dbQuery(database) {
+                repository.markPanamaFiscalStatus(
+                    id = prepared.id,
+                    status = CreditNoteFiscalStatus.INCIERTA,
+                    message = diagnostic,
+                )
+            }
+        }
+
+    private suspend fun appendPdfDiagnostic(
+        database: Database,
+        creditNoteId: String,
+        response: CreateCreditNoteResponse,
+        diagnostic: String?,
+    ): CreateCreditNoteResponse {
+        if (diagnostic == null) {
+            return response
+        }
+        runCatching {
+            dbQuery(database) {
+                repository.recordPanamaDiagnostic(creditNoteId, diagnostic)
+            }
+        }.onFailure { error ->
+            logger.error(
+                "NC PA {} confirmada, pero no se pudo guardar el diagnóstico del PDF",
+                creditNoteId,
+                error,
+            )
+        }
+        return response.copy(fiscalMessage = diagnostic)
     }
 
     suspend fun confirmFiscal(

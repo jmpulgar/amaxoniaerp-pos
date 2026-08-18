@@ -267,7 +267,10 @@ private fun validateCreditRules(amounts: CreditAmounts) {
     if (amounts.saldoDeclarado > BigDecimal.ZERO && amounts.saldoDeclarado != amounts.saldoEsperado) {
         throw InvalidSaleRequestException("El saldo pendiente no coincide con los pagos recibidos")
     }
-    if (amounts.totalCxc == BigDecimal.ZERO && amounts.saldoDeclarado == BigDecimal.ZERO && amounts.saldoEsperado > BigDecimal.ZERO) {
+    if (amounts.totalCxc == BigDecimal.ZERO &&
+        amounts.saldoDeclarado == BigDecimal.ZERO &&
+        amounts.saldoEsperado > BigDecimal.ZERO
+    ) {
         throw InvalidSaleRequestException("Debe indicar el saldo pendiente de la venta a crédito")
     }
 }

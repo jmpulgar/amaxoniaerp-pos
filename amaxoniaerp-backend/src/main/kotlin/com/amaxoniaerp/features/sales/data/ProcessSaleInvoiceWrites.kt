@@ -2,8 +2,8 @@ package com.amaxoniaerp.features.sales.data
 
 import com.amaxoniaerp.features.items.data.FacturaDetalleProductoLoteTable
 import com.amaxoniaerp.features.items.data.ItemLoteTable
-import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
+import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
@@ -28,8 +28,8 @@ private const val PROMOTION_TYPE_LENGTH = 20
 private const val PROMOTION_NAME_LENGTH = 200
 private const val PAYMENT_USER_LENGTH = 60
 
-/** Contexto compartido por las escrituras de factura dentro de la transacción de venta. */
-internal class SaleWriteContext(
+/** Contexto compartido por las escrituras de factura dentro de la transacciÃ³n de venta. */
+internal data class SaleWriteContext(
     val request: ProcessSaleRequest,
     val invoiceId: String,
     val invoiceCode: String,
@@ -104,7 +104,10 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.observacion] = ""
         it[facturaTable.fechaVencimiento] = fechaVencimientoFactura
         it[facturaTable.servicioAnio] = ctx.today.year
-        it[facturaTable.servicioMes] = ctx.today.monthValue.toString().padStart(2, '0')
+        it[facturaTable.servicioMes] =
+            ctx.today.monthValue
+                .toString()
+                .padStart(2, '0')
         it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia
         it[facturaTable.numcomContabilizado] = 0
         it[facturaTable.fechaContabilizado] = ctx.today
@@ -152,11 +155,11 @@ private fun insertFacturaCountryFields(
 }
 
 /** Retorna lista de (detalleId, itemIndex) para vincular con lotes */
-internal fun insertFacturaDetalle(
-    ctx: SaleWriteContext,
-): List<String> {
+internal fun insertFacturaDetalle(ctx: SaleWriteContext): List<String> {
     val vendedorPorDefecto = ctx.request.factura.codVendedor
-    val usuario = ctx.request.factura.usuarioCreacion.take(INVOICE_USER_LENGTH)
+    val usuario =
+        ctx.request.factura.usuarioCreacion
+            .take(INVOICE_USER_LENGTH)
     val detalleIds = mutableListOf<String>()
 
     ctx.request.items.forEach { item ->
@@ -302,7 +305,9 @@ internal fun insertFacturaDetalleFormaPago(ctx: SaleWriteContext) {
         it[fpgTable.totalizarNroOtroDocumento] = 0
         it[fpgTable.totalizarBancoOtroDocumento] = 0
         it[fpgTable.fechaCreacion] = ctx.now
-        it[fpgTable.usuarioCreacion] = ctx.request.factura.usuarioCreacion.take(PAYMENT_USER_LENGTH)
+        it[fpgTable.usuarioCreacion] =
+            ctx.request.factura.usuarioCreacion
+                .take(PAYMENT_USER_LENGTH)
         it[fpgTable.totalizarMontoCredito] = ctx.monetaryContext.toBase(montos.credito)
         it[fpgTable.totalizarMontoDebito] = ctx.monetaryContext.toBase(montos.debito)
         it[fpgTable.totalizarMontoTransferencia] = ctx.monetaryContext.toBase(montos.transferencia)
@@ -325,8 +330,8 @@ private fun insertFormaPagoCountryFields(
     }
 }
 
-/** Montos agregados por tipo de pago (normalizado a los códigos del ERP). */
-private class PaymentBreakdown(
+/** Montos agregados por tipo de pago (normalizado a los cÃ³digos del ERP). */
+private data class PaymentBreakdown(
     val efectivo: Double,
     val cheque: Double,
     val tarjeta: Double,

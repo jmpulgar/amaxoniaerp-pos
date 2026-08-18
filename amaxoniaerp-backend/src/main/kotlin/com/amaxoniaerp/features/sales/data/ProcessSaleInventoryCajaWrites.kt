@@ -3,15 +3,13 @@ package com.amaxoniaerp.features.sales.data
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.SaleItemInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentInput
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
-import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.Year
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -114,7 +112,9 @@ private fun insertKardexHeader(
         it[kardexTable.idAlmacenSalida] = physicalItems.first().itemAlmacen
         it[kardexTable.idSucursal] = ctx.request.factura.idSucursal
         it[kardexTable.validadoFecha] = ctx.today
-        it[kardexTable.validadoUsuario] = ctx.request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
+        it[kardexTable.validadoUsuario] =
+            ctx.request.factura.usuarioCreacion
+                .take(STANDARD_USER_LENGTH)
         it[kardexTable.validadoObservacion] = "Salida por Ventas"
         if (kardexTable is SalesKardexTablePA) {
             it[kardexTable.controlaStock] = 0
@@ -150,19 +150,29 @@ private fun insertKardexDetalle(
     }
 }
 
+/** Identificadores de las filas de caja generadas para una venta. */
+private data class CajaEntryIds(
+    val cajaId: String,
+    val transactionId: String,
+    val cajaReciboId: String,
+)
+
 internal fun insertCajaEntries(ctx: SaleWriteContext) {
-    val cajaId = UUID.randomUUID().toString()
-    val transactionId = UUID.randomUUID().toString()
-    val cajaReciboId = UUID.randomUUID().toString()
+    val ids =
+        CajaEntryIds(
+            cajaId = UUID.randomUUID().toString(),
+            transactionId = UUID.randomUUID().toString(),
+            cajaReciboId = UUID.randomUUID().toString(),
+        )
     val resumen = ctx.request.pagoResumen
     val totalBase = ctx.monetaryContext.toBase(resumen.totalizarMontoCancelar)
     val fechaTexto = ctx.today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
     val montoTexto = totalBase.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
 
-    insertCajaNueva(ctx, cajaId, transactionId, totalBase, fechaTexto, montoTexto)
-    insertCajaRecibo(ctx, cajaReciboId, totalBase, fechaTexto)
+    insertCajaNueva(ctx, ids, totalBase, fechaTexto, montoTexto)
+    insertCajaRecibo(ctx, ids.cajaReciboId, totalBase, fechaTexto)
     ctx.request.pagos.forEach { pago ->
-        insertCajaDetallePago(ctx, cajaId, transactionId, cajaReciboId, pago)
+        insertCajaDetallePago(ctx, ids, pago)
     }
 }
 
@@ -171,15 +181,16 @@ private fun cajaConcepto(
     fechaTexto: String,
     montoTexto: String,
 ): String {
-    val clienteNombre = ctx.request.factura.facturarA.ifBlank { "CLIENTE MOSTRADOR" }
+    val clienteNombre =
+        ctx.request.factura.facturarA
+            .ifBlank { "CLIENTE MOSTRADOR" }
     return "Ingreso por Factura #${ctx.invoiceCode}, Fecha: $fechaTexto, " +
         "Cliente: $clienteNombre, Monto: $montoTexto."
 }
 
 private fun insertCajaNueva(
     ctx: SaleWriteContext,
-    cajaId: String,
-    transactionId: String,
+    ids: CajaEntryIds,
     totalBase: BigDecimal,
     fechaTexto: String,
     montoTexto: String,
@@ -187,8 +198,8 @@ private fun insertCajaNueva(
     val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(ctx.monetaryContext.countryCode)
 
     cajaNuevaTable.insert {
-        it[cajaNuevaTable.cajaId] = cajaId
-        it[cajaNuevaTable.idTransaccion] = transactionId
+        it[cajaNuevaTable.cajaId] = ids.cajaId
+        it[cajaNuevaTable.idTransaccion] = ids.transactionId
         it[cajaNuevaTable.fecha] = ctx.today
         it[cajaNuevaTable.ingEg] = CajaIngresoEgreso.I
         it[cajaNuevaTable.monto] = totalBase
@@ -204,7 +215,9 @@ private fun insertCajaNueva(
                 CajaStatus.Pagada
             }
         it[cajaNuevaTable.sucursalId] = ctx.request.factura.idSucursal
-        it[cajaNuevaTable.usuarioCreacion] = ctx.request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
+        it[cajaNuevaTable.usuarioCreacion] =
+            ctx.request.factura.usuarioCreacion
+                .take(STANDARD_USER_LENGTH)
         it[cajaNuevaTable.fechaCreacion] = ctx.now
         it[cajaNuevaTable.idCompra] = ""
         it[cajaNuevaTable.idProveedor] = ""
@@ -223,7 +236,9 @@ private fun insertCajaRecibo(
     totalBase: BigDecimal,
     fechaTexto: String,
 ) {
-    val clienteNombre = ctx.request.factura.facturarA.ifBlank { "CLIENTE MOSTRADOR" }
+    val clienteNombre =
+        ctx.request.factura.facturarA
+            .ifBlank { "CLIENTE MOSTRADOR" }
     val cajaReciboTable = SalesCajaNuevaReciboTableFactory.forCountry(ctx.monetaryContext.countryCode)
     cajaReciboTable.insert {
         it[cajaReciboTable.cajaReciboId] = cajaReciboId
@@ -233,11 +248,13 @@ private fun insertCajaRecibo(
         it[cajaReciboTable.monto] = totalBase
         it[cajaReciboTable.observacion] =
             "Ingreso por Factura #${ctx.invoiceCode}, Fecha: $fechaTexto, " +
-                "Cliente: $clienteNombre"
+            "Cliente: $clienteNombre"
         it[cajaReciboTable.codVendedor] = ctx.request.factura.codVendedor
         it[cajaReciboTable.idCliente] = ctx.request.factura.idCliente
         it[cajaReciboTable.idProveedor] = ""
-        it[cajaReciboTable.usuarioCreacion] = ctx.request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
+        it[cajaReciboTable.usuarioCreacion] =
+            ctx.request.factura.usuarioCreacion
+                .take(STANDARD_USER_LENGTH)
         it[cajaReciboTable.fechaCreacion] = ctx.now
         it[cajaReciboTable.status] = "AC"
         it[cajaReciboTable.contabilizado] = 0
@@ -257,9 +274,7 @@ private fun insertCajaRecibo(
 
 private fun insertCajaDetallePago(
     ctx: SaleWriteContext,
-    cajaId: String,
-    transactionId: String,
-    cajaReciboId: String,
+    ids: CajaEntryIds,
     pago: SalePaymentInput,
 ) {
     val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(ctx.monetaryContext.countryCode)
@@ -269,14 +284,16 @@ private fun insertCajaDetallePago(
 
     cajaNuevaDetalleTable.insert {
         it[cajaNuevaDetalleTable.cajaDetalleId] = detalleId
-        it[cajaNuevaDetalleTable.cajaId] = cajaId
+        it[cajaNuevaDetalleTable.cajaId] = ids.cajaId
         it[cajaNuevaDetalleTable.idFormaPago] = pago.idFormaPago
-        it[cajaNuevaDetalleTable.idTransaccion] = transactionId
-        it[cajaNuevaDetalleTable.cajaReciboId] = cajaReciboId
+        it[cajaNuevaDetalleTable.idTransaccion] = ids.transactionId
+        it[cajaNuevaDetalleTable.cajaReciboId] = ids.cajaReciboId
         it[cajaNuevaDetalleTable.monto] = montoPagoBase
         it[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
         it[cajaNuevaDetalleTable.concepto] = null
-        it[cajaNuevaDetalleTable.usuarioCreacion] = ctx.request.factura.usuarioCreacion.take(STANDARD_USER_LENGTH)
+        it[cajaNuevaDetalleTable.usuarioCreacion] =
+            ctx.request.factura.usuarioCreacion
+                .take(STANDARD_USER_LENGTH)
         it[cajaNuevaDetalleTable.fechaCreacion] = ctx.now
         it[cajaNuevaDetalleTable.retencionTipo] = ""
         it[cajaNuevaDetalleTable.retencionPorcentaje] = ""
@@ -298,7 +315,7 @@ private fun insertCajaDetallePago(
 
     SalesCajaNuevaDetalleFormaPagoTable.insert {
         it[cajaDetalleFormaPagoId] = UUID.randomUUID().toString()
-        it[this.cajaId] = cajaId
+        it[this.cajaId] = ids.cajaId
         it[cajaDetalleId] = detalleId
         it[tipoMovimiento] = pago.tipoMovimiento
         it[idFormaPago] = pago.idFormaPago
