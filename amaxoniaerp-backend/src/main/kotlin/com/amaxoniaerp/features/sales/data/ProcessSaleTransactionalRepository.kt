@@ -85,28 +85,9 @@ open class ProcessSaleTransactionalRepository(
                 creditDecision = creditDecision,
             )
 
-        insertFactura(writeContext)
-        val detalleIds = insertFacturaDetalle(writeContext)
-        processLotTracking(writeContext, detalleIds)
-        insertFacturaImpuestos(writeContext)
-        insertFacturaDetalleFormaPago(writeContext)
-
-        val shouldAffectInventory =
-            (preparedRequest.procesar == 1 || preparedRequest.factura.codEstatus == 2) &&
-                !preparedRequest.esCobroCreditoPrevio
-        if (shouldAffectInventory) {
-            updateInventoryAndKardex(writeContext)
-            insertCajaEntries(writeContext)
-        }
-
+        persistSale(writeContext)
         if (monetaryContext.multiMoneda == "SI" && monetaryContext.idTasa > 0) {
-            // Solo VE tiene el campo `facturado` en tasas_cambio
-            val tasasTableVE = TasasCambioTableFactory.forCountry(countryCode)
-            if (tasasTableVE is TasasCambioTableVE) {
-                tasasTableVE.update({ tasasTableVE.id eq monetaryContext.idTasa.toLong() }) {
-                    it[tasasTableVE.facturado] = "S"
-                }
-            }
+            markTasaFacturada(countryCode, monetaryContext)
         }
 
         val sesionMesaCerrada =
@@ -121,6 +102,35 @@ open class ProcessSaleTransactionalRepository(
             codEstatus = preparedRequest.factura.codEstatus,
             sesionMesaCerrada = sesionMesaCerrada,
         )
+    }
+
+    private fun persistSale(writeContext: SaleWriteContext) {
+        insertFactura(writeContext)
+        val detalleIds = insertFacturaDetalle(writeContext)
+        processLotTracking(writeContext, detalleIds)
+        insertFacturaImpuestos(writeContext)
+        insertFacturaDetalleFormaPago(writeContext)
+
+        val shouldAffectInventory =
+            (writeContext.request.procesar == 1 || writeContext.request.factura.codEstatus == 2) &&
+                !writeContext.request.esCobroCreditoPrevio
+        if (shouldAffectInventory) {
+            updateInventoryAndKardex(writeContext)
+            insertCajaEntries(writeContext)
+        }
+    }
+
+    private fun markTasaFacturada(
+        countryCode: String,
+        monetaryContext: MonetaryContext,
+    ) {
+        // Solo VE tiene el campo `facturado` en tasas_cambio
+        val tasasTableVE = TasasCambioTableFactory.forCountry(countryCode)
+        if (tasasTableVE is TasasCambioTableVE) {
+            tasasTableVE.update({ tasasTableVE.id eq monetaryContext.idTasa.toLong() }) {
+                it[tasasTableVE.facturado] = "S"
+            }
+        }
     }
 
     private fun prepareRequestWithWarehouses(

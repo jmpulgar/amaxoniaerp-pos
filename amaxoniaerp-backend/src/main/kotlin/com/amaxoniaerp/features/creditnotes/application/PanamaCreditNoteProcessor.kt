@@ -83,6 +83,15 @@ class PanamaCreditNoteProcessor(
                     mensaje = "Error de autenticación con el PAC: ${error.message}",
                 )
             }
+        return runSubmission(context, prepared, companyDb, token)
+    }
+
+    private suspend fun runSubmission(
+        context: PanamaCreditNotePayloadContext,
+        prepared: PreparedCreditNote,
+        companyDb: String?,
+        token: PacAuthToken,
+    ): PanamaCreditNotePacResult {
         val payload =
             buildPayload(context).getOrElse { error ->
                 if (error is Error) throw error
@@ -92,6 +101,16 @@ class PanamaCreditNoteProcessor(
                     mensaje = "Error construyendo documento electrónico: ${error.message}",
                 )
             }
+        return sendPayload(context, prepared, companyDb, token, payload)
+    }
+
+    private suspend fun sendPayload(
+        context: PanamaCreditNotePayloadContext,
+        prepared: PreparedCreditNote,
+        companyDb: String?,
+        token: PacAuthToken,
+        payload: TheFactoryHkaDocumentoWrapper,
+    ): PanamaCreditNotePacResult {
         val response =
             pacClient
                 .sendDocument(
@@ -105,6 +124,16 @@ class PanamaCreditNoteProcessor(
                         mensaje = "Error de comunicación con el PAC: ${error.message}",
                     )
                 }
+        return finalizeSubmission(context, prepared, companyDb, token, response)
+    }
+
+    private suspend fun finalizeSubmission(
+        context: PanamaCreditNotePayloadContext,
+        prepared: PreparedCreditNote,
+        companyDb: String?,
+        token: PacAuthToken,
+        response: PacResponse,
+    ): PanamaCreditNotePacResult {
         if (!response.exitoso || response.cufe.isNullOrBlank()) {
             logger.warn("PAC rechazó NC PA {}: [{}] {}", prepared.id, response.codigo, response.mensaje)
             return PanamaCreditNotePacResult.Rejected(response.codigo, response.mensaje)

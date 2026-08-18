@@ -25,13 +25,18 @@ private class CreditAmounts(
     val totalGeneral: BigDecimal,
     val totalPagos: BigDecimal,
     val totalCxc: BigDecimal,
-    val saldoEsperado: BigDecimal,
     val saldoDeclarado: BigDecimal,
     formaPagoSolicitada: String,
     val hasNegativePayment: Boolean,
 ) {
     val totalPagadoReal: BigDecimal
         get() = totalPagos - totalCxc
+
+    val saldoEsperado: BigDecimal =
+        totalGeneral
+            .subtract(totalPagadoReal)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP)
 
     val isCredit: Boolean =
         formaPagoSolicitada == "credito" ||
@@ -73,26 +78,16 @@ private fun computeCreditAmounts(request: ProcessSaleRequest): CreditAmounts {
         pagos
             .filter { (tipoMovimiento, _) -> tipoMovimiento == "CXC" }
             .fold(BigDecimal.ZERO.setScale(2)) { total, (_, amount) -> total + amount }
-    val saldoEsperado =
-        totalGeneral
-            .subtract(totalPagos - totalCxc)
-            .max(BigDecimal.ZERO)
-            .setScale(2, RoundingMode.HALF_UP)
     val saldoDeclarado = request.pagoResumen.totalizarSaldoPendiente.toScaledBigDecimal(2)
     val formaPagoSolicitada =
         request.factura.formaPago
             .trim()
             .lowercase()
-    val isCredit =
-        formaPagoSolicitada == "credito" ||
-            totalCxc > BigDecimal.ZERO ||
-            saldoDeclarado > BigDecimal.ZERO
 
     return CreditAmounts(
         totalGeneral,
         totalPagos,
         totalCxc,
-        saldoEsperado,
         saldoDeclarado,
         formaPagoSolicitada,
         pagos.any { (_, amount) -> amount < BigDecimal.ZERO },
