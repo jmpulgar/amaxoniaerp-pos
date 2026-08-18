@@ -495,15 +495,17 @@ backend-build
 
 ### TASK-022 — Static analysis backend
 
-> **ESTADO: EN PROGRESO (2026-08-16).** Detekt backend reducido de `1.415` a `114` weighted findings
-> sin baseline, sin `@Suppress`, sin reglas desactivadas y sin cambios de negocio (tests GREEN,
-> ktlint GREEN, JaCoCo ratchet GREEN en cada slice; commits `20aff34..f1ab5ef`).
-> Saneamiento aplicado: MaxLineLength 116→0, TooGenericExceptionCaught 39→0, SwallowedException 2→0,
-> UseCheckOrError/UseRequire 6→0, ComplexCondition 5→0, ReturnCount 25→0, InstanceOfCheckForException 1→0,
-> conversión de routes a handlers + seam canónico de tenant, extracción de pasos en processors FE PA/VE.
-> **PENDIENTE para cerrar:** 50 LongMethod, 19 LongParameterList, 14 TooManyFunctions, 13
-> CyclomaticComplexMethod, 11 ThrowsCount, 6 LargeClass, 1 NestedBlockDepth (repositorios y builders).
-> `.\gradlew.bat build` NO está verde hasta que Detekt llegue a 0.
+> **ESTADO: COMPLETADA (2026-08-18).** Detekt backend en **0 findings** (weighted = 0; main + test)
+> sin baseline, sin `@Suppress`, sin reglas desactivadas y sin cambios de negocio. Gates GREEN
+> en el cierre: `compileKotlin` + `compileTestKotlin`, `ktlintCheck`, `test`, `jacocoTestCoverageVerification`
+> (COVEREDRATIO >= 0.46526415) y `build`.
+> Saneamiento aplicado: MaxLineLength, TooGenericExceptionCaught, SwallowedException, UseCheckOrError/UseRequire,
+> ComplexCondition, ReturnCount, InstanceOfCheckForException, LongMethod/LongParameterList/ThrowsCount/LargeClass
+> de repositorios y processors (extracción de slices: caja readers, creditnote support/queries/panama workflow,
+> warehouse/credit decision, electronic invoice mappers, detail writes, submitDocument steps), corrección
+> de mojibake UTF-8 heredado de HEAD, y reducción final de los 15 findings de test a 0 (spec builders,
+> seeds divididos, `CuentaMesaRepositoryTest` LargeClass 829→0 dividido en `CuentaMesaRepositoryTestBase`
+> + `CuentaMesaRepositoryTest` + `CuentaMesaFacturadaTest`). Commits: `3675802..2029f5c` + cierre.
 
 Agregar Detekt + ktlint.
 No crear baseline masivo permanente.
@@ -561,16 +563,17 @@ No tocar `.env*`.
 
 ### TASK-030 — Deep tenant seam
 
-> **ESTADO: EN PROGRESO (2026-08-16).** Creado seam canónico `com.amaxoniaerp.core.tenant.CompanyRequestContext`
-> con `resolveCompanyRequestContext`/`requireUserId`/`requireCompanyDbHeader` y extensiones de claims
-> (`getCountryCode`/`getAdminDb`/`getSchemaType`) movidas fuera de features. Migradas todas las rutas
-> backend al seam (sales, caja, credit notes, FE, facturas, items, clients, client-types, geography,
-> pos, promotions, mesas vía `PosCompanyContext` que ahora delega en el seam). Los handlers por feature
-> (`CajaHandlers`, `ClientsHandlers`, `ItemsHandlers`, `FacturasHandlers`, `GeographyHandlers`,
-> `SesionMesaHandlers`, `PedidoMesaHandlers`, `CuentaMesaHandlers`, `MesasHandlers`, `SalesHandlers`,
-> `ElectronicInvoiceHandlers`, `CreditNoteHandlers`, `AssetsHandlers`) eliminan la resolución manual
-> duplicada de JWT/tenant por endpoint. **PENDIENTE para cerrar:** verificación automatizada de
-> duplicación = 0 y architecture test que congele el seam.
+> **ESTADO: COMPLETADA (2026-08-18).** Seam canónico `com.amaxoniaerp.core.tenant.CompanyRequestContext`
+> (`resolveCompanyRequestContext`/`requireUserId`/`requireCompanyDbHeader` + extensiones de claims
+> `getCountryCode`/`getAdminDb`/`getSchemaType`) es la única vía de resolución de tenant en el backend.
+> Migradas todas las rutas al seam (sales, caja —eliminada `resolveCajaCompanyContext` manual—, credit
+> notes —el header `Company-DB` ya no se relee, se usa el valor validado del scope—, FE, facturas,
+> items, clients, client-types, geography, pos, promotions, mesas vía `PosCompanyContext` que delega
+> en el seam). **Duplicación = 0** verificado por escaneo amplio de `principal<JWTPrincipal>`,
+> `getClaim("token_type"/"admin_db"/"country_code"/"schema_type")`, `headers["Company-DB"]` y
+> `resolve*CompanyContext` fuera de `core/tenant` y `features/auth`. **Architecture test**
+> `TenantSeamArchitectureTest` congela el seam (2 tests: resolución solo en seam/auth y sin imports de
+> las extensiones desde features). Gates GREEN: `build` completo (compile, ktlint, test, JaCoCo, detekt=0).
 
 Crear concepto canónico:
 

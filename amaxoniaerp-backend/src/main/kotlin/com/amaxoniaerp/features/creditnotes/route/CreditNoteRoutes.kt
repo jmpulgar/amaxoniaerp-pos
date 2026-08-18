@@ -27,6 +27,7 @@ private const val MAX_CREDIT_NOTE_PAGE_LIMIT = 200
 private data class CreditNoteRequestScope(
     val database: Database,
     val countryCode: String,
+    val companyDb: String,
     val username: String,
 )
 
@@ -159,7 +160,7 @@ internal class CreditNoteHandlers(
                         countryCode = scope.countryCode,
                         request = request,
                         username = scope.username,
-                        companyDb = call.request.headers["Company-DB"],
+                        companyDb = scope.companyDb,
                     )
                 call.respond(HttpStatusCode.Created, response)
             } catch (e: CreditNoteValidationException) {
@@ -204,7 +205,12 @@ internal class CreditNoteHandlers(
                     .asString()
                     .orEmpty()
                     .ifBlank { "POS" }
-            CreditNoteRequestScope(database = database, countryCode = ctx.countryCode, username = username)
+            CreditNoteRequestScope(
+                database = database,
+                countryCode = ctx.countryCode,
+                companyDb = companyDb,
+                username = username,
+            )
         }
 }
 

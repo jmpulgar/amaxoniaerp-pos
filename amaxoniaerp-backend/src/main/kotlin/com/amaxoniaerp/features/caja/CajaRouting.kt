@@ -1,7 +1,8 @@
 package com.amaxoniaerp.features.caja
 
-import com.amaxoniaerp.core.tenant.getAdminDb
-import com.amaxoniaerp.core.tenant.getCountryCode
+import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
+import com.amaxoniaerp.core.tenant.requireUserId
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
@@ -13,8 +14,6 @@ import com.amaxoniaerp.features.caja.domain.CajaStatusResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -42,11 +41,6 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
     }
 }
 
-internal data class CajaCompanyContext(
-    val countryCode: String,
-    val companyDb: String,
-)
-
 /**
  * Handlers de los endpoints de caja. Validan contexto/parámetros, ejecutan la
  * operación del repositorio y mapean el resultado a HTTP.
@@ -58,32 +52,28 @@ internal class CajaHandlers(
 
     suspend fun listar(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
-            val principal = call.principal<JWTPrincipal>()!!
-            val userId = principal.payload.getClaim("user_id").asInt()
-            if (userId == null) {
-                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido: falta user_id"))
-                return@run
-            }
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
+            val userId = ctx.requireUserId(call) ?: return@run
 
-            val cajas = cajaRepository.getCajas(ctx.countryCode, ctx.companyDb, userId)
-            log.debug("Cajas listadas. companyDb={} userId={}", ctx.companyDb, userId)
+            val cajas = cajaRepository.getCajas(ctx.countryCode, companyDb, userId)
+            log.debug("Cajas listadas. companyDb={} userId={}", companyDb, userId)
             call.respond(HttpStatusCode.OK, cajas)
         }
 
     suspend fun abrir(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
-            val principal = call.principal<JWTPrincipal>()!!
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
             val username =
-                principal.payload
+                ctx.principal.payload
                     .getClaim("username")
                     .asString()
                     .orEmpty()
                     .ifBlank { "Unknown" }
 
             val request = call.receive<AperturaRequest>()
-            val result = cajaRepository.openCaja(ctx.countryCode, ctx.companyDb, request, username)
+            val result = cajaRepository.openCaja(ctx.countryCode, companyDb, request, username)
 
             result.fold(
                 onSuccess = { cajaSecuencia ->
@@ -100,7 +90,8 @@ internal class CajaHandlers(
 
     suspend fun status(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
 
             val idCaja = call.parameters["id"]
             if (idCaja.isNullOrBlank()) {
@@ -108,7 +99,7 @@ internal class CajaHandlers(
                 return@run
             }
 
-            val cajaSecuencia = cajaRepository.getCajaStatus(ctx.countryCode, ctx.companyDb, idCaja)
+            val cajaSecuencia = cajaRepository.getCajaStatus(ctx.countryCode, companyDb, idCaja)
             if (cajaSecuencia != null) {
                 call.respond(
                     HttpStatusCode.OK,
@@ -124,7 +115,8 @@ internal class CajaHandlers(
 
     suspend fun resumenSecuencia(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
 
             val idCaja = call.parameters["id"]
             if (idCaja.isNullOrBlank()) {
@@ -132,7 +124,7 @@ internal class CajaHandlers(
                 return@run
             }
 
-            val summary = cajaRepository.getCajaSequenceSummary(ctx.countryCode, ctx.companyDb, idCaja)
+            val summary = cajaRepository.getCajaSequenceSummary(ctx.countryCode, companyDb, idCaja)
             if (summary == null) {
                 call.respond(
                     HttpStatusCode.OK,
@@ -155,7 +147,8 @@ internal class CajaHandlers(
 
     suspend fun datosSecuencia(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
 
             val id = call.request.queryParameters["id"]
             if (id.isNullOrBlank()) {
@@ -168,7 +161,7 @@ internal class CajaHandlers(
                     ?.let { it == "1" || it.equals("true", ignoreCase = true) }
                     ?: false
 
-            cajaRepository.getCajaSecuenciaData(ctx.countryCode, ctx.companyDb, id, verify).fold(
+            cajaRepository.getCajaSecuenciaData(ctx.countryCode, companyDb, id, verify).fold(
                 onSuccess = { data ->
                     call.respond(HttpStatusCode.OK, CajaSecuenciaGetResponse(success = true, data = data))
                 },
@@ -183,7 +176,8 @@ internal class CajaHandlers(
 
     suspend fun codigoSecuencia(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
 
             val idCaja = call.request.queryParameters["id"]
             if (idCaja.isNullOrBlank()) {
@@ -191,7 +185,7 @@ internal class CajaHandlers(
                 return@run
             }
 
-            cajaRepository.getNextSecuenciaCodigo(ctx.countryCode, ctx.companyDb, idCaja).fold(
+            cajaRepository.getNextSecuenciaCodigo(ctx.countryCode, companyDb, idCaja).fold(
                 onSuccess = { codigo ->
                     call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                 },
@@ -206,7 +200,8 @@ internal class CajaHandlers(
 
     suspend fun cerrar(call: ApplicationCall) =
         run {
-            val ctx = call.resolveCajaCompanyContext() ?: return@run
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
 
             val request =
                 runCatching { call.receive<CajaCierreSaveRequest>() }.getOrElse { e ->
@@ -221,7 +216,7 @@ internal class CajaHandlers(
                     return@run
                 }
 
-            cajaRepository.saveCajaCierre(ctx.countryCode, ctx.companyDb, request).fold(
+            cajaRepository.saveCajaCierre(ctx.countryCode, companyDb, request).fold(
                 onSuccess = { response ->
                     call.respond(HttpStatusCode.OK, response)
                 },
@@ -239,42 +234,3 @@ internal class CajaHandlers(
             )
         }
 }
-
-/**
- * Misma regla que notas de crédito / ventas POS: token de empresa, `Company-DB` = `admin_db`, `country_code` en JWT.
- */
-internal suspend fun ApplicationCall.resolveCajaCompanyContext(): CajaCompanyContext? =
-    run {
-        val principal = principal<JWTPrincipal>()
-        if (principal == null) {
-            respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token inválido"))
-            return@run null
-        }
-        if (principal.payload.getClaim("token_type").asString() != "company") {
-            respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere token de empresa"))
-            return@run null
-        }
-        val companyDbHeader = request.headers["Company-DB"]
-        if (companyDbHeader.isNullOrBlank()) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Company-DB header is missing"))
-            return@run null
-        }
-        val adminDb = principal.getAdminDb()
-        if (adminDb == null) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta admin_db en token"))
-            return@run null
-        }
-        if (!companyDbHeader.equals(adminDb, ignoreCase = true)) {
-            respond(
-                HttpStatusCode.Forbidden,
-                mapOf("error" to "Company-DB no coincide con la empresa autenticada"),
-            )
-            return@run null
-        }
-        val countryCode = principal.getCountryCode()
-        if (countryCode == null) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta country_code en token"))
-            return@run null
-        }
-        CajaCompanyContext(countryCode = countryCode, companyDb = companyDbHeader)
-    }
