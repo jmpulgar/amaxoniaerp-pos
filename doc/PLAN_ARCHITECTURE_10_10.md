@@ -608,6 +608,19 @@ Exit:
 
 ### TASK-031 — Error model
 
+> **ESTADO: COMPLETADA (2026-08-18).** Modelo tipado `com.amaxoniaerp.core.error.ErrorCategory`
+> (Validation, Unauthorized, Forbidden, NotFound, Conflict, DomainRule, ExternalService, Unexpected)
+> + `ApiException(category, mensaje público, cause)`. Todas las excepciones de dominio migradas a
+> categorías (auth: Unauthorized/Forbidden/NotFound; sales: Conflict/DomainRule/Validation;
+> creditnotes: Validation/NotFound; FE/PAC: ExternalService/DomainRule/NotFound). `StatusPages`
+> central mapea categoría → HTTP (`statusFor`) con log (warn 4xx / error 5xx) y mensaje estable;
+> `Throwable` → 500 "Error interno del servidor" sin exponer SQL/PAC/internals. Rutas auth/sales/
+> creditnotes ya no duplican el mapeo (delegan en StatusPages, misma respuesta). Caja: fallos de
+> repositorio exponen sólo mensajes de negocio (`IllegalStateException`); errores internos (SQL/red)
+> van al log y se responde fallback estable; auto-close ya no embebe `error.message` crudo.
+> Test `ErrorModelTest` congela el mapeo categoría→HTTP. Gates GREEN: `build` completo
+> (compile, ktlint, test, JaCoCo, detekt=0).
+
 Categorías:
 
 ```text

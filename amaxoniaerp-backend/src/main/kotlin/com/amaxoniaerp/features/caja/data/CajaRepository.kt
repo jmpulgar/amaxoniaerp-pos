@@ -91,9 +91,14 @@ class CajaRepository {
             autoCloseOpenSequence(countryCode, dbName, currentOpen.idCajaSecuencia).fold(
                 onSuccess = { },
                 onFailure = { error ->
+                    log.warn(
+                        "No se pudo cerrar automaticamente la secuencia abierta. idSecuencia={}",
+                        currentOpen.idCajaSecuencia,
+                        error,
+                    )
                     return Result.failure(
                         IllegalStateException(
-                            "No se pudo cerrar automaticamente la secuencia abierta: ${error.message}",
+                            "No se pudo cerrar automaticamente la secuencia abierta",
                             error,
                         ),
                     )

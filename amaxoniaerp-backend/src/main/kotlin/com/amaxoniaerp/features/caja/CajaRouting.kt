@@ -24,6 +24,18 @@ import org.slf4j.LoggerFactory
 
 private const val ERR_QUERY_SEQUENCE = "No se pudo consultar la secuencia"
 private const val ERR_CALCULATE_SEQUENCE = "No se pudo calcular secuencia"
+private const val ERR_OPEN_CAJA = "No se pudo abrir la caja"
+private const val ERR_CLOSE_CAJA = "No se pudo cerrar la caja"
+private const val ERR_INVALID_PAYLOAD = "Payload inválido"
+
+/**
+ * Mensaje público estable para fallos de caja: expone sólo los mensajes de
+ * negocio (`IllegalStateException` lanzados por el repositorio con `error(...)`);
+ * cualquier falla interna (SQL, red, etc.) se queda en el log y se responde el
+ * fallback estable.
+ */
+private fun Throwable.publicMessage(fallback: String): String =
+    (this as? IllegalStateException)?.message?.takeIf { it.isNotBlank() } ?: fallback
 
 fun Route.cajaRouting(cajaRepository: CajaRepository) {
     val handlers = CajaHandlers(cajaRepository)
@@ -83,7 +95,11 @@ internal class CajaHandlers(
                     )
                 },
                 onFailure = { error ->
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to error.message))
+                    log.warn("No se pudo abrir la caja. companyDb={} idCaja={}", companyDb, request.idCaja, error)
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to error.publicMessage(ERR_OPEN_CAJA)),
+                    )
                 },
             )
         }
@@ -166,9 +182,10 @@ internal class CajaHandlers(
                     call.respond(HttpStatusCode.OK, CajaSecuenciaGetResponse(success = true, data = data))
                 },
                 onFailure = { error ->
+                    log.warn("No se pudo consultar la secuencia. id={}", id, error)
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        CajaSecuenciaGetResponse(success = false, error = error.message ?: ERR_QUERY_SEQUENCE),
+                        CajaSecuenciaGetResponse(success = false, error = error.publicMessage(ERR_QUERY_SEQUENCE)),
                     )
                 },
             )
@@ -190,9 +207,10 @@ internal class CajaHandlers(
                     call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                 },
                 onFailure = { error ->
+                    log.warn("No se pudo calcular secuencia. idCaja={}", idCaja, error)
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        mapOf("error" to (error.message ?: ERR_CALCULATE_SEQUENCE)),
+                        mapOf("error" to error.publicMessage(ERR_CALCULATE_SEQUENCE)),
                     )
                 },
             )
@@ -205,12 +223,13 @@ internal class CajaHandlers(
 
             val request =
                 runCatching { call.receive<CajaCierreSaveRequest>() }.getOrElse { e ->
+                    log.warn("Payload inválido al cerrar caja.", e)
                     call.respond(
                         HttpStatusCode.BadRequest,
                         CajaCierreSaveResponse(
                             success = false,
                             message = "Payload inválido",
-                            error = e.message,
+                            error = e.publicMessage(ERR_INVALID_PAYLOAD),
                         ),
                     )
                     return@run
@@ -221,12 +240,13 @@ internal class CajaHandlers(
                     call.respond(HttpStatusCode.OK, response)
                 },
                 onFailure = { error ->
+                    log.warn("No se pudo cerrar la caja. id={}", request.id, error)
                     call.respond(
                         HttpStatusCode.BadRequest,
                         CajaCierreSaveResponse(
                             success = false,
                             message = "No se pudo cerrar la caja",
-                            error = error.message,
+                            error = error.publicMessage(ERR_CLOSE_CAJA),
                             id = request.id,
                         ),
                     )

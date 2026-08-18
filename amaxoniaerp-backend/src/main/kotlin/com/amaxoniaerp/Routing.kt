@@ -1,5 +1,7 @@
 package com.amaxoniaerp
 
+import com.amaxoniaerp.core.error.ApiException
+import com.amaxoniaerp.core.error.ErrorCategory
 import com.amaxoniaerp.features.assets.route.assetsRoutes
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.auth.route.authRoutes
@@ -71,11 +73,50 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
 private const val HTTP_REQUEST_TIMEOUT_MS = 30_000L
+private const val SERVER_ERROR_THRESHOLD = 500
 
 private val routingLog = LoggerFactory.getLogger("Routing")
 
-fun Application.configureRouting() {
+/**
+ * Mapeo canónico de categorías de error a códigos HTTP. Respuesta pública
+ * estable; los detalles internos solo van al log.
+ */
+internal fun statusFor(category: ErrorCategory): HttpStatusCode =
+    when (category) {
+        ErrorCategory.Validation -> HttpStatusCode.BadRequest
+        ErrorCategory.Unauthorized -> HttpStatusCode.Unauthorized
+        ErrorCategory.Forbidden -> HttpStatusCode.Forbidden
+        ErrorCategory.NotFound -> HttpStatusCode.NotFound
+        ErrorCategory.Conflict -> HttpStatusCode.Conflict
+        ErrorCategory.DomainRule -> HttpStatusCode.BadRequest
+        ErrorCategory.ExternalService -> HttpStatusCode.BadGateway
+        ErrorCategory.Unexpected -> HttpStatusCode.InternalServerError
+    }
+
+private fun Application.installStatusPages() {
     install(StatusPages) {
+        exception<ApiException> { call, cause ->
+            val status = statusFor(cause.category)
+            if (status.value >= SERVER_ERROR_THRESHOLD) {
+                routingLog.error(
+                    "API error. method={} path={} category={} message={}",
+                    call.request.httpMethod.value,
+                    call.request.uri,
+                    cause.category,
+                    cause.message,
+                    cause,
+                )
+            } else {
+                routingLog.warn(
+                    "API error. method={} path={} category={} message={}",
+                    call.request.httpMethod.value,
+                    call.request.uri,
+                    cause.category,
+                    cause.message,
+                )
+            }
+            call.respond(status, mapOf("error" to cause.message))
+        }
         exception<Throwable> { call, cause ->
             routingLog.error(
                 "Unhandled request error. method={} path={} message={}",
@@ -90,6 +131,10 @@ fun Application.configureRouting() {
             )
         }
     }
+}
+
+fun Application.configureRouting() {
+    installStatusPages()
 
     val jwtConfig = loadJwtConfig()
     val dotenv = loadDotEnv()

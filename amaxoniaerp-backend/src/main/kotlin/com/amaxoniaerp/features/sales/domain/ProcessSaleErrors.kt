@@ -1,17 +1,21 @@
 package com.amaxoniaerp.features.sales.domain
 
+import com.amaxoniaerp.core.error.ApiException
+import com.amaxoniaerp.core.error.ErrorCategory
+
 sealed class ProcessSaleException(
+    category: ErrorCategory,
     message: String,
-) : RuntimeException(message)
+) : ApiException(category, message)
 
 class DuplicateInvoiceException(
     message: String,
-) : ProcessSaleException(message)
+) : ProcessSaleException(ErrorCategory.Conflict, message)
 
 class InsufficientStockException(
     message: String,
-) : ProcessSaleException(message)
+) : ProcessSaleException(ErrorCategory.DomainRule, message)
 
 class InvalidSaleRequestException(
     message: String,
-) : ProcessSaleException(message)
+) : ProcessSaleException(ErrorCategory.Validation, message)

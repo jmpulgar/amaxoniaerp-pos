@@ -3,9 +3,6 @@
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
-import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
-import com.amaxoniaerp.features.sales.domain.InsufficientStockException
-import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -53,22 +50,14 @@ internal class SalesHandlers(
             )
             val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
 
-            try {
-                val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
-                log.info(
-                    "POS sale processed. country={} idFactura={} codFactura={} status={}",
-                    ctx.countryCode,
-                    result.idFactura,
-                    result.codFactura,
-                    result.codEstatus,
-                )
-                call.respond(HttpStatusCode.Created, result)
-            } catch (e: DuplicateInvoiceException) {
-                call.respond(HttpStatusCode.Conflict, mapOf("error" to (e.message ?: "Factura duplicada")))
-            } catch (e: InsufficientStockException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Stock insuficiente")))
-            } catch (e: InvalidSaleRequestException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-            }
+            val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
+            log.info(
+                "POS sale processed. country={} idFactura={} codFactura={} status={}",
+                ctx.countryCode,
+                result.idFactura,
+                result.codFactura,
+                result.codEstatus,
+            )
+            call.respond(HttpStatusCode.Created, result)
         }
 }

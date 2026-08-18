@@ -1,13 +1,16 @@
 package com.amaxoniaerp.features.auth.domain
 
+import com.amaxoniaerp.core.error.ApiException
+import com.amaxoniaerp.core.error.ErrorCategory
+
 open class AuthenticationException(
     message: String,
-) : RuntimeException(message)
+) : ApiException(ErrorCategory.Unauthorized, message)
 
 open class AuthorizationException(
     message: String,
-) : RuntimeException(message)
+) : ApiException(ErrorCategory.Forbidden, message)
 
 open class NotFoundException(
     message: String,
-) : RuntimeException(message)
+) : ApiException(ErrorCategory.NotFound, message)

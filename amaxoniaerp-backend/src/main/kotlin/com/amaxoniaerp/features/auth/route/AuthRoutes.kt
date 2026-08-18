@@ -1,10 +1,7 @@
 package com.amaxoniaerp.features.auth.route
 
 import com.amaxoniaerp.features.auth.domain.AuthService
-import com.amaxoniaerp.features.auth.domain.AuthenticationException
-import com.amaxoniaerp.features.auth.domain.AuthorizationException
 import com.amaxoniaerp.features.auth.domain.LoginRequest
-import com.amaxoniaerp.features.auth.domain.NotFoundException
 import com.amaxoniaerp.features.companies.domain.CompanySelectRequest
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import io.ktor.http.HttpStatusCode
@@ -74,20 +71,13 @@ private suspend fun login(
         return@run
     }
 
-    try {
-        val response =
-            authService.login(
-                username = request.username,
-                password = request.password,
-                countryCode = countryCode.uppercase(),
-            )
-        call.respond(response)
-    } catch (ex: AuthenticationException) {
-        call.respond(
-            HttpStatusCode.Unauthorized,
-            mapOf("error" to (ex.message ?: "Credenciales inválidas")),
+    val response =
+        authService.login(
+            username = request.username,
+            password = request.password,
+            countryCode = countryCode.uppercase(),
         )
-    }
+    call.respond(response)
 }
 
 private suspend fun selectCompany(
@@ -117,30 +107,13 @@ private suspend fun selectCompany(
 
     val request = call.receive<CompanySelectRequest>()
 
-    try {
-        val response =
-            companyService.selectCompany(
-                userId = userId,
-                companyId = request.companyId,
-                countryCode = countryCode,
-            )
-        call.respond(response)
-    } catch (ex: AuthenticationException) {
-        call.respond(
-            HttpStatusCode.Unauthorized,
-            mapOf("error" to (ex.message ?: "Token inválido")),
+    val response =
+        companyService.selectCompany(
+            userId = userId,
+            companyId = request.companyId,
+            countryCode = countryCode,
         )
-    } catch (ex: AuthorizationException) {
-        call.respond(
-            HttpStatusCode.Forbidden,
-            mapOf("error" to (ex.message ?: "Acceso denegado")),
-        )
-    } catch (ex: NotFoundException) {
-        call.respond(
-            HttpStatusCode.NotFound,
-            mapOf("error" to (ex.message ?: "No encontrado")),
-        )
-    }
+    call.respond(response)
 }
 
 // Las extensiones de claims del JWT (getCountryCode/getSchemaType/getAdminDb)

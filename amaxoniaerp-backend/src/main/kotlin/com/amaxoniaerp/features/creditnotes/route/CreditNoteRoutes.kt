@@ -7,7 +7,6 @@ import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
 import com.amaxoniaerp.features.creditnotes.data.CreditNoteListQuery
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalRequest
 import com.amaxoniaerp.features.creditnotes.domain.CreateCreditNoteRequest
-import com.amaxoniaerp.features.creditnotes.domain.CreditNoteNotFoundException
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteValidationException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -67,24 +66,20 @@ internal class CreditNoteHandlers(
                 return@run
             }
 
-            try {
-                call.respond(
-                    creditNoteService.list(
-                        database = scope.database,
-                        countryCode = scope.countryCode,
-                        query =
-                            CreditNoteListQuery(
-                                limit = limit,
-                                offset = offset,
-                                search = search,
-                                fechaInicio = fechaInicio,
-                                fechaFin = fechaFin,
-                            ),
-                    ),
-                )
-            } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-            }
+            call.respond(
+                creditNoteService.list(
+                    database = scope.database,
+                    countryCode = scope.countryCode,
+                    query =
+                        CreditNoteListQuery(
+                            limit = limit,
+                            offset = offset,
+                            search = search,
+                            fechaInicio = fechaInicio,
+                            fechaFin = fechaFin,
+                        ),
+                ),
+            )
         }
 
     suspend fun listarFacturasElegibles(call: ApplicationCall) =
@@ -153,21 +148,15 @@ internal class CreditNoteHandlers(
             val scope = resolveScope(call) ?: return@run
             val request = call.receive<CreateCreditNoteRequest>()
 
-            try {
-                val response =
-                    creditNoteService.create(
-                        database = scope.database,
-                        countryCode = scope.countryCode,
-                        request = request,
-                        username = scope.username,
-                        companyDb = scope.companyDb,
-                    )
-                call.respond(HttpStatusCode.Created, response)
-            } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-            } catch (e: CreditNoteNotFoundException) {
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
-            }
+            val response =
+                creditNoteService.create(
+                    database = scope.database,
+                    countryCode = scope.countryCode,
+                    request = request,
+                    username = scope.username,
+                    companyDb = scope.companyDb,
+                )
+            call.respond(HttpStatusCode.Created, response)
         }
 
     suspend fun confirmarFiscal(call: ApplicationCall) =
@@ -180,14 +169,8 @@ internal class CreditNoteHandlers(
             }
             val request = call.receive<ConfirmCreditNoteFiscalRequest>()
 
-            try {
-                val response = creditNoteService.confirmFiscal(scope.database, scope.countryCode, id, request)
-                call.respond(response)
-            } catch (e: CreditNoteValidationException) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Solicitud inválida")))
-            } catch (e: CreditNoteNotFoundException) {
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "Registro no encontrado")))
-            }
+            val response = creditNoteService.confirmFiscal(scope.database, scope.countryCode, id, request)
+            call.respond(response)
         }
 
     /**
