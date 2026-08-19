@@ -670,6 +670,14 @@ Remover Koin/HelloService si queda sin uso real.
 
 ### TASK-033 — Observability
 
+> **ESTADO: COMPLETADA (2026-08-18).** Correlation/request id vía plugin `CallId`
+> (recupera `X-Request-Id`, genera `req-<uuid>`, responde el header) verificado por
+> `ObservabilityTest`. Logging estructurado: MDC `call-id` + `country` en patrón logback
+> (`[req=...] [country=...]`); tenant context seguro vía `core/tenant/TenantLogging.kt`
+> (sólo `country_code`, nunca `admin_db`/empresa/secretos). Duración por request incluida en
+> el formato default de `CallLogging` (`" in Nms"`). Categorías de error en los logs de
+> StatusPages (TASK-031). Gates GREEN: `build` completo (compile, ktlint, test, JaCoCo, detekt=0).
+
 Normalizar:
 
 - correlation/request id;
