@@ -9,11 +9,6 @@ internal fun isCancelledStatus(description: String?): Boolean {
         description.equals("Anulado", ignoreCase = true)
 }
 
-internal fun isCashSigla(siglas: String?): Boolean {
-    val value = siglas.orEmpty().trim().uppercase()
-    return value == "CASH" || value == "EF" || value == "EFE" || value == "EFECTIVO"
-}
-
 internal fun classifyPaymentCategory(
     tipoMovimiento: String?,
     siglas: String?,

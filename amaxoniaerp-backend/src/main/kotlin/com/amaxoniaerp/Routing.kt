@@ -120,7 +120,7 @@ private fun Route.installCoreRoutes() {
 
 private fun Route.installPosRoutes(deps: AppDependencies) {
     itemsRoutes(deps.repositories.itemsRepository)
-    cajaRouting(deps.repositories.cajaRepository)
+    cajaRouting(deps.caja.cajaRepository, deps.caja.openCajaUseCase, deps.caja.closeCajaUseCase)
     posRouting(deps.repositories.formasPagoRepository)
     mesasRouting(deps.repositories.mesasRepository)
 
@@ -134,13 +134,13 @@ private fun Route.installPosRoutes(deps: AppDependencies) {
 
     promotionsRoutes(deps.repositories.promotionsRepository)
     salesRoutes(deps.mesas.processSaleUseCase)
-    creditNoteRoutes(deps.creditNoteDependencies.creditNoteService)
-    electronicInvoiceRoutes(deps.feDependencies.feFactory)
+    creditNoteRoutes(deps.fiscal.creditNoteDependencies.creditNoteService)
+    electronicInvoiceRoutes(deps.fiscal.feDependencies.feFactory)
 
     assetsRoutes(assetsBaseUrls = deps.routingConfig.assetsBaseUrls, dataBasePath = deps.routingConfig.dataBasePath)
     // Rutas auxiliares que aún podrían necesitar refactoring
     clientsRoutes(deps.repositories.clientsRepository)
     clientTypesRoutes(deps.repositories.clientTypesRepository)
-    facturasRoutes(deps.repositories.facturasRepository, deps.feDependencies.panamaProcessor)
+    facturasRoutes(deps.repositories.facturasRepository, deps.fiscal.feDependencies.panamaProcessor)
     geographyRoutes(deps.repositories.geographyRepository)
 }

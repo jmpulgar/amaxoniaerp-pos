@@ -229,6 +229,12 @@ data class CajaFormaPagoDevolucionItem(
     val monto: Double = 0.0,
 )
 
+/** Total por forma de pago usado por el cálculo del cierre automático. */
+data class FormaPagoCloseTotal(
+    val sigla: String?,
+    val monto: Double,
+)
+
 @Serializable
 data class CajaCierreSaveRequest(
     val id: String,

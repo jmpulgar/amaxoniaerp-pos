@@ -4,7 +4,6 @@ import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreDetalleRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreFormaPagoRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
-import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -75,43 +74,6 @@ internal fun insertCajaDetalleCierreFormaPago(
         it[montoDiferencia] = detalle.montoDiferencia.toMoney()
         it[CajaDetalleCierreFormaPagoTable.serieSucursal] = serieSucursal
     }
-}
-
-internal data class FormaPagoCloseTotal(
-    val sigla: String?,
-    val monto: Double,
-)
-
-internal fun buildAutoCloseFormaPagoTotals(data: CajaSecuenciaData): Map<Int, FormaPagoCloseTotal> {
-    val totals = linkedMapOf<Int, FormaPagoCloseTotal>()
-
-    data.formaPago
-        .asSequence()
-        .filter { it.id > 0 && it.monto != 0.0 }
-        .forEach { line ->
-            totals.merge(
-                line.id,
-                FormaPagoCloseTotal(sigla = line.siglas, monto = line.monto),
-            ) { current, incoming ->
-                current.copy(monto = current.monto + incoming.monto)
-            }
-        }
-
-    data.formaPagoDevolucion
-        .asSequence()
-        .filter { it.idFormaPago > 0 && it.monto != 0.0 }
-        .forEach { line ->
-            totals.merge(
-                line.idFormaPago,
-                FormaPagoCloseTotal(sigla = line.siglas, monto = line.monto),
-            ) { current, incoming ->
-                current.copy(monto = current.monto + incoming.monto)
-            }
-        }
-
-    return totals
-        .filterValues { it.monto > 0.0 }
-        .toMap()
 }
 
 internal fun insertAperturaRecord(

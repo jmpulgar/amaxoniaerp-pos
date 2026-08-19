@@ -5,6 +5,7 @@ import com.amaxoniaerp.features.caja.domain.CajaFormaPagoDevolucionItem
 import com.amaxoniaerp.features.caja.domain.CajaFormaPagoItem
 import com.amaxoniaerp.features.caja.domain.CajaInventarioItem
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
+import com.amaxoniaerp.features.caja.domain.isCashSigla
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.amaxoniaerp.features.pos.data.CajaFormaTable
 import com.amaxoniaerp.features.sales.data.CajaStatus

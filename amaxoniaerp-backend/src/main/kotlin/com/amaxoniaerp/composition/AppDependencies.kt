@@ -1,6 +1,8 @@
 ﻿package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.auth.domain.AuthService
+import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
+import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.data.ClientsRepository
@@ -23,9 +25,9 @@ import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 class AppDependencies(
     val auth: AuthDependencies,
     val repositories: Repositories,
+    val caja: CajaDependencies,
     val mesas: MesasDependencies,
-    val feDependencies: FeDependencies,
-    val creditNoteDependencies: CreditNoteDependencies,
+    val fiscal: FiscalDependencies,
     val routingConfig: RoutingConfig,
 )
 
@@ -41,11 +43,23 @@ class Repositories {
     val clientTypesRepository = ClientTypesRepository()
     val facturasRepository = FacturasRepository()
     val geographyRepository = GeographyRepository()
-    val cajaRepository = CajaRepository()
     val formasPagoRepository = FormasPagoRepository()
     val promotionsRepository = PromotionsRepository()
     val mesasRepository = MesasRepository()
 }
+
+/** Caja: workflows de apertura/cierre (B) sobre el repositorio de queries/escritura. */
+class CajaDependencies(
+    val cajaRepository: CajaRepository,
+    val openCajaUseCase: OpenCajaUseCase,
+    val closeCajaUseCase: CloseCajaUseCase,
+)
+
+/** Grafo fiscal: FE (PAC/HKA) y su consumidor de notas de crédito. */
+class FiscalDependencies(
+    val feDependencies: FeDependencies,
+    val creditNoteDependencies: CreditNoteDependencies,
+)
 
 /**
  * Cuenta/mesas y la venta POS comparten repositorios: SesionMesaRepository usa

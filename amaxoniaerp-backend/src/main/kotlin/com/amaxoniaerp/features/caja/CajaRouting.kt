@@ -4,6 +4,8 @@ import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
 import com.amaxoniaerp.core.tenant.requireUserId
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
+import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
+import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
@@ -38,8 +40,12 @@ private const val ERR_INVALID_PAYLOAD = "Payload inválido"
 private fun Throwable.publicMessage(fallback: String): String =
     (this as? IllegalStateException)?.message?.takeIf { it.isNotBlank() } ?: fallback
 
-fun Route.cajaRouting(cajaRepository: CajaRepository) {
-    val handlers = CajaHandlers(cajaRepository)
+fun Route.cajaRouting(
+    cajaRepository: CajaRepository,
+    openCaja: OpenCajaUseCase,
+    closeCaja: CloseCajaUseCase,
+) {
+    val handlers = CajaHandlers(cajaRepository, openCaja, closeCaja)
 
     route("/api/cajas") {
         authenticate {
@@ -60,6 +66,8 @@ fun Route.cajaRouting(cajaRepository: CajaRepository) {
  */
 internal class CajaHandlers(
     private val cajaRepository: CajaRepository,
+    private val openCaja: OpenCajaUseCase,
+    private val closeCaja: CloseCajaUseCase,
 ) {
     private val log = LoggerFactory.getLogger("CajaRouting")
 
@@ -88,7 +96,7 @@ internal class CajaHandlers(
 
             val request = call.receive<AperturaRequest>()
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            val result = cajaRepository.openCaja(database, ctx.countryCode, companyDb, request, username)
+            val result = openCaja.execute(database, ctx.countryCode, companyDb, request, username)
 
             result.fold(
                 onSuccess = { cajaSecuencia ->
@@ -243,7 +251,7 @@ internal class CajaHandlers(
                 }
 
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            cajaRepository.saveCajaCierre(database, ctx.countryCode, request).fold(
+            closeCaja.close(database, ctx.countryCode, request).fold(
                 onSuccess = { response ->
                     call.respond(HttpStatusCode.OK, response)
                 },

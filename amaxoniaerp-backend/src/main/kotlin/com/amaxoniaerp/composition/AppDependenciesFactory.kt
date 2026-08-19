@@ -1,6 +1,9 @@
 package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.auth.domain.AuthService
+import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
+import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
+import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
@@ -27,6 +30,7 @@ fun buildAppDependencies(application: Application): AppDependencies {
     val auth = AuthDependencies(AuthService(jwtConfig), CompanyService(jwtConfig))
 
     val repositories = Repositories()
+    val caja = buildCajaDependencies()
     val feHttpClient = buildFeHttpClient()
     application.environment.monitor.subscribe(ApplicationStopped) { feHttpClient.close() }
     val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
@@ -41,11 +45,18 @@ fun buildAppDependencies(application: Application): AppDependencies {
     return AppDependencies(
         auth = auth,
         repositories = repositories,
+        caja = caja,
         mesas = mesas,
-        feDependencies = feDependencies,
-        creditNoteDependencies = creditNoteDependencies,
+        fiscal = FiscalDependencies(feDependencies, creditNoteDependencies),
         routingConfig = routingConfig,
     )
+}
+
+private fun buildCajaDependencies(): CajaDependencies {
+    val cajaRepository = CajaRepository()
+    val closeCajaUseCase = CloseCajaUseCase(cajaRepository)
+    val openCajaUseCase = OpenCajaUseCase(cajaRepository, closeCajaUseCase)
+    return CajaDependencies(cajaRepository, openCajaUseCase, closeCajaUseCase)
 }
 
 private fun buildMesasDependencies(feFactory: ElectronicInvoiceProcessorFactory): MesasDependencies {

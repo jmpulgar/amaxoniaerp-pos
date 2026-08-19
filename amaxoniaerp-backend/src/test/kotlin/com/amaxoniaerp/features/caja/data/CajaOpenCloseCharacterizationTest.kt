@@ -1,5 +1,7 @@
 package com.amaxoniaerp.features.caja.data
 
+import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
+import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreDetalleRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreFormaPagoRequest
@@ -42,6 +44,8 @@ import kotlin.test.assertTrue
  */
 class CajaOpenCloseCharacterizationTest {
     private val repository = CajaRepository()
+    private val closeCaja = CloseCajaUseCase(repository)
+    private val openCaja = OpenCajaUseCase(repository, closeCaja)
     private lateinit var database: Database
 
     @Before
@@ -99,7 +103,7 @@ class CajaOpenCloseCharacterizationTest {
     @Test
     fun `openCaja crea secuencia 000001 con detalle de apertura y retorna estado abierto`() =
         runBlocking {
-            val result = repository.openCaja(database, PA, DB, apertura(), "alice")
+            val result = openCaja.execute(database, PA, DB, apertura(), "alice")
 
             assertTrue(result.isSuccess)
             val status = result.getOrThrow()
@@ -134,8 +138,8 @@ class CajaOpenCloseCharacterizationTest {
     @Test
     fun `openCaja genera secuencias incrementales de seis digitos`() =
         runBlocking {
-            repository.openCaja(database, PA, DB, apertura(), "alice")
-            repository.openCaja(database, PA, DB, apertura(), "alice")
+            openCaja.execute(database, PA, DB, apertura(), "alice")
+            openCaja.execute(database, PA, DB, apertura(), "alice")
 
             val secuencias = secuenciaRows().mapNotNull { it[CajaSecuenciaTable.secuencia] }
             assertEquals(listOf("000001", "000002"), secuencias.sorted())
@@ -155,7 +159,7 @@ class CajaOpenCloseCharacterizationTest {
             seedMovimiento("mov-s", "S", 3.0)
             seedDevolucion("dev-1", FORMA_EF, 2.0)
 
-            val result = repository.openCaja(database, PA, DB, apertura(), "bob")
+            val result = openCaja.execute(database, PA, DB, apertura(), "bob")
 
             assertTrue(result.isSuccess)
             val nueva = result.getOrThrow()
@@ -194,7 +198,7 @@ class CajaOpenCloseCharacterizationTest {
     @Test
     fun `saveCajaCierre falla si la secuencia no existe`() =
         runBlocking {
-            val result = repository.saveCajaCierre(database, PA, cierreRequest(id = "missing"))
+            val result = closeCaja.close(database, PA, cierreRequest(id = "missing"))
 
             assertTrue(result.isFailure)
             assertEquals("Secuencia de caja no encontrada", result.exceptionOrNull()!!.message)
@@ -205,7 +209,7 @@ class CajaOpenCloseCharacterizationTest {
         runBlocking {
             seedSecuenciaCerrada()
 
-            val result = repository.saveCajaCierre(database, PA, cierreRequest(id = SEQ_CLOSED))
+            val result = closeCaja.close(database, PA, cierreRequest(id = SEQ_CLOSED))
 
             assertTrue(result.isFailure)
             assertEquals("La secuencia de caja ya se encuentra cerrada", result.exceptionOrNull()!!.message)
@@ -217,7 +221,7 @@ class CajaOpenCloseCharacterizationTest {
             seedSecuenciaAbierta(id = SEQ_OPEN, secuencia = "000001", montoApertura = 0.0)
             seedFactura("fac-temp", SEQ_OPEN, formaPago = "contado", codEstatus = 1)
 
-            val result = repository.saveCajaCierre(database, PA, cierreRequest(id = SEQ_OPEN))
+            val result = closeCaja.close(database, PA, cierreRequest(id = SEQ_OPEN))
 
             assertTrue(result.isFailure)
             assertEquals("Existen facturas temporales pendientes por procesar", result.exceptionOrNull()!!.message)
@@ -229,7 +233,7 @@ class CajaOpenCloseCharacterizationTest {
             seedSecuenciaAbierta(id = SEQ_OPEN, secuencia = "000001", montoApertura = 0.0)
             seedFactura("fac-cred", SEQ_OPEN, formaPago = "Credito", codEstatus = 1)
 
-            val result = repository.saveCajaCierre(database, PA, cierreRequest(id = SEQ_OPEN))
+            val result = closeCaja.close(database, PA, cierreRequest(id = SEQ_OPEN))
 
             assertTrue(result.isSuccess)
             assertTrue(secuenciaRows().single()[CajaSecuenciaTable.fechaCierre] != null)
@@ -258,7 +262,7 @@ class CajaOpenCloseCharacterizationTest {
                     numeroCierreFiscal = "Z-99",
                 )
 
-            val result = repository.saveCajaCierre(database, PA, request)
+            val result = closeCaja.close(database, PA, request)
 
             val response = result.getOrThrow()
             assertTrue(response.success)
