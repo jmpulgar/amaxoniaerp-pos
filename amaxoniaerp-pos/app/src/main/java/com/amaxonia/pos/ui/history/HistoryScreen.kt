@@ -67,6 +67,12 @@ import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.PosPalette
 
+/** Alto estimado de cada fila del detalle en la hoja inferior. */
+private const val DETALLE_ROW_HEIGHT_DP = 72
+
+/** Filas visibles como máximo dentro de la hoja de detalle. */
+private const val VISIBLE_DETALLE_ROWS = 8
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
@@ -873,7 +879,7 @@ private fun FacturaDetalleSheetContent(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height((items.size.coerceAtMost(8) * 72).dp),
+                            .height((items.size.coerceAtMost(VISIBLE_DETALLE_ROWS) * DETALLE_ROW_HEIGHT_DP).dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(items, key = { it.id }) { item ->

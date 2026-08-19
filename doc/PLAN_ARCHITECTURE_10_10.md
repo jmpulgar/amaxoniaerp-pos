@@ -729,8 +729,7 @@ short finalize DB phase
 
 ### TASK-043 — Caja
 
-> **ESTADO: COMPLETADA (2026-08-18).** Characterization tests H2 primero
-> (`CajaOpenCloseCharacterizationTest`: apertura/secuencia incremental, auto-close
+> **ESTADO: COMPLETADA (2026-08-18).** Characterization tests H2 primero> (`CajaOpenCloseCharacterizationTest`: apertura/secuencia incremental, auto-close
 > por nueva apertura con totales vigentes —incluido el doble conteo actual de
 > devoluciones—, validaciones de cierre, redondeo HALF_UP y reescritura de
 > detalles). Luego: `OpenCajaUseCase`/`CloseCajaUseCase` en `application/` con la
@@ -936,6 +935,21 @@ Eliminar service locator leakage sin over-engineering.
 ---
 
 ## FASE 7 — DETEKT BASELINE ZERO
+
+> **ESTADO: EN PROGRESO (2026-08-19) — TASK-070/073/074 hechos; quema 246→138 (-44%).**
+>
+> - **TASK-070** clasificación registrada: MagicNumber 76 (mayormente dp/sp en
+>   Compose), ReturnCount 38 (repositorios), LongMethod 36 (screens raíz),
+>   LongParameterList 11, CyclomaticComplexMethod 7, TooManyFunctions 6,
+>   TooGenericExceptionCaught 6, UnusedPrivateProperty 1.
+> - **TASK-074 hardware parsers**: `TheFactoryFiscalCommandBuilder` extraído puro
+>   (11 characterization tests; detectó error de transcripción en taxCodes),
+>   `TheFactoryPrinterImpl` queda sólo transporte TCP (-22 findings).
+> - **TASK-073/075 slices resueltos**: OfflineFirstProductRepository (policy+
+>   cache extraídos, -13), WelcomeScreen (split composables, -9), HistoryScreen
+>   MagicNumber (-2).
+> - Gates GREEN en cada slice (detekt/ktlint/tests). El baseline restante
+>   (138) sigue el burn-down progresivo del §6-P0; sin suppress nuevos.
 
 ### TASK-070 — Clasificar baseline
 
