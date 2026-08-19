@@ -12,11 +12,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import com.amaxonia.pos.composition.DependencyContainer
 import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.core.device.deviceClassFor
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.printer.RapidPayBridge
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.LocalDeviceClass
 import com.amaxonia.pos.ui.common.rememberDeviceClass
 import com.amaxonia.pos.ui.navigation.AppNavigation

@@ -7,7 +7,6 @@ import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.payment.PaymentSuccessViewModel
 import com.amaxonia.pos.ui.payment.PaymentViewModel
 

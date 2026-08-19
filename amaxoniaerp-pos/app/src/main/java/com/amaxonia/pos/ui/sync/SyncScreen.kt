@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
-import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.ui.common.injectedViewModel
 
 @Composable
@@ -38,7 +37,7 @@ fun SyncScreen(
 
     LaunchedEffect(Unit) {
         viewModel.startSyncIfNeeded {
-            SyncScheduler.schedulePeriodic(context)
+            AppGraph.sync.schedulePeriodic(context)
             onSyncCompleted()
         }
     }
@@ -71,7 +70,7 @@ fun SyncScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = {
                     viewModel.retry {
-                        SyncScheduler.schedulePeriodic(context)
+                        AppGraph.sync.schedulePeriodic(context)
                         onSyncCompleted()
                     }
                 }) {

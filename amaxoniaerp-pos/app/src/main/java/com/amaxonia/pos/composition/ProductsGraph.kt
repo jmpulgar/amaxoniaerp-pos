@@ -1,6 +1,5 @@
 package com.amaxonia.pos.composition
 
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.products.ProductFormViewModel
 import com.amaxonia.pos.ui.products.ProductListViewModel
 

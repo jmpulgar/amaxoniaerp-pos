@@ -866,6 +866,27 @@ Fallar test si `Screen.kt` o `ViewModel.kt` importa `DependencyContainer`.
 
 ## FASE 6 — ANDROID FEATURE CONSISTENCY
 
+> **ESTADO: COMPLETADA (2026-08-19) — TASK-060..065.**
+>
+> - **TASK-060 Cart**: verificado sin duplicación de pricing — la UI sólo
+>   formatea para display vía `BigDecimalMoneyFormatter` (domain); el negocio de
+>   carrito vive en coordinators + use cases de domain.
+> - **TASK-061 Dashboard**: composición ya fuera de la pantalla (FASE 5,
+>   `DashboardGraph`); coordinators pasan el deletion test (catalog/cart/caja
+>   coordinan múltiples repos/use cases cada uno).
+> - **TASK-062 Caja**: `CierreCajaViewModel` depende de use cases de domain
+>   (`CashClosePrintingService`/`CashCloseTicketPayloadBuilder`), no de printer
+>   factory; reimpresión del éxito centralizada en `PaymentGraph`.
+> - **TASK-063 Mesas**: VMs alineados con boundaries del backend (comanda→pedidos,
+>   cuenta→cuenta+pedidos+caja activa) construidos vía `MesasGraph`.
+> - **TASK-064 Credit notes**: `ProcessCreditNoteFiscalUseCase` se construye en
+>   `CreditNotesGraph`, no en el Composable.
+> - **TASK-065 Rest**: `DependencyContainer` movido de `ui/common` a
+>   `composition` (la composición ya no vive bajo ui); `SyncScheduler` (WorkManager)
+>   detrás de fachada `SyncGraph` — 3 pantallas dejaron de importar `data.sync`.
+>   `CompositionBoundaryArchitectureTest` congela además `ui !-> data`.
+> - Gates GREEN: detekt, ktlintCheck, testAmaxoniaDebugUnitTest, 3 flavors y kover.
+
 Orden recomendado:
 
 1. cart;

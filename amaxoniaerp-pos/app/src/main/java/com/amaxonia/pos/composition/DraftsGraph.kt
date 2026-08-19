@@ -1,6 +1,5 @@
 package com.amaxonia.pos.composition
 
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.drafts.DraftInvoicesViewModel
 
 /** Grafo del feature borradores de factura (TASK-051/052). */

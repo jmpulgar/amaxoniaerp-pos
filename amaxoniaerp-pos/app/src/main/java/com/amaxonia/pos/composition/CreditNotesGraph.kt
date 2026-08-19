@@ -1,7 +1,6 @@
 package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.creditnotes.CreditNotesViewModel
 
 /**

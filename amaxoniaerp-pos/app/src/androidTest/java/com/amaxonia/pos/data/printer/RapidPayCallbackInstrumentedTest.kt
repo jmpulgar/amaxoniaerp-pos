@@ -4,10 +4,10 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.amaxonia.pos.MainActivity
+import com.amaxonia.pos.composition.DependencyContainer
 import com.amaxonia.pos.core.telemetry.SaleEvent
 import com.amaxonia.pos.core.telemetry.SaleTelemetry
 import com.amaxonia.pos.core.telemetry.TelemetrySink
-import com.amaxonia.pos.ui.common.DependencyContainer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest

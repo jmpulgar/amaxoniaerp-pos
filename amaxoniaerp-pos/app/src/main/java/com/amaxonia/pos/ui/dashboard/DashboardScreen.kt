@@ -127,7 +127,6 @@ import coil.compose.AsyncImage
 import com.amaxonia.pos.R
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
-import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
@@ -206,7 +205,7 @@ fun DashboardScreen(
     var showSellerSheet by remember { mutableStateOf(false) }
     val productGridState = rememberLazyGridState()
     val productListState = rememberLazyListState()
-    val manualSyncInfos by SyncScheduler.getManualSyncWorkInfos(context).observeAsState(emptyList())
+    val manualSyncInfos by AppGraph.sync.manualSyncWorkInfos(context).observeAsState(emptyList())
     val isSyncRunning =
         manualSyncInfos.any { info ->
             info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
@@ -503,7 +502,7 @@ fun DashboardScreen(
                         }
                     }
                     DrawerMenuItem(Icons.Default.Refresh, "Actualizar datos") {
-                        SyncScheduler.enqueueManual(context)
+                        AppGraph.sync.enqueueManual(context)
                         scope.launch { drawerState.close() }
                     }
                 }

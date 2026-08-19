@@ -3,7 +3,6 @@ package com.amaxonia.pos.composition
 import com.amaxonia.pos.domain.repository.SelectedTableHolder
 import com.amaxonia.pos.domain.repository.TableAccountPayment
 import com.amaxonia.pos.domain.repository.TableAccountPaymentHolder
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.mesas.AreasMesasViewModel
 import com.amaxonia.pos.ui.mesas.ComandaViewModel
 import com.amaxonia.pos.ui.mesas.CuentaMesaViewModel

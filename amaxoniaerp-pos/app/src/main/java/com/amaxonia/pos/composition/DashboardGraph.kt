@@ -2,7 +2,6 @@ package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.dashboard.DashboardCajaCoordinator
 import com.amaxonia.pos.ui.dashboard.DashboardCartCoordinator
 import com.amaxonia.pos.ui.dashboard.DashboardCatalogCoordinator

@@ -1,4 +1,4 @@
-package com.amaxonia.pos.ui.common
+package com.amaxonia.pos.composition
 
 import android.content.Context
 import com.amaxonia.pos.data.local.LocalStore

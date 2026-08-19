@@ -1,7 +1,6 @@
 package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.data.remote.NetworkMonitor
-import com.amaxonia.pos.ui.common.DependencyContainer
 
 /**
  * Composition boundary de la app (TASK-050/051): único punto que las pantallas

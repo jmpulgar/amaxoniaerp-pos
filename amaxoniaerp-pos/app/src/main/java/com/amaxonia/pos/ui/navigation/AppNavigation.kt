@@ -27,7 +27,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
-import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.repository.TableAccountPayment
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.cart.CartScreen
@@ -111,7 +110,7 @@ fun AppNavigation(startDestination: String) {
         snackbarHostState.showSnackbar(
             message =
                 if (isOnline) {
-                    SyncScheduler.enqueuePendingInvoices(context)
+                    AppGraph.sync.enqueuePendingInvoices(context)
                     "Conexión restaurada. Reenviando pendientes..."
                 } else {
                     "Sin conexión. Puedes seguir trabajando offline."
@@ -146,8 +145,8 @@ fun AppNavigation(startDestination: String) {
             composable("select_company") {
                 CompanySelectionScreen(
                     onCompanySelected = {
-                        SyncScheduler.enqueueManual(context)
-                        SyncScheduler.schedulePeriodic(context)
+                        AppGraph.sync.enqueueManual(context)
+                        AppGraph.sync.schedulePeriodic(context)
                         // Limpia todo el stack y va a dashboard
                         navigateAndClearStack("dashboard")
                     },

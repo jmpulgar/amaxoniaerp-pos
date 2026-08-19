@@ -2,7 +2,6 @@ package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.domain.model.printer.TicketPrinter
 import com.amaxonia.pos.domain.repository.PrinterRepository
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.settings.SettingsViewModel
 
 /**

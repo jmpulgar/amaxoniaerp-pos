@@ -55,6 +55,33 @@ class CompositionBoundaryArchitectureTest {
         )
     }
 
+    @Test
+    fun `ui no importa implementaciones de data`() {
+        val violations =
+            kotlinFiles()
+                .filter { file ->
+                    file.parentFile
+                        ?.toRelativeString(
+                            KOTLIN_ROOT,
+                        )?.startsWith("com${File.separator}amaxonia${File.separator}pos${File.separator}ui") ==
+                        true
+                }.flatMap { file ->
+                    file
+                        .readText()
+                        .lines()
+                        .filter { it.startsWith(DATA_IMPORT_PREFIX) }
+                        .map { "${file.toRelativeString(KOTLIN_ROOT)}: ${it.trim()}" }
+                }
+
+        assertTrue(
+            buildString {
+                appendLine("Archivos bajo ui/ que importan data/ (la dirección canónica es ui -> domain):")
+                violations.forEach { appendLine("  - $it") }
+            },
+            violations.isEmpty(),
+        )
+    }
+
     private fun kotlinFiles(): List<File> =
         KOTLIN_ROOT
             .walkTopDown()
@@ -63,6 +90,7 @@ class CompositionBoundaryArchitectureTest {
 
     private companion object {
         val KOTLIN_ROOT: File = File("src/main/java").absoluteFile
-        const val CONTAINER_IMPORT = "import com.amaxonia.pos.ui.common.DependencyContainer"
+        const val CONTAINER_IMPORT = "import com.amaxonia.pos.composition.DependencyContainer"
+        const val DATA_IMPORT_PREFIX = "import com.amaxonia.pos.data."
     }
 }

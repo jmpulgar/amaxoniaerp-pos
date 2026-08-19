@@ -5,7 +5,6 @@ import com.amaxonia.pos.ui.cart.CartActionHandler
 import com.amaxonia.pos.ui.cart.CartConfigurationCoordinator
 import com.amaxonia.pos.ui.cart.CartStateCoordinator
 import com.amaxonia.pos.ui.cart.CartViewModel
-import com.amaxonia.pos.ui.common.DependencyContainer
 
 /**
  * Grafo del feature carrito (TASK-051/052): la misma construcción se usa en
