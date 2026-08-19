@@ -1,5 +1,6 @@
 package com.amaxoniaerp
 
+import com.amaxoniaerp.composition.buildAppDependencies
 import io.ktor.server.application.Application
 
 fun main(args: Array<String>) {
@@ -8,11 +9,10 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
-    configureFrameworks()
     configureHTTP()
     configureSecurity()
     configureMonitoring()
     configureSerialization()
     configureDatabases()
-    configureRouting()
+    configureRouting(buildAppDependencies(this))
 }

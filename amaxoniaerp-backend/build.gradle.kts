@@ -63,8 +63,6 @@ tasks.jacocoTestCoverageVerification {
 }
 
 dependencies {
-    implementation(libs.koin.ktor)
-    implementation(libs.koin.logger.slf4j)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.swagger)
     implementation(libs.ktor.server.cors)

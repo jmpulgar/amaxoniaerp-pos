@@ -644,6 +644,16 @@ Reglas:
 
 ### TASK-032 — Composition root backend
 
+> **ESTADO: COMPLETADA (2026-08-18).** Constructor DI manual como estrategia canónica única.
+> Crear `com.amaxoniaerp.composition` con `AppDependencies` (agrega `AuthDependencies`,
+> `Repositories`, `MesasDependencies`, `FeDependencies`, `CreditNoteDependencies`,
+> `RoutingConfig`) y `buildAppDependencies(application)` (factories: HttpClient FE con shutdown
+> en `ApplicationStopped`, processors PA/VE, credit notes, mesas + `ProcessSaleUseCase`,
+> assets base URLs). `Routing.kt` ya no construye infraestructura: `configureRouting(deps)`
+> sólo registra endpoints + StatusPages. `Application.module()` construye el grafo una vez.
+> Koin y `HelloService` eliminados (dependencies + version catalog) — no tenían uso real.
+> Gates GREEN: `build` completo (compile, ktlint, test, JaCoCo, detekt=0).
+
 Usar constructor DI manual como estrategia canónica.
 
 Crear:

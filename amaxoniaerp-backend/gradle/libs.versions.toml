@@ -1,7 +1,6 @@
 [versions]
 exposed = "0.61.0"
 h2 = "2.3.232"
-koin = "4.1.2-Beta1"
 kotlin = "2.2.21"
 kaml = "0.79.0"
 ktor = "3.3.2"
@@ -11,8 +10,6 @@ detekt = "1.23.8"
 ktlintGradle = "14.2.0"
 
 [libraries]
-koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
-koin-logger-slf4j = { module = "io.insert-koin:koin-logger-slf4j", version.ref = "koin" }
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
 ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
