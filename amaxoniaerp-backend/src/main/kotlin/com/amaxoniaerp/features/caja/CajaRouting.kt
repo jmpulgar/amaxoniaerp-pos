@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.caja
 
+import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
 import com.amaxoniaerp.core.tenant.requireUserId
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
@@ -68,7 +69,8 @@ internal class CajaHandlers(
             val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
             val userId = ctx.requireUserId(call) ?: return@run
 
-            val cajas = cajaRepository.getCajas(ctx.countryCode, companyDb, userId)
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val cajas = cajaRepository.getCajas(database, ctx.countryCode, userId)
             log.debug("Cajas listadas. companyDb={} userId={}", companyDb, userId)
             call.respond(HttpStatusCode.OK, cajas)
         }
@@ -85,7 +87,8 @@ internal class CajaHandlers(
                     .ifBlank { "Unknown" }
 
             val request = call.receive<AperturaRequest>()
-            val result = cajaRepository.openCaja(ctx.countryCode, companyDb, request, username)
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val result = cajaRepository.openCaja(database, ctx.countryCode, companyDb, request, username)
 
             result.fold(
                 onSuccess = { cajaSecuencia ->
@@ -115,7 +118,8 @@ internal class CajaHandlers(
                 return@run
             }
 
-            val cajaSecuencia = cajaRepository.getCajaStatus(ctx.countryCode, companyDb, idCaja)
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val cajaSecuencia = cajaRepository.getCajaStatus(database, companyDb, idCaja)
             if (cajaSecuencia != null) {
                 call.respond(
                     HttpStatusCode.OK,
@@ -140,7 +144,8 @@ internal class CajaHandlers(
                 return@run
             }
 
-            val summary = cajaRepository.getCajaSequenceSummary(ctx.countryCode, companyDb, idCaja)
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val summary = cajaRepository.getCajaSequenceSummary(database, ctx.countryCode, companyDb, idCaja)
             if (summary == null) {
                 call.respond(
                     HttpStatusCode.OK,
@@ -177,7 +182,8 @@ internal class CajaHandlers(
                     ?.let { it == "1" || it.equals("true", ignoreCase = true) }
                     ?: false
 
-            cajaRepository.getCajaSecuenciaData(ctx.countryCode, companyDb, id, verify).fold(
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            cajaRepository.getCajaSecuenciaData(database, ctx.countryCode, id, verify).fold(
                 onSuccess = { data ->
                     call.respond(HttpStatusCode.OK, CajaSecuenciaGetResponse(success = true, data = data))
                 },
@@ -202,7 +208,8 @@ internal class CajaHandlers(
                 return@run
             }
 
-            cajaRepository.getNextSecuenciaCodigo(ctx.countryCode, companyDb, idCaja).fold(
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            cajaRepository.getNextSecuenciaCodigo(database, idCaja).fold(
                 onSuccess = { codigo ->
                     call.respond(HttpStatusCode.OK, CajaSecuenciaCodigoResponse(codigo = codigo))
                 },
@@ -235,7 +242,8 @@ internal class CajaHandlers(
                     return@run
                 }
 
-            cajaRepository.saveCajaCierre(ctx.countryCode, companyDb, request).fold(
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            cajaRepository.saveCajaCierre(database, ctx.countryCode, request).fold(
                 onSuccess = { response ->
                     call.respond(HttpStatusCode.OK, response)
                 },
