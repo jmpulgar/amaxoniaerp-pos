@@ -66,12 +66,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceLineDto
 import com.amaxonia.pos.domain.model.payment.FormaPago
-import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.ConfirmedContainer
 import com.amaxonia.pos.ui.theme.ConfirmedContent
@@ -84,17 +83,7 @@ import com.amaxonia.pos.ui.theme.PosPalette
 fun CreditNotesScreen(
     viewModel: CreditNotesViewModel =
         injectedViewModel {
-            CreditNotesViewModel(
-                creditNoteRepository = DependencyContainer.creditNoteRepository,
-                cajaRepository = DependencyContainer.cajaRepository,
-                formaPagoRepository = DependencyContainer.formaPagoRepository,
-                processCreditNoteFiscal =
-                    ProcessCreditNoteFiscalUseCase(
-                        DependencyContainer.creditNoteRepository,
-                        DependencyContainer.printerFactory,
-                        DependencyContainer.posConfigurationRepository,
-                    ),
-            )
+            AppGraph.creditNotes.creditNotesViewModel()
         },
     onBack: () -> Unit,
 ) {

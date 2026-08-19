@@ -59,10 +59,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.PosPalette
@@ -70,7 +70,7 @@ import com.amaxonia.pos.ui.theme.PosPalette
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
-    viewModel: HistoryViewModel = injectedViewModel { HistoryViewModel(DependencyContainer.invoiceHistoryRepository) },
+    viewModel: HistoryViewModel = injectedViewModel { AppGraph.history.historyViewModel() },
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()

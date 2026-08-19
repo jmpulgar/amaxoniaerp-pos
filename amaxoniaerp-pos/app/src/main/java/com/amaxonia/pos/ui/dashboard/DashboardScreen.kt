@@ -125,14 +125,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkInfo
 import coil.compose.AsyncImage
 import com.amaxonia.pos.R
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
-import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.CategoryChipRow
@@ -160,37 +159,7 @@ private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 fun DashboardScreen(
     viewModel: DashboardViewModel =
         injectedViewModel {
-            val cajaCoordinator =
-                DashboardCajaCoordinator(
-                    DependencyContainer.cajaRepository,
-                    DependencyContainer.cartRepository,
-                    DependencyContainer.cashClosePrintingService,
-                    DependencyContainer.cashCloseTicketPayloadBuilder,
-                    DependencyContainer.networkMonitor,
-                )
-            DashboardViewModel(
-                catalogCoordinator =
-                    DashboardCatalogCoordinator(
-                        DependencyContainer.productRepository,
-                        DependencyContainer.reportRepository,
-                        DependencyContainer.posConfigurationRepository,
-                        DependencyContainer.serverEnvironment,
-                        DashboardProductMapper(DependencyContainer.imageUrlResolver),
-                    ),
-                cartCoordinator =
-                    DashboardCartCoordinator(
-                        DependencyContainer.promotionRepository,
-                        DependencyContainer.cartRepository,
-                        ResolveClientBranchesUseCase(
-                            DependencyContainer.posConfigurationRepository,
-                            DependencyContainer.clientBranchRepository,
-                        ),
-                        DependencyContainer.refreshCartProductLotsUseCase,
-                        cajaCoordinator,
-                        DependencyContainer.appClock,
-                    ),
-                cajaCoordinator = cajaCoordinator,
-            )
+            AppGraph.dashboard.dashboardViewModel()
         },
     onLogout: () -> Unit,
     onNavigateToClients: () -> Unit,
@@ -216,19 +185,19 @@ fun DashboardScreen(
     }
     // Abre el diálogo de apertura cuando se solicita desde otra pantalla
     // (p. ej. "Aperturar nueva caja" tras el cierre).
-    val pendingApertura by DependencyContainer.pendingAperturaRequest.collectAsStateWithLifecycle()
+    val pendingApertura by AppGraph.dashboard.pendingAperturaRequest.collectAsStateWithLifecycle()
     LaunchedEffect(pendingApertura) {
         if (pendingApertura) {
             viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive)
-            DependencyContainer.consumeAperturaRequest()
+            AppGraph.dashboard.consumeAperturaRequest()
         }
     }
     // Abre el selector de caja cuando otra pantalla lo solicita (p. ej. "Áreas y mesas" sin caja).
-    val pendingCajaSelector by DependencyContainer.pendingCajaSelectorRequest.collectAsStateWithLifecycle()
+    val pendingCajaSelector by AppGraph.dashboard.pendingCajaSelectorRequest.collectAsStateWithLifecycle()
     LaunchedEffect(pendingCajaSelector) {
         if (pendingCajaSelector) {
             viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true))
-            DependencyContainer.consumeCajaSelectorRequest()
+            AppGraph.dashboard.consumeCajaSelectorRequest()
         }
     }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)

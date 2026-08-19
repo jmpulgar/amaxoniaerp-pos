@@ -21,15 +21,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.data.sync.SyncScheduler
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 
 @Composable
 fun SyncScreen(
     viewModel: SyncViewModel =
         injectedViewModel {
-            SyncViewModel(DependencyContainer.catalogSyncer)
+            AppGraph.sync.syncViewModel()
         },
     onSyncCompleted: () -> Unit,
 ) {

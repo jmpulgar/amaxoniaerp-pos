@@ -44,8 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.DraftInvoice
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -63,10 +63,7 @@ fun DraftInvoicesScreen(
     onDraftLoaded: () -> Unit,
     viewModel: DraftInvoicesViewModel =
         injectedViewModel {
-            DraftInvoicesViewModel(
-                DependencyContainer.draftInvoiceRepository,
-                DependencyContainer.restoreDraftInvoiceUseCase,
-            )
+            AppGraph.drafts.draftInvoicesViewModel()
         },
 ) {
     val drafts by viewModel.drafts.collectAsStateWithLifecycle()

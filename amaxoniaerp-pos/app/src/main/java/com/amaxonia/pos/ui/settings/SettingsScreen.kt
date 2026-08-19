@@ -67,8 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.R
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.printer.PrinterType
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.InfoBlue
 import com.amaxonia.pos.ui.theme.InfoCyan
@@ -82,10 +82,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel =
         injectedViewModel {
-            SettingsViewModel(
-                settingsRepository = DependencyContainer.posConfigurationRepository,
-                fiscalDiagnostics = DependencyContainer.fiscalDeviceDiagnostics,
-            )
+            AppGraph.settings.settingsViewModel()
         },
 ) {
     val selectedPrinterType by viewModel.selectedPrinterType.collectAsStateWithLifecycle()
@@ -694,7 +691,7 @@ fun SettingsScreen(
                                     }
                                 }
                                 if (selectedPrinterType == PrinterType.SUNMI_V2) {
-                                    val ticketPrinter = DependencyContainer.printerFactory.getActiveTicketPrinter()
+                                    val ticketPrinter = AppGraph.settings.activeTicketPrinter()
                                     val result = ticketPrinter?.printText(brandPrintTestMessage)
                                     if (result is com.amaxonia.pos.domain.model.printer.PrintResult.Success) {
                                         snackbarHostState.showSnackbar(
@@ -709,7 +706,7 @@ fun SettingsScreen(
                                         )
                                     }
                                 } else {
-                                    val printer = DependencyContainer.printerFactory.getActivePrinter()
+                                    val printer = AppGraph.settings.activePrinter()
                                     if (printer == null) {
                                         snackbarHostState.showSnackbar(
                                             "Impresora no disponible. Verifica la conexion.",

@@ -47,9 +47,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.repository.Department
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.FormSection
 import com.amaxonia.pos.ui.common.components.PosDropdown
@@ -62,7 +62,7 @@ import java.util.Locale
 @Composable
 fun ProductFormScreen(
     productId: String?,
-    viewModel: ProductFormViewModel = injectedViewModel { ProductFormViewModel(DependencyContainer.productRepository) },
+    viewModel: ProductFormViewModel = injectedViewModel { AppGraph.products.productFormViewModel() },
     onBack: () -> Unit,
     onSaveSuccess: () -> Unit,
 ) {

@@ -25,20 +25,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
-import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
-import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.data.sync.SyncScheduler
-import com.amaxonia.pos.domain.model.printer.PrintResult
-import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.repository.TableAccountPayment
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.cart.CartScreen
-import com.amaxonia.pos.ui.cart.CartViewModel
 import com.amaxonia.pos.ui.clients.ClientFormScreen
 import com.amaxonia.pos.ui.clients.ClientListScreen
 import com.amaxonia.pos.ui.clients.ClientSelectionScreen
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.company.CompanySelectionScreen
 import com.amaxonia.pos.ui.creditnotes.CreditNotesScreen
 import com.amaxonia.pos.ui.dashboard.DashboardScreen
@@ -47,9 +42,7 @@ import com.amaxonia.pos.ui.history.HistoryScreen
 import com.amaxonia.pos.ui.login.LoginScreen
 import com.amaxonia.pos.ui.mesas.AreasMesasScreen
 import com.amaxonia.pos.ui.mesas.ComandaScreen
-import com.amaxonia.pos.ui.mesas.ComandaViewModel
 import com.amaxonia.pos.ui.mesas.CuentaMesaScreen
-import com.amaxonia.pos.ui.mesas.CuentaMesaViewModel
 import com.amaxonia.pos.ui.payment.PaymentScreen
 import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
@@ -70,10 +63,10 @@ fun AppNavigation(startDestination: String) {
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val cartRepository = DependencyContainer.cartRepository
+    val cartRepository = AppGraph.dashboard.cartRepository
     val snackbarHostState = remember { SnackbarHostState() }
-    val isOnline by DependencyContainer.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
-        initialValue = DependencyContainer.networkMonitor.isOnline(),
+    val isOnline by AppGraph.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
+        initialValue = AppGraph.networkMonitor.isOnline(),
     )
     var hasSeenConnectivityState by remember { mutableStateOf(false) }
 
@@ -174,9 +167,7 @@ fun AppNavigation(startDestination: String) {
                 DashboardScreen(
                     onLogout = {
                         scope.launch {
-                            DependencyContainer.cartRepository.clearCart()
-                            DependencyContainer.cajaRepository.clearActiveCaja()
-                            DependencyContainer.authRepository.logout()
+                            AppGraph.dashboard.logout()
                             navigateAndClearStack("welcome")
                         }
                     },
@@ -200,7 +191,7 @@ fun AppNavigation(startDestination: String) {
                     onBack = { navController.popBackStack() },
                     onSelectCaja = {
                         // Sin caja no hay sucursal: se reutiliza el selector de caja del Dashboard.
-                        DependencyContainer.requestCajaSelectorOnDashboard()
+                        AppGraph.dashboard.requestCajaSelectorOnDashboard()
                         navigateAndClearStack("dashboard")
                     },
                     // Fase 3 - Comanda: al tener sesión activa para la mesa, navegamos a la
@@ -229,46 +220,15 @@ fun AppNavigation(startDestination: String) {
                 val areaId = entry.arguments?.getInt("areaId") ?: return@composable
                 val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
                 val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
-                val selected = DependencyContainer.selectedTableHolder.selectedTable.value
+                val selected = AppGraph.mesas.selectedTableHolder.selectedTable.value
                 val mesaNombre = selected?.mesa?.displayName ?: "Mesa $mesaId"
                 val comandaViewModel =
                     remember {
-                        ComandaViewModel(
-                            areaId = areaId,
-                            mesaId = mesaId,
-                            sesionId = sesionId,
-                            pedidosMesaRepository = DependencyContainer.pedidosMesaRepository,
-                            cartRepository = DependencyContainer.cartRepository,
-                            activeCajaReader = DependencyContainer.cajaRepository,
-                            connectivity = DependencyContainer.networkMonitor,
-                        )
+                        AppGraph.mesas.comandaViewModel(areaId, mesaId, sesionId)
                     }
                 val cartViewModel =
                     remember {
-                        CartViewModel(
-                            stateCoordinator =
-                                com.amaxonia.pos.ui.cart.CartStateCoordinator(
-                                    DependencyContainer.cartRepository,
-                                    DependencyContainer.clientRepository,
-                                    DependencyContainer.posConfigurationRepository,
-                                    DependencyContainer.clientBranchRepository,
-                                    com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase(
-                                        DependencyContainer.posConfigurationRepository,
-                                        DependencyContainer.imageUrlResolver,
-                                    ),
-                                ),
-                            configurationCoordinator =
-                                com.amaxonia.pos.ui.cart.CartConfigurationCoordinator(
-                                    DependencyContainer.posConfigurationRepository,
-                                    DependencyContainer.cajaRepository,
-                                ),
-                            actionHandler =
-                                com.amaxonia.pos.ui.cart.CartActionHandler(
-                                    DependencyContainer.cartRepository,
-                                    DependencyContainer.refreshCartProductLotsUseCase,
-                                    DependencyContainer.saveDraftInvoiceUseCase,
-                                ),
-                        )
+                        AppGraph.cart.cartViewModel()
                     }
                 ComandaScreen(
                     mesaNombre = mesaNombre,
@@ -294,18 +254,11 @@ fun AppNavigation(startDestination: String) {
                 val areaId = entry.arguments?.getInt("areaId") ?: return@composable
                 val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
                 val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
-                val selected = DependencyContainer.selectedTableHolder.selectedTable.value
+                val selected = AppGraph.mesas.selectedTableHolder.selectedTable.value
                 val client by cartRepository.selectedClient.collectAsStateWithLifecycle()
                 val cuentaViewModel =
                     remember(areaId, mesaId, sesionId) {
-                        CuentaMesaViewModel(
-                            areaId = areaId,
-                            mesaId = mesaId,
-                            sesionId = sesionId,
-                            cuentasRepository = DependencyContainer.cuentaMesaRepository,
-                            pedidosRepository = DependencyContainer.pedidosMesaRepository,
-                            activeCajaReader = DependencyContainer.cajaRepository,
-                        )
+                        AppGraph.mesas.cuentaMesaViewModel(areaId, mesaId, sesionId)
                     }
                 CuentaMesaScreen(
                     mesaNombre = selected?.mesa?.displayName ?: "Mesa $mesaId",
@@ -315,7 +268,7 @@ fun AppNavigation(startDestination: String) {
                     onBack = { navController.popBackStack() },
                     onSelectClient = { navController.navigate("client_selection_mode") },
                     onPay = { cuenta ->
-                        DependencyContainer.tableAccountPaymentHolder.select(
+                        AppGraph.mesas.selectTableAccountForPayment(
                             TableAccountPayment(areaId, mesaId, sesionId, cuenta),
                         )
                         navController.navigate("payment/${cuenta.total}")
@@ -347,7 +300,7 @@ fun AppNavigation(startDestination: String) {
                     },
                     onOpenNewCaja = {
                         // Pide al Dashboard abrir el diálogo de apertura al recibir foco.
-                        DependencyContainer.requestAperturaOnDashboard()
+                        AppGraph.dashboard.requestAperturaOnDashboard()
                         navigateAndClearStack("dashboard")
                     },
                 )
@@ -462,19 +415,14 @@ fun AppNavigation(startDestination: String) {
                     onBack = { navController.popBackStack() },
                     onPaymentSuccess = { payload ->
                         scope.launch {
-                            DependencyContainer.tableAccountPaymentHolder.clear()
-                            if (payload.tableSessionClosed) {
-                                DependencyContainer.selectedTableHolder.clear()
-                                DependencyContainer.cartRepository.clearCart()
-                            }
-                            DependencyContainer.localStore.saveLastPaymentSuccess(payload)
+                            AppGraph.payment.handlePaymentSuccess(payload)
                             navController.navigate("payment_success/${payload.transactionId}") {
                                 popUpTo("dashboard") { inclusive = false }
                             }
                         }
                     },
                     onNavigateToApertura = {
-                        DependencyContainer.requestAperturaOnDashboard()
+                        AppGraph.dashboard.requestAperturaOnDashboard()
                         navigateAndClearStack("dashboard")
                     },
                 )
@@ -493,63 +441,7 @@ fun AppNavigation(startDestination: String) {
                 SuccessScreen(
                     transactionId = backStackEntry.arguments?.getString("transactionId").orEmpty(),
                     onPrintReceipt = { trxId ->
-                        val selectedPrinter = DependencyContainer.localStore.readSelectedPrinterType()
-                        if (selectedPrinter == PrinterType.SUNMI_V2) {
-                            val ticketPrinter =
-                                DependencyContainer.printerFactory.getActiveTicketPrinter()
-                                    ?: return@SuccessScreen Result.failure(IllegalStateException("Impresora SUNMI no disponible"))
-                            val payloadResult = DependencyContainer.salesRepository.getPrintPayload(trxId)
-                            if (payloadResult.isFailure) {
-                                Result.failure(
-                                    payloadResult.exceptionOrNull() ?: IllegalStateException("No se pudo obtener el payload de impresión"),
-                                )
-                            } else {
-                                val payload = payloadResult.getOrThrow()
-                                val countryCode =
-                                    DependencyContainer.localStore
-                                        .readSelectedCountry()
-                                        ?.code
-                                        .orEmpty()
-                                // FASE 2 (Punto 3) — Selector por país en reimpresión SUNMI_V2.
-                                //   - VE → VenezuelaInvoiceTicketFormatter (factura digital HKA, 40 cols)
-                                //   - PA → PanamaInvoiceTicketFormatter (CAFE/DGI/QR)
-                                //   - OTRO → se conserva el formatter por defecto que tenía el sistema
-                                //            antes de esta integración (PanamaInvoiceTicketFormatter),
-                                //            para NO romper países distintos de VE/PA.
-                                val ticket =
-                                    when (countryCode.uppercase()) {
-                                        "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
-                                        "PA" -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
-                                        else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
-                                    }
-                                when (val printResult = ticketPrinter.printTicket(ticket)) {
-                                    PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
-                                    is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))
-                                }
-                            }
-                        } else {
-                            val transactionResult = DependencyContainer.transactionRepository.getTransactionById(trxId)
-                            if (transactionResult.isFailure) {
-                                Result.failure(
-                                    transactionResult.exceptionOrNull() ?: IllegalStateException("No se encontro la transaccion"),
-                                )
-                            } else {
-                                val printer = DependencyContainer.printerFactory.getActivePrinter()
-                                if (printer == null) {
-                                    Result.failure(IllegalStateException("No hay impresora configurada"))
-                                } else {
-                                    val transaction = transactionResult.getOrThrow()
-                                    printer.printReceipt(transaction).fold(
-                                        onSuccess = {
-                                            Result.success("Imprimiendo recibo...")
-                                        },
-                                        onFailure = { error ->
-                                            Result.failure(error)
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                        AppGraph.payment.printSuccessReceipt(trxId)
                     },
                     onNextOrder = {
                         cartRepository.clearCart()

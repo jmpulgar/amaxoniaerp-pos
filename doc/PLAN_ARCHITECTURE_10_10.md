@@ -800,6 +800,27 @@ Auditar country selection, HKA/digital policy, results, timeout/retry y SQL/HTTP
 
 ## FASE 5 — ANDROID COMPOSITION ROOT
 
+> **ESTADO: COMPLETADA (2026-08-19) — TASK-050/051/052/053/054.**
+>
+> - **TASK-050/051**: package `composition` con `AppGraph` como boundary único y
+>   feature graphs ligeros (plain Kotlin: login, company, dashboard, cart, caja,
+>   mesas, payment, clients, products, creditNotes, drafts, history, reports,
+>   settings, sync) que centralizan la construcción de ViewModels/coordinators.
+>   `DependencyContainer` deja de consumirse desde screens/navigation (22 archivos
+>   migrados); sólo queda en `MainActivity`/instrumented tests (entrypoints de
+>   plataforma permitidos) y en los propios graphs (composition).
+> - **TASK-052/053**: construcción por constructor injection desde el graph; sin
+>   `DependencyContainer` dentro de ViewModels; la navegación delega orquestación
+>   de infraestructura (logout, post-pago, reimpresión SUNMI/genérica, eventos
+>   one-shot de apertura/selector de caja) a los graphs.
+> - **TASK-054**: `CompositionBoundaryArchitectureTest` congela el boundary
+>   (screens/ViewModels y todo `ui/` sin importar `DependencyContainer`).
+> - Detekt baseline regenerado: mismos findings de deuda con firmas actualizadas
+>   (246→181 entradas; se limpiaron 51 entradas obsoletas de deuda ya resuelta);
+>   sin deuda nueva fuera de baseline.
+> - Gates GREEN: detekt, ktlintCheck, testAmaxoniaDebugUnitTest, assemble de los
+>   3 flavors debug y koverVerifyAmaxoniaDebug.
+
 ### TASK-050 — Prohibir `DependencyContainer` en screens
 
 Target: acceso sólo desde composition/platform entrypoints.

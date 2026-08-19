@@ -65,9 +65,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosStatusBadge
@@ -105,11 +105,7 @@ fun SuccessScreen(
 ) {
     val viewModel =
         injectedViewModel {
-            PaymentSuccessViewModel(
-                paymentSuccessRepository = DependencyContainer.posConfigurationRepository,
-                salesRepository = DependencyContainer.salesRepository,
-                transactionId = transactionId,
-            )
+            AppGraph.payment.paymentSuccessViewModel(transactionId)
         }
 
     val uiState by viewModel.state.collectAsStateWithLifecycle()

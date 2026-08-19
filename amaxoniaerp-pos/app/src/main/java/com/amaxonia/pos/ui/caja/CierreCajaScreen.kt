@@ -64,9 +64,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.AccentPurple
@@ -81,11 +81,7 @@ import com.amaxonia.pos.ui.theme.WarningOrange
 fun CierreCajaScreen(
     viewModel: CierreCajaViewModel =
         injectedViewModel {
-            CierreCajaViewModel(
-                DependencyContainer.cajaRepository,
-                DependencyContainer.cashClosePrintingService,
-                DependencyContainer.cashCloseTicketPayloadBuilder,
-            )
+            AppGraph.caja.cierreCajaViewModel()
         },
     onBack: () -> Unit,
     onCloseSuccess: () -> Unit,

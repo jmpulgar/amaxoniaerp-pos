@@ -37,9 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.ForeignIdType
 import com.amaxonia.pos.domain.model.TaxpayerType
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.FormSection
 import com.amaxonia.pos.ui.common.components.PosDropdown
 import com.amaxonia.pos.ui.common.components.PosTextInput
@@ -51,11 +51,7 @@ fun ClientFormScreen(
     clientId: String?,
     viewModel: ClientFormViewModel =
         injectedViewModel {
-            ClientFormViewModel(
-                DependencyContainer.clientRepository,
-                DependencyContainer.addressCatalogRepository,
-                DependencyContainer.clientFormCatalogSource,
-            )
+            AppGraph.clients.clientFormViewModel()
         },
     onBack: () -> Unit,
     onSaveSuccess: () -> Unit,

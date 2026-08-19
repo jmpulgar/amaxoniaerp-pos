@@ -50,8 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.Company
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,10 +59,7 @@ import com.amaxonia.pos.ui.common.injectedViewModel
 fun CompanySelectionScreen(
     viewModel: CompanySelectionViewModel =
         injectedViewModel {
-            CompanySelectionViewModel(
-                DependencyContainer.companyRepository,
-                DependencyContainer.authRepository,
-            )
+            AppGraph.company.companySelectionViewModel()
         },
     onCompanySelected: () -> Unit,
     onBack: () -> Unit,

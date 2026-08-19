@@ -58,9 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.ProductStock
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 
@@ -69,11 +69,7 @@ import com.amaxonia.pos.ui.theme.PosPalette
 fun ProductListScreen(
     viewModel: ProductListViewModel =
         injectedViewModel {
-            ProductListViewModel(
-                DependencyContainer.productRepository,
-                DependencyContainer.posConfigurationRepository,
-                DependencyContainer.imageUrlResolver,
-            )
+            AppGraph.products.productListViewModel()
         },
     onBack: () -> Unit,
     onNavigateToForm: (String?) -> Unit,

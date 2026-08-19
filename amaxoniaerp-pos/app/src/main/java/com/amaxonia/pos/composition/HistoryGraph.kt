@@ -1,0 +1,9 @@
+package com.amaxonia.pos.composition
+
+import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.ui.history.HistoryViewModel
+
+/** Grafo del feature historial de ventas (TASK-051/052). */
+object HistoryGraph {
+    fun historyViewModel(): HistoryViewModel = HistoryViewModel(DependencyContainer.invoiceHistoryRepository)
+}

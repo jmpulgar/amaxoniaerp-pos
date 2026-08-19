@@ -72,11 +72,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
-import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.CartEmptyState
@@ -96,30 +95,7 @@ private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
 fun CartScreen(
     viewModel: CartViewModel =
         injectedViewModel {
-            CartViewModel(
-                stateCoordinator =
-                    CartStateCoordinator(
-                        DependencyContainer.cartRepository,
-                        DependencyContainer.clientRepository,
-                        DependencyContainer.posConfigurationRepository,
-                        DependencyContainer.clientBranchRepository,
-                        ResolveClientImageUrlUseCase(
-                            DependencyContainer.posConfigurationRepository,
-                            DependencyContainer.imageUrlResolver,
-                        ),
-                    ),
-                configurationCoordinator =
-                    CartConfigurationCoordinator(
-                        DependencyContainer.posConfigurationRepository,
-                        DependencyContainer.cajaRepository,
-                    ),
-                actionHandler =
-                    CartActionHandler(
-                        DependencyContainer.cartRepository,
-                        DependencyContainer.refreshCartProductLotsUseCase,
-                        DependencyContainer.saveDraftInvoiceUseCase,
-                    ),
-            )
+            AppGraph.cart.cartViewModel()
         },
     onBack: () -> Unit,
     onCheckout: (Double) -> Unit,

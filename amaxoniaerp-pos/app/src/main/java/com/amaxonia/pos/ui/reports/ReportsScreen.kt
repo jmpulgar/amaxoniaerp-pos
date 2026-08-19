@@ -52,9 +52,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
@@ -68,7 +68,7 @@ private const val BEST_SELLER_AMOUNT_WEIGHT = 0.6f
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
-    viewModel: ReportsViewModel = injectedViewModel { ReportsViewModel(DependencyContainer.reportRepository) },
+    viewModel: ReportsViewModel = injectedViewModel { AppGraph.reports.reportsViewModel() },
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()

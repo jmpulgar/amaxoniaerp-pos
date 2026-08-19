@@ -95,14 +95,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
-import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
-import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
@@ -133,20 +131,7 @@ fun PaymentScreen(
     // Instancia del ViewModel usando inyección de dependencias
     val viewModel =
         injectedViewModel {
-            PaymentViewModel(
-                loadPaymentContext =
-                    LoadPaymentContextUseCase(
-                        DependencyContainer.cajaRepository,
-                        DependencyContainer.formaPagoRepository,
-                    ),
-                loadPaymentCountry = LoadPaymentCountryUseCase(DependencyContainer.localStore),
-                validatePayment = DependencyContainer.validatePaymentUseCase,
-                buildPaymentDetails = DependencyContainer.buildPaymentDetailsUseCase,
-                paymentOperation = DependencyContainer.paymentOperation,
-                selectedClient = DependencyContainer.cartRepository.selectedClient,
-                tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
-                cartFinancialSnapshot = DependencyContainer.cartRepository.financialSnapshot,
-            )
+            AppGraph.payment.paymentViewModel()
         }
 
     val context = LocalContext.current

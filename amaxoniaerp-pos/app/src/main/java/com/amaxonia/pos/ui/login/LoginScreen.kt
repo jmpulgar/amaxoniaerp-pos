@@ -56,9 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.R
-import com.amaxonia.pos.domain.usecase.auth.AuthenticateUserUseCase
-import com.amaxonia.pos.domain.usecase.auth.ConfigureLoginCountryUseCase
-import com.amaxonia.pos.ui.common.DependencyContainer
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.login.components.CountrySelector
 import com.amaxonia.pos.ui.theme.PosPalette
@@ -67,10 +65,7 @@ import com.amaxonia.pos.ui.theme.PosPalette
 fun LoginScreen(
     viewModel: LoginViewModel =
         injectedViewModel {
-            LoginViewModel(
-                AuthenticateUserUseCase(DependencyContainer.authRepository, DependencyContainer.localStore),
-                ConfigureLoginCountryUseCase(DependencyContainer.serverEnvironment, DependencyContainer.localStore),
-            )
+            AppGraph.login.loginViewModel()
         },
     onLoginSuccess: () -> Unit,
     onBack: () -> Unit,

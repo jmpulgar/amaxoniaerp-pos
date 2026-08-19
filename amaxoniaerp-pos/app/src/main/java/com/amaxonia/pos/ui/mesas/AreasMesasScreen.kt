@@ -64,8 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.mesas.Mesa
-import com.amaxonia.pos.ui.common.DependencyContainer
 import com.amaxonia.pos.ui.common.injectedViewModel
 
 /** Ancho mínimo de tile para el grid de mesas: 2 columnas en 320dp, 3 en 480dp, más en tablet. */
@@ -84,13 +84,7 @@ private val MESA_GRID_MIN_TILE = 150.dp
 fun AreasMesasScreen(
     viewModel: AreasMesasViewModel =
         injectedViewModel {
-            AreasMesasViewModel(
-                DependencyContainer.areaRepository,
-                DependencyContainer.cajaRepository,
-                DependencyContainer.networkMonitor,
-                DependencyContainer.selectedTableHolder,
-                DependencyContainer.sesionMesaRepository,
-            )
+            AppGraph.mesas.areasMesasViewModel()
         },
     onBack: () -> Unit,
     onSelectCaja: () -> Unit,
