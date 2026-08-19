@@ -1368,9 +1368,12 @@ private fun decodeBase64Image(imageData: String?): ImageBitmap? {
     if (imageData.isNullOrBlank()) return null
     return try {
         val normalized = imageData.substringAfter("base64,", imageData).trim()
-        if (normalized.isBlank()) return null
-        val bytes = Base64.decode(normalized, Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        if (normalized.isBlank()) {
+            null
+        } else {
+            val bytes = Base64.decode(normalized, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
     } catch (_: IllegalArgumentException) {
         null
     }

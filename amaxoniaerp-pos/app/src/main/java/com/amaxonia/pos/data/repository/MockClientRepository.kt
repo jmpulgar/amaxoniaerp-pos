@@ -23,16 +23,18 @@ class MockClientRepository : ClientRepository {
         pageSize: Int,
     ): Result<List<Client>> {
         simulateNetworkDelay()
-        if (shouldSimulateError()) {
-            return Result.failure(Exception("Error al cargar clientes desde el servidor"))
+        return when {
+            shouldSimulateError() -> Result.failure(Exception("Error al cargar clientes desde el servidor"))
+            else -> {
+                val start = (page - 1) * pageSize
+                val end = (start + pageSize).coerceAtMost(mockClients.size)
+                if (start >= mockClients.size) {
+                    Result.success(emptyList())
+                } else {
+                    Result.success(mockClients.subList(start, end).toList())
+                }
+            }
         }
-        val start = (page - 1) * pageSize
-        val end = (start + pageSize).coerceAtMost(mockClients.size)
-        if (start >= mockClients.size) {
-            return Result.success(emptyList())
-        }
-        val paginatedClients = mockClients.subList(start, end)
-        return Result.success(paginatedClients.toList())
     }
 
     override suspend fun getClientById(id: String): Result<Client> {
@@ -91,10 +93,10 @@ class MockClientRepository : ClientRepository {
             }
         val start = (page - 1) * pageSize
         val end = (start + pageSize).coerceAtMost(filtered.size)
-        if (start >= filtered.size) {
-            return Result.success(emptyList())
+        return when {
+            start >= filtered.size -> Result.success(emptyList())
+            else -> Result.success(filtered.subList(start, end).toList())
         }
-        return Result.success(filtered.subList(start, end).toList())
     }
 
     override suspend fun saveClient(client: Client): Result<Unit> {

@@ -157,47 +157,47 @@ class SettingsViewModel(
     }
 
     suspend fun loadGatewayOptions(): Result<List<GatewayOption>> {
-        val diagnostics =
-            fiscalDiagnostics ?: return Result.failure(
-                IllegalStateException("Cliente de pasarela HKA no disponible"),
-            )
+        val diagnostics = fiscalDiagnostics
         val current = _theFactorySettings.value
-        val savedGateway =
-            current.gatewayKey
-                .takeIf { it.isNotBlank() }
-                ?.let { key ->
-                    GatewayOption(
-                        key = key,
-                        label = current.gatewayLabel.ifBlank { "Pasarela $key" },
-                    )
-                }
-        if (current.ipAddress.isBlank() || current.port.toIntOrNull() == null) {
-            return Result.failure(IllegalStateException("Guarda IP y puerto antes de consultar pasarelas"))
-        }
-
-        _isLoadingGateways.value = true
-        return diagnostics
-            .gateways()
-            .onSuccess { list ->
-                val options = if (list.isNotEmpty()) list else savedGateway?.let(::listOf).orEmpty()
-                _gatewayOptions.value = options
-                if (current.gatewayKey.isBlank()) {
-                    val first = options.firstOrNull()
-                    if (first != null) {
-                        onGatewaySelected(first)
+        return when {
+            diagnostics == null -> Result.failure(IllegalStateException("Cliente de pasarela HKA no disponible"))
+            current.ipAddress.isBlank() || current.port.toIntOrNull() == null ->
+                Result.failure(IllegalStateException("Guarda IP y puerto antes de consultar pasarelas"))
+            else -> {
+                val savedGateway =
+                    current.gatewayKey
+                        .takeIf { it.isNotBlank() }
+                        ?.let { key ->
+                            GatewayOption(
+                                key = key,
+                                label = current.gatewayLabel.ifBlank { "Pasarela $key" },
+                            )
+                        }
+                _isLoadingGateways.value = true
+                diagnostics
+                    .gateways()
+                    .onSuccess { list ->
+                        val options = if (list.isNotEmpty()) list else savedGateway?.let(::listOf).orEmpty()
+                        _gatewayOptions.value = options
+                        if (current.gatewayKey.isBlank()) {
+                            val first = options.firstOrNull()
+                            if (first != null) {
+                                onGatewaySelected(first)
+                            }
+                        }
+                    }.onFailure { throwable ->
+                        _errorMessage.value = throwable.message ?: "No se pudo consultar pasarelas"
+                        if (_gatewayOptions.value.isEmpty()) {
+                            _gatewayOptions.value = savedGateway?.let(::listOf).orEmpty()
+                            if (current.gatewayKey.isBlank()) {
+                                savedGateway?.let(::onGatewaySelected)
+                            }
+                        }
+                    }.also {
+                        _isLoadingGateways.value = false
                     }
-                }
-            }.onFailure { throwable ->
-                _errorMessage.value = throwable.message ?: "No se pudo consultar pasarelas"
-                if (_gatewayOptions.value.isEmpty()) {
-                    _gatewayOptions.value = savedGateway?.let(::listOf).orEmpty()
-                    if (current.gatewayKey.isBlank()) {
-                        savedGateway?.let(::onGatewaySelected)
-                    }
-                }
-            }.also {
-                _isLoadingGateways.value = false
             }
+        }
     }
 
     suspend fun persistTheFactorySettings(
@@ -248,14 +248,16 @@ class SettingsViewModel(
             fiscalDiagnostics
                 ?: return "HkaConnectionHelper no disponible"
         val settings = _theFactorySettings.value
-        if (settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null) {
-            return "Configura la IP y el puerto primero"
-        }
-        val result = diagnostics.testConnection(settings.ipAddress, settings.port.toInt())
-        return if (result.success) {
-            "Conexion exitosa (${result.latencyMs}ms)"
-        } else {
-            result.errorMessage ?: "No se pudo conectar"
+        return when {
+            settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null -> "Configura la IP y el puerto primero"
+            else -> {
+                val result = diagnostics.testConnection(settings.ipAddress, settings.port.toInt())
+                if (result.success) {
+                    "Conexion exitosa (${result.latencyMs}ms)"
+                } else {
+                    result.errorMessage ?: "No se pudo conectar"
+                }
+            }
         }
     }
 
@@ -268,14 +270,16 @@ class SettingsViewModel(
             fiscalDiagnostics
                 ?: return "HkaConnectionHelper no disponible"
         val settings = _theFactorySettings.value
-        if (settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null) {
-            return "Configura la IP y el puerto primero"
-        }
-        val result = diagnostics.printerStatus(settings.ipAddress, settings.port.toInt())
-        return if (result.success) {
-            "ESTADO: ${result.statusDescription}\nERROR: ${result.errorDescription}"
-        } else {
-            result.errorMessage ?: "No se pudo consultar el estado"
+        return when {
+            settings.ipAddress.isBlank() || settings.port.toIntOrNull() == null -> "Configura la IP y el puerto primero"
+            else -> {
+                val result = diagnostics.printerStatus(settings.ipAddress, settings.port.toInt())
+                if (result.success) {
+                    "ESTADO: ${result.statusDescription}\nERROR: ${result.errorDescription}"
+                } else {
+                    result.errorMessage ?: "No se pudo consultar el estado"
+                }
+            }
         }
     }
 }

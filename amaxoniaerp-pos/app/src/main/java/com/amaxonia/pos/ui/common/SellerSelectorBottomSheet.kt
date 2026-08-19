@@ -120,7 +120,9 @@ fun SellerSelectorBottomSheet(
 
 fun Seller.shortName(): String {
     val parts = nombre.trim().split(" ").filter { it.isNotBlank() }
-    if (parts.isEmpty()) return "Vendedor"
-    if (parts.size == 1) return parts.first()
-    return "${parts[0]} ${parts[1].first()}."
+    return when {
+        parts.isEmpty() -> "Vendedor"
+        parts.size == 1 -> parts.first()
+        else -> "${parts[0]} ${parts[1].first()}."
+    }
 }

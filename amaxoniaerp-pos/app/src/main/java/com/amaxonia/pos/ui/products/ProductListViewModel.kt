@@ -52,9 +52,12 @@ class ProductListViewModel(
 
     fun ensureStockLoaded(productId: String) {
         val current = _state.value
-        if (productId.isBlank()) return
-        if (current.stockByProductId.containsKey(productId)) return
-        if (current.loadingStockIds.contains(productId)) return
+        if (productId.isBlank() ||
+            current.stockByProductId.containsKey(productId) ||
+            current.loadingStockIds.contains(productId)
+        ) {
+            return
+        }
 
         viewModelScope.launch {
             _state.update { it.copy(loadingStockIds = it.loadingStockIds + productId) }

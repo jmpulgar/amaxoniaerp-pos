@@ -84,21 +84,24 @@ class SunmiV2Printer(
         }
 
     private suspend fun withService(block: (com.sunmi.peripheral.printer.SunmiPrinterService) -> Unit): PrintResult {
-        val connected = manager.bind()
-        if (!connected) return PrintResult.Error("Servicio de impresión SUNMI no disponible")
-        val service = manager.getService() ?: return PrintResult.Error("Impresora SUNMI no conectada")
-        return runCatching { block(service) }
-            .fold(
-                onSuccess = { PrintResult.Success },
-                onFailure = { e ->
-                    // Same boundary/order as the original catches: fatal errors keep propagating.
-                    when (e) {
-                        is RemoteException -> PrintResult.Error("Error comunicando con la impresora SUNMI", e)
-                        is Exception -> PrintResult.Error(e.message ?: "No se pudo imprimir en SUNMI", e)
-                        else -> throw e
-                    }
-                },
-            )
+        if (!manager.bind()) return PrintResult.Error("Servicio de impresión SUNMI no disponible")
+        val service = manager.getService()
+        return when {
+            service == null -> PrintResult.Error("Impresora SUNMI no conectada")
+            else ->
+                runCatching { block(service) }
+                    .fold(
+                        onSuccess = { PrintResult.Success },
+                        onFailure = { e ->
+                            // Same boundary/order as the original catches: fatal errors keep propagating.
+                            when (e) {
+                                is RemoteException -> PrintResult.Error("Error comunicando con la impresora SUNMI", e)
+                                is Exception -> PrintResult.Error(e.message ?: "No se pudo imprimir en SUNMI", e)
+                                else -> throw e
+                            }
+                        },
+                    )
+        }
     }
 
     private fun TicketAlign.toSunmiAlign(): Int =

@@ -26,13 +26,16 @@ class PromotionRepositoryImpl(
         val token =
             localStore.readCompanySession()?.token
                 ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) return Result.success(Unit)
-        return runCatching {
-            val promos = apiService.getPromotions(token)
-            promocionDao.clearDetalles()
-            promocionDao.clearPromociones()
-            promocionDao.insertPromociones(promos.map { it.toEntity() })
-            promocionDao.insertDetalles(promos.flatMap { promo -> promo.detalle.map { it.toEntity(promo.id) } })
+        return when {
+            !networkMonitor.isOnline() -> Result.success(Unit)
+            else ->
+                runCatching {
+                    val promos = apiService.getPromotions(token)
+                    promocionDao.clearDetalles()
+                    promocionDao.clearPromociones()
+                    promocionDao.insertPromociones(promos.map { it.toEntity() })
+                    promocionDao.insertDetalles(promos.flatMap { promo -> promo.detalle.map { it.toEntity(promo.id) } })
+                }
         }
     }
 

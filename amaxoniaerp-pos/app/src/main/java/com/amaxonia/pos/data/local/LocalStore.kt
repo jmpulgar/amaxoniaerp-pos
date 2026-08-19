@@ -133,19 +133,20 @@ class LocalStore(
             runCatching {
                 AppJson.decodeFromString(ActiveCajaSnapshot.serializer(), json)
             }.getOrNull()
-        if (snapshot == null) {
+        val usable = snapshot != null && isActiveCajaSnapshotUsable(snapshot)
+        return if (usable) {
+            snapshot?.caja
+        } else {
             clearActiveCaja()
-            return null
+            null
         }
+    }
 
+    private suspend fun isActiveCajaSnapshotUsable(snapshot: ActiveCajaSnapshot): Boolean {
         val session = readCompanySession()
         val isSameCompany = session?.company?.adminDb == snapshot.companyDb
         val isToday = snapshot.date == LocalDate.now().toString()
-        if (!isSameCompany || !isToday) {
-            clearActiveCaja()
-            return null
-        }
-        return snapshot.caja
+        return isSameCompany && isToday
     }
 
     suspend fun clearActiveCaja() {
@@ -177,12 +178,18 @@ class LocalStore(
             runCatching {
                 AppJson.decodeFromString(FormasPagoSnapshot.serializer(), json)
             }.getOrNull()
-        if (snapshot == null) return emptyList()
+        val usable = snapshot != null && isFormasPagoSnapshotUsable(snapshot, cajaId)
+        return if (usable) snapshot?.formasPago ?: emptyList() else emptyList()
+    }
 
+    private suspend fun isFormasPagoSnapshotUsable(
+        snapshot: FormasPagoSnapshot,
+        cajaId: String?,
+    ): Boolean {
         val session = readCompanySession()
         val isSameCompany = session?.company?.adminDb == snapshot.companyDb
         val isSameCaja = snapshot.cajaId == cajaId
-        return if (isSameCompany && isSameCaja) snapshot.formasPago else emptyList()
+        return isSameCompany && isSameCaja
     }
 
     // ============ ÁREAS Y MESAS (configuración de salón) ============
@@ -434,13 +441,20 @@ class LocalStore(
         secureKey: String,
         legacyKey: Preferences.Key<String>,
     ): String? {
-        readSecureValue(secureKey)?.let { secureValue ->
-            if (dataStore.data.first()[legacyKey] != null) {
-                dataStore.edit { prefs -> prefs.remove(legacyKey) }
-            }
-            return secureValue
+        val secureValue = readSecureValue(secureKey)
+        if (secureValue == null) {
+            return migrateLegacyToSecureStore(secureKey, legacyKey)
         }
+        if (dataStore.data.first()[legacyKey] != null) {
+            dataStore.edit { prefs -> prefs.remove(legacyKey) }
+        }
+        return secureValue
+    }
 
+    private suspend fun migrateLegacyToSecureStore(
+        secureKey: String,
+        legacyKey: Preferences.Key<String>,
+    ): String? {
         val legacyValue = dataStore.data.first()[legacyKey] ?: return null
         return runCatching {
             secureWriter.write(secureKey, legacyValue)
@@ -559,13 +573,15 @@ class LocalStore(
      */
     suspend fun readLastPaymentSuccess(transactionId: String): PaymentSuccessPayload? {
         val prefs = dataStore.data.first()
-        val json = prefs[lastPaymentSuccessKey] ?: return null
-        val cachedTransactionId = prefs[lastPaymentSuccessTransactionIdKey] ?: return null
-        if (cachedTransactionId != transactionId) return null
-
-        return runCatching {
-            AppJson.decodeFromString(PaymentSuccessPayload.serializer(), json)
-        }.getOrNull()
+        val json = prefs[lastPaymentSuccessKey]
+        val cachedTransactionId = prefs[lastPaymentSuccessTransactionIdKey]
+        return if (json == null || cachedTransactionId != transactionId) {
+            null
+        } else {
+            runCatching {
+                AppJson.decodeFromString(PaymentSuccessPayload.serializer(), json)
+            }.getOrNull()
+        }
     }
 
     private companion object {

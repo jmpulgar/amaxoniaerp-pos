@@ -19,9 +19,9 @@ class CachedCompanyRepository(
         val snapshot =
             localStore.readAuthSnapshot()
                 ?: return Result.failure(IllegalStateException("No hay sesion iniciada"))
-        val company =
-            snapshot.companies.firstOrNull { it.id.toString() == id }
-                ?: return Result.failure(IllegalArgumentException("Empresa no encontrada"))
-        return Result.success(Company(company.id.toString(), company.name, company.rif.orEmpty(), ""))
+        return snapshot.companies
+            .firstOrNull { it.id.toString() == id }
+            ?.let { Result.success(Company(it.id.toString(), it.name, it.rif.orEmpty(), "")) }
+            ?: Result.failure(IllegalArgumentException("Empresa no encontrada"))
     }
 }

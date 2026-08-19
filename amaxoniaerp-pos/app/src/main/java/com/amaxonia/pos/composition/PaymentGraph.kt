@@ -62,26 +62,29 @@ object PaymentGraph {
         }
 
     private suspend fun printSunmiTicket(transactionId: String): Result<String> {
-        val ticketPrinter =
-            DependencyContainer.printerFactory.getActiveTicketPrinter()
-                ?: return Result.failure(IllegalStateException("Impresora SUNMI no disponible"))
-        val payload =
-            DependencyContainer.salesRepository.getPrintPayload(transactionId).getOrElse { error ->
-                return Result.failure(error)
+        val ticketPrinter = DependencyContainer.printerFactory.getActiveTicketPrinter()
+        return when {
+            ticketPrinter == null -> Result.failure(IllegalStateException("Impresora SUNMI no disponible"))
+            else -> {
+                val payload =
+                    DependencyContainer.salesRepository.getPrintPayload(transactionId).getOrElse { error ->
+                        return Result.failure(error)
+                    }
+                val countryCode =
+                    DependencyContainer.localStore
+                        .readSelectedCountry()
+                        ?.code
+                        .orEmpty()
+                val ticket =
+                    when (countryCode.uppercase()) {
+                        "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
+                        else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                    }
+                when (val printResult = ticketPrinter.printTicket(ticket)) {
+                    PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
+                    is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))
+                }
             }
-        val countryCode =
-            DependencyContainer.localStore
-                .readSelectedCountry()
-                ?.code
-                .orEmpty()
-        val ticket =
-            when (countryCode.uppercase()) {
-                "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
-                else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
-            }
-        return when (val printResult = ticketPrinter.printTicket(ticket)) {
-            PrintResult.Success -> Result.success("Ticket SUNMI enviado correctamente")
-            is PrintResult.Error -> Result.failure(IllegalStateException(printResult.message, printResult.cause))
         }
     }
 
@@ -90,12 +93,14 @@ object PaymentGraph {
             DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrElse { error ->
                 return Result.failure(error)
             }
-        val printer =
-            DependencyContainer.printerFactory.getActivePrinter()
-                ?: return Result.failure(IllegalStateException("No hay impresora configurada"))
-        return printer.printReceipt(transaction).fold(
-            onSuccess = { Result.success("Imprimiendo recibo...") },
-            onFailure = { Result.failure(it) },
-        )
+        val printer = DependencyContainer.printerFactory.getActivePrinter()
+        return when {
+            printer == null -> Result.failure(IllegalStateException("No hay impresora configurada"))
+            else ->
+                printer.printReceipt(transaction).fold(
+                    onSuccess = { Result.success("Imprimiendo recibo...") },
+                    onFailure = { Result.failure(it) },
+                )
+        }
     }
 }

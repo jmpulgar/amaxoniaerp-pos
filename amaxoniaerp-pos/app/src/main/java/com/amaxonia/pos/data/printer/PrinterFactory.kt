@@ -35,43 +35,51 @@ class PrinterFactory(
     private var sunmiPrinterInstance: TicketPrinter? = null
 
     private fun getTheFactoryPrinterOrNull(): PrinterRepository? {
-        if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
+        theFactoryPrinterInstance?.let { return it }
         synchronized(this) {
-            if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
-            // Atrapar Throwable (incluidos NoClassDefFoundError en Android 10) sin crash: mismo
-            // límite defensivo que el catch original, expresado con runCatching.
-            theFactoryPrinterInstance =
-                runCatching {
-                    TheFactoryPrinterImpl(
-                        context = appContext,
-                        localStore = localStore,
-                    )
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = { t ->
-                        SafeLog.e(TAG, "Fiscal printer implementation is unavailable", t)
-                        null
-                    },
-                )
-            return theFactoryPrinterInstance
+            return when {
+                theFactoryPrinterInstance != null -> theFactoryPrinterInstance
+                else -> {
+                    // Atrapar Throwable (incluidos NoClassDefFoundError en Android 10) sin crash: mismo
+                    // límite defensivo que el catch original, expresado con runCatching.
+                    theFactoryPrinterInstance =
+                        runCatching {
+                            TheFactoryPrinterImpl(
+                                context = appContext,
+                                localStore = localStore,
+                            )
+                        }.fold(
+                            onSuccess = { it },
+                            onFailure = { t ->
+                                SafeLog.e(TAG, "Fiscal printer implementation is unavailable", t)
+                                null
+                            },
+                        )
+                    theFactoryPrinterInstance
+                }
+            }
         }
     }
 
     private fun getSunmiPrinterOrNull(): TicketPrinter? {
-        if (sunmiPrinterInstance != null) return sunmiPrinterInstance
+        sunmiPrinterInstance?.let { return it }
         synchronized(this) {
-            if (sunmiPrinterInstance != null) return sunmiPrinterInstance
-            sunmiPrinterInstance =
-                runCatching {
-                    SunmiV2Printer(appContext)
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = { t ->
-                        SafeLog.e(TAG, "SUNMI printer implementation is unavailable", t)
-                        null
-                    },
-                )
-            return sunmiPrinterInstance
+            return when {
+                sunmiPrinterInstance != null -> sunmiPrinterInstance
+                else -> {
+                    sunmiPrinterInstance =
+                        runCatching {
+                            SunmiV2Printer(appContext)
+                        }.fold(
+                            onSuccess = { it },
+                            onFailure = { t ->
+                                SafeLog.e(TAG, "SUNMI printer implementation is unavailable", t)
+                                null
+                            },
+                        )
+                    sunmiPrinterInstance
+                }
+            }
         }
     }
 

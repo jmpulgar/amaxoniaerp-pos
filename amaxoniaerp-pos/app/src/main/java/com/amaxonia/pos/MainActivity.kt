@@ -107,9 +107,7 @@ class MainActivity : ComponentActivity() {
         intent: Intent?,
         source: String,
     ) {
-        if (intent == null) return
-
-        if (intent.getStringExtra(EXTRA_RESULT_CODE) == null) return
+        if (intent == null || intent.getStringExtra(EXTRA_RESULT_CODE) == null) return
 
         SafeLog.d(TAG, "Rapid Pay result received from $source")
 

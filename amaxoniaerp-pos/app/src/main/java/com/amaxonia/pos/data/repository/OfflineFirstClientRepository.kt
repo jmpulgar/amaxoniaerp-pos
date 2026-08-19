@@ -37,24 +37,25 @@ class OfflineFirstClientRepository(
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
-        if (!networkMonitor.isOnline()) {
-            val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
-            return if (cached.isNotEmpty()) {
-                Result.success(cached)
-            } else {
-                Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        return when {
+            !networkMonitor.isOnline() -> {
+                val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
+                if (cached.isNotEmpty()) {
+                    Result.success(cached)
+                } else {
+                    Result.failure(IllegalStateException("No hay empresa seleccionada"))
+                }
             }
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getClients(token, limit = pageSize, offset = offset, search = null)
-            clientDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
+            token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
+            else ->
+                runCatching {
+                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = null)
+                    clientDao.insertAll(response.data.map { it.toEntity() })
+                    response.data.map { it.toDomain() }
+                }.recoverCatching { error ->
+                    val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
+                    if (cached.isNotEmpty()) cached else throw error
+                }
         }
     }
 
@@ -69,20 +70,21 @@ class OfflineFirstClientRepository(
 
     override suspend fun searchClients(query: String): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
-        if (!networkMonitor.isOnline()) {
-            val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-            return Result.success(cached)
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getClients(token, limit = 100, offset = 0, search = query)
-            clientDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
+        return when {
+            !networkMonitor.isOnline() -> {
+                val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
+                Result.success(cached)
+            }
+            token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
+            else ->
+                runCatching {
+                    val response = apiService.getClients(token, limit = 100, offset = 0, search = query)
+                    clientDao.insertAll(response.data.map { it.toEntity() })
+                    response.data.map { it.toDomain() }
+                }.recoverCatching { error ->
+                    val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
+                    if (cached.isNotEmpty()) cached else throw error
+                }
         }
     }
 
@@ -93,21 +95,22 @@ class OfflineFirstClientRepository(
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
-        if (!networkMonitor.isOnline()) {
-            val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-            return Result.success(cached.map { it.toDomain() })
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getClients(token, limit = pageSize, offset = offset, search = query)
-            clientDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-            val mapped = cached.map { it.toDomain() }
-            if (mapped.isNotEmpty()) mapped else throw error
+        return when {
+            !networkMonitor.isOnline() -> {
+                val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
+                Result.success(cached.map { it.toDomain() })
+            }
+            token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
+            else ->
+                runCatching {
+                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = query)
+                    clientDao.insertAll(response.data.map { it.toEntity() })
+                    response.data.map { it.toDomain() }
+                }.recoverCatching { error ->
+                    val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
+                    val mapped = cached.map { it.toDomain() }
+                    if (mapped.isNotEmpty()) mapped else throw error
+                }
         }
     }
 

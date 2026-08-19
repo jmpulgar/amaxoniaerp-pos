@@ -27,11 +27,12 @@ class ClientListViewModel(
     }
 
     fun getClientPhotoUrl(client: Client): String {
-        if (client.id.isBlank() || adminDb.isBlank()) return ""
-        val filename =
-            client.photoFilename.takeIf { it.isNotBlank() }
-                ?: return ""
-        return imageUrlResolver.client(adminDb, client.id, filename)
+        val filename = client.photoFilename.takeIf { it.isNotBlank() }
+        return if (client.id.isBlank() || adminDb.isBlank() || filename == null) {
+            ""
+        } else {
+            imageUrlResolver.client(adminDb, client.id, filename)
+        }
     }
 
     private val _state = MutableStateFlow(ClientListState())
