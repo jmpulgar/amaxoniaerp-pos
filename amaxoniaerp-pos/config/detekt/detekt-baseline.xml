@@ -43,6 +43,8 @@
     <ID>LongMethod:SettingsScreen.kt$@Composable private fun PrinterOptionCard( icon: ImageVector, iconTint: Color, title: String, description: String, isSelected: Boolean, onSelect: () -&gt; Unit, )</ID>
     <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, viewModel: SettingsViewModel = injectedViewModel { AppGraph.settings.settingsViewModel() }, )</ID>
     <ID>LongMethod:SuccessScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SuccessScreen( transactionId: String, onPrintReceipt: suspend (String) -&gt; Result&lt;String&gt;, onNextOrder: () -&gt; Unit, )</ID>
+    <ID>LongMethod:WelcomeScreen.kt$@Composable private fun WelcomeActions( onLoginClick: () -&gt; Unit, onRequestAccountClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:WelcomeScreen.kt$@Composable private fun WelcomeWaves( wavePhase: Float, colors: WelcomeWaveColors, )</ID>
     <ID>LongMethod:WelcomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun WelcomeScreen( onLoginClick: () -&gt; Unit, onRequestAccountClick: () -&gt; Unit, )</ID>
     <ID>LongParameterList:ApiService.kt$ApiService$( token: String, limit: Int, offset: Int, search: String?, includeTotal: Boolean? = null, departmentId: Int? = null, )</ID>
     <ID>LongParameterList:CajaSelectorSheet.kt$( cajas: List&lt;Caja&gt;, isLoading: Boolean, errorMessage: String?, canDismiss: Boolean, onSelectCaja: (Caja) -&gt; Unit, onReload: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
@@ -105,13 +107,6 @@
     <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$4096</ID>
     <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$9</ID>
     <ID>MagicNumber:ValueObjects.kt$TaxRate.Companion$4</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$0.46f</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$0.65f</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$0.8f</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$16f</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$26f</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$3</ID>
-    <ID>MagicNumber:WelcomeScreen.kt$4</ID>
     <ID>ReturnCount:CachedCompanyRepository.kt$CachedCompanyRepository$override suspend fun getCompanyById(id: String): Result&lt;Company&gt;</ID>
     <ID>ReturnCount:ClientListViewModel.kt$ClientListViewModel$fun getClientPhotoUrl(client: Client): String</ID>
     <ID>ReturnCount:LocalStore.kt$LocalStore$private suspend fun readSecureOrMigrate( secureKey: String, legacyKey: Preferences.Key&lt;String&gt;, ): String?</ID>
@@ -147,6 +142,5 @@
     <ID>TooManyFunctions:CreditNotesViewModel.kt$CreditNotesViewModel : ViewModel</ID>
     <ID>TooManyFunctions:LocalStore.kt$LocalStore : CountrySelectionStorePaymentSessionReaderSalonConfigCacheCompanyTokenReader</ID>
     <ID>TooManyFunctions:PaymentScreen.kt$com.amaxonia.pos.ui.payment.PaymentScreen.kt</ID>
-    <ID>UnusedPrivateProperty:WelcomeScreen.kt$val gradientMid = colorResource(R.color.brand_gradient_mid)</ID>
   </CurrentIssues>
 </SmellBaseline>
