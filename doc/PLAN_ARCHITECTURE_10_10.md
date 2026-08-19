@@ -729,9 +729,19 @@ short finalize DB phase
 
 ### TASK-043 — Caja
 
-> **ESTADO: PENDIENTE.** Requiere characterization tests H2 de apertura/cierre (auto-close,
-> validaciones) antes de extraer `OpenCajaUseCase`/`CloseCajaUseCase` con la orquestación que
-> hoy vive en `CajaRepository`. Los GETs permanecen como queries.
+> **ESTADO: COMPLETADA (2026-08-18).** Characterization tests H2 primero
+> (`CajaOpenCloseCharacterizationTest`: apertura/secuencia incremental, auto-close
+> por nueva apertura con totales vigentes —incluido el doble conteo actual de
+> devoluciones—, validaciones de cierre, redondeo HALF_UP y reescritura de
+> detalles). Luego: `OpenCajaUseCase`/`CloseCajaUseCase` en `application/` con la
+> orquestación (auto-close, reloj de negocio, validaciones dentro de la
+> transacción), cálculo puro `CajaAutoClose.kt` en `domain/` (isCashSigla,
+> buildAutoCloseFormaPagoTotals, buildAutoCloseRequest), `CajaRepository`
+> reducido a queries + primitivas de escritura (`recordApertura`/`persistCierre`),
+> GETs permanecen como queries. `CajaRepository` recibe `Database` (patrón
+> mesas/facturas, testeable H2). Composition: `CajaDependencies`;
+> `Repositories` ya no expone caja. HTTP/JSON, negocio y mensajes intactos.
+> Gates GREEN: `build` completo (compile, ktlint, detekt=0, test, JaCoCo).
 
 Separar application workflows sólo donde hay negocio:
 
