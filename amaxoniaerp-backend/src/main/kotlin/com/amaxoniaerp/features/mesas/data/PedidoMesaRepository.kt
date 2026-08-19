@@ -225,7 +225,7 @@ class PedidoMesaRepository {
             val actual =
                 EstadoPedidoMesa.fromCodigo(linea[PedidoMesaTable.estado])
                     ?: return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
-            if (!transicionValida(actual, destino)) return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
+            if (!actual.puedeTransicionarA(destino)) return@newSuspendedTransaction PedidoMesaResult.EstadoInvalido
 
             val ahora = LocalDateTime.now()
             PedidoMesaTable.update({ PedidoMesaTable.id eq pedidoId }) {
@@ -332,19 +332,6 @@ class PedidoMesaRepository {
             fechaEntrega = this[PedidoMesaTable.fechaEntrega]?.formatIso(),
         )
 
-    private fun transicionValida(
-        actual: EstadoPedidoMesa,
-        destino: EstadoPedidoMesa,
-    ): Boolean =
-        run {
-            if (actual.esFinal) return false
-            if (destino == EstadoPedidoMesa.CANCELADA) return true
-            // Avance hacia adelante; nunca retroceder a PENDIENTE una vez enviado.
-            val ordenActual = ORDEN_ESTADOS.getValue(actual)
-            val ordenDestino = ORDEN_ESTADOS.getValue(destino)
-            return ordenDestino > ordenActual && destino != EstadoPedidoMesa.PENDIENTE
-        }
-
     private fun LocalDateTime.formatIso(): String = ISO_FORMATTER.format(this)
 
     private companion object {
@@ -352,17 +339,6 @@ class PedidoMesaRepository {
         val ISO_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 
         val ESTADOS_FINALES_CODIGO = listOf(EstadoPedidoMesa.ENTREGADA.codigo, EstadoPedidoMesa.CANCELADA.codigo)
-
-        /** Orden lógico para validar que las transiciones solo avancen. */
-        val ORDEN_ESTADOS: Map<EstadoPedidoMesa, Int> =
-            mapOf(
-                EstadoPedidoMesa.PENDIENTE to 1,
-                EstadoPedidoMesa.ENVIADA to 2,
-                EstadoPedidoMesa.EN_PREPARACION to 3,
-                EstadoPedidoMesa.LISTA to 4,
-                EstadoPedidoMesa.ENTREGADA to 5,
-                EstadoPedidoMesa.CANCELADA to 6,
-            )
     }
 }
 

@@ -33,8 +33,34 @@ enum class EstadoPedidoMesa(
     val esFinal: Boolean
         get() = this == ENTREGADA || this == CANCELADA
 
+    /**
+     * Máquina de estados de la línea de pedido: desde un estado no final se puede
+     * avanzar hacia adelante o anular (`CANCELADA`); nunca retroceder —en particular
+     * no se vuelve a `PENDIENTE` una vez enviada— y las líneas finales no se mueven.
+     */
+    fun puedeTransicionarA(destino: EstadoPedidoMesa): Boolean =
+        when {
+            esFinal -> false
+            destino == CANCELADA -> true
+            else -> destino != PENDIENTE && destino.orden > orden
+        }
+
+    private val orden: Int
+        get() = ORDEN_ESTADOS.getValue(this)
+
     companion object {
         fun fromCodigo(codigo: String): EstadoPedidoMesa? = entries.firstOrNull { it.codigo == codigo }
+
+        /** Orden lógico para validar que las transiciones solo avancen. */
+        private val ORDEN_ESTADOS: Map<EstadoPedidoMesa, Int> =
+            mapOf(
+                PENDIENTE to 1,
+                ENVIADA to 2,
+                EN_PREPARACION to 3,
+                LISTA to 4,
+                ENTREGADA to 5,
+                CANCELADA to 6,
+            )
     }
 }
 

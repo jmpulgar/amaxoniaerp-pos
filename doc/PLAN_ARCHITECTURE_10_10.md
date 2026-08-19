@@ -754,9 +754,18 @@ GETs simples pueden continuar como queries.
 
 ### TASK-044 — Mesas
 
-> **ESTADO: PENDIENTE.** Deep operations (OpenSession, Add/modify order, RequestAccount,
-> Pay/close account, Cancel/close session) requieren characterization tests de las
-> transiciones de estado antes de mover negocio fuera de los repositorios.
+> **ESTADO: COMPLETADA (2026-08-18).** Las deep operations ya estaban congeladas por
+> characterization tests H2 (70 tests: SesionMesaRepositoryTest —abrir/cerrar/cancelar y
+> transiciones—, PedidoMesaRepositoryTest —crear/enviar/cambiar estado y prohibiciones—,
+> CuentaMesaRepositoryTest + CuentaMesaFacturadaTest —crear/dividir cuenta, solicitar
+> cuenta, pago/idempotencia/cierre CERRADA_PAGADA—, MesasRepositoryTest). Negocio movido
+> fuera del repositorio: la máquina de estados de la línea de pedido (`transicionValida` +
+> `ORDEN_ESTADOS` inline en `PedidoMesaRepository`) ahora es `EstadoPedidoMesa
+> .puedeTransicionarA(destino)` en domain, pura y congelada por `EstadoPedidoMesaTest`.
+> Las reglas de sesión (`EstadoSesionMesa.esFinal/admitePedidos`) ya vivían en domain y los
+> repositorios de mesas ya operan como deep modules transaccionales (patrón `database` inyectado,
+> results tipados). El cálculo de división/saldo de cuentas queda en data (acoplado a rows,
+> protegido por characterization; no se crea capa artificial). Gates GREEN: `build` completo.
 
 Deep operations para:
 
