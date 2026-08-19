@@ -125,19 +125,6 @@
     <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun getAllClients( page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
     <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun searchClients( query: String, page: Int, pageSize: Int, ): Result&lt;List&lt;Client&gt;&gt;</ID>
     <ID>ReturnCount:OfflineFirstClientRepository.kt$OfflineFirstClientRepository$override suspend fun searchClients(query: String): Result&lt;List&lt;Client&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts( departmentId: Int?, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts( page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getAllProducts(departmentId: Int?): Result&lt;List&lt;Product&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getBrands(): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getDepartments(): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getFamilies(sectionId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getLines(brandId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getProductStock(id: String): Result&lt;ProductStock&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getSections(departmentId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun getSubFamilies(familyId: Int): Result&lt;List&lt;Department&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts( query: String, departmentId: Int?, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts( query: String, page: Int, pageSize: Int, ): Result&lt;List&lt;Product&gt;&gt;</ID>
-    <ID>ReturnCount:OfflineFirstProductRepository.kt$OfflineFirstProductRepository$override suspend fun searchProducts(query: String): Result&lt;List&lt;Product&gt;&gt;</ID>
     <ID>ReturnCount:PaymentGraph.kt$PaymentGraph$private suspend fun printGenericReceipt(transactionId: String): Result&lt;String&gt;</ID>
     <ID>ReturnCount:PaymentGraph.kt$PaymentGraph$private suspend fun printSunmiTicket(transactionId: String): Result&lt;String&gt;</ID>
     <ID>ReturnCount:PaymentScreen.kt$private fun decodeBase64Image(imageData: String?): ImageBitmap?</ID>

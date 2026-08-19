@@ -11,307 +11,125 @@ import com.amaxonia.pos.domain.model.ProductStock
 import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.ProductRepository
 
+/**
+ * Repositorio offline-first de productos. La política offline/online y la
+ * lectura de caché viven en [ProductFetchPolicy]/[ProductPageCache]; aquí
+ * queda el mapeo de la interfaz y los flujos con estado propio (producto por
+ * id, stock, guardado).
+ */
 class OfflineFirstProductRepository(
-    private val apiService: ApiService,
-    private val localStore: LocalStore,
-    private val productDao: ProductDao,
-    private val networkMonitor: NetworkMonitor,
+    apiService: ApiService,
+    localStore: LocalStore,
+    productDao: ProductDao,
+    networkMonitor: NetworkMonitor,
 ) : ProductRepository {
-    override suspend fun getDepartments(): Result<List<Department>> {
-        val token = localStore.readCompanySession()?.token
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    private val fetch = ProductFetchPolicy(apiService, localStore, productDao, networkMonitor)
+    private val cache = ProductPageCache(productDao)
+    private val localStore = localStore
+    private val apiService = apiService
+    private val productDao = productDao
+    private val networkMonitor = networkMonitor
+
+    override suspend fun getDepartments(): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getDepartments(token).map { Department(it.id, it.name) }
         }
-    }
 
-    override suspend fun getSections(departmentId: Int): Result<List<Department>> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    override suspend fun getSections(departmentId: Int): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getSections(token, departmentId).map { Department(it.id, it.name) }
         }
-    }
 
-    override suspend fun getFamilies(sectionId: Int): Result<List<Department>> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    override suspend fun getFamilies(sectionId: Int): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getFamilies(token, sectionId).map { Department(it.id, it.name) }
         }
-    }
 
-    override suspend fun getSubFamilies(familyId: Int): Result<List<Department>> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    override suspend fun getSubFamilies(familyId: Int): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getSubFamilies(token, familyId).map { Department(it.id, it.name) }
         }
-    }
 
-    override suspend fun getBrands(): Result<List<Department>> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    override suspend fun getBrands(): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getBrands(token).map { Department(it.id, it.name) }
         }
-    }
 
-    override suspend fun getLines(brandId: Int): Result<List<Department>> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión"))
-        }
-        return runCatching {
+    override suspend fun getLines(brandId: Int): Result<List<Department>> =
+        fetch.onlineCatalog { token ->
             apiService.getLines(token, brandId).map { Department(it.id, it.name) }
         }
-    }
 
     override suspend fun getAllProducts(
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> {
-        val token = localStore.readCompanySession()?.token
-        val offset = (page - 1).coerceAtLeast(0) * pageSize
-        if (!networkMonitor.isOnline()) {
-            val cached = productDao.getPaged(pageSize, offset).map { it.toDomain() }
-            return Result.success(cached)
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getProducts(token, limit = pageSize, offset = offset, search = null)
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = productDao.getPaged(pageSize, offset).map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
-        }
-    }
+    ): Result<List<Product>> = fetch.pageWithCacheFallback(null, null, pageSize, pageOffset(page, pageSize))
 
     override suspend fun getAllProducts(): Result<List<Product>> = getAllProducts(null)
 
     override suspend fun getAllProducts(departmentId: Int?): Result<List<Product>> {
-        val token = localStore.readCompanySession()?.token
         if (!networkMonitor.isOnline()) {
-            val cached = productDao.getPaged(limit = 1000, offset = 0).map { it.toDomain() }
-            return if (cached.isNotEmpty()) {
-                Result.success(cached)
-            } else {
-                Result.failure(IllegalStateException("No hay empresa seleccionada"))
-            }
+            val cached = cache.fullCatalog()
+            return if (cached.isNotEmpty()) Result.success(cached) else Result.failure(IllegalStateException(NO_COMPANY_ERROR))
         }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response =
-                apiService.getProducts(
-                    token,
-                    limit = 500,
-                    offset = 0,
-                    search = null,
-                    departmentId = departmentId,
-                )
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = productDao.getPaged(limit = 1000, offset = 0).map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
-        }
+        return fetch
+            .pageWithCacheFallback(departmentId, null, FULL_CATALOG_PAGE_SIZE, 0)
+            .recoverCatching { error -> cache.fullCatalog().ifEmpty { throw error } }
     }
 
     override suspend fun getAllProducts(
         departmentId: Int?,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> {
-        val token = localStore.readCompanySession()?.token
-        val offset = (page - 1).coerceAtLeast(0) * pageSize
-        if (!networkMonitor.isOnline()) {
-            val cached =
-                if (departmentId == null) {
-                    productDao.getPaged(limit = pageSize, offset = offset)
-                } else {
-                    productDao.getPagedByDepartment(departmentId, limit = pageSize, offset = offset)
-                }
-            return Result.success(cached.map { it.toDomain() })
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response =
-                apiService.getProducts(
-                    token,
-                    limit = pageSize,
-                    offset = offset,
-                    search = null,
-                    departmentId = departmentId,
-                )
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached =
-                if (departmentId == null) {
-                    productDao.getPaged(limit = pageSize, offset = offset)
-                } else {
-                    productDao.getPagedByDepartment(departmentId, limit = pageSize, offset = offset)
-                }.map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
-        }
-    }
+    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, null, pageSize, pageOffset(page, pageSize))
 
     override suspend fun getProductById(id: String): Result<Product> {
         val token = localStore.readCompanySession()?.token
         val cachedProduct = productDao.getById(id)?.toDomain()
 
-        if (!token.isNullOrBlank() && networkMonitor.isOnline()) {
-            return runCatching {
-                val remoteProduct = apiService.getProductById(token, id)
-                productDao.insertAll(listOf(remoteProduct.toEntity()))
-                remoteProduct.toDomain()
-            }.recoverCatching {
-                cachedProduct ?: throw it
-            }
-        }
-
-        return if (cachedProduct != null) {
-            Result.success(cachedProduct)
-        } else {
-            Result.failure(IllegalArgumentException("Producto no encontrado"))
+        return when {
+            !token.isNullOrBlank() && networkMonitor.isOnline() ->
+                runCatching {
+                    val remoteProduct = apiService.getProductById(token, id)
+                    productDao.insertAll(listOf(remoteProduct.toEntity()))
+                    remoteProduct.toDomain()
+                }.recoverCatching {
+                    cachedProduct ?: throw it
+                }
+            cachedProduct != null -> Result.success(cachedProduct)
+            else -> Result.failure(IllegalArgumentException("Producto no encontrado"))
         }
     }
 
     override suspend fun getProductStock(id: String): Result<ProductStock> {
-        val token =
-            localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-
-        if (!networkMonitor.isOnline()) {
-            return Result.failure(IllegalStateException("Sin conexión para consultar stock por almacén"))
-        }
-
-        return runCatching {
-            apiService.getItemStock(token, id).toDomain()
-        }
-    }
-
-    override suspend fun searchProducts(query: String): Result<List<Product>> {
         val token = localStore.readCompanySession()?.token
-        if (!networkMonitor.isOnline()) {
-            val cached = productDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-            return Result.success(cached)
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getProducts(token, limit = 100, offset = 0, search = query)
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = productDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
+        return when {
+            token.isNullOrBlank() -> Result.failure(IllegalStateException(NO_COMPANY_ERROR))
+            !networkMonitor.isOnline() -> Result.failure(IllegalStateException("Sin conexión para consultar stock por almacén"))
+            else -> runCatching { apiService.getItemStock(token, id).toDomain() }
         }
     }
+
+    override suspend fun searchProducts(query: String): Result<List<Product>> =
+        fetch.pageWithCacheFallback(null, query, SEARCH_PAGE_SIZE, 0)
 
     override suspend fun searchProducts(
         query: String,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> {
-        val token = localStore.readCompanySession()?.token
-        val offset = (page - 1).coerceAtLeast(0) * pageSize
-        if (!networkMonitor.isOnline()) {
-            val cached = productDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-            return Result.success(cached.map { it.toDomain() })
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response = apiService.getProducts(token, limit = pageSize, offset = offset, search = query)
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached = productDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-            val mapped = cached.map { it.toDomain() }
-            if (mapped.isNotEmpty()) mapped else throw error
-        }
-    }
+    ): Result<List<Product>> = fetch.pageWithCacheFallback(null, query, pageSize, pageOffset(page, pageSize))
 
     override suspend fun searchProducts(
         query: String,
         departmentId: Int?,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> {
-        val token = localStore.readCompanySession()?.token
-        val offset = (page - 1).coerceAtLeast(0) * pageSize
-        val normalized = normalizeQuery(query)
-        if (!networkMonitor.isOnline()) {
-            val cached =
-                if (departmentId == null) {
-                    productDao.searchPaged(normalized, limit = pageSize, offset = offset)
-                } else {
-                    productDao.searchPagedByDepartment(normalized, departmentId, limit = pageSize, offset = offset)
-                }
-            return Result.success(cached.map { it.toDomain() })
-        }
-        if (token.isNullOrBlank()) {
-            return Result.failure(IllegalStateException("No hay empresa seleccionada"))
-        }
-        return runCatching {
-            val response =
-                apiService.getProducts(
-                    token,
-                    limit = pageSize,
-                    offset = offset,
-                    search = query,
-                    departmentId = departmentId,
-                )
-            productDao.insertAll(response.data.map { it.toEntity() })
-            response.data.map { it.toDomain() }
-        }.recoverCatching { error ->
-            val cached =
-                if (departmentId == null) {
-                    productDao.searchPaged(normalized, limit = pageSize, offset = offset)
-                } else {
-                    productDao.searchPagedByDepartment(normalized, departmentId, limit = pageSize, offset = offset)
-                }.map { it.toDomain() }
-            if (cached.isNotEmpty()) cached else throw error
-        }
-    }
+    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize))
 
     override suspend fun saveProduct(product: Product): Result<Unit> {
         val token =
             localStore.readCompanySession()?.token
-                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+                ?: return Result.failure(IllegalStateException(NO_COMPANY_ERROR))
         val request = product.toCreateRequest()
         return runCatching {
             val id = product.id.toIntOrNull()
@@ -328,8 +146,14 @@ class OfflineFirstProductRepository(
     override suspend fun deleteProduct(id: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("Eliminar productos no esta implementado"))
 
-    private fun normalizeQuery(query: String): String {
-        val normalized = query.trim()
-        return if (normalized.isEmpty()) "%" else "%$normalized%"
+    private fun pageOffset(
+        page: Int,
+        pageSize: Int,
+    ): Int = (page - 1).coerceAtLeast(0) * pageSize
+
+    private companion object {
+        const val NO_COMPANY_ERROR = "No hay empresa seleccionada"
+        const val FULL_CATALOG_PAGE_SIZE = 500
+        const val SEARCH_PAGE_SIZE = 100
     }
 }
