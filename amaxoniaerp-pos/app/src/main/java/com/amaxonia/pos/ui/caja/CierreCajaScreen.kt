@@ -405,13 +405,18 @@ private fun PaymentBreakdownCard(summary: CierreCajaSummary) {
     }
 }
 
+/** IDs de las líneas de pago sintetizadas por el fallback legado. */
+private const val FALLBACK_LINE_ID_CASH = 1
+private const val FALLBACK_LINE_ID_CARD = 2
+private const val FALLBACK_LINE_ID_OTHER = 3
+
 /** Fallback legado cuando el resumen no trae líneas: las sintetiza de los totales agregados. */
 private fun resolvePaymentLines(summary: CierreCajaSummary): List<CierreCajaPaymentLine> =
     summary.paymentLines.ifEmpty {
         listOf(
-            CierreCajaPaymentLine(1, "Efectivo", "CASH", summary.totalCash),
-            CierreCajaPaymentLine(2, "Tarjeta", "TARJETA", summary.totalCard),
-            CierreCajaPaymentLine(3, "Otros", "OT", summary.totalOther),
+            CierreCajaPaymentLine(FALLBACK_LINE_ID_CASH, "Efectivo", "CASH", summary.totalCash),
+            CierreCajaPaymentLine(FALLBACK_LINE_ID_CARD, "Tarjeta", "TARJETA", summary.totalCard),
+            CierreCajaPaymentLine(FALLBACK_LINE_ID_OTHER, "Otros", "OT", summary.totalOther),
         ).filter { it.amount > 0.0 }
     }
 

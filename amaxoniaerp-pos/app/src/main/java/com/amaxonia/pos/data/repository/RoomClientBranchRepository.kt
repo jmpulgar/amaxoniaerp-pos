@@ -11,13 +11,16 @@ class RoomClientBranchRepository(
     override suspend fun findFor(client: Client): List<ClientBranch> = dao.getForClient(client)
 }
 
+/** Longitud máxima del código de cliente usada como clave de sus sucursales. */
+private const val CLIENT_CODE_MAX_LENGTH = 9
+
 private suspend fun ClientSucursalDao.getForClient(client: Client): List<ClientBranch> {
     val candidates =
         buildList {
             add(client.code.trim())
-            add(client.code.trim().take(9))
+            add(client.code.trim().take(CLIENT_CODE_MAX_LENGTH))
             add(client.id.trim())
-            add(client.id.trim().take(9))
+            add(client.id.trim().take(CLIENT_CODE_MAX_LENGTH))
         }.filter { it.isNotBlank() }
             .distinct()
 

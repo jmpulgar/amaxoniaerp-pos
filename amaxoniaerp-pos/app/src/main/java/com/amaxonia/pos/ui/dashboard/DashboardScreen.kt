@@ -151,6 +151,19 @@ import kotlinx.coroutines.launch
 
 private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 
+/** Ítems que faltan por debajo del último visible para disparar la carga de más productos. */
+private const val PREFETCH_THRESHOLD_ITEMS = 6
+
+/** Líneas de detalle de promoción mostradas como vista previa en la tarjeta. */
+private const val PROMO_DETAILS_PREVIEW_COUNT = 4
+
+/** Máximo de dígitos aceptados al escribir una cantidad manual. */
+private const val MAX_QUANTITY_DIGITS = 5
+
+/** Pesos del teclado numérico manual: columnas de números y botón Cobrar (ENTER). */
+private const val KEYPAD_NUMBERS_WEIGHT = 3f
+private const val CHARGE_BUTTON_WEIGHT = 3f
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 // Raíz Compose conserva navegación y estado local; dividirla alteraría alcance de remember/effects.
@@ -238,7 +251,7 @@ fun DashboardScreen(
                 productGridState.layoutInfo.visibleItemsInfo
                     .lastOrNull()
                     ?.index ?: return@derivedStateOf false
-            lastVisible >= productGridState.layoutInfo.totalItemsCount - 6
+            lastVisible >= productGridState.layoutInfo.totalItemsCount - PREFETCH_THRESHOLD_ITEMS
         }
     }
 
@@ -248,7 +261,7 @@ fun DashboardScreen(
                 productListState.layoutInfo.visibleItemsInfo
                     .lastOrNull()
                     ?.index ?: return@derivedStateOf false
-            lastVisible >= productListState.layoutInfo.totalItemsCount - 6
+            lastVisible >= productListState.layoutInfo.totalItemsCount - PREFETCH_THRESHOLD_ITEMS
         }
     }
 
@@ -1268,7 +1281,7 @@ private fun PromotionOptionCard(
             Spacer(Modifier.height(10.dp))
             Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), shape = MaterialTheme.shapes.medium) {
                 Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    promo.detalles.take(4).forEach { detail ->
+                    promo.detalles.take(PROMO_DETAILS_PREVIEW_COUNT).forEach { detail ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
                             Spacer(Modifier.width(8.dp))
@@ -1288,8 +1301,9 @@ private fun PromotionOptionCard(
                             )
                         }
                     }
-                    if (promo.detalles.size > 4) {
-                        Text("+${promo.detalles.size - 4} productos más", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    if (promo.detalles.size > PROMO_DETAILS_PREVIEW_COUNT) {
+                        val hiddenCount = promo.detalles.size - PROMO_DETAILS_PREVIEW_COUNT
+                        Text("+$hiddenCount productos más", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1355,7 +1369,7 @@ private fun sanitizeQuantityInput(value: String): String =
         .filter { it.isDigit() }
         .trimStart('0')
         .ifBlank { "" }
-        .take(5)
+        .take(MAX_QUANTITY_DIGITS)
 
 @Composable
 fun ProductCard(
@@ -1687,7 +1701,7 @@ fun ManualEntryContent(
         ) {
             // Columna Izquierda (Números)
             Column(
-                modifier = Modifier.weight(3f),
+                modifier = Modifier.weight(KEYPAD_NUMBERS_WEIGHT),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val keys =
@@ -1761,7 +1775,7 @@ fun ManualEntryContent(
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     modifier =
                         Modifier
-                            .weight(3f)
+                            .weight(CHARGE_BUTTON_WEIGHT)
                             .fillMaxWidth(),
                 ) {
                     Icon(

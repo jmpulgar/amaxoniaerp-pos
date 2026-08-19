@@ -15,6 +15,11 @@ class ApiReportRepository(
     private val apiService: ApiService,
     private val localStore: LocalStore,
 ) : ReportRepository {
+    private companion object {
+        /** Tamaño de página fijo pedido al backend para el top de más vendidos. */
+        const val BEST_SELLERS_LIMIT = 20
+    }
+
     private val bestSellerColors =
         longArrayOf(
             0xFF1565C0,
@@ -57,7 +62,7 @@ class ApiReportRepository(
             return Result.failure(IllegalStateException("No hay empresa seleccionada"))
         }
         return runCatching {
-            val list = apiService.getBestSellers(token, 20)
+            val list = apiService.getBestSellers(token, BEST_SELLERS_LIMIT)
             val maxCount = list.maxOfOrNull { it.salesCount }?.toFloat() ?: 1f
             list.mapIndexed { index, dto ->
                 BestSellerProduct(

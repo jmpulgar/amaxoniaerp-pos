@@ -20,6 +20,16 @@ class OfflineFirstClientFormCatalogSource(
     private val localAddressCatalogs: AddressCatalogRepository,
     private val localClientTypes: ClientTypeRepository,
 ) : ClientFormCatalogSource {
+    private companion object {
+        /** Los catálogos del formulario se piden completos en una sola página. */
+        const val REMOTE_CATALOG_PAGE_SIZE = 1000
+
+        /** Niveles jerárquicos de dirección (país/estado/ciudad). */
+        const val ADDRESS_LEVEL_1 = 1
+        const val ADDRESS_LEVEL_2 = 2
+        const val ADDRESS_LEVEL_3 = 3
+    }
+
     override suspend fun load(): ClientFormCatalogs {
         val token = localStore.readCompanySession()?.token
         if (!networkMonitor.isOnline() || token.isNullOrBlank()) return loadLocal()
@@ -29,11 +39,11 @@ class OfflineFirstClientFormCatalogSource(
 
     private suspend fun loadRemote(token: String): ClientFormCatalogs =
         coroutineScope {
-            val countries = async { apiService.getCountries(token, 1000, 0, false) }
-            val types = async { apiService.getClientTypes(token, 1000, 0, false) }
-            val level1 = async { apiService.getAddressLevels(token, 1, 1000, 0, false) }
-            val level2 = async { apiService.getAddressLevels(token, 2, 1000, 0, false) }
-            val level3 = async { apiService.getAddressLevels(token, 3, 1000, 0, false) }
+            val countries = async { apiService.getCountries(token, REMOTE_CATALOG_PAGE_SIZE, 0, false) }
+            val types = async { apiService.getClientTypes(token, REMOTE_CATALOG_PAGE_SIZE, 0, false) }
+            val level1 = async { apiService.getAddressLevels(token, ADDRESS_LEVEL_1, REMOTE_CATALOG_PAGE_SIZE, 0, false) }
+            val level2 = async { apiService.getAddressLevels(token, ADDRESS_LEVEL_2, REMOTE_CATALOG_PAGE_SIZE, 0, false) }
+            val level3 = async { apiService.getAddressLevels(token, ADDRESS_LEVEL_3, REMOTE_CATALOG_PAGE_SIZE, 0, false) }
             ClientFormCatalogs(
                 countries = countries.await().map { Country(it.id, it.iso, it.name) },
                 clientTypes = types.await().map { ClientTypeOption(it.id, it.name) },

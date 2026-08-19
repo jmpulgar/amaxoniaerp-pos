@@ -80,7 +80,7 @@ class SunmiV2Printer(
                     }
                 }
             }
-            service.lineWrap(4, null)
+            service.lineWrap(TICKET_TRAILING_FEED_LINES, null)
         }
 
     private suspend fun withService(block: (com.sunmi.peripheral.printer.SunmiPrinterService) -> Unit): PrintResult {
@@ -115,6 +115,9 @@ private object SunmiFontSize {
     const val TOTALS_REGULAR = 24f
     const val TOTALS_BOLD = 26f
 }
+
+/** Saltos de línea que alimentan el papel tras imprimir un ticket completo. */
+private const val TICKET_TRAILING_FEED_LINES = 4
 
 /**
  * Builds a single physical line for [TicketElement.TotalsRow], guaranteeing that the rendered

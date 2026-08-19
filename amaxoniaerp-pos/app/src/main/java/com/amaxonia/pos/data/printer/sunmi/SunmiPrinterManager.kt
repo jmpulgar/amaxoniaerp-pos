@@ -8,6 +8,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
+/** Plazo máximo para completar el bind del servicio de impresión SUNMI. */
+private const val BIND_TIMEOUT_MS = 3_000L
+
 class SunmiPrinterManager(
     context: Context,
 ) {
@@ -20,7 +23,7 @@ class SunmiPrinterManager(
     suspend fun bind(): Boolean {
         printerService?.let { return true }
 
-        return withTimeoutOrNull(3_000) {
+        return withTimeoutOrNull(BIND_TIMEOUT_MS) {
             suspendCancellableCoroutine { continuation ->
                 val bindCallback =
                     object : InnerPrinterCallback() {

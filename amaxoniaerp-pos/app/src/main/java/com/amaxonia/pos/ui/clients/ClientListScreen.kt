@@ -230,10 +230,10 @@ fun ClientListItem(
                 // Helper visual rápido para mostrar nombres en lugar de IDs
                 val typeName =
                     when (client.clientTypeId) {
-                        1 -> "Contribuyente"
-                        2 -> "Consumidor Final"
-                        3 -> "Gobierno"
-                        4 -> "Extranjero"
+                        CLIENT_TYPE_CONTRIBUYENTE -> "Contribuyente"
+                        CLIENT_TYPE_CONSUMIDOR_FINAL -> "Consumidor Final"
+                        CLIENT_TYPE_GOBIERNO -> "Gobierno"
+                        CLIENT_TYPE_EXTRANJERO -> "Extranjero"
                         else -> "Tipo ${client.clientTypeId}"
                     }
 
@@ -247,3 +247,9 @@ fun ClientListItem(
         }
     }
 }
+
+/** IDs de tipo de cliente del catálogo del backend, mostrados con nombre fijo en la lista. */
+private const val CLIENT_TYPE_CONTRIBUYENTE = 1
+private const val CLIENT_TYPE_CONSUMIDOR_FINAL = 2
+private const val CLIENT_TYPE_GOBIERNO = 3
+private const val CLIENT_TYPE_EXTRANJERO = 4

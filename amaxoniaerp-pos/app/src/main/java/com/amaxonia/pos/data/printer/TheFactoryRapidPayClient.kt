@@ -235,17 +235,17 @@ class TheFactoryRapidPayClient(
             error("Monto excede mÃ¡ximo permitido por plataforma financiera (999999999.99)")
         }
         val amountCents =
-            (amount.coerceAtLeast(0.01) * 100)
+            (amount.coerceAtLeast(MIN_GATEWAY_AMOUNT) * AMOUNT_CENTS_SCALE)
                 .roundToLong()
                 .toString()
-                .padStart(16, '0')
+                .padStart(AMOUNT_FIELD_LENGTH, '0')
 
-        val customer = customerIdentifier.filter(Char::isDigit).take(9).ifBlank { "0" }
+        val customer = customerIdentifier.filter(Char::isDigit).take(CUSTOMER_ID_MAX_LENGTH).ifBlank { "0" }
         val commerce =
             commerceRif
                 .uppercase()
                 .filter { it.isLetterOrDigit() }
-                .take(11)
+                .take(COMMERCE_RIF_MAX_LENGTH)
                 .ifBlank { error("RIF de comercio invÃ¡lido. Configura parametros_generales.rif") }
 
         // Manual HKA V1.0.2: K{gateway}V{amount16}|{ci/rif}|{rifComercio}|
@@ -296,7 +296,7 @@ class TheFactoryRapidPayClient(
 
     private fun readRawResponse(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(4096)
+        val buffer = ByteArray(SOCKET_BUFFER_SIZE)
         val output = ByteArrayOutputStream()
         val originalTimeout = socket.soTimeout
         socket.soTimeout = READ_CHUNK_TIMEOUT_MS
@@ -348,6 +348,14 @@ class TheFactoryRapidPayClient(
         private const val SOCKET_TIMEOUT_MS = 10000
         private const val READ_CHUNK_TIMEOUT_MS = 2000
         private const val MAX_GATEWAY_AMOUNT = 999_999_999.99
+
+        // Manual HKA V1.0.2: monto en centésimos a 16 dígitos, CI/RIF del cliente (9) y del comercio (11)
+        private const val MIN_GATEWAY_AMOUNT = 0.01
+        private const val AMOUNT_CENTS_SCALE = 100
+        private const val AMOUNT_FIELD_LENGTH = 16
+        private const val CUSTOMER_ID_MAX_LENGTH = 9
+        private const val COMMERCE_RIF_MAX_LENGTH = 11
+        private const val SOCKET_BUFFER_SIZE = 4096
     }
 }
 

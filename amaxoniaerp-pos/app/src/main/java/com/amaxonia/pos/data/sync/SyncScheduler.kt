@@ -20,6 +20,9 @@ object SyncScheduler {
     internal const val FISCAL_CONFIRMATION_WORK_NAME = "fiscal_confirmation_sync"
     internal const val GATEWAY_CALLBACK_WORK_NAME = "gateway_callback_sync"
 
+    /** Intervalo del sync periódico de catálogo en segundo plano. */
+    private const val CATALOG_SYNC_INTERVAL_HOURS = 12L
+
     fun getManualSyncWorkInfos(context: Context) = WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(MANUAL_WORK_NAME)
 
     fun schedulePeriodic(context: Context) {
@@ -29,7 +32,7 @@ object SyncScheduler {
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
         val request =
-            PeriodicWorkRequestBuilder<CatalogSyncWorker>(12, TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<CatalogSyncWorker>(CATALOG_SYNC_INTERVAL_HOURS, TimeUnit.HOURS)
                 .setConstraints(constraints)
                 .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(

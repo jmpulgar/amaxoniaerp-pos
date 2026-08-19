@@ -96,7 +96,7 @@ class HkaConnectionHelper(
                         error("La impresora no respondiÃ³")
                     }
 
-                    if (response[0].toInt() and 0xFF == NAK) {
+                    if (response[0].toInt() and BYTE_MASK == NAK) {
                         error("La impresora respondiÃ³ con NAK (error)")
                     }
 
@@ -124,7 +124,7 @@ class HkaConnectionHelper(
      */
     private fun readResponseWithStripping(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(1024)
+        val buffer = ByteArray(SOCKET_BUFFER_SIZE)
         val output = ByteArrayOutputStream()
 
         val originalTimeout = socket.soTimeout
@@ -135,7 +135,7 @@ class HkaConnectionHelper(
                 val bytesRead = inputStream.read(buffer)
                 if (bytesRead == -1) break
 
-                val first = buffer[0].toInt() and 0xFF
+                val first = buffer[0].toInt() and BYTE_MASK
                 val off = if (first in 6..15) 0 else 1
                 if (bytesRead > off) {
                     output.write(buffer, off, bytesRead - off)
@@ -155,8 +155,8 @@ class HkaConnectionHelper(
      * Matches SDK's PrinterStatus(int status, int error) constructor.
      */
     private fun parseStatus(bytes: ByteArray): PrinterStatusResult {
-        val statusByte = bytes[0].toInt() and 0xFF
-        val errorByte = if (bytes.size > 1) bytes[1].toInt() and 0xFF else 0x40
+        val statusByte = bytes[0].toInt() and BYTE_MASK
+        val errorByte = if (bytes.size > 1) bytes[1].toInt() and BYTE_MASK else DEFAULT_ERROR_BYTE
 
         val statusHex = Integer.toHexString(statusByte)
         val errorHex = Integer.toHexString(errorByte)
@@ -203,6 +203,9 @@ class HkaConnectionHelper(
         private const val SOCKET_TIMEOUT_MS = 10000
         private const val READ_CHUNK_TIMEOUT_MS = 2000
         private const val NAK = 21
+        private const val BYTE_MASK = 0xFF
+        private const val DEFAULT_ERROR_BYTE = 0x40
+        private const val SOCKET_BUFFER_SIZE = 1024
     }
 }
 

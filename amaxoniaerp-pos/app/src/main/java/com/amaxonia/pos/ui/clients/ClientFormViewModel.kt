@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Tipos de cliente (catálogo del backend) que representan personas jurídicas: fijan el taxpayerType. */
+private val JURIDICO_CLIENT_TYPE_IDS = setOf(2, 3)
+
 class ClientFormViewModel(
     private val clientRepository: ClientRepository,
     private val addressCatalogRepository: AddressCatalogRepository,
@@ -163,7 +166,7 @@ class ClientFormViewModel(
             val updatedClient =
                 s.client.copy(
                     clientTypeId = type.id,
-                    taxpayerType = if (type.id == 2 || type.id == 3) TaxpayerType.JURIDICO else s.client.taxpayerType,
+                    taxpayerType = if (type.id in JURIDICO_CLIENT_TYPE_IDS) TaxpayerType.JURIDICO else s.client.taxpayerType,
                 )
             s.copy(client = updatedClient)
         }
@@ -171,7 +174,7 @@ class ClientFormViewModel(
 
     fun onTaxpayerTypeChange(type: TaxpayerType) {
         val currentTypeId = _state.value.client.clientTypeId
-        if (currentTypeId == 2 || currentTypeId == 3) return
+        if (currentTypeId in JURIDICO_CLIENT_TYPE_IDS) return
         _state.update { it.copy(client = it.client.copy(taxpayerType = type)) }
     }
 

@@ -21,6 +21,9 @@ import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.ui.theme.PosTheme
 
+/** Ancho del dropdown de países como fracción de la pantalla. */
+private const val DROPDOWN_MENU_WIDTH_FRACTION = 0.9f
+
 /**
  * Componente de selección de país para la pantalla de login.
  * Muestra un dropdown con los países disponibles y sus banderas.
@@ -56,7 +59,7 @@ fun CountrySelector(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(0.9f),
+            modifier = Modifier.fillMaxWidth(DROPDOWN_MENU_WIDTH_FRACTION),
         ) {
             countries.forEach { country ->
                 DropdownMenuItem(

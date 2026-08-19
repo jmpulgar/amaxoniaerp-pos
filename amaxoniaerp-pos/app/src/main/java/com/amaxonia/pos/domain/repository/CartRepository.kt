@@ -16,6 +16,13 @@ import kotlinx.coroutines.flow.update
 
 /** In-memory cart state exposed through stable domain models. */
 class CartRepository {
+    private companion object {
+        /** Conversión porcentaje → fracción para impuestos, y rango válido de descuento. */
+        const val PERCENT_DIVISOR = 100.0
+        const val MIN_DISCOUNT_PERCENT = 0.0
+        const val MAX_DISCOUNT_PERCENT = 100.0
+    }
+
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
@@ -111,7 +118,7 @@ class CartRepository {
         return if (unit == "UNIDAD" && product.bulkQuantity > 1.0) {
             price?.unitPricePlusTax?.takeIf { it > 0.0 }
                 ?: price?.unitPrice?.takeIf { it > 0.0 }?.let { unitPrice ->
-                    if (product.isExempt || product.taxRate <= 0.0) unitPrice else unitPrice * (1.0 + product.taxRate / 100.0)
+                    if (product.isExempt || product.taxRate <= 0.0) unitPrice else unitPrice * (1.0 + product.taxRate / PERCENT_DIVISOR)
                 }
                 ?: 0.0
         } else {
@@ -293,7 +300,7 @@ class CartRepository {
         discountPercent: Double,
     ) {
         invalidateFinancialSnapshot()
-        val safeDiscount = discountPercent.coerceIn(0.0, 100.0)
+        val safeDiscount = discountPercent.coerceIn(MIN_DISCOUNT_PERCENT, MAX_DISCOUNT_PERCENT)
         _cartItems.update { items ->
             items.map { item ->
                 if (item.product.id == productId) {

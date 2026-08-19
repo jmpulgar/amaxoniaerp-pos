@@ -29,6 +29,16 @@ class CatalogSyncer(
     private val clientTypeDao: ClientTypeDao,
     private val promocionDao: PromocionDao,
 ) : com.amaxonia.pos.domain.repository.CatalogSynchronization {
+    private companion object {
+        /** Longitud máxima del código de cliente usada como clave de sus sucursales. */
+        const val CLIENT_CODE_MAX_LENGTH = 9
+
+        /** Niveles jerárquicos de dirección (país/estado/ciudad) sincronizados. */
+        const val ADDRESS_LEVEL_1 = 1
+        const val ADDRESS_LEVEL_2 = 2
+        const val ADDRESS_LEVEL_3 = 3
+    }
+
     override suspend fun syncAll(pageSize: Int): Result<Unit> {
         val session =
             localStore.readCompanySession()
@@ -70,7 +80,7 @@ class CatalogSyncer(
             clientDao.insertAll(response.data.map { it.toEntity() })
             response.data.forEach { client ->
                 val id = client.id ?: return@forEach
-                val code = client.code.orEmpty().take(9)
+                val code = client.code.orEmpty().take(CLIENT_CODE_MAX_LENGTH)
                 runCatching {
                     val sucursales = apiService.getClientSucursales(token, id)
                     if (code.isNotBlank()) {
@@ -136,9 +146,9 @@ class CatalogSyncer(
         token: String,
         pageSize: Int,
     ) {
-        syncAddressLevel(token, pageSize, 1)
-        syncAddressLevel(token, pageSize, 2)
-        syncAddressLevel(token, pageSize, 3)
+        syncAddressLevel(token, pageSize, ADDRESS_LEVEL_1)
+        syncAddressLevel(token, pageSize, ADDRESS_LEVEL_2)
+        syncAddressLevel(token, pageSize, ADDRESS_LEVEL_3)
     }
 
     private suspend fun syncAddressLevel(
@@ -158,9 +168,9 @@ class CatalogSyncer(
                 )
             if (response.isEmpty()) break
             when (level) {
-                1 -> addressLevel1Dao.insertAll(response.map { it.toLevel1Entity() })
-                2 -> addressLevel2Dao.insertAll(response.map { it.toLevel2Entity() })
-                3 -> addressLevel3Dao.insertAll(response.map { it.toLevel3Entity() })
+                ADDRESS_LEVEL_1 -> addressLevel1Dao.insertAll(response.map { it.toLevel1Entity() })
+                ADDRESS_LEVEL_2 -> addressLevel2Dao.insertAll(response.map { it.toLevel2Entity() })
+                ADDRESS_LEVEL_3 -> addressLevel3Dao.insertAll(response.map { it.toLevel3Entity() })
             }
             offset += pageSize
         }

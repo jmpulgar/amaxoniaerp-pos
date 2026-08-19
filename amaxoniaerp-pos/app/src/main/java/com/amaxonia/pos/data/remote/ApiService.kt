@@ -46,6 +46,10 @@ import kotlinx.serialization.json.jsonObject
 class ApiService(
     private val apiClient: ApiClient,
 ) {
+    private companion object {
+        const val HTTP_UNAUTHORIZED = 401
+    }
+
     // Acceso al cliente HTTP actual (se recrea automáticamente si cambia la URL)
     private val client: HttpClient
         get() = apiClient.httpClient
@@ -68,7 +72,7 @@ class ApiService(
                 setBody(request)
             }
         if (!response.status.isSuccess()) {
-            if (response.status.value == 401) {
+            if (response.status.value == HTTP_UNAUTHORIZED) {
                 throw UnauthorizedException("Usuario o contrasena incorrectos")
             }
             val message =

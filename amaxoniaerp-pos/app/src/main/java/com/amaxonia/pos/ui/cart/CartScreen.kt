@@ -90,6 +90,9 @@ import com.amaxonia.pos.ui.theme.cartBrandGradient
 /** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
 private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
 
+/** Máximo de dígitos aceptados al escribir una cantidad manual en el carrito. */
+private const val MAX_QUANTITY_DIGITS = 5
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(
@@ -918,7 +921,7 @@ private fun sanitizeQuantityInput(value: String): String =
         .filter { it.isDigit() }
         .trimStart('0')
         .ifBlank { "" }
-        .take(5)
+        .take(MAX_QUANTITY_DIGITS)
 
 @Composable
 fun CartItemRow(

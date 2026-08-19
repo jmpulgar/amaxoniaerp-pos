@@ -81,6 +81,7 @@ private const val RING_TARGET_SCALE = 1.7f
 private const val RING_ANIMATION_DURATION_MS = 650
 private const val CARD_INITIAL_SCALE = 0.85f
 private const val CARD_SCALE_ANIMATION_DURATION_MS = 260
+private const val CARD_ENTER_SCALE_ANIMATION_DURATION_MS = 220
 private val WIDE_CONTENT_MAX_WIDTH = 560.dp
 
 /** Acciones de la pantalla agrupadas para mantener las firmas de los composables pequeñas. */
@@ -269,7 +270,7 @@ private fun SuccessAnimatedBody(
             visible = animation.visible,
             enter =
                 fadeIn(animationSpec = tween(CARD_SCALE_ANIMATION_DURATION_MS)) +
-                    scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
+                    scaleIn(initialScale = 0.92f, animationSpec = tween(CARD_ENTER_SCALE_ANIMATION_DURATION_MS)),
         ) {
             if (isLoading) {
                 LoadingConfirmation(scale = animation.scale)

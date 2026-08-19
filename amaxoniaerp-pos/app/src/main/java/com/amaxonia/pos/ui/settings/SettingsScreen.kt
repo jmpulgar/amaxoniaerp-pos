@@ -76,6 +76,9 @@ import com.amaxonia.pos.ui.theme.NeutralGray
 import com.amaxonia.pos.ui.theme.SuccessGreen
 import kotlinx.coroutines.launch
 
+/** Forma de píldora del indicador de estado de impresora configurada. */
+private val STATUS_PILL_SHAPE = RoundedCornerShape(50)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -643,7 +646,7 @@ fun SettingsScreen(
                         Box(
                             modifier =
                                 Modifier
-                                    .clip(RoundedCornerShape(50))
+                                    .clip(STATUS_PILL_SHAPE)
                                     .background(
                                         if (selectedPrinterType != PrinterType.NONE) {
                                             SuccessGreen.copy(alpha = 0.12f)

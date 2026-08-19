@@ -42,13 +42,16 @@ class TaxRate private constructor(
     override fun toString(): String = "TaxRate(${percentage.toPlainString()}%)"
 
     companion object {
+        /** Escala decimal fija (4 dígitos) con la que se normaliza todo porcentaje de impuesto. */
+        private const val PERCENTAGE_SCALE = 4
+
         val ZERO = of(BigDecimal.ZERO)
 
         fun of(value: BigDecimal): TaxRate {
             require(value >= BigDecimal.ZERO && value <= BigDecimal("100")) {
                 "Tax rate must be between 0 and 100"
             }
-            return TaxRate(value.setScale(4, RoundingMode.HALF_EVEN))
+            return TaxRate(value.setScale(PERCENTAGE_SCALE, RoundingMode.HALF_EVEN))
         }
 
         fun fromDouble(value: Double): TaxRate = of(BigDecimal.valueOf(value))

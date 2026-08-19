@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Conversión porcentaje → fracción para utilidad e impuesto en el cálculo de precios. */
+private const val PERCENT_DIVISOR = 100
+
 class ProductFormViewModel(
     private val productRepository: ProductRepository,
 ) : ViewModel() {
@@ -177,12 +180,12 @@ class ProductFormViewModel(
             val currentPrices = currentProduct.prices.toMutableList()
             var updatedRow = currentPrices[index].block()
             val cost = currentProduct.costActual
-            val price = if (cost > 0) cost * (1 + (updatedRow.utilityPercent / 100)) else updatedRow.price
+            val price = if (cost > 0) cost * (1 + (updatedRow.utilityPercent / PERCENT_DIVISOR)) else updatedRow.price
             val priceWithTax =
                 if (currentProduct.isExempt) {
                     price
                 } else {
-                    price * (1 + (currentProduct.taxRate / 100))
+                    price * (1 + (currentProduct.taxRate / PERCENT_DIVISOR))
                 }
             updatedRow =
                 updatedRow.copy(
@@ -203,7 +206,7 @@ class ProductFormViewModel(
                 state.product.prices.map { row ->
                     val price =
                         if (cost > 0) {
-                            cost * (1 + (row.utilityPercent / 100))
+                            cost * (1 + (row.utilityPercent / PERCENT_DIVISOR))
                         } else {
                             row.price
                         }
@@ -211,7 +214,7 @@ class ProductFormViewModel(
                         if (state.product.isExempt) {
                             price
                         } else {
-                            price * (1 + (taxRate / 100))
+                            price * (1 + (taxRate / PERCENT_DIVISOR))
                         }
                     row.copy(
                         price = price,

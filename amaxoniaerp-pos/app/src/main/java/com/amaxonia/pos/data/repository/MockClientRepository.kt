@@ -6,6 +6,10 @@ import com.amaxonia.pos.domain.repository.ClientRepository
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
+/** Cada 3er cliente demo es jurídico; códigos "CL-001..050". */
+private const val JURIDICO_EVERY_N_CLIENTS = 3
+private const val MOCK_CLIENT_CODE_LENGTH = 3
+
 class MockClientRepository : ClientRepository {
     private val mockClients = mutableListOf<Client>()
     private val failureRate = 0.1
@@ -129,11 +133,11 @@ class MockClientRepository : ClientRepository {
     private fun generateMockClients() {
         mockClients.clear()
         for (i in 1..50) {
-            val typeId = if (i % 3 == 0) 2 else 1
+            val typeId = if (i % JURIDICO_EVERY_N_CLIENTS == 0) 2 else 1
             val taxpayer = if (typeId == 2) TaxpayerType.JURIDICO else TaxpayerType.NATURAL
             mockClients.add(
                 Client(
-                    code = "CL-${i.toString().padStart(3, '0')}",
+                    code = "CL-${i.toString().padStart(MOCK_CLIENT_CODE_LENGTH, '0')}",
                     firstName = if (typeId == 2) "Empresa $i S.A." else "Cliente $i",
                     lastName = if (typeId == 2) "Comercial $i" else "Apellido $i",
                     clientTypeId = typeId,

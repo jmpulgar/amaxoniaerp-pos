@@ -132,6 +132,10 @@ private fun FacturaSummaryDto.toTransaction(): Transaction {
  * Extracts "HH:mm" from a datetime string like "dd/MM/yyyy HH:mm:ss".
  */
 private fun extractTime(dateTimeStr: String): String? {
-    if (dateTimeStr.isBlank() || dateTimeStr.length <= 10) return null
-    return dateTimeStr.substring(11).take(5) // "HH:mm"
+    if (dateTimeStr.isBlank() || dateTimeStr.length <= DATE_PART_LENGTH) return null
+    return dateTimeStr.substring(DATE_PART_LENGTH + 1).take(TIME_LENGTH) // "HH:mm"
 }
+
+/** Longitudes fijas del formato "dd/MM/yyyy HH:mm:ss". */
+private const val DATE_PART_LENGTH = 10
+private const val TIME_LENGTH = 5

@@ -18,13 +18,18 @@ import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 import io.ktor.client.network.sockets.SocketTimeoutException as KtorSocketTimeoutException
 
 /** Base (ms) del backoff exponencial de reintento para lecturas idempotentes. */
 private const val RETRY_BASE_DELAY_MS = 100L
+
+/** Timeouts HTTP: conexión corta; lectura/escritura amplias para sincronización y facturación. */
+private val CONNECT_TIMEOUT = 15.seconds
+private val IO_TIMEOUT = 60.seconds
 
 /**
  * Cliente HTTP de Ktor configurado dinámicamente según el país seleccionado.
@@ -55,9 +60,9 @@ class ApiClient(
                 OkHttpClient
                     .Builder()
                     .connectionSpecs(connectionSpecs)
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
-                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .connectTimeout(CONNECT_TIMEOUT.toJavaDuration())
+                    .readTimeout(IO_TIMEOUT.toJavaDuration())
+                    .writeTimeout(IO_TIMEOUT.toJavaDuration())
                     .build()
             } else {
                 null
@@ -76,9 +81,9 @@ class ApiClient(
                 configureCajaRetry()
             }
             install(HttpTimeout) {
-                requestTimeoutMillis = 60_000
-                connectTimeoutMillis = 15_000
-                socketTimeoutMillis = 60_000
+                requestTimeoutMillis = IO_TIMEOUT.inWholeMilliseconds
+                connectTimeoutMillis = CONNECT_TIMEOUT.inWholeMilliseconds
+                socketTimeoutMillis = IO_TIMEOUT.inWholeMilliseconds
             }
             defaultRequest {
                 url(apiConfigManager.baseUrl.value)

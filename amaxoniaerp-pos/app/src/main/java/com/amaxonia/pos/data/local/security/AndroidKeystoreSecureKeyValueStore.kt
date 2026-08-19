@@ -60,8 +60,8 @@ class AndroidKeystoreSecureKeyValueStore(
     }
 
     private fun decrypt(encoded: String): String {
-        val parts = encoded.split(SEPARATOR, limit = 3)
-        if (parts.size != 3 || parts[0] != FORMAT_VERSION) {
+        val parts = encoded.split(SEPARATOR, limit = ENCRYPTED_VALUE_PARTS)
+        if (parts.size != ENCRYPTED_VALUE_PARTS || parts[0] != FORMAT_VERSION) {
             throw SecureStorageException("Unsupported secure value format")
         }
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -83,7 +83,7 @@ class AndroidKeystoreSecureKeyValueStore(
                         KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
                     ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
+                    .setKeySize(AES_KEY_SIZE_BITS)
                     .build(),
             )
             generateKey()
@@ -96,6 +96,8 @@ class AndroidKeystoreSecureKeyValueStore(
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_TAG_LENGTH = 128
+        private const val AES_KEY_SIZE_BITS = 256
+        private const val ENCRYPTED_VALUE_PARTS = 3
         private const val FORMAT_VERSION = "v1"
         private const val SEPARATOR = ":"
     }

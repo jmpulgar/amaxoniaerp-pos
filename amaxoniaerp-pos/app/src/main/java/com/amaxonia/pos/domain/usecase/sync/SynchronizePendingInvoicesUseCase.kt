@@ -83,8 +83,8 @@ class SynchronizePendingInvoicesUseCase(
     private val decoder: PendingSaleDecoder,
     private val gateway: PendingSaleGateway,
     private val clock: AppClock,
-    private val interruptedLease: Duration = Duration.ofMinutes(15),
-    private val claimLease: Duration = Duration.ofMinutes(2),
+    private val interruptedLease: Duration = DEFAULT_INTERRUPTED_LEASE,
+    private val claimLease: Duration = DEFAULT_CLAIM_LEASE,
 ) {
     /**
      * @param tenantId the canonical tenant id of the currently active session.
@@ -136,5 +136,11 @@ class SynchronizePendingInvoicesUseCase(
         }
 
         return if (requiresRetry) PendingInvoiceSyncResult.Retry else PendingInvoiceSyncResult.Success
+    }
+
+    private companion object {
+        /** Leases de la cola de reenvío: recuperación de envíos interrumpidos y claim atómico por factura. */
+        val DEFAULT_INTERRUPTED_LEASE: Duration = Duration.ofMinutes(15)
+        val DEFAULT_CLAIM_LEASE: Duration = Duration.ofMinutes(2)
     }
 }

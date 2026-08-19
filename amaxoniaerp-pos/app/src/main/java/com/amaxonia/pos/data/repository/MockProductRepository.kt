@@ -9,6 +9,10 @@ import com.amaxonia.pos.domain.repository.ProductRepository
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
+/** IDs fijos del catálogo demo y ancho del código generado "PROD-0001". */
+private const val THIRD_MOCK_OPTION_ID = 3
+private const val MOCK_PRODUCT_CODE_LENGTH = 4
+
 class MockProductRepository : ProductRepository {
     private val mockProducts = mutableListOf<Product>()
     private val failureRate = 0.1
@@ -29,7 +33,7 @@ class MockProductRepository : ProductRepository {
         val options =
             when (departmentId) {
                 1 -> listOf(Department(1, "Seccion 1"), Department(2, "Seccion 2"))
-                2 -> listOf(Department(3, "Seccion 3"))
+                2 -> listOf(Department(THIRD_MOCK_OPTION_ID, "Seccion 3"))
                 else -> emptyList()
             }
         return Result.success(options)
@@ -39,7 +43,7 @@ class MockProductRepository : ProductRepository {
         val options =
             when (sectionId) {
                 1 -> listOf(Department(1, "Familia 1"), Department(2, "Familia 2"))
-                2 -> listOf(Department(3, "Familia 3"))
+                2 -> listOf(Department(THIRD_MOCK_OPTION_ID, "Familia 3"))
                 else -> emptyList()
             }
         return Result.success(options)
@@ -49,7 +53,7 @@ class MockProductRepository : ProductRepository {
         val options =
             when (familyId) {
                 1 -> listOf(Department(1, "Subfamilia 1"), Department(2, "Subfamilia 2"))
-                2 -> listOf(Department(3, "Subfamilia 3"))
+                2 -> listOf(Department(THIRD_MOCK_OPTION_ID, "Subfamilia 3"))
                 else -> emptyList()
             }
         return Result.success(options)
@@ -61,7 +65,7 @@ class MockProductRepository : ProductRepository {
         val options =
             when (brandId) {
                 1 -> listOf(Department(1, "Linea 1"), Department(2, "Linea 2"))
-                2 -> listOf(Department(3, "Linea 3"))
+                2 -> listOf(Department(THIRD_MOCK_OPTION_ID, "Linea 3"))
                 else -> emptyList()
             }
         return Result.success(options)
@@ -206,7 +210,7 @@ class MockProductRepository : ProductRepository {
         for (i in 1..200) {
             mockProducts.add(
                 Product(
-                    code = "PROD-${i.toString().padStart(4, '0')}",
+                    code = "PROD-${i.toString().padStart(MOCK_PRODUCT_CODE_LENGTH, '0')}",
                     description = "Producto Ejemplo $i",
                     reference = "REF-$i",
                     costActual = 10.0 + i,

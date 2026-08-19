@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Longitud máxima aceptada del número de serie de la impresora The Factory HKA. */
+private const val THE_FACTORY_SERIAL_MAX_LENGTH = 10
+
 class SettingsViewModel(
     private val settingsRepository: PosSettingsRepository,
     private val fiscalDiagnostics: FiscalDeviceDiagnostics? = null,
@@ -121,7 +124,7 @@ class SettingsViewModel(
                     value
                         .uppercase()
                         .filter(Char::isLetterOrDigit)
-                        .take(10),
+                        .take(THE_FACTORY_SERIAL_MAX_LENGTH),
             )
         }
     }
@@ -216,7 +219,7 @@ class SettingsViewModel(
                         .trim()
                         .uppercase()
                         .filter(Char::isLetterOrDigit)
-                        .take(10),
+                        .take(THE_FACTORY_SERIAL_MAX_LENGTH),
             )
 
         return runCatching {
