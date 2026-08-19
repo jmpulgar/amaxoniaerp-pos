@@ -85,6 +85,25 @@ Se justifica `application/` o un módulo de operación cuando existe al menos un
 
 No se agrega `application/` a CRUD simples sólo por simetría.
 
+### Clasificación de features (TASK-040)
+
+| Feature | Archetype | Estructura |
+|---|---|---|
+| `sales` | **B** (referencia) | `route -> ProcessSaleUseCase -> domain -> ProcessSaleTransactionalRepository` |
+| `creditnotes` | **B + C** | `route -> CreditNoteService -> PanamaCreditNoteProcessor -> PAC` (staged: DB corta, PAC fuera de tx, finalize) |
+| `electronicinvoice` | **C** | `ElectronicInvoiceProcessorFactory` + strategies PA/VE -> `pac/thefactory` adapters |
+| `mesas` | **B** | sesiones/pedidos/cuentas con transiciones de estado; facturación vía `ProcessSaleUseCase` |
+| `caja` | **B** (open/close) + **A** (GETs) | apertura/cierre con auto-close y validaciones en `CajaRepository`; GETs son queries |
+| `auth` | **B** | `route -> AuthService/CompanyService` (two-tier login + selección de empresa) |
+| `companies` | **B** | `CompanyService` emite token de empresa |
+| `facturas` | **A + C** | queries directas; confirmación fiscal/envío de correo delegan en el processor FE |
+| `assets` | **A** | servir archivos/URLs |
+| `clients` / `client-types` | **A** | query/CRUD simple |
+| `items` | **A** | query/CRUD simple |
+| `geography` | **A** | catálogos |
+| `pos` (formas de pago) | **A** | catálogo |
+| `promotions` | **A** | consultas de promociones |
+
 ## Composition roots y DI
 
 La estrategia canónica es constructor DI manual. El composition root crea adaptadores, repositories, application services/use cases y los entrega a routing/UI. Koin no debe convertirse en una segunda estrategia paralela para el mismo grafo.

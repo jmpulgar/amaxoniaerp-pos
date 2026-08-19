@@ -693,6 +693,11 @@ Normalizar:
 
 ### TASK-040 — Clasificar features
 
+> **ESTADO: COMPLETADA (2026-08-18).** Clasificación registrada en `doc/ARCHITECTURE.md`
+> (§ Clasificación de features): sales=B (referencia), creditnotes=B+C, electronicinvoice=C,
+> mesas=B, caja=B (open/close)+A (GETs), auth/companies=B, facturas=A+C,
+> assets/clients/items/geography/pos/promotions=A.
+
 Cada feature:
 
 ```text
@@ -703,9 +708,16 @@ EXTERNAL_INTEGRATION
 
 ### TASK-041 — Sales reference architecture
 
+> **ESTADO: COMPLETADA (2026-08-18).** Sales ya cumple el patrón referencia
+> (`route -> ProcessSaleUseCase -> domain -> ProcessSaleTransactionalRepository`); se conserva.
+
 Mantenerlo como referencia si ya cumple.
 
 ### TASK-042 — Credit notes
+
+> **ESTADO: COMPLETADA (2026-08-18).** Flujo staged preservado y verificado en
+> `CreditNoteService`: `dbQuery` (prepare) -> `processor.process` con PAC FUERA de transacción
+> -> `dbQuery` (finalize/appendPdfDiagnostic). Sin I/O externo dentro de transacción SQL.
 
 Preservar estrictamente:
 
@@ -717,6 +729,10 @@ short finalize DB phase
 
 ### TASK-043 — Caja
 
+> **ESTADO: PENDIENTE.** Requiere characterization tests H2 de apertura/cierre (auto-close,
+> validaciones) antes de extraer `OpenCajaUseCase`/`CloseCajaUseCase` con la orquestación que
+> hoy vive en `CajaRepository`. Los GETs permanecen como queries.
+
 Separar application workflows sólo donde hay negocio:
 
 ```text
@@ -727,6 +743,10 @@ CloseCaja
 GETs simples pueden continuar como queries.
 
 ### TASK-044 — Mesas
+
+> **ESTADO: PENDIENTE.** Deep operations (OpenSession, Add/modify order, RequestAccount,
+> Pay/close account, Cancel/close session) requieren characterization tests de las
+> transiciones de estado antes de mover negocio fuera de los repositorios.
 
 Deep operations para:
 
@@ -740,9 +760,19 @@ Cancel/close session
 
 ### TASK-045 — Query features
 
+> **ESTADO: COMPLETADA (2026-08-18).** Clients/items/geography/promotions/pos permanecen
+> simples (route -> repository) sin capas artificiales; clasificados como Archetype A.
+
 Clients/items/geography/promotions/pos pueden seguir simples si no contienen negocio pesado.
 
 ### TASK-046 — Electronic invoice
+
+> **ESTADO: COMPLETADA (2026-08-18).** Auditoría: Strategy/Factory/adapters conservados;
+> selección de país por `tipo_facturacion` vía `ElectronicInvoiceProcessorFactory`; steps
+> separados en `PanamaInvoiceProcessor` (loadContext/auth/build/send/persist) y
+> `VenezuelaInvoiceStrategy` (reserva de correlativo DB -> HKA fuera de tx); resultados
+> tipados (`ElectronicInvoiceResult`), timeout 30s en HttpClient FE, sin retry ciego.
+> Sin HTTP dentro de transacción SQL.
 
 Conservar Strategy/Factory/adapters.
 Auditar country selection, HKA/digital policy, results, timeout/retry y SQL/HTTP boundaries.
