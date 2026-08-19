@@ -38,17 +38,21 @@ class PrinterFactory(
         if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
         synchronized(this) {
             if (theFactoryPrinterInstance != null) return theFactoryPrinterInstance
-            // Atrapar Throwable para evitar crashes de bajo nivel como NoClassDefFoundError en Android 10
+            // Atrapar Throwable (incluidos NoClassDefFoundError en Android 10) sin crash: mismo
+            // límite defensivo que el catch original, expresado con runCatching.
             theFactoryPrinterInstance =
-                try {
+                runCatching {
                     TheFactoryPrinterImpl(
                         context = appContext,
                         localStore = localStore,
                     )
-                } catch (t: Throwable) {
-                    SafeLog.e(TAG, "Fiscal printer implementation is unavailable", t)
-                    null
-                }
+                }.fold(
+                    onSuccess = { it },
+                    onFailure = { t ->
+                        SafeLog.e(TAG, "Fiscal printer implementation is unavailable", t)
+                        null
+                    },
+                )
             return theFactoryPrinterInstance
         }
     }
@@ -58,12 +62,15 @@ class PrinterFactory(
         synchronized(this) {
             if (sunmiPrinterInstance != null) return sunmiPrinterInstance
             sunmiPrinterInstance =
-                try {
+                runCatching {
                     SunmiV2Printer(appContext)
-                } catch (t: Throwable) {
-                    SafeLog.e(TAG, "SUNMI printer implementation is unavailable", t)
-                    null
-                }
+                }.fold(
+                    onSuccess = { it },
+                    onFailure = { t ->
+                        SafeLog.e(TAG, "SUNMI printer implementation is unavailable", t)
+                        null
+                    },
+                )
             return sunmiPrinterInstance
         }
     }

@@ -599,7 +599,9 @@ fun DashboardScreen(
                             onClick = {
                                 focusManager.clearFocus()
                                 scope.launch {
-                                    try {
+                                    // Same Throwable boundary as the original catch: defensive
+                                    // last-resort guard around Compose drawer state transitions.
+                                    runCatching {
                                         SafeLog.d(DASHBOARD_LOG_TAG, "Drawer requested")
                                         if (drawerState.isClosed) {
                                             drawerState.snapTo(DrawerValue.Open)
@@ -607,7 +609,7 @@ fun DashboardScreen(
                                         } else {
                                             SafeLog.d(DASHBOARD_LOG_TAG, "Drawer open request ignored")
                                         }
-                                    } catch (throwable: Throwable) {
+                                    }.onFailure { throwable ->
                                         SafeLog.e(DASHBOARD_LOG_TAG, "Unable to open drawer", throwable)
                                         runCatching { drawerState.close() }
                                     }

@@ -442,16 +442,24 @@ class LocalStore(
         }
 
         val legacyValue = dataStore.data.first()[legacyKey] ?: return null
-        return try {
+        return runCatching {
             secureWriter.write(secureKey, legacyValue)
             dataStore.edit { prefs -> prefs.remove(legacyKey) }
             legacyValue
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (error: Exception) {
-            SafeLog.e(TAG, "Secure migration failed; legacy value was preserved", error)
-            legacyValue
-        }
+        }.fold(
+            onSuccess = { it },
+            onFailure = { error ->
+                // Same boundary as the original catches: cancellation and fatal errors propagate.
+                when (error) {
+                    is CancellationException -> throw error
+                    is Exception -> {
+                        SafeLog.e(TAG, "Secure migration failed; legacy value was preserved", error)
+                        legacyValue
+                    }
+                    else -> throw error
+                }
+            },
+        )
     }
 
     private fun readSecureValue(key: String): String? =

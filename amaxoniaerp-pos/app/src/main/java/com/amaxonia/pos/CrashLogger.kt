@@ -23,7 +23,7 @@ object CrashLogger {
         context: Context,
         throwable: Throwable,
     ) {
-        try {
+        runCatching {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val filename = "crash_log_$timestamp.txt"
             val dir = context.getExternalFilesDir(null)
@@ -50,7 +50,9 @@ object CrashLogger {
             fileWriter.close()
 
             SafeLog.e("CrashLogger", "Debug crash report saved")
-        } catch (e: Exception) {
+        }.onFailure { e ->
+            // Same Exception boundary as the original catch: fatal JVM errors keep propagating.
+            if (e !is Exception) throw e
             SafeLog.e("CrashLogger", "Unable to save debug crash report", e)
         }
     }

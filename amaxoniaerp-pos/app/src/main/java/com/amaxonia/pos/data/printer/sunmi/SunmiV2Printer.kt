@@ -87,14 +87,18 @@ class SunmiV2Printer(
         val connected = manager.bind()
         if (!connected) return PrintResult.Error("Servicio de impresión SUNMI no disponible")
         val service = manager.getService() ?: return PrintResult.Error("Impresora SUNMI no conectada")
-        return try {
-            block(service)
-            PrintResult.Success
-        } catch (e: RemoteException) {
-            PrintResult.Error("Error comunicando con la impresora SUNMI", e)
-        } catch (e: Exception) {
-            PrintResult.Error(e.message ?: "No se pudo imprimir en SUNMI", e)
-        }
+        return runCatching { block(service) }
+            .fold(
+                onSuccess = { PrintResult.Success },
+                onFailure = { e ->
+                    // Same boundary/order as the original catches: fatal errors keep propagating.
+                    when (e) {
+                        is RemoteException -> PrintResult.Error("Error comunicando con la impresora SUNMI", e)
+                        is Exception -> PrintResult.Error(e.message ?: "No se pudo imprimir en SUNMI", e)
+                        else -> throw e
+                    }
+                },
+            )
     }
 
     private fun TicketAlign.toSunmiAlign(): Int =
