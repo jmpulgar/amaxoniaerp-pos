@@ -5,10 +5,7 @@ import com.amaxonia.pos.R
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.domain.model.Transaction
-import com.amaxonia.pos.domain.model.TransactionFiscalItem
-import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalDocumentDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalLineDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNotePrintResult
 import com.amaxonia.pos.domain.model.creditnote.ReceiptPrintResult
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
@@ -19,17 +16,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
+/**
+ * Adaptador TCP de la impresora fiscal The Factory HKA (TASK-074): sólo
+ * transporte (conexión, cifrado, lectura de respuesta) y orquestación de
+ * impresión. La construcción de comandos del protocolo vive en
+ * [TheFactoryFiscalCommandBuilder] (pura, congelada por characterization
+ * tests); este adaptador se queda aquí porque depende de red/criptografía.
+ */
 class TheFactoryPrinterImpl(
     context: Context,
     private val localStore: LocalStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val commandBuilder: TheFactoryFiscalCommandBuilder = TheFactoryFiscalCommandBuilder(),
 ) : PrinterRepository {
     private val appContext = context.applicationContext
     private val cryptography = MainFactory().createInstance(appContext)
@@ -41,18 +43,13 @@ class TheFactoryPrinterImpl(
                 validateSettings(settings)
 
                 SafeLog.d(TAG, "Preparing fiscal printer for receipt")
-                try {
-                    sendTcpCommand(
-                        ipAddress = settings.ipAddress,
-                        port = settings.port.toInt(),
-                        command = "7",
-                    )
-                    SafeLog.d(TAG, "Fiscal printer is ready for receipt")
-                } catch (e: Exception) {
-                    SafeLog.e(TAG, "No open fiscal document needed cancellation", e)
-                }
+                cancelOpenFiscalDocument(settings)
 
-                val commands = buildFiscalCommands(transaction)
+                val commands =
+                    commandBuilder.buildFiscalCommands(
+                        transaction = transaction,
+                        brandReceiptName = appContext.getString(R.string.brand_receipt_name),
+                    )
                 SafeLog.d(TAG, "Sending ${commands.size} fiscal receipt operations")
                 commands.forEachIndexed { index, command ->
                     sendTcpCommand(
@@ -65,12 +62,10 @@ class TheFactoryPrinterImpl(
                 SafeLog.d(TAG, "Fiscal receipt operations completed")
 
                 val printerState = readPrinterState(settings)
-                val paddedFiscalNumber =
-                    printerState.lastInvoiceNumber
-                        .takeIf { it > 0 }
-                        ?.toString()
-                        ?.padStart(8, '0')
-                val fiscalNumber = paddedFiscalNumber.orEmpty()
+                val fiscalNumber =
+                    commandBuilder
+                        .padFiscalNumber(printerState.lastInvoiceNumber)
+                        .orEmpty()
 
                 if (fiscalNumber.isBlank()) {
                     SafeLog.w(TAG, "Fiscal printer did not return a receipt number")
@@ -94,8 +89,10 @@ class TheFactoryPrinterImpl(
                 validateSettings(settings)
                 cancelOpenFiscalDocument(settings)
 
-                val localSerial = sanitizeText(settings.printerSerial, maxLength = 10)
-                val documentSerial = sanitizeText(document.printerSerial, maxLength = 10)
+                val localSerial =
+                    commandBuilder.sanitizeText(settings.printerSerial, maxLength = PRINTER_SERIAL_MAX_LENGTH)
+                val documentSerial =
+                    commandBuilder.sanitizeText(document.printerSerial, maxLength = PRINTER_SERIAL_MAX_LENGTH)
                 val (resolvedPrinterSerial, serialSource) =
                     when {
                         localSerial.isNotBlank() -> localSerial to "local_settings"
@@ -111,7 +108,7 @@ class TheFactoryPrinterImpl(
                 SafeLog.i(TAG, "Fiscal printer serial resolved from $serialSource")
 
                 val commands =
-                    buildCreditNoteCommands(
+                    commandBuilder.buildCreditNoteCommands(
                         document = document,
                         printerSerial = resolvedPrinterSerial,
                     )
@@ -132,11 +129,8 @@ class TheFactoryPrinterImpl(
 
                 val printerStateAfter = readPrinterState(settings)
                 val fiscalNumber =
-                    printerStateAfter.lastCreditNoteNumber
-                        .takeIf { it > 0 }
-                        ?.toString()
-                        ?.padStart(8, '0')
-                        ?: error("No se pudo determinar el nÃºmero fiscal de la nota de crÃ©dito")
+                    commandBuilder.padFiscalNumber(printerStateAfter.lastCreditNoteNumber)
+                        ?: error("No se pudo determinar el número fiscal de la nota de crédito")
 
                 CreditNotePrintResult(
                     fiscalNumber = fiscalNumber,
@@ -146,192 +140,6 @@ class TheFactoryPrinterImpl(
                 SafeLog.e(TAG, "Fiscal credit-note printing failed", error)
             }
         }
-
-    /**
-     * Builds the fiscal command list for The Factory HKA protocol.
-     *
-     * Protocol commands:
-     * - "iR*{clientId}" â€” customer tax id / identification
-     * - "iS*{clientName}" â€” customer name
-     * - "@{text}"      â€” free text / comment line (non-fiscal)
-     * - "{taxPrefix}{price}{qty}{description}" â€” item line
-     *     - price: monto con 2 decimales implicitos (x100), padded to 10 digits
-     *     - qty: cantidad con 3 decimales implicitos (x1000), padded to 8 digits
-     *     - description: up to 30 chars
-     *     - taxPrefix: ' ' exento, '!' IVA general, '"' IVA reducido, '#' IVA adicional
-     * - "3"   â€” subtotal
-     * - "101" â€” close with cash payment
-     * - "102" â€” close with debit card payment
-     * - "103" â€” close with credit card payment
-     * - "104" â€” close with other payment method
-     * - "199" â€” close without specifying payment method
-     */
-    private fun buildFiscalCommands(transaction: Transaction): List<String> {
-        val invoice = sanitizeText(transaction.invoiceNumber, maxLength = 12).ifBlank { "SINFACTURA" }
-        val description = sanitizeText("VENTA $invoice", maxLength = 30)
-        val fiscalItems =
-            transaction.fiscalItems
-                .filter { it.quantity > 0.0 && it.unitPriceWithoutTax > 0.0 }
-
-        val lines = mutableListOf<String>()
-
-        // 1. Customer identification (if available)
-        val clientId = sanitizeText(transaction.clienteIdentificacion, maxLength = 20)
-        if (clientId.isNotBlank()) {
-            lines += "iR*$clientId"
-        }
-
-        // 2. Customer name (if available)
-        val clientName = sanitizeText(transaction.clienteNombre, maxLength = 30)
-        if (clientName.isNotBlank()) {
-            lines += "iS*$clientName"
-        }
-
-        // 3. Comment lines
-        lines += "@${appContext.getString(R.string.brand_receipt_name)}"
-        lines += "@$description"
-
-        // 4. Item lines (using item IVA code and unit amount WITHOUT tax)
-        if (fiscalItems.isNotEmpty()) {
-            fiscalItems.forEach { item ->
-                lines += buildFiscalItemLine(item)
-            }
-        } else {
-            // Fallback for legacy transactions that do not have item details.
-            val fallbackAmount = (transaction.fiscalAmount ?: transaction.amount).coerceAtLeast(0.01)
-            val priceField = formatPrinterPrice(fallbackAmount)
-            val quantityField = formatPrinterQty(1.0)
-            lines += " $priceField$quantityField$description"
-        }
-
-        // 5. Subtotal
-        lines += "3"
-
-        // 6. Payment close command
-        lines += resolvePaymentCommand(transaction.paymentMethods, transaction.formaPago)
-
-        return lines
-    }
-
-    private fun buildFiscalItemLine(item: TransactionFiscalItem): String {
-        val taxPrefix = resolveFiscalTaxPrefix(item.iva)
-        val priceField = formatPrinterPrice(item.unitPriceWithoutTax.coerceAtLeast(0.01))
-        val quantityField = formatPrinterQty(item.quantity)
-        val description = sanitizeText(item.description, maxLength = 30).ifBlank { "ITEM" }
-        return "$taxPrefix$priceField$quantityField$description"
-    }
-
-    private fun resolveFiscalTaxPrefix(iva: Double): Char {
-        val normalizedIva = iva.coerceAtLeast(0.0)
-        return when {
-            normalizedIva <= 0.0 -> ' ' // Exento
-            isSameTaxRate(normalizedIva, 8.0) -> '"' // IVA reducido
-            isSameTaxRate(normalizedIva, 31.0) -> '#' // IVA adicional
-            else -> '!' // IVA general (16% y fallback para otras tasas > 0)
-        }
-    }
-
-    private fun isSameTaxRate(
-        actual: Double,
-        expected: Double,
-    ): Boolean = abs(actual - expected) <= TAX_RATE_TOLERANCE
-
-    private fun buildCreditNoteCommands(
-        document: CreditNoteFiscalDocumentDto,
-        printerSerial: String,
-    ): List<String> {
-        val lines = mutableListOf<String>()
-        val fiscalRef = document.originalFiscalNumber.trim()
-        if (fiscalRef.isBlank()) {
-            error(
-                "La factura original no tiene nÃºmero de documento fiscal en el sistema. " +
-                    "El comando iF* de la nota de crÃ©dito debe usar el nÃºmero fiscal de la factura impresa " +
-                    "(no el cÃ³digo interno tipo 018-00015). " +
-                    "Confirma que la venta quedÃ³ con nÃºmero fiscal guardado en el ERP o vuelve a emitir/consultar la factura.",
-            )
-        }
-        val referenceNumber = normalizeOriginalFiscalReference(fiscalRef)
-        val referenceDate = normalizePrinterDate(document.originalInvoiceDate.ifBlank { document.date })
-        val normalizedPrinterSerial = sanitizeText(printerSerial, maxLength = 10)
-        val taxCodes = resolveCreditNoteTaxCodes(document.lines)
-
-        // Reference data for the affected invoice first (NC fiscal flow).
-        lines += "iF*$referenceNumber"
-        lines += "iD*$referenceDate"
-        lines += "iI*$normalizedPrinterSerial"
-
-        val customerId = sanitizeText(document.customerIdentifier, maxLength = 20)
-        if (customerId.isNotBlank()) {
-            lines += "iR*$customerId"
-        }
-
-        val customerName = sanitizeText(document.customerName, maxLength = 30)
-        if (customerName.isNotBlank()) {
-            lines += "iS*$customerName"
-        }
-
-        val address = sanitizeText(document.customerAddress, maxLength = 30)
-        if (address.isNotBlank()) {
-            lines += "i01$address"
-        }
-
-        val phone = sanitizeText(document.customerPhone, maxLength = 30)
-        if (phone.isNotBlank()) {
-            lines += "i02$phone"
-        }
-
-        val comment = sanitizeText(document.comment.ifBlank { "NC ${document.creditNoteCode}" }, maxLength = 30)
-        lines += "A$comment"
-
-        document.lines.forEach { line ->
-            val taxCode = taxCodes[line.taxRate] ?: 0
-            lines += buildCreditNoteItemLine(line, taxCode)
-        }
-
-        lines += "3"
-        lines += "199"
-        return lines
-    }
-
-    private fun buildCreditNoteItemLine(
-        line: CreditNoteFiscalLineDto,
-        taxCode: Int,
-    ): String {
-        val quantity = line.quantity.coerceAtLeast(0.001)
-        val unitAmount = resolveCreditNoteUnitAmountWithoutTax(line, quantity)
-        val priceField = formatPrinterPrice(unitAmount)
-        val quantityField = formatPrinterQty(quantity)
-        val description = sanitizeText(line.description, maxLength = 30).ifBlank { "DEVOLUCION" }
-        return "d$taxCode$priceField$quantityField$description"
-    }
-
-    private fun resolveCreditNoteUnitAmountWithoutTax(
-        line: CreditNoteFiscalLineDto,
-        quantity: Double,
-    ): Double {
-        val unitWithoutTax = line.unitPriceWithoutTax
-        if (unitWithoutTax > 0.0) {
-            return unitWithoutTax
-        }
-
-        // Backward compatibility when backend payload does not include unitPriceWithoutTax yet.
-        val taxDivisor = 1 + (line.taxRate.coerceAtLeast(0.0) / 100.0)
-        val totalWithoutTax = line.totalWithTax / taxDivisor
-        return (totalWithoutTax / quantity).coerceAtLeast(0.01)
-    }
-
-    private fun resolveCreditNoteTaxCodes(lines: List<CreditNoteFiscalLineDto>): Map<Double, Int> =
-        lines
-            .map { it.taxRate }
-            .distinct()
-            .associateWith { taxRate ->
-                when {
-                    taxRate <= 0.0 -> 0
-                    taxRate >= 20.0 -> 3
-                    taxRate <= 8.0 -> 2
-                    else -> 1
-                }
-            }
 
     override suspend fun printReportX(): Result<Unit> =
         withContext(ioDispatcher) {
@@ -379,81 +187,17 @@ class TheFactoryPrinterImpl(
             }
         }
 
-    /**
-     * Maps the app's formaPago string to the HKA fiscal payment close command.
-     *
-     * 101 = Cash (Efectivo / Contado)
-     * 102 = Debit card
-     * 103 = Credit card
-     * 104 = Other (transfer, check, etc.)
-     * 199 = Unspecified
-     */
-    private fun resolvePaymentCommand(
-        paymentMethods: List<TransactionPaymentMethod>,
-        formaPago: String,
-    ): String {
-        paymentMethods
-            .maxByOrNull { it.amount }
-            ?.fiscalCode
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return it }
-
-        return mapPaymentCommand(formaPago)
-    }
-
-    private fun mapPaymentCommand(formaPago: String): String {
-        val normalized = formaPago.lowercase().trim()
-        return when {
-            normalized.contains("efectivo") || normalized.contains("contado") || normalized.contains("divisa") -> "101"
-            normalized.contains("punto de venta") || normalized.contains("debito") || normalized.contains("debit") -> "102"
-            normalized.contains("credito") || normalized.contains("credit") || normalized.contains("tarjeta") -> "103"
-            normalized.contains("transfer") ||
-                normalized.contains("cheque") ||
-                normalized.contains("deposito") ||
-                normalized.contains("zelle") ||
-                normalized.contains("pago movil") ||
-                normalized.contains("yappy") ||
-                normalized.contains("nequi") ||
-                normalized.contains("solutech") ||
-                normalized.contains("sunmi") -> "104"
-            normalized.isBlank() -> "101" // Default to cash
-            else -> "199" // Unspecified
-        }
-    }
-
-    private fun formatPrinterPrice(amount: Double): String =
-        ((amount.coerceAtLeast(0.0) * 100).roundToInt())
-            .toString()
-            .padStart(10, '0')
-
-    private fun formatPrinterQty(quantity: Double): String =
-        ((quantity.coerceAtLeast(0.0) * 1000).roundToInt())
-            .toString()
-            .padStart(8, '0')
-
-    private fun normalizeOriginalFiscalReference(value: String): String {
-        val digits = value.filter(Char::isDigit)
-        return when {
-            digits.length >= 11 -> digits.takeLast(11)
-            digits.length >= 8 -> digits.takeLast(8)
-            else -> digits.padStart(8, '0')
-        }
-    }
-
-    private fun normalizePrinterDate(value: String): String =
-        runCatching {
-            LocalDate.parse(value).format(PRINTER_DATE_FORMATTER)
-        }.getOrDefault(value.takeIf { it.matches(PRINTER_DATE_REGEX) } ?: LocalDate.now().format(PRINTER_DATE_FORMATTER))
-
+    /** Cancela un documento fiscal abierto (best-effort antes de imprimir). */
     private fun cancelOpenFiscalDocument(settings: TheFactorySettings) {
-        try {
+        runCatching {
             sendTcpCommand(
                 ipAddress = settings.ipAddress,
                 port = settings.port.toInt(),
-                command = "7",
+                command = CANCEL_DOCUMENT_COMMAND,
             )
-        } catch (e: Exception) {
-            SafeLog.e(TAG, "No open fiscal document needed cancellation", e)
+            SafeLog.d(TAG, "Fiscal printer is ready")
+        }.onFailure { error ->
+            SafeLog.e(TAG, "No open fiscal document needed cancellation", error)
         }
     }
 
@@ -464,7 +208,7 @@ class TheFactoryPrinterImpl(
                 port = settings.port.toInt(),
                 command = "S1",
             )
-        return parsePrinterState(response.toString(Charsets.UTF_8))
+        return commandBuilder.parsePrinterState(response.toString(Charsets.UTF_8))
     }
 
     private fun sendTcpCommandForResponse(
@@ -481,32 +225,10 @@ class TheFactoryPrinterImpl(
             outputStream.flush()
             val response = readSocketResponse(socket)
             if (response.isEmpty()) {
-                error("La impresora no respondiÃ³ al comando $command")
+                error("La impresora no respondió al comando $command")
             }
             return response
         }
-    }
-
-    private fun parsePrinterState(rawState: String): PrinterStateSnapshot {
-        val parts =
-            rawState
-                .split('\n')
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-
-        if (parts.size >= 16) {
-            return PrinterStateSnapshot(
-                registeredMachineNumber = parts.getOrNull(13).orEmpty(),
-                lastInvoiceNumber = parts.getOrNull(2)?.toIntOrNull() ?: 0,
-                lastCreditNoteNumber = parts.getOrNull(6)?.toIntOrNull() ?: 0,
-            )
-        }
-
-        return PrinterStateSnapshot(
-            registeredMachineNumber = parts.getOrNull(9).orEmpty(),
-            lastInvoiceNumber = parts.getOrNull(2)?.toIntOrNull() ?: 0,
-            lastCreditNoteNumber = parts.getOrNull(12)?.toIntOrNull() ?: 0,
-        )
     }
 
     private fun encryptCommand(command: String): ByteArray {
@@ -535,12 +257,12 @@ class TheFactoryPrinterImpl(
             val response = readSocketResponse(socket)
             SafeLog.d(TAG, "Fiscal printer response received")
             if (!isSuccessfulResponse(response)) {
-                val firstByte = response.firstOrNull()?.toInt()?.and(0xFF)
+                val firstByte = response.firstOrNull()?.toInt()?.and(BYTE_MASK)
                 error(
                     if (firstByte == NAK) {
-                        "The Factory rechazo el comando fiscal '${command.take(12)}' (NAK 0x15)"
+                        "The Factory rechazo el comando fiscal '${command.take(COMMAND_LOG_PREVIEW_LENGTH)}' (NAK 0x15)"
                     } else {
-                        "The Factory rechazo el comando fiscal '${command.take(12)}'"
+                        "The Factory rechazo el comando fiscal '${command.take(COMMAND_LOG_PREVIEW_LENGTH)}'"
                     },
                 )
             }
@@ -558,7 +280,7 @@ class TheFactoryPrinterImpl(
                 command = command,
             )
         }.getOrElse { closeError ->
-            SafeLog.w(TAG, "Fiscal document close was rejected; using compatible fallback")
+            SafeLog.e(TAG, "Fiscal document close was rejected; using compatible fallback", closeError)
             sendTcpCommand(
                 ipAddress = settings.ipAddress,
                 port = settings.port.toInt(),
@@ -578,23 +300,23 @@ class TheFactoryPrinterImpl(
      */
     private fun readSocketResponse(socket: Socket): ByteArray {
         val inputStream = socket.getInputStream()
-        val buffer = ByteArray(1024)
+        val buffer = ByteArray(SOCKET_BUFFER_SIZE)
         val output = ByteArrayOutputStream()
 
         try {
             while (true) {
                 val bytesRead = inputStream.read(buffer)
-                if (bytesRead == -1) break
+                if (bytesRead == EOF) break
                 // Preserve one-byte control responses (ACK/NAK/ENQ/NUL) for proper diagnostics.
-                val first = buffer[0].toInt() and 0xFF
+                val first = buffer[0].toInt() and BYTE_MASK
                 val keepAsControl = bytesRead == 1 && (first == ACK || first == NAK || first == ENQ || first == NUL)
-                val offset = if (keepAsControl || first in 6..15) 0 else 1
+                val offset = if (keepAsControl || first in CONTROL_BYTE_RANGE) 0 else 1
                 if (bytesRead > offset) {
                     output.write(buffer, offset, bytesRead - offset)
                 }
             }
-        } catch (_: java.net.SocketTimeoutException) {
-            // Timeout from soTimeout â€” treat whatever we have as the full response
+        } catch (_: IOException) {
+            // Timeout from soTimeout — treat whatever we have as the full response
         }
 
         return output.toByteArray()
@@ -602,8 +324,8 @@ class TheFactoryPrinterImpl(
 
     private fun isSuccessfulResponse(response: ByteArray): Boolean {
         if (response.isEmpty()) return false
-        val firstByte = response.first().toInt() and 0xFF
-        return firstByte == ACK || firstByte == ENQ || firstByte == NUL || response.size > 10
+        val firstByte = response.first().toInt() and BYTE_MASK
+        return firstByte == ACK || firstByte == ENQ || firstByte == NUL || response.size > MIN_PAYLOAD_RESPONSE_SIZE
     }
 
     private fun validateSettings(settings: TheFactorySettings) {
@@ -614,16 +336,6 @@ class TheFactoryPrinterImpl(
             error("El puerto configurado para The Factory HKA no es valido")
         }
     }
-
-    private fun sanitizeText(
-        value: String,
-        maxLength: Int,
-    ): String =
-        value
-            .uppercase()
-            .filter { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' }
-            .trim()
-            .take(maxLength)
 
     private companion object {
         const val TAG = "HkaPrinter"
@@ -637,16 +349,15 @@ class TheFactoryPrinterImpl(
         const val ENQ = 5
         const val ACK = 6
         const val NAK = 21
+        const val EOF = -1
+        const val BYTE_MASK = 0xFF
+        const val SOCKET_BUFFER_SIZE = 1024
+        const val COMMAND_LOG_PREVIEW_LENGTH = 12
+        const val MIN_PAYLOAD_RESPONSE_SIZE = 10
+        const val PRINTER_SERIAL_MAX_LENGTH = 10
+        const val CANCEL_DOCUMENT_COMMAND = "7"
         const val CLOSE_DOCUMENT_COMMAND_199 = "199"
         const val CLOSE_DOCUMENT_COMMAND_101 = "101"
-        const val TAX_RATE_TOLERANCE = 0.01
-        val PRINTER_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        val PRINTER_DATE_REGEX = Regex("\\d{2}/\\d{2}/\\d{4}")
+        val CONTROL_BYTE_RANGE = 6..15
     }
 }
-
-private data class PrinterStateSnapshot(
-    val registeredMachineNumber: String,
-    val lastInvoiceNumber: Int,
-    val lastCreditNoteNumber: Int,
-)

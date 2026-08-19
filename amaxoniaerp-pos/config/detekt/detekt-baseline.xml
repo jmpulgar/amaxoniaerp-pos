@@ -8,7 +8,6 @@
     <ID>CyclomaticComplexMethod:HkaConnectionHelper.kt$HkaConnectionHelper$private fun parseStatus(bytes: ByteArray): PrinterStatusResult</ID>
     <ID>CyclomaticComplexMethod:MappingExtensions.kt$fun ProductDto.toDomain(): Product</ID>
     <ID>CyclomaticComplexMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, viewModel: SettingsViewModel = injectedViewModel { AppGraph.settings.settingsViewModel() }, )</ID>
-    <ID>CyclomaticComplexMethod:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$private fun mapPaymentCommand(formaPago: String): String</ID>
     <ID>LongMethod:AppNavigation.kt$@Composable fun AppNavigation(startDestination: String)</ID>
     <ID>LongMethod:CajaSelectorSheet.kt$@Composable private fun CajaCard( caja: Caja, onClick: () -&gt; Unit, )</ID>
     <ID>LongMethod:CajaSelectorSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CajaSelectorSheet( cajas: List&lt;Caja&gt;, isLoading: Boolean, errorMessage: String?, canDismiss: Boolean, onSelectCaja: (Caja) -&gt; Unit, onReload: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
@@ -99,25 +98,6 @@
     <ID>MagicNumber:SunmiV2Printer.kt$SunmiV2Printer$4</ID>
     <ID>MagicNumber:SyncScheduler.kt$SyncScheduler$12</ID>
     <ID>MagicNumber:SynchronizePendingInvoicesUseCase.kt$SynchronizePendingInvoicesUseCase$15</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0.001</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0.01</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$0xFF</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$10</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$100</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$100.0</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$1000</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$1024</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$11</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$12</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$13</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$16</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$20.0</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$3</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$31.0</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$6</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$8</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$8.0</ID>
-    <ID>MagicNumber:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$9</ID>
     <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$0.01</ID>
     <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$100</ID>
     <ID>MagicNumber:TheFactoryRapidPayClient.kt$TheFactoryRapidPayClient$11</ID>
@@ -175,13 +155,11 @@
     <ID>TooGenericExceptionCaught:LocalStore.kt$LocalStore$error: Exception</ID>
     <ID>TooGenericExceptionCaught:PrinterFactory.kt$PrinterFactory$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:SunmiV2Printer.kt$SunmiV2Printer$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl$e: Exception</ID>
     <ID>TooManyFunctions:ApiService.kt$ApiService</ID>
     <ID>TooManyFunctions:CartRepository.kt$CartRepository</ID>
     <ID>TooManyFunctions:CreditNotesViewModel.kt$CreditNotesViewModel : ViewModel</ID>
     <ID>TooManyFunctions:LocalStore.kt$LocalStore : CountrySelectionStorePaymentSessionReaderSalonConfigCacheCompanyTokenReader</ID>
     <ID>TooManyFunctions:PaymentScreen.kt$com.amaxonia.pos.ui.payment.PaymentScreen.kt</ID>
-    <ID>TooManyFunctions:TheFactoryPrinterImpl.kt$TheFactoryPrinterImpl : PrinterRepository</ID>
     <ID>UnusedPrivateProperty:WelcomeScreen.kt$val gradientMid = colorResource(R.color.brand_gradient_mid)</ID>
   </CurrentIssues>
 </SmellBaseline>
