@@ -38,6 +38,3 @@ SellerSelectorBottomSheet.kt:31:5 detekt.LongMethod
 SettingsScreen.kt:84:5 detekt.CyclomaticComplexMethod
 SettingsScreen.kt:84:5 detekt.LongMethod
 SuccessScreen.kt:102:5 detekt.LongMethod
-WelcomeScreen.kt:209:13 detekt.LongMethod
-WelcomeScreen.kt:341:13 detekt.LongMethod
-WelcomeScreen.kt:95:5 detekt.LongMethod

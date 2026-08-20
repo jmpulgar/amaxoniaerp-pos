@@ -54,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -101,41 +102,13 @@ fun WelcomeScreen(
     val gradientStart = colorResource(R.color.brand_gradient_start)
     val gradientEnd = colorResource(R.color.brand_gradient_end)
     val taglineColor = colorResource(R.color.brand_welcome_tagline)
-    val waveColors =
-        WelcomeWaveColors(
-            backTop = colorResource(R.color.brand_wave_back_top),
-            backBottom = colorResource(R.color.brand_wave_back_bottom),
-            frontStart = colorResource(R.color.brand_wave_front_start),
-            frontMid = colorResource(R.color.brand_wave_front_mid),
-            frontEnd = colorResource(R.color.brand_wave_front_end),
-            scrim = colorResource(R.color.brand_wave_scrim),
-        )
+    val waveColors = rememberWelcomeWaveColors()
     val websiteUrl = stringResource(R.string.brand_website_url)
     val supportUrl = stringResource(R.string.brand_support_url)
     var showContactSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
-
-    // Fade-in sutil
-    val contentAlpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        contentAlpha.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = FADE_IN_MILLIS, easing = FastOutSlowInEasing),
-        )
-    }
-
-    // Animación de ola
-    val infiniteTransition = rememberInfiniteTransition(label = "wave")
-    val wavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = WAVE_PERIOD_MILLIS, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-        label = "wavePhase",
-    )
+    val contentAlpha = rememberFadeInAlpha()
+    val wavePhase = rememberWavePhase()
 
     fun openLink(url: String) {
         context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
@@ -148,23 +121,9 @@ fun WelcomeScreen(
                 .background(PosPalette.FixedWhite),
     ) {
         WelcomeWaves(wavePhase = wavePhase, colors = waveColors)
-
-        // Refuerzo de gradiente sutil para anclar la zona de texto al color de marca
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush =
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        gradientStart.copy(alpha = 0.0f),
-                                        gradientStart.copy(alpha = 0.0f),
-                                        gradientEnd.copy(alpha = 0.18f),
-                                    ),
-                            ),
-                    ),
+        WelcomeBrandScrim(
+            gradientStart = gradientStart,
+            gradientEnd = gradientEnd,
         )
 
         Column(
@@ -173,7 +132,7 @@ fun WelcomeScreen(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .alpha(contentAlpha.value),
+                    .alpha(contentAlpha),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             WelcomeBrandHeader(taglineColor = taglineColor)
@@ -204,6 +163,72 @@ fun WelcomeScreen(
     }
 }
 
+/** Colores de las capas de las olas (por flavor). */
+@Composable
+private fun rememberWelcomeWaveColors(): WelcomeWaveColors =
+    WelcomeWaveColors(
+        backTop = colorResource(R.color.brand_wave_back_top),
+        backBottom = colorResource(R.color.brand_wave_back_bottom),
+        frontStart = colorResource(R.color.brand_wave_front_start),
+        frontMid = colorResource(R.color.brand_wave_front_mid),
+        frontEnd = colorResource(R.color.brand_wave_front_end),
+        scrim = colorResource(R.color.brand_wave_scrim),
+    )
+
+/** Fade-in sutil al entrar a la pantalla. */
+@Composable
+private fun rememberFadeInAlpha(): Float {
+    val contentAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        contentAlpha.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = FADE_IN_MILLIS, easing = FastOutSlowInEasing),
+        )
+    }
+    return contentAlpha.value
+}
+
+/** Fase continua de la animación de ola. */
+@Composable
+private fun rememberWavePhase(): Float {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = WAVE_PERIOD_MILLIS, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "wavePhase",
+    )
+    return wavePhase
+}
+
+/** Refuerzo de gradiente sutil para anclar la zona de texto al color de marca. */
+@Composable
+private fun WelcomeBrandScrim(
+    gradientStart: Color,
+    gradientEnd: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    gradientStart.copy(alpha = 0.0f),
+                                    gradientStart.copy(alpha = 0.0f),
+                                    gradientEnd.copy(alpha = 0.18f),
+                                ),
+                        ),
+                ),
+    )
+}
+
 /** Olas animadas de la zona inferior (dibujo en Canvas). */
 @Composable
 private fun WelcomeWaves(
@@ -211,70 +236,97 @@ private fun WelcomeWaves(
     colors: WelcomeWaveColors,
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-        val waveY = h * WAVE_Y_RATIO // dónde comienza la ola
-
-        // Ola trasera (más suave pero con bastante cuerpo para no perder profundidad)
-        val backWave =
-            Path().apply {
-                moveTo(0f, h)
-                lineTo(0f, waveY + WAVE_BACK_AMPLITUDE)
-                for (x in 0..w.toInt() step WAVE_STEP_PX) {
-                    val xf = x.toFloat()
-                    val y =
-                        waveY +
-                            WAVE_BACK_AMPLITUDE *
-                            sin(wavePhase * WAVE_BACK_PHASE_FACTOR + xf / w * WAVE_BACK_CYCLES * Math.PI).toFloat()
-                    lineTo(xf, y)
-                }
-                lineTo(w, h)
-                close()
-            }
-        drawPath(
-            path = backWave,
-            brush =
-                Brush.verticalGradient(
-                    colors = listOf(colors.backTop, colors.backBottom),
-                    startY = waveY - WAVE_BACK_AMPLITUDE,
-                    endY = h,
-                ),
-            style = Fill,
+        val waveY = size.height * WAVE_Y_RATIO // dónde comienza la ola
+        drawBackWave(
+            width = size.width,
+            height = size.height,
+            waveY = waveY,
+            wavePhase = wavePhase,
+            colors = colors,
         )
-
-        // Ola frontal (principal) con gradiente saturado opaco
-        val frontWave =
-            Path().apply {
-                moveTo(0f, h)
-                lineTo(0f, waveY)
-                for (x in 0..w.toInt() step WAVE_STEP_PX) {
-                    val xf = x.toFloat()
-                    val y = waveY + WAVE_FRONT_AMPLITUDE * sin(wavePhase + xf / w * WAVE_FRONT_CYCLES * Math.PI).toFloat()
-                    lineTo(xf, y)
-                }
-                lineTo(w, h)
-                close()
-            }
-        drawPath(
-            path = frontWave,
-            brush =
-                Brush.linearGradient(
-                    colors = listOf(colors.frontStart, colors.frontMid, colors.frontEnd),
-                    start = Offset(0f, waveY),
-                    end = Offset(w, h),
-                ),
-            style = Fill,
+        drawFrontWave(
+            width = size.width,
+            height = size.height,
+            waveY = waveY,
+            wavePhase = wavePhase,
+            colors = colors,
         )
-
         // Scrim inferior para asegurar contraste del texto blanco sobre las olas
         drawRect(
             color = colors.scrim,
             topLeft = Offset(0f, waveY),
             size =
                 androidx.compose.ui.geometry
-                    .Size(w, h - waveY),
+                    .Size(size.width, size.height - waveY),
         )
     }
+}
+
+/** Ola trasera (más suave pero con bastante cuerpo para no perder profundidad). */
+private fun DrawScope.drawBackWave(
+    width: Float,
+    height: Float,
+    waveY: Float,
+    wavePhase: Float,
+    colors: WelcomeWaveColors,
+) {
+    val backWave =
+        Path().apply {
+            moveTo(0f, height)
+            lineTo(0f, waveY + WAVE_BACK_AMPLITUDE)
+            for (x in 0..width.toInt() step WAVE_STEP_PX) {
+                val xf = x.toFloat()
+                val y =
+                    waveY +
+                        WAVE_BACK_AMPLITUDE *
+                        sin(wavePhase * WAVE_BACK_PHASE_FACTOR + xf / width * WAVE_BACK_CYCLES * Math.PI).toFloat()
+                lineTo(xf, y)
+            }
+            lineTo(width, height)
+            close()
+        }
+    drawPath(
+        path = backWave,
+        brush =
+            Brush.verticalGradient(
+                colors = listOf(colors.backTop, colors.backBottom),
+                startY = waveY - WAVE_BACK_AMPLITUDE,
+                endY = height,
+            ),
+        style = Fill,
+    )
+}
+
+/** Ola frontal (principal) con gradiente saturado opaco. */
+private fun DrawScope.drawFrontWave(
+    width: Float,
+    height: Float,
+    waveY: Float,
+    wavePhase: Float,
+    colors: WelcomeWaveColors,
+) {
+    val frontWave =
+        Path().apply {
+            moveTo(0f, height)
+            lineTo(0f, waveY)
+            for (x in 0..width.toInt() step WAVE_STEP_PX) {
+                val xf = x.toFloat()
+                val y = waveY + WAVE_FRONT_AMPLITUDE * sin(wavePhase + xf / width * WAVE_FRONT_CYCLES * Math.PI).toFloat()
+                lineTo(xf, y)
+            }
+            lineTo(width, height)
+            close()
+        }
+    drawPath(
+        path = frontWave,
+        brush =
+            Brush.linearGradient(
+                colors = listOf(colors.frontStart, colors.frontMid, colors.frontEnd),
+                start = Offset(0f, waveY),
+                end = Offset(width, height),
+            ),
+        style = Fill,
+    )
 }
 
 /** Logo grande sobre fondo blanco + tagline de marca. */
@@ -343,71 +395,83 @@ private fun WelcomeActions(
     onRequestAccountClick: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 32.dp)) {
-        Button(
-            onClick = onLoginClick,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = PosPalette.FixedWhite,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ),
-            elevation =
-                ButtonDefaults.buttonElevation(
-                    defaultElevation = 6.dp,
-                    pressedElevation = 2.dp,
-                ),
-        ) {
-            Text(
-                text = "Iniciar sesión",
-                style =
-                    MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    ),
-            )
-        }
+        LoginButton(onClick = onLoginClick)
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        OutlinedButton(
-            onClick = onRequestAccountClick,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            border =
-                ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                    width = 1.5.dp,
-                    brush =
-                        Brush.linearGradient(
-                            colors =
-                                listOf(
-                                    PosPalette.FixedWhite,
-                                    PosPalette.FixedWhite.copy(alpha = 0.7f),
-                                ),
-                        ),
+        RequestAccountButton(onClick = onRequestAccountClick)
+    }
+}
+
+/** Botón principal de inicio de sesión. */
+@Composable
+private fun LoginButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = PosPalette.FixedWhite,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ),
+        elevation =
+            ButtonDefaults.buttonElevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 2.dp,
+            ),
+    ) {
+        Text(
+            text = "Iniciar sesión",
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                 ),
-            colors =
-                ButtonDefaults.outlinedButtonColors(
-                    containerColor = PosPalette.Transparent,
-                    contentColor = PosPalette.FixedWhite,
-                ),
-        ) {
-            Text(
-                text = "Solicitar tu cuenta",
-                style =
-                    MaterialTheme.typography.labelLarge.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** Botón outline para solicitar una cuenta. */
+@Composable
+private fun RequestAccountButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+        shape = RoundedCornerShape(14.dp),
+        border =
+            ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                width = 1.5.dp,
+                brush =
+                    Brush.linearGradient(
+                        colors =
+                            listOf(
+                                PosPalette.FixedWhite,
+                                PosPalette.FixedWhite.copy(alpha = 0.7f),
+                            ),
                     ),
-                color = PosPalette.FixedWhite,
-            )
-        }
+            ),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = PosPalette.Transparent,
+                contentColor = PosPalette.FixedWhite,
+            ),
+    ) {
+        Text(
+            text = "Solicitar tu cuenta",
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            color = PosPalette.FixedWhite,
+        )
     }
 }
 
