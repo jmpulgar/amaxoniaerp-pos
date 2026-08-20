@@ -35,6 +35,4 @@ ProductFormScreen.kt:63:5 detekt.LongMethod
 ProductListScreen.kt:271:13 detekt.LongMethod
 ProductListScreen.kt:69:5 detekt.LongMethod
 SellerSelectorBottomSheet.kt:31:5 detekt.LongMethod
-SettingsScreen.kt:84:5 detekt.CyclomaticComplexMethod
-SettingsScreen.kt:84:5 detekt.LongMethod
 SuccessScreen.kt:102:5 detekt.LongMethod
