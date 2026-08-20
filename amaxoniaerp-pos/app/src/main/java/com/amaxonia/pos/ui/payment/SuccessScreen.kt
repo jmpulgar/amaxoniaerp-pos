@@ -73,6 +73,7 @@ import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosStatusBadge
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 private const val RING_INITIAL_SCALE = 0.6f
@@ -116,27 +117,8 @@ fun SuccessScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(uiState.errorMessage) {
-        val msg = uiState.errorMessage
-        if (!msg.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(msg)
-        }
-    }
-
-    LaunchedEffect(payload?.receiptPrintMessage) {
-        val message = payload?.receiptPrintMessage.orEmpty()
-        if (message.isNotBlank()) {
-            snackbarHostState.showSnackbar(message)
-        }
-    }
-
-    BackHandler(enabled = true) {
-        scope.launch {
-            snackbarHostState.showSnackbar(
-                message = "Usa Nueva orden para finalizar y limpiar el estado de venta",
-            )
-        }
-    }
+    SuccessSnackbarEffects(uiState = uiState, snackbarHostState = snackbarHostState)
+    SuccessBackHandler(scope = scope, snackbarHostState = snackbarHostState)
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -172,6 +154,42 @@ fun SuccessScreen(
                         onSendReceiptEmail = { viewModel.sendReceiptEmail() },
                         onNextOrder = onNextOrder,
                     ),
+            )
+        }
+    }
+}
+
+/** Muestra como snackbars los mensajes de error y de recibo impreso. */
+@Composable
+private fun SuccessSnackbarEffects(
+    uiState: PaymentSuccessUiState,
+    snackbarHostState: SnackbarHostState,
+) {
+    LaunchedEffect(uiState.errorMessage) {
+        val msg = uiState.errorMessage
+        if (!msg.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    LaunchedEffect(uiState.payload?.receiptPrintMessage) {
+        val message = uiState.payload?.receiptPrintMessage.orEmpty()
+        if (message.isNotBlank()) {
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+}
+
+/** Back bloqueado: guía al usuario hacia Nueva orden. */
+@Composable
+private fun SuccessBackHandler(
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+) {
+    BackHandler(enabled = true) {
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                message = "Usa Nueva orden para finalizar y limpiar el estado de venta",
             )
         }
     }

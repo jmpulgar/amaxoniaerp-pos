@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +62,7 @@ import coil.compose.AsyncImage
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.ProductStock
+import com.amaxonia.pos.domain.model.ProductWarehouseStock
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 
@@ -91,17 +93,7 @@ fun ProductListScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Inventario", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { ProductsTopBar(onBack = onBack) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onNavigateToForm(null) },
@@ -111,26 +103,7 @@ fun ProductListScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
-            if (state.error != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            state.error ?: "Error desconocido",
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        TextButton(onClick = { viewModel.retry() }) {
-                            Text("Reintentar")
-                        }
-                    }
-                }
-            }
+            ProductListErrorCard(error = state.error, onRetry = viewModel::retry)
             if (state.isLoading && state.products.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -139,54 +112,17 @@ fun ProductListScreen(
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
-                OutlinedTextField(
+                ProductSearchField(
                     value = state.searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChange(it) },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    placeholder = { Text("Buscar producto, referencia o código") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = PosPalette.Transparent,
-                        ),
+                    onValueChange = viewModel::onSearchQueryChange,
                 )
-                LazyColumn(
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                ) {
-                    items(state.products, key = { it.id }) { product ->
-                        LaunchedEffect(product.id) {
-                            viewModel.ensureStockLoaded(product.id)
-                        }
-                        val imageUrl = viewModel.getProductImageUrl(product.photoUrl)
-                        ProductItem(
-                            product = product,
-                            imageUrl = imageUrl,
-                            stock = state.stockByProductId[product.id],
-                            isStockLoading = state.loadingStockIds.contains(product.id),
-                            actions =
-                                ProductItemActions(
-                                    onStockClick = {
-                                        val stock = state.stockByProductId[product.id]
-                                        if (stock != null) selectedStock = stock
-                                    },
-                                    onClick = { onNavigateToForm(product.id) },
-                                ),
-                        )
-                    }
-                    if (state.isLoading) {
-                        item {
-                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
+                ProductListItems(
+                    state = state,
+                    viewModel = viewModel,
+                    listState = listState,
+                    onNavigateToForm = onNavigateToForm,
+                    onSelectStock = { stock -> selectedStock = stock },
+                )
             }
         }
 
@@ -195,6 +131,111 @@ fun ProductListScreen(
                 stock = stock,
                 onDismiss = { selectedStock = null },
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProductsTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text("Inventario", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = MaterialTheme.colorScheme.primary)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+@Composable
+private fun ProductListErrorCard(
+    error: String?,
+    onRetry: () -> Unit,
+) {
+    if (error == null) return
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                error,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            TextButton(onClick = onRetry) {
+                Text("Reintentar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        placeholder = { Text("Buscar producto, referencia o código") },
+        leadingIcon = { Icon(Icons.Default.Search, null) },
+        shape = RoundedCornerShape(12.dp),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = PosPalette.Transparent,
+            ),
+    )
+}
+
+@Composable
+private fun ProductListItems(
+    state: ProductListState,
+    viewModel: ProductListViewModel,
+    listState: LazyListState,
+    onNavigateToForm: (String?) -> Unit,
+    onSelectStock: (ProductStock) -> Unit,
+) {
+    LazyColumn(
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 80.dp),
+    ) {
+        items(state.products, key = { it.id }) { product ->
+            LaunchedEffect(product.id) {
+                viewModel.ensureStockLoaded(product.id)
+            }
+            val imageUrl = viewModel.getProductImageUrl(product.photoUrl)
+            ProductItem(
+                product = product,
+                imageUrl = imageUrl,
+                stock = state.stockByProductId[product.id],
+                isStockLoading = state.loadingStockIds.contains(product.id),
+                actions =
+                    ProductItemActions(
+                        onStockClick = {
+                            val stock = state.stockByProductId[product.id]
+                            if (stock != null) onSelectStock(stock)
+                        },
+                        onClick = { onNavigateToForm(product.id) },
+                    ),
+            )
+        }
+        if (state.isLoading) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            }
         }
     }
 }
@@ -299,41 +340,47 @@ private fun ProductStockDialog(
                 Spacer(modifier = Modifier.height(10.dp))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(stock.almacenes, key = { it.almacenId }) { almacen ->
-                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = almacen.almacenNombre.ifBlank { "Almacén ${almacen.almacenId}" },
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    "Tipo: ${almacen.almacenTipo.ifBlank { "N/A" }}",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    "Cant.: ${formatStock(almacen.cantidad)} | Muestra: ${formatStock(almacen.cantidadMuestra)}",
-                                    fontSize = 12.sp,
-                                )
-                                Text(
-                                    "Precomp.: ${formatStock(
-                                        almacen.cantidadPrecomprometida,
-                                    )} | Disp.: ${formatStock(almacen.cantidadDisponible)}",
-                                    fontSize = 12.sp,
-                                )
-                                Text(
-                                    "Min/Max: ${formatStock(almacen.stockMinimo)} / ${formatStock(almacen.stockMaximo)}",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                        AlmacenStockCard(almacen = almacen)
                     }
                 }
             }
         },
     )
+}
+
+/** Tarjeta con el detalle de stock de un almacén. */
+@Composable
+private fun AlmacenStockCard(almacen: ProductWarehouseStock) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(
+                text = almacen.almacenNombre.ifBlank { "Almacén ${almacen.almacenId}" },
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "Tipo: ${almacen.almacenTipo.ifBlank { "N/A" }}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Cant.: ${formatStock(almacen.cantidad)} | Muestra: ${formatStock(almacen.cantidadMuestra)}",
+                fontSize = 12.sp,
+            )
+            Text(
+                "Precomp.: ${formatStock(
+                    almacen.cantidadPrecomprometida,
+                )} | Disp.: ${formatStock(almacen.cantidadDisponible)}",
+                fontSize = 12.sp,
+            )
+            Text(
+                "Min/Max: ${formatStock(almacen.stockMinimo)} / ${formatStock(almacen.stockMaximo)}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 private fun formatStock(value: Double): String {

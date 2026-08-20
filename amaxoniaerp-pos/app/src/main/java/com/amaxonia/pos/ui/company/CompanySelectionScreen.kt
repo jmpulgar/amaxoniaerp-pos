@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,36 +69,12 @@ fun CompanySelectionScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val subtitleColor = MaterialTheme.colorScheme.onSurface
     val filteredCompanies =
-        remember(state.companies, searchQuery) {
-            val query = searchQuery.trim()
-            if (query.isEmpty()) {
-                state.companies
-            } else {
-                state.companies.filter { company ->
-                    company.name.contains(query, ignoreCase = true) ||
-                        company.ruc.contains(query, ignoreCase = true)
-                }
-            }
-        }
+        remember(state.companies, searchQuery) { filterCompanies(state.companies, searchQuery) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { CompanySelectionTopBar(onBack = onBack) },
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -108,20 +85,7 @@ fun CompanySelectionScreen(
                         .padding(horizontal = 22.dp),
                 horizontalAlignment = Alignment.Start,
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Selecciona tu empresa",
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "¿Dónde vas a trabajar hoy?",
-                    fontSize = 16.sp,
-                    color = subtitleColor,
-                )
-                Spacer(modifier = Modifier.height(24.dp))
+                CompanySelectionHeader(subtitleColor = subtitleColor)
                 Card(
                     modifier =
                         Modifier
@@ -132,52 +96,19 @@ fun CompanySelectionScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 ) {
                     if (state.error != null) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = state.error ?: "Error desconocido",
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.retry() }) {
-                                    Text("Reintentar")
-                                }
-                            }
-                        }
+                        CompanySelectionError(
+                            error = state.error,
+                            onRetry = viewModel::retry,
+                        )
                     } else if (!state.isLoading) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            item {
-                                CompanySearchField(
-                                    query = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                )
-                            }
-                            if (filteredCompanies.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "No hay resultados",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 14.sp,
-                                    )
-                                }
-                            } else {
-                                items(filteredCompanies) { company ->
-                                    CompanyItemModern(
-                                        company = company,
-                                        onClick = {
-                                            viewModel.selectCompany(company, onCompanySelected)
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                        CompanyListItems(
+                            searchQuery = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            filteredCompanies = filteredCompanies,
+                            onSelect = { company ->
+                                viewModel.selectCompany(company, onCompanySelected)
+                            },
+                        )
                     }
                 }
             }
@@ -185,6 +116,120 @@ fun CompanySelectionScreen(
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
+    }
+}
+
+/** Filtra empresas por nombre o RUC (case-insensitive). */
+private fun filterCompanies(
+    companies: List<Company>,
+    searchQuery: String,
+): List<Company> {
+    val query = searchQuery.trim()
+    return if (query.isEmpty()) {
+        companies
+    } else {
+        companies.filter { company ->
+            company.name.contains(query, ignoreCase = true) ||
+                company.ruc.contains(query, ignoreCase = true)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompanySelectionTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = {},
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+/** Título y subtítulo de la pantalla de selección de empresa. */
+@Composable
+private fun CompanySelectionHeader(subtitleColor: Color) {
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Selecciona tu empresa",
+        fontSize = 30.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "¿Dónde vas a trabajar hoy?",
+        fontSize = 16.sp,
+        color = subtitleColor,
+    )
+    Spacer(modifier = Modifier.height(24.dp))
+}
+
+/** Error de carga con reintento. */
+@Composable
+private fun CompanySelectionError(
+    error: String?,
+    onRetry: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = error ?: "Error desconocido",
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onRetry) {
+                Text("Reintentar")
+            }
+        }
+    }
+}
+
+/** Lista filtrable de empresas. */
+@Composable
+private fun CompanyListItems(
+    searchQuery: String,
+    onQueryChange: (String) -> Unit,
+    filteredCompanies: List<Company>,
+    onSelect: (Company) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            CompanySearchField(
+                query = searchQuery,
+                onQueryChange = onQueryChange,
+            )
+        }
+        if (filteredCompanies.isEmpty()) {
+            item {
+                Text(
+                    text = "No hay resultados",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                )
+            }
+        } else {
+            items(filteredCompanies) { company ->
+                CompanyItemModern(
+                    company = company,
+                    onClick = { onSelect(company) },
                 )
             }
         }

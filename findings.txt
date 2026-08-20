@@ -1,7 +1,6 @@
 ﻿ApiService.kt:46:7 detekt.TooManyFunctions
 CajaSelectorSheet.kt:203:13 detekt.LongMethod
 CartRepository.kt:18:7 detekt.TooManyFunctions
-CompanySelectionScreen.kt:59:5 detekt.LongMethod
 CreditNotesScreen.kt:660:13 detekt.LongMethod
 CreditNotesScreen.kt:77:5 detekt.LongMethod
 CreditNotesViewModel.kt:164:9 detekt.LongMethod
@@ -12,8 +11,5 @@ HkaConnectionHelper.kt:157:17 detekt.CyclomaticComplexMethod
 LocalStore.kt:48:7 detekt.TooManyFunctions
 MappingExtensions.kt:54:16 detekt.CyclomaticComplexMethod
 PaymentScreen.kt:3:1 detekt.TooManyFunctions
-ProductFormScreen.kt:63:5 detekt.LongMethod
-ProductListScreen.kt:271:13 detekt.LongMethod
-ProductListScreen.kt:69:5 detekt.LongMethod
 SellerSelectorBottomSheet.kt:31:5 detekt.LongMethod
-SuccessScreen.kt:102:5 detekt.LongMethod
+

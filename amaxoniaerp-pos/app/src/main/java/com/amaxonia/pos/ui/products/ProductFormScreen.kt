@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.PriceLevel
+import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.FormSection
@@ -68,12 +69,6 @@ fun ProductFormScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val product = state.product
-    val departmentNames = state.departments.map { it.name }
-    val sectionNames = state.sections.map { it.name }
-    val familyNames = state.families.map { it.name }
-    val subFamilyNames = state.subFamilies.map { it.name }
-    val brandNames = state.brands.map { it.name }
-    val lineNames = state.lines.map { it.name }
 
     LaunchedEffect(productId) {
         viewModel.loadProduct(productId)
@@ -82,44 +77,10 @@ fun ProductFormScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (state.isEditMode) "Editar producto" else "Nuevo producto",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.saveProduct(onSaveSuccess) },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        if (state.isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Save,
-                                contentDescription = "Guardar producto",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            ProductFormTopAppBar(
+                state = state,
+                onBack = onBack,
+                onSave = { viewModel.saveProduct(onSaveSuccess) },
             )
         },
     ) { padding ->
@@ -134,191 +95,9 @@ fun ProductFormScreen(
         ) {
             state.error?.let { ProductFormError(it) }
 
-            FormSection(title = "Datos generales") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PosTextInput("Código", product.code, Modifier.weight(1f)) {
-                        viewModel.updateField { copy(code = it) }
-                    }
-                    PosTextInput("Referencia", product.reference, Modifier.weight(1f)) {
-                        viewModel.updateField { copy(reference = it) }
-                    }
-                }
-                PosTextInput("Descripción", product.description) {
-                    viewModel.updateField { copy(description = it) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PosTextInput("Cód. barras 1", product.barcode1, Modifier.weight(1f)) {
-                        viewModel.updateField { copy(barcode1 = it) }
-                    }
-                    PosTextInput("Cód. barras 2", product.barcode2, Modifier.weight(1f)) {
-                        viewModel.updateField { copy(barcode2 = it) }
-                    }
-                }
-                PosTextInput("Cód. barras 3", product.barcode3) {
-                    viewModel.updateField { copy(barcode3 = it) }
-                }
-                Button(
-                    onClick = {},
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                ) {
-                    Text(
-                        text = "Seleccionar foto",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            FormSection(title = "Categorización") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        PosDropdown(
-                            "Departamento",
-                            departmentNames,
-                            selectedOption = selectedName(state.departments, product.department),
-                        ) { selected ->
-                            state.departments
-                                .firstOrNull { it.name == selected }
-                                ?.id
-                                ?.let(viewModel::onDepartmentChanged)
-                        }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        PosDropdown(
-                            "Sección",
-                            sectionNames,
-                            selectedOption = selectedName(state.sections, product.section),
-                            enabled = product.department.isNotBlank(),
-                        ) { selected ->
-                            state.sections
-                                .firstOrNull { it.name == selected }
-                                ?.id
-                                ?.let(viewModel::onSectionChanged)
-                        }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        PosDropdown(
-                            "Familia",
-                            familyNames,
-                            selectedOption = selectedName(state.families, product.family),
-                            enabled = product.section.isNotBlank(),
-                        ) { selected ->
-                            state.families
-                                .firstOrNull { it.name == selected }
-                                ?.id
-                                ?.let(viewModel::onFamilyChanged)
-                        }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        PosDropdown(
-                            "Subfamilia",
-                            subFamilyNames,
-                            selectedOption = selectedName(state.subFamilies, product.subFamily),
-                            enabled = product.family.isNotBlank(),
-                        ) { selected ->
-                            state.subFamilies.firstOrNull { it.name == selected }?.id?.let { id ->
-                                viewModel.updateField { copy(subFamily = id.toString()) }
-                            }
-                        }
-                    }
-                }
-                PosDropdown(
-                    "Marca",
-                    brandNames,
-                    selectedOption = selectedName(state.brands, product.brand),
-                ) { selected ->
-                    state.brands
-                        .firstOrNull { it.name == selected }
-                        ?.id
-                        ?.let(viewModel::onBrandChanged)
-                }
-                PosDropdown(
-                    "Línea",
-                    lineNames,
-                    selectedOption = selectedName(state.lines, product.line),
-                    enabled = product.brand.isNotBlank(),
-                ) { selected ->
-                    state.lines
-                        .firstOrNull { it.name == selected }
-                        ?.id
-                        ?.let(viewModel::onLineChanged)
-                }
-            }
-
-            FormSection(title = "Costos e impuestos") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        PosDropdown("Exento", listOf("SI", "NO"), if (product.isExempt) "SI" else "NO") {
-                            val isExempt = it == "SI"
-                            viewModel.updateField {
-                                copy(
-                                    isExempt = isExempt,
-                                    taxRate = if (isExempt) 0.0 else taxRate,
-                                )
-                            }
-                            viewModel.recalculateAllPrices()
-                        }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        PosMoneyInput("IVA %", product.taxRate, showZero = true) {
-                            viewModel.updateField { copy(taxRate = if (isExempt) 0.0 else it) }
-                            viewModel.recalculateAllPrices()
-                        }
-                    }
-                    IconButton(
-                        onClick = viewModel::recalculateAllPrices,
-                        modifier =
-                            Modifier
-                                .padding(top = 18.dp)
-                                .size(48.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Calculate,
-                            contentDescription = "Recalcular precios",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-                Text(
-                    text = "Costos",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PosMoneyInput("Actual ($)", product.costActual, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(costActual = it) }
-                        viewModel.recalculateAllPrices()
-                    }
-                    PosMoneyInput("Promedio ($)", product.costAverage, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(costAverage = it) }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PosMoneyInput("Anterior ($)", product.costPrevious, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(costPrevious = it) }
-                    }
-                    PosMoneyInput("Procesado ($)", product.costProcessed, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(costProcessed = it) }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PosMoneyInput("Comisión %", product.commissionPercent, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(commissionPercent = it) }
-                    }
-                    PosMoneyInput("Costo franco", product.costFranco, Modifier.weight(1f), showZero = true) {
-                        viewModel.updateField { copy(costFranco = it) }
-                    }
-                }
-            }
+            GeneralProductDataSection(product, viewModel)
+            ProductCategorizationSection(state, viewModel)
+            CostsAndTaxesSection(product, viewModel)
 
             PriceTable(
                 prices = product.prices,
@@ -327,28 +106,326 @@ fun ProductFormScreen(
                 },
             )
 
-            Button(
+            SaveProductButton(
+                isEditMode = state.isEditMode,
+                isSaving = state.isSaving,
                 onClick = { viewModel.saveProduct(onSaveSuccess) },
-                enabled = !state.isSaving,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            ) {
-                if (state.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = if (state.isEditMode) "Guardar cambios" else "Guardar producto",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            )
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProductFormTopAppBar(
+    state: ProductFormState,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    TopAppBar(
+        title = {
+            Text(
+                text = if (state.isEditMode) "Editar producto" else "Nuevo producto",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onSave,
+                modifier = Modifier.size(48.dp),
+            ) {
+                if (state.isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = "Guardar producto",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+/** Códigos, descripción, barras y foto del producto. */
+@Composable
+private fun GeneralProductDataSection(
+    product: Product,
+    viewModel: ProductFormViewModel,
+) {
+    FormSection(title = "Datos generales") {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PosTextInput("Código", product.code, Modifier.weight(1f)) {
+                viewModel.updateField { copy(code = it) }
+            }
+            PosTextInput("Referencia", product.reference, Modifier.weight(1f)) {
+                viewModel.updateField { copy(reference = it) }
+            }
+        }
+        PosTextInput("Descripción", product.description) {
+            viewModel.updateField { copy(description = it) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PosTextInput("Cód. barras 1", product.barcode1, Modifier.weight(1f)) {
+                viewModel.updateField { copy(barcode1 = it) }
+            }
+            PosTextInput("Cód. barras 2", product.barcode2, Modifier.weight(1f)) {
+                viewModel.updateField { copy(barcode2 = it) }
+            }
+        }
+        PosTextInput("Cód. barras 3", product.barcode3) {
+            viewModel.updateField { copy(barcode3 = it) }
+        }
+        Button(
+            onClick = {},
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Text(
+                text = "Seleccionar foto",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/** Jerarquía comercial: departamento, sección, familia, subfamilia, marca y línea. */
+@Composable
+private fun ProductCategorizationSection(
+    state: ProductFormState,
+    viewModel: ProductFormViewModel,
+) {
+    val product = state.product
+    FormSection(title = "Categorización") {
+        CategoryFirstRow(state, product, viewModel)
+        CategorySecondRow(state, product, viewModel)
+        PosDropdown(
+            "Marca",
+            state.brands.map { it.name },
+            selectedOption = selectedName(state.brands, product.brand),
+        ) { selected ->
+            state.brands
+                .firstOrNull { it.name == selected }
+                ?.id
+                ?.let(viewModel::onBrandChanged)
+        }
+        PosDropdown(
+            "Línea",
+            state.lines.map { it.name },
+            selectedOption = selectedName(state.lines, product.line),
+            enabled = product.brand.isNotBlank(),
+        ) { selected ->
+            state.lines
+                .firstOrNull { it.name == selected }
+                ?.id
+                ?.let(viewModel::onLineChanged)
+        }
+    }
+}
+
+/** Departamentos y secciones. */
+@Composable
+private fun CategoryFirstRow(
+    state: ProductFormState,
+    product: Product,
+    viewModel: ProductFormViewModel,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f)) {
+            PosDropdown(
+                "Departamento",
+                state.departments.map { it.name },
+                selectedOption = selectedName(state.departments, product.department),
+            ) { selected ->
+                state.departments
+                    .firstOrNull { it.name == selected }
+                    ?.id
+                    ?.let(viewModel::onDepartmentChanged)
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            PosDropdown(
+                "Sección",
+                state.sections.map { it.name },
+                selectedOption = selectedName(state.sections, product.section),
+                enabled = product.department.isNotBlank(),
+            ) { selected ->
+                state.sections
+                    .firstOrNull { it.name == selected }
+                    ?.id
+                    ?.let(viewModel::onSectionChanged)
+            }
+        }
+    }
+}
+
+/** Familias y subfamilias. */
+@Composable
+private fun CategorySecondRow(
+    state: ProductFormState,
+    product: Product,
+    viewModel: ProductFormViewModel,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f)) {
+            PosDropdown(
+                "Familia",
+                state.families.map { it.name },
+                selectedOption = selectedName(state.families, product.family),
+                enabled = product.section.isNotBlank(),
+            ) { selected ->
+                state.families
+                    .firstOrNull { it.name == selected }
+                    ?.id
+                    ?.let(viewModel::onFamilyChanged)
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            PosDropdown(
+                "Subfamilia",
+                state.subFamilies.map { it.name },
+                selectedOption = selectedName(state.subFamilies, product.subFamily),
+                enabled = product.family.isNotBlank(),
+            ) { selected ->
+                state.subFamilies.firstOrNull { it.name == selected }?.id?.let { id ->
+                    viewModel.updateField { copy(subFamily = id.toString()) }
+                }
+            }
+        }
+    }
+}
+
+/** Impuestos y costos del producto. */
+@Composable
+private fun CostsAndTaxesSection(
+    product: Product,
+    viewModel: ProductFormViewModel,
+) {
+    FormSection(title = "Costos e impuestos") {
+        ExemptTaxRow(product, viewModel)
+        Text(
+            text = "Costos",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PosMoneyInput("Actual ($)", product.costActual, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(costActual = it) }
+                viewModel.recalculateAllPrices()
+            }
+            PosMoneyInput("Promedio ($)", product.costAverage, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(costAverage = it) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PosMoneyInput("Anterior ($)", product.costPrevious, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(costPrevious = it) }
+            }
+            PosMoneyInput("Procesado ($)", product.costProcessed, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(costProcessed = it) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PosMoneyInput("Comisión %", product.commissionPercent, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(commissionPercent = it) }
+            }
+            PosMoneyInput("Costo franco", product.costFranco, Modifier.weight(1f), showZero = true) {
+                viewModel.updateField { copy(costFranco = it) }
+            }
+        }
+    }
+}
+
+/** Selector de exención + IVA y botón de recálculo. */
+@Composable
+private fun ExemptTaxRow(
+    product: Product,
+    viewModel: ProductFormViewModel,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.weight(1f)) {
+            PosDropdown("Exento", listOf("SI", "NO"), if (product.isExempt) "SI" else "NO") {
+                val isExempt = it == "SI"
+                viewModel.updateField {
+                    copy(
+                        isExempt = isExempt,
+                        taxRate = if (isExempt) 0.0 else taxRate,
+                    )
+                }
+                viewModel.recalculateAllPrices()
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            PosMoneyInput("IVA %", product.taxRate, showZero = true) {
+                viewModel.updateField { copy(taxRate = if (isExempt) 0.0 else it) }
+                viewModel.recalculateAllPrices()
+            }
+        }
+        IconButton(
+            onClick = viewModel::recalculateAllPrices,
+            modifier =
+                Modifier
+                    .padding(top = 18.dp)
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Calculate,
+                contentDescription = "Recalcular precios",
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaveProductButton(
+    isEditMode: Boolean,
+    isSaving: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = !isSaving,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+    ) {
+        if (isSaving) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(
+            text = if (isEditMode) "Guardar cambios" else "Guardar producto",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
