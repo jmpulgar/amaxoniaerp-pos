@@ -16,26 +16,21 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -50,8 +45,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,15 +62,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import com.amaxonia.pos.composition.AppGraph
-import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
-import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
-import com.amaxonia.pos.ui.common.components.CartEmptyState
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
@@ -107,258 +96,40 @@ fun CartScreen(
         }
     }
     var showSellerSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var itemToEditPrice by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<com.amaxonia.pos.domain.model.CartItem?>(null)
-    }
-    var itemToEditDiscount by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<com.amaxonia.pos.domain.model.CartItem?>(null)
-    }
-    var priceInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-    var discountInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val editState = androidx.compose.runtime.remember { CartEditState() }
 
-    // Mensaje de exito (borrador guardado)
-    state.orderSuccessMessage?.let { successMessage ->
-        AlertDialog(
-            onDismissRequest = {
-                viewModel.onAction(CartUiAction.ClearMessage)
-            },
-            title = { Text("Borrador Guardado") },
-            text = { Text(successMessage) },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.onAction(CartUiAction.ClearMessage)
-                    onBack()
-                }) { Text("Aceptar") }
-            },
-        )
-    }
-
-    val editingPriceItem = itemToEditPrice
-    if (editingPriceItem != null) {
-        AlertDialog(
-            onDismissRequest = { itemToEditPrice = null },
-            confirmButton = {
-                Button(onClick = {
-                    val parsed = priceInput.toDoubleOrNull()
-                    if (parsed != null) {
-                        viewModel.onAction(CartUiAction.UpdateItemPrice(editingPriceItem.product.id, parsed))
-                        itemToEditPrice = null
-                    }
-                }) { Text("Guardar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { itemToEditPrice = null }) { Text("Cancelar") }
-            },
-            title = { Text("Editar precio unitario") },
-            text = {
-                Column {
-                    Text(editingPriceItem.product.description, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = priceInput,
-                        onValueChange = { priceInput = it },
-                        label = { Text("Precio unitario con IVA") },
-                        singleLine = true,
-                    )
-                }
-            },
-        )
-    }
-
-    val editingDiscountItem = itemToEditDiscount
-    if (editingDiscountItem != null) {
-        AlertDialog(
-            onDismissRequest = { itemToEditDiscount = null },
-            confirmButton = {
-                Button(onClick = {
-                    val parsed = discountInput.toDoubleOrNull()
-                    if (parsed != null) {
-                        viewModel.onAction(CartUiAction.UpdateItemDiscount(editingDiscountItem.product.id, parsed))
-                        itemToEditDiscount = null
-                    }
-                }) { Text("Guardar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { itemToEditDiscount = null }) { Text("Cancelar") }
-            },
-            title = { Text("Aplicar descuento") },
-            text = {
-                Column {
-                    Text(editingDiscountItem.product.description, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = discountInput,
-                        onValueChange = { discountInput = it },
-                        label = { Text("Descuento (%)") },
-                        singleLine = true,
-                    )
-                }
-            },
-        )
-    }
-
+    CartOrderSavedOverlay(state = state, viewModel = viewModel, onBack = onBack)
+    CartEditDialogs(editState = editState, viewModel = viewModel)
     if (showSellerSheet) {
-        SellerSelectorBottomSheet(
-            sellers = state.availableSellers,
-            selectedSellerId = state.currentSeller?.id,
-            onSelect = { seller -> viewModel.onAction(CartUiAction.SelectSeller(seller.id)) },
+        CartSellerSheetOverlay(
+            state = state,
+            viewModel = viewModel,
             onDismiss = { showSellerSheet = false },
         )
     }
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "Carrito",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (state.items.isNotEmpty()) {
-                            Text(
-                                if (state.items.size == 1) "1 artículo" else "${state.items.size} artículos",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                },
-                actions = {
-                    if (state.items.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onAction(CartUiAction.ClearCart) }) {
-                            Icon(
-                                Icons.Default.DeleteSweep,
-                                contentDescription = "Limpiar carrito",
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            CartTopAppBar(
+                state = state,
+                onBack = onBack,
+                onClearCart = { viewModel.onAction(CartUiAction.ClearCart) },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (state.items.isNotEmpty()) {
-                CartBottomBar(
-                    total = state.total,
-                    secondaryTotal =
-                        state.totalBsText
-                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
-                            ?.let { "${formatCurrencyLabel(state.abrMonedaSecundaria)} $it" },
-                    onSaveDraft = { viewModel.onAction(CartUiAction.SaveDraft) },
-                    onCheckout = { viewModel.onAction(CartUiAction.Checkout) },
-                )
-            }
-        },
+        bottomBar = { CartBottomBarArea(state = state, viewModel = viewModel) },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
-            // SECCIÓN CLIENTE + VENDEDOR (panel consolidado)
-            CartClientVendorPanel(
-                state = state,
-                onSelectClient = onSelectClient,
-                onRemoveClient = { viewModel.onAction(CartUiAction.RemoveClient) },
-                onChangeSeller = { showSellerSheet = true },
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
-                ClientSucursalSelectorCard(
-                    sucursales = state.clientSucursales,
-                    selectedSucursal = state.selectedClientSucursal,
-                    isRequiredMissing = state.isMissingRequiredClientSucursal,
-                    onSelect = { branchId -> viewModel.onAction(CartUiAction.SelectClientBranch(branchId)) },
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            state.cartActionError?.let { message ->
-                CartErrorBanner(message)
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            if (state.items.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CartEmptyState()
-                }
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.displayItems, key = { it.id }) { displayItem ->
-                        when (displayItem) {
-                            is ItemCarrito.ProductoIndividual -> {
-                                val item = displayItem.item
-                                CartItemRow(
-                                    item = item,
-                                    actions =
-                                        CartItemActions(
-                                            onIncrease = { viewModel.onAction(CartUiAction.IncreaseQuantity(item.product.id)) },
-                                            onDecrease = { viewModel.onAction(CartUiAction.DecreaseQuantity(item.product.id)) },
-                                            onRemove = { viewModel.onAction(CartUiAction.RemoveItem(item.product.id)) },
-                                            onUnitChange = { unit ->
-                                                viewModel.onAction(CartUiAction.UpdateItemUnit(item.product.id, unit))
-                                            },
-                                            onQuantityChange = { quantity ->
-                                                viewModel.onAction(CartUiAction.UpdateItemQuantity(item.product.id, quantity))
-                                            },
-                                            edit =
-                                                CartItemEditActions(
-                                                    onEditPrice = {
-                                                        itemToEditPrice = item
-                                                        priceInput =
-                                                            String.format(
-                                                                java.util.Locale.getDefault(),
-                                                                "%.2f",
-                                                                item.unitPriceWithTax,
-                                                            )
-                                                    },
-                                                    onEditDiscount = {
-                                                        itemToEditDiscount = item
-                                                        discountInput =
-                                                            String.format(
-                                                                java.util.Locale.getDefault(),
-                                                                "%.2f",
-                                                                item.discountPercent,
-                                                            )
-                                                    },
-                                                ),
-                                        ),
-                                    allowEditPrice = state.allowEditPrices,
-                                    allowDiscount = state.allowDiscounts,
-                                )
-                            }
-                            is ItemCarrito.PromocionAgrupada -> {
-                                PromotionCartGroup(
-                                    group = displayItem,
-                                    onRemove = {
-                                        viewModel.onAction(CartUiAction.RemovePromotion(displayItem.promocionId))
-                                    },
-                                    onQuantityChange = { times ->
-                                        viewModel.onAction(
-                                            CartUiAction.UpdatePromotionQuantity(displayItem.promocionId, times),
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        CartScreenContent(
+            state = state,
+            viewModel = viewModel,
+            actions =
+                CartScreenActions(
+                    onSelectClient = onSelectClient,
+                    onChangeSeller = { showSellerSheet = true },
+                    onStartEdit = editState::start,
+                ),
+            modifier = Modifier.padding(padding),
+        )
     }
 }
 
@@ -630,7 +401,7 @@ private fun CartSellerRow(
 }
 
 @Composable
-private fun CartErrorBanner(message: String) {
+internal fun CartErrorBanner(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
@@ -659,13 +430,12 @@ private fun CartErrorBanner(message: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ClientSucursalSelectorCard(
+internal fun ClientSucursalSelectorCard(
     sucursales: List<com.amaxonia.pos.domain.model.ClientBranch>,
     selectedSucursal: com.amaxonia.pos.domain.model.ClientBranch?,
     isRequiredMissing: Boolean,
     onSelect: (Int) -> Unit,
 ) {
-    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val hasMultiple = sucursales.size > 1
 
     Card(
@@ -690,46 +460,12 @@ private fun ClientSucursalSelectorCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (hasMultiple) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    OutlinedTextField(
-                        value = selectedSucursal?.nombreSucursal.orEmpty(),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        isError = isRequiredMissing,
-                        placeholder = { Text("Seleccionar sucursal") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier =
-                            Modifier
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                                .fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        sucursales.forEach { sucursal ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(sucursal.nombreSucursal, fontWeight = FontWeight.SemiBold)
-                                        sucursal.direccion?.takeIf { it.isNotBlank() }?.let {
-                                            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    onSelect(sucursal.sucursalId)
-                                    expanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                SucursalSelectorDropdown(
+                    sucursales = sucursales,
+                    selectedSucursal = selectedSucursal,
+                    isRequiredMissing = isRequiredMissing,
+                    onSelect = onSelect,
+                )
                 if (isRequiredMissing) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -749,6 +485,58 @@ private fun ClientSucursalSelectorCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SucursalSelectorDropdown(
+    sucursales: List<com.amaxonia.pos.domain.model.ClientBranch>,
+    selectedSucursal: com.amaxonia.pos.domain.model.ClientBranch?,
+    isRequiredMissing: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = selectedSucursal?.nombreSucursal.orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            isError = isRequiredMissing,
+            placeholder = { Text("Seleccionar sucursal") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier =
+                Modifier
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            sucursales.forEach { sucursal ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(sucursal.nombreSucursal, fontWeight = FontWeight.SemiBold)
+                            sucursal.direccion?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
+                    onClick = {
+                        onSelect(sucursal.sucursalId)
+                        expanded = false
+                    },
+                )
             }
         }
     }
@@ -793,7 +581,7 @@ private fun buildInitials(name: String): String {
 }
 
 @Composable
-private fun PromotionCartGroup(
+internal fun PromotionCartGroup(
     group: ItemCarrito.PromocionAgrupada,
     onRemove: () -> Unit,
     onQuantityChange: (Int) -> Unit,
@@ -810,83 +598,10 @@ private fun PromotionCartGroup(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(42.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        accent,
-                                        MaterialTheme.colorScheme.primary,
-                                    ),
-                                ),
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.LocalOffer, contentDescription = null, tint = PosPalette.FixedWhite)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("PROMOCIÓN ${group.promocionCodigo}", color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                    Text(
-                        group.promocionNombre,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "EL PRODUCTO ESTÁ CONFORMADO POR:",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error)
-                }
-            }
+            PromotionGroupHeader(group = group, accent = accent, onRemove = onRemove)
 
             Spacer(Modifier.height(10.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                group.items.forEach { item ->
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                                .padding(horizontal = 10.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(accent))
-                        Spacer(Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                item.product.description,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                "Cant. ${String.format(java.util.Locale.getDefault(), "%.2f", item.quantityDecimal)}",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accent,
-                        )
-                    }
-                }
-            }
+            PromotionGroupItems(group = group, accent = accent)
 
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -921,6 +636,98 @@ private fun PromotionCartGroup(
                 isError = timesText.isNotBlank() && times < 1,
                 label = "Promociones",
             )
+        }
+    }
+}
+
+/** Encabezado de la promoción agrupada con su botón de quitar. */
+@Composable
+private fun PromotionGroupHeader(
+    group: ItemCarrito.PromocionAgrupada,
+    accent: androidx.compose.ui.graphics.Color,
+    onRemove: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier =
+                Modifier
+                    .size(42.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                accent,
+                                MaterialTheme.colorScheme.primary,
+                            ),
+                        ),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.LocalOffer, contentDescription = null, tint = PosPalette.FixedWhite)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("PROMOCIÓN ${group.promocionCodigo}", color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+            Text(
+                group.promocionNombre,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "EL PRODUCTO ESTÁ CONFORMADO POR:",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        IconButton(onClick = onRemove) {
+            Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** Líneas de producto que conforman la promoción. */
+@Composable
+private fun PromotionGroupItems(
+    group: ItemCarrito.PromocionAgrupada,
+    accent: androidx.compose.ui.graphics.Color,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        group.items.forEach { item ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(accent))
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        item.product.description,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "Cant. ${String.format(java.util.Locale.getDefault(), "%.2f", item.quantityDecimal)}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                )
+            }
         }
     }
 }
