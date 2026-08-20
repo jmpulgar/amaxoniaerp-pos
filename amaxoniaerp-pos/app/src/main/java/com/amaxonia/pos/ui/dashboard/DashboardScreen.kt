@@ -1,6 +1,5 @@
 package com.amaxonia.pos.ui.dashboard
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,28 +26,22 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
-import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.People
@@ -66,8 +58,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -108,10 +98,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -123,14 +111,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkInfo
-import coil.compose.AsyncImage
 import com.amaxonia.pos.R
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
-import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
-import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.CategoryChipRow
@@ -144,7 +129,6 @@ import com.amaxonia.pos.ui.theme.OfflineRed
 import com.amaxonia.pos.ui.theme.OnlineGreen
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
-import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.SuccessGreen
 import com.amaxonia.pos.ui.theme.WarningOrange
 import kotlinx.coroutines.launch
@@ -154,15 +138,8 @@ private const val DASHBOARD_LOG_TAG = "DashboardScreen"
 /** Ítems que faltan por debajo del último visible para disparar la carga de más productos. */
 private const val PREFETCH_THRESHOLD_ITEMS = 6
 
-/** Líneas de detalle de promoción mostradas como vista previa en la tarjeta. */
-private const val PROMO_DETAILS_PREVIEW_COUNT = 4
-
 /** Máximo de dígitos aceptados al escribir una cantidad manual. */
 private const val MAX_QUANTITY_DIGITS = 5
-
-/** Pesos del teclado numérico manual: columnas de números y botón Cobrar (ENTER). */
-private const val KEYPAD_NUMBERS_WEIGHT = 3f
-private const val CHARGE_BUTTON_WEIGHT = 3f
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -1123,222 +1100,6 @@ private fun ProductQuantitySheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PromotionChoiceSheet(
-    product: DashboardProduct,
-    promotions: List<Promocion>,
-    onAddIndividual: (Int) -> Unit,
-    onAddPromotion: (Promocion, Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var individualQuantityText by remember { mutableStateOf("1") }
-    val individualQuantity = individualQuantityText.toIntOrNull() ?: 0
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 18.dp)
-                    .padding(bottom = 22.dp),
-        ) {
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(48.dp)
-                                .clip(MaterialTheme.shapes.medium)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.tertiary,
-                                        ),
-                                    ),
-                                ),
-                    ) {
-                        Icon(
-                            Icons.Default.LocalOffer,
-                            contentDescription = null,
-                            tint = PosPalette.FixedWhite,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Este producto tiene promoción",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Text(
-                            product.name,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
-                            fontSize = 13.sp,
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Producto individual", fontWeight = FontWeight.Bold)
-                    QuantityStepper(
-                        quantityText = individualQuantityText,
-                        onQuantityTextChange = { individualQuantityText = sanitizeQuantityInput(it) },
-                        onDecrease = {
-                            individualQuantityText =
-                                ((individualQuantityText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString()
-                        },
-                        onIncrease = {
-                            individualQuantityText =
-                                ((individualQuantityText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString()
-                        },
-                        onDone = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
-                        isError = individualQuantityText.isNotBlank() && individualQuantity < 1,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedButton(
-                        onClick = { if (individualQuantity >= 1) onAddIndividual(individualQuantity) },
-                        enabled = individualQuantity >= 1,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                    ) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Vender producto individual", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Text("Promociones disponibles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(promotions, key = { it.id }) { promo ->
-                    PromotionOptionCard(promo = promo, onAddPromotion = { times -> onAddPromotion(promo, times) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PromotionOptionCard(
-    promo: Promocion,
-    onAddPromotion: (Int) -> Unit,
-) {
-    val accent = if (promo.tipo == "KIT") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-    var timesText by remember { mutableStateOf("1") }
-    val times = timesText.toIntOrNull() ?: 0
-    Card(
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Surface(color = accent.copy(alpha = 0.12f), shape = PosExtraShapes.Pill) {
-                    Text(
-                        text = promo.tipo,
-                        color = accent,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(promo.nombre, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text("Código ${promo.codigo}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                }
-                Text(BigDecimalMoneyFormatter.money(promo.total), color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
-            }
-
-            Spacer(Modifier.height(10.dp))
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), shape = MaterialTheme.shapes.medium) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    promo.detalles.take(PROMO_DETAILS_PREVIEW_COUNT).forEach { detail ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "${detail.cantidadTotal.stripTrailingZeros().toPlainString()} x ${detail.productName}",
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                BigDecimalMoneyFormatter.money(detail.totalConIva),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (promo.detalles.size > PROMO_DETAILS_PREVIEW_COUNT) {
-                        val hiddenCount = promo.detalles.size - PROMO_DETAILS_PREVIEW_COUNT
-                        Text("+$hiddenCount productos más", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-            QuantityStepper(
-                quantityText = timesText,
-                onQuantityTextChange = { timesText = sanitizeQuantityInput(it) },
-                onDecrease = { timesText = ((timesText.toIntOrNull() ?: 1) - 1).coerceAtLeast(1).toString() },
-                onIncrease = { timesText = ((timesText.toIntOrNull() ?: 0) + 1).coerceAtLeast(1).toString() },
-                onDone = { if (times >= 1) onAddPromotion(times) },
-                isError = timesText.isNotBlank() && times < 1,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = { if (times >= 1) onAddPromotion(times) },
-                enabled = times >= 1,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = PosPalette.FixedWhite),
-            ) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Agregar promoción x${times.coerceAtLeast(1)}", fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
 @Composable
 private fun BottomPillItem(
     selected: Boolean,
@@ -1369,234 +1130,12 @@ private fun BottomPillItem(
     }
 }
 
-private fun sanitizeQuantityInput(value: String): String =
+internal fun sanitizeQuantityInput(value: String): String =
     value
         .filter { it.isDigit() }
         .trimStart('0')
         .ifBlank { "" }
         .take(MAX_QUANTITY_DIGITS)
-
-@Composable
-fun ProductCard(
-    product: DashboardProduct,
-    onAddClick: () -> Unit,
-    onQuantityClick: () -> Unit,
-) {
-    Card(
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth().height(240.dp),
-    ) {
-        Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
-            // Imagen flexible: absorbe el alto restante para que la tarjeta nunca
-            // desborde en columnas estrechas (320dp → 2 columnas de ~138dp).
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!product.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = product.imageUrl,
-                        contentDescription = product.name,
-                        modifier = Modifier.fillMaxSize(),
-                        onError = { SafeLog.w("ProductImage", "Dashboard product image load failed") },
-                        onSuccess = { SafeLog.d("ProductImage", "Dashboard product image loaded") },
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Inventory,
-                        contentDescription = "Sin imagen",
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(44.dp),
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = product.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!product.code.isNullOrBlank()) {
-                Text(
-                    text = "Ref: ${product.code}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            // Precio en su propia fila (adaptive: montos grandes encogen sin recortarse).
-            AdaptiveAmountText(
-                text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                baseStyle = PosTextStyles.priceTileLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(),
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 12f,
-                        maxLines = 1,
-                    ),
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            // Acciones alineadas a la derecha; targets ≥48dp vía minimum interactive.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = onQuantityClick,
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Elegir cantidad",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = onAddClick,
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Agregar una unidad",
-                        tint = PosPalette.FixedWhite,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProductListRow(
-    product: DashboardProduct,
-    onAddClick: () -> Unit,
-    onQuantityClick: () -> Unit,
-) {
-    Card(
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(56.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!product.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = product.imageUrl,
-                        contentDescription = product.name,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Inventory,
-                        contentDescription = "Sin imagen",
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!product.code.isNullOrBlank()) {
-                    Text(
-                        text = "Ref: ${product.code}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else {
-                    Spacer(Modifier.height(4.dp))
-                }
-                AdaptiveAmountText(
-                    text = "$${String.format(java.util.Locale.getDefault(), "%.2f", product.price)}",
-                    baseStyle = PosTextStyles.priceTileLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 13f,
-                            maxLines = 1,
-                        ),
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onQuantityClick,
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Elegir cantidad",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                IconButton(
-                    onClick = onAddClick,
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Agregar una unidad",
-                        tint = PosPalette.FixedWhite,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun DrawerMenuItem(
@@ -1621,177 +1160,6 @@ fun DrawerMenuItem(
             fontSize = 16.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
         )
-    }
-}
-
-@Composable
-fun ManualEntryContent(
-    currentValue: String,
-    onKeyClick: (String) -> Unit,
-    onClearClick: () -> Unit,
-    onBackspaceClick: () -> Unit,
-    onEnterClick: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Título de la sección
-        Text(
-            text = "Ingreso Manual",
-            style =
-                TextStyle(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                ),
-            modifier =
-                Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 24.dp),
-        )
-
-        // Pantalla del precio (Visor) — monto adaptive para que importes largos no se corten.
-        Card(
-            shape = MaterialTheme.shapes.medium,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = "Monto a cobrar",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                AdaptiveAmountText(
-                    text = if (currentValue.isEmpty()) "$ 0.00" else "$ $currentValue",
-                    baseStyle =
-                        TextStyle(
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                        ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth(),
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 18f,
-                            maxLines = 1,
-                        ),
-                )
-            }
-        }
-
-        // Teclado Numérico (el bottomBar ya reserva su espacio vía paddingValues;
-        // sin padding extra que desperdicie pantalla).
-        Row(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // Columna Izquierda (Números)
-            Column(
-                modifier = Modifier.weight(KEYPAD_NUMBERS_WEIGHT),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                val keys =
-                    listOf(
-                        listOf("1", "2", "3"),
-                        listOf("4", "5", "6"),
-                        listOf("7", "8", "9"),
-                        listOf("C", "0", "000"),
-                    )
-
-                keys.forEach { row ->
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        row.forEach { key ->
-                            Button(
-                                onClick = {
-                                    if (key == "C") onClearClick() else onKeyClick(key)
-                                },
-                                shape = MaterialTheme.shapes.small,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                contentPadding = PaddingValues(0.dp),
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                            ) {
-                                Text(
-                                    text = key,
-                                    fontSize = if (key == "000") 20.sp else 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (key == "C") PosPalette.DangerRed else MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Columna Derecha (Acciones)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // Botón Borrar
-                Button(
-                    onClick = onBackspaceClick,
-                    shape = MaterialTheme.shapes.small,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Backspace,
-                        contentDescription = "Borrar",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-
-                // Botón ENTER
-                Button(
-                    onClick = onEnterClick,
-                    shape = MaterialTheme.shapes.small,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    modifier =
-                        Modifier
-                            .weight(CHARGE_BUTTON_WEIGHT)
-                            .fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Cobrar",
-                        tint = PosPalette.FixedWhite,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-            }
-        }
     }
 }
 

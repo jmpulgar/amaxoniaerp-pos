@@ -14,12 +14,7 @@ CreditNotesScreen.kt:660:13 detekt.LongMethod
 CreditNotesScreen.kt:77:5 detekt.LongMethod
 CreditNotesViewModel.kt:164:9 detekt.LongMethod
 CreditNotesViewModel.kt:22:7 detekt.TooManyFunctions
-DashboardScreen.kt:1128:13 detekt.LongMethod
-DashboardScreen.kt:1254:13 detekt.LongMethod
-DashboardScreen.kt:1380:5 detekt.LongMethod
-DashboardScreen.kt:1494:5 detekt.LongMethod
-DashboardScreen.kt:1628:5 detekt.LongMethod
-DependencyContainer.kt:381:9 detekt.LongMethod
+CreditNotesViewModel.kt:164:9 detekt.LongMethod
 DraftInvoicesScreen.kt:178:13 detekt.LongMethod
 HkaConnectionHelper.kt:157:17 detekt.CyclomaticComplexMethod
 LocalStore.kt:48:7 detekt.TooManyFunctions
