@@ -7,7 +7,6 @@ CartScreen.kt:662:13 detekt.LongMethod
 CartScreen.kt:796:13 detekt.LongMethod
 CartScreen.kt:91:5 detekt.CyclomaticComplexMethod
 CartScreen.kt:91:5 detekt.LongMethod
-CierreCajaViewModel.kt:94:9 detekt.LongMethod
 ClientFormScreen.kt:50:5 detekt.LongMethod
 ClientListScreen.kt:183:5 detekt.LongMethod
 ClientListScreen.kt:62:5 detekt.LongMethod
