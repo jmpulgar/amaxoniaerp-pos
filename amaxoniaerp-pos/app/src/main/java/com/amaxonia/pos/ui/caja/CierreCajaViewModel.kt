@@ -93,71 +93,75 @@ class CierreCajaViewModel(
 
     fun confirmClose(printTicket: Boolean) {
         _showCloseTicketPrompt.value = false
-        val currentState = _uiState.value
         val summary =
-            when (currentState) {
+            when (val currentState = _uiState.value) {
                 is CierreCajaUiState.Ready -> currentState.summary
                 is CierreCajaUiState.Error -> currentState.summary ?: return
                 else -> return
             }
 
-        viewModelScope.launch {
-            _uiState.value = CierreCajaUiState.Closing(summary)
+        viewModelScope.launch { closeCaja(printTicket, summary) }
+    }
 
-            cajaRepository.activeCaja.value ?: run {
+    private suspend fun closeCaja(
+        printTicket: Boolean,
+        summary: CierreCajaSummary,
+    ) {
+        _uiState.value = CierreCajaUiState.Closing(summary)
+
+        cajaRepository.activeCaja.value ?: run {
+            _uiState.value =
+                CierreCajaUiState.Error(
+                    message = "No hay caja activa para cerrar",
+                    summary = summary,
+                )
+            return
+        }
+
+        cajaRepository.closeCaja(buildCierreRequest(summary)).fold(
+            onSuccess = { response ->
+                if (printTicket) {
+                    printCloseTicket(summary)
+                }
+                // Conservamos la caja seleccionada (solo cerramos la secuencia) para
+                // que el Dashboard quede en "pendiente de apertura" y se pueda ofrecer
+                // aperturar una nueva sin dejar un hueco donde no se puede facturar.
+                cajaRepository.markSequenceClosed()
+                _uiState.value =
+                    CierreCajaUiState.Success(
+                        message = response.message,
+                    )
+            },
+            onFailure = { error ->
                 _uiState.value =
                     CierreCajaUiState.Error(
-                        message = "No hay caja activa para cerrar",
+                        message = error.message ?: "Error al cerrar la caja",
                         summary = summary,
                     )
-                return@launch
-            }
-
-            val request =
-                CierreCajaRequest(
-                    id = summary.idCajaSecuencia,
-                    monto_efectivo_ventas = summary.montoEfectivoVentas,
-                    monto_efectivo_entrada = summary.montoEfectivoEntrada,
-                    monto_efectivo_salida = summary.montoEfectivoSalida,
-                    monto_efectivo_total = summary.montoEfectivoTotal,
-                    monto_efectivo_cierre = summary.montoEfectivoCierre,
-                    monto_efectivo_diferencia = summary.montoEfectivoDiferencia,
-                    monto_otros_total = summary.montoOtrosTotal,
-                    monto_otros_cierre = summary.montoOtrosCierre,
-                    monto_otros_diferencia = summary.montoOtrosDiferencia,
-                    monto_total = summary.montoTotal,
-                    monto_cierre = summary.montoCierre,
-                    monto_diferencia = summary.montoDiferencia,
-                    detalle = summary.detalle,
-                    detalle_formapago = summary.detalleFormaPago,
-                    observacion_cierre = "",
-                    numero_cierre_fiscal = "",
-                )
-
-            cajaRepository.closeCaja(request).fold(
-                onSuccess = { response ->
-                    if (printTicket) {
-                        printCloseTicket(summary)
-                    }
-                    // Conservamos la caja seleccionada (solo cerramos la secuencia) para
-                    // que el Dashboard quede en "pendiente de apertura" y se pueda ofrecer
-                    // aperturar una nueva sin dejar un hueco donde no se puede facturar.
-                    cajaRepository.markSequenceClosed()
-                    _uiState.value =
-                        CierreCajaUiState.Success(
-                            message = response.message,
-                        )
-                },
-                onFailure = { error ->
-                    _uiState.value =
-                        CierreCajaUiState.Error(
-                            message = error.message ?: "Error al cerrar la caja",
-                            summary = summary,
-                        )
-                },
-            )
-        }
+            },
+        )
     }
+
+    private fun buildCierreRequest(summary: CierreCajaSummary): CierreCajaRequest =
+        CierreCajaRequest(
+            id = summary.idCajaSecuencia,
+            monto_efectivo_ventas = summary.montoEfectivoVentas,
+            monto_efectivo_entrada = summary.montoEfectivoEntrada,
+            monto_efectivo_salida = summary.montoEfectivoSalida,
+            monto_efectivo_total = summary.montoEfectivoTotal,
+            monto_efectivo_cierre = summary.montoEfectivoCierre,
+            monto_efectivo_diferencia = summary.montoEfectivoDiferencia,
+            monto_otros_total = summary.montoOtrosTotal,
+            monto_otros_cierre = summary.montoOtrosCierre,
+            monto_otros_diferencia = summary.montoOtrosDiferencia,
+            monto_total = summary.montoTotal,
+            monto_cierre = summary.montoCierre,
+            monto_diferencia = summary.montoDiferencia,
+            detalle = summary.detalle,
+            detalle_formapago = summary.detalleFormaPago,
+            observacion_cierre = "",
+            numero_cierre_fiscal = "",
+        )
 
     private suspend fun printCloseTicket(summary: CierreCajaSummary) {
         val payload = ticketPayloadBuilder.build(summary, cajaRepository.activeCaja.value)
