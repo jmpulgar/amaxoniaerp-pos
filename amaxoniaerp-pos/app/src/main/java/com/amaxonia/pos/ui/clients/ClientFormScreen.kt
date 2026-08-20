@@ -65,42 +65,10 @@ fun ClientFormScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (state.isEditMode) "Editar cliente" else "Nuevo cliente",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.saveClient(onSaveSuccess) },
-                        enabled = !state.isSaving,
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        if (state.isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Save,
-                                contentDescription = "Guardar cliente",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            ClientFormTopAppBar(
+                state = state,
+                onBack = onBack,
+                onSave = { viewModel.saveClient(onSaveSuccess) },
             )
         },
     ) { padding ->
@@ -124,6 +92,52 @@ fun ClientFormScreen(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClientFormTopAppBar(
+    state: ClientFormState,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    TopAppBar(
+        title = {
+            Text(
+                text = if (state.isEditMode) "Editar cliente" else "Nuevo cliente",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onSave,
+                enabled = !state.isSaving,
+                modifier = Modifier.size(48.dp),
+            ) {
+                if (state.isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = "Guardar cliente",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
 }
 
 @Composable

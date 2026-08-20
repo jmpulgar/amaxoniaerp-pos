@@ -1,6 +1,5 @@
 package com.amaxonia.pos.ui.clients
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,43 +10,30 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.theme.PosPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,17 +68,7 @@ fun ClientListScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Clientes", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { ClientsTopBar(title = "Clientes", onBack = onBack) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onNavigateToForm(null) },
@@ -104,75 +79,73 @@ fun ClientListScreen(
             }
         },
     ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-        ) {
-            if (state.error != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            state.error ?: "Error desconocido",
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        TextButton(onClick = { viewModel.retry() }) {
-                            Text("Reintentar")
-                        }
-                    }
-                }
+        ClientListContent(
+            state = state,
+            viewModel = viewModel,
+            listState = listState,
+            onNavigateToForm = onNavigateToForm,
+            modifier = Modifier.padding(padding),
+        )
+    }
+}
+
+@Composable
+private fun ClientListContent(
+    state: ClientListState,
+    viewModel: ClientListViewModel,
+    listState: LazyListState,
+    onNavigateToForm: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+    ) {
+        ClientErrorCard(error = state.error, onRetry = viewModel::retry)
+        ClientSearchField(
+            value = state.searchQuery,
+            onValueChange = viewModel::onSearchQueryChange,
+        )
+        if (state.isLoading && state.clients.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = { viewModel.onSearchQueryChange(it) },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                placeholder = { Text("Buscar por nombre o documento") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                shape = RoundedCornerShape(12.dp),
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = PosPalette.Transparent,
-                    ),
+        } else {
+            ClientListItems(
+                state = state,
+                viewModel = viewModel,
+                listState = listState,
+                onNavigateToForm = onNavigateToForm,
             )
-            if (state.isLoading && state.clients.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        }
+    }
+}
+
+@Composable
+private fun ClientListItems(
+    state: ClientListState,
+    viewModel: ClientListViewModel,
+    listState: LazyListState,
+    onNavigateToForm: (String?) -> Unit,
+) {
+    LazyColumn(
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 80.dp),
+    ) {
+        items(state.clients, key = { it.id }) { client ->
+            ClientListItem(
+                client = client,
+                photoUrl = viewModel.getClientPhotoUrl(client),
+                onClick = { onNavigateToForm(client.id) },
+            )
+        }
+        if (state.isLoading) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                ) {
-                    items(state.clients, key = { it.id }) { client ->
-                        ClientListItem(
-                            client = client,
-                            photoUrl = viewModel.getClientPhotoUrl(client),
-                            onClick = { onNavigateToForm(client.id) },
-                        )
-                    }
-                    if (state.isLoading) {
-                        item {
-                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -195,24 +168,7 @@ fun ClientListItem(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (photoUrl.isNotBlank()) {
-                    coil.compose.AsyncImage(
-                        model = photoUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape),
-                    )
-                } else {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-                }
-            }
+            ClientAvatarBox(photoUrl = photoUrl)
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
@@ -228,17 +184,8 @@ fun ClientListItem(
                 )
 
                 // Helper visual rápido para mostrar nombres en lugar de IDs
-                val typeName =
-                    when (client.clientTypeId) {
-                        CLIENT_TYPE_CONTRIBUYENTE -> "Contribuyente"
-                        CLIENT_TYPE_CONSUMIDOR_FINAL -> "Consumidor Final"
-                        CLIENT_TYPE_GOBIERNO -> "Gobierno"
-                        CLIENT_TYPE_EXTRANJERO -> "Extranjero"
-                        else -> "Tipo ${client.clientTypeId}"
-                    }
-
                 Text(
-                    text = typeName, // AHORA MUESTRA EL NOMBRE
+                    text = clientTypeName(client.clientTypeId), // AHORA MUESTRA EL NOMBRE
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
@@ -247,6 +194,16 @@ fun ClientListItem(
         }
     }
 }
+
+/** Nombre legible del tipo de cliente del catálogo del backend. */
+private fun clientTypeName(clientTypeId: Int): String =
+    when (clientTypeId) {
+        CLIENT_TYPE_CONTRIBUYENTE -> "Contribuyente"
+        CLIENT_TYPE_CONSUMIDOR_FINAL -> "Consumidor Final"
+        CLIENT_TYPE_GOBIERNO -> "Gobierno"
+        CLIENT_TYPE_EXTRANJERO -> "Extranjero"
+        else -> "Tipo $clientTypeId"
+    }
 
 /** IDs de tipo de cliente del catálogo del backend, mostrados con nombre fijo en la lista. */
 private const val CLIENT_TYPE_CONTRIBUYENTE = 1

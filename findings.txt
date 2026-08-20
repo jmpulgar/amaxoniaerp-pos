@@ -1,10 +1,6 @@
 ﻿ApiService.kt:46:7 detekt.TooManyFunctions
 CajaSelectorSheet.kt:203:13 detekt.LongMethod
 CartRepository.kt:18:7 detekt.TooManyFunctions
-ClientFormScreen.kt:50:5 detekt.LongMethod
-ClientListScreen.kt:183:5 detekt.LongMethod
-ClientListScreen.kt:62:5 detekt.LongMethod
-ClientSelectionScreen.kt:62:5 detekt.LongMethod
 CompanySelectionScreen.kt:59:5 detekt.LongMethod
 CreditNotesScreen.kt:660:13 detekt.LongMethod
 CreditNotesScreen.kt:77:5 detekt.LongMethod
