@@ -5,6 +5,7 @@ import com.amaxonia.pos.data.local.db.ProductDao
 import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.remote.ApiService
+import com.amaxonia.pos.data.remote.CatalogPage
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.domain.model.Product
 
@@ -99,9 +100,7 @@ internal class ProductFetchPolicy(
             val response =
                 apiService.getProducts(
                     token,
-                    limit = limit,
-                    offset = offset,
-                    search = query,
+                    page = CatalogPage(limit = limit, offset = offset, search = query),
                     departmentId = departmentId,
                 )
             productDao.insertAll(response.data.map { it.toEntity() })

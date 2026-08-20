@@ -171,8 +171,7 @@ fun SettingsScreen(
 
             // Printer option cards
             PrinterOptionCard(
-                icon = Icons.Rounded.Cancel,
-                iconTint = NeutralGray,
+                visual = PrinterOptionVisual(icon = Icons.Rounded.Cancel, iconTint = NeutralGray),
                 title = "Sin Impresora",
                 description = "No se imprimiran recibos. Los comprobantes se envian solo de forma digital.",
                 isSelected = selectedPrinterType == PrinterType.NONE,
@@ -183,8 +182,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 PrinterOptionCard(
-                    icon = Icons.Rounded.Receipt,
-                    iconTint = InfoBlue,
+                    visual = PrinterOptionVisual(icon = Icons.Rounded.Receipt, iconTint = InfoBlue),
                     title = "The Factory HKA (Fiscal)",
                     description = "Impresora fiscal homologada. Requiere la app The Factory HKA instalada en el dispositivo.",
                     isSelected = selectedPrinterType == PrinterType.THE_FACTORY_HKA,
@@ -195,8 +193,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             PrinterOptionCard(
-                icon = Icons.Rounded.Bluetooth,
-                iconTint = InfoCyan,
+                visual = PrinterOptionVisual(icon = Icons.Rounded.Bluetooth, iconTint = InfoCyan),
                 title = "Generica (Bluetooth)",
                 description = "Impresora termica generica conectada por Bluetooth. Compatible con la mayoria de impresoras ESC/POS.",
                 isSelected = selectedPrinterType == PrinterType.GENERIC_BLUETOOTH,
@@ -207,8 +204,7 @@ fun SettingsScreen(
 
             if (isPA) {
                 PrinterOptionCard(
-                    icon = Icons.Rounded.PhoneAndroid,
-                    iconTint = SuccessGreen,
+                    visual = PrinterOptionVisual(icon = Icons.Rounded.PhoneAndroid, iconTint = SuccessGreen),
                     title = "SUNMI",
                     description = "Impresora integrada en terminales Sunmi V2 y V2 Pro. Conexion directa sin Bluetooth.",
                     isSelected = selectedPrinterType == PrinterType.SUNMI_V2,
@@ -790,15 +786,22 @@ fun SettingsScreen(
     }
 }
 
+/** Datos visuales de la tarjeta de opción de impresora. */
+private data class PrinterOptionVisual(
+    val icon: ImageVector,
+    val iconTint: Color,
+)
+
 @Composable
 private fun PrinterOptionCard(
-    icon: ImageVector,
-    iconTint: Color,
+    visual: PrinterOptionVisual,
     title: String,
     description: String,
     isSelected: Boolean,
     onSelect: () -> Unit,
 ) {
+    val icon = visual.icon
+    val iconTint = visual.iconTint
     ElevatedCard(
         onClick = onSelect,
         modifier = Modifier.fillMaxWidth(),
@@ -826,22 +829,7 @@ private fun PrinterOptionCard(
                     .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Icon container
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(iconTint.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
+            PrinterOptionIcon(icon = icon, iconTint = iconTint)
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -865,23 +853,53 @@ private fun PrinterOptionCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             // Selection indicator
-            if (isSelected) {
-                Icon(
-                    Icons.Rounded.CheckCircle,
-                    contentDescription = "Seleccionada",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            } else {
-                RadioButton(
-                    selected = false,
-                    onClick = onSelect,
-                    colors =
-                        RadioButtonDefaults.colors(
-                            unselectedColor = MaterialTheme.colorScheme.outline,
-                        ),
-                )
-            }
+            PrinterSelectionIndicator(isSelected = isSelected, onSelect = onSelect)
         }
+    }
+}
+
+@Composable
+private fun PrinterSelectionIndicator(
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+) {
+    if (isSelected) {
+        Icon(
+            Icons.Rounded.CheckCircle,
+            contentDescription = "Seleccionada",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp),
+        )
+    } else {
+        RadioButton(
+            selected = false,
+            onClick = onSelect,
+            colors =
+                RadioButtonDefaults.colors(
+                    unselectedColor = MaterialTheme.colorScheme.outline,
+                ),
+        )
+    }
+}
+
+@Composable
+private fun PrinterOptionIcon(
+    icon: ImageVector,
+    iconTint: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconTint.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(26.dp),
+        )
     }
 }

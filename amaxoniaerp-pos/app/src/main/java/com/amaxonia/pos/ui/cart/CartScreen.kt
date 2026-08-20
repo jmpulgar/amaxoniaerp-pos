@@ -25,21 +25,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -89,9 +85,6 @@ import com.amaxonia.pos.ui.theme.cartBrandGradient
 
 /** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
 private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
-
-/** Máximo de dígitos aceptados al escribir una cantidad manual en el carrito. */
-private const val MAX_QUANTITY_DIGITS = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -311,25 +304,41 @@ fun CartScreen(
                                 val item = displayItem.item
                                 CartItemRow(
                                     item = item,
-                                    onIncrease = { viewModel.onAction(CartUiAction.IncreaseQuantity(item.product.id)) },
-                                    onDecrease = { viewModel.onAction(CartUiAction.DecreaseQuantity(item.product.id)) },
-                                    onRemove = { viewModel.onAction(CartUiAction.RemoveItem(item.product.id)) },
+                                    actions =
+                                        CartItemActions(
+                                            onIncrease = { viewModel.onAction(CartUiAction.IncreaseQuantity(item.product.id)) },
+                                            onDecrease = { viewModel.onAction(CartUiAction.DecreaseQuantity(item.product.id)) },
+                                            onRemove = { viewModel.onAction(CartUiAction.RemoveItem(item.product.id)) },
+                                            onUnitChange = { unit ->
+                                                viewModel.onAction(CartUiAction.UpdateItemUnit(item.product.id, unit))
+                                            },
+                                            onQuantityChange = { quantity ->
+                                                viewModel.onAction(CartUiAction.UpdateItemQuantity(item.product.id, quantity))
+                                            },
+                                            edit =
+                                                CartItemEditActions(
+                                                    onEditPrice = {
+                                                        itemToEditPrice = item
+                                                        priceInput =
+                                                            String.format(
+                                                                java.util.Locale.getDefault(),
+                                                                "%.2f",
+                                                                item.unitPriceWithTax,
+                                                            )
+                                                    },
+                                                    onEditDiscount = {
+                                                        itemToEditDiscount = item
+                                                        discountInput =
+                                                            String.format(
+                                                                java.util.Locale.getDefault(),
+                                                                "%.2f",
+                                                                item.discountPercent,
+                                                            )
+                                                    },
+                                                ),
+                                        ),
                                     allowEditPrice = state.allowEditPrices,
                                     allowDiscount = state.allowDiscounts,
-                                    onEditPrice = {
-                                        itemToEditPrice = item
-                                        priceInput = String.format(java.util.Locale.getDefault(), "%.2f", item.unitPriceWithTax)
-                                    },
-                                    onEditDiscount = {
-                                        itemToEditDiscount = item
-                                        discountInput = String.format(java.util.Locale.getDefault(), "%.2f", item.discountPercent)
-                                    },
-                                    onUnitChange = { unit ->
-                                        viewModel.onAction(CartUiAction.UpdateItemUnit(item.product.id, unit))
-                                    },
-                                    onQuantityChange = { quantity ->
-                                        viewModel.onAction(CartUiAction.UpdateItemQuantity(item.product.id, quantity))
-                                    },
                                 )
                             }
                             is ItemCarrito.PromocionAgrupada -> {
@@ -912,224 +921,6 @@ private fun PromotionCartGroup(
                 isError = timesText.isNotBlank() && times < 1,
                 label = "Promociones",
             )
-        }
-    }
-}
-
-private fun sanitizeQuantityInput(value: String): String =
-    value
-        .filter { it.isDigit() }
-        .trimStart('0')
-        .ifBlank { "" }
-        .take(MAX_QUANTITY_DIGITS)
-
-@Composable
-fun CartItemRow(
-    item: com.amaxonia.pos.domain.model.CartItem,
-    onIncrease: () -> Unit,
-    onDecrease: () -> Unit,
-    onRemove: () -> Unit,
-    allowEditPrice: Boolean,
-    allowDiscount: Boolean,
-    onEditPrice: () -> Unit,
-    onEditDiscount: () -> Unit,
-    onUnitChange: (String) -> Unit,
-    onQuantityChange: (Int) -> Unit,
-) {
-    var unitMenuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var quantityText by androidx.compose.runtime.remember(item.product.id, item.quantity) {
-        androidx.compose.runtime.mutableStateOf(item.quantity.toString())
-    }
-    val typedQuantity = quantityText.toIntOrNull() ?: 0
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-            // Fila 1: descripción (flexible) + eliminar (target ≥48dp vía minimum interactive).
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    item.product.description,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Quitar del carrito",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Fila 2: precio unitario (flexible) + total de línea (adaptive, nunca desborda).
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "$ ${String.format(
-                        java.util.Locale.getDefault(),
-                        "%.2f",
-                        item.unitPriceWithTax,
-                    )} / ${item.displayUnitLabel.lowercase()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                AdaptiveAmountText(
-                    text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.total)}",
-                    baseStyle = PosTextStyles.priceTileLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 13f,
-                        ),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Fila 3: stepper (flexible) + acciones de precio/descuento con targets ≥48dp
-            // (IconButton enforza minimum interactive size) y sin solapamiento.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                QuantityStepper(
-                    quantityText = quantityText,
-                    onQuantityTextChange = { value ->
-                        quantityText = sanitizeQuantityInput(value)
-                        quantityText.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
-                    },
-                    onDecrease = {
-                        val next = (item.quantity - 1)
-                        if (next <= 0) {
-                            onRemove()
-                        } else {
-                            quantityText = next.toString()
-                            onDecrease()
-                        }
-                    },
-                    onIncrease = {
-                        val next = item.quantity + 1
-                        quantityText = next.toString()
-                        onIncrease()
-                    },
-                    onDone = {
-                        if (typedQuantity >= 1) onQuantityChange(typedQuantity)
-                    },
-                    isError = quantityText.isNotBlank() && typedQuantity < 1,
-                    label = "Cantidad",
-                    modifier = Modifier.weight(1f),
-                )
-                if (allowEditPrice) {
-                    IconButton(onClick = onEditPrice, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Editar precio",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-                if (allowDiscount) {
-                    IconButton(onClick = onEditDiscount, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            Icons.Default.Percent,
-                            contentDescription = "Aplicar descuento",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
-
-            if (item.product.canSwitchUnit) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Unidad:",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box {
-                        AssistChip(
-                            onClick = { unitMenuExpanded = true },
-                            label = { Text(item.displayUnitLabel) },
-                            leadingIcon = {
-                                Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(16.dp))
-                            },
-                        )
-                        DropdownMenu(
-                            expanded = unitMenuExpanded,
-                            onDismissRequest = { unitMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("UNIDAD") },
-                                onClick = {
-                                    unitMenuExpanded = false
-                                    onUnitChange("UNIDAD")
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(item.product.packageLabel) },
-                                onClick = {
-                                    unitMenuExpanded = false
-                                    onUnitChange("EMPAQUE")
-                                },
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Total unidades: ${String.format(java.util.Locale.getDefault(), "%.2f", item.quantityTotal)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-
-            // Descuento (condicional)
-            if (item.discountPercent > 0.0) {
-                Text(
-                    "Desc: ${String.format(
-                        java.util.Locale.getDefault(),
-                        "%.2f",
-                        item.discountPercent,
-                    )}% (-$ ${String.format(java.util.Locale.getDefault(), "%.2f", item.discountAmountWithoutTax)})",
-                    color = MaterialTheme.colorScheme.tertiary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-
-            // Lotes asignados (condicional)
-            if (item.lotAssignments.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                item.lotAssignments.forEach { lot ->
-                    val expiry = if (!lot.vencimiento.isNullOrBlank()) " - Vence: ${lot.vencimiento}" else ""
-                    Text(
-                        "Lote: ${lot.codigoLote} (${lot.cantidad} uds$expiry)",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
         }
     }
 }

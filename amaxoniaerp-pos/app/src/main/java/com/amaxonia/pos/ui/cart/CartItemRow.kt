@@ -1,0 +1,357 @@
+package com.amaxonia.pos.ui.cart
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
+import com.amaxonia.pos.ui.common.components.QuantityStepper
+import com.amaxonia.pos.ui.theme.PosTextStyles
+import java.util.Locale
+
+/** Máximo de dígitos aceptados al escribir una cantidad manual en el carrito. */
+internal const val MAX_QUANTITY_DIGITS = 5
+
+internal fun sanitizeQuantityInput(value: String): String =
+    value
+        .filter { it.isDigit() }
+        .trimStart('0')
+        .ifBlank { "" }
+        .take(MAX_QUANTITY_DIGITS)
+
+/** Acciones de edición (precio/descuento) del renglón de carrito. */
+class CartItemEditActions(
+    val onEditPrice: () -> Unit,
+    val onEditDiscount: () -> Unit,
+)
+
+/** Callbacks del renglón de carrito, agrupados para la fila de ítem. */
+class CartItemActions(
+    val onIncrease: () -> Unit,
+    val onDecrease: () -> Unit,
+    val onRemove: () -> Unit,
+    val onUnitChange: (String) -> Unit,
+    val onQuantityChange: (Int) -> Unit,
+    val edit: CartItemEditActions,
+)
+
+@Composable
+fun CartItemRow(
+    item: com.amaxonia.pos.domain.model.CartItem,
+    actions: CartItemActions,
+    allowEditPrice: Boolean,
+    allowDiscount: Boolean,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+            CartItemHeaderRow(item = item, onRemove = actions.onRemove)
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            CartItemPriceRow(item = item)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            CartItemQuantityRow(
+                item = item,
+                actions = actions,
+                allowEditPrice = allowEditPrice,
+                allowDiscount = allowDiscount,
+            )
+
+            if (item.product.canSwitchUnit) {
+                Spacer(modifier = Modifier.height(8.dp))
+                CartItemUnitSelector(item = item, onUnitChange = actions.onUnitChange)
+            }
+
+            CartItemFootnotes(item = item)
+        }
+    }
+}
+
+/**
+ * Estado editable de la cantidad del renglón: texto del stepper, validación y
+ * transiciones hacia los callbacks del carrito. Se recrea al cambiar ítem/cantidad.
+ */
+private class CartQuantityController(
+    initialQuantity: Int,
+    private val onQuantityChange: (Int) -> Unit,
+    private val onDecrease: () -> Unit,
+    private val onIncrease: () -> Unit,
+    private val onRemove: () -> Unit,
+) {
+    var text by mutableStateOf(initialQuantity.toString())
+    val typedQuantity: Int get() = text.toIntOrNull() ?: 0
+    val isError: Boolean get() = text.isNotBlank() && typedQuantity < 1
+
+    fun onTextChange(value: String) {
+        text = sanitizeQuantityInput(value)
+        text.toIntOrNull()?.takeIf { it >= 1 }?.let(onQuantityChange)
+    }
+
+    fun decrease(currentQuantity: Int) {
+        val next = currentQuantity - 1
+        if (next <= 0) {
+            onRemove()
+        } else {
+            text = next.toString()
+            onDecrease()
+        }
+    }
+
+    fun increase(currentQuantity: Int) {
+        text = (currentQuantity + 1).toString()
+        onIncrease()
+    }
+
+    fun done() {
+        if (typedQuantity >= 1) onQuantityChange(typedQuantity)
+    }
+}
+
+/** Fila 1: descripción (flexible) + eliminar (target ≥48dp vía minimum interactive). */
+@Composable
+private fun CartItemHeaderRow(
+    item: com.amaxonia.pos.domain.model.CartItem,
+    onRemove: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(
+            item.product.description,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "Quitar del carrito",
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/** Fila 2: precio unitario (flexible) + total de línea (adaptive, nunca desborda). */
+@Composable
+private fun CartItemPriceRow(item: com.amaxonia.pos.domain.model.CartItem) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "$ ${String.format(
+                Locale.getDefault(),
+                "%.2f",
+                item.unitPriceWithTax,
+            )} / ${item.displayUnitLabel.lowercase()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        AdaptiveAmountText(
+            text = "$ ${String.format(Locale.getDefault(), "%.2f", item.total)}",
+            baseStyle = PosTextStyles.priceTileLarge,
+            color = MaterialTheme.colorScheme.primary,
+            options = AdaptiveAmountOptions(minFontSizeSp = 13f),
+        )
+    }
+}
+
+/**
+ * Fila 3: stepper (flexible) + acciones de precio/descuento con targets ≥48dp
+ * (IconButton enforza minimum interactive size) y sin solapamiento.
+ */
+@Composable
+private fun CartItemQuantityRow(
+    item: com.amaxonia.pos.domain.model.CartItem,
+    actions: CartItemActions,
+    allowEditPrice: Boolean,
+    allowDiscount: Boolean,
+) {
+    val controller =
+        remember(item.product.id, item.quantity) {
+            CartQuantityController(
+                initialQuantity = item.quantity,
+                onQuantityChange = actions.onQuantityChange,
+                onDecrease = actions.onDecrease,
+                onIncrease = actions.onIncrease,
+                onRemove = actions.onRemove,
+            )
+        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        QuantityStepper(
+            quantityText = controller.text,
+            onQuantityTextChange = controller::onTextChange,
+            onDecrease = { controller.decrease(item.quantity) },
+            onIncrease = { controller.increase(item.quantity) },
+            onDone = controller::done,
+            isError = controller.isError,
+            label = "Cantidad",
+            modifier = Modifier.weight(1f),
+        )
+        CartItemEditButtons(
+            allowEditPrice = allowEditPrice,
+            allowDiscount = allowDiscount,
+            onEditPrice = actions.edit.onEditPrice,
+            onEditDiscount = actions.edit.onEditDiscount,
+        )
+    }
+}
+
+@Composable
+private fun CartItemEditButtons(
+    allowEditPrice: Boolean,
+    allowDiscount: Boolean,
+    onEditPrice: () -> Unit,
+    onEditDiscount: () -> Unit,
+) {
+    if (allowEditPrice) {
+        IconButton(onClick = onEditPrice, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = "Editar precio",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+    if (allowDiscount) {
+        IconButton(onClick = onEditDiscount, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Percent,
+                contentDescription = "Aplicar descuento",
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CartItemUnitSelector(
+    item: com.amaxonia.pos.domain.model.CartItem,
+    onUnitChange: (String) -> Unit,
+) {
+    var unitMenuExpanded by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "Unidad:",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Box {
+            AssistChip(
+                onClick = { unitMenuExpanded = true },
+                label = { Text(item.displayUnitLabel) },
+                leadingIcon = {
+                    Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(16.dp))
+                },
+            )
+            DropdownMenu(
+                expanded = unitMenuExpanded,
+                onDismissRequest = { unitMenuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("UNIDAD") },
+                    onClick = {
+                        unitMenuExpanded = false
+                        onUnitChange("UNIDAD")
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(item.product.packageLabel) },
+                    onClick = {
+                        unitMenuExpanded = false
+                        onUnitChange("EMPAQUE")
+                    },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            "Total unidades: ${String.format(Locale.getDefault(), "%.2f", item.quantityTotal)}",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+        )
+    }
+}
+
+/** Descuento y lotes asignados, secciones condicionales al pie de la tarjeta. */
+@Composable
+private fun CartItemFootnotes(item: com.amaxonia.pos.domain.model.CartItem) {
+    // Descuento (condicional)
+    if (item.discountPercent > 0.0) {
+        Text(
+            "Desc: ${String.format(
+                Locale.getDefault(),
+                "%.2f",
+                item.discountPercent,
+            )}% (-$ ${String.format(Locale.getDefault(), "%.2f", item.discountAmountWithoutTax)})",
+            color = MaterialTheme.colorScheme.tertiary,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+
+    // Lotes asignados (condicional)
+    if (item.lotAssignments.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(4.dp))
+        item.lotAssignments.forEach { lot ->
+            val expiry = if (!lot.vencimiento.isNullOrBlank()) " - Vence: ${lot.vencimiento}" else ""
+            Text(
+                "Lote: ${lot.codigoLote} (${lot.cantidad} uds$expiry)",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}

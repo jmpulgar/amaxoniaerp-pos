@@ -169,15 +169,17 @@ internal fun CartPanelEmpty() =
 internal fun PreviewCartItemRow(item: CartItem) {
     CartItemRow(
         item = item,
-        onIncrease = {},
-        onDecrease = {},
-        onRemove = {},
+        actions =
+            CartItemActions(
+                onIncrease = {},
+                onDecrease = {},
+                onRemove = {},
+                onUnitChange = {},
+                onQuantityChange = {},
+                edit = CartItemEditActions(onEditPrice = {}, onEditDiscount = {}),
+            ),
         allowEditPrice = true,
         allowDiscount = true,
-        onEditPrice = {},
-        onEditDiscount = {},
-        onUnitChange = {},
-        onQuantityChange = {},
     )
 }
 

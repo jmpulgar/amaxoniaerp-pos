@@ -53,6 +53,7 @@ import com.amaxonia.pos.data.repository.RoomOfflineInvoiceWriter
 import com.amaxonia.pos.data.repository.RoomPendingSalesReader
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.SesionMesaRepositoryImpl
+import com.amaxonia.pos.data.sync.CatalogDaos
 import com.amaxonia.pos.data.sync.CatalogSyncer
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.ServerCountries
@@ -505,15 +506,7 @@ object DependencyContainer {
             CatalogSyncer(
                 apiService = apiService,
                 localStore = localStore,
-                clientDao = database.clientDao(),
-                clientSucursalDao = database.clientSucursalDao(),
-                productDao = database.productDao(),
-                countryDao = database.countryDao(),
-                addressLevel1Dao = database.addressLevel1Dao(),
-                addressLevel2Dao = database.addressLevel2Dao(),
-                addressLevel3Dao = database.addressLevel3Dao(),
-                clientTypeDao = database.clientTypeDao(),
-                promocionDao = database.promocionDao(),
+                daos = CatalogDaos.from(database),
             )
         initialized = true
     }

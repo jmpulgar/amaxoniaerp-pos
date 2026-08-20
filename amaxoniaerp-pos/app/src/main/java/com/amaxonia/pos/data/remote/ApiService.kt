@@ -100,23 +100,20 @@ class ApiService(
 
     suspend fun getProducts(
         token: String,
-        limit: Int,
-        offset: Int,
-        search: String?,
-        includeTotal: Boolean? = null,
+        page: CatalogPage,
         departmentId: Int? = null,
     ): PagedResponse<ProductDto> =
         client
             .get("items") {
                 authHeaders(token)
                 url {
-                    parameters.append("limit", limit.toString())
-                    parameters.append("offset", offset.toString())
-                    if (!search.isNullOrBlank()) {
-                        parameters.append("search", search)
+                    parameters.append("limit", page.limit.toString())
+                    parameters.append("offset", page.offset.toString())
+                    if (!page.search.isNullOrBlank()) {
+                        parameters.append("search", page.search)
                     }
-                    if (includeTotal != null) {
-                        parameters.append("includeTotal", includeTotal.toString())
+                    if (page.includeTotal != null) {
+                        parameters.append("includeTotal", page.includeTotal.toString())
                     }
                     if (departmentId != null && departmentId > 0) {
                         parameters.append("departmentId", departmentId.toString())
@@ -399,3 +396,11 @@ class ApiService(
         return response.data
     }
 }
+
+/** Página solicitada a un endpoint de listado de catálogo (items, clientes, catálogos). */
+data class CatalogPage(
+    val limit: Int,
+    val offset: Int,
+    val search: String? = null,
+    val includeTotal: Boolean? = null,
+)

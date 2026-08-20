@@ -45,6 +45,13 @@ import com.amaxonia.pos.ui.theme.SuccessGreen
 private val CajaAvailable = SuccessGreen
 private val CajaInactive = NeutralGray
 
+/** Acciones del sheet selector de caja. */
+class CajaSelectorActions(
+    val onSelectCaja: (Caja) -> Unit,
+    val onReload: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CajaSelectorSheet(
@@ -52,10 +59,11 @@ fun CajaSelectorSheet(
     isLoading: Boolean,
     errorMessage: String?,
     canDismiss: Boolean,
-    onSelectCaja: (Caja) -> Unit,
-    onReload: () -> Unit,
-    onDismiss: () -> Unit,
+    actions: CajaSelectorActions,
 ) {
+    val onSelectCaja = actions.onSelectCaja
+    val onReload = actions.onReload
+    val onDismiss = actions.onDismiss
     val sheetState =
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
@@ -81,91 +89,110 @@ fun CajaSelectorSheet(
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 32.dp),
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = "Seleccionar Caja",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "Elige la caja para operar",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                IconButton(onClick = onReload) {
-                    Icon(
-                        Icons.Rounded.Refresh,
-                        contentDescription = "Recargar",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
+            CajaSelectorHeader(onReload = onReload)
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            when {
-                isLoading -> {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                errorMessage != null -> {
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors =
-                            CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                            ),
-                    ) {
-                        Text(
-                            text = errorMessage,
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            fontSize = 14.sp,
-                        )
-                    }
-                }
-                cajas.isEmpty() -> {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "No hay cajas configuradas",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 16.sp,
-                        )
-                    }
-                }
-                else -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(cajas, key = { it.idCaja }) { caja ->
-                            CajaCard(
-                                caja = caja,
-                                onClick = { onSelectCaja(caja) },
-                            )
-                        }
-                    }
+            CajaSelectorBody(
+                cajas = cajas,
+                isLoading = isLoading,
+                errorMessage = errorMessage,
+                onSelectCaja = onSelectCaja,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CajaSelectorHeader(onReload: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text(
+                text = "Seleccionar Caja",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Elige la caja para operar",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        IconButton(onClick = onReload) {
+            Icon(
+                Icons.Rounded.Refresh,
+                contentDescription = "Recargar",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CajaSelectorBody(
+    cajas: List<Caja>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onSelectCaja: (Caja) -> Unit,
+) {
+    when {
+        isLoading -> {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        errorMessage != null -> {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+            ) {
+                Text(
+                    text = errorMessage,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+        cajas.isEmpty() -> {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "No hay cajas configuradas",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 16.sp,
+                )
+            }
+        }
+        else -> {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(cajas, key = { it.idCaja }) { caja ->
+                    CajaCard(
+                        caja = caja,
+                        onClick = { onSelectCaja(caja) },
+                    )
                 }
             }
         }

@@ -35,8 +35,7 @@ class CreditNoteApiImpl(
     ): Result<CreditNotesListResponseDto> =
         getRequest(
             path = "api/pos/notas-credito",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             serializer = CreditNotesListResponseDto.serializer(),
             search = search,
             fallbackMessage = "No se pudieron cargar las notas de crédito",
@@ -49,8 +48,7 @@ class CreditNoteApiImpl(
     ): Result<CreditNoteDetailDto> =
         getRequest(
             path = "api/pos/notas-credito/$id",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             serializer = CreditNoteDetailDto.serializer(),
             fallbackMessage = "No se pudo cargar la nota de crédito",
         )
@@ -62,8 +60,7 @@ class CreditNoteApiImpl(
     ): Result<CreditNoteSourceInvoiceListResponseDto> =
         getRequest(
             path = "api/pos/notas-credito/facturas",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             serializer = CreditNoteSourceInvoiceListResponseDto.serializer(),
             search = search,
             fallbackMessage = "No se pudieron cargar las facturas elegibles",
@@ -76,8 +73,7 @@ class CreditNoteApiImpl(
     ): Result<CreditNoteSourceInvoiceDetailDto> =
         getRequest(
             path = "api/pos/notas-credito/facturas/$id",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             serializer = CreditNoteSourceInvoiceDetailDto.serializer(),
             fallbackMessage = "No se pudo cargar la factura seleccionada",
         )
@@ -89,8 +85,7 @@ class CreditNoteApiImpl(
     ): Result<CreateCreditNoteResponseDto> =
         postRequest(
             path = "api/pos/notas-credito",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             payload = payload,
             serializer = CreateCreditNoteResponseDto.serializer(),
             fallbackMessage = "No se pudo crear la nota de crédito",
@@ -104,8 +99,7 @@ class CreditNoteApiImpl(
     ): Result<ConfirmCreditNoteFiscalResponseDto> =
         postRequest(
             path = "api/pos/notas-credito/$id/confirmacion-fiscal",
-            authHeader = authHeader,
-            companyDb = companyDb,
+            tenant = TenantHeaders(authHeader, companyDb),
             payload = payload,
             serializer = ConfirmCreditNoteFiscalResponseDto.serializer(),
             fallbackMessage = "No se pudo confirmar la nota de crédito fiscal",
@@ -113,8 +107,7 @@ class CreditNoteApiImpl(
 
     private suspend fun <T> getRequest(
         path: String,
-        authHeader: String,
-        companyDb: String,
+        tenant: TenantHeaders,
         serializer: KSerializer<T>,
         search: String? = null,
         fallbackMessage: String,
@@ -122,8 +115,8 @@ class CreditNoteApiImpl(
         catchingResult {
             val response =
                 apiClient.httpClient.get(path) {
-                    header("Authorization", authHeader)
-                    header("Company-DB", companyDb)
+                    header("Authorization", tenant.authHeader)
+                    header("Company-DB", tenant.companyDb)
                     if (!search.isNullOrBlank()) {
                         parameter("search", search)
                     }
@@ -133,8 +126,7 @@ class CreditNoteApiImpl(
 
     private suspend fun <T> postRequest(
         path: String,
-        authHeader: String,
-        companyDb: String,
+        tenant: TenantHeaders,
         payload: Any,
         serializer: KSerializer<T>,
         fallbackMessage: String,
@@ -142,8 +134,8 @@ class CreditNoteApiImpl(
         catchingResult {
             val response =
                 apiClient.httpClient.post(path) {
-                    header("Authorization", authHeader)
-                    header("Company-DB", companyDb)
+                    header("Authorization", tenant.authHeader)
+                    header("Company-DB", tenant.companyDb)
                     contentType(ContentType.Application.Json)
                     setBody(payload)
                 }
@@ -168,3 +160,9 @@ class CreditNoteApiImpl(
             error(fallbackMessage)
         }
 }
+
+/** Cabeceras canónicas de tenant (Authorization + Company-DB) usadas por las llamadas POS. */
+private data class TenantHeaders(
+    val authHeader: String,
+    val companyDb: String,
+)

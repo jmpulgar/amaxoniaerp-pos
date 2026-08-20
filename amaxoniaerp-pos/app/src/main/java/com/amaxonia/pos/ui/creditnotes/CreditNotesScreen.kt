@@ -36,14 +36,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -55,22 +52,19 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceLineDto
-import com.amaxonia.pos.domain.model.payment.FormaPago
+import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.ConfirmedContainer
 import com.amaxonia.pos.ui.theme.ConfirmedContent
@@ -172,13 +166,19 @@ fun CreditNotesScreen(
                 CreditNotesMode.CREATE ->
                     CreditNoteCreateContent(
                         state = state,
-                        onFechaChange = viewModel::onFechaChange,
-                        onPeriodoChange = viewModel::onPeriodoChange,
-                        onObservacionChange = viewModel::onObservacionChange,
-                        onDevolverStockChange = viewModel::onDevolverStockChange,
-                        onGenerarAbonoChange = viewModel::onGenerarAbonoChange,
-                        onRefundMethodChange = viewModel::onRefundMethodChange,
-                        onSubmit = viewModel::submitCreditNote,
+                        handlers =
+                            CreditNoteCreateHandlers(
+                                fields =
+                                    CreditNoteFieldHandlers(
+                                        onFechaChange = viewModel::onFechaChange,
+                                        onPeriodoChange = viewModel::onPeriodoChange,
+                                        onObservacionChange = viewModel::onObservacionChange,
+                                    ),
+                                onDevolverStockChange = viewModel::onDevolverStockChange,
+                                onGenerarAbonoChange = viewModel::onGenerarAbonoChange,
+                                onRefundMethodChange = viewModel::onRefundMethodChange,
+                                onSubmit = viewModel::submitCreditNote,
+                            ),
                     )
             }
 
@@ -255,17 +255,27 @@ private fun CreditNoteInvoicePickerContent(
     }
 }
 
+/** Handlers de los campos de texto del formulario de nota de crédito. */
+private class CreditNoteFieldHandlers(
+    val onFechaChange: (String) -> Unit,
+    val onPeriodoChange: (String) -> Unit,
+    val onObservacionChange: (String) -> Unit,
+)
+
+/** Handlers del formulario de creación de nota de crédito. */
+private class CreditNoteCreateHandlers(
+    val fields: CreditNoteFieldHandlers,
+    val onDevolverStockChange: (Boolean) -> Unit,
+    val onGenerarAbonoChange: (Boolean) -> Unit,
+    val onRefundMethodChange: (Int?) -> Unit,
+    val onSubmit: () -> Unit,
+)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun CreditNoteCreateContent(
     state: CreditNotesState,
-    onFechaChange: (String) -> Unit,
-    onPeriodoChange: (String) -> Unit,
-    onObservacionChange: (String) -> Unit,
-    onDevolverStockChange: (Boolean) -> Unit,
-    onGenerarAbonoChange: (Boolean) -> Unit,
-    onRefundMethodChange: (Int?) -> Unit,
-    onSubmit: () -> Unit,
+    handlers: CreditNoteCreateHandlers,
 ) {
     val invoice = state.selectedInvoice
     if (invoice == null) {
@@ -298,210 +308,264 @@ private fun CreditNoteCreateContent(
             }
         }
 
+        item { CreditNoteSourceSummaryCard(invoice = invoice) }
+
+        item { CreditNoteProductsSection(invoice = invoice) }
+
         item {
-            ElevatedCard(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                        Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
-                        Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                            Text(
-                                "${invoice.moneda} ${formatAmount(invoice.subtotalOriginal)}",
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp,
-                            )
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Total", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                            Text(
-                                "${invoice.moneda} ${formatAmount(invoice.totalOriginal)}",
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp,
-                            )
-                        }
-                        if (invoice.tasa != null) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Tasa (Bs)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                                Text("Bs ${formatAmount(invoice.tasa)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                            }
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Total USD", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                            Text("USD ${formatAmount(invoice.totalUsd)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Total Bs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                            Text("Bs ${formatAmount(invoice.totalBs)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
+            CreditNoteFormFieldsSection(
+                state = state,
+                fields = handlers.fields,
+                onDevolverStockChange = handlers.onDevolverStockChange,
+            )
         }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+            CreditNoteAbonoSection(
+                state = state,
+                onGenerarAbonoChange = handlers.onGenerarAbonoChange,
+                onRefundMethodChange = handlers.onRefundMethodChange,
+            )
+        }
+
+        item {
+            CreditNoteSubmitButton(
+                isSubmitting = state.isSubmitting,
+                onSubmit = handlers.onSubmit,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreditNoteSourceSummaryCard(invoice: CreditNoteSourceInvoiceDetailDto) {
+    ElevatedCard(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(invoice.codigo, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Text(invoice.clienteNombre, fontWeight = FontWeight.Medium)
+                Text(invoice.clienteIdentificacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     Text(
-                        text = "Productos (${invoice.lines.size})",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        "${invoice.moneda} ${formatAmount(invoice.subtotalOriginal)}",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
                     )
                 }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    invoice.lines.forEach { line ->
-                        InvoiceLineReadOnlyCard(line = line, currency = invoice.moneda)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text(
+                        "${invoice.moneda} ${formatAmount(invoice.totalOriginal)}",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                    )
+                }
+                if (invoice.tasa != null) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Tasa (Bs)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        Text("Bs ${formatAmount(invoice.tasa)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
                     }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total USD", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text("USD ${formatAmount(invoice.totalUsd)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total Bs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    Text("Bs ${formatAmount(invoice.totalBs)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
+    }
+}
 
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    OutlinedTextField(
-                        value = state.form.fecha,
-                        onValueChange = onFechaChange,
-                        label = { Text("Fecha") },
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = state.form.periodo,
-                        onValueChange = onPeriodoChange,
-                        label = { Text("Periodo") },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                OutlinedTextField(value = state.form.observacion, onValueChange = onObservacionChange, label = {
-                    Text("ObservaciÃ³n")
-                }, modifier = Modifier.fillMaxWidth())
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Switch(
-                        checked = state.form.devolverStock,
-                        onCheckedChange = onDevolverStockChange,
-                        colors =
-                            androidx.compose.material3.SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            ),
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Devolver stock al inventario", fontWeight = FontWeight.Medium)
-                }
-            }
+@Composable
+private fun CreditNoteProductsSection(invoice: CreditNoteSourceInvoiceDetailDto) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.Inventory2,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Productos (${invoice.lines.size})",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
 
-        item {
-            ElevatedCard(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Â¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { onGenerarAbonoChange(true) },
-                            ) {
-                                androidx.compose.material3.RadioButton(
-                                    selected = state.form.generarAbono,
-                                    onClick = { onGenerarAbonoChange(true) },
-                                    colors =
-                                        androidx.compose.material3.RadioButtonDefaults.colors(
-                                            selectedColor = MaterialTheme.colorScheme.primary,
-                                        ),
-                                )
-                                Text(
-                                    "Si",
-                                    modifier = Modifier.padding(start = 8.dp),
-                                    color =
-                                        if (state.form.generarAbono) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { onGenerarAbonoChange(false) },
-                            ) {
-                                androidx.compose.material3.RadioButton(
-                                    selected = !state.form.generarAbono,
-                                    onClick = { onGenerarAbonoChange(false) },
-                                    colors =
-                                        androidx.compose.material3.RadioButtonDefaults.colors(
-                                            selectedColor = MaterialTheme.colorScheme.primary,
-                                        ),
-                                )
-                                Text(
-                                    "No",
-                                    modifier = Modifier.padding(start = 8.dp),
-                                    color =
-                                        if (!state.form.generarAbono) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                )
-                            }
-                        }
-                    }
-
-                    if (!state.form.generarAbono) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                "Seleccione la forma de pago para realizar el reintegro al cliente:",
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            RefundMethodSelector(
-                                methods = state.availableRefundMethods,
-                                selectedId = state.form.idFormaPagoReintegro,
-                                onSelected = onRefundMethodChange,
-                            )
-                        }
-                    }
-                }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            invoice.lines.forEach { line ->
+                InvoiceLineReadOnlyCard(line = line, currency = invoice.moneda)
             }
         }
+    }
+}
 
-        item {
-            Button(
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = !state.isSubmitting,
-                shape = RoundedCornerShape(12.dp),
+@Composable
+private fun CreditNoteFormFieldsSection(
+    state: CreditNotesState,
+    fields: CreditNoteFieldHandlers,
+    onDevolverStockChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            OutlinedTextField(
+                value = state.form.fecha,
+                onValueChange = fields.onFechaChange,
+                label = { Text("Fecha") },
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = state.form.periodo,
+                onValueChange = fields.onPeriodoChange,
+                label = { Text("Periodo") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        OutlinedTextField(value = state.form.observacion, onValueChange = fields.onObservacionChange, label = {
+            Text("ObservaciÃ³n")
+        }, modifier = Modifier.fillMaxWidth())
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Switch(
+                checked = state.form.devolverStock,
+                onCheckedChange = onDevolverStockChange,
                 colors =
-                    androidx.compose.material3.ButtonDefaults
-                        .buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            ) {
-                if (state.isSubmitting) {
-                    androidx.compose.material3.CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
-                } else {
-                    Text("Generar nota de crÃ©dito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.material3.SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    ),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text("Devolver stock al inventario", fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun CreditNoteAbonoSection(
+    state: CreditNotesState,
+    onGenerarAbonoChange: (Boolean) -> Unit,
+    onRefundMethodChange: (Int?) -> Unit,
+) {
+    ElevatedCard(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Â¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                AbonoYesNoOptions(
+                    selected = state.form.generarAbono,
+                    onSelect = onGenerarAbonoChange,
+                )
+            }
+
+            if (!state.form.generarAbono) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Seleccione la forma de pago para realizar el reintegro al cliente:",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    RefundMethodSelector(
+                        methods = state.availableRefundMethods,
+                        selectedId = state.form.idFormaPagoReintegro,
+                        onSelected = onRefundMethodChange,
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AbonoYesNoOptions(
+    selected: Boolean,
+    onSelect: (Boolean) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onSelect(true) },
+        ) {
+            androidx.compose.material3.RadioButton(
+                selected = selected,
+                onClick = { onSelect(true) },
+                colors =
+                    androidx.compose.material3.RadioButtonDefaults.colors(
+                        selectedColor = MaterialTheme.colorScheme.primary,
+                    ),
+            )
+            Text(
+                "Si",
+                modifier = Modifier.padding(start = 8.dp),
+                color =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { onSelect(false) },
+        ) {
+            androidx.compose.material3.RadioButton(
+                selected = !selected,
+                onClick = { onSelect(false) },
+                colors =
+                    androidx.compose.material3.RadioButtonDefaults.colors(
+                        selectedColor = MaterialTheme.colorScheme.primary,
+                    ),
+            )
+            Text(
+                "No",
+                modifier = Modifier.padding(start = 8.dp),
+                color =
+                    if (!selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreditNoteSubmitButton(
+    isSubmitting: Boolean,
+    onSubmit: () -> Unit,
+) {
+    Button(
+        onClick = onSubmit,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        enabled = !isSubmitting,
+        shape = RoundedCornerShape(12.dp),
+        colors =
+            androidx.compose.material3.ButtonDefaults
+                .buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+    ) {
+        if (isSubmitting) {
+            androidx.compose.material3.CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
+        } else {
+            Text("Generar nota de crÃ©dito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -571,85 +635,6 @@ internal fun SummaryBanner(
 }
 
 @Composable
-private fun InvoiceLineReadOnlyCard(
-    line: CreditNoteSourceInvoiceLineDto,
-    currency: String,
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = formatQuantity(line.cantidadOriginal),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = line.descripcion,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (line.codigo.isNotBlank()) {
-                    Text(
-                        text = line.codigo,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(horizontalAlignment = Alignment.End) {
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "$currency ${formatAmount(line.totalConIvaOriginal)}",
-                    baseStyle =
-                        MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                        ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 11f,
-                        ),
-                )
-                Text(
-                    text = "IVA: ${formatAmount(line.pIva)}%",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
     val isConfirmed = status == CreditNoteFiscalStatusDto.CONFIRMADA
     AssistChip(
@@ -669,39 +654,6 @@ internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
                 leadingIconContentColor = if (isConfirmed) ConfirmedContent else PendingContent,
             ),
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RefundMethodSelector(
-    methods: List<FormaPago>,
-    selectedId: Int?,
-    onSelected: (Int) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = methods.firstOrNull { it.idFormaPago == selectedId }?.descripcion.orEmpty()
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-        OutlinedTextField(
-            value = selectedLabel,
-            onValueChange = {},
-            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            readOnly = true,
-            label = { Text("Forma de pago de reintegro") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            methods.forEach { method ->
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(method.descripcion.orEmpty()) },
-                    onClick = {
-                        onSelected(method.idFormaPago)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -856,12 +808,3 @@ private fun screenTitle(mode: CreditNotesMode): String =
     }
 
 internal fun formatAmount(value: Double): String = String.format(java.util.Locale.getDefault(), "%.2f", value)
-
-private fun formatQuantity(value: Double): String =
-    if (value % 1.0 ==
-        0.0
-    ) {
-        value.toInt().toString()
-    } else {
-        String.format(java.util.Locale.getDefault(), "%.3f", value)
-    }

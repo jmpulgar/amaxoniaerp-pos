@@ -364,11 +364,14 @@ private fun VentasSummaryCard(summary: CierreCajaSummary) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             SummaryRow(
-                icon = Icons.Rounded.ShoppingCart,
-                iconTint = MaterialTheme.colorScheme.primary,
+                visual =
+                    SummaryRowVisual(
+                        icon = Icons.Rounded.ShoppingCart,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        valueColor = MaterialTheme.colorScheme.primary,
+                    ),
                 label = "Total Ventas",
                 value = formatMoney(summary.totalSales),
-                valueColor = MaterialTheme.colorScheme.primary,
                 isBold = true,
             )
         }
@@ -388,11 +391,9 @@ private fun PaymentBreakdownCard(summary: CierreCajaSummary) {
             lines.forEachIndexed { index, line ->
                 val (icon, tint) = paymentLineVisual(line.siglas)
                 SummaryRow(
-                    icon = icon,
-                    iconTint = tint,
+                    visual = SummaryRowVisual(icon = icon, iconTint = tint, valueColor = tint),
                     label = line.label,
                     value = formatMoney(line.amount),
-                    valueColor = tint,
                 )
                 if (index < lines.lastIndex) {
                     HorizontalDivider(
@@ -704,15 +705,23 @@ private fun MiniStat(
     }
 }
 
+/** Datos visuales de una fila del resumen de cierre: icono/tinte y color del importe. */
+private data class SummaryRowVisual(
+    val icon: ImageVector,
+    val iconTint: Color,
+    val valueColor: Color,
+)
+
 @Composable
 private fun SummaryRow(
-    icon: ImageVector,
-    iconTint: Color,
+    visual: SummaryRowVisual,
     label: String,
     value: String,
-    valueColor: Color,
     isBold: Boolean = false,
 ) {
+    val icon = visual.icon
+    val iconTint = visual.iconTint
+    val valueColor = visual.valueColor
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -722,21 +731,7 @@ private fun SummaryRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f, fill = false),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(iconTint.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            SummaryRowIcon(icon = icon, iconTint = iconTint)
             Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = label,
@@ -767,6 +762,28 @@ private fun SummaryRow(
                 com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
                     minFontSizeSp = 12f,
                 ),
+        )
+    }
+}
+
+@Composable
+private fun SummaryRowIcon(
+    icon: ImageVector,
+    iconTint: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(iconTint.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(20.dp),
         )
     }
 }

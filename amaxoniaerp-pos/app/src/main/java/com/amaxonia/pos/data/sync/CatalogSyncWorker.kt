@@ -8,6 +8,7 @@ import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.ApiService
+import com.amaxonia.pos.data.sync.CatalogDaos
 
 class CatalogSyncWorker(
     context: Context,
@@ -23,15 +24,7 @@ class CatalogSyncWorker(
             CatalogSyncer(
                 apiService = apiService,
                 localStore = localStore,
-                clientDao = database.clientDao(),
-                clientSucursalDao = database.clientSucursalDao(),
-                productDao = database.productDao(),
-                countryDao = database.countryDao(),
-                addressLevel1Dao = database.addressLevel1Dao(),
-                addressLevel2Dao = database.addressLevel2Dao(),
-                addressLevel3Dao = database.addressLevel3Dao(),
-                clientTypeDao = database.clientTypeDao(),
-                promocionDao = database.promocionDao(),
+                daos = CatalogDaos.from(database),
             )
 
         return syncer.syncAll().fold(

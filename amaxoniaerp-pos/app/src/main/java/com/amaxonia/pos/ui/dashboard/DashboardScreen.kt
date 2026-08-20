@@ -335,13 +335,16 @@ fun DashboardScreen(
             isLoading = state.isLoadingCajas,
             errorMessage = state.error,
             canDismiss = state.hasActiveCaja,
-            onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.RequestApertura(caja)) },
-            onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch()) },
-            onDismiss = {
-                if (state.hasActiveCaja) {
-                    viewModel.onAction(DashboardCajaUiAction.SetSelectorVisible(false))
-                }
-            },
+            actions =
+                CajaSelectorActions(
+                    onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.RequestApertura(caja)) },
+                    onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch()) },
+                    onDismiss = {
+                        if (state.hasActiveCaja) {
+                            viewModel.onAction(DashboardCajaUiAction.SetSelectorVisible(false))
+                        }
+                    },
+                ),
         )
     }
 

@@ -169,11 +169,14 @@ fun ProductListScreen(
                             imageUrl = imageUrl,
                             stock = state.stockByProductId[product.id],
                             isStockLoading = state.loadingStockIds.contains(product.id),
-                            onStockClick = {
-                                val stock = state.stockByProductId[product.id]
-                                if (stock != null) selectedStock = stock
-                            },
-                            onClick = { onNavigateToForm(product.id) },
+                            actions =
+                                ProductItemActions(
+                                    onStockClick = {
+                                        val stock = state.stockByProductId[product.id]
+                                        if (stock != null) selectedStock = stock
+                                    },
+                                    onClick = { onNavigateToForm(product.id) },
+                                ),
                         )
                     }
                     if (state.isLoading) {
@@ -196,15 +199,22 @@ fun ProductListScreen(
     }
 }
 
+/** Acciones de la tarjeta de producto en la lista. */
+class ProductItemActions(
+    val onStockClick: () -> Unit,
+    val onClick: () -> Unit,
+)
+
 @Composable
 fun ProductItem(
     product: com.amaxonia.pos.domain.model.Product,
     imageUrl: String,
     stock: ProductStock?,
     isStockLoading: Boolean,
-    onStockClick: () -> Unit,
-    onClick: () -> Unit,
+    actions: ProductItemActions,
 ) {
+    val onStockClick = actions.onStockClick
+    val onClick = actions.onClick
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(16.dp),

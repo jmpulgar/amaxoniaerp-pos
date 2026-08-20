@@ -389,11 +389,14 @@ private fun PriceTable(
             HorizontalDivider()
             prices.forEachIndexed { index, priceRow ->
                 PriceRowItem(
-                    label = priceRow.label,
-                    price = priceRow.price,
-                    utility = priceRow.utilityPercent,
-                    pricePlusUtility = priceRow.pricePlusUtility,
-                    total = priceRow.pricePlusTax,
+                    values =
+                        PriceRowValues(
+                            label = priceRow.label,
+                            price = priceRow.price,
+                            utility = priceRow.utilityPercent,
+                            pricePlusUtility = priceRow.pricePlusUtility,
+                            total = priceRow.pricePlusTax,
+                        ),
                     onUtilityChange = { onUtilityChange(index, it) },
                 )
                 if (index < prices.lastIndex) {
@@ -442,15 +445,25 @@ private fun selectedName(
     return options.firstOrNull { it.id == id }?.name.orEmpty()
 }
 
+/** Valores mostrados en una fila de la tabla de precios por nivel. */
+internal data class PriceRowValues(
+    val label: String,
+    val price: Double,
+    val utility: Double,
+    val pricePlusUtility: Double,
+    val total: Double,
+)
+
 @Composable
-fun PriceRowItem(
-    label: String,
-    price: Double,
-    utility: Double,
-    pricePlusUtility: Double,
-    total: Double,
+internal fun PriceRowItem(
+    values: PriceRowValues,
     onUtilityChange: (String) -> Unit,
 ) {
+    val label = values.label
+    val price = values.price
+    val utility = values.utility
+    val pricePlusUtility = values.pricePlusUtility
+    val total = values.total
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
