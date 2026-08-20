@@ -1,6 +1,4 @@
 ﻿ApiService.kt:46:7 detekt.TooManyFunctions
-AppNavigation.kt:61:5 detekt.CyclomaticComplexMethod
-AppNavigation.kt:61:5 detekt.LongMethod
 CajaSelectorSheet.kt:203:13 detekt.LongMethod
 CartRepository.kt:18:7 detekt.TooManyFunctions
 CartScreen.kt:662:13 detekt.LongMethod
