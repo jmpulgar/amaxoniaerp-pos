@@ -1,8 +1,7 @@
 package com.amaxonia.pos.ui.history
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,31 +13,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.rounded.CalendarToday
-import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Receipt
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -52,28 +45,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.Transaction
-import com.amaxonia.pos.domain.model.TransactionStatus
-import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.PosPalette
+import java.util.Locale
 
-/** Alto estimado de cada fila del detalle en la hoja inferior. */
-private const val DETALLE_ROW_HEIGHT_DP = 72
-
-/** Filas visibles como máximo dentro de la hoja de detalle. */
-private const val VISIBLE_DETALLE_ROWS = 8
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel = injectedViewModel { AppGraph.history.historyViewModel() },
@@ -82,47 +67,11 @@ fun HistoryScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     // Detail bottom sheet
-    if (state.showDetalleSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissDetalle() },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            tonalElevation = 0.dp,
-        ) {
-            FacturaDetalleSheetContent(
-                transaction = state.selectedTransaction,
-                items = state.detalleItems,
-                isLoading = state.isLoadingDetalle,
-                error = state.detalleError,
-            )
-        }
-    }
+    HistoryDetalleSheet(state = state, onDismiss = viewModel::dismissDetalle)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Historial de Facturas",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            "Volver",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { HistoryTopAppBar(onBack = onBack) },
     ) { padding ->
         Column(
             modifier =
@@ -130,41 +79,7 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding),
         ) {
-            // Búsqueda siempre visible; los filtros avanzados se pliegan detrás del toggle para
-            // que la lista ocupe la pantalla. Mismos callbacks del ViewModel, ensamblados aquí.
-            var filtersExpanded by remember { mutableStateOf(false) }
-            HistorySearchField(
-                value = state.filter.search.orEmpty(),
-                onValueChange = viewModel::onSearchChanged,
-                filtersExpanded = filtersExpanded,
-                onToggleFilters = { filtersExpanded = !filtersExpanded },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            androidx.compose.animation.AnimatedVisibility(visible = filtersExpanded) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    HistoryIdentityFilters(
-                        filter = state.filter,
-                        onUsuarioChanged = viewModel::onUsuarioChanged,
-                        onSucursalChanged = viewModel::onSucursalChanged,
-                    )
-                    HistoryDateRangeFilters(
-                        filter = state.filter,
-                        onFechaInicioChanged = viewModel::onFechaInicioChanged,
-                        onFechaFinChanged = viewModel::onFechaFinChanged,
-                    )
-                    HistoryStatusFilter(
-                        filter = state.filter,
-                        onEstatusChanged = viewModel::onEstatusChanged,
-                    )
-                    HistoryFilterActions(
-                        onApply = viewModel::applyFilters,
-                        onClear = viewModel::clearFilters,
-                    )
-                }
-            }
+            HistoryFiltersSection(state = state, viewModel = viewModel)
 
             if (!state.isLoading || state.transactions.isNotEmpty()) {
                 SummaryBar(
@@ -174,117 +89,243 @@ fun HistoryScreen(
                 )
             }
 
-            when {
-                state.isLoading && state.transactions.isEmpty() -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Cargando facturas...",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                state.error != null -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ElevatedCard(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors =
-                                CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                ),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = state.error ?: "Error desconocido",
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    fontSize = 14.sp,
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.retry() }) {
-                                    Text("Reintentar")
-                                }
-                            }
-                        }
-                    }
-                }
-                state.transactions.isEmpty() -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Rounded.Receipt,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.size(64.dp),
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "No hay facturas registradas",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Las facturas apareceran aqui una vez que realices ventas",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                        }
-                    }
-                }
-                else -> {
-                    // Group transactions by dateHeader for sticky headers
-                    val grouped =
-                        remember(state.transactions) {
-                            state.transactions.groupBy { it.dateHeader }
-                        }
+            HistoryContent(state = state, viewModel = viewModel)
+        }
+    }
+}
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding =
-                            PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                bottom = 24.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        grouped.forEach { (dateHeader, transactions) ->
-                            stickyHeader(key = "header_$dateHeader") {
-                                DateStickyHeader(date = dateHeader)
-                            }
-                            items(
-                                items = transactions,
-                                key = { it.id },
-                            ) { transaction ->
-                                TransactionCard(
-                                    transaction = transaction,
-                                    onClick = { viewModel.onTransactionClick(transaction) },
-                                )
-                            }
-                        }
-                    }
+/** Hoja inferior con el detalle de la factura seleccionada. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryDetalleSheet(
+    state: HistoryState,
+    onDismiss: () -> Unit,
+) {
+    if (!state.showDetalleSheet) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        tonalElevation = 0.dp,
+    ) {
+        FacturaDetalleSheetContent(
+            transaction = state.selectedTransaction,
+            items = state.detalleItems,
+            isLoading = state.isLoadingDetalle,
+            error = state.detalleError,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryTopAppBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Text(
+                "Historial de Facturas",
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    "Volver",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+/** Búsqueda + filtros avanzados plegables. */
+@Composable
+private fun HistoryFiltersSection(
+    state: HistoryState,
+    viewModel: HistoryViewModel,
+) {
+    // Búsqueda siempre visible; los filtros avanzados se pliegan detrás del toggle para
+    // que la lista ocupe la pantalla. Mismos callbacks del ViewModel, ensamblados aquí.
+    var filtersExpanded by remember { mutableStateOf(false) }
+    HistorySearchField(
+        value = state.filter.search.orEmpty(),
+        onValueChange = viewModel::onSearchChanged,
+        filtersExpanded = filtersExpanded,
+        onToggleFilters = { filtersExpanded = !filtersExpanded },
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+    AnimatedVisibility(visible = filtersExpanded) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HistoryIdentityFilters(
+                filter = state.filter,
+                onUsuarioChanged = viewModel::onUsuarioChanged,
+                onSucursalChanged = viewModel::onSucursalChanged,
+            )
+            HistoryDateRangeFilters(
+                filter = state.filter,
+                onFechaInicioChanged = viewModel::onFechaInicioChanged,
+                onFechaFinChanged = viewModel::onFechaFinChanged,
+            )
+            HistoryStatusFilter(
+                filter = state.filter,
+                onEstatusChanged = viewModel::onEstatusChanged,
+            )
+            HistoryFilterActions(
+                onApply = viewModel::applyFilters,
+                onClear = viewModel::clearFilters,
+            )
+        }
+    }
+}
+
+/** Estado principal del historial: carga, error, vacío o lista agrupada. */
+@Composable
+private fun HistoryContent(
+    state: HistoryState,
+    viewModel: HistoryViewModel,
+) {
+    when {
+        state.isLoading && state.transactions.isEmpty() -> HistoryLoadingState()
+        state.error != null -> HistoryErrorState(error = state.error, onRetry = viewModel::retry)
+        state.transactions.isEmpty() -> HistoryEmptyState()
+        else ->
+            HistoryTransactionsList(
+                transactions = state.transactions,
+                onTransactionClick = viewModel::onTransactionClick,
+            )
+    }
+}
+
+@Composable
+private fun HistoryLoadingState() {
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "Cargando facturas...",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryErrorState(
+    error: String?,
+    onRetry: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        ElevatedCard(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors =
+                CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                ),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = error ?: "Error desconocido",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onRetry) {
+                    Text("Reintentar")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryEmptyState() {
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Rounded.Receipt,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(64.dp),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "No hay facturas registradas",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Las facturas apareceran aqui una vez que realices ventas",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+    }
+}
+
+/** Lista de transacciones agrupadas por fecha con headers sticky. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HistoryTransactionsList(
+    transactions: List<Transaction>,
+    onTransactionClick: (Transaction) -> Unit,
+) {
+    // Group transactions by dateHeader for sticky headers
+    val grouped =
+        remember(transactions) {
+            transactions.groupBy { it.dateHeader }
+        }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding =
+            PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 24.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        grouped.forEach { (dateHeader, dateTransactions) ->
+            stickyHeader(key = "header_$dateHeader") {
+                DateStickyHeader(date = dateHeader)
+            }
+            items(
+                items = dateTransactions,
+                key = { it.id },
+            ) { transaction ->
+                TransactionCard(
+                    transaction = transaction,
+                    onClick = { onTransactionClick(transaction) },
+                )
             }
         }
     }
@@ -337,17 +378,17 @@ internal fun SummaryBar(
                     color = PosPalette.FixedWhite.copy(alpha = 0.7f),
                 )
                 // Monto adaptive: totales enormes encogen sin recortarse en 320dp.
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "$currency ${String.format(java.util.Locale.getDefault(), "%.2f", totalMonto)}",
+                AdaptiveAmountText(
+                    text = "$currency ${String.format(Locale.getDefault(), "%.2f", totalMonto)}",
                     baseStyle =
                         MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            textAlign = TextAlign.End,
                         ),
                     color = PosPalette.FixedWhite,
                     modifier = Modifier.fillMaxWidth(),
                     options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        AdaptiveAmountOptions(
                             minFontSizeSp = 13f,
                         ),
                 )
@@ -380,7 +421,7 @@ internal fun HistorySearchField(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        androidx.compose.material3.FilledTonalIconButton(
+        FilledTonalIconButton(
             onClick = onToggleFilters,
             modifier = Modifier.size(48.dp),
         ) {
@@ -394,7 +435,7 @@ internal fun HistorySearchField(
 
 @Composable
 internal fun HistoryIdentityFilters(
-    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
+    filter: InvoiceHistoryFilter,
     onUsuarioChanged: (String) -> Unit,
     onSucursalChanged: (String) -> Unit,
 ) {
@@ -422,7 +463,7 @@ internal fun HistoryIdentityFilters(
 
 @Composable
 internal fun HistoryDateRangeFilters(
-    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
+    filter: InvoiceHistoryFilter,
     onFechaInicioChanged: (String) -> Unit,
     onFechaFinChanged: (String) -> Unit,
 ) {
@@ -451,7 +492,7 @@ internal fun HistoryDateRangeFilters(
 
 @Composable
 internal fun HistoryStatusFilter(
-    filter: com.amaxonia.pos.domain.repository.InvoiceHistoryFilter,
+    filter: InvoiceHistoryFilter,
     onEstatusChanged: (String) -> Unit,
 ) {
     OutlinedTextField(
@@ -473,7 +514,7 @@ internal fun HistoryFilterActions(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        androidx.compose.material3.OutlinedButton(
+        OutlinedButton(
             onClick = onClear,
             modifier = Modifier.weight(1f).height(48.dp),
         ) {
@@ -484,545 +525,6 @@ internal fun HistoryFilterActions(
             modifier = Modifier.weight(1f).height(48.dp),
         ) {
             Text("Aplicar")
-        }
-    }
-}
-
-// ---------- Sticky Date Header ----------
-
-@Composable
-private fun DateStickyHeader(date: String) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Rounded.CalendarToday,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = date,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-}
-
-// ---------- Transaction Card ----------
-
-@Composable
-internal fun TransactionCard(
-    transaction: Transaction,
-    onClick: () -> Unit,
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TransactionCardIcon()
-            Spacer(modifier = Modifier.width(14.dp))
-            TransactionCardInfo(transaction = transaction, modifier = Modifier.weight(1f))
-            TransactionCardAmount(transaction)
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(start = 4.dp).size(20.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun TransactionCardIcon() {
-    Box(
-        modifier =
-            Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Rounded.Receipt,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
-@Composable
-private fun TransactionCardInfo(
-    transaction: Transaction,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = transaction.invoiceNumber,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        StatusBadge(status = transaction.status)
-        Spacer(modifier = Modifier.height(6.dp))
-        TransactionMetadataRow(transaction)
-    }
-}
-
-@Composable
-private fun TransactionMetadataRow(transaction: Transaction) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Rounded.Schedule,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(13.dp),
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = transaction.time,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (transaction.clienteNombre.isNotBlank()) {
-            Spacer(modifier = Modifier.width(10.dp))
-            Icon(
-                Icons.Rounded.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(13.dp),
-            )
-            Spacer(modifier = Modifier.width(3.dp))
-            Text(
-                text = transaction.clienteNombre,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-        }
-    }
-}
-
-@Composable
-private fun TransactionCardAmount(transaction: Transaction) {
-    Column(horizontalAlignment = Alignment.End) {
-        com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-            text = "${transaction.currency} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.amount)}",
-            baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary,
-            options =
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 11f,
-                ),
-        )
-        if (transaction.totalRef != null && transaction.totalRef > 0.0 && !transaction.abrMonedaSecundaria.isNullOrBlank()) {
-            Text(
-                text =
-                    "${formatCurrencyLabel(transaction.abrMonedaSecundaria)} " +
-                        String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef),
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-// ---------- Status Badge ----------
-
-@Composable
-private fun StatusBadge(status: TransactionStatus) {
-    val backgroundColor = Color(status.colorHex).copy(alpha = 0.1f)
-    val textColor = Color(status.colorHex)
-
-    Box(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(backgroundColor)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        Text(
-            text = status.label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = textColor,
-        )
-    }
-}
-
-// ---------- Factura Detail Bottom Sheet ----------
-
-@Composable
-private fun FacturaDetalleSheetContent(
-    transaction: Transaction?,
-    items: List<FacturaDetalleItemDto>,
-    isLoading: Boolean,
-    error: String?,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-    ) {
-        // Header
-        if (transaction != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Receipt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = transaction.invoiceNumber,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "${transaction.dateHeader}  ${transaction.time}",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        StatusBadge(status = transaction.status)
-                    }
-                }
-            }
-
-            // Client + payment info
-            if (transaction.clienteNombre.isNotBlank() || transaction.formaPago.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        if (transaction.clienteNombre.isNotBlank()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Rounded.Person,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = transaction.clienteNombre,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                            if (transaction.clienteIdentificacion.isNotBlank()) {
-                                Text(
-                                    text = transaction.clienteIdentificacion,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 24.dp),
-                                )
-                            }
-                        }
-                        if (transaction.formaPago.isNotBlank()) {
-                            if (transaction.clienteNombre.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Rounded.ShoppingCart,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = transaction.formaPago.replaceFirstChar { it.uppercase() },
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        // Section title
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Rounded.Inventory2,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Productos",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (!isLoading && items.isNotEmpty()) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "(${items.size})",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        when {
-            isLoading -> {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp),
-                            strokeWidth = 3.dp,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            "Cargando productos...",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            error != null -> {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors =
-                        CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                ) {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-            items.isEmpty() -> {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Sin productos",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height((items.size.coerceAtMost(VISIBLE_DETALLE_ROWS) * DETALLE_ROW_HEIGHT_DP).dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(items, key = { it.id }) { item ->
-                        DetalleItemRow(item = item, currency = transaction?.currency ?: "USD")
-                    }
-                }
-
-                // Total row
-                if (transaction != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Total",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Column(horizontalAlignment = Alignment.End) {
-                            com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                                text = "${transaction.currency} ${String.format(
-                                    java.util.Locale.getDefault(),
-                                    "%.2f",
-                                    transaction.amount,
-                                )}",
-                                baseStyle =
-                                    MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                color = MaterialTheme.colorScheme.primary,
-                                options =
-                                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                                        minFontSizeSp = 13f,
-                                    ),
-                            )
-                            if (transaction.totalRef != null &&
-                                transaction.totalRef > 0.0 &&
-                                !transaction.abrMonedaSecundaria.isNullOrBlank()
-                            ) {
-                                Text(
-                                    text = "${formatCurrencyLabel(
-                                        transaction.abrMonedaSecundaria,
-                                    )} ${String.format(java.util.Locale.getDefault(), "%.2f", transaction.totalRef)}",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ---------- Detalle Item Row ----------
-
-@Composable
-private fun DetalleItemRow(
-    item: FacturaDetalleItemDto,
-    currency: String,
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Qty badge
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text =
-                        if (item.cantidad == item.cantidad.toLong().toDouble()) {
-                            "${item.cantidad.toLong()}"
-                        } else {
-                            String.format(java.util.Locale.getDefault(), "%.1f", item.cantidad)
-                        },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.descripcion,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (item.codigo.isNotBlank()) {
-                    Text(
-                        text = item.codigo,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(horizontalAlignment = Alignment.End) {
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "$currency ${String.format(java.util.Locale.getDefault(), "%.2f", item.totalConIva)}",
-                    baseStyle =
-                        MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                        ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 11f,
-                        ),
-                )
-                Text(
-                    text = "c/u ${String.format(java.util.Locale.getDefault(), "%.2f", item.precioUnitario)}",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }

@@ -21,10 +21,6 @@ DashboardScreen.kt:1494:5 detekt.LongMethod
 DashboardScreen.kt:1628:5 detekt.LongMethod
 DependencyContainer.kt:381:9 detekt.LongMethod
 DraftInvoicesScreen.kt:178:13 detekt.LongMethod
-HistoryScreen.kt:676:13 detekt.CyclomaticComplexMethod
-HistoryScreen.kt:676:13 detekt.LongMethod
-HistoryScreen.kt:78:5 detekt.LongMethod
-HistoryScreen.kt:946:13 detekt.LongMethod
 HkaConnectionHelper.kt:157:17 detekt.CyclomaticComplexMethod
 LocalStore.kt:48:7 detekt.TooManyFunctions
 MappingExtensions.kt:54:16 detekt.CyclomaticComplexMethod
