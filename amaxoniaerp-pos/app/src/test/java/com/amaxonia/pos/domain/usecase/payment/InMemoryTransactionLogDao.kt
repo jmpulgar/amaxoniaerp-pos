@@ -106,6 +106,7 @@ internal class InMemoryTransactionLogDao : TransactionLogDao {
         rows[id] =
             rows[id]!!.copy(
                 fiscalConfirmationStatus = status,
+                remoteInvoiceId = remoteInvoiceId,
                 fiscalNumber = fiscalNumber,
                 printerSerial = printerSerial,
                 fiscalConfirmationRetryCount = rows[id]!!.fiscalConfirmationRetryCount + 1,
