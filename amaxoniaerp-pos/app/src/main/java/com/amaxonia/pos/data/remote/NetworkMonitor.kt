@@ -11,7 +11,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-class NetworkMonitor(
+/**
+ * Implementación por defecto de [ConnectivityStatus]. Abierta para permitir
+ * stubs de conectividad en pruebas (misma interfaz, sin wrappers extra).
+ */
+open class NetworkMonitor(
     context: Context,
 ) : ConnectivityStatus {
     private val connectivityManager =
