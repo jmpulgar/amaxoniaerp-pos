@@ -22,14 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,13 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.theme.ConfirmedContainer
-import com.amaxonia.pos.ui.theme.ConfirmedContent
-import com.amaxonia.pos.ui.theme.PendingContainer
-import com.amaxonia.pos.ui.theme.PendingContent
 import com.amaxonia.pos.ui.theme.PosPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,52 +112,67 @@ fun CreditNotesScreen(
                     .fillMaxSize()
                     .padding(padding),
         ) {
-            when (state.mode) {
-                CreditNotesMode.LIST ->
-                    CreditNotesListContent(
-                        state = state,
-                        onSearchChange = viewModel::onSearchQueryChange,
-                        onSearch = viewModel::searchCreditNotes,
-                        onOpenDetail = viewModel::openCreditNoteDetail,
-                    )
-                CreditNotesMode.INVOICE_PICKER ->
-                    CreditNoteInvoicePickerContent(
-                        state = state,
-                        onSearchChange = viewModel::onInvoiceSearchQueryChange,
-                        onSearch = viewModel::searchSourceInvoices,
-                        onSelectInvoice = viewModel::selectInvoice,
-                    )
-                CreditNotesMode.CREATE ->
-                    CreditNoteCreateContent(
-                        state = state,
-                        handlers =
-                            CreditNoteCreateHandlers(
-                                fields =
-                                    CreditNoteFieldHandlers(
-                                        onFechaChange = viewModel.formController::onFechaChange,
-                                        onPeriodoChange = viewModel.formController::onPeriodoChange,
-                                        onObservacionChange = viewModel.formController::onObservacionChange,
-                                    ),
-                                onDevolverStockChange = viewModel.formController::onDevolverStockChange,
-                                onGenerarAbonoChange = viewModel.formController::onGenerarAbonoChange,
-                                onRefundMethodChange = viewModel.formController::onRefundMethodChange,
-                                onSubmit = viewModel::submitCreditNote,
-                            ),
-                    )
-            }
+            CreditNotesModeContent(state = state, viewModel = viewModel)
 
             if (state.isLoading || state.isSubmitting) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(PosPalette.FixedBlack.copy(alpha = 0.08f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
+                CreditNotesLoadingOverlay()
             }
         }
+    }
+}
+
+/** Contenido según el modo del flujo (lista, selector de factura, creación). */
+@Composable
+private fun CreditNotesModeContent(
+    state: CreditNotesState,
+    viewModel: CreditNotesViewModel,
+) {
+    when (state.mode) {
+        CreditNotesMode.LIST ->
+            CreditNotesListContent(
+                state = state,
+                onSearchChange = viewModel::onSearchQueryChange,
+                onSearch = viewModel::searchCreditNotes,
+                onOpenDetail = viewModel::openCreditNoteDetail,
+            )
+        CreditNotesMode.INVOICE_PICKER ->
+            CreditNoteInvoicePickerContent(
+                state = state,
+                onSearchChange = viewModel::onInvoiceSearchQueryChange,
+                onSearch = viewModel::searchSourceInvoices,
+                onSelectInvoice = viewModel::selectInvoice,
+            )
+        CreditNotesMode.CREATE ->
+            CreditNoteCreateContent(
+                state = state,
+                handlers =
+                    CreditNoteCreateHandlers(
+                        fields =
+                            CreditNoteFieldHandlers(
+                                onFechaChange = viewModel.formController::onFechaChange,
+                                onPeriodoChange = viewModel.formController::onPeriodoChange,
+                                onObservacionChange = viewModel.formController::onObservacionChange,
+                            ),
+                        onDevolverStockChange = viewModel.formController::onDevolverStockChange,
+                        onGenerarAbonoChange = viewModel.formController::onGenerarAbonoChange,
+                        onRefundMethodChange = viewModel.formController::onRefundMethodChange,
+                        onSubmit = viewModel::submitCreditNote,
+                    ),
+            )
+    }
+}
+
+/** Velo de carga sobre el contenido durante carga o envío. */
+@Composable
+private fun CreditNotesLoadingOverlay() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PosPalette.FixedBlack.copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -632,94 +638,3 @@ private fun SearchRow(
         }
     }
 }
-
-@Composable
-internal fun SummaryBanner(
-    title: String,
-    value: String,
-    amount: Double,
-    modifier: Modifier = Modifier,
-) {
-    ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = PosPalette.FixedWhite.copy(alpha = 0.8f), fontSize = 12.sp)
-                Text(value, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            }
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                Text("Monto total", color = PosPalette.FixedWhite.copy(alpha = 0.8f), fontSize = 12.sp)
-                // Monto adaptive: totales enormes encogen sin recortarse en 320dp.
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                    text = "Bs ${formatAmount(amount)}",
-                    baseStyle =
-                        MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        ),
-                    color = PosPalette.FixedWhite,
-                    modifier = Modifier.fillMaxWidth(),
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 13f,
-                        ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
-    val isConfirmed = status == CreditNoteFiscalStatusDto.CONFIRMADA
-    AssistChip(
-        onClick = {},
-        label = { Text(if (isConfirmed) "Fiscal confirmada" else "Fiscal pendiente") },
-        leadingIcon = {
-            Icon(
-                imageVector = if (isConfirmed) Icons.Default.CheckCircle else Icons.Default.Print,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-            )
-        },
-        colors =
-            AssistChipDefaults.assistChipColors(
-                containerColor = if (isConfirmed) ConfirmedContainer else PendingContainer,
-                labelColor = if (isConfirmed) ConfirmedContent else PendingContent,
-                leadingIconContentColor = if (isConfirmed) ConfirmedContent else PendingContent,
-            ),
-    )
-}
-
-@Composable
-private fun EmptyState(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        }
-    }
-}
-
-private fun screenTitle(mode: CreditNotesMode): String =
-    when (mode) {
-        CreditNotesMode.LIST -> "Notas de crÃ©dito"
-        CreditNotesMode.INVOICE_PICKER -> "Seleccionar factura"
-        CreditNotesMode.CREATE -> "Nueva nota de crÃ©dito"
-    }
-
-internal fun formatAmount(value: Double): String = String.format(java.util.Locale.getDefault(), "%.2f", value)

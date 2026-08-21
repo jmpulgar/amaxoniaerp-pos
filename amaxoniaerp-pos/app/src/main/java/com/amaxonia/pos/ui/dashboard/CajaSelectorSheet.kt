@@ -226,21 +226,7 @@ private fun CajaCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Icon with status indicator
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.PointOfSale,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
+            CajaIcon()
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -271,6 +257,26 @@ private fun CajaCard(
             // Status badge
             CajaStatusBadge(statusColor = statusColor, isActive = isActive)
         }
+    }
+}
+
+/** Ícono de la caja dentro de su contenedor redondeado. */
+@Composable
+private fun CajaIcon() {
+    Box(
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.PointOfSale,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(26.dp),
+        )
     }
 }
 
