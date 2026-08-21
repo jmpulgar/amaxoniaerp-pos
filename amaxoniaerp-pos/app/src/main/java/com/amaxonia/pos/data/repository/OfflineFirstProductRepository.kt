@@ -6,6 +6,16 @@ import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
+import com.amaxonia.pos.data.remote.createProduct
+import com.amaxonia.pos.data.remote.getBrands
+import com.amaxonia.pos.data.remote.getDepartments
+import com.amaxonia.pos.data.remote.getFamilies
+import com.amaxonia.pos.data.remote.getItemStock
+import com.amaxonia.pos.data.remote.getLines
+import com.amaxonia.pos.data.remote.getProductById
+import com.amaxonia.pos.data.remote.getSections
+import com.amaxonia.pos.data.remote.getSubFamilies
+import com.amaxonia.pos.data.remote.updateProduct
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
 import com.amaxonia.pos.domain.repository.Department

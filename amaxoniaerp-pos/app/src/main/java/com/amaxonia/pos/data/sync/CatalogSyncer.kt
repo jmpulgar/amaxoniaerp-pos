@@ -17,6 +17,13 @@ import com.amaxonia.pos.data.local.db.toLevel2Entity
 import com.amaxonia.pos.data.local.db.toLevel3Entity
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
+import com.amaxonia.pos.data.remote.getAddressLevels
+import com.amaxonia.pos.data.remote.getClientSucursales
+import com.amaxonia.pos.data.remote.getClientTypes
+import com.amaxonia.pos.data.remote.getClients
+import com.amaxonia.pos.data.remote.getCountries
+import com.amaxonia.pos.data.remote.getProducts
+import com.amaxonia.pos.data.remote.getPromotions
 
 class CatalogSyncer(
     private val apiService: ApiService,

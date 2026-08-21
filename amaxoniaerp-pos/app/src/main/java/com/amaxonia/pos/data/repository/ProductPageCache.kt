@@ -7,6 +7,7 @@ import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
 import com.amaxonia.pos.data.remote.NetworkMonitor
+import com.amaxonia.pos.data.remote.getProducts
 import com.amaxonia.pos.domain.model.Product
 
 /**

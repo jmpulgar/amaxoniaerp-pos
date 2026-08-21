@@ -3,6 +3,9 @@ package com.amaxonia.pos.data.repository
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
+import com.amaxonia.pos.data.remote.getAddressLevels
+import com.amaxonia.pos.data.remote.getClientTypes
+import com.amaxonia.pos.data.remote.getCountries
 import com.amaxonia.pos.domain.model.AddressLevel
 import com.amaxonia.pos.domain.model.ClientTypeOption
 import com.amaxonia.pos.domain.model.Country

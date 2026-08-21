@@ -8,6 +8,7 @@ import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
+import com.amaxonia.pos.data.remote.getPromotions
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion

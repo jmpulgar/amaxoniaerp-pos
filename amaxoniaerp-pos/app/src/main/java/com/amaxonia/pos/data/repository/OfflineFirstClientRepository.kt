@@ -6,6 +6,10 @@ import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
+import com.amaxonia.pos.data.remote.createClient
+import com.amaxonia.pos.data.remote.getClients
+import com.amaxonia.pos.data.remote.getDefaultClient
+import com.amaxonia.pos.data.remote.updateClient
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.repository.ClientRepository
 

@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.remote.ApiService
+import com.amaxonia.pos.data.remote.getBestSellers
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.ReportRepository
