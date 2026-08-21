@@ -3,7 +3,6 @@ package com.amaxonia.pos.domain.repository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
-import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
@@ -291,38 +290,6 @@ class CartRepository {
                         itemUnitPackage = normalizedUnit,
                         unitPriceWithTax = priceForUnit(item.product, normalizedUnit),
                     )
-                } else {
-                    item
-                }
-            }
-        }
-    }
-
-    /** Marca un producto como que tiene configuracion de lote */
-    fun setItemHasLotConfig(
-        productId: String,
-        hasLotConfig: Boolean,
-    ) {
-        cartItemsState.update { items ->
-            items.map { item ->
-                if (item.product.id == productId && !item.isPromotionLine) {
-                    item.copy(hasLotConfig = hasLotConfig)
-                } else {
-                    item
-                }
-            }
-        }
-    }
-
-    /** Asigna lotes FEFO a un item del carrito */
-    fun assignLots(
-        productId: String,
-        lots: List<LotAssignment>,
-    ) {
-        cartItemsState.update { items ->
-            items.map { item ->
-                if (item.product.id == productId && !item.isPromotionLine) {
-                    item.copy(lotAssignments = lots)
                 } else {
                     item
                 }

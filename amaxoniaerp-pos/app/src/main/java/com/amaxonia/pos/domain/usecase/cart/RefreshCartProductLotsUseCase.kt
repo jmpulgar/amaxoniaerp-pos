@@ -4,6 +4,8 @@ import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ProductLotAvailability
 import com.amaxonia.pos.domain.repository.ProductLotRepository
+import com.amaxonia.pos.domain.repository.assignLots
+import com.amaxonia.pos.domain.repository.setItemHasLotConfig
 
 enum class LotRefreshPolicy {
     DISCOVER_CONFIGURATION,
