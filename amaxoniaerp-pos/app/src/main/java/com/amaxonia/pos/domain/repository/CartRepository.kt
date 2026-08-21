@@ -23,8 +23,8 @@ class CartRepository {
         const val MAX_DISCOUNT_PERCENT = 100.0
     }
 
-    private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
-    val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
+    internal val cartItemsState = MutableStateFlow<List<CartItem>>(emptyList())
+    val cartItems: StateFlow<List<CartItem>> = cartItemsState.asStateFlow()
 
     /**
      * Sesión de mesa en la que se enmarca el carrito cuando se opera desde la pantalla de
@@ -36,32 +36,24 @@ class CartRepository {
      * `pedidosMesaRepository.enviarComanda`. Al salir de la comanda, el ViewModel invoca
      * [unbindSesionMesa] para que el siguiente carrito arranque limpio.
      */
-    private val _sesionMesaId = MutableStateFlow<Int?>(null)
-    val sesionMesaId: StateFlow<Int?> = _sesionMesaId.asStateFlow()
-
-    fun bindSesionMesa(sesionId: Int) {
-        _sesionMesaId.value = sesionId
-    }
-
-    fun unbindSesionMesa() {
-        _sesionMesaId.value = null
-    }
+    internal val sesionMesaIdState = MutableStateFlow<Int?>(null)
+    val sesionMesaId: StateFlow<Int?> = sesionMesaIdState.asStateFlow()
 
     // Nuevo: Estado del cliente seleccionado para la transacción actual
-    private val _selectedClient = MutableStateFlow<Client?>(null)
-    val selectedClient: StateFlow<Client?> = _selectedClient.asStateFlow()
+    internal val selectedClientState = MutableStateFlow<Client?>(null)
+    val selectedClient: StateFlow<Client?> = selectedClientState.asStateFlow()
 
-    private val _selectedClientSucursal = MutableStateFlow<ClientBranch?>(null)
-    val selectedClientSucursal: StateFlow<ClientBranch?> = _selectedClientSucursal.asStateFlow()
+    internal val selectedClientSucursalState = MutableStateFlow<ClientBranch?>(null)
+    val selectedClientSucursal: StateFlow<ClientBranch?> = selectedClientSucursalState.asStateFlow()
 
-    private val _clientSucursales = MutableStateFlow<List<ClientBranch>>(emptyList())
-    val clientSucursales: StateFlow<List<ClientBranch>> = _clientSucursales.asStateFlow()
+    internal val clientSucursalesState = MutableStateFlow<List<ClientBranch>>(emptyList())
+    val clientSucursales: StateFlow<List<ClientBranch>> = clientSucursalesState.asStateFlow()
 
-    private val _availableSellers = MutableStateFlow<List<Seller>>(emptyList())
-    val availableSellers: StateFlow<List<Seller>> = _availableSellers.asStateFlow()
+    internal val availableSellersState = MutableStateFlow<List<Seller>>(emptyList())
+    val availableSellers: StateFlow<List<Seller>> = availableSellersState.asStateFlow()
 
-    private val _currentSeller = MutableStateFlow<Seller?>(null)
-    val currentSeller: StateFlow<Seller?> = _currentSeller.asStateFlow()
+    internal val currentSellerState = MutableStateFlow<Seller?>(null)
+    val currentSeller: StateFlow<Seller?> = currentSellerState.asStateFlow()
 
     private val _financialSnapshot = MutableStateFlow<SaleFinancialSnapshot?>(null)
     val financialSnapshot: StateFlow<SaleFinancialSnapshot?> = _financialSnapshot.asStateFlow()
@@ -80,10 +72,10 @@ class CartRepository {
     ) {
         invalidateFinancialSnapshot()
         val safeQuantity = quantity.coerceAtLeast(1)
-        val currentSellerId = _currentSeller.value?.id ?: 0
+        val currentSellerId = currentSellerState.value?.id ?: 0
         val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
         val defaultPrice = priceForUnit(product, defaultUnit)
-        _cartItems.update { currentItems ->
+        cartItemsState.update { currentItems ->
             val existingIndex = currentItems.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
             if (existingIndex != -1) {
                 val mutable = currentItems.toMutableList()
@@ -132,8 +124,8 @@ class CartRepository {
     ) {
         invalidateFinancialSnapshot()
         val safeTimes = times.coerceAtLeast(1)
-        val currentSellerId = _currentSeller.value?.id ?: 0
-        _cartItems.update { currentItems ->
+        val currentSellerId = currentSellerState.value?.id ?: 0
+        cartItemsState.update { currentItems ->
             if (currentItems.any { it.promocionId == promocion.id }) {
                 return@update updatePromotionLines(currentItems, promocion.id, safeTimes, append = true)
             }
@@ -177,12 +169,12 @@ class CartRepository {
     fun getDisplayItems(): List<ItemCarrito> {
         val grouped = mutableListOf<ItemCarrito>()
         val promotionIds = mutableSetOf<String>()
-        _cartItems.value.forEach { item ->
+        cartItemsState.value.forEach { item ->
             val promoId = item.promocionId
             if (promoId.isNullOrBlank()) {
                 grouped.add(ItemCarrito.ProductoIndividual(item))
             } else if (promotionIds.add(promoId)) {
-                val promoItems = _cartItems.value.filter { it.promocionId == promoId }
+                val promoItems = cartItemsState.value.filter { it.promocionId == promoId }
                 val first = promoItems.first()
                 grouped.add(
                     ItemCarrito.PromocionAgrupada(
@@ -202,14 +194,14 @@ class CartRepository {
     fun increaseQuantity(productId: String) {
         updateItemQuantity(
             productId,
-            (_cartItems.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 0) + 1,
+            (cartItemsState.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 0) + 1,
         )
     }
 
     fun decreaseQuantity(productId: String) {
         updateItemQuantity(
             productId,
-            (_cartItems.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 1) - 1,
+            (cartItemsState.value.firstOrNull { it.product.id == productId && !it.isPromotionLine }?.quantity ?: 1) - 1,
         )
     }
 
@@ -222,7 +214,7 @@ class CartRepository {
             return
         }
         invalidateFinancialSnapshot()
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine) {
                     item.copy(quantity = quantity, quantityDecimal = quantity.toDouble())
@@ -242,19 +234,19 @@ class CartRepository {
             return
         }
         invalidateFinancialSnapshot()
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             updatePromotionLines(items, promocionId, times, append = false)
         }
     }
 
     fun removeItem(productId: String) {
         invalidateFinancialSnapshot()
-        _cartItems.update { items -> items.filter { it.product.id != productId || it.isPromotionLine } }
+        cartItemsState.update { items -> items.filter { it.product.id != productId || it.isPromotionLine } }
     }
 
     fun removePromotion(promotionId: String) {
         invalidateFinancialSnapshot()
-        _cartItems.update { items -> items.filter { it.promocionId != promotionId } }
+        cartItemsState.update { items -> items.filter { it.promocionId != promotionId } }
     }
 
     private fun updatePromotionLines(
@@ -284,7 +276,7 @@ class CartRepository {
     ) {
         invalidateFinancialSnapshot()
         val safePrice = unitPriceWithTax.coerceAtLeast(0.0)
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId) {
                     item.copy(unitPriceWithTax = safePrice)
@@ -301,7 +293,7 @@ class CartRepository {
     ) {
         invalidateFinancialSnapshot()
         val safeDiscount = discountPercent.coerceIn(MIN_DISCOUNT_PERCENT, MAX_DISCOUNT_PERCENT)
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId) {
                     item.copy(discountPercent = safeDiscount)
@@ -318,7 +310,7 @@ class CartRepository {
     ) {
         invalidateFinancialSnapshot()
         val normalizedUnit = if (unit == "UNIDAD") "UNIDAD" else "EMPAQUE"
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine && item.product.canSwitchUnit) {
                     item.copy(
@@ -337,7 +329,7 @@ class CartRepository {
         productId: String,
         hasLotConfig: Boolean,
     ) {
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine) {
                     item.copy(hasLotConfig = hasLotConfig)
@@ -353,7 +345,7 @@ class CartRepository {
         productId: String,
         lots: List<LotAssignment>,
     ) {
-        _cartItems.update { items ->
+        cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine) {
                     item.copy(lotAssignments = lots)
@@ -365,96 +357,20 @@ class CartRepository {
     }
 
     fun clearCart() {
-        _cartItems.value = emptyList()
+        cartItemsState.value = emptyList()
         _financialSnapshot.value = null
-        _selectedClient.value = null
-        _selectedClientSucursal.value = null
-        _clientSucursales.value = emptyList()
-        _currentSeller.value = null
-        _availableSellers.value = emptyList()
+        selectedClientState.value = null
+        selectedClientSucursalState.value = null
+        clientSucursalesState.value = emptyList()
+        currentSellerState.value = null
+        availableSellersState.value = emptyList()
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)
     fun clearItemsOnly() {
-        _cartItems.value = emptyList()
+        cartItemsState.value = emptyList()
         _financialSnapshot.value = null
     }
 
-    // Nuevas funciones para manejar el cliente
-    fun setClient(client: Client) {
-        _selectedClient.value = client
-        _selectedClientSucursal.value = null
-        _clientSucursales.value = emptyList()
-    }
-
-    fun removeClient() {
-        _selectedClient.value = null
-        _selectedClientSucursal.value = null
-        _clientSucursales.value = emptyList()
-    }
-
-    fun setClientSucursal(sucursal: ClientBranch?) {
-        _selectedClientSucursal.value = sucursal
-    }
-
-    fun setClientSucursales(sucursales: List<ClientBranch>) {
-        val normalized = sucursales.distinctBy { it.sucursalId }
-        _clientSucursales.value = normalized
-
-        val current =
-            _selectedClientSucursal.value
-                ?.takeIf { selected -> normalized.any { it.sucursalId == selected.sucursalId } }
-        _selectedClientSucursal.value = current ?: normalized.singleOrNull()
-    }
-
-    fun setSellerContext(
-        defaultSellerId: Int?,
-        defaultSellerName: String?,
-        sellers: List<Seller>,
-    ) {
-        val normalized =
-            sellers
-                .filter { it.id > 0 }
-                .distinctBy { it.id }
-
-        val fallback =
-            defaultSellerId
-                ?.takeIf { it > 0 }
-                ?.let { id -> defaultSellerName?.takeIf(String::isNotBlank)?.let { Seller(id, it) } }
-
-        val available =
-            buildList {
-                addAll(normalized)
-                if (fallback != null && none { it.id == fallback.id }) {
-                    add(fallback)
-                }
-            }
-
-        _availableSellers.value = available
-
-        val selected =
-            available.firstOrNull { it.id == defaultSellerId }
-                ?: _currentSeller.value?.let { current -> available.firstOrNull { it.id == current.id } }
-                ?: available.firstOrNull()
-
-        if (selected != null) {
-            applyCurrentSeller(selected)
-        }
-    }
-
-    fun setCurrentSeller(seller: Seller) {
-        applyCurrentSeller(seller)
-    }
-
-    private fun applyCurrentSeller(seller: Seller) {
-        val changed = _currentSeller.value?.id != seller.id
-        _currentSeller.value = seller
-        if (!changed) return
-
-        _cartItems.update { items ->
-            items.map { item -> item.copy(codVendedor = seller.id) }
-        }
-    }
-
-    fun getTotal(): Double = _cartItems.value.sumOf { it.total }
+    fun getTotal(): Double = cartItemsState.value.sumOf { it.total }
 }

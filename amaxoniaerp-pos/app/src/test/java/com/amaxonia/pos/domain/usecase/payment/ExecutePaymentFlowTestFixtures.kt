@@ -38,6 +38,8 @@ import com.amaxonia.pos.domain.repository.PaymentGateway
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
+import com.amaxonia.pos.domain.repository.setClient
+import com.amaxonia.pos.domain.repository.setSellerContext
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 import kotlinx.coroutines.flow.MutableStateFlow

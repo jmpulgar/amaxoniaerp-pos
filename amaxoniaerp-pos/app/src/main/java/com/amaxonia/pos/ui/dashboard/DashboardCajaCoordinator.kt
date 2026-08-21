@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ConnectivityStatus
+import com.amaxonia.pos.domain.repository.setSellerContext
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintOutcome
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
 import com.amaxonia.pos.domain.usecase.caja.CashCloseTicketPayloadBuilder

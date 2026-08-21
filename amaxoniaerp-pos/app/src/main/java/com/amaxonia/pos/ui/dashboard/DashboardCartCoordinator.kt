@@ -5,6 +5,8 @@ import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.PromotionRepository
+import com.amaxonia.pos.domain.repository.setClientSucursales
+import com.amaxonia.pos.domain.repository.setCurrentSeller
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.usecase.ValidarAdicionPromocionUseCase
 import com.amaxonia.pos.domain.usecase.cart.LotRefreshPolicy

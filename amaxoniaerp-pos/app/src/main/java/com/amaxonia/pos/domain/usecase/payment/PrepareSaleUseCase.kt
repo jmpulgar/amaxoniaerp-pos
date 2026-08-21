@@ -20,6 +20,7 @@ import com.amaxonia.pos.domain.repository.ConnectivityStatus
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.repository.TransactionRepository
+import com.amaxonia.pos.domain.repository.setClientSucursales
 
 internal class PaymentStateRepositories(
     val transaction: TransactionRepository,

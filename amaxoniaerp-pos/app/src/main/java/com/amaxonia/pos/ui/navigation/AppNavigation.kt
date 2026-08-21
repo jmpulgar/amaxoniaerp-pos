@@ -32,6 +32,7 @@ import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.TableAccountPayment
+import com.amaxonia.pos.domain.repository.setClient
 import com.amaxonia.pos.ui.caja.CierreCajaScreen
 import com.amaxonia.pos.ui.cart.CartScreen
 import com.amaxonia.pos.ui.clients.ClientFormScreen

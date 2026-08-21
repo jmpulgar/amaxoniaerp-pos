@@ -8,6 +8,11 @@ import com.amaxonia.pos.domain.repository.ClientBranchRepository
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
+import com.amaxonia.pos.domain.repository.removeClient
+import com.amaxonia.pos.domain.repository.setClient
+import com.amaxonia.pos.domain.repository.setClientSucursal
+import com.amaxonia.pos.domain.repository.setClientSucursales
+import com.amaxonia.pos.domain.repository.setCurrentSeller
 import com.amaxonia.pos.domain.usecase.cart.LotRefreshPolicy
 import com.amaxonia.pos.domain.usecase.cart.RefreshCartProductLotsUseCase
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase

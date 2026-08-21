@@ -8,6 +8,8 @@ import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ConnectivityStatus
 import com.amaxonia.pos.domain.repository.PedidosMesaRepository
+import com.amaxonia.pos.domain.repository.bindSesionMesa
+import com.amaxonia.pos.domain.repository.unbindSesionMesa
 import com.amaxonia.pos.domain.usecase.mesas.BuildPedidoMesaItemsInput
 import com.amaxonia.pos.domain.usecase.mesas.BuildPedidoMesaItemsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
