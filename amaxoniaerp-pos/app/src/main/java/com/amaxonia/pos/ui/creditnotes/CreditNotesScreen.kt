@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -56,13 +55,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -84,50 +81,26 @@ fun CreditNotesScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.error) {
-        state.error?.let { snackbarHostState.showSnackbar(it) }
-    }
-    LaunchedEffect(state.successMessage) {
-        state.successMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearSuccessMessage()
-        }
-    }
+    CreditNotesSnackbarEffects(
+        state = state,
+        viewModel = viewModel,
+        snackbarHostState = snackbarHostState,
+    )
 
-    val selectedCreditNote = state.selectedCreditNote
-    if (state.showCreditNoteDetail && selectedCreditNote != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = viewModel::dismissCreditNoteDetail,
-            sheetState = sheetState,
-        ) {
-            CreditNoteDetailSheet(
-                detail = selectedCreditNote,
-                isSubmitting = state.isSubmitting,
-                onProcessFiscal = viewModel::processSelectedCreditNoteFiscal,
-            )
-        }
-    }
+    CreditNoteDetailSheetOverlay(
+        state = state,
+        onProcessFiscal = viewModel::processSelectedCreditNoteFiscal,
+        onDismiss = viewModel::dismissCreditNoteDetail,
+    )
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(screenTitle(state.mode), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (state.mode == CreditNotesMode.LIST) onBack() else viewModel.backFromFlow()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.primary)
-                    }
-                },
-                actions = {
-                    if (state.mode == CreditNotesMode.LIST) {
-                        IconButton(onClick = viewModel::retry) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Actualizar", tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                },
+            CreditNotesTopBar(
+                state = state,
+                onBack = onBack,
+                onBackFromFlow = viewModel::backFromFlow,
+                onRetry = viewModel::retry,
             )
         },
         floatingActionButton = {
@@ -170,13 +143,13 @@ fun CreditNotesScreen(
                             CreditNoteCreateHandlers(
                                 fields =
                                     CreditNoteFieldHandlers(
-                                        onFechaChange = viewModel::onFechaChange,
-                                        onPeriodoChange = viewModel::onPeriodoChange,
-                                        onObservacionChange = viewModel::onObservacionChange,
+                                        onFechaChange = viewModel.formController::onFechaChange,
+                                        onPeriodoChange = viewModel.formController::onPeriodoChange,
+                                        onObservacionChange = viewModel.formController::onObservacionChange,
                                     ),
-                                onDevolverStockChange = viewModel::onDevolverStockChange,
-                                onGenerarAbonoChange = viewModel::onGenerarAbonoChange,
-                                onRefundMethodChange = viewModel::onRefundMethodChange,
+                                onDevolverStockChange = viewModel.formController::onDevolverStockChange,
+                                onGenerarAbonoChange = viewModel.formController::onGenerarAbonoChange,
+                                onRefundMethodChange = viewModel.formController::onRefundMethodChange,
                                 onSubmit = viewModel::submitCreditNote,
                             ),
                     )
@@ -195,6 +168,75 @@ fun CreditNotesScreen(
             }
         }
     }
+}
+
+/** Muestra como snackbars los mensajes de error y éxito del flujo. */
+@Composable
+private fun CreditNotesSnackbarEffects(
+    state: CreditNotesState,
+    viewModel: CreditNotesViewModel,
+    snackbarHostState: SnackbarHostState,
+) {
+    LaunchedEffect(state.error) {
+        state.error?.let { snackbarHostState.showSnackbar(it) }
+    }
+    LaunchedEffect(state.successMessage) {
+        state.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
+}
+
+/** Hoja inferior con el detalle de la nota seleccionada. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreditNoteDetailSheetOverlay(
+    state: CreditNotesState,
+    onProcessFiscal: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val selectedCreditNote = state.selectedCreditNote
+    if (state.showCreditNoteDetail && selectedCreditNote != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+        ) {
+            CreditNoteDetailSheet(
+                detail = selectedCreditNote,
+                isSubmitting = state.isSubmitting,
+                onProcessFiscal = onProcessFiscal,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreditNotesTopBar(
+    state: CreditNotesState,
+    onBack: () -> Unit,
+    onBackFromFlow: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(screenTitle(state.mode), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
+        navigationIcon = {
+            IconButton(onClick = {
+                if (state.mode == CreditNotesMode.LIST) onBack() else onBackFromFlow()
+            }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.primary)
+            }
+        },
+        actions = {
+            if (state.mode == CreditNotesMode.LIST) {
+                IconButton(onClick = onRetry) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Actualizar", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -654,133 +696,6 @@ internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
                 leadingIconContentColor = if (isConfirmed) ConfirmedContent else PendingContent,
             ),
     )
-}
-
-@Composable
-private fun CreditNoteDetailSheet(
-    detail: CreditNoteDetailDto,
-    isSubmitting: Boolean,
-    onProcessFiscal: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-                .padding(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ReceiptLong,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = detail.codigo,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FiscalStatusChip(status = detail.fiscalStatus)
-                }
-            }
-        }
-
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (detail.clienteNombre.isNotBlank()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = detail.clienteNombre,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    if (detail.clienteIdentificacion.isNotBlank()) {
-                        Text(
-                            text = detail.clienteIdentificacion,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 24.dp),
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Factura origen", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Text(detail.facturaCodigo, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Monto", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountText(
-                        text = "Bs ${formatAmount(detail.total)}",
-                        baseStyle =
-                            MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                            ),
-                        color = MaterialTheme.colorScheme.primary,
-                        options =
-                            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                                minFontSizeSp = 12f,
-                            ),
-                    )
-                }
-            }
-        }
-
-        if (detail.fiscalStatus == CreditNoteFiscalStatusDto.PENDIENTE && detail.fiscalDocument != null) {
-            Button(
-                onClick = onProcessFiscal,
-                enabled = !isSubmitting,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors =
-                    androidx.compose.material3.ButtonDefaults
-                        .buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            ) {
-                if (isSubmitting) {
-                    CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
-                } else {
-                    Icon(Icons.Default.Print, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Procesar nota de crÃ©dito fiscal", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
 }
 
 @Composable

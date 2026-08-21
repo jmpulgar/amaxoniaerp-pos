@@ -59,60 +59,73 @@ fun SellerSelectorBottomSheet(
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(sellers, key = { it.id }) { seller ->
-                        val selected = selectedSellerId == seller.id
-                        Surface(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onSelect(seller)
-                                        onDismiss()
-                                    },
-                            shape = RoundedCornerShape(10.dp),
-                            color =
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primary.copy(
-                                        alpha = 0.14f,
-                                    )
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                            tonalElevation = if (selected) 1.dp else 0.dp,
-                            shadowElevation = 1.dp,
-                        ) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    text = seller.nombre,
-                                    fontSize = 15.sp,
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .padding(start = 12.dp),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                )
-                                if (selected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Seleccionado",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        }
+                        SellerOptionItem(
+                            seller = seller,
+                            selected = selectedSellerId == seller.id,
+                            onClick = {
+                                onSelect(seller)
+                                onDismiss()
+                            },
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Fila de un vendedor con indicador de selección. */
+@Composable
+private fun SellerOptionItem(
+    seller: Seller,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color =
+            if (selected) {
+                MaterialTheme.colorScheme.primary.copy(
+                    alpha = 0.14f,
+                )
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        tonalElevation = if (selected) 1.dp else 0.dp,
+        shadowElevation = 1.dp,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = seller.nombre,
+                fontSize = 15.sp,
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Seleccionado",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

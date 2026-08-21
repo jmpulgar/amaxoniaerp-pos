@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -268,22 +269,31 @@ private fun CajaCard(
             Spacer(modifier = Modifier.width(8.dp))
 
             // Status badge
-            Box(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .background(statusColor.copy(alpha = 0.12f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) {
-                Text(
-                    // `estatus` es la configuración de la caja, no si tiene secuencia
-                    // abierta; usamos "Disponible" para no sugerir que ya está abierta.
-                    text = if (isActive) "Disponible" else "Inactiva",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = statusColor,
-                )
-            }
+            CajaStatusBadge(statusColor = statusColor, isActive = isActive)
         }
+    }
+}
+
+/** Badge Disponible/Inactiva de la caja. */
+@Composable
+private fun CajaStatusBadge(
+    statusColor: Color,
+    isActive: Boolean,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(statusColor.copy(alpha = 0.12f))
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            // `estatus` es la configuración de la caja, no si tiene secuencia
+            // abierta; usamos "Disponible" para no sugerir que ya está abierta.
+            text = if (isActive) "Disponible" else "Inactiva",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = statusColor,
+        )
     }
 }

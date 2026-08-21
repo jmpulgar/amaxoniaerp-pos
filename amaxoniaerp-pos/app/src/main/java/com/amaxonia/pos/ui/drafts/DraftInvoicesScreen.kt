@@ -180,15 +180,6 @@ private fun DraftInvoiceCard(
     onLoad: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
-    val date = dateFormat.format(Date(draft.createdAt))
-    val clientName =
-        if (draft.clientFirstName.isNullOrBlank()) {
-            "Sin cliente"
-        } else {
-            "${draft.clientFirstName} ${draft.clientLastName.orEmpty()}".trim()
-        }
-
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -199,80 +190,103 @@ private fun DraftInvoiceCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = clientName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${draft.itemCount} productos · $date",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!draft.sellerName.isNullOrBlank()) {
-                        Text(
-                            text = "Vendedor: ${draft.sellerName}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                AdaptiveAmountText(
-                    text = "$ ${String.format(Locale.getDefault(), "%.2f", draft.total)}",
-                    modifier = Modifier.weight(DRAFT_AMOUNT_WEIGHT),
-                    baseStyle =
-                        MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        ),
-                    color = MaterialTheme.colorScheme.primary,
-                    options = AdaptiveAmountOptions(minFontSizeSp = 12f),
+            DraftInvoiceSummary(draft = draft)
+            DraftInvoiceActions(onLoad = onLoad, onDelete = onDelete)
+        }
+    }
+}
+
+/** Resumen del borrador: cliente, cantidad, fecha, vendedor y monto. */
+@Composable
+private fun DraftInvoiceSummary(draft: DraftInvoice) {
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    val date = dateFormat.format(Date(draft.createdAt))
+    val clientName =
+        if (draft.clientFirstName.isNullOrBlank()) {
+            "Sin cliente"
+        } else {
+            "${draft.clientFirstName} ${draft.clientLastName.orEmpty()}".trim()
+        }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = clientName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${draft.itemCount} productos · $date",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!draft.sellerName.isNullOrBlank()) {
+                Text(
+                    text = "Vendedor: ${draft.sellerName}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        AdaptiveAmountText(
+            text = "$ ${String.format(Locale.getDefault(), "%.2f", draft.total)}",
+            modifier = Modifier.weight(DRAFT_AMOUNT_WEIGHT),
+            baseStyle =
+                MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                ),
+            color = MaterialTheme.colorScheme.primary,
+            options = AdaptiveAmountOptions(minFontSizeSp = 12f),
+        )
+    }
+}
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Button(
-                    onClick = onLoad,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text(
-                        text = "Cargar al carrito",
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Eliminar borrador",
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+/** Acciones del borrador: cargar al carrito y eliminar. */
+@Composable
+private fun DraftInvoiceActions(
+    onLoad: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = onLoad,
+            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        ) {
+            Text(
+                text = "Cargar al carrito",
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+            )
+        }
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Eliminar borrador",
+                tint = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

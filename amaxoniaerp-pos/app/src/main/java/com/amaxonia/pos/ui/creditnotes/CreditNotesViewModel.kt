@@ -2,10 +2,8 @@ package com.amaxonia.pos.ui.creditnotes
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.amaxonia.pos.domain.model.creditnote.CreateCreditNoteRequestDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
-import com.amaxonia.pos.domain.model.creditnote.CreditNoteSettlementTypeDto
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
@@ -27,6 +25,9 @@ class CreditNotesViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(CreditNotesState())
     val state: StateFlow<CreditNotesState> = _state.asStateFlow()
+
+    /** Edición de los campos del formulario de nota de crédito. */
+    val formController = CreditNoteFormController(_state)
 
     init {
         refreshAll()
@@ -129,38 +130,6 @@ class CreditNotesViewModel(
         _state.update { it.copy(showCreditNoteDetail = false, selectedCreditNote = null) }
     }
 
-    fun onFechaChange(value: String) {
-        _state.update { it.copy(form = it.form.copy(fecha = value)) }
-    }
-
-    fun onPeriodoChange(value: String) {
-        _state.update { it.copy(form = it.form.copy(periodo = value)) }
-    }
-
-    fun onObservacionChange(value: String) {
-        _state.update { it.copy(form = it.form.copy(observacion = value)) }
-    }
-
-    fun onDevolverStockChange(enabled: Boolean) {
-        _state.update { it.copy(form = it.form.copy(devolverStock = enabled)) }
-    }
-
-    fun onGenerarAbonoChange(generar: Boolean) {
-        _state.update {
-            it.copy(
-                form =
-                    it.form.copy(
-                        generarAbono = generar,
-                        idFormaPagoReintegro = if (generar) null else it.form.idFormaPagoReintegro,
-                    ),
-            )
-        }
-    }
-
-    fun onRefundMethodChange(idFormaPago: Int?) {
-        _state.update { it.copy(form = it.form.copy(idFormaPagoReintegro = idFormaPago)) }
-    }
-
     fun submitCreditNote() {
         val currentState = _state.value
         val invoice =
@@ -187,27 +156,11 @@ class CreditNotesViewModel(
                 return@launch
             }
 
-            val settlementType =
-                if (currentState.form.generarAbono) {
-                    CreditNoteSettlementTypeDto.ABONO
-                } else if (currentState.form.idFormaPagoReintegro != null) {
-                    CreditNoteSettlementTypeDto.REINTEGRO
-                } else {
-                    CreditNoteSettlementTypeDto.NINGUNO
-                }
-
             val payload =
-                CreateCreditNoteRequestDto(
-                    idFactura = invoice.id,
-                    fecha = currentState.form.fecha,
-                    periodo = currentState.form.periodo,
-                    observacion = currentState.form.observacion,
-                    detalle = emptyList(), // Devolución total
-                    anular = true, // Siempre se anula
-                    devolverStock = currentState.form.devolverStock,
+                buildCreateCreditNoteRequest(
+                    invoice = invoice,
+                    form = currentState.form,
                     idCajaSecuencia = idCajaSecuencia,
-                    settlementType = settlementType,
-                    idFormaPagoReintegro = currentState.form.idFormaPagoReintegro,
                 )
 
             creditNoteRepository.createCreditNote(payload).fold(
