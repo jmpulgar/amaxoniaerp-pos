@@ -2,6 +2,9 @@ package com.amaxonia.pos.data.printer
 
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.readSelectedPrinterType
+import com.amaxonia.pos.data.local.readTheFactorySettings
 import com.amaxonia.pos.domain.model.TransactionPaymentMethod
 import com.amaxonia.pos.domain.model.payment.EXTERNAL_GATEWAY_MARKER
 import com.amaxonia.pos.domain.model.payment.GatewayApproval

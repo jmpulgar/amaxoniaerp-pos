@@ -2,6 +2,10 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.clearActiveCaja
+import com.amaxonia.pos.data.local.readActiveCajaForToday
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.saveActiveCaja
 import com.amaxonia.pos.data.remote.api.CajaApi
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja

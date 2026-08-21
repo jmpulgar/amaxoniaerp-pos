@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.api.CreditNoteApi
 import com.amaxonia.pos.domain.model.creditnote.ConfirmCreditNoteFiscalRequestDto
 import com.amaxonia.pos.domain.model.creditnote.ConfirmCreditNoteFiscalResponseDto

@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.printer
 
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.Transaction

@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readAuthSnapshot
 import com.amaxonia.pos.domain.model.Company
 import com.amaxonia.pos.domain.repository.CompanyRepository
 

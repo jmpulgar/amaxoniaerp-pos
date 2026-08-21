@@ -1,8 +1,10 @@
-﻿package com.amaxonia.pos.data.printer
+package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readSelectedPrinterType
+import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
 import com.amaxonia.pos.data.printer.sunmi.SunmiV2Printer
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TicketPrinter

@@ -1,9 +1,10 @@
-﻿package com.amaxonia.pos.data.printer
+package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.R
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readTheFactorySettings
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalDocumentDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNotePrintResult

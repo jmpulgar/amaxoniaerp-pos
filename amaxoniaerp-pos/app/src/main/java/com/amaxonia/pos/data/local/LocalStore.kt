@@ -7,14 +7,11 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.security.AndroidKeystoreSecureKeyValueStore
 import com.amaxonia.pos.data.local.security.SecureKeyValueStore
 import com.amaxonia.pos.data.local.security.VerifiedSecureValueWriter
-import com.amaxonia.pos.data.remote.dto.ClientDto
 import com.amaxonia.pos.data.remote.dto.CompanyDetailsDto
 import com.amaxonia.pos.data.remote.dto.LoginResponse
-import com.amaxonia.pos.data.remote.dto.ProductDto
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.caja.Caja
@@ -23,174 +20,53 @@ import com.amaxonia.pos.domain.model.mesas.AreasResult
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.domain.model.mesas.MesasResult
 import com.amaxonia.pos.domain.model.payment.FormaPago
-import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
-import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.CompanyTokenReader
 import com.amaxonia.pos.domain.repository.CountrySelectionStore
 import com.amaxonia.pos.domain.repository.PaymentSessionReader
 import com.amaxonia.pos.domain.repository.SalonConfigCache
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
-import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("amaxonia_pos")
 
+/**
+ * Almacenamiento local del POS. Los miembros no-override viven como extensiones en
+ * archivos del mismo package (LocalStoreAuthSession, LocalStoreSalonCajaCache,
+ * LocalStoreCatalogCache, LocalStorePosSettings, LocalStorePaymentSuccess).
+ */
 class LocalStore(
     context: Context,
-    private val secureStore: SecureKeyValueStore = AndroidKeystoreSecureKeyValueStore(context),
+    internal val secureStore: SecureKeyValueStore = AndroidKeystoreSecureKeyValueStore(context),
 ) : CountrySelectionStore,
     PaymentSessionReader,
     SalonConfigCache,
     CompanyTokenReader {
-    private val dataStore = context.applicationContext.dataStore
-    private val secureWriter = VerifiedSecureValueWriter(secureStore)
-    private val authSnapshotKey = stringPreferencesKey("auth_snapshot")
-    private val companySessionKey = stringPreferencesKey("company_session")
-    private val productsKey = stringPreferencesKey("products_cache")
-    private val clientsKey = stringPreferencesKey("clients_cache")
-    private val selectedCountryKey = stringPreferencesKey("selected_country_code")
-    private val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
-    private val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
-    private val theFactoryPortKey = stringPreferencesKey("the_factory_port")
-    private val theFactoryModeKey = stringPreferencesKey("the_factory_mode")
-    private val theFactoryGatewayKey = stringPreferencesKey("the_factory_gateway_key")
-    private val theFactoryGatewayLabelKey = stringPreferencesKey("the_factory_gateway_label")
-    private val theFactoryPrinterSerialKey = stringPreferencesKey("the_factory_printer_serial")
-    private val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
-    private val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
-    private val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
-    private val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
-    private val areasKey = stringPreferencesKey("areas_snapshot")
-    private val mesasKey = stringPreferencesKey("mesas_snapshot")
-    private val lastPaymentSuccessKey = stringPreferencesKey("last_payment_success")
-    private val lastPaymentSuccessTransactionIdKey = stringPreferencesKey("last_payment_success_transaction_id")
-
-    suspend fun saveAuthSnapshot(snapshot: AuthSnapshot) {
-        val json = AppJson.encodeToString(snapshot)
-        writeSecureAndRemoveLegacy(SECURE_AUTH_SNAPSHOT, authSnapshotKey, json)
-    }
-
-    suspend fun readAuthSnapshot(): AuthSnapshot? {
-        val json = readSecureOrMigrate(SECURE_AUTH_SNAPSHOT, authSnapshotKey) ?: return null
-        return runCatching { AppJson.decodeFromString(AuthSnapshot.serializer(), json) }
-            .onFailure { SafeLog.e(TAG, "Stored authentication snapshot is invalid", it) }
-            .getOrNull()
-    }
-
-    suspend fun saveCompanySession(session: CompanySessionSnapshot) {
-        val json = AppJson.encodeToString(session)
-        writeSecureAndRemoveLegacy(SECURE_COMPANY_SESSION, companySessionKey, json)
-    }
-
-    suspend fun readCompanySession(): CompanySessionSnapshot? {
-        val json = readSecureOrMigrate(SECURE_COMPANY_SESSION, companySessionKey) ?: return null
-        return runCatching { AppJson.decodeFromString(CompanySessionSnapshot.serializer(), json) }
-            .onFailure { SafeLog.e(TAG, "Stored company session is invalid", it) }
-            .getOrNull()
-    }
-
-    suspend fun clearAuthSession() {
-        removeSecureValue(SECURE_AUTH_SNAPSHOT)
-        removeSecureValue(SECURE_COMPANY_SESSION)
-        dataStore.edit { prefs ->
-            prefs.remove(authSnapshotKey)
-            prefs.remove(companySessionKey)
-            prefs.remove(activeCajaKey)
-            // La configuración de salón es por sucursal: al cerrar sesión debe desaparecer para
-            // que un login distinto nunca vea áreas ni mesas de la sesión anterior.
-            prefs.remove(areasKey)
-            prefs.remove(mesasKey)
-        }
-    }
-
-    suspend fun saveActiveCaja(caja: Caja) {
-        val session = readCompanySession() ?: return
-        val snapshot =
-            ActiveCajaSnapshot(
-                companyDb = session.company.adminDb,
-                date = LocalDate.now().toString(),
-                caja = caja,
-            )
-        val json = AppJson.encodeToString(snapshot)
-        dataStore.edit { prefs ->
-            prefs[activeCajaKey] = json
-        }
-    }
-
-    suspend fun readActiveCajaForToday(): Caja? {
-        val json = dataStore.data.first()[activeCajaKey] ?: return null
-        val snapshot =
-            runCatching {
-                AppJson.decodeFromString(ActiveCajaSnapshot.serializer(), json)
-            }.getOrNull()
-        val usable = snapshot != null && isActiveCajaSnapshotUsable(snapshot)
-        return if (usable) {
-            snapshot?.caja
-        } else {
-            clearActiveCaja()
-            null
-        }
-    }
-
-    private suspend fun isActiveCajaSnapshotUsable(snapshot: ActiveCajaSnapshot): Boolean {
-        val session = readCompanySession()
-        val isSameCompany = session?.company?.adminDb == snapshot.companyDb
-        val isToday = snapshot.date == LocalDate.now().toString()
-        return isSameCompany && isToday
-    }
-
-    suspend fun clearActiveCaja() {
-        dataStore.edit { prefs ->
-            prefs.remove(activeCajaKey)
-        }
-    }
-
-    suspend fun saveFormasPago(
-        cajaId: String?,
-        formasPago: List<FormaPago>,
-    ) {
-        val session = readCompanySession() ?: return
-        val snapshot =
-            FormasPagoSnapshot(
-                companyDb = session.company.adminDb,
-                cajaId = cajaId,
-                formasPago = formasPago,
-            )
-        val json = AppJson.encodeToString(snapshot)
-        dataStore.edit { prefs ->
-            prefs[formasPagoKey] = json
-        }
-    }
-
-    suspend fun readFormasPago(cajaId: String?): List<FormaPago> {
-        val json = dataStore.data.first()[formasPagoKey] ?: return emptyList()
-        val snapshot =
-            runCatching {
-                AppJson.decodeFromString(FormasPagoSnapshot.serializer(), json)
-            }.getOrNull()
-        val usable = snapshot != null && isFormasPagoSnapshotUsable(snapshot, cajaId)
-        return if (usable) snapshot?.formasPago ?: emptyList() else emptyList()
-    }
-
-    private suspend fun isFormasPagoSnapshotUsable(
-        snapshot: FormasPagoSnapshot,
-        cajaId: String?,
-    ): Boolean {
-        val session = readCompanySession()
-        val isSameCompany = session?.company?.adminDb == snapshot.companyDb
-        val isSameCaja = snapshot.cajaId == cajaId
-        return isSameCompany && isSameCaja
-    }
+    internal val dataStore = context.applicationContext.dataStore
+    internal val secureWriter = VerifiedSecureValueWriter(secureStore)
+    internal val authSnapshotKey = stringPreferencesKey("auth_snapshot")
+    internal val companySessionKey = stringPreferencesKey("company_session")
+    internal val productsKey = stringPreferencesKey("products_cache")
+    internal val clientsKey = stringPreferencesKey("clients_cache")
+    internal val selectedCountryKey = stringPreferencesKey("selected_country_code")
+    internal val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
+    internal val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
+    internal val theFactoryPortKey = stringPreferencesKey("the_factory_port")
+    internal val theFactoryModeKey = stringPreferencesKey("the_factory_mode")
+    internal val theFactoryGatewayKey = stringPreferencesKey("the_factory_gateway_key")
+    internal val theFactoryGatewayLabelKey = stringPreferencesKey("the_factory_gateway_label")
+    internal val theFactoryPrinterSerialKey = stringPreferencesKey("the_factory_printer_serial")
+    internal val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
+    internal val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
+    internal val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
+    internal val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
+    internal val areasKey = stringPreferencesKey("areas_snapshot")
+    internal val mesasKey = stringPreferencesKey("mesas_snapshot")
+    internal val lastPaymentSuccessKey = stringPreferencesKey("last_payment_success")
+    internal val lastPaymentSuccessTransactionIdKey = stringPreferencesKey("last_payment_success_transaction_id")
 
     // ============ ÁREAS Y MESAS (configuración de salón) ============
 
@@ -299,16 +175,6 @@ class LocalStore(
         )
     }
 
-    private fun decodeAreasSnapshot(json: String): AreasSnapshot? =
-        runCatching { AppJson.decodeFromString(AreasSnapshot.serializer(), json) }
-            .onFailure { SafeLog.e(TAG, "Stored areas snapshot is invalid", it) }
-            .getOrNull()
-
-    private fun decodeMesasSnapshot(json: String): MesasSnapshot? =
-        runCatching { AppJson.decodeFromString(MesasSnapshot.serializer(), json) }
-            .onFailure { SafeLog.e(TAG, "Stored mesas snapshot is invalid", it) }
-            .getOrNull()
-
     override suspend fun currentCountryCode(): String = readSelectedCountry()?.code ?: "VE"
 
     override suspend fun currentUsername(): String = readAuthSnapshot()?.user?.username ?: "POS"
@@ -324,194 +190,6 @@ class LocalStore(
                 nominaDb = session.company.payrollDb,
             )
         }
-
-    /**
-     * Cheap string-only accessor used by sync workers; avoids materialising a
-     * full [SaleTenant] when all the worker needs is to know whether a row is
-     * allowed under the current session.
-     */
-    suspend fun currentTenantId(): String? = readCompanySession()?.let { SaleTenant.idFor(it.company.id) }
-
-    suspend fun isInitialSyncCompleted(companyId: Int): Boolean {
-        val key = booleanPreferencesKey("initial_sync_completed_$companyId")
-        return dataStore.data.first()[key] ?: false
-    }
-
-    suspend fun setInitialSyncCompleted(
-        companyId: Int,
-        completed: Boolean,
-    ) {
-        val key = booleanPreferencesKey("initial_sync_completed_$companyId")
-        dataStore.edit { prefs ->
-            prefs[key] = completed
-        }
-    }
-
-    suspend fun saveProducts(products: List<ProductDto>) {
-        val json = AppJson.encodeToString(products)
-        dataStore.edit { prefs ->
-            prefs[productsKey] = json
-        }
-    }
-
-    suspend fun readProducts(): List<ProductDto> {
-        val json = dataStore.data.first()[productsKey] ?: return emptyList()
-        return runCatching { AppJson.decodeFromString(ListSerializer(ProductDto.serializer()), json) }
-            .getOrDefault(emptyList())
-    }
-
-    suspend fun saveClients(clients: List<ClientDto>) {
-        val json = AppJson.encodeToString(clients)
-        dataStore.edit { prefs ->
-            prefs[clientsKey] = json
-        }
-    }
-
-    suspend fun readClients(): List<ClientDto> {
-        val json = dataStore.data.first()[clientsKey] ?: return emptyList()
-        return runCatching { AppJson.decodeFromString(ListSerializer(ClientDto.serializer()), json) }
-            .getOrDefault(emptyList())
-    }
-
-    suspend fun saveSelectedPrinterType(printerType: PrinterType) {
-        PrinterTypePolicy.validate(readSelectedCountry(), printerType)
-        dataStore.edit { prefs ->
-            prefs[selectedPrinterTypeKey] = printerType.name
-        }
-    }
-
-    suspend fun readSelectedPrinterType(): PrinterType = selectedPrinterTypeFlow().first()
-
-    fun selectedPrinterTypeFlow(): Flow<PrinterType> =
-        dataStore.data.map { prefs ->
-            val country = prefs[selectedCountryKey]?.let { ServerCountries.fromCode(it) }
-            val storedPrinter =
-                prefs[selectedPrinterTypeKey]
-                    ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
-                    ?: PrinterType.NONE
-            PrinterTypePolicy.coerce(country, storedPrinter)
-        }
-
-    suspend fun saveTheFactorySettings(settings: TheFactorySettings) {
-        val gatewayKey = settings.gatewayKey.trim()
-        if (gatewayKey.isEmpty()) {
-            removeSecureValue(SECURE_GATEWAY_KEY)
-        } else {
-            secureWriter.write(SECURE_GATEWAY_KEY, gatewayKey)
-        }
-        dataStore.edit { prefs ->
-            prefs[theFactoryIpKey] = settings.ipAddress.trim()
-            prefs[theFactoryPortKey] = settings.port.trim()
-            prefs[theFactoryModeKey] = settings.openMode.trim()
-            prefs.remove(theFactoryGatewayKey)
-            prefs[theFactoryGatewayLabelKey] = settings.gatewayLabel.trim()
-            prefs[theFactoryPrinterSerialKey] = settings.printerSerial.trim()
-        }
-    }
-
-    suspend fun readTheFactorySettings(): TheFactorySettings = theFactorySettingsFlow().first()
-
-    fun theFactorySettingsFlow(): Flow<TheFactorySettings> =
-        flow {
-            readSecureOrMigrate(SECURE_GATEWAY_KEY, theFactoryGatewayKey)
-            emitAll(
-                dataStore.data.map { prefs ->
-                    TheFactorySettings(
-                        ipAddress = prefs[theFactoryIpKey].orEmpty(),
-                        port = prefs[theFactoryPortKey].orEmpty(),
-                        openMode = prefs[theFactoryModeKey].orEmpty(),
-                        gatewayKey = readSecureValue(SECURE_GATEWAY_KEY).orEmpty(),
-                        gatewayLabel = prefs[theFactoryGatewayLabelKey].orEmpty(),
-                        printerSerial = prefs[theFactoryPrinterSerialKey].orEmpty(),
-                    )
-                },
-            )
-        }
-
-    private suspend fun writeSecureAndRemoveLegacy(
-        secureKey: String,
-        legacyKey: Preferences.Key<String>,
-        value: String,
-    ) {
-        secureWriter.write(secureKey, value)
-        dataStore.edit { prefs -> prefs.remove(legacyKey) }
-    }
-
-    private suspend fun readSecureOrMigrate(
-        secureKey: String,
-        legacyKey: Preferences.Key<String>,
-    ): String? {
-        val secureValue = readSecureValue(secureKey)
-        if (secureValue == null) {
-            return migrateLegacyToSecureStore(secureKey, legacyKey)
-        }
-        if (dataStore.data.first()[legacyKey] != null) {
-            dataStore.edit { prefs -> prefs.remove(legacyKey) }
-        }
-        return secureValue
-    }
-
-    private suspend fun migrateLegacyToSecureStore(
-        secureKey: String,
-        legacyKey: Preferences.Key<String>,
-    ): String? {
-        val legacyValue = dataStore.data.first()[legacyKey] ?: return null
-        return runCatching {
-            secureWriter.write(secureKey, legacyValue)
-            dataStore.edit { prefs -> prefs.remove(legacyKey) }
-            legacyValue
-        }.fold(
-            onSuccess = { it },
-            onFailure = { error ->
-                // Same boundary as the original catches: cancellation and fatal errors propagate.
-                when (error) {
-                    is CancellationException -> throw error
-                    is Exception -> {
-                        SafeLog.e(TAG, "Secure migration failed; legacy value was preserved", error)
-                        legacyValue
-                    }
-                    else -> throw error
-                }
-            },
-        )
-    }
-
-    private fun readSecureValue(key: String): String? =
-        runCatching { secureStore.readString(key) }
-            .onFailure { SafeLog.e(TAG, "Secure value could not be read", it) }
-            .getOrNull()
-
-    private fun removeSecureValue(key: String) {
-        runCatching { secureStore.remove(key) }
-            .onFailure { SafeLog.e(TAG, "Secure value could not be removed", it) }
-            .getOrThrow()
-    }
-
-    suspend fun saveAllowEditPrices(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[allowEditPricesKey] = enabled
-        }
-    }
-
-    suspend fun saveAllowDiscounts(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[allowDiscountsKey] = enabled
-        }
-    }
-
-    fun allowEditPricesFlow(): Flow<Boolean> =
-        dataStore.data.map { prefs ->
-            prefs[allowEditPricesKey] ?: false
-        }
-
-    fun allowDiscountsFlow(): Flow<Boolean> =
-        dataStore.data.map { prefs ->
-            prefs[allowDiscountsKey] ?: false
-        }
-
-    suspend fun readAllowEditPrices(): Boolean = allowEditPricesFlow().first()
-
-    suspend fun readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
 
     // ============ COUNTRY SELECTION ============
 
@@ -540,51 +218,7 @@ class LocalStore(
         return ServerCountries.fromCode(code)
     }
 
-    /**
-     * Flow observable del país seleccionado
-     */
-    fun selectedCountryFlow(): Flow<ServerCountry?> =
-        dataStore.data.map { prefs ->
-            prefs[selectedCountryKey]?.let { ServerCountries.fromCode(it) }
-        }
-
-    /**
-     * Limpia la selección de país (logout o reset)
-     */
-    suspend fun clearSelectedCountry() {
-        dataStore.edit { prefs ->
-            prefs.remove(selectedCountryKey)
-        }
-    }
-
-    // ============ PAYMENT SUCCESS ============
-
-    suspend fun saveLastPaymentSuccess(payload: PaymentSuccessPayload) {
-        val json = AppJson.encodeToString(PaymentSuccessPayload.serializer(), payload)
-        dataStore.edit { prefs ->
-            prefs[lastPaymentSuccessKey] = json
-            prefs[lastPaymentSuccessTransactionIdKey] = payload.transactionId
-        }
-    }
-
-    /**
-     * Reads the cached payment success payload.
-     * We cache only the most recent transaction to keep preferences storage small.
-     */
-    suspend fun readLastPaymentSuccess(transactionId: String): PaymentSuccessPayload? {
-        val prefs = dataStore.data.first()
-        val json = prefs[lastPaymentSuccessKey]
-        val cachedTransactionId = prefs[lastPaymentSuccessTransactionIdKey]
-        return if (json == null || cachedTransactionId != transactionId) {
-            null
-        } else {
-            runCatching {
-                AppJson.decodeFromString(PaymentSuccessPayload.serializer(), json)
-            }.getOrNull()
-        }
-    }
-
-    private companion object {
+    internal companion object {
         const val TAG = "LocalStore"
         const val SECURE_AUTH_SNAPSHOT = "auth_snapshot_v1"
         const val SECURE_COMPANY_SESSION = "company_session_v1"
@@ -679,7 +313,7 @@ data class MesasSnapshot(
     /**
      * Compatibilidad con snapshots anteriores a la fase del plano: si el JSON viejo trae
      * `mesasByArea`, [NullableUrlSerializer]/kotlinx lo ignoran (AppJson.ignoreUnknownKeys =
-     * true) y aquí reconstruemos el campo con defaults seguros para no perder las mesas.
+     * true) y aquí reconstruimos el campo con defaults seguros para no perder las mesas.
      *
      * En la práctica un usuario con snapshot viejo verá, al refrescar, el plano rellenarse
      * con lienzo e imagen nuevos; si entra offline antes de refrescar, aún podrá seleccionar.

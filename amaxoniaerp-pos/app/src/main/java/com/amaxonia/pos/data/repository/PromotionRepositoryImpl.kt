@@ -6,6 +6,7 @@ import com.amaxonia.pos.data.local.db.PromocionCompleta
 import com.amaxonia.pos.data.local.db.PromocionDao
 import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.getPromotions

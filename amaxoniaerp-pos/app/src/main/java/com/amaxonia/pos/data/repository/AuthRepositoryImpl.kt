@@ -1,7 +1,12 @@
-﻿package com.amaxonia.pos.data.repository
+package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.data.local.CompanySessionSnapshot
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.clearAuthSession
+import com.amaxonia.pos.data.local.readAuthSnapshot
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.saveAuthSnapshot
+import com.amaxonia.pos.data.local.saveCompanySession
 import com.amaxonia.pos.data.local.toSnapshot
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.dto.SelectCompanyRequest

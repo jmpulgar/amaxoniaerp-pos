@@ -1,6 +1,18 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.allowDiscountsFlow
+import com.amaxonia.pos.data.local.allowEditPricesFlow
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.readLastPaymentSuccess
+import com.amaxonia.pos.data.local.readSelectedPrinterType
+import com.amaxonia.pos.data.local.saveAllowDiscounts
+import com.amaxonia.pos.data.local.saveAllowEditPrices
+import com.amaxonia.pos.data.local.saveSelectedPrinterType
+import com.amaxonia.pos.data.local.saveTheFactorySettings
+import com.amaxonia.pos.data.local.selectedCountryFlow
+import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
+import com.amaxonia.pos.data.local.theFactorySettingsFlow
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrinterType

@@ -1,5 +1,6 @@
 package com.amaxonia.pos.composition
 
+import com.amaxonia.pos.data.local.clearActiveCaja
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.dashboard.DashboardCajaCoordinator

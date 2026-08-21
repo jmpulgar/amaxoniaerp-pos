@@ -1,10 +1,11 @@
-﻿package com.amaxonia.pos.data.printer
+package com.amaxonia.pos.data.printer
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readTheFactorySettings
 import com.amaxonia.pos.domain.model.payment.GatewayLaunchPayload
 import com.amaxonia.pos.domain.model.printer.GatewayOption
 import com.thefactoryhka.hkacryptolib.MainFactory

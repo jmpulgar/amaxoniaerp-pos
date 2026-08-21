@@ -15,6 +15,9 @@ import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.local.db.toLevel1Entity
 import com.amaxonia.pos.data.local.db.toLevel2Entity
 import com.amaxonia.pos.data.local.db.toLevel3Entity
+import com.amaxonia.pos.data.local.isInitialSyncCompleted
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.setInitialSyncCompleted
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
 import com.amaxonia.pos.data.remote.getAddressLevels

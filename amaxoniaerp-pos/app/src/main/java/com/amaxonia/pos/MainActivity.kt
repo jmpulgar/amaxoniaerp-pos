@@ -16,6 +16,8 @@ import com.amaxonia.pos.composition.DependencyContainer
 import com.amaxonia.pos.core.device.DeviceClass
 import com.amaxonia.pos.core.device.deviceClassFor
 import com.amaxonia.pos.core.logging.SafeLog
+import com.amaxonia.pos.data.local.readAuthSnapshot
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.printer.RapidPayBridge
 import com.amaxonia.pos.ui.common.LocalDeviceClass
 import com.amaxonia.pos.ui.common.rememberDeviceClass

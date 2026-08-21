@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.currentTenantId
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.TransactionLogDao
 import com.amaxonia.pos.data.local.db.TransactionLogEntity

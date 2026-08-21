@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.currentTenantId
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager

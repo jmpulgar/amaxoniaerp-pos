@@ -1,5 +1,7 @@
 package com.amaxonia.pos.composition
 
+import com.amaxonia.pos.data.local.readSelectedPrinterType
+import com.amaxonia.pos.data.local.saveLastPaymentSuccess
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload

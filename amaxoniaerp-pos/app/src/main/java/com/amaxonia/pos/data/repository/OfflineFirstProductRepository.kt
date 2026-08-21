@@ -4,6 +4,7 @@ import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.ProductDao
 import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.createProduct
