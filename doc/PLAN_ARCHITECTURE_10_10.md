@@ -1027,6 +1027,40 @@ Sales/stock/CxC/caja/mesas/credit notes.
 #### TASK-088 — PAC client tests
 Accepted/rejected/timeout/invalid body/5xx/uncertain usando mock HTTP.
 
+> **ESTADO: COMPLETADA (2026-08-21) — TASK-080..088. Gates completos Android
+> (detekt/ktlint/test/3 flavors/kover ratchet) y backend (test/detekt/ktlint/
+> jacoco ratchet ≥ 0.46526415) verdes.**
+>
+> - **TASK-080..083 Android** ya cerrados en commits previos (domain, ViewModels,
+>   offline-first repositories + `NetworkMonitor` open para stubs, migraciones
+>   Room 10→17 y DAO semantics con `InMemoryTransactionLogDao` espejo del SQL).
+> - **TASK-084** `QueueFiscalConfirmationUseCaseTest`: persistencia del tuplo
+>   fiscal antes del replay, elegibilidad inmediata (`nextAttemptAt = now`),
+>   contador de reintentos acumulativo y escalera de backoff acotada a 1 h.
+>   El fake ahora refleja el write de `remoteInvoiceId` del SQL real.
+> - **TASK-085** `PanamaInvoiceProcessorTest` (fakes sin DB; repositorio abierto
+>   solo para stubs): mapeos por paso INVOICE_NOT_FOUND/CONFIG_ERROR/AUTH_ERROR/
+>   SEND_ERROR, best-effort post-DGI (fallo SQL no revierte Success), correo
+>   opcional. **HALLAZGO characterization**: los `throw` dentro de lambdas
+>   `Result.map{}` (NotApplicable por tipo_facturacion<3 y el rechazo del PAC)
+>   ESCAPAN del contrato Result como FeStepFailure crudo; en ventas lo captura
+>   el runCatching genérico (código/mensaje del PAC se pierden) y la ruta
+>   directa cae al 500. Corregirlo es decisión fiscal → fuera de alcance.
+> - **TASK-086** integración de rutas sobre `module()` real con H2 inyectado por
+>   reflexión en la caché de `DatabaseManager`: auth (validación login,
+>   malformed body → 500 estable), matriz completa del seam tenant vía
+>   GET /api/cajas (401 plugin / 403 identity / 400 claims / 400-403 header
+>   Company-DB) con contrato de serialización real del DTO Caja (mixto camel/
+>   snake `@SerialName`), StatusPages contract (todas las categorías → HTTP),
+>   validación sales/caja-close/mesas/notas-credito (nota: Company-DB pasa al
+>   cache key verbatim, case-sensitive).
+> - **TASK-087** hueco stock cubierto: `ItemsStockLotsRepositoryTest` (H2) —
+>   total solo suma almacenes de venta con deducción de precompromiso, FEFO
+>   excluyendo disponibilidad cero, bandera sin-configuración-lote.
+> - **TASK-088** `TheFactoryHkaRestClientTest` (MockEngine, cliente PA intacto):
+>   auth ok/rechazada/sin-token, emisión aceptada/rechazada-negocio/HTTP 500/
+>   ilegible+timeout (incierto sin respuesta fabricada), descarga PDF, correo.
+
 ---
 
 ## FASE 9 — CROSS-SYSTEM CONTRACT TESTING
