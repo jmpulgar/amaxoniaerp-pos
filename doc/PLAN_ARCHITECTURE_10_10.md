@@ -936,7 +936,7 @@ Eliminar service locator leakage sin over-engineering.
 
 ## FASE 7 — DETEKT BASELINE ZERO
 
-> **ESTADO: EN PROGRESO (2026-08-19) — TASK-070/073/074 hechos; quema 246→138 (-44%).**
+> **ESTADO: COMPLETADA (2026-08-21) — TASK-070..075. 246 → 0 findings; baseline eliminado.**
 >
 > - **TASK-070** clasificación registrada: MagicNumber 76 (mayormente dp/sp en
 >   Compose), ReturnCount 38 (repositorios), LongMethod 36 (screens raíz),
@@ -947,9 +947,20 @@ Eliminar service locator leakage sin over-engineering.
 >   `TheFactoryPrinterImpl` queda sólo transporte TCP (-22 findings).
 > - **TASK-073/075 slices resueltos**: OfflineFirstProductRepository (policy+
 >   cache extraídos, -13), WelcomeScreen (split composables, -9), HistoryScreen
->   MagicNumber (-2).
-> - Gates GREEN en cada slice (detekt/ktlint/tests). El baseline restante
->   (138) sigue el burn-down progresivo del §6-P0; sin suppress nuevos.
+>   MagicNumber (-2), clientes/productos/company/success screens, credit notes,
+>   `ApiService` split (`ItemCatalogApi`/`ClientDirectoryApi` extensiones),
+>   `CartRepository` session/lots (`CartRepositorySession.kt`,
+>   `CartRepositoryLots.kt`), `PaymentScreen` non-cash panels
+>   (`PaymentNonCash.kt`; `NonCashRow` permanece bajo el `@file:Suppress`
+>   preexistente del refactor cerrado), `LocalStore` split en 5 archivos de
+>   extensiones cohesivas (AuthSession/SalonCajaCache/CatalogCache/PosSettings/
+>   PaymentSuccess; la clase conserva sólo los 10 overrides de interfaces),
+>   `DependencyContainer.initialize` 132→métodos privados por grafo de
+>   dependencia (orden de construcción preservado verbatim).
+> - **Cierre**: `config/detekt/detekt-baseline.xml` ELIMINADO; detekt PASS sin
+>   baseline (reporte vacío); sin `@Suppress` nuevos; gates completos verde
+>   (detekt/ktlint/test + assembleAmaxoniaDebug/BanescoVenezuela/Listoerp +
+>   koverVerify ratchet ≥15%/≥4383 líneas); `findings.txt` regenerado vacío.
 
 ### TASK-070 — Clasificar baseline
 
