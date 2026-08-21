@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.repository.ClientBranchRepository
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
+import com.amaxonia.pos.domain.repository.getDisplayItems
 import com.amaxonia.pos.domain.repository.removeClient
 import com.amaxonia.pos.domain.repository.setClient
 import com.amaxonia.pos.domain.repository.setClientSucursal

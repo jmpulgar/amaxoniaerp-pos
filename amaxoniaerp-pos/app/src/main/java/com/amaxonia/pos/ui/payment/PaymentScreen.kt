@@ -5,8 +5,6 @@ package com.amaxonia.pos.ui.payment
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
-import android.graphics.BitmapFactory
-import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -14,7 +12,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,8 +32,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,13 +40,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AddCard
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PointOfSale
-import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,8 +76,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -105,7 +95,6 @@ import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
 import com.amaxonia.pos.ui.common.components.KeypadKey
-import com.amaxonia.pos.ui.common.components.PosEmptyState
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosVisualTone
@@ -113,10 +102,9 @@ import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.isLandscape
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
-import com.amaxonia.pos.ui.theme.paymentMethodColor
 import kotlinx.coroutines.delay
 
-private const val SECONDARY_CURRENCY_LABEL = "Bs."
+internal const val SECONDARY_CURRENCY_LABEL = "Bs."
 private val COMPACT_WIDTH_THRESHOLD = 600.dp
 private val COMFORTABLE_HEIGHT_THRESHOLD = 600.dp
 
@@ -1057,130 +1045,6 @@ internal fun PrimaryCtaButton(
 }
 
 @Composable
-private fun NonCashSummaryPanel(
-    state: PaymentState,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Text(
-            "Resumen del cobro",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PaymentSummaryLine(
-                    label = "Asignado",
-                    value = "$ ${state.nonCashAssignedText}",
-                    secondary =
-                        state.nonCashAssignedBsText
-                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
-                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
-                    emphasized = state.isPaymentEnough,
-                )
-                PaymentSummaryLine(
-                    label = "Saldo restante",
-                    value = "$ ${state.nonCashPendingText}",
-                    secondary =
-                        state.nonCashPendingBsText
-                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
-                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
-                    emphasized = !state.isPaymentEnough,
-                )
-            }
-        }
-        AnimatedVisibility(
-            visible = state.showInsufficientReminder && !state.isPaymentEnough,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
-        ) {
-            Text(
-                text =
-                    buildString {
-                        append("Faltan $ ${state.nonCashPendingText} para completar el pago")
-                        if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
-                            append(" ($SECONDARY_CURRENCY_LABEL ${state.nonCashPendingBsText})")
-                        }
-                    },
-                color = MaterialTheme.colorScheme.error,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun NonCashListPanel(
-    state: PaymentState,
-    onAction: (PaymentUiAction) -> Unit,
-    fillRemaining: Boolean,
-    modifier: Modifier = Modifier,
-    narrow: Boolean = false,
-) {
-    Column(modifier = modifier) {
-        if (state.formasPagoTarjetaOtro.isEmpty()) {
-            PosEmptyState(
-                icon = Icons.Default.CreditCard,
-                title = "Otros medios no disponibles",
-                message = "No hay tarjetas u otras formas de pago configuradas para esta caja.",
-                modifier = Modifier.fillMaxWidth(),
-            )
-            return
-        }
-
-        Text(
-            "Formas disponibles",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val listModifier = if (fillRemaining) Modifier.weight(1f) else Modifier
-        LazyColumn(
-            modifier = listModifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(state.formasPagoTarjetaOtro, key = { it.idFormaPago }) { forma ->
-                NonCashRow(
-                    forma = forma,
-                    value = state.nonCashAmountsInput[forma.idFormaPago].orEmpty(),
-                    pendingAmount = state.nonCashPendingText,
-                    canUseCredit = state.canUseCredit,
-                    narrow = narrow,
-                    onValueChange = {
-                        onAction(PaymentUiAction.SetNonCashAmount(forma.idFormaPago, it))
-                    },
-                    onUseExactAmount = {
-                        onAction(PaymentUiAction.SetExactNonCashAmount(forma.idFormaPago))
-                    },
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-        PrimaryCtaButton(
-            state = state,
-            warningScale = 1f,
-            isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
-            onClick = { onAction(PaymentUiAction.ProcessPayment) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
 fun NonCashRow(
     forma: FormaPago,
     value: String,
@@ -1285,107 +1149,6 @@ fun NonCashRow(
         }
     }
 }
-
-@Composable
-private fun PaymentSummaryLine(
-    label: String,
-    value: String,
-    secondary: String?,
-    emphasized: Boolean,
-) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Column(horizontalAlignment = Alignment.End) {
-            AdaptiveAmountText(
-                text = value,
-                baseStyle =
-                    MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
-                    ),
-                color =
-                    if (emphasized) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                modifier = Modifier.widthIn(max = 180.dp),
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 11f,
-                        maxLines = 1,
-                    ),
-            )
-            secondary?.let {
-                Text(
-                    text = it,
-                    style = PosTextStyles.amountSecondary,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaymentMethodIcon(forma: FormaPago) {
-    val decodedImage = remember(forma.imagen) { decodeBase64Image(forma.imagen) }
-    val fallbackColor = remember(forma.siglas) { paymentMethodColor(forma.siglas) }
-
-    Box(
-        modifier =
-            Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(fallbackColor.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (decodedImage != null) {
-            Image(
-                bitmap = decodedImage,
-                contentDescription = forma.descripcion,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-            )
-        } else {
-            Icon(
-                imageVector = fallbackIconForSigla(forma.siglas),
-                contentDescription = forma.descripcion,
-                tint = fallbackColor,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-private fun decodeBase64Image(imageData: String?): ImageBitmap? {
-    if (imageData.isNullOrBlank()) return null
-    return try {
-        val normalized = imageData.substringAfter("base64,", imageData).trim()
-        if (normalized.isBlank()) {
-            null
-        } else {
-            val bytes = Base64.decode(normalized, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }
-    } catch (_: IllegalArgumentException) {
-        null
-    }
-}
-
-private fun fallbackIconForSigla(sigla: String?): ImageVector =
-    when (sigla?.uppercase()) {
-        "TDC", "TDD" -> Icons.Default.CreditCard
-        "TR", "DB", "CK", "BANK" -> Icons.Default.AccountBalance
-        "CXC" -> Icons.Default.Wallet
-        else -> Icons.Default.Wallet
-    }
 
 @Composable
 private fun ProcessingPaymentOverlay(

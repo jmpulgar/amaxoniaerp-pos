@@ -3,7 +3,6 @@ package com.amaxonia.pos.domain.repository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
-import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.model.LotAssignment
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
@@ -164,31 +163,6 @@ class CartRepository {
                 }
             currentItems + promotionLines
         }
-    }
-
-    fun getDisplayItems(): List<ItemCarrito> {
-        val grouped = mutableListOf<ItemCarrito>()
-        val promotionIds = mutableSetOf<String>()
-        cartItemsState.value.forEach { item ->
-            val promoId = item.promocionId
-            if (promoId.isNullOrBlank()) {
-                grouped.add(ItemCarrito.ProductoIndividual(item))
-            } else if (promotionIds.add(promoId)) {
-                val promoItems = cartItemsState.value.filter { it.promocionId == promoId }
-                val first = promoItems.first()
-                grouped.add(
-                    ItemCarrito.PromocionAgrupada(
-                        promocionId = promoId,
-                        promocionCodigo = first.promocionCodigo,
-                        promocionNombre = first.promocionNombre,
-                        promocionTipo = first.promocionTipo,
-                        promocionGrupo = first.promocionGrupo,
-                        items = promoItems,
-                    ),
-                )
-            }
-        }
-        return grouped
     }
 
     fun increaseQuantity(productId: String) {
