@@ -1,4 +1,4 @@
-﻿package com.amaxonia.pos.data.printer
+package com.amaxonia.pos.data.printer
 
 import android.content.Context
 import com.amaxonia.pos.core.logging.SafeLog
@@ -150,7 +150,7 @@ class HkaConnectionHelper(
         return output.toByteArray()
     }
 
-    /**
+/**
      * Parses printer status from response bytes.
      * Matches SDK's PrinterStatus(int status, int error) constructor.
      */
@@ -158,43 +158,52 @@ class HkaConnectionHelper(
         val statusByte = bytes[0].toInt() and BYTE_MASK
         val errorByte = if (bytes.size > 1) bytes[1].toInt() and BYTE_MASK else DEFAULT_ERROR_BYTE
 
-        val statusHex = Integer.toHexString(statusByte)
-        val errorHex = Integer.toHexString(errorByte)
-
-        val statusDescription =
-            when (statusHex) {
-                "40" -> "Modo Entrenamiento, en Espera"
-                "41" -> "Modo Entrenamiento, en TransacciÃ³n Fiscal"
-                "42" -> "Modo Entrenamiento, en TransacciÃ³n No Fiscal"
-                "60" -> "Modo Fiscal, en Espera"
-                "68" -> "Modo Fiscal, MF llena, en Espera"
-                "61" -> "Modo Fiscal, en TransacciÃ³n Fiscal"
-                "69" -> "Modo Fiscal, MF llena, en TransacciÃ³n Fiscal"
-                "62" -> "Modo Fiscal, en TransacciÃ³n No Fiscal"
-                "6a" -> "Modo Fiscal, MF llena, en TransacciÃ³n No Fiscal"
-                else -> "Estado desconocido (0x$statusHex)"
-            }
-
-        val errorDescription =
-            when (errorHex) {
-                "40" -> "NingÃºn error"
-                "48" -> "Error gaveta"
-                "41" -> "Sin papel"
-                "42" -> "Error mecÃ¡nico / papel"
-                "43" -> "Error mecÃ¡nico y fin de papel"
-                "60" -> "Error fiscal"
-                "64" -> "Error en memoria fiscal"
-                "6c" -> "Memoria fiscal llena"
-                else -> "Error desconocido (0x$errorHex)"
-            }
-
         SafeLog.d(TAG, "Fiscal printer status parsed")
 
         return PrinterStatusResult(
             success = true,
-            statusDescription = statusDescription,
-            errorDescription = errorDescription,
+            statusDescription = describePrinterStatus(statusByte),
+            errorDescription = describePrinterError(errorByte),
         )
+    }
+
+/**
+     * Descrubre el modo/estado del equipo fiscal a partir del byte de status.
+     * Mapeo 1:1 del when original del parseStatus (SDK PrinterStatus).
+     */
+    internal fun describePrinterStatus(statusByte: Int): String {
+        val hex = Integer.toHexString(statusByte)
+        return when (hex) {
+            "40" -> "Modo Entrenamiento, en Espera"
+            "41" -> "Modo Entrenamiento, en TransacciÃ³n Fiscal"
+            "42" -> "Modo Entrenamiento, en TransacciÃ³n No Fiscal"
+            "60" -> "Modo Fiscal, en Espera"
+            "68" -> "Modo Fiscal, MF llena, en Espera"
+            "61" -> "Modo Fiscal, en TransacciÃ³n Fiscal"
+            "69" -> "Modo Fiscal, MF llena, en TransacciÃ³n Fiscal"
+            "62" -> "Modo Fiscal, en TransacciÃ³n No Fiscal"
+            "6a" -> "Modo Fiscal, MF llena, en TransacciÃ³n No Fiscal"
+            else -> "Estado desconocido (0x$hex)"
+        }
+    }
+
+/**
+     * Describe el error del equipo fiscal a partir del byte de error.
+     * Mapeo 1:1 del when original del parseStatus (SDK PrinterStatus).
+     */
+    internal fun describePrinterError(errorByte: Int): String {
+        val hex = Integer.toHexString(errorByte)
+        return when (hex) {
+            "40" -> "NingÃºn error"
+            "48" -> "Error gaveta"
+            "41" -> "Sin papel"
+            "42" -> "Error mecÃ¡nico / papel"
+            "43" -> "Error mecÃ¡nico y fin de papel"
+            "60" -> "Error fiscal"
+            "64" -> "Error en memoria fiscal"
+            "6c" -> "Memoria fiscal llena"
+            else -> "Error desconocido (0x$hex)"
+        }
     }
 
     companion object {

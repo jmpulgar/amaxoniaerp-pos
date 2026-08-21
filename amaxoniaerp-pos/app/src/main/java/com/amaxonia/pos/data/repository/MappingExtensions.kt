@@ -29,6 +29,9 @@ private fun priceByLabel(
         it.label.equals(label, ignoreCase = true)
     } ?: PriceLevel(label = label)
 
+/** Default numérico del wire: null se interpreta como 0.0. */
+private fun Double?.orZero(): Double = this ?: 0.0
+
 // --- Company Mappers ---
 fun CompanyDto.toDomainCompany(): Company =
     Company(
@@ -76,16 +79,16 @@ fun ProductDto.toDomain(): Product {
         gobSegment = gobSegment.orEmpty(),
         gobFamily = gobFamily.orEmpty(),
         isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
-        taxRate = taxRate ?: 0.0,
-        costActual = costActual ?: 0.0,
-        costAverage = costAverage ?: 0.0,
-        costPrevious = costPrevious ?: 0.0,
-        costCIF = costCIF ?: 0.0,
-        costFOB = costFOB ?: 0.0,
-        costProcessed = costProcessed ?: 0.0,
-        commissionPercent = commissionPercent ?: 0.0,
-        costEuroOrigin = costEuroOrigin ?: 0.0,
-        costFranco = costFranco ?: 0.0,
+        taxRate = taxRate.orZero(),
+        costActual = costActual.orZero(),
+        costAverage = costAverage.orZero(),
+        costPrevious = costPrevious.orZero(),
+        costCIF = costCIF.orZero(),
+        costFOB = costFOB.orZero(),
+        costProcessed = costProcessed.orZero(),
+        commissionPercent = commissionPercent.orZero(),
+        costEuroOrigin = costEuroOrigin.orZero(),
+        costFranco = costFranco.orZero(),
         unitPackage = unitPackage.orEmpty(),
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
