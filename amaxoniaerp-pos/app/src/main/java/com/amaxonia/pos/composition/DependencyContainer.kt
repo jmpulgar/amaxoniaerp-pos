@@ -380,6 +380,22 @@ object DependencyContainer {
 
     fun initialize(context: Context) {
         if (initialized) return
+        val database = initializeNetworkAndSession(context)
+        initializeRemoteRepositories(database)
+        initializeLocalRepositories(database)
+        initializeTransactionIdempotency(database)
+        initializePaymentLedgers()
+        this.catalogSyncer =
+            CatalogSyncer(
+                apiService = apiService,
+                localStore = localStore,
+                daos = CatalogDaos.from(database),
+            )
+        initialized = true
+    }
+
+    /** Núcleo de red y sesión: config de API, cliente/servicio, almacenamiento local y monitor. */
+    private fun initializeNetworkAndSession(context: Context): AppDatabase {
         val apiConfigManager = ApiConfigManager()
         apiConfigManager.updateBaseUrl(ServerCountries.AVAILABLE[0])
         val apiClient = ApiClient(apiConfigManager)
@@ -397,6 +413,11 @@ object DependencyContainer {
         this.apiConfigManager = apiConfigManager
         this.serverEnvironment = ApiServerEnvironment(apiConfigManager, apiClient)
         this.imageUrlResolver = RemoteImageUrlResolver(apiConfigManager)
+        return database
+    }
+
+    /** Repositorios respaldados por la API remota. */
+    private fun initializeRemoteRepositories(database: AppDatabase) {
         authRepository = AuthRepositoryImpl(apiService, localStore)
         companyRepository = CachedCompanyRepository(localStore)
         productRepository = OfflineFirstProductRepository(apiService, localStore, database.productDao(), networkMonitor)
@@ -435,12 +456,20 @@ object DependencyContainer {
                 localAddressCatalogs = addressCatalogRepository,
                 localClientTypes = clientTypeRepository,
             )
+    }
+
+    /** DAOs y repositorios locales (Room) para borradores, sucursales y ventas pendientes. */
+    private fun initializeLocalRepositories(database: AppDatabase) {
         draftInvoiceDao = database.draftInvoiceDao()
         draftInvoiceRepository = RoomDraftInvoiceRepository(draftInvoiceDao)
         clientSucursalDao = database.clientSucursalDao()
         clientBranchRepository = RoomClientBranchRepository(clientSucursalDao)
         pendingInvoiceDao = database.pendingInvoiceDao()
         pendingSalesReader = RoomPendingSalesReader(pendingInvoiceDao)
+    }
+
+    /** Log de transacciones y casos de uso de cola idempotente (fiscal y gateway). */
+    private fun initializeTransactionIdempotency(database: AppDatabase) {
         transactionLogDao = database.transactionLogDao()
         startTransactionUseCase =
             StartTransactionUseCase(
@@ -458,6 +487,10 @@ object DependencyContainer {
                 dao = transactionLogDao,
                 clock = SystemAppClock(),
             )
+    }
+
+    /** Ledgers de confirmación fiscal / callback de gateway y cola offline de facturas. */
+    private fun initializePaymentLedgers() {
         fiscalConfirmationLedger =
             PaymentFiscalConfirmationLedger { outcome ->
                 when (outcome) {
@@ -502,12 +535,5 @@ object DependencyContainer {
                 idGenerator = UuidGenerator,
                 clock = SystemAppClock(),
             )
-        catalogSyncer =
-            CatalogSyncer(
-                apiService = apiService,
-                localStore = localStore,
-                daos = CatalogDaos.from(database),
-            )
-        initialized = true
     }
 }
