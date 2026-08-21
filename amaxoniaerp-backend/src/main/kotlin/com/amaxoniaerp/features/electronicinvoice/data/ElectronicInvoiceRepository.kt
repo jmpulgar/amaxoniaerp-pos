@@ -26,15 +26,18 @@ private const val LOG_TOKEN_PREFIX_LENGTH = 8
  * de nota de crédito en PanamaCreditNoteLoader.kt.
  *
  * NO modifica la lógica de escritura de facturas existente (eso lo hace ProcessSaleTransactionalRepository).
+ *
+ * Abierta (clase y métodos usados por el orquestador) para permitir dobles de
+ * prueba del workflow FE sin base de datos; misma semántica, sin wrappers.
  */
-class ElectronicInvoiceRepository {
+open class ElectronicInvoiceRepository {
     private val logger = LoggerFactory.getLogger(ElectronicInvoiceRepository::class.java)
 
     /**
      * Carga todos los datos necesarios para construir el payload de FE
      * a partir de una factura existente en la DB.
      */
-    suspend fun loadInvoiceContext(
+    open suspend fun loadInvoiceContext(
         database: Database,
         invoiceId: String,
     ): InvoiceFEContext =
@@ -163,7 +166,7 @@ class ElectronicInvoiceRepository {
     /**
      * Actualiza la factura con los datos retornados por el PAC tras un envío exitoso.
      */
-    suspend fun updateInvoiceWithFEResponse(
+    open suspend fun updateInvoiceWithFEResponse(
         database: Database,
         update: FeResponseUpdate,
     ) = dbQuery(database) {
@@ -191,7 +194,7 @@ class ElectronicInvoiceRepository {
     /**
      * Incrementa el correlativo del número de documento fiscal en la tabla `correlativos`.
      */
-    suspend fun incrementNumeroDocumentoFiscal(database: Database) =
+    open suspend fun incrementNumeroDocumentoFiscal(database: Database) =
         dbQuery(database) {
             val updated =
                 FECorrelativosTable.update({
@@ -207,7 +210,7 @@ class ElectronicInvoiceRepository {
             }
         }
 
-    suspend fun getInvoiceCufe(
+    open suspend fun getInvoiceCufe(
         database: Database,
         invoiceId: String,
     ): String? =
