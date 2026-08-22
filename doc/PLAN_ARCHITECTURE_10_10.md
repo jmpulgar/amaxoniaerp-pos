@@ -1323,6 +1323,20 @@ RUNBOOK_DATABASE_MIGRATION.md
 ### TASK-132 — PR template
 Functional change, country, migration, contract, tests, UI, HKA/PAC, rollback.
 
+> **ESTADO: COMPLETADA (2026-08-22) — TASK-130..132.**
+>
+> - **TASK-130** README raíz: layout, build/tests por repo con los comandos
+>   reales, contratos wire y reglas de oro.
+> - **TASK-131** Runbooks operativos en `doc/runbooks/`: PAYMENT (flujo,
+>   idempotencia, reconciliación 409), HKA (impresora VE + useHka20), PAC
+>   (PA CUFE + VE digital, códigos y matriz), OFFLINE_SYNC (leases/estados/
+>   tenant), DATABASE_MIGRATION (Room 10→17; schema backend = criterio de
+>   parada).
+> - **TASK-132** `.github/PULL_REQUEST_TEMPLATE.md` con los ejes del PLAN.
+> - Scorecards finales en `doc/SCORECARD_FINAL.md`; CHECKLIST MAESTRO (§11)
+>   marcado — único ítem abierto: CI required on main (branch protection
+>   anulada, TASK-024). AGENTS por repo permanecen vigentes sin cambios.
+
 # 5. ORDEN DE EJECUCIÓN
 
 No entregar este plan entero a un agente para modificar todo de una sola vez.
@@ -1483,20 +1497,21 @@ No empezar refactors masivos de features antes de estos guardrails.
 
 # 11. CHECKLIST MAESTRO
 
-- [ ] FASE 0 — Baseline/inventory
-- [ ] FASE 1 — Architecture constitution
-- [ ] FASE 2 — CI/quality gates/repo hygiene
-- [ ] FASE 3 — Backend core
-- [ ] FASE 4 — Backend feature normalization
-- [ ] FASE 5 — Android composition root
-- [ ] FASE 6 — Android feature consistency
-- [ ] FASE 7 — Detekt baseline zero
-- [ ] FASE 8 — Test architecture
-- [ ] FASE 9 — Cross-system contracts
-- [ ] FASE 10 — Financial/fiscal hardening
-- [ ] FASE 11 — Architecture tests
-- [ ] FASE 12 — Performance/reliability
-- [ ] FASE 13 — Documentation/operations
-- [ ] Final Architecture scorecard PASS
-- [ ] Final Consistency scorecard PASS
-- [ ] Final Quality/Testing scorecard PASS
+- [x] FASE 0 — Baseline/inventory
+- [x] FASE 1 — Architecture constitution
+- [x] FASE 2 — CI/quality gates/repo hygiene
+- [x] FASE 3 — Backend core
+- [x] FASE 4 — Backend feature normalization
+- [x] FASE 5 — Android composition root
+- [x] FASE 6 — Android feature consistency
+- [x] FASE 7 — Detekt baseline zero
+- [x] FASE 8 — Test architecture
+- [x] FASE 9 — Cross-system contracts
+- [x] FASE 10 — Financial/fiscal hardening
+- [x] FASE 11 — Architecture tests
+- [x] FASE 12 — Performance/reliability
+- [x] FASE 13 — Documentation/operations
+- [x] Final Architecture scorecard PASS (`doc/SCORECARD_FINAL.md`)
+- [x] Final Consistency scorecard PASS (ídem)
+- [ ] Final Quality/Testing scorecard PASS — único ítem abierto: "CI required
+      on main" (branch protection anulada, TASK-024 fuera de alcance); resto PASS.
