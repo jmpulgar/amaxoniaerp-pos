@@ -134,6 +134,42 @@ class CalculateSaleTotalsUseCaseTest {
         assertEquals(10700L, MinorUnitMoney.fromDoubleAsMinor(result.total))
     }
 
+    /**
+     * TASK-101 rounding matrix: the 9.99 cent boundary and large amounts
+     * stay exact at scale 2 through the BigDecimal rollup and the minor-unit
+     * conversion.
+     */
+    @Test
+    fun `9_99 line and large amounts stay scale-2 exact`() {
+        val single =
+            useCase(
+                listOf(item(LineValues(9.99, 1.0, 0.0, 0.0, 9.99, 9.99))),
+            )
+        assertEquals(9.99, single.subtotalGross, 0.0)
+        assertEquals(9.99, single.total, 0.0)
+        assertEquals(999L, MinorUnitMoney.fromDoubleAsMinor(single.total))
+
+        val large =
+            useCase(
+                listOf(
+                    item(
+                        LineValues(
+                            priceWithoutTax = 1000000.00,
+                            quantity = 1.0,
+                            discount = 0.50,
+                            taxRate = 7.0,
+                            net = 1000000.00,
+                            total = 1070000.00,
+                        ),
+                    ),
+                ),
+            )
+        assertEquals(1000000.00, large.subtotalNet, 0.0)
+        assertEquals(0.50, large.itemDiscounts, 0.0)
+        assertEquals(1070000.00, large.total, 0.0)
+        assertEquals(107000000L, MinorUnitMoney.fromDoubleAsMinor(large.total))
+    }
+
     private fun item(values: LineValues) =
         SaleItemDto(
             idItem = 1,

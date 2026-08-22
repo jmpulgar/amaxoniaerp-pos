@@ -172,6 +172,43 @@ class ExecutePaymentFlowUseCaseTest {
             )
         }
 
+    /**
+     * TASK-101 rounding matrix: the pending balance folds CXC lines in
+     * [Money] so 0.10 + 0.20 lands exactly on 0.30, while the legacy
+     * `montosPorTipo` grouping still sums raw Doubles and keeps the
+     * canonical IEEE-754 residue. Both behaviors are characterized as-is.
+     */
+    @Test
+    fun `partial CXC balance folds cents exactly while legacy grouping keeps Double residue`() =
+        runTest {
+            val fixture = fixture(FixtureOptions(isOnline = true))
+            val cash = paymentMethod(1, "CASH", "Efectivo")
+            val cxc = paymentMethod(2, "CXC", "Cuenta por cobrar")
+
+            val result =
+                fixture.useCase(
+                    input(
+                        paymentDetails =
+                            listOf(
+                                FormaPagoDetalle(idFormaPago = 1, sigla = "CASH", monto = 9.70),
+                                FormaPagoDetalle(idFormaPago = 2, sigla = "CXC", monto = 0.10),
+                                FormaPagoDetalle(idFormaPago = 2, sigla = "CXC", monto = 0.20),
+                            ),
+                        methods = listOf(cash, cxc),
+                        tenderedAmount = Money.parse("9.70"),
+                        paymentCondition = PaymentCondition.CREDITO,
+                    ),
+                ) {}
+
+            assertTrue(result is PaymentFlowResult.Success)
+            val summary = fixture.sales.request?.pagoResumen
+            assertEquals(0.30, summary?.totalizarSaldoPendiente ?: -1.0, 0.0)
+            assertEquals(
+                mapOf("CASH" to 9.7, "CXC" to 0.30000000000000004),
+                summary?.montosPorTipo,
+            )
+        }
+
     @Test
     fun `normal credit card keeps contado and zero CXC balance`() =
         runTest {
