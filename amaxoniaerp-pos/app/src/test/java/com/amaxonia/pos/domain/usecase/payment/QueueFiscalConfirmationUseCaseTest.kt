@@ -142,6 +142,54 @@ class QueueFiscalConfirmationUseCaseTest {
         assertEquals(QueueFiscalConfirmationUseCase.nextAttempt(0), QueueFiscalConfirmationUseCase.nextAttempt(-3))
     }
 
+    /**
+     * TASK-102 (matriz de idempotencia) — confirmación fiscal duplicada:
+     * compone el ciclo completo del worker sobre la fila durable. Tras el
+     * primer pase exitoso (markFiscalConfirmed), un segundo pase del worker
+     * NO vuelve a elegirla (findFiscalConfirmable vacío) y un mark repetido
+     * es idempotente: estado, tuplo fiscal y contador no retroceden.
+     */
+    @Test
+    fun `confirmacion duplicada - la fila confirmada no vuelve a elegirse ni revierte su estado`() =
+        runTest {
+            seedRow("fx-dup")
+            useCase.enqueue(
+                "fx-dup",
+                remoteInvoiceId = "42",
+                fiscalNumber = "000001-00012345",
+                printerSerial = "SN-PRN-7",
+                failureMessage = "impresora offline",
+            )
+
+            // Primer pase del worker: elegible y confirmado con éxito.
+            val firstPass = dao.findFiscalConfirmable(now = nowMs, limit = 25)
+            assertEquals(listOf("fx-dup"), firstPass.map { it.clientCorrelationId })
+            dao.markFiscalConfirmed(
+                id = "fx-dup",
+                status = QueueFiscalConfirmationUseCase.STATUS_CONFIRMED,
+                fiscalNumber = "000001-00012345",
+                printerSerial = "SN-PRN-7",
+            )
+
+            // Segundo pase (retry/restart del worker): nada pendiente.
+            assertTrue(dao.findFiscalConfirmable(now = nowMs, limit = 25).isEmpty())
+
+            // Caracterización: un mark repetido SOBRESCRIBE el tuplo (el SQL
+            // real no tiene guardas de estado ni COALESCE), pero la fila
+            // consolidada jamás vuelve a ser elegible: no hay segunda
+            // confirmación remota.
+            dao.markFiscalConfirmed(
+                id = "fx-dup",
+                status = QueueFiscalConfirmationUseCase.STATUS_CONFIRMED,
+                fiscalNumber = "000001-00099999",
+                printerSerial = "SN-OTHER",
+            )
+            val row = dao.findById("fx-dup")!!
+            assertEquals(QueueFiscalConfirmationUseCase.STATUS_CONFIRMED, row.fiscalConfirmationStatus)
+            assertEquals("000001-00099999", row.fiscalNumber)
+            assertTrue(dao.findFiscalConfirmable(now = nowMs + 3_600_000, limit = 25).isEmpty())
+        }
+
     private fun seedRow(id: String) {
         val entity =
             TransactionLogEntity(
