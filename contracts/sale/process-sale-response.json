@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "idFactura": "offline-id-001",
+  "codFactura": "FAC-000123",
+  "codEstatus": 2,
+  "cufe": "CUFE-123",
+  "qr": "QR-DATA",
+  "fechaRecepcionDGI": "2026-08-21T10:00:00"
+}

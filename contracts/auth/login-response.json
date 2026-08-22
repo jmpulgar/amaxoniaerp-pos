@@ -1,0 +1,17 @@
+{
+  "token": "jwt-identity-token",
+  "user": {
+    "id": 7,
+    "username": "cajero1",
+    "role": "CAJERO"
+  },
+  "companies": [
+    {
+      "id": 2,
+      "name": "Compañía Prueba",
+      "rif": "TEST-ID"
+    }
+  ],
+  "countryCode": "PA",
+  "schemaType": "TYPE_A"
+}

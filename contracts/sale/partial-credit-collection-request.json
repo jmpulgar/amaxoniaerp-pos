@@ -1,0 +1,45 @@
+{
+  "idFactura": "FAC-ORIGINAL-001",
+  "esCobroCreditoPrevio": true,
+  "factura": {
+    "idCliente": "client-1",
+    "codCliente": "C0001",
+    "codVendedor": 7,
+    "idShop": 2,
+    "idSucursal": 2,
+    "idCaja": "caja-1",
+    "codigoCaja": "CJ01",
+    "idCajaSecuencia": "seq-1",
+    "serieSucursal": "A01",
+    "formaPago": "contado",
+    "codEstatus": 2,
+    "subtotal": 0.0,
+    "ivaTotalFactura": 0.0,
+    "totalTotalFactura": 10.44,
+    "montoItemsFactura": 0.0,
+    "totalizarBaseImponible": 0.0,
+    "totalizarMontoIva": 0.0,
+    "totalizarTotalGeneral": 10.44,
+    "usuarioCreacion": "POS",
+    "facturarA": "CLIENTE PRUEBA",
+    "facturarARuc": "TEST-ID",
+    "facturarADireccion": "DIRECCION",
+    "facturarATelefono": "0000"
+  },
+  "items": [],
+  "pagoResumen": {
+    "totalizarMontoCancelar": 10.44,
+    "totalizarMontoEfectivo": 10.44,
+    "totalizarCambio": 0.0,
+    "totalizarSaldoPendiente": 0.0,
+    "montosPorTipo": {"CASH": 10.44}
+  },
+  "pagos": [
+    {
+      "idFormaPago": 1,
+      "tipoMovimiento": "CASH",
+      "monto": 10.44,
+      "montoRecibido": 10.44
+    }
+  ]
+}

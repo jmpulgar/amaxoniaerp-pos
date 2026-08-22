@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "producto_id": 42,
+      "item_codigo": "P42",
+      "_item_descripcion": "PRODUCTO",
+      "_item_cantidad": 2.0,
+      "_item_preciosiniva": 5.0,
+      "_item_totalsiniva": 9.0,
+      "_item_totalconiva": 10.44,
+      "notas": "sin cebolla"
+    }
+  ],
+  "enviar_inmediato": true
+}

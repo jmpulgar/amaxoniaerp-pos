@@ -1,0 +1,14 @@
+{
+  "idFactura": "invoice-1",
+  "fecha": "2026-07-12",
+  "periodo": "2026-07",
+  "observacion": "DEVOLUCION",
+  "detalle": [
+    {"idDetalleFactura": "line-1", "cantidad": 1.5}
+  ],
+  "idCajaSecuencia": "cash-sequence-1",
+  "settlementType": "REINTEGRO",
+  "idFormaPagoReintegro": 2,
+  "devolucionElectronica": true,
+  "numeroFiscalElectronico": "FISCAL-001"
+}

@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "token": "jwt-company-token",
+  "currentCompany": {
+    "id": 2,
+    "name": "Compañía Prueba",
+    "adminDb": "t_prueba",
+    "accountingDb": "cont_prueba",
+    "payrollDb": "nom_prueba",
+    "rif": "TEST-ID"
+  },
+  "countryCode": "PA",
+  "schemaType": "TYPE_A"
+}

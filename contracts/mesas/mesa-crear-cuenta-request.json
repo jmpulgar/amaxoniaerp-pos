@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "pedido_mesa_id": 101,
+      "cantidad": 1.5
+    }
+  ],
+  "incluir_todo_pendiente": false
+}

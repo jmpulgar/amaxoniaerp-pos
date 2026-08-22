@@ -1,0 +1,24 @@
+{
+  "id": "seq-1",
+  "monto_efectivo_ventas": 107.0,
+  "monto_efectivo_entrada": 50.0,
+  "monto_efectivo_salida": 5.0,
+  "monto_efectivo_total": 152.0,
+  "monto_efectivo_cierre": 152.0,
+  "monto_efectivo_diferencia": 0.0,
+  "monto_otros_total": 20.0,
+  "monto_otros_cierre": 20.0,
+  "monto_otros_diferencia": 0.0,
+  "monto_total": 172.0,
+  "monto_cierre": 172.0,
+  "monto_diferencia": 0.0,
+  "detalle_formapago": [
+    {
+      "id_forma_pago": 1,
+      "monto": 107.0,
+      "monto_cierre": 152.0,
+      "monto_diferencia": 0.0
+    }
+  ],
+  "observacion_cierre": "cierre sin diferencias"
+}
