@@ -226,7 +226,7 @@ private fun CompanyListItems(
                 )
             }
         } else {
-            items(filteredCompanies) { company ->
+            items(filteredCompanies, key = { it.id }) { company ->
                 CompanyItemModern(
                     company = company,
                     onClick = { onSelect(company) },

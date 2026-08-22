@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -114,6 +115,12 @@ fun CuentaMesaScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentAlignment = Alignment.TopCenter,
         ) {
+            // Solo depende de pedidos+cuentas: memoizar evita re-filtrar (y
+            // re-agrupar reservadoPorPedido) en cada tecla de cantidad.
+            val disponibles =
+                remember(state.pedidos, state.cuentas) {
+                    state.pedidos.filter { state.disponible(it) > 0.0 }
+                }
             LazyColumn(
                 modifier = Modifier.fillMaxHeight().widthIn(max = 840.dp).fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -122,7 +129,7 @@ fun CuentaMesaScreen(
                 item {
                     CuentaOverview(
                         activeAccounts = state.cuentasActivas.size,
-                        availableProducts = state.pedidos.count { state.disponible(it) > 0.0 },
+                        availableProducts = disponibles.size,
                     )
                 }
                 item {
@@ -165,7 +172,6 @@ fun CuentaMesaScreen(
                             icon = Icons.Default.Splitscreen,
                         )
                     }
-                    val disponibles = state.pedidos.filter { state.disponible(it) > 0.0 }
                     if (disponibles.isEmpty()) {
                         item {
                             PosEmptyState(
