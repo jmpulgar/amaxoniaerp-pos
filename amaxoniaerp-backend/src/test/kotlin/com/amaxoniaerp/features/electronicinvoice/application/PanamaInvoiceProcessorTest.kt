@@ -21,10 +21,12 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDo
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
+import java.io.IOException
 import java.sql.SQLException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Tests del workflow de Facturación Electrónica PA ([PanamaInvoiceProcessor])
@@ -279,6 +281,35 @@ class PanamaInvoiceProcessorTest {
             val result = processor(repo, client).processElectronicInvoice(database, "F-8")
             assertIs<ElectronicInvoiceResult.Success>(result)
             assertEquals(0, client.emailCalls)
+        }
+
+    /**
+     * TASK-103 (matriz fiscal PA) — failure/uncertain: el transporte del
+     * cliente PA envuelve TODO en `Result.failure`, de modo que un timeout
+     * emerge como [IOException] cruda (incierta a nivel transporte). Este
+     * test caracteriza el comportamiento VIGENTE: el procesador PA la
+     * clasifica como fallo determinista `SEND_ERROR` (NO produce
+     * `ElectronicInvoiceResult.Uncertain`; ese productor solo existe en VE).
+     * Promover el timeout PA a Uncertain es una decisión fiscal/PAC — fuera
+     * de alcance. Invariantes que SÍ se sostienen: un fallo de transporte no
+     * persiste datos fiscales ni consume correlativo.
+     */
+    @Test
+    fun `timeout de transporte en el envio se caracteriza como SEND_ERROR sin persistir`() =
+        runBlocking {
+            val client = RecordingPacClient()
+            client.sendResult = Result.failure(IOException("Timeout esperando DGI"))
+            val repo = FakeRepository(context())
+            val result = processor(repo, client).processElectronicInvoice(database, "F-9")
+            val failure = assertIs<ElectronicInvoiceResult.Failure>(result)
+            assertEquals("SEND_ERROR", failure.codigo)
+            assertTrue(
+                failure.mensaje.contains("comunicación con el PAC"),
+                "el mensaje debe identificar el problema de comunicación: ${failure.mensaje}",
+            )
+            assertEquals(1, client.sendCalls)
+            assertEquals(0, repo.updateCalls)
+            assertEquals(0, repo.incrementCalls)
         }
 
     private fun config(facturacion: Int) =
