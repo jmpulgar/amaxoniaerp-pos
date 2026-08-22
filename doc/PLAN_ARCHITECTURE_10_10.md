@@ -1100,6 +1100,28 @@ VE digital
 VE HKA-20
 ```
 
+> **ESTADO: COMPLETADA (2026-08-22) — TASK-090..093. Gates completos Android
+> (detekt/ktlint/test/3 flavors/kover ratchet) y backend (test/detekt/ktlint/
+> jacoco ratchet ≥ 0.46526415) verdes.**
+>
+> - **TASK-090** `contracts/` en raíz del repo (16 JSON + README.md): fuente
+>   única de verdad wire para auth/sale (contado, crédito, cobro parcial de
+>   CxC)/caja/mesas/creditnote/fiscal; goldens originales de Android copiados
+>   verbatim a `sale/` y `creditnote/`.
+> - **TASK-091** `ContractFixtureTest` Android: round-trip estricto por familia
+>   para requests; respuestas backend-canónicas SOLO decode (Android omite
+>   legítimamente `countryCode`/`schemaType` vía `ignoreUnknownKeys`).
+> - **TASK-092** `ContractFixtureTest` backend: round-trip estricto para todas
+>   las familias EXCEPTO los 3 requests de venta (decode-assert por asimetría
+>   `codEstatus`: requerido Android vs default `=2` backend, documentada en
+>   `contracts/README.md` §6).
+> - **TASK-093** `MultiCountryContractMatrixTest` + espejo Android: matriz
+>   PA/VE-digital/VE-HKA20 sobre fixtures compartidos
+>   (`ve-digital-process-sale-response.json`, `ve-hka20-process-sale-response.json`)
+>   discriminando país por presencia/ausencia de campos fiscales en el cable;
+>   discriminador `useHka20` (ausente→null, true→viaja); Android decodifica las
+>   respuestas VE afirmando `cufe==null` y documento fiscal presente.
+
 ---
 
 ## FASE 10 — FINANCIAL & FISCAL HARDENING
