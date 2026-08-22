@@ -27,6 +27,8 @@ Consecuencias para los fixtures:
 | auth/company-select-* | ídem | ídem | ídem | ídem |
 | sale/process-sale-request | Android | Backend | + golden original | ídem |
 | sale/process-sale-response | Backend | Android | ídem | ídem |
+| sale/ve-digital-process-sale-response | Backend (VE digital, TASK-093) | Android + backend (matriz multi-país) | ídem | ídem |
+| sale/ve-hka20-process-sale-response | Backend (VE impresora HKA-20) | ídem | ídem | ídem |
 | sale/credit-sale-request | Android (`formaPago=credito`, CXC, saldo>0) | Backend | ídem | ídem |
 | sale/partial-credit-collection-request | Android (`esCobroCreditoPrevio=true`, `idFactura`=factura original) | Backend | ídem | ídem |
 | caja/caja-apertura-request | Android | Backend | ídem | ídem |

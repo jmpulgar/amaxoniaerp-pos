@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "idFactura": "offline-id-001",
+  "codFactura": "FAC-000123",
+  "codEstatus": 2,
+  "numeroDocumentoFiscal": "00000000000000000001",
+  "numeroControlThka": "CTL-00000001"
+}

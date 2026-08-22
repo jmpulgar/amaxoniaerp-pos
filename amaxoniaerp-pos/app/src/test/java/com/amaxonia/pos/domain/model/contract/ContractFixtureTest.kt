@@ -130,6 +130,27 @@ class ContractFixtureTest {
         assertEquals("CUFE-123", response.cufe)
     }
 
+    @Test
+    fun `respuestas VE digital y HKA-20 del backend decodifican con campos fiscales`() {
+        // Espejo de MultiCountryContractMatrixTest: los fixtures VE comparten el
+        // DTO con PA; el país se discrimina por presencia/ausencia de campos.
+        listOf(
+            "sale/ve-digital-process-sale-response.json",
+            "sale/ve-hka20-process-sale-response.json",
+        ).forEach { relPath ->
+            val response = decode(relPath, ProcessSaleResponseDto.serializer())
+            assertTrue("cufe debe ausentarse en VE: $relPath", response.cufe == null)
+            assertTrue(
+                "documento fiscal VE obligatorio: $relPath",
+                !response.numeroDocumentoFiscal.isNullOrBlank(),
+            )
+            assertTrue(
+                "control HKA obligatorio: $relPath",
+                !response.numeroControlThka.isNullOrBlank(),
+            )
+        }
+    }
+
     // ─── Caja ──────────────────────────────────────────────────────────────
 
     @Test
