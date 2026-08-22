@@ -51,3 +51,7 @@ Consecuencias para los fixtures:
    backend. Ausente en ambos cables cuando no aplica.
 5. Varios wrappers de respuesta Android llevan campo `error` extra que el
    backend no envía; es tolerado por omisión.
+6. **SaleInvoiceInput.codEstatus**: requerido en Android (siempre viaja en el
+   request, valor 2) pero default `=2` en backend, cuyo re-encode lo omite.
+   Los tests backend de la familia sale hacen decode-assert (no round-trip
+   estricto); el cable Android→backend es correcto tal cual.
