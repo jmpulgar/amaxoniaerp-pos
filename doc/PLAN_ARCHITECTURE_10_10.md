@@ -1265,6 +1265,44 @@ Timeout/cancellation/retry sólo idempotente; nunca retry ciego de venta.
 ### TASK-123 — Startup
 Medir Android startup y backend initialization.
 
+> **ESTADO: COMPLETADA (2026-08-22) — TASK-120..123. Gates completos Android
+> y backend verdes. Cambios de código limitados a lo behavior-neutral con
+> evidencia de auditoría.**
+>
+> - **TASK-120 Compose**: auditoría con evidencia — 24/25 `items()` ya usan
+>   `key=`; corregidos los 2 hallazgos medios: keys estables en la lista de
+>   empresas (`CompanySelectionScreen`) y `remember(pedidos, cuentas)` con
+>   hoist del filtro de productos divisibles en `CuentaMesaScreen` (además
+>   reutilizado por el contador del overview, que duplicaba el cómputo).
+>   Hallazgos menores documentados sin cambio (sin medición no se tocan):
+>   `sumOf` en `CreditNotesScreen`, getters computados de `CuentaMesaState`,
+>   lambdas condicionales en `ProductTiles` (solo debug). Coil ya cubre
+>   imágenes con cache; cartTotal vive fuera de composición.
+> - **TASK-121 Backend DB**: auditoría N+1/repetidas documentada — inserts en
+>   loop batcheables (detalle venta/impuestos/kardex/pagos caja/detalles NC),
+>   N+1 anidado en restauración de lotes NC, full-scan `devolucion_header_PA`
+>   por fila en `listEligibleInvoices`, `parametros_generales` 2× y tabla caja
+>   3× por venta, factura releída tras lock en creación NC. **Índices
+>   secundarios faltantes en tablas calientes (`factura.id_caja_secuencia`,
+>   `factura_detalle.id_factura`, `caja_nueva.*`) = cambio de SCHEMA →
+>   DETENIDO y reportado como decisión pendiente**; los rewrites de queries en
+>   rutas fiscales/financieras críticas quedan sujetos al mismo gate.
+> - **TASK-122 Network reliability**: verificado — retry de transporte es
+>   GET-only (`ApiClient.configureCajaRetry`: 502–504 o fallo de conexión,
+>   `CancellationException` excluido); la venta (POST) nunca se reintenta
+>   a ciegas; timeout→retry reusa el mismo `idFactura` como clave de
+>   idempotencia (`ExecutePaymentFlowAuditTest`); HTTP 409 converge a
+>   reconciliación; timeout PAC PA → resultado incierto de transporte sin
+>   clasificar como rechazo (`TheFactoryHkaRestClientTest`).
+> - **TASK-123 Startup**: backend medido con `InitializationSmokeTest`
+>   (INIT_METRIC): **~2.1 s** arranque frío `module()`+primer `/health` en
+>   máquina de desarrollo. Android: inventario estático —
+>   `DependencyContainer.initialize` construye síncronamente DB/red/sesión/
+>   repos/idempotencia/ledgers y difiere el resto vía `by lazy`; la medición
+>   runtime en dispositivo requiere emulador/hardware **no disponible en este
+>   entorno** (limitación registrada, número pendiente de captura en CI con
+>   dispositivo).
+
 ---
 
 ## FASE 13 — DOCUMENTATION / OPERATIONS
