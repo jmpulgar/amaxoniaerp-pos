@@ -82,6 +82,88 @@ class CompositionBoundaryArchitectureTest {
         )
     }
 
+    /**
+     * FASE 11 — domain !-> data: el dominio no conoce la capa de datos.
+     *
+     * Excepciones allow-listadas (deuda documentada, NO precedentes): los
+     * use cases de la cola durable fiscal/gateway consumen el seam
+     * [com.amaxonia.pos.data.local.db.TransactionLogDao] por diseño
+     * (TASK-082/083); migrarlos exige una TASK funcional.
+     */
+    @Test
+    fun `domain no importa data salvo la cola durable allow-listada`() {
+        val violations =
+            kotlinFiles()
+                .filter { isUnderDomain(it) }
+                .flatMap { file ->
+                    val rel = relPath(file)
+                    file
+                        .readText()
+                        .lines()
+                        .filter { it.startsWith(DATA_IMPORT_PREFIX) }
+                        .map { "$rel: ${it.trim()}" }
+                }.filterNot { line ->
+                    DOMAIN_DATA_ALLOW_LIST.any { allowed -> line.startsWith(allowed) }
+                }
+
+        assertTrue(
+            buildString {
+                appendLine("Archivos bajo domain/ que importan data/ sin estar allow-listados:")
+                violations.forEach { appendLine("  - $it") }
+            },
+            violations.isEmpty(),
+        )
+    }
+
+    /** FASE 11 — domain !-> ui: regla limpia, sin excepciones. */
+    @Test
+    fun `domain no importa ui`() {
+        val violations =
+            kotlinFiles()
+                .filter { isUnderDomain(it) }
+                .flatMap { file ->
+                    file
+                        .readText()
+                        .lines()
+                        .filter { it.startsWith(UI_IMPORT_PREFIX) }
+                        .map { "${relPath(file)}: ${it.trim()}" }
+                }
+
+        assertTrue(
+            buildString {
+                appendLine("Archivos bajo domain/ que importan ui/:")
+                violations.forEach { appendLine("  - $it") }
+            },
+            violations.isEmpty(),
+        )
+    }
+
+    /**
+     * FASE 11 — las implementaciones de repositorio viven en data/
+     * (la dirección canónica es data -> domain; un *RepositoryImpl fuera de
+     * data/ crea una segunda capa de implementación huérfana).
+     */
+    @Test
+    fun `las implementaciones de repositorio viven en data`() {
+        val violations =
+            kotlinFiles()
+                .filter { REPOSITORY_IMPL.containsMatchIn(it.readText()) }
+                .filterNot { file -> relPath(file).contains("/data/") }
+                .map { relPath(it) }
+
+        assertTrue(
+            buildString {
+                appendLine("*RepositoryImpl fuera de la capa data/:")
+                violations.forEach { appendLine("  - $it") }
+            },
+            violations.isEmpty(),
+        )
+    }
+
+    private fun relPath(file: File): String = file.toRelativeString(KOTLIN_ROOT).replace(File.separatorChar, '/')
+
+    private fun isUnderDomain(file: File): Boolean = relPath(file).startsWith("com/amaxonia/pos/domain/")
+
     private fun kotlinFiles(): List<File> =
         KOTLIN_ROOT
             .walkTopDown()
@@ -92,5 +174,16 @@ class CompositionBoundaryArchitectureTest {
         val KOTLIN_ROOT: File = File("src/main/java").absoluteFile
         const val CONTAINER_IMPORT = "import com.amaxonia.pos.composition.DependencyContainer"
         const val DATA_IMPORT_PREFIX = "import com.amaxonia.pos.data."
+        const val UI_IMPORT_PREFIX = "import com.amaxonia.pos.ui."
+        val REPOSITORY_IMPL = Regex("""class\s+\w*RepositoryImpl\b""")
+
+        /** Cola durable fiscal/gateway: seam DAO permitido en dominio (TASK-082/083). */
+        val DOMAIN_DATA_ALLOW_LIST =
+            listOf(
+                "com/amaxonia/pos/domain/usecase/payment/AdvanceFiscalStateUseCase.kt",
+                "com/amaxonia/pos/domain/usecase/payment/QueueFiscalConfirmationUseCase.kt",
+                "com/amaxonia/pos/domain/usecase/payment/QueueGatewayCallbackUseCase.kt",
+                "com/amaxonia/pos/domain/usecase/payment/StartTransactionUseCase.kt",
+            )
     }
 }
