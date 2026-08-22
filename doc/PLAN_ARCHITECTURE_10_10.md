@@ -1176,6 +1176,33 @@ duplicate fiscal confirmation
 
 PA, VE digital y VE HKA con success/rejection/uncertain/failure según corresponda.
 
+> **ESTADO: COMPLETADA (2026-08-22) — TASK-100..103. Gates completos Android
+> (detekt/ktlint/test/3 flavors/kover ratchet) y backend (test/detekt/ktlint/
+> jacoco ratchet ≥ 0.46526415) verdes.**
+>
+> - **TASK-100** Inventario de dinero por rol en `doc/MONEY_INVENTORY.md`
+>   (wire/display/cálculo/DB, ambos lados). Cálculo ya es `Money`/`BigDecimal`
+>   en ventas/notas de crédito/PAC VE; wire Double retenido por compatibilidad
+>   (aprobado por el PLAN). Deuda clasificada NO migrada (caja backend,
+>   resúmenes facturas, carrito Android, columnas float/double): convertirlos
+>   puede alterar resultados numéricos o el esquema → criterio de parada.
+> - **TASK-101** Caracterización de redondeo SIN cambio numérico:
+>   `ProcessSaleMonetaryRoundingCharacterizationTest` (boundary backend
+>   `toMoney`/`toBase` HALF_UP escala 2, tasa VE, montos grandes), Android
+>   9.99/montos grandes en `CalculateSaleTotalsUseCaseTest` y CxC parcial en
+>   centavos (`Money` fold exacto vs residuo IEEE-754 del agrupado legado).
+> - **TASK-102** Matriz de idempotencia auditada (8 casos): timeout, process
+>   death, retry, reconciliación, offline→online y callback duplicado ya
+>   cubiertos; se añadió lo faltante — HTTP 409 E2E por factura duplicada en
+>   `/ventas/procesar` sobre H2 sembrado y confirmación fiscal duplicada
+>   (fila confirmada jamás re-elegida; mark repetido sobrescribe tuplo según
+>   el SQL real).
+> - **TASK-103** Matriz fiscal: VE digital completa (VenezuelaInvoiceStrategyTest),
+>   VE HKA-20 cubierta por `ProcessSaleUseCaseSelectionTest`; se añadió la
+>   entrada PA faltante — timeout de transporte caracterizado como fallo
+>   determinista `SEND_ERROR`. PA no produce `Uncertain` hoy (solo VE);
+>   promoverlo es decisión fiscal/PAC → criterio de parada, documentado.
+
 ---
 
 ## FASE 11 — ARCHITECTURE TESTS
