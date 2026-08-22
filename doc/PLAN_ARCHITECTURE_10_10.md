@@ -1230,6 +1230,25 @@ feature !-> another feature's data implementation
 
 La herramienta concreta se elige según compatibilidad real con el proyecto.
 
+> **ESTADO: COMPLETADA (2026-08-22) — escaneo de fuentes .kt con la técnica
+> existente (walkTopDown + allow-lists explícitas), sin dependencias nuevas.
+> Gates completos Android y backend verdes.**
+>
+> - **Android** (`CompositionBoundaryArchitectureTest` extendido):
+>   `domain !-> data` (cola durable fiscal/gateway allow-listada como seam
+>   TASK-082/083), `domain !-> ui` (limpio) y `*RepositoryImpl` confinado a
+>   `data/`. Screen/ViewModel `!-> DependencyContainer` y `ui !-> data` ya
+>   estaban congelados.
+> - **Backend** (`FeatureDependencyArchitectureTest` nuevo): `domain !->`
+>   Ktor/Exposed/PAC (3 estrategias VE legacy allow-listadas); rutas
+>   `!-> DatabaseManager` (9 rutas legacy congeladas por tests de
+>   integración) y `!-> HttpClient(` (limpio); `application/domain` de una
+>   feature `!->` implementación data ajena (3 cruces heredados
+>   allow-listados; la reutilización data→data de tablas del MISMO esquema
+>   compartido queda fuera de la regla).
+> - Verificación negativa: se inyectaron archivos sonda temporales y los
+>   tests FALLARON para cada regla nueva antes de aceptarlos.
+
 ---
 
 ## FASE 12 — PERFORMANCE & RELIABILITY
