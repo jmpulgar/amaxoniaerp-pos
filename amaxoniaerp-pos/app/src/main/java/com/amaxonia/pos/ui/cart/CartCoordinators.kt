@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.cart
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ClientBranchRepository
@@ -98,7 +99,9 @@ class CartStateCoordinator(
             it.copy(
                 items = items,
                 displayItems = cartRepository.getDisplayItems(),
-                total = financialSnapshot?.total ?: items.sumOf { item -> item.total },
+                // Fallback de suma en Money (BigDecimal): evita acumular
+                // residuo IEEE-754 cuando no hay snapshot financiero.
+                total = financialSnapshot?.total ?: items.fold(Money.ZERO) { acc, item -> acc + Money.fromDouble(item.total) }.toDouble(),
                 selectedClient = client,
                 selectedClientPhotoUrl = if (client == null) "" else it.selectedClientPhotoUrl,
                 cartActionError = if (client == null) null else it.cartActionError,

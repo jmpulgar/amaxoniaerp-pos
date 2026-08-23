@@ -3,6 +3,7 @@ package com.amaxonia.pos.ui.dashboard
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.PromotionRepository
 import com.amaxonia.pos.domain.repository.setClientSucursales
@@ -45,7 +46,9 @@ class DashboardCartCoordinator(
                     it.copy(
                         cartItems = items,
                         cartItemCount = items.sumOf { item -> item.quantity },
-                        cartTotal = items.sumOf { item -> item.total },
+                        // Suma monetaria en Money (BigDecimal) para no acumular
+                        // residuo IEEE-754 en el display; Double sólo al salir.
+                        cartTotal = items.fold(Money.ZERO) { acc, item -> acc + Money.fromDouble(item.total) }.toDouble(),
                     )
                 }
             }

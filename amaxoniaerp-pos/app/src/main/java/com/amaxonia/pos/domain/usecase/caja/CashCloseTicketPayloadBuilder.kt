@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.caja.CashClosePromotionLine
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.repository.CashCloseContextReader
 import com.amaxonia.pos.domain.repository.PendingSalesReader
@@ -60,16 +61,18 @@ class CashCloseTicketPayloadBuilder(
     }
 
     private fun buildPaymentAmounts(summary: CierreCajaSummary): Map<String, Double> {
-        val amounts = ticketFormatter.paymentLabels.associateWith { 0.0 }.toMutableMap()
+        // Suma por forma de pago en Money (BigDecimal): evita acumular residuo
+        // IEEE-754; el ticket sigue formateando "%.2f" sobre el Double de salida.
+        val amounts = ticketFormatter.paymentLabels.associateWith { Money.ZERO }.toMutableMap()
         summary.paymentLines.forEach { line ->
             val label = normalizePaymentLabel(line.label, line.siglas)
-            amounts[label] = amounts.getValue(label) + line.amount
+            amounts[label] = amounts.getValue(label) + Money.fromDouble(line.amount)
         }
         if (summary.paymentLines.isEmpty()) {
-            amounts["EFECTIVO"] = summary.totalCash
-            amounts["TARJETA DE DEBITO"] = summary.totalCard
+            amounts["EFECTIVO"] = Money.fromDouble(summary.totalCash)
+            amounts["TARJETA DE DEBITO"] = Money.fromDouble(summary.totalCard)
         }
-        return amounts
+        return amounts.mapValues { (_, value) -> value.toDouble() }
     }
 
     private fun normalizePaymentLabel(

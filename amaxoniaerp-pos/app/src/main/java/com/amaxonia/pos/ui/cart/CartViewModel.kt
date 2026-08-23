@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.ItemCarrito
+import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +34,16 @@ data class CartState(
     val selectedClientSucursal: ClientBranch? = null,
     val cartActionError: String? = null,
 ) {
+    // Conversión Bs en BigDecimal (mismo camino que PaymentScreen:Money.times)
+    // para no multiplicar en Double; el formateo "%.2f" legacy se preserva.
     val totalBsText: String
-        get() = if (isMultiCurrency && tasa > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", total * tasa) else ""
+        get() =
+            if (isMultiCurrency && tasa > 0.0) {
+                val converted = Money.fromDouble(total).times(java.math.BigDecimal.valueOf(tasa))
+                String.format(java.util.Locale.getDefault(), "%.2f", converted.toDouble())
+            } else {
+                ""
+            }
 
     val requiresClientSucursal: Boolean
         get() = isPanama && selectedClient != null && clientSucursales.isNotEmpty()

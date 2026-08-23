@@ -312,6 +312,4 @@ class CartRepository {
         cartItemsState.value = emptyList()
         _financialSnapshot.value = null
     }
-
-    fun getTotal(): Double = cartItemsState.value.sumOf { it.total }
 }

@@ -139,11 +139,6 @@ data class PaymentState(
     val effectiveTaxLabel: String
         get() = taxLabel.takeIf { it.isNotBlank() } ?: "Impuesto"
 
-    fun toBs(amount: Double): Double {
-        if (!isMultiCurrency || tasa <= 0.0) return 0.0
-        return amount * tasa
-    }
-
     /**
      * Multi-currency conversion performed entirely in [Money] (BigDecimal)
      * so no `Double` arithmetic leaks into monetary calculations
