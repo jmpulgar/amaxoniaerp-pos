@@ -120,7 +120,7 @@ private fun Route.installCoreRoutes() {
 
 private fun Route.installPosRoutes(deps: AppDependencies) {
     itemsRoutes(deps.repositories.itemsRepository)
-    cajaRouting(deps.caja.cajaRepository, deps.caja.openCajaUseCase, deps.caja.closeCajaUseCase)
+    cajaRouting(deps.caja.cajaRepository, deps.caja.openCajaUseCase, deps.caja.cajaSession)
     posRouting(deps.repositories.formasPagoRepository)
     mesasRouting(deps.repositories.mesasRepository)
 

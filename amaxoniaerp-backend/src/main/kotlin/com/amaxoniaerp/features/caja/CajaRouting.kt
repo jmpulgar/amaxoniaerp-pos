@@ -4,7 +4,7 @@ import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
 import com.amaxoniaerp.core.tenant.requireUserId
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
-import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
+import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
@@ -43,9 +43,9 @@ private fun Throwable.publicMessage(fallback: String): String =
 fun Route.cajaRouting(
     cajaRepository: CajaRepository,
     openCaja: OpenCajaUseCase,
-    closeCaja: CloseCajaUseCase,
+    cajaSession: CajaSessionWorkflow,
 ) {
-    val handlers = CajaHandlers(cajaRepository, openCaja, closeCaja)
+    val handlers = CajaHandlers(cajaRepository, openCaja, cajaSession)
 
     route("/api/cajas") {
         authenticate {
@@ -67,7 +67,7 @@ fun Route.cajaRouting(
 internal class CajaHandlers(
     private val cajaRepository: CajaRepository,
     private val openCaja: OpenCajaUseCase,
-    private val closeCaja: CloseCajaUseCase,
+    private val cajaSession: CajaSessionWorkflow,
 ) {
     private val log = LoggerFactory.getLogger("CajaRouting")
 
@@ -127,7 +127,7 @@ internal class CajaHandlers(
             }
 
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            val cajaSecuencia = cajaRepository.getCajaStatus(database, companyDb, idCaja)
+            val cajaSecuencia = cajaSession.status(database, companyDb, idCaja)
             if (cajaSecuencia != null) {
                 call.respond(
                     HttpStatusCode.OK,
@@ -251,7 +251,7 @@ internal class CajaHandlers(
                 }
 
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            closeCaja.close(database, ctx.countryCode, request).fold(
+            cajaSession.close(database, ctx.countryCode, request).fold(
                 onSuccess = { response ->
                     call.respond(HttpStatusCode.OK, response)
                 },

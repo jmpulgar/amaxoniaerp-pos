@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.caja.data
 
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
+import com.amaxoniaerp.features.caja.domain.CajaSecuenciaGuard
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -47,14 +48,8 @@ internal fun mapOpenSecuenciaRow(row: ResultRow): CajaSecuencia =
         idSucursal = 1, // default since it was removed
     )
 
-/** Datos mínimos de guarda para cerrar una secuencia: estado y serie sucursal. */
-internal data class CajaSecuenciaGuard(
-    val cerrada: Boolean,
-    val serieSucursal: String,
-)
-
 /** Lectura de guarda de la secuencia a cerrar; null si no existe. */
-internal fun findSecuenciaGuard(idSecuencia: String): CajaSecuenciaGuard? {
+internal fun readSessionGuard(idSecuencia: String): CajaSecuenciaGuard? {
     val row =
         CajaSecuenciaTable
             .selectAll()

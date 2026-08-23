@@ -93,7 +93,7 @@ class CajaRepository {
         runCatching {
             dbQuery(database) {
                 val guard =
-                    findSecuenciaGuard(request.id)
+                    readSessionGuard(request.id)
                         ?: error("Secuencia de caja no encontrada")
 
                 if (guard.cerrada) {

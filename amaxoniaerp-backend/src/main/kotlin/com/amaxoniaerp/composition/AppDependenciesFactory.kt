@@ -1,9 +1,11 @@
 package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.auth.domain.AuthService
+import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
 import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
+import com.amaxoniaerp.features.caja.data.ExposedCajaSessionStore
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
@@ -56,7 +58,8 @@ private fun buildCajaDependencies(): CajaDependencies {
     val cajaRepository = CajaRepository()
     val closeCajaUseCase = CloseCajaUseCase(cajaRepository)
     val openCajaUseCase = OpenCajaUseCase(cajaRepository, closeCajaUseCase)
-    return CajaDependencies(cajaRepository, openCajaUseCase, closeCajaUseCase)
+    val cajaSession = CajaSessionWorkflow(ExposedCajaSessionStore())
+    return CajaDependencies(cajaRepository, openCajaUseCase, cajaSession)
 }
 
 private fun buildMesasDependencies(feFactory: ElectronicInvoiceProcessorFactory): MesasDependencies {
