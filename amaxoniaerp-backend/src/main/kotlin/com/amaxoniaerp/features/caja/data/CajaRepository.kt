@@ -1,17 +1,12 @@
 package com.amaxoniaerp.features.caja.data
 
 import com.amaxoniaerp.core.database.dbQuery
-import com.amaxoniaerp.core.time.BusinessClock
-import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.Caja
-import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
-import com.amaxoniaerp.features.caja.domain.CajaCierreSaveResponse
 import com.amaxoniaerp.features.caja.domain.CajaCierreSummary
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
-import java.util.UUID
 
 /**
  * Repositorio de caja: queries tipo Archetype A (catálogo, resumen de
@@ -64,60 +59,6 @@ class CajaRepository {
     ): Result<CajaSecuenciaData> =
         runCatching {
             dbQuery(database) { readCajaSecuenciaData(countryCode, idSecuencia, verifyFacturasTemporales) }
-        }
-
-    suspend fun recordApertura(
-        database: Database,
-        countryCode: String,
-        request: AperturaRequest,
-        username: String,
-    ): Result<Unit> {
-        val now = BusinessClock.nowForCountry(countryCode)
-        val newId = UUID.randomUUID().toString()
-        val nextSequence =
-            dbQuery(database) {
-                resolveNextSecuenciaCode(request.idCaja)
-            }
-
-        return dbQuery(database) {
-            insertAperturaRecord(newId, request, username, now, nextSequence)
-            Result.success(Unit)
-        }
-    }
-
-    suspend fun persistCierre(
-        database: Database,
-        countryCode: String,
-        request: CajaCierreSaveRequest,
-        validateFacturasTemporales: Boolean,
-    ): Result<CajaCierreSaveResponse> =
-        runCatching {
-            dbQuery(database) {
-                val guard =
-                    readSessionGuard(request.id)
-                        ?: error("Secuencia de caja no encontrada")
-
-                if (guard.cerrada) {
-                    error("La secuencia de caja ya se encuentra cerrada")
-                }
-
-                if (validateFacturasTemporales &&
-                    countFacturasTemporales(countryCode, request.id) > 0
-                ) {
-                    error("Existen facturas temporales pendientes por procesar")
-                }
-
-                val now = BusinessClock.nowForCountry(countryCode)
-
-                persistCierreRecord(request, now)
-                rewriteCierreDetallesRecord(request, guard.serieSucursal)
-
-                CajaCierreSaveResponse(
-                    success = true,
-                    message = "Cierre de caja guardado correctamente",
-                    id = request.id,
-                )
-            }
         }
 
     suspend fun getCajaSequenceSummary(
