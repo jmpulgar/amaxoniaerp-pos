@@ -12,24 +12,6 @@ value class InvoiceId(
     }
 }
 
-@JvmInline
-value class PaymentId(
-    val value: String,
-) {
-    init {
-        require(value.isNotBlank()) { "PaymentId cannot be blank" }
-    }
-}
-
-@JvmInline
-value class CajaId(
-    val value: String,
-) {
-    init {
-        require(value.isNotBlank()) { "CajaId cannot be blank" }
-    }
-}
-
 class TaxRate private constructor(
     val percentage: BigDecimal,
 ) {
@@ -78,20 +60,4 @@ class Quantity private constructor(
 
         fun fromDouble(value: Double): Quantity = of(BigDecimal.valueOf(value))
     }
-}
-
-sealed interface DomainFailure {
-    val message: String
-
-    data class Validation(
-        override val message: String,
-    ) : DomainFailure
-
-    data class Recoverable(
-        override val message: String,
-    ) : DomainFailure
-
-    data class Permanent(
-        override val message: String,
-    ) : DomainFailure
 }

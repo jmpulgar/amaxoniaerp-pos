@@ -2,7 +2,6 @@ package com.amaxonia.pos.domain.usecase
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Promocion
-import com.amaxonia.pos.domain.model.PromocionDetalle
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
@@ -28,14 +27,6 @@ class ValidarAdicionPromocionUseCase {
             ?.let { Result.failure(IllegalStateException(it)) }
             ?: Result.success(Unit)
     }
-}
-
-object PromotionPriceCalculator {
-    fun totalConIva(detalle: PromocionDetalle): BigDecimal = detalle.totalConIva.money()
-
-    fun totalSinIva(detalle: PromocionDetalle): BigDecimal = (detalle.totalConIva - detalle.impuesto).money()
-
-    fun iva(detalle: PromocionDetalle): BigDecimal = detalle.iva.money()
 }
 
 object BigDecimalMoneyFormatter {

@@ -119,13 +119,6 @@ enum class SaleEvent(
     GATEWAY_DUPLICATE_CALLBACK("gateway.duplicate_callback"),
 }
 
-/** Severity used by [AlertPolicy.shouldAlert] and sink routing. */
-enum class TelemetrySeverity {
-    INFO,
-    WARN,
-    ALERT,
-}
-
 /** Plug-in point for a structured sink (e.g. Crashlytics, HTTP collector). */
 fun interface TelemetrySink {
     fun emit(

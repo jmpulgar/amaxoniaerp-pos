@@ -42,21 +42,6 @@ object FlexibleDoubleSerializer : KSerializer<Double> {
     }
 }
 
-object FlexibleIntSerializer : KSerializer<Int> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleInt", PrimitiveKind.INT)
-
-    override fun serialize(
-        encoder: Encoder,
-        value: Int,
-    ) = encoder.encodeInt(value)
-
-    override fun deserialize(decoder: Decoder): Int {
-        val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeInt()
-        val primitive = jsonDecoder.decodeJsonElement().jsonPrimitive
-        return primitive.intOrNull ?: primitive.content.toIntOrNull() ?: 0
-    }
-}
-
 object FlexibleBooleanSerializer : KSerializer<Boolean> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleBoolean", PrimitiveKind.BOOLEAN)
 

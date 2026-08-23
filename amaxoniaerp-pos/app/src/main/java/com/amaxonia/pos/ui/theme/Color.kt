@@ -5,7 +5,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
 import com.amaxonia.pos.R
 
-val ErrorRed = Color(0xFFBA1A1A)
 val SuccessGreen = Color(0xFF2E7D32)
 val NeutralGray = Color(0xFF9E9E9E)
 val InfoBlue = Color(0xFF1565C0)
