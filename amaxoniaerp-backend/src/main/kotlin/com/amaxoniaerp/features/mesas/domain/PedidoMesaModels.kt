@@ -106,21 +106,6 @@ data class PedidoMesaResponse(
         get() = (itemCantidad - cantidadFacturada).coerceAtLeast(0.0)
 }
 
-/**
- * Resumen compacto de una comanda (líneas que comparten `comanda_secuencia`). Lo consume el
- * POS para mostrar "comanda #3 enviada a cocina".
- */
-@Serializable
-data class ComandaMesaResumen(
-    @SerialName("sesion_mesa_id") val sesionMesaId: Int,
-    val secuencia: Int,
-    val estado: String,
-    @SerialName("fecha_envio") val fechaEnvio: String,
-    @SerialName("cantidad_lineas") val cantidadLineas: Int,
-    @SerialName("total_sin_iva") val totalSinIva: Double,
-    @SerialName("total_con_iva") val totalConIva: Double,
-)
-
 @Serializable
 data class PedidosMesaListResponse(
     val success: Boolean,

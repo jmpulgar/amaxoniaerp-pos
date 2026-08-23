@@ -2,7 +2,6 @@ package com.amaxoniaerp.features.mesas.data
 
 import com.amaxoniaerp.features.mesas.domain.CuentaDetalleResponse
 import com.amaxoniaerp.features.mesas.domain.CuentaMesaResponse
-import com.amaxoniaerp.features.mesas.domain.EstadoPedidoMesa
 import org.jetbrains.exposed.sql.ResultRow
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -19,10 +18,6 @@ internal val CUENTA_ISO_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOC
 
 internal const val UNIT_CALCULATION_SCALE = 6
 internal const val QUANTITY_SCALE = 3
-
-/** Estados que NO impiden el cierre por pago: solo ENTREGADA/CANCELADA. */
-internal val ESTADOS_NO_IMPiden_CIERRE =
-    listOf(EstadoPedidoMesa.ENTREGADA.codigo, EstadoPedidoMesa.CANCELADA.codigo)
 
 internal fun ResultRow.toCuentaMesaResponse(detalles: List<CuentaDetalleResponse> = emptyList()): CuentaMesaResponse =
     CuentaMesaResponse(

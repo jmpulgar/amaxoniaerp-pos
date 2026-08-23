@@ -170,12 +170,6 @@ data class MarcarCuentaFacturadaResponse(
     val error: String? = null,
 )
 
-/** Request opcional para cancelar una cuenta ACTIVA sin facturar (revierte saldos). */
-@Serializable
-data class CancelarCuentaRequest(
-    @SerialName("cancelar_sesion") val cancelarSesion: Boolean = false,
-)
-
 /** Resultado interno del repositorio de cuenta. Lo traduce el routing a HTTP status. */
 sealed interface CuentaMesaResult {
     data class Creada(
@@ -184,10 +178,6 @@ sealed interface CuentaMesaResult {
 
     data class Listada(
         val cuentas: List<CuentaMesaResponse>,
-    ) : CuentaMesaResult
-
-    data class SolicitudRegistrada(
-        val sesion: SesionMesaResponse,
     ) : CuentaMesaResult
 
     data class Facturada(
@@ -214,6 +204,4 @@ sealed interface CuentaMesaResult {
     data object IdempotenciaFallidaPrevia : CuentaMesaResult
 
     data object SinItemsParaCrear : CuentaMesaResult
-
-    data object SaldosPendientesEnSesion : CuentaMesaResult
 }
