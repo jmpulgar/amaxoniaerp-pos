@@ -54,7 +54,7 @@ class PendingInvoiceDaoTest {
             countryCode = "PA",
             payloadJson = "{}",
             localInvoiceNumber = "LOC-$id",
-            total = 10.0,
+            totalMinor = 1_000L,
             clientName = "Cliente",
             status = status,
             tenantId = tenantId,

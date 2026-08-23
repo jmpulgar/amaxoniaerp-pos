@@ -25,7 +25,7 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         PromocionDetalleEntity::class,
         TransactionLogEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -635,6 +635,118 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * MONEY-001 completion (FASE 14 / TASK-150): `draft_invoices` y
+         * `pending_invoices` convergen a persistencia canónica minor-units.
+         *
+         * - draft_invoices: las columnas legadas REAL (`total`,
+         *   `subtotalGross`, `itemDiscounts`, `subtotalNet`, `tax`) se
+         *   sustituyen por sus contrapartes `*Minor` INTEGER + `currencyCode`.
+         *   Backfill con `CAST(ROUND(x * 100.0) AS INTEGER)` — misma convención
+         *   del backfill 13→14 (round-half-away-from-zero ≈ HALF_EVEN a escala
+         *   POS de 2 decimales).
+         * - pending_invoices: se elimina la columna legada `total REAL`
+         *   (escrita pero jamás leída); `totalMinor`/`currencyCode` (v14)
+         *   permanecen como canónicos.
+         *
+         * Rebuild de tabla en lugar de ALTER: Room valida el schema
+         * post-migración contra el 18.json exportado y las entidades no
+         * declaran `@ColumnInfo(defaultValue)`, así que las columnas no deben
+         * llevar cláusula DEFAULT (misma razón documentada en 13→14).
+         */
+        internal val MIGRATION_17_18 =
+            object : Migration(17, 18) {
+                // Secuencia SQL debe permanecer indivisible y auditable para migración Room.
+                @Suppress("LongMethod")
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // ============================================================
+                    // draft_invoices: rebuild reemplazando REAL -> minor-units.
+                    // ============================================================
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS draft_invoices_v18 (" +
+                            "id TEXT NOT NULL, " +
+                            "clientId TEXT, " +
+                            "clientFirstName TEXT, " +
+                            "clientLastName TEXT, " +
+                            "sellerId INTEGER NOT NULL, " +
+                            "sellerName TEXT, " +
+                            "itemsJson TEXT NOT NULL, " +
+                            "totalMinor INTEGER NOT NULL, " +
+                            "itemCount INTEGER NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "subtotalGrossMinor INTEGER NOT NULL, " +
+                            "itemDiscountsMinor INTEGER NOT NULL, " +
+                            "subtotalNetMinor INTEGER NOT NULL, " +
+                            "taxMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "PRIMARY KEY(id))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO draft_invoices_v18 (" +
+                            "id, clientId, clientFirstName, clientLastName, sellerId, sellerName, " +
+                            "itemsJson, totalMinor, itemCount, createdAt, subtotalGrossMinor, " +
+                            "itemDiscountsMinor, subtotalNetMinor, taxMinor, currencyCode) " +
+                            "SELECT " +
+                            "id, clientId, clientFirstName, clientLastName, sellerId, sellerName, " +
+                            "itemsJson, CAST(ROUND(total * 100.0) AS INTEGER), itemCount, createdAt, " +
+                            "CAST(ROUND(subtotalGross * 100.0) AS INTEGER), " +
+                            "CAST(ROUND(itemDiscounts * 100.0) AS INTEGER), " +
+                            "CAST(ROUND(subtotalNet * 100.0) AS INTEGER), " +
+                            "CAST(ROUND(tax * 100.0) AS INTEGER), " +
+                            "'USD' " +
+                            "FROM draft_invoices",
+                    )
+                    db.execSQL("DROP TABLE draft_invoices")
+                    db.execSQL("ALTER TABLE draft_invoices_v18 RENAME TO draft_invoices")
+
+                    // ============================================================
+                    // pending_invoices: rebuild eliminando la columna legada
+                    // `total`; el resto de columnas v17 se preserva verbatim.
+                    // ============================================================
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS pending_invoices_v18 (" +
+                            "id TEXT NOT NULL, " +
+                            "countryCode TEXT NOT NULL, " +
+                            "payloadJson TEXT NOT NULL, " +
+                            "localInvoiceNumber TEXT NOT NULL, " +
+                            "clientName TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "retryCount INTEGER NOT NULL, " +
+                            "lastError TEXT, " +
+                            "remoteInvoiceId TEXT, " +
+                            "remoteInvoiceNumber TEXT, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "tenantCompanyId INTEGER NOT NULL, " +
+                            "tenantAdminDb TEXT NOT NULL, " +
+                            "tenantContableDb TEXT NOT NULL, " +
+                            "tenantNominaDb TEXT NOT NULL, " +
+                            "tenantLabel TEXT NOT NULL, " +
+                            "totalMinor INTEGER NOT NULL, " +
+                            "currencyCode TEXT NOT NULL, " +
+                            "leasedUntil INTEGER NOT NULL, " +
+                            "createdAt INTEGER NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(id))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO pending_invoices_v18 (" +
+                            "id, countryCode, payloadJson, localInvoiceNumber, clientName, " +
+                            "status, retryCount, lastError, remoteInvoiceId, remoteInvoiceNumber, " +
+                            "tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, " +
+                            "tenantLabel, totalMinor, currencyCode, leasedUntil, createdAt, updatedAt) " +
+                            "SELECT " +
+                            "id, countryCode, payloadJson, localInvoiceNumber, clientName, " +
+                            "status, retryCount, lastError, remoteInvoiceId, remoteInvoiceNumber, " +
+                            "tenantId, tenantCompanyId, tenantAdminDb, tenantContableDb, tenantNominaDb, " +
+                            "tenantLabel, totalMinor, currencyCode, leasedUntil, createdAt, updatedAt " +
+                            "FROM pending_invoices",
+                    )
+                    db.execSQL("DROP TABLE pending_invoices")
+                    db.execSQL("ALTER TABLE pending_invoices_v18 RENAME TO pending_invoices")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_invoices_tenantId ON pending_invoices(tenantId)")
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -653,6 +765,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_14_15,
                 MIGRATION_15_16,
                 MIGRATION_16_17,
+                MIGRATION_17_18,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -679,6 +792,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_14_15,
                         MIGRATION_15_16,
                         MIGRATION_16_17,
+                        MIGRATION_17_18,
                     ).build()
                     .also { instance = it }
             }

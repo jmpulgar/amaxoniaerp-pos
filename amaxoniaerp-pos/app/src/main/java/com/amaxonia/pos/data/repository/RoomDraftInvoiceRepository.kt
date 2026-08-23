@@ -3,8 +3,16 @@ package com.amaxonia.pos.data.repository
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
 import com.amaxonia.pos.data.local.db.DraftInvoiceEntity
 import com.amaxonia.pos.domain.model.DraftInvoice
+import com.amaxonia.pos.domain.model.money.MinorUnitMoney
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
+import java.math.BigDecimal
 
+/**
+ * Boundary dominio↔Room para borradores. La persistencia es minor-units
+ * canónico (MONEY-001); la conversión usa `MinorUnitMoney`, que rechaza con
+ * [com.amaxonia.pos.domain.model.money.MoneyOverflowException] cualquier
+ * residuo sub-centavo material en lugar de redondear silenciosamente.
+ */
 class RoomDraftInvoiceRepository(
     private val dao: DraftInvoiceDao,
 ) : DraftInvoiceRepository {
@@ -23,13 +31,13 @@ class RoomDraftInvoiceRepository(
             sellerId = sellerId,
             sellerName = sellerName,
             itemsJson = itemsJson,
-            total = total,
+            total = totalMinor.toDomainMoney(),
             itemCount = itemCount,
             createdAt = createdAt,
-            subtotalGross = subtotalGross,
-            itemDiscounts = itemDiscounts,
-            subtotalNet = subtotalNet,
-            tax = tax,
+            subtotalGross = subtotalGrossMinor.toDomainMoney(),
+            itemDiscounts = itemDiscountsMinor.toDomainMoney(),
+            subtotalNet = subtotalNetMinor.toDomainMoney(),
+            tax = taxMinor.toDomainMoney(),
         )
 
     private fun DraftInvoice.toEntity() =
@@ -41,12 +49,14 @@ class RoomDraftInvoiceRepository(
             sellerId = sellerId,
             sellerName = sellerName,
             itemsJson = itemsJson,
-            total = total,
+            totalMinor = MinorUnitMoney.fromDoubleAsMinor(total),
             itemCount = itemCount,
             createdAt = createdAt,
-            subtotalGross = subtotalGross,
-            itemDiscounts = itemDiscounts,
-            subtotalNet = subtotalNet,
-            tax = tax,
+            subtotalGrossMinor = MinorUnitMoney.fromDoubleAsMinor(subtotalGross),
+            itemDiscountsMinor = MinorUnitMoney.fromDoubleAsMinor(itemDiscounts),
+            subtotalNetMinor = MinorUnitMoney.fromDoubleAsMinor(subtotalNet),
+            taxMinor = MinorUnitMoney.fromDoubleAsMinor(tax),
         )
+
+    private fun Long.toDomainMoney(): Double = BigDecimal.valueOf(this).movePointLeft(MinorUnitMoney.DEFAULT_SCALE).toDouble()
 }

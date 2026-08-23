@@ -12,7 +12,8 @@ import androidx.room.Query
  * the same tenant identity columns as [TransactionLogEntity] plus the
  * canonical total in minor-units, and a per-row lease so a single
  * [PendingInvoiceSyncWorker] cannot double-submit a row when relaunched
- * (auditoría ítems 3, 4, 8).
+ * (auditoría ítems 3, 4, 8). Schema v18 elimina la columna legada
+ * `total REAL` (solo escritura, nunca leída): `totalMinor` es canónico.
  */
 @Entity(tableName = "pending_invoices")
 data class PendingInvoiceEntity(
@@ -20,7 +21,6 @@ data class PendingInvoiceEntity(
     val countryCode: String,
     val payloadJson: String,
     val localInvoiceNumber: String,
-    val total: Double,
     val clientName: String,
     val status: String = "PENDING",
     val retryCount: Int = 0,

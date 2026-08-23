@@ -64,6 +64,54 @@ class AppDatabaseMigrationTest {
     fun `base creada en v16 migra al schema actual`() = migrateFrom(16)
 
     @Test
+    fun `base creada en v17 migra al schema actual`() = migrateFrom(17)
+
+    @Test
+    fun `migracion 17 a 18 rellena minor units de draft_invoices y elimina total legado de pending_invoices`() {
+        val db = openMigratedFrom(17)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            // draft_invoices: columnas REAL legadas fuera, minor-units dentro.
+            sqlite
+                .query(
+                    "SELECT subtotalGrossMinor, itemDiscountsMinor, subtotalNetMinor, taxMinor, currencyCode FROM draft_invoices LIMIT 0",
+                ).use { cursor ->
+                    assertEquals(5, cursor.columnCount)
+                }
+            assertFalse("columna legada 'total' debe desaparecer de draft_invoices", sqlite.hasColumn("draft_invoices", "total"))
+            // pending_invoices: la columna legada 'total' se elimina; minor queda.
+            sqlite
+                .query(
+                    "SELECT totalMinor, currencyCode FROM pending_invoices LIMIT 0",
+                ).use { cursor ->
+                    assertEquals(2, cursor.columnCount)
+                }
+            assertFalse("columna legada 'total' debe desaparecer de pending_invoices", sqlite.hasColumn("pending_invoices", "total"))
+
+            val dao = db.draftInvoiceDao()
+            runBlocking {
+                dao.insert(
+                    DraftInvoiceEntity(
+                        id = "d-1",
+                        itemsJson = "[]",
+                        totalMinor = 1_500L,
+                        itemCount = 3,
+                        subtotalGrossMinor = 1_400L,
+                        itemDiscountsMinor = 25L,
+                        subtotalNetMinor = 1_375L,
+                        taxMinor = 125L,
+                    ),
+                )
+                val saved = dao.getAll().single()
+                assertEquals(1_500L, saved.totalMinor)
+                assertEquals(1_375L, saved.subtotalNetMinor)
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `tras migrar desde v10 los DAOs operan sobre el schema actual`() {
         val db = openMigratedFrom(10)
         try {
@@ -85,6 +133,20 @@ class AppDatabaseMigrationTest {
         } finally {
             db.close()
         }
+    }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.hasColumn(
+        table: String,
+        column: String,
+    ): Boolean {
+        var found = false
+        query("PRAGMA table_info($table)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.moveToNext()) {
+                if (cursor.getString(nameIndex) == column) found = true
+            }
+        }
+        return found
     }
 
     private fun openMigratedFrom(startVersion: Int): AppDatabase {
@@ -167,6 +229,6 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 17
+        const val SCHEMA_VERSION = 18
     }
 }

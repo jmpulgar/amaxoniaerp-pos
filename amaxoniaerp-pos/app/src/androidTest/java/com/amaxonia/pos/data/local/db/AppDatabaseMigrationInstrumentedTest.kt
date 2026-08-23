@@ -209,9 +209,11 @@ class AppDatabaseMigrationInstrumentedTest {
     }
 
     private fun assertV17DraftFinancialColumnsExist(db: SupportSQLiteDatabase) {
+        // Desde v18 los montos de draft_invoices son minor-units canónicos
+        // (TASK-150); las columnas REAL legadas ya no existen.
         db
             .query(
-                "SELECT subtotalGross, itemDiscounts, subtotalNet, tax FROM draft_invoices LIMIT 0",
+                "SELECT totalMinor, subtotalGrossMinor, itemDiscountsMinor, subtotalNetMinor, taxMinor, currencyCode FROM draft_invoices LIMIT 0",
             ).use { cursor ->
                 cursor.columnCount
             }
