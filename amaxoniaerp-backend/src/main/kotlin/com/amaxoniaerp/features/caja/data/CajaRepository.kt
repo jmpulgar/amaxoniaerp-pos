@@ -10,19 +10,15 @@ import com.amaxoniaerp.features.caja.domain.CajaCierreSummary
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.selectAll
 import org.slf4j.LoggerFactory
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 /**
  * Repositorio de caja: queries de estado/secuencia/resumen/catálogo y
  * primitivas de escritura usadas por los workflows de application
- * (OpenCajaUseCase/CloseCajaUseCase). La lectura de la secuencia vive en
- * CajaSecuenciaDataReader.kt, el resumen de cierre en
+ * (OpenCajaUseCase/CloseCajaUseCase). Las primitivas con alcance de
+ * transacción viven en CajaSessionPrimitives.kt, la lectura de la secuencia
+ * en CajaSecuenciaDataReader.kt, el resumen de cierre en
  * CajaCierreSummaryReader.kt, el catálogo de cajas en CajaCatalogReader.kt y
  * los helpers de cierre en CajaCierreSupport.kt.
  */
@@ -35,13 +31,7 @@ class CajaRepository {
         idCaja: String,
     ): CajaSecuencia? =
         dbQuery(database) {
-            val openCajas =
-                CajaSecuenciaTable
-                    .selectAll()
-                    .where { (CajaSecuenciaTable.idCaja eq idCaja) and (CajaSecuenciaTable.fechaCierre.isNull()) }
-                    .orderBy(CajaSecuenciaTable.fechaApertura to SortOrder.DESC)
-                    .limit(2)
-                    .toList()
+            val openCajas = findOpenSecuenciaRows(idCaja)
 
             if (openCajas.size > 1) {
                 log.warn(
@@ -52,29 +42,7 @@ class CajaRepository {
                 )
             }
 
-            openCajas
-                .firstOrNull()
-                ?.let { row ->
-                    CajaSecuencia(
-                        idCajaSecuencia = row[CajaSecuenciaTable.idCajaSecuencia],
-                        idCaja = row[CajaSecuenciaTable.idCaja],
-                        fechaApertura =
-                            row[CajaSecuenciaTable.fechaApertura]?.format(
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-                            ) ?: "",
-                        montoApertura = row[CajaSecuenciaTable.montoEfectivoApertura].toDouble(),
-                        fechaCierre =
-                            row[CajaSecuenciaTable.fechaCierre]?.format(
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-                            ),
-                        montoCierre = row[CajaSecuenciaTable.montoEfectivoCierre]?.toDouble(),
-                        estatus = if (row[CajaSecuenciaTable.fechaCierre] == null) 1 else 0,
-                        usuarioApertura = row[CajaSecuenciaTable.usuario] ?: "",
-                        usuarioCierre = null,
-                        serieSucursal = row[CajaSecuenciaTable.serieSucursal],
-                        idSucursal = 1, // default since it was removed
-                    )
-                }
+            openCajas.firstOrNull()?.let(::mapOpenSecuenciaRow)
         }
 
     suspend fun getNextSecuenciaCodigo(
@@ -124,15 +92,11 @@ class CajaRepository {
     ): Result<CajaCierreSaveResponse> =
         runCatching {
             dbQuery(database) {
-                val secuenciaRow =
-                    CajaSecuenciaTable
-                        .selectAll()
-                        .where { CajaSecuenciaTable.idCajaSecuencia eq request.id }
-                        .limit(1)
-                        .firstOrNull()
+                val guard =
+                    findSecuenciaGuard(request.id)
                         ?: error("Secuencia de caja no encontrada")
 
-                if (secuenciaRow[CajaSecuenciaTable.fechaCierre] != null) {
+                if (guard.cerrada) {
                     error("La secuencia de caja ya se encuentra cerrada")
                 }
 
@@ -143,10 +107,9 @@ class CajaRepository {
                 }
 
                 val now = BusinessClock.nowForCountry(countryCode)
-                val serieSucursal = secuenciaRow[CajaSecuenciaTable.serieSucursal]
 
                 persistCierreRecord(request, now)
-                rewriteCierreDetallesRecord(request, serieSucursal)
+                rewriteCierreDetallesRecord(request, guard.serieSucursal)
 
                 CajaCierreSaveResponse(
                     success = true,
