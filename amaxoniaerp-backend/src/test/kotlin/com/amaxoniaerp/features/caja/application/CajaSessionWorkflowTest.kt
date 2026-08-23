@@ -96,7 +96,7 @@ class CajaSessionWorkflowTest {
     @Test
     fun `status retorna la secuencia abierta mas reciente`() =
         runBlocking {
-            store.openSecuencias = listOf(secuencia(SEQ_LATEST), secuencia(SEQ_OLDER))
+            store.openSecuencias = mutableListOf(secuencia(SEQ_LATEST), secuencia(SEQ_OLDER))
 
             val status = workflow.status(database, DB, CAJA)
 
@@ -107,9 +107,55 @@ class CajaSessionWorkflowTest {
     @Test
     fun `status retorna null sin secuencias abiertas`() =
         runBlocking {
-            store.openSecuencias = emptyList()
+            store.openSecuencias = mutableListOf()
 
             assertNull(workflow.status(database, DB, CAJA))
+        }
+
+    @Test
+    fun `open sin sesion previa inserta apertura y retorna estado abierto`() =
+        runBlocking {
+            val result = workflow.open(database, PA, DB, apertura(), "alice")
+
+            val secuenciaAbierta = result.getOrThrow()
+            assertEquals("alice", secuenciaAbierta.usuarioApertura)
+            assertEquals(1, secuenciaAbierta.estatus)
+            assertNull(secuenciaAbierta.fechaCierre)
+            assertEquals(
+                listOf("findOpenSecuencias", "nextSecuenciaCode", "insertApertura", "findOpenSecuencias"),
+                store.calls,
+            )
+            assertEquals(1, store.openSecuencias.size)
+        }
+
+    @Test
+    fun `open con auto-close fallido falla con mensaje estable y no inserta apertura`() =
+        runBlocking {
+            store.openSecuencias = mutableListOf(secuencia(SEQ_OLD))
+            store.readSecuenciaDataError = IllegalStateException("boom")
+
+            val result = workflow.open(database, PA, DB, apertura(), "bob")
+
+            val error = result.exceptionOrNull()
+            assertIs<IllegalStateException>(error)
+            assertEquals("No se pudo cerrar automaticamente la secuencia abierta", error.message)
+            assertTrue(
+                generateSequence(error as Throwable?) { it?.cause }
+                    .any { it?.message == "boom" },
+                "la causa original debe sobrevivir en la cadena",
+            )
+            assertTrue("insertApertura" !in store.calls)
+        }
+
+    @Test
+    fun `open falla si no puede releer la apertura recien insertada`() =
+        runBlocking {
+            store.insertSinAbrir = true
+
+            val result = workflow.open(database, PA, DB, apertura(), "carol")
+
+            assertIs<IllegalStateException>(result.exceptionOrNull())
+            assertEquals("Failed to retrieve open caja.", result.exceptionOrNull()!!.message)
         }
 
     private fun cierreRequest(id: String) =
@@ -144,13 +190,22 @@ class CajaSessionWorkflowTest {
             idSucursal = 1,
         )
 
+    private fun apertura() =
+        AperturaRequest(
+            idCaja = CAJA,
+            montoApertura = 50.0,
+            idVendedor = 1,
+            serieSucursal = "A",
+        )
+
     private companion object {
         const val PA = "PA"
         const val DB = "testdb"
         const val CAJA = "caja-1"
         const val SEQ = "seq-open"
+        const val SEQ_OLD = "seq-old"
         const val SEQ_LATEST = "seq-new"
-        const val SEQ_OLDER = "seq-old"
+        const val SEQ_OLDER = "seq-older"
     }
 }
 
@@ -160,11 +215,13 @@ internal class RecordingCajaSessionStore : CajaSessionStore {
     val writtenCierres = mutableListOf<Triple<CajaCierreSaveRequest, LocalDateTime, String>>()
     var guard: CajaSecuenciaGuard? = null
     var temporalesPendientes = 0
-    var openSecuencias: List<CajaSecuencia> = emptyList()
+    var openSecuencias: MutableList<CajaSecuencia> = mutableListOf()
+    var readSecuenciaDataError: Throwable? = null
+    var insertSinAbrir = false
 
     override fun findOpenSecuencias(idCaja: String): List<CajaSecuencia> {
         calls += "findOpenSecuencias"
-        return openSecuencias
+        return openSecuencias.toList()
     }
 
     override fun findSecuenciaGuard(idSecuencia: String): CajaSecuenciaGuard? {
@@ -195,7 +252,9 @@ internal class RecordingCajaSessionStore : CajaSessionStore {
         verifyFacturasTemporales: Boolean,
     ): CajaSecuenciaData {
         calls += "readSecuenciaData"
-        throw UnsupportedOperationException("no implementado en este test")
+        val scripted = readSecuenciaDataError
+        if (scripted != null) throw scripted
+        error("Secuencia de caja no encontrada")
     }
 
     override fun nextSecuenciaCode(idCaja: String): String {
@@ -211,5 +270,20 @@ internal class RecordingCajaSessionStore : CajaSessionStore {
         nextSequence: String,
     ) {
         calls += "insertApertura"
+        if (insertSinAbrir) return
+        openSecuencias +=
+            CajaSecuencia(
+                idCajaSecuencia = newId,
+                idCaja = request.idCaja,
+                fechaApertura = "",
+                montoApertura = request.montoApertura,
+                fechaCierre = null,
+                montoCierre = null,
+                estatus = 1,
+                usuarioApertura = username,
+                usuarioCierre = null,
+                serieSucursal = request.serieSucursal,
+                idSucursal = 1,
+            )
     }
 }

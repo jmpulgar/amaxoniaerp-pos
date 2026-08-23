@@ -14,13 +14,14 @@ import org.slf4j.LoggerFactory
 import java.util.UUID
 
 /**
- * Repositorio de caja: queries de estado/secuencia/resumen/catálogo y
- * primitivas de escritura usadas por los workflows de application
- * (OpenCajaUseCase/CloseCajaUseCase). Las primitivas con alcance de
- * transacción viven en CajaSessionPrimitives.kt, la lectura de la secuencia
- * en CajaSecuenciaDataReader.kt, el resumen de cierre en
- * CajaCierreSummaryReader.kt, el catálogo de cajas en CajaCatalogReader.kt y
- * los helpers de cierre en CajaCierreSupport.kt.
+ * Repositorio de caja: queries tipo Archetype A (catálogo, resumen de
+ * cierre, datos y código de secuencia). La sesión —apertura atómica,
+ * cierre y estado— vive en CajaSessionWorkflow (application) sobre el
+ * puerto CajaSessionStore; las primitivas con alcance de transacción están
+ * en CajaSessionPrimitives.kt, la lectura de la secuencia en
+ * CajaSecuenciaDataReader.kt, el resumen de cierre en
+ * CajaCierreSummaryReader.kt, el catálogo de cajas en CajaCatalogReader.kt
+ * y los helpers de cierre en CajaCierreSupport.kt.
  */
 class CajaRepository {
     private val log = LoggerFactory.getLogger(CajaRepository::class.java)

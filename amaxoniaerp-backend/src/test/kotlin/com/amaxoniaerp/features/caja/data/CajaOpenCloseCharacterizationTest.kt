@@ -1,8 +1,6 @@
 package com.amaxoniaerp.features.caja.data
 
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
-import com.amaxoniaerp.features.caja.application.CloseCajaUseCase
-import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreDetalleRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreFormaPagoRequest
@@ -13,7 +11,9 @@ import com.amaxoniaerp.features.sales.data.CajaIngresoEgreso
 import com.amaxoniaerp.features.sales.data.CajaStatus
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaDetalleTablePA
 import com.amaxoniaerp.features.sales.data.SalesCajaNuevaTablePA
+import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
 import com.amaxoniaerp.features.sales.data.SalesFacturaTablePA
+import com.amaxoniaerp.features.sales.data.SalesStockTable
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -44,14 +44,10 @@ import kotlin.test.assertTrue
  * devolución aplicada y buildAutoCloseFormaPagoTotals la vuelve a sumar).
  */
 class CajaOpenCloseCharacterizationTest {
-    private val repository = CajaRepository()
-    private val closeCajaLegacy = CloseCajaUseCase(repository)
-    private val openCaja = OpenCajaUseCase(repository, closeCajaLegacy)
     private lateinit var database: Database
 
-    /** Punto de entrada de cierre tras T2: el workflow profundo de sesión. */
-    private val cajaSession: CajaSessionWorkflow
-        get() = CajaSessionWorkflow(ExposedCajaSessionStore())
+    /** Punto de entrada de sesión de caja: el módulo profundo de application. */
+    private lateinit var cajaSession: CajaSessionWorkflow
 
     @Before
     fun setUp() {
@@ -77,15 +73,20 @@ class CajaOpenCloseCharacterizationTest {
                 SalesCajaNuevaTablePA,
                 SalesCajaNuevaDetalleTablePA,
                 SalesFacturaTablePA,
+                SalesFacturaDetalleTable,
+                SalesStockTable,
             )
             seedFormasPago()
         }
+        cajaSession = CajaSessionWorkflow(ExposedCajaSessionStore())
     }
 
     @After
     fun tearDown() {
         transaction(database) {
             SchemaUtils.drop(
+                SalesStockTable,
+                SalesFacturaDetalleTable,
                 SalesFacturaTablePA,
                 SalesCajaNuevaDetalleTablePA,
                 SalesCajaNuevaTablePA,
@@ -108,7 +109,7 @@ class CajaOpenCloseCharacterizationTest {
     @Test
     fun `openCaja crea secuencia 000001 con detalle de apertura y retorna estado abierto`() =
         runBlocking {
-            val result = openCaja.execute(database, PA, DB, apertura(), "alice")
+            val result = cajaSession.open(database, PA, DB, apertura(), "alice")
 
             assertTrue(result.isSuccess)
             val status = result.getOrThrow()
@@ -143,8 +144,8 @@ class CajaOpenCloseCharacterizationTest {
     @Test
     fun `openCaja genera secuencias incrementales de seis digitos`() =
         runBlocking {
-            openCaja.execute(database, PA, DB, apertura(), "alice")
-            openCaja.execute(database, PA, DB, apertura(), "alice")
+            cajaSession.open(database, PA, DB, apertura(), "alice")
+            cajaSession.open(database, PA, DB, apertura(), "alice")
 
             val secuencias = secuenciaRows().mapNotNull { it[CajaSecuenciaTable.secuencia] }
             assertEquals(listOf("000001", "000002"), secuencias.sorted())
@@ -164,7 +165,7 @@ class CajaOpenCloseCharacterizationTest {
             seedMovimiento("mov-s", "S", 3.0)
             seedDevolucion("dev-1", FORMA_EF, 2.0)
 
-            val result = openCaja.execute(database, PA, DB, apertura(), "bob")
+            val result = cajaSession.open(database, PA, DB, apertura(), "bob")
 
             assertTrue(result.isSuccess)
             val nueva = result.getOrThrow()
@@ -198,6 +199,36 @@ class CajaOpenCloseCharacterizationTest {
             assertEquals(BigDecimal("104.00"), formasCierre[FORMA_EF]!![CajaDetalleCierreFormaPagoTable.montoVentas])
             assertEquals(BigDecimal("40.00"), formasCierre[FORMA_TDC]!![CajaDetalleCierreFormaPagoTable.montoVentas])
             assertEquals(0, detalleCierreCount(SEQ_OLD))
+        }
+
+    @Test
+    fun `openCaja revierte el autoclose si la insercion de la apertura falla`() =
+        runBlocking {
+            seedSecuenciaAbierta(id = SEQ_OLD, secuencia = "000005", montoApertura = 10.0)
+            transaction(database) { SchemaUtils.drop(CajaDetalleAperturaTable) }
+
+            val result = cajaSession.open(database, PA, DB, apertura(), "dave")
+
+            assertTrue(result.isFailure)
+            val abierta = secuenciaRows().single()
+            assertEquals(SEQ_OLD, abierta[CajaSecuenciaTable.idCajaSecuencia])
+            assertNull(abierta[CajaSecuenciaTable.fechaCierre])
+
+            transaction(database) { SchemaUtils.create(CajaDetalleAperturaTable) }
+        }
+
+    @Test
+    fun `openCaja autocierra aunque haya facturas temporales pendientes`() =
+        runBlocking {
+            seedSecuenciaAbierta(id = SEQ_OLD, secuencia = "000005", montoApertura = 0.0)
+            seedFactura("fac-temp-old", SEQ_OLD, formaPago = "contado", codEstatus = 1)
+
+            val result = cajaSession.open(database, PA, DB, apertura(), "erin")
+
+            assertTrue(result.isSuccess)
+            val cerrada = secuenciaRows().first { it[CajaSecuenciaTable.idCajaSecuencia] == SEQ_OLD }
+            assertNotNull(cerrada[CajaSecuenciaTable.fechaCierre])
+            assertEquals(2, secuenciaRows().size)
         }
 
     @Test

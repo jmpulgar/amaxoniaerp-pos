@@ -5,7 +5,6 @@ import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
 import com.amaxoniaerp.core.tenant.requireUserId
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
-import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
@@ -42,10 +41,9 @@ private fun Throwable.publicMessage(fallback: String): String =
 
 fun Route.cajaRouting(
     cajaRepository: CajaRepository,
-    openCaja: OpenCajaUseCase,
     cajaSession: CajaSessionWorkflow,
 ) {
-    val handlers = CajaHandlers(cajaRepository, openCaja, cajaSession)
+    val handlers = CajaHandlers(cajaRepository, cajaSession)
 
     route("/api/cajas") {
         authenticate {
@@ -66,7 +64,6 @@ fun Route.cajaRouting(
  */
 internal class CajaHandlers(
     private val cajaRepository: CajaRepository,
-    private val openCaja: OpenCajaUseCase,
     private val cajaSession: CajaSessionWorkflow,
 ) {
     private val log = LoggerFactory.getLogger("CajaRouting")
@@ -96,7 +93,7 @@ internal class CajaHandlers(
 
             val request = call.receive<AperturaRequest>()
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            val result = openCaja.execute(database, ctx.countryCode, companyDb, request, username)
+            val result = cajaSession.open(database, ctx.countryCode, companyDb, request, username)
 
             result.fold(
                 onSuccess = { cajaSecuencia ->

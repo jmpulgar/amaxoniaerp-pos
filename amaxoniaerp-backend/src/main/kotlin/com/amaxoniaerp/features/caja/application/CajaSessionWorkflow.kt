@@ -2,11 +2,15 @@ package com.amaxoniaerp.features.caja.application
 
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.core.time.BusinessClock
+import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveResponse
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
+import com.amaxoniaerp.features.caja.domain.buildAutoCloseRequest
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
+import java.time.ZoneId
+import java.util.UUID
 
 /**
  * Workflow de sesión de caja (apertura → cierre → estado): módulo profundo
@@ -66,6 +70,92 @@ class CajaSessionWorkflow(
         dbQuery(database) {
             currentOpenSecuencias(dbName, idCaja).firstOrNull()
         }
+
+    /**
+     * Abre una nueva secuencia de caja. Si la caja tiene una sesión abierta
+     * se auto-cierra antes de abrir la siguiente, y toda la operación —
+     * auto-close, inserción y relectura de estado— corre en UNA fase de
+     * transacción: si la apertura falla después del auto-close, ambas
+     * escrituras revierten y la sesión previa permanece abierta.
+     *
+     * Nota: esta atomicidad aplica a fallos dentro de la fase; la
+     * serialización de aperturas concurrentes requiere un índice único a
+     * nivel de esquema (decisión funcional separada).
+     */
+    suspend fun open(
+        database: Database,
+        countryCode: String,
+        dbName: String,
+        request: AperturaRequest,
+        username: String,
+    ): Result<CajaSecuencia> {
+        log.info(
+            "openCaja reloj negocio: countryCode={} zone={} fechaAperturaLocal={} jvmDefaultZone={}",
+            countryCode,
+            BusinessClock.zoneForCountry(countryCode),
+            BusinessClock.nowForCountry(countryCode),
+            ZoneId.systemDefault(),
+        )
+
+        return runCatching {
+            dbQuery(database) {
+                currentOpenSecuencias(dbName, request.idCaja).firstOrNull()?.let { abierta ->
+                    runCatching { autoCloseInPhase(countryCode, abierta.idCajaSecuencia) }
+                        .getOrElse { error ->
+                            log.warn(
+                                "No se pudo cerrar automaticamente la secuencia abierta. idSecuencia={}",
+                                abierta.idCajaSecuencia,
+                                error,
+                            )
+                            throw IllegalStateException(
+                                "No se pudo cerrar automaticamente la secuencia abierta",
+                                error,
+                            )
+                        }
+                }
+
+                val newId = UUID.randomUUID().toString()
+                val nextSequence = store.nextSecuenciaCode(request.idCaja)
+                store.insertApertura(
+                    newId = newId,
+                    request = request,
+                    username = username,
+                    now = BusinessClock.nowForCountry(countryCode),
+                    nextSequence = nextSequence,
+                )
+
+                currentOpenSecuencias(dbName, request.idCaja).firstOrNull()
+                    ?: error("Failed to retrieve open caja.")
+            }
+        }
+    }
+
+    /**
+     * Auto-close dentro de la fase de apertura: cierra con los montos
+     * calculados y diferencias en cero, sin bloquear por facturas
+     * temporales (comportamiento vigente congelado). Relee la guarda de la
+     * secuencia para validar estado y tomar la serie sucursal, igual que el
+     * cierre vigente.
+     */
+    private fun autoCloseInPhase(
+        countryCode: String,
+        idSecuencia: String,
+    ) {
+        val data =
+            store.readSecuenciaData(
+                countryCode = countryCode,
+                idSecuencia = idSecuencia,
+                verifyFacturasTemporales = false,
+            )
+        val cierreRequest = buildAutoCloseRequest(data)
+        val guard =
+            store.findSecuenciaGuard(idSecuencia)
+                ?: error("Secuencia de caja no encontrada")
+        if (guard.cerrada) {
+            error("La secuencia de caja ya se encuentra cerrada")
+        }
+        store.writeCierre(cierreRequest, BusinessClock.nowForCountry(countryCode), guard.serieSucursal)
+    }
 
     private fun currentOpenSecuencias(
         dbName: String,

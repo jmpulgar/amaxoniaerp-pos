@@ -55,7 +55,7 @@ internal fun loadInventarioVentas(
     val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
     val facturasValidas =
         facturaTable
-            .select(facturaTable.idFactura)
+            .select(facturaTable.idFactura, facturaTable.codEstatus)
             .where { facturaTable.idCajaSecuencia eq idSecuencia }
             .filter { row -> (row[facturaTable.codEstatus] ?: 0) != ANNULLED_INVOICE_STATUS }
     val facturaIds = facturasValidas.map { it[facturaTable.idFactura] }

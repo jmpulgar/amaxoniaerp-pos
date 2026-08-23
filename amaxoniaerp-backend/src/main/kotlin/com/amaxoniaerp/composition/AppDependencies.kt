@@ -2,7 +2,6 @@
 
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
-import com.amaxoniaerp.features.caja.application.OpenCajaUseCase
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.data.ClientsRepository
@@ -48,10 +47,9 @@ class Repositories {
     val mesasRepository = MesasRepository()
 }
 
-/** Caja: workflow de apertura (transición) y sesión de caja profunda sobre el repositorio de queries. */
+/** Caja: módulo profundo de sesión (apertura atómica/cierre/estado) sobre el repositorio de queries. */
 class CajaDependencies(
     val cajaRepository: CajaRepository,
-    val openCajaUseCase: OpenCajaUseCase,
     val cajaSession: CajaSessionWorkflow,
 )
 
