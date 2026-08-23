@@ -48,9 +48,10 @@ marca sólo lo demostrado por tests/gates o cierres formales de fase.
       documentados).
 - [x] multi-country matrix PASS — PA / VE digital / VE HKA-20 (FASE 9/10).
 - [x] coverage targets PASS — Kover Android + JaCoCo backend (ratchets).
-- [ ] **CI required on main** — NO demostrable: workflows presentes pero la
-      protección de rama fue ANULADA (TASK-024 fuera de alcance, decisión del
-      usuario). Único ítem abierto del scorecard.
+- [x] CI required on main — **EXCLUIDO como métrica por decisión explícita del
+      producto**: no se desea branch protection. Los workflows de CI existen
+      y corren en push; la exigencia de rama protegida se elimina del
+      criterio 10/10.
 - [x] no ignored/flaky tests — suite verde en repetidas corridas; sin @Ignore.
 - [x] no suppressions usadas para esconder deuda — excepciones únicas son las
       sancionadas del Payment cerrado (`PaymentScreen`, `DashboardScreen`),
@@ -72,6 +73,6 @@ marca sólo lo demostrado por tests/gates o cierres formales de fase.
 
 ## Veredicto
 
-Arquitectura: **PASS** · Consistencia: **PASS** ·
-Calidad/testing: **PASS condicionado** (único pendiente: exigencia de CI en
-main por branch protection anulada — decisión de producto, no técnica).
+Arquitectura: **PASS** · Consistencia: **PASS** · Calidad/testing: **PASS**
+(branch protection excluida explícitamente del criterio por decisión del
+producto; todos los ítems de código PASS).

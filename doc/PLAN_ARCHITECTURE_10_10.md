@@ -1513,5 +1513,6 @@ No empezar refactors masivos de features antes de estos guardrails.
 - [x] FASE 13 — Documentation/operations
 - [x] Final Architecture scorecard PASS (`doc/SCORECARD_FINAL.md`)
 - [x] Final Consistency scorecard PASS (ídem)
-- [ ] Final Quality/Testing scorecard PASS — único ítem abierto: "CI required
-      on main" (branch protection anulada, TASK-024 fuera de alcance); resto PASS.
+- [x] Final Quality/Testing scorecard PASS — branch protection excluida del
+      criterio por decisión explícita del producto (no se desea); resto PASS
+      (`doc/SCORECARD_FINAL.md`).
