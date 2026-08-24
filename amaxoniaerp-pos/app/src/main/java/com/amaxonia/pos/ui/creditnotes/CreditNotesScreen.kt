@@ -255,10 +255,13 @@ private fun CreditNotesListContent(
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         SearchRow(value = state.searchQuery, placeholder = "Buscar devoluciones", onValueChange = onSearchChange, onSearch = onSearch)
         Spacer(modifier = Modifier.height(12.dp))
+        // El total sólo cambia con la lista: se memoiza para no re-sumar en
+        // cada recomposición del banner.
+        val creditNotesTotal = remember(state.creditNotes) { state.creditNotes.sumOf { it.total } }
         SummaryBanner(
             title = "Devoluciones registradas",
             value = state.creditNotes.size.toString(),
-            amount = state.creditNotes.sumOf { it.total },
+            amount = creditNotesTotal,
         )
         Spacer(modifier = Modifier.height(12.dp))
         if (state.creditNotes.isEmpty()) {
