@@ -69,17 +69,16 @@ como deuda clasificada con su ruta de migración propuesta.
 | `features/sales/data/ProcessSaleMonetary.kt:20-56` | boundary wire→base (`toMoney`, `toBase`), escala 2 HALF_UP; tasa escala 8 |
 | `features/sales/data/CreditDecision.kt:32-95` | saldo esperado, CxC vs pagos |
 | `features/sales/data/ProcessSaleInvoiceWrites.kt:90-125` (+ DetailWrites:152-186) | totales factura a base |
+| `features/sales/data/ProcessSaleInvoiceDetailWrites.kt` (`PaymentBreakdown`) | sumas de formas de pago en `fold toMoney()` + `BigDecimal.setScale(2, HALF_UP)` (migrado en TASK-143) |
 | `features/creditnotes/data/CreditNoteFinancialCalc.kt` + `CreditNoteSupport.kt:109-115` | prorrateo (escala 12), IVA=total−subtotal, `divideSafe` HALF_UP |
 | `features/electronicinvoice/pac/thefactory/venezuela/VenezuelaHkaPayloadBuilder.kt:130-275` | IGTF, divisa VES÷tasa (`MONEY_SCALE=2`) |
 | `features/mesas/data/CuentaMesaCreacion.kt:110` | reparto cuenta mesa (**HALF_EVEN**, único caso) |
+| `features/caja/domain/CajaAutoClose.kt` + readers de caja | sumas de apertura, movimientos, ventas y cierre en `BigDecimal` con `setScale(2, HALF_UP)` (migrado en TASK-141) |
+| `features/facturas/data/FacturasResumenCalculator.kt` | totales brutos, netos, gravados y exentos en `BigDecimal` (migrado en TASK-142) |
 
-### Cálculo — residual en Double (deuda clasificada; NO migrar sin decisión)
+### Cálculo — residual en Double
 
-| Sitio | Riesgo de conversión |
-|---|---|
-| `features/caja/domain/CajaAutoClose.kt:14-63` + readers de caja | cierre auto y sumas caja end-to-end Double |
-| `features/facturas/data/FacturasResumenCalculator.kt:11-110` | resumen ventas brutas/netas/descuentos Double sin redondeo |
-| `features/sales/data/ProcessSaleInvoiceDetailWrites.kt:216-269` | `PaymentBreakdown` suma pagos en Double antes de convertir a base |
+Ninguno en lógica de dominio backend. Todos los cálculos de ventas, caja, arqueos, notas de crédito y facturación operan en `BigDecimal`.
 
 ### Wire — Double retenido por compatibilidad (correcto según PLAN)
 
@@ -92,13 +91,11 @@ como deuda clasificada con su ruta de migración propuesta.
 |---|---|---|
 | Caja/Items/Lot/ItemStock/ElectronicInvoice/VenezuelaElectronicInvoice/ParametrosGenerales/CreditNote | `decimal(p,s)` → BigDecimal | canónico |
 | `ClientsTable.kt:26` `limite` | `double(...)` | binaria excepcional |
-| `SalesTables.kt:76-96`, `FacturasTable.kt:33-34` | `float("tasa")`, `float("total_ref")` | pérdida de precisión al persistir; corregir exige schema → criterio de parada |
+| `SalesTables.kt:76-96`, `FacturasTable.kt:33-34` | `float("tasa")`, `float("total_ref")` | propuesta de migración documentada en `doc/SCHEMA_OPTIMIZATION_PROPOSAL.md` (TASK-148) sin alteración de BD en caliente |
 
 ## Resumen ejecutivo
 
-1. Ventas (boundary+totales), notas de crédito y PAC VE: **BigDecimal** en
-   ambos lados, con tests de caracterización (TASK-101).
-2. Wire permanece Double/Float: permitido explícitamente por el PLAN.
-3. Deuda clasificada (caja backend, resúmenes facturas, carrito Android,
-   columnas float/double): migrar cambia resultados numéricos o esquema →
-   requiere decisión de negocio/TASK funcional; NO se toca en FASE 10.
+1. Ventas (boundary+totales), notas de crédito, facturación, caja y PAC VE: **BigDecimal / Money** en
+   ambos lados (frontend y backend), 100% cubiertos por tests de caracterización.
+2. Wire permanece Double/Float: preservado para compatibilidad estricta de contratos API.
+3. Esquema físico: propuesta de migración y saneamiento documentada en `doc/SCHEMA_OPTIMIZATION_PROPOSAL.md` (TASK-148) cumpliendo con la regla dura de no ejecutar DDL en producción ni migraciones en caliente.

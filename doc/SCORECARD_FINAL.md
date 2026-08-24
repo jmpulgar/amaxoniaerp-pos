@@ -1,4 +1,4 @@
-# Scorecard final 10/10 (FASE 13)
+# Scorecard final 10/10 (FASE 14 / CIERRE TASK-170)
 
 Evaluación contra `doc/PLAN_ARCHITECTURE_10_10.md` §8. Regla aplicada: se
 marca sólo lo demostrado por tests/gates o cierres formales de fase.
@@ -8,6 +8,8 @@ marca sólo lo demostrado por tests/gates o cierres formales de fase.
 - [x] 0 architecture-test violations — `CompositionBoundaryArchitectureTest`
       (Android) + `FeatureDependencyArchitectureTest`/`TenantSeamArchitectureTest`
       (backend) verdes; sondas negativas verificadas (FASE 11).
+- [x] 0 allow-lists residuales en domain o rutas — `DOMAIN_INFRA_ALLOW_LIST` = 0,
+      `ROUTES_DATABASE_MANAGER_ALLOW_LIST` = 0 (FASE 14).
 - [x] 0 direct `DependencyContainer` usages desde feature UI — ídem.
 - [x] 1 Android composition strategy — composition root único (FASE 5).
 - [x] 1 backend composition strategy — DI manual vía `composition/AppDependencies`.
@@ -29,9 +31,9 @@ marca sólo lo demostrado por tests/gates o cierres formales de fase.
       ARCHITECTURE.md política canónica; runbooks nuevos (FASE 13).
 - [x] DTO/domain boundaries documentados — `doc/MONEY_INVENTORY.md`,
       `contracts/README.md`.
-- [x] money policy cumplida — boundary BigDecimal + caracterización
-      (deuda residual clasificada pendiente de decisión: caja backend,
-      resúmenes, carrito display; ver inventario).
+- [x] money policy cumplida 100% — domain calculations en `BigDecimal` / `Money`
+      (Caja, Resúmenes facturas, PaymentBreakdown y Ticket migrados en FASE 14;
+      caracterizados con tests).
 
 ## Calidad/testing
 
