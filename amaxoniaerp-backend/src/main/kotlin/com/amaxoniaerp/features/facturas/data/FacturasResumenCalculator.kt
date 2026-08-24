@@ -2,31 +2,37 @@ package com.amaxoniaerp.features.facturas.data
 
 import com.amaxoniaerp.features.facturas.domain.FacturasResumen
 import org.jetbrains.exposed.sql.ResultRow
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+private val ZERO_MONEY = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+
+private fun Double.toMoney(): BigDecimal = BigDecimal.valueOf(this).setScale(2, RoundingMode.HALF_UP)
+
 /** Acumulador mutable de totales del resumen de facturas (PA y VE). */
 private class ResumenAccumulator {
-    var ventasBrutas = 0.0
-    var ventasNetas = 0.0
-    var cancelaciones = 0.0
+    var ventasBrutas = ZERO_MONEY
+    var ventasNetas = ZERO_MONEY
+    var cancelaciones = ZERO_MONEY
     var totalPagadas = 0
     var totalAnuladas = 0
     var moneda = "USD"
     var abrMonedaSec: String? = null
     var tasaGlobal: Float? = null
-    var ventasBrutasRef = 0.0
-    var ventasNetasRef = 0.0
-    var cancelacionesRef = 0.0
+    var ventasBrutasRef = ZERO_MONEY
+    var ventasNetasRef = ZERO_MONEY
+    var cancelacionesRef = ZERO_MONEY
 
     fun add(
         row: ResultRow,
         tabla: BaseFacturasTable,
     ) {
         val descripcionEstatus = row[EstatusTable.descripcion] ?: ""
-        val total = row[tabla.totalTotalFactura].toDouble()
-        val totalGeneral = row[tabla.totalizarTotalGeneral].toDouble()
+        val total = row[tabla.totalTotalFactura].setScale(2, RoundingMode.HALF_UP)
+        val totalGeneral = row[tabla.totalizarTotalGeneral].setScale(2, RoundingMode.HALF_UP)
         val isAnulada =
             descripcionEstatus.equals("Anulada", ignoreCase = true) ||
                 descripcionEstatus.equals("Anulado", ignoreCase = true)
@@ -42,25 +48,34 @@ private class ResumenAccumulator {
         row: ResultRow,
         tabla: FacturasTableVE,
         isAnulada: Boolean,
-        total: Double,
-        totalGeneral: Double,
+        total: BigDecimal,
+        totalGeneral: BigDecimal,
     ) {
         val tasaRow = row[tabla.tasa]
-        val totalRefRow = row[tabla.totalRef]?.toDouble() ?: 0.0
+        val totalRefRow = (row[tabla.totalRef]?.toDouble() ?: 0.0).toMoney()
         val abrSecRow = row[tabla.abrMonedaSecundaria]
 
         if (isAnulada) {
-            cancelaciones += total
-            cancelacionesRef += totalRefRow
+            cancelaciones = (cancelaciones + total).setScale(2, RoundingMode.HALF_UP)
+            cancelacionesRef = (cancelacionesRef + totalRefRow).setScale(2, RoundingMode.HALF_UP)
             totalAnuladas++
         } else {
-            ventasBrutas += totalGeneral
-            ventasNetas += total
-            ventasBrutasRef += totalRefRow
-            ventasNetasRef += totalRefRow
+            ventasBrutas = (ventasBrutas + totalGeneral).setScale(2, RoundingMode.HALF_UP)
+            ventasNetas = (ventasNetas + total).setScale(2, RoundingMode.HALF_UP)
+            ventasBrutasRef = (ventasBrutasRef + totalRefRow).setScale(2, RoundingMode.HALF_UP)
+            ventasNetasRef = (ventasNetasRef + totalRefRow).setScale(2, RoundingMode.HALF_UP)
             totalPagadas++
         }
 
+        updateCurrencyMetadata(row, tabla, abrSecRow, tasaRow)
+    }
+
+    private fun updateCurrencyMetadata(
+        row: ResultRow,
+        tabla: FacturasTableVE,
+        abrSecRow: String?,
+        tasaRow: Float?,
+    ) {
         if (moneda == "USD") {
             val m = row[tabla.abrMonedaBase]?.takeIf { it.isNotBlank() }
             if (m != null) moneda = m
@@ -75,39 +90,51 @@ private class ResumenAccumulator {
 
     private fun addGeneric(
         isAnulada: Boolean,
-        total: Double,
-        totalGeneral: Double,
+        total: BigDecimal,
+        totalGeneral: BigDecimal,
     ) {
         if (isAnulada) {
-            cancelaciones += total
+            cancelaciones = (cancelaciones + total).setScale(2, RoundingMode.HALF_UP)
             totalAnuladas++
         } else {
-            ventasBrutas += totalGeneral
-            ventasNetas += total
+            ventasBrutas = (ventasBrutas + totalGeneral).setScale(2, RoundingMode.HALF_UP)
+            ventasNetas = (ventasNetas + total).setScale(2, RoundingMode.HALF_UP)
             totalPagadas++
         }
     }
 
     fun build(totalFacturas: Int): FacturasResumen {
-        val descuentos = (ventasBrutas - ventasNetas).coerceAtLeast(0.0)
-        val ticketPromedio = if (totalPagadas > 0) ventasNetas / totalPagadas else 0.0
+        val diff = (ventasBrutas - ventasNetas).setScale(2, RoundingMode.HALF_UP)
+        val descuentos = if (diff < ZERO_MONEY) ZERO_MONEY else diff
+        val ticketPromedio =
+            if (totalPagadas > 0) {
+                ventasNetas.divide(BigDecimal.valueOf(totalPagadas.toLong()), 2, RoundingMode.HALF_UP)
+            } else {
+                ZERO_MONEY
+            }
         val tasa = tasaGlobal
         val hasMultiCurrency = !abrMonedaSec.isNullOrBlank() && tasa != null && tasa > 0f
+        val ticketPromedioRef =
+            if (hasMultiCurrency && totalPagadas > 0) {
+                ventasNetasRef.divide(BigDecimal.valueOf(totalPagadas.toLong()), 2, RoundingMode.HALF_UP)
+            } else {
+                null
+            }
 
         return FacturasResumen(
-            ventasBrutas = ventasBrutas,
-            ventasNetas = ventasNetas,
-            descuentos = descuentos,
-            cancelaciones = cancelaciones,
+            ventasBrutas = ventasBrutas.toDouble(),
+            ventasNetas = ventasNetas.toDouble(),
+            descuentos = descuentos.toDouble(),
+            cancelaciones = cancelaciones.toDouble(),
             totalFacturas = totalFacturas,
             totalFacturasPagadas = totalPagadas,
             totalFacturasAnuladas = totalAnuladas,
-            ticketPromedio = ticketPromedio,
+            ticketPromedio = ticketPromedio.toDouble(),
             moneda = moneda,
-            ventasBrutasRef = if (hasMultiCurrency) ventasBrutasRef else null,
-            ventasNetasRef = if (hasMultiCurrency) ventasNetasRef else null,
-            cancelacionesRef = if (hasMultiCurrency) cancelacionesRef else null,
-            ticketPromedioRef = if (hasMultiCurrency && totalPagadas > 0) ventasNetasRef / totalPagadas else null,
+            ventasBrutasRef = if (hasMultiCurrency) ventasBrutasRef.toDouble() else null,
+            ventasNetasRef = if (hasMultiCurrency) ventasNetasRef.toDouble() else null,
+            cancelacionesRef = if (hasMultiCurrency) cancelacionesRef.toDouble() else null,
+            ticketPromedioRef = ticketPromedioRef?.toDouble(),
             abrMonedaSecundaria = abrMonedaSec,
         )
     }
