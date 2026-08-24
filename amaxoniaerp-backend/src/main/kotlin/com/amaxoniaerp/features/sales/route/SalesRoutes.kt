@@ -1,6 +1,6 @@
-﻿package com.amaxoniaerp.features.sales.route
+package com.amaxoniaerp.features.sales.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
@@ -48,7 +48,7 @@ internal class SalesHandlers(
                 request.pagos.size,
                 request.factura.totalTotalFactura,
             )
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
 
             val result = processSaleUseCase.execute(companyDb, ctx.countryCode, request)
             log.info(

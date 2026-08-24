@@ -1,6 +1,6 @@
-﻿package com.amaxoniaerp.features.geography.route
+package com.amaxoniaerp.features.geography.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.geography.domain.AddressLevelsListResponse
@@ -40,7 +40,7 @@ internal class GeographyHandlers(
 
             val paging = call.resolvePaging() ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val (countries, total) =
                 geographyRepository.listCatalog(
                     database = companyDb,
@@ -76,7 +76,7 @@ internal class GeographyHandlers(
 
             val paging = call.resolvePaging() ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val (levels, total) =
                 geographyRepository.listAddressLevels(
                     database = companyDb,

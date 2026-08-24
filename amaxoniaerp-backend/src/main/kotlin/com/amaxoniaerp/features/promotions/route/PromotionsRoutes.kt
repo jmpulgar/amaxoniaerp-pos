@@ -1,6 +1,6 @@
 package com.amaxoniaerp.features.promotions.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
 import com.amaxoniaerp.features.promotions.domain.PromotionsListResponse
@@ -24,6 +24,6 @@ private suspend fun listarPromociones(
     repository: PromotionsRepository,
 ) = run {
     val ctx = call.resolveCompanyRequestContext() ?: return@run
-    val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+    val companyDb = ctx.connectDatabase()
     call.respond(PromotionsListResponse(repository.listPromotions(companyDb)))
 }

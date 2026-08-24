@@ -145,23 +145,10 @@ class FeatureDependencyArchitectureTest {
         val DOMAIN_INFRA_ALLOW_LIST: List<String> = emptyList()
 
         /**
-         * Seam legacy: estas rutas resuelven su DB vía DatabaseManager y están
-         * congeladas por tests de integración (TenantSeam/SalesRoutes/
-         * CreditNoteRoutes). Una ruta NUEVA no puede sumarse a esta lista sin
-         * decisión explícita.
+         * Las rutas delegan la resolución de base de datos en CompanyRequestContext
+         * y no acceden directamente a DatabaseManager.
          */
-        val ROUTES_DATABASE_MANAGER_ALLOW_LIST =
-            listOf(
-                "com/amaxoniaerp/features/clients/route/ClientsRoute.kt",
-                "com/amaxoniaerp/features/clients/route/ClientTypesRoute.kt",
-                "com/amaxoniaerp/features/creditnotes/route/CreditNoteRoutes.kt",
-                "com/amaxoniaerp/features/electronicinvoice/route/ElectronicInvoiceRoutes.kt",
-                "com/amaxoniaerp/features/facturas/route/FacturasRoutes.kt",
-                "com/amaxoniaerp/features/geography/route/GeographyRoutes.kt",
-                "com/amaxoniaerp/features/items/route/ItemsRoutes.kt",
-                "com/amaxoniaerp/features/promotions/route/PromotionsRoutes.kt",
-                "com/amaxoniaerp/features/sales/route/SalesRoutes.kt",
-            )
+        val ROUTES_DATABASE_MANAGER_ALLOW_LIST: List<String> = emptyList()
 
         /**
          * Cruces heredados application/domain → data ajena, caracterizados:

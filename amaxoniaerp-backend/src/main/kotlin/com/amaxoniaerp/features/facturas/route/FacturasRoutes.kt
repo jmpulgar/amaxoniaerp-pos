@@ -1,6 +1,6 @@
 package com.amaxoniaerp.features.facturas.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
 import com.amaxoniaerp.features.facturas.data.FacturasFilter
@@ -73,7 +73,7 @@ internal class FacturasHandlers(
                     return@run
                 }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val (facturas, total) =
                 facturasRepository.listFacturas(
                     database = companyDb,
@@ -101,7 +101,7 @@ internal class FacturasHandlers(
                     return@run
                 }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val resumen = facturasRepository.getResumen(companyDb, ctx.countryCode, filter)
             call.respond(resumen)
         }
@@ -111,7 +111,7 @@ internal class FacturasHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val idFactura = call.requireParameter("idFactura", "Missing idFactura") ?: return@run
 
-            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val database = ctx.connectDatabase()
             val factura = facturasRepository.findByCorrelationId(database, ctx.countryCode, idFactura)
             call.respondFactura(factura)
         }
@@ -121,7 +121,7 @@ internal class FacturasHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val detalle = facturasRepository.getFacturaDetalle(companyDb, ctx.countryCode, facturaId)
             call.respondFactura(detalle)
         }
@@ -131,7 +131,7 @@ internal class FacturasHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             // El repositorio valida internamente los países soportados (PA/VE) y
             // omite los campos fiscales propios de Panamá cuando corresponde.
             // No bloquear el país aquí: si la configuración del POS permite el
@@ -162,7 +162,7 @@ internal class FacturasHandlers(
 
             val request = call.receive<ConfirmFacturaFiscalRequest>()
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             try {
                 val response = facturasRepository.confirmFiscal(companyDb, ctx.countryCode, facturaId, request)
                 call.respond(response)
@@ -185,7 +185,7 @@ internal class FacturasHandlers(
 
             val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             panamaInvoiceProcessor.resendInvoiceEmail(companyDb, facturaId).fold(
                 onSuccess = { call.respond(it) },
                 onFailure = { throwable ->

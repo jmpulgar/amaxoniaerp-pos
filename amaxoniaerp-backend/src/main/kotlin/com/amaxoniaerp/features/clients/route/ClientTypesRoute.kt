@@ -1,6 +1,6 @@
-﻿package com.amaxoniaerp.features.clients.route
+package com.amaxoniaerp.features.clients.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.domain.ClientTypesListResponse
@@ -40,7 +40,7 @@ private suspend fun listarClientTypes(
         return@run
     }
 
-    val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+    val companyDb = ctx.connectDatabase()
     val (types, total) =
         clientTypesRepository.listClientTypes(
             database = companyDb,

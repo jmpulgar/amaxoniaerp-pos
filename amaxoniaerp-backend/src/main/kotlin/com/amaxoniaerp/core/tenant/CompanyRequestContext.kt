@@ -1,10 +1,12 @@
 package com.amaxoniaerp.core.tenant
 
+import com.amaxoniaerp.core.database.DatabaseManager
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
+import org.jetbrains.exposed.sql.Database
 
 /** Claim `country_code` del JWT. */
 fun JWTPrincipal.getCountryCode(): String? = payload.getClaim("country_code")?.asString()
@@ -93,3 +95,7 @@ suspend fun CompanyRequestContext.requireCompanyDbHeader(call: ApplicationCall):
         }
         companyDbHeader
     }
+
+/** Conecta a la base de datos de la empresa resuelta en el contexto. */
+fun CompanyRequestContext.connectDatabase(companyDbName: String = adminDb): Database =
+    DatabaseManager.connectToCompanyDb(countryCode, companyDbName)

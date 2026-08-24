@@ -1,6 +1,6 @@
 package com.amaxoniaerp.features.creditnotes.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.requireCompanyDbHeader
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
@@ -181,7 +181,7 @@ internal class CreditNoteHandlers(
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run null
             val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run null
-            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val database = ctx.connectDatabase(companyDb)
             val username =
                 ctx.principal.payload
                     .getClaim("username")

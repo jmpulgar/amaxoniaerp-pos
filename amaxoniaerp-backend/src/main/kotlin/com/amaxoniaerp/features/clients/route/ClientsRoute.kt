@@ -1,6 +1,6 @@
-﻿package com.amaxoniaerp.features.clients.route
+package com.amaxoniaerp.features.clients.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.clients.data.ClientsRepository
 import com.amaxoniaerp.features.clients.domain.ClientsListResponse
@@ -60,7 +60,7 @@ internal class ClientsHandlers(
                 return@run
             }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
             call.respond(ClientsListResponse(data = clients, total = total))
         }
@@ -69,7 +69,7 @@ internal class ClientsHandlers(
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode)
             if (defaultClient == null) {
                 call.respond(HttpStatusCode.NotFound, mapOf("error" to "Default client not configured"))
@@ -98,7 +98,7 @@ internal class ClientsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val id = call.requireClientId() ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val sucursales = clientsRepository.listClientSucursales(companyDb, ctx.countryCode, id)
             call.respond(sucursales)
         }
@@ -113,7 +113,7 @@ internal class ClientsHandlers(
                 return@run
             }
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val client = clientsRepository.createClient(companyDb, ctx.countryCode, request)
             call.respond(HttpStatusCode.Created, client)
         }
@@ -141,7 +141,7 @@ internal class ClientsHandlers(
     private suspend fun resolveDatabase(call: ApplicationCall): Database? =
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run null
-            DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            ctx.connectDatabase()
         }
 
     private suspend fun ApplicationCall.requireClientId(): String? =

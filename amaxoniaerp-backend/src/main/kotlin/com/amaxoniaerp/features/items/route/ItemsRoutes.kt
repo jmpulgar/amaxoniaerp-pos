@@ -1,6 +1,6 @@
 package com.amaxoniaerp.features.items.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.facturas.data.getBestSellerItemQuantities
 import com.amaxoniaerp.features.items.data.ItemsListQuery
@@ -173,7 +173,7 @@ internal class ItemsHandlers(
             }
 
             // Conectar a BD de empresa usando Two-Tier routing
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
 
             val (items, total) =
                 itemsRepository.listItems(
@@ -199,7 +199,7 @@ internal class ItemsHandlers(
                 call.request.queryParameters["limit"]
                     ?.toIntOrNull()
                     ?.coerceIn(MIN_BEST_SELLERS_LIMIT, MAX_BEST_SELLERS_LIMIT) ?: DEFAULT_BEST_SELLERS_LIMIT
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val quantities = getBestSellerItemQuantities(companyDb, limit)
             val ids = quantities.map { it.first }
             val products = itemsRepository.getItemsByIds(companyDb, ctx.countryCode, ids)
@@ -224,7 +224,7 @@ internal class ItemsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
 
             val request = call.receive<CreateProductRequest>()
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
 
             val product =
                 itemsRepository.createItem(
@@ -242,7 +242,7 @@ internal class ItemsHandlers(
             val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
 
             val request = call.receive<CreateProductRequest>()
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
 
             val product =
                 itemsRepository.updateItem(
@@ -264,7 +264,7 @@ internal class ItemsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
 
             val product =
                 itemsRepository.getItemById(
@@ -285,7 +285,7 @@ internal class ItemsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val lots = itemsRepository.getItemLots(companyDb, id)
             call.respond(lots)
         }
@@ -295,7 +295,7 @@ internal class ItemsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val id = call.requireIntParam("id", ERR_INVALID_PRODUCT_ID) ?: return@run
 
-            val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val companyDb = ctx.connectDatabase()
             val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
             call.respond(stock)
         }
@@ -304,7 +304,7 @@ internal class ItemsHandlers(
 private suspend fun ApplicationCall.resolveDatabase(): org.jetbrains.exposed.sql.Database? =
     run {
         val ctx = resolveCompanyRequestContext() ?: return@run null
-        DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+        ctx.connectDatabase()
     }
 
 private suspend fun ApplicationCall.respondDepartments(list: List<Pair<Int, String>>) {

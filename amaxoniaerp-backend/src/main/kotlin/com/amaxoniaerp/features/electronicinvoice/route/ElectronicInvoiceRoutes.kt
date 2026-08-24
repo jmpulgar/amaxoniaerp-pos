@@ -1,6 +1,6 @@
 package com.amaxoniaerp.features.electronicinvoice.route
 
-import com.amaxoniaerp.core.database.DatabaseManager
+import com.amaxoniaerp.core.tenant.connectDatabase
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
@@ -51,7 +51,7 @@ internal class ElectronicInvoiceHandlers(
                 return@run
             }
 
-            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+            val database = ctx.connectDatabase()
             val processor = factory.forCountry(ctx.countryCode)
 
             when (val result = processor.processElectronicInvoice(database, invoiceId)) {
