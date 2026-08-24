@@ -58,7 +58,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.R
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.ui.common.injectedViewModel
-import com.amaxonia.pos.ui.login.components.CountrySelector
 import com.amaxonia.pos.ui.theme.PosPalette
 
 @Composable
@@ -151,19 +150,6 @@ private fun LoginForm(
             text = stringResource(R.string.login_title),
             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold),
             color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.height(18.dp))
-        Text(
-            text = stringResource(R.string.login_country_region),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        CountrySelector(
-            selectedCountry = state.selectedCountry,
-            onCountrySelected = { onAction(LoginUiAction.CountryChanged(it)) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isLoading,
         )
         Spacer(modifier = Modifier.height(18.dp))
         LoginCredentialsCard(state, onAction)

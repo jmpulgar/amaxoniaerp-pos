@@ -19,25 +19,27 @@ enum class SchemaType {
 
 /** Países soportados. La capa data aporta la URL del entorno en runtime. */
 object ServerCountries {
-    val AVAILABLE: List<ServerCountry> =
-        listOf(
-            ServerCountry(
-                code = "VE",
-                displayName = "Venezuela",
-                baseUrl = "",
-                flagEmoji = "🇻🇪",
-                schemaType = SchemaType.TYPE_B,
-            ),
-            ServerCountry(
-                code = "PA",
-                displayName = "Panamá",
-                baseUrl = "",
-                flagEmoji = "🇵🇦",
-                schemaType = SchemaType.TYPE_A,
-            ),
+    val VENEZUELA: ServerCountry =
+        ServerCountry(
+            code = "VE",
+            displayName = "Venezuela",
+            baseUrl = "",
+            flagEmoji = "🇻🇪",
+            schemaType = SchemaType.TYPE_B,
         )
 
-    fun fromCode(code: String): ServerCountry? = AVAILABLE.find { it.code == code }
+    val PANAMA: ServerCountry =
+        ServerCountry(
+            code = "PA",
+            displayName = "Panamá",
+            baseUrl = "",
+            flagEmoji = "🇵🇦",
+            schemaType = SchemaType.TYPE_A,
+        )
+
+    val AVAILABLE: List<ServerCountry> = listOf(VENEZUELA, PANAMA)
+
+    fun fromCode(code: String): ServerCountry? = AVAILABLE.find { it.code.equals(code, ignoreCase = true) }
 
     fun getAvailable(): List<ServerCountry> = AVAILABLE
 }

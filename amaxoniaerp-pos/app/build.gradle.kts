@@ -64,17 +64,20 @@ android {
         create("amaxonia") {
             dimension = "brand"
             applicationId = "com.amaxonia.pos"
+            buildConfigField("String", "DEFAULT_COUNTRY_CODE", "\"PA\"")
         }
 
         create("banescoVenezuela") {
             dimension = "brand"
             // Provisional: reemplazar por el applicationId oficial de Banesco cuando esté disponible.
             applicationId = "com.amaxonia.pos.banesco"
+            buildConfigField("String", "DEFAULT_COUNTRY_CODE", "\"VE\"")
         }
 
         create("listoerp") {
             dimension = "brand"
             applicationId = "com.amaxonia.pos.listoerp"
+            buildConfigField("String", "DEFAULT_COUNTRY_CODE", "\"VE\"")
         }
     }
 

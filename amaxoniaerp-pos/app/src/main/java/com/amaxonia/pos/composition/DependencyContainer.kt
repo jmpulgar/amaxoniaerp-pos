@@ -1,6 +1,7 @@
 package com.amaxonia.pos.composition
 
 import android.content.Context
+import com.amaxonia.pos.BuildConfig
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.ClientSucursalDao
@@ -396,8 +397,11 @@ object DependencyContainer {
 
     /** Núcleo de red y sesión: config de API, cliente/servicio, almacenamiento local y monitor. */
     private fun initializeNetworkAndSession(context: Context): AppDatabase {
+        val defaultCountry =
+            ServerCountries.fromCode(BuildConfig.DEFAULT_COUNTRY_CODE)
+                ?: ServerCountries.AVAILABLE[0]
         val apiConfigManager = ApiConfigManager()
-        apiConfigManager.updateBaseUrl(ServerCountries.AVAILABLE[0])
+        apiConfigManager.updateBaseUrl(defaultCountry)
         val apiClient = ApiClient(apiConfigManager)
         val apiService = ApiService(apiClient)
         val applicationContext = context.applicationContext

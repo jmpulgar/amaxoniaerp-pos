@@ -2,6 +2,8 @@ package com.amaxonia.pos.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.domain.model.ServerCountries
+import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.usecase.auth.AuthenticateUserUseCase
 import com.amaxonia.pos.domain.usecase.auth.ConfigureLoginCountryUseCase
 import com.amaxonia.pos.domain.usecase.auth.LoginCredentials
@@ -19,8 +21,9 @@ import kotlinx.coroutines.launch
 class LoginViewModel(
     private val authenticateUser: AuthenticateUserUseCase,
     private val configureCountry: ConfigureLoginCountryUseCase,
+    private val defaultCountry: ServerCountry = ServerCountries.AVAILABLE[0],
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(LoginState())
+    private val mutableState = MutableStateFlow(LoginState(selectedCountry = defaultCountry))
     val state: StateFlow<LoginState> = mutableState.asStateFlow()
 
     private val mutableEffects = MutableSharedFlow<LoginUiEffect>(extraBufferCapacity = 1)
@@ -34,10 +37,6 @@ class LoginViewModel(
                 mutableState.update { it.copy(password = action.value, errorMessage = null) }
             LoginUiAction.TogglePasswordVisibility ->
                 mutableState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
-            is LoginUiAction.CountryChanged -> {
-                mutableState.update { it.copy(selectedCountry = action.country, errorMessage = null) }
-                configureCountry.select(action.country)
-            }
             LoginUiAction.LoadSavedCountry -> restoreCountry()
             LoginUiAction.Submit -> submit()
         }
@@ -45,7 +44,7 @@ class LoginViewModel(
 
     private fun restoreCountry() {
         viewModelScope.launch {
-            val restored = configureCountry.restore(mutableState.value.selectedCountry)
+            val restored = configureCountry.restore(defaultCountry)
             mutableState.update { it.copy(selectedCountry = restored) }
         }
     }

@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.repository
 
+import com.amaxonia.pos.BuildConfig
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.allowDiscountsFlow
 import com.amaxonia.pos.data.local.allowEditPricesFlow
@@ -13,6 +14,7 @@ import com.amaxonia.pos.data.local.saveTheFactorySettings
 import com.amaxonia.pos.data.local.selectedCountryFlow
 import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
 import com.amaxonia.pos.data.local.theFactorySettingsFlow
+import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrinterType
@@ -45,9 +47,14 @@ class LocalPosConfigurationRepository(
             ?.adminDb
             .orEmpty()
 
-    override suspend fun currentCountryCode(): String = localStore.readSelectedCountry()?.code.orEmpty()
+    override suspend fun currentCountryCode(): String =
+        localStore.readSelectedCountry()?.code
+            ?: ServerCountries.fromCode(BuildConfig.DEFAULT_COUNTRY_CODE)?.code
+            ?: "VE"
 
-    override suspend fun currentCountry(): ServerCountry? = localStore.readSelectedCountry()
+    override suspend fun currentCountry(): ServerCountry? =
+        localStore.readSelectedCountry()
+            ?: ServerCountries.fromCode(BuildConfig.DEFAULT_COUNTRY_CODE)
 
     override suspend fun selectedPrinterType(): PrinterType = localStore.readSelectedPrinterType()
 

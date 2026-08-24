@@ -1,5 +1,7 @@
 package com.amaxonia.pos.composition
 
+import com.amaxonia.pos.BuildConfig
+import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.usecase.auth.AuthenticateUserUseCase
 import com.amaxonia.pos.domain.usecase.auth.ConfigureLoginCountryUseCase
 import com.amaxonia.pos.ui.login.LoginViewModel
@@ -10,5 +12,8 @@ object LoginGraph {
         LoginViewModel(
             AuthenticateUserUseCase(DependencyContainer.authRepository, DependencyContainer.localStore),
             ConfigureLoginCountryUseCase(DependencyContainer.serverEnvironment, DependencyContainer.localStore),
+            defaultCountry =
+                ServerCountries.fromCode(BuildConfig.DEFAULT_COUNTRY_CODE)
+                    ?: ServerCountries.AVAILABLE[0],
         )
 }

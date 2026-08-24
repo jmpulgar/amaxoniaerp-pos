@@ -23,10 +23,6 @@ sealed interface LoginUiAction {
 
     data object TogglePasswordVisibility : LoginUiAction
 
-    data class CountryChanged(
-        val country: ServerCountry,
-    ) : LoginUiAction
-
     data object LoadSavedCountry : LoginUiAction
 
     data object Submit : LoginUiAction

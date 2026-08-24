@@ -30,16 +30,20 @@ class LoginViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun selectingCountryUpdatesStateAndServerEnvironmentWithoutGlobalContainer() {
-        val environment = FakeServerEnvironment()
-        val viewModel = viewModel(environment = environment)
-        val panama = ServerCountries.AVAILABLE.single { it.code == "PA" }
+    fun defaultCountryInitializesStateAndAppliesToEnvironment() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val environment = FakeServerEnvironment()
+            val panama = ServerCountries.AVAILABLE.single { it.code == "PA" }
+            val viewModel = viewModel(environment = environment, defaultCountry = panama)
 
-        viewModel.onAction(LoginUiAction.CountryChanged(panama))
+            assertEquals(panama, viewModel.state.value.selectedCountry)
 
-        assertEquals(panama, viewModel.state.value.selectedCountry)
-        assertEquals(listOf(panama), environment.selections)
-    }
+            viewModel.onAction(LoginUiAction.LoadSavedCountry)
+            advanceUntilIdle()
+
+            assertEquals(panama, viewModel.state.value.selectedCountry)
+            assertEquals(listOf(panama), environment.selections)
+        }
 
     @Test
     fun savedCountryIsRestoredAndApplied() =
@@ -143,10 +147,12 @@ class LoginViewModelTest {
         auth: AuthRepository = FailingAuthRepository,
         environment: FakeServerEnvironment = FakeServerEnvironment(),
         store: CountrySelectionStore = FakeCountryStore(null),
+        defaultCountry: ServerCountry = ServerCountries.AVAILABLE[0],
     ): LoginViewModel =
         LoginViewModel(
             AuthenticateUserUseCase(auth, store),
             ConfigureLoginCountryUseCase(environment, store),
+            defaultCountry = defaultCountry,
         )
 
     private object FailingAuthRepository : AuthRepository {

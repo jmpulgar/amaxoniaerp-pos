@@ -28,7 +28,8 @@ suspend fun LocalStore.readSelectedPrinterType(): PrinterType = selectedPrinterT
 
 fun LocalStore.selectedPrinterTypeFlow(): Flow<PrinterType> =
     dataStore.data.map { prefs ->
-        val country = prefs[selectedCountryKey]?.let { ServerCountries.fromCode(it) }
+        val code = prefs[selectedCountryKey] ?: com.amaxonia.pos.BuildConfig.DEFAULT_COUNTRY_CODE
+        val country = ServerCountries.fromCode(code)
         val storedPrinter =
             prefs[selectedPrinterTypeKey]
                 ?.let { storedValue -> PrinterType.entries.firstOrNull { it.name == storedValue } }
@@ -103,7 +104,8 @@ suspend fun LocalStore.readAllowDiscounts(): Boolean = allowDiscountsFlow().firs
  */
 fun LocalStore.selectedCountryFlow(): Flow<ServerCountry?> =
     dataStore.data.map { prefs ->
-        prefs[selectedCountryKey]?.let { ServerCountries.fromCode(it) }
+        val code = prefs[selectedCountryKey] ?: com.amaxonia.pos.BuildConfig.DEFAULT_COUNTRY_CODE
+        ServerCountries.fromCode(code)
     }
 
 /**

@@ -175,7 +175,8 @@ class LocalStore(
         )
     }
 
-    override suspend fun currentCountryCode(): String = readSelectedCountry()?.code ?: "VE"
+    override suspend fun currentCountryCode(): String =
+        readSelectedCountry()?.code ?: ServerCountries.fromCode(com.amaxonia.pos.BuildConfig.DEFAULT_COUNTRY_CODE)?.code ?: "VE"
 
     override suspend fun currentUsername(): String = readAuthSnapshot()?.user?.username ?: "POS"
 
