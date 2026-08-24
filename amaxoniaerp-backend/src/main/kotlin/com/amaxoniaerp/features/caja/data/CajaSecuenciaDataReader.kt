@@ -164,8 +164,7 @@ internal fun readCajaSecuenciaData(
     val detalleApertura = loadDetalleApertura(idSecuencia)
     val montosPorForma = loadMontosPorForma(countryCode, idSecuencia)
     val formaPagoItems = loadFormaPagoItems(header.idCaja, montosPorForma)
-    val montoEntrada = loadMovimientoTotal(idSecuencia, "E")
-    val montoSalida = loadMovimientoTotal(idSecuencia, "S")
+    val (montoEntrada, montoSalida) = loadMovimientoEntradaSalida(idSecuencia)
     appendEntradasSalidasItems(formaPagoItems, montoEntrada, montoSalida)
 
     val formaPagoDevolucion = loadFormaPagoDevolucion(idSecuencia)

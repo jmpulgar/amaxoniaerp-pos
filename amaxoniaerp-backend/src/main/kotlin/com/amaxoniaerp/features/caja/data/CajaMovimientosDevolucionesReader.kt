@@ -8,19 +8,30 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
+import java.math.BigDecimal
+import java.math.RoundingMode
 
-internal fun loadMovimientoTotal(
-    idSecuencia: String,
-    tipo: String,
-): Double =
+internal fun loadMovimientoEntradaSalida(idSecuencia: String): Pair<Double, Double> =
     runCatching {
-        CajaMovimientoTable
-            .select(CajaMovimientoTable.total)
-            .where {
-                (CajaMovimientoTable.idSecuencia eq idSecuencia) and
-                    (CajaMovimientoTable.tipo eq tipo)
-            }.sumOf { it[CajaMovimientoTable.total].toDouble() }
-    }.getOrDefault(0.0)
+        val rows =
+            CajaMovimientoTable
+                .select(CajaMovimientoTable.tipo, CajaMovimientoTable.total)
+                .where {
+                    (CajaMovimientoTable.idSecuencia eq idSecuencia) and
+                        (CajaMovimientoTable.tipo inList listOf("E", "S"))
+                }.toList()
+
+        var entrada = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+        var salida = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+        for (row in rows) {
+            val total = row[CajaMovimientoTable.total].setScale(2, RoundingMode.HALF_UP)
+            when (row[CajaMovimientoTable.tipo]) {
+                "E" -> entrada = (entrada + total).setScale(2, RoundingMode.HALF_UP)
+                "S" -> salida = (salida + total).setScale(2, RoundingMode.HALF_UP)
+            }
+        }
+        entrada.toDouble() to salida.toDouble()
+    }.getOrDefault(0.0 to 0.0)
 
 internal fun appendEntradasSalidasItems(
     formaPagoItems: MutableList<CajaFormaPagoItem>,
