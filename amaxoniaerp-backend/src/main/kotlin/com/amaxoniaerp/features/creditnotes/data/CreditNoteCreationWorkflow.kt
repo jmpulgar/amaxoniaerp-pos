@@ -5,6 +5,8 @@ import com.amaxoniaerp.features.creditnotes.domain.CreateCreditNoteRequest
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteSettlementType
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteValidationException
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
@@ -136,36 +138,40 @@ internal fun insertCreditNoteDetails(
     lines: List<ProcessedLine>,
     annulFullyReturnedLines: Boolean,
 ) {
-    lines.forEach { line ->
-        CreditNoteDetailTable.insert {
-            it[idDevolucionDetalle] = UUID.randomUUID().toString()
-            it[idDevolucion] = creditNoteId
-            it[idDetalleFactura] = line.sourceLine.idDetalleFactura
-            it[idItem] = line.sourceLine.idItem
-            it[itemAlmacen] = line.sourceLine.almacen
-            it[itemCantidad] = line.quantity.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
-            it[itemPrecioSinIva] = line.sourceLine.precioSinIva
-            it[itemDescuento] = line.sourceLine.descuentoPorcentaje
-            it[itemMontoDescuento] = line.discountAmount
-            it[itemPIva] = line.sourceLine.pIva
-            it[itemTotalSinIva] = line.totalSinIva
-            it[itemTotalConIva] = line.totalConIva
-            it[codVendedor] = line.sourceLine.codVendedor
-            it[itemCodigo] = line.sourceLine.codigo
-            it[itemReferencia] = line.sourceLine.referencia
+    if (lines.isNotEmpty()) {
+        CreditNoteDetailTable.batchInsert(lines) { line ->
+            this[CreditNoteDetailTable.idDevolucionDetalle] = UUID.randomUUID().toString()
+            this[CreditNoteDetailTable.idDevolucion] = creditNoteId
+            this[CreditNoteDetailTable.idDetalleFactura] = line.sourceLine.idDetalleFactura
+            this[CreditNoteDetailTable.idItem] = line.sourceLine.idItem
+            this[CreditNoteDetailTable.itemAlmacen] = line.sourceLine.almacen
+            this[CreditNoteDetailTable.itemCantidad] = line.quantity.setScale(QUANTITY_SCALE, RoundingMode.HALF_UP)
+            this[CreditNoteDetailTable.itemPrecioSinIva] = line.sourceLine.precioSinIva
+            this[CreditNoteDetailTable.itemDescuento] = line.sourceLine.descuentoPorcentaje
+            this[CreditNoteDetailTable.itemMontoDescuento] = line.discountAmount
+            this[CreditNoteDetailTable.itemPIva] = line.sourceLine.pIva
+            this[CreditNoteDetailTable.itemTotalSinIva] = line.totalSinIva
+            this[CreditNoteDetailTable.itemTotalConIva] = line.totalConIva
+            this[CreditNoteDetailTable.codVendedor] = line.sourceLine.codVendedor
+            this[CreditNoteDetailTable.itemCodigo] = line.sourceLine.codigo
+            this[CreditNoteDetailTable.itemReferencia] = line.sourceLine.referencia
         }
+    }
 
-        if (annulFullyReturnedLines) {
-            val lineFullyCancelled =
-                line.sourceLine.availableQuantity
-                    .subtract(line.quantity)
-                    .isEffectivelyZero()
-            if (lineFullyCancelled) {
-                CreditNoteFacturaDetalleTable.update(
-                    { CreditNoteFacturaDetalleTable.idDetalleFactura eq line.sourceLine.idDetalleFactura },
-                ) {
-                    it[anulado] = true
-                }
+    if (annulFullyReturnedLines) {
+        val fullyCancelledIds =
+            lines
+                .filter { line ->
+                    line.sourceLine.availableQuantity
+                        .subtract(line.quantity)
+                        .isEffectivelyZero()
+                }.map { it.sourceLine.idDetalleFactura }
+
+        if (fullyCancelledIds.isNotEmpty()) {
+            CreditNoteFacturaDetalleTable.update(
+                { CreditNoteFacturaDetalleTable.idDetalleFactura inList fullyCancelledIds },
+            ) {
+                it[anulado] = true
             }
         }
     }

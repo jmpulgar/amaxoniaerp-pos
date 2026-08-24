@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
@@ -171,21 +172,7 @@ internal fun insertCajaEntries(ctx: SaleWriteContext) {
 
     insertCajaNueva(ctx, ids, totalBase, fechaTexto, montoTexto)
     insertCajaRecibo(ctx, ids.cajaReciboId, totalBase, fechaTexto)
-    ctx.request.pagos.forEach { pago ->
-        insertCajaDetallePago(ctx, ids, pago)
-    }
-}
-
-private fun cajaConcepto(
-    ctx: SaleWriteContext,
-    fechaTexto: String,
-    montoTexto: String,
-): String {
-    val clienteNombre =
-        ctx.request.factura.facturarA
-            .ifBlank { "CLIENTE MOSTRADOR" }
-    return "Ingreso por Factura #${ctx.invoiceCode}, Fecha: $fechaTexto, " +
-        "Cliente: $clienteNombre, Monto: $montoTexto."
+    insertCajaDetallePagos(ctx, ids)
 }
 
 private fun insertCajaNueva(
@@ -196,6 +183,12 @@ private fun insertCajaNueva(
     montoTexto: String,
 ) {
     val cajaNuevaTable = SalesCajaNuevaTableFactory.forCountry(ctx.monetaryContext.countryCode)
+    val clienteNombre =
+        ctx.request.factura.facturarA
+            .ifBlank { "CLIENTE MOSTRADOR" }
+    val concepto =
+        "Ingreso por Factura #${ctx.invoiceCode}, Fecha: $fechaTexto, " +
+            "Cliente: $clienteNombre, Monto: $montoTexto."
 
     cajaNuevaTable.insert {
         it[cajaNuevaTable.cajaId] = ids.cajaId
@@ -207,7 +200,7 @@ private fun insertCajaNueva(
         it[cajaNuevaTable.comprobanteNumero] = ctx.invoiceCode
         it[cajaNuevaTable.idFactura] = ctx.invoiceId
         it[cajaNuevaTable.idCliente] = ctx.request.factura.idCliente
-        it[cajaNuevaTable.concepto] = cajaConcepto(ctx, fechaTexto, montoTexto)
+        it[cajaNuevaTable.concepto] = concepto
         it[cajaNuevaTable.status] =
             if (ctx.creditDecision.saldoEsperado > BigDecimal.ZERO) {
                 CajaStatus.Pendiente
@@ -272,64 +265,93 @@ private fun insertCajaRecibo(
     }
 }
 
-private fun insertCajaDetallePago(
+private data class PagoDetallePair(
+    val pago: SalePaymentInput,
+    val detalleId: String,
+    val montoPagoBase: BigDecimal,
+    val montoRecibidoBase: BigDecimal,
+)
+
+private fun insertCajaDetallePagos(
     ctx: SaleWriteContext,
     ids: CajaEntryIds,
-    pago: SalePaymentInput,
+) {
+    if (ctx.request.pagos.isEmpty()) return
+    val items =
+        ctx.request.pagos.map { pago ->
+            PagoDetallePair(
+                pago = pago,
+                detalleId = UUID.randomUUID().toString(),
+                montoPagoBase = ctx.monetaryContext.toBase(pago.monto),
+                montoRecibidoBase = ctx.monetaryContext.toBase(pago.montoRecibido),
+            )
+        }
+
+    insertCajaNuevaDetalleBatch(ctx, ids, items)
+    insertCajaNuevaDetalleFormaPagoBatch(ctx, ids, items)
+}
+
+private fun insertCajaNuevaDetalleBatch(
+    ctx: SaleWriteContext,
+    ids: CajaEntryIds,
+    items: List<PagoDetallePair>,
 ) {
     val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(ctx.monetaryContext.countryCode)
-    val detalleId = UUID.randomUUID().toString()
-    val montoPagoBase = ctx.monetaryContext.toBase(pago.monto)
-    val montoRecibidoBase = ctx.monetaryContext.toBase(pago.montoRecibido)
-
-    cajaNuevaDetalleTable.insert {
-        it[cajaNuevaDetalleTable.cajaDetalleId] = detalleId
-        it[cajaNuevaDetalleTable.cajaId] = ids.cajaId
-        it[cajaNuevaDetalleTable.idFormaPago] = pago.idFormaPago
-        it[cajaNuevaDetalleTable.idTransaccion] = ids.transactionId
-        it[cajaNuevaDetalleTable.cajaReciboId] = ids.cajaReciboId
-        it[cajaNuevaDetalleTable.monto] = montoPagoBase
-        it[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
-        it[cajaNuevaDetalleTable.concepto] = null
-        it[cajaNuevaDetalleTable.usuarioCreacion] =
+    cajaNuevaDetalleTable.batchInsert(items) { item ->
+        val pago = item.pago
+        this[cajaNuevaDetalleTable.cajaDetalleId] = item.detalleId
+        this[cajaNuevaDetalleTable.cajaId] = ids.cajaId
+        this[cajaNuevaDetalleTable.idFormaPago] = pago.idFormaPago
+        this[cajaNuevaDetalleTable.idTransaccion] = ids.transactionId
+        this[cajaNuevaDetalleTable.cajaReciboId] = ids.cajaReciboId
+        this[cajaNuevaDetalleTable.monto] = item.montoPagoBase
+        this[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
+        this[cajaNuevaDetalleTable.concepto] = null
+        this[cajaNuevaDetalleTable.usuarioCreacion] =
             ctx.request.factura.usuarioCreacion
                 .take(STANDARD_USER_LENGTH)
-        it[cajaNuevaDetalleTable.fechaCreacion] = ctx.now
-        it[cajaNuevaDetalleTable.retencionTipo] = ""
-        it[cajaNuevaDetalleTable.retencionPorcentaje] = ""
-        it[cajaNuevaDetalleTable.numero] = ""
-        it[cajaNuevaDetalleTable.observacion] = ""
-        it[cajaNuevaDetalleTable.retencionBaseCalculo] = ""
-        it[cajaNuevaDetalleTable.serieSucursal] = ""
-        it[cajaNuevaDetalleTable.cajaSecuencia] = ""
-        it[cajaNuevaDetalleTable.numeroControl] = ""
-        it[cajaNuevaDetalleTable.numeroComprobante] = ""
-        it[cajaNuevaDetalleTable.retencionMonto] = ""
-        it[cajaNuevaDetalleTable.retencionDetalleJson] = ""
-        // Campos exclusivos de Venezuela
+        this[cajaNuevaDetalleTable.fechaCreacion] = ctx.now
+        this[cajaNuevaDetalleTable.retencionTipo] = ""
+        this[cajaNuevaDetalleTable.retencionPorcentaje] = ""
+        this[cajaNuevaDetalleTable.numero] = ""
+        this[cajaNuevaDetalleTable.observacion] = ""
+        this[cajaNuevaDetalleTable.retencionBaseCalculo] = ""
+        this[cajaNuevaDetalleTable.serieSucursal] = ""
+        this[cajaNuevaDetalleTable.cajaSecuencia] = ""
+        this[cajaNuevaDetalleTable.numeroControl] = ""
+        this[cajaNuevaDetalleTable.numeroComprobante] = ""
+        this[cajaNuevaDetalleTable.retencionMonto] = ""
+        this[cajaNuevaDetalleTable.retencionDetalleJson] = ""
         if (cajaNuevaDetalleTable is SalesCajaNuevaDetalleTableVE) {
-            it[cajaNuevaDetalleTable.montoRecibido] = montoRecibidoBase
-            it[cajaNuevaDetalleTable.montoMonedaPrincipal] = montoPagoBase
+            this[cajaNuevaDetalleTable.montoRecibido] = item.montoRecibidoBase
+            this[cajaNuevaDetalleTable.montoMonedaPrincipal] = item.montoPagoBase
         }
     }
+}
 
-    SalesCajaNuevaDetalleFormaPagoTable.insert {
-        it[cajaDetalleFormaPagoId] = UUID.randomUUID().toString()
-        it[this.cajaId] = ids.cajaId
-        it[cajaDetalleId] = detalleId
-        it[tipoMovimiento] = pago.tipoMovimiento
-        it[idFormaPago] = pago.idFormaPago
-        it[comprobante] = "FACT"
-        it[concepto] = "Ingreso por venta"
-        it[monto] = montoPagoBase
-        it[montoOriginal] = montoPagoBase
-        it[tdcProveedor] = ""
-        it[tdcNumero] = ""
-        it[tdcTitular] = ""
-        it[tdcVencimiento] = ""
-        it[tdcCvv] = ""
-        it[codigoVerificacion] = ""
-        it[idAbonoDetalle] = ""
-        it[efectivoCambio] = ctx.monetaryContext.toBase(pago.efectivoCambio)
+private fun insertCajaNuevaDetalleFormaPagoBatch(
+    ctx: SaleWriteContext,
+    ids: CajaEntryIds,
+    items: List<PagoDetallePair>,
+) {
+    SalesCajaNuevaDetalleFormaPagoTable.batchInsert(items) { item ->
+        val pago = item.pago
+        this[SalesCajaNuevaDetalleFormaPagoTable.cajaDetalleFormaPagoId] = UUID.randomUUID().toString()
+        this[SalesCajaNuevaDetalleFormaPagoTable.cajaId] = ids.cajaId
+        this[SalesCajaNuevaDetalleFormaPagoTable.cajaDetalleId] = item.detalleId
+        this[SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento] = pago.tipoMovimiento
+        this[SalesCajaNuevaDetalleFormaPagoTable.idFormaPago] = pago.idFormaPago
+        this[SalesCajaNuevaDetalleFormaPagoTable.comprobante] = "FACT"
+        this[SalesCajaNuevaDetalleFormaPagoTable.concepto] = "Ingreso por venta"
+        this[SalesCajaNuevaDetalleFormaPagoTable.monto] = item.montoPagoBase
+        this[SalesCajaNuevaDetalleFormaPagoTable.montoOriginal] = item.montoPagoBase
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcProveedor] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcNumero] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcTitular] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcVencimiento] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcCvv] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.codigoVerificacion] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.idAbonoDetalle] = ""
+        this[SalesCajaNuevaDetalleFormaPagoTable.efectivoCambio] = ctx.monetaryContext.toBase(pago.efectivoCambio)
     }
 }

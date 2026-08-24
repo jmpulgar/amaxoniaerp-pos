@@ -9,6 +9,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
@@ -129,16 +130,15 @@ internal fun processLotTracking(
 }
 
 internal fun insertFacturaImpuestos(ctx: SaleWriteContext) {
-    ctx.request.impuestos.forEach { tax ->
-        SalesFacturaImpuestosTable.insert {
-            it[idFacturaImpuestos] = UUID.randomUUID().toString()
-            it[idFactura] = ctx.invoiceId
-            it[totalizarBaseRetencion] = ctx.monetaryContext.toBase(tax.totalizarBaseRetencion)
-            it[codImpuestoIva] = tax.codImpuestoIva
-            it[totalizarMontoIva2] = ctx.monetaryContext.toBase(tax.totalizarMontoIva2)
-            it[usuarioCreacion] = ctx.request.factura.usuarioCreacion
-            it[fechaCreacion] = ctx.now
-        }
+    if (ctx.request.impuestos.isEmpty()) return
+    SalesFacturaImpuestosTable.batchInsert(ctx.request.impuestos) { tax ->
+        this[SalesFacturaImpuestosTable.idFacturaImpuestos] = UUID.randomUUID().toString()
+        this[SalesFacturaImpuestosTable.idFactura] = ctx.invoiceId
+        this[SalesFacturaImpuestosTable.totalizarBaseRetencion] = ctx.monetaryContext.toBase(tax.totalizarBaseRetencion)
+        this[SalesFacturaImpuestosTable.codImpuestoIva] = tax.codImpuestoIva
+        this[SalesFacturaImpuestosTable.totalizarMontoIva2] = ctx.monetaryContext.toBase(tax.totalizarMontoIva2)
+        this[SalesFacturaImpuestosTable.usuarioCreacion] = ctx.request.factura.usuarioCreacion
+        this[SalesFacturaImpuestosTable.fechaCreacion] = ctx.now
     }
 }
 
