@@ -12,6 +12,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.util.UUID
 
@@ -213,60 +214,72 @@ private data class PaymentBreakdown(
     val otros: Double,
 )
 
+private val ZERO_MONEY = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+
+private val KNOWN_PAYMENT_CODES =
+    setOf(
+        "CASH",
+        "EF",
+        "EFE",
+        "EFECTIVO",
+        "CH",
+        "CHEQUE",
+        "TDC",
+        "TARJETA",
+        "PV",
+        "POS",
+        "NEQ",
+        "DE",
+        "DEPOSITO",
+        "TR",
+        "TRANSFERENCIA",
+        "PM",
+        "CR",
+        "CREDITO",
+        "DB",
+        "DEBITO",
+        "CERT",
+        "CERTIFICADO",
+        "CXC",
+        "OT",
+        "MB",
+    )
+
 private fun computePaymentBreakdown(request: ProcessSaleRequest): PaymentBreakdown {
     val montosPorTipo =
         request.pagos
             .groupBy { it.tipoMovimiento.trim().uppercase() }
-            .mapValues { (_, list) -> list.sumOf { it.monto } }
+            .mapValues { (_, list) ->
+                list
+                    .map { it.monto.toMoney() }
+                    .fold(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP)
+            }
 
-    fun amountOf(vararg keys: String): Double = keys.sumOf { key -> montosPorTipo[key] ?: 0.0 }
+    fun amountOf(vararg keys: String): BigDecimal =
+        keys
+            .map { key -> montosPorTipo[key] ?: ZERO_MONEY }
+            .fold(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP)
 
-    val knownCodes =
-        setOf(
-            "CASH",
-            "EF",
-            "EFE",
-            "EFECTIVO",
-            "CH",
-            "CHEQUE",
-            "TDC",
-            "TARJETA",
-            "PV",
-            "POS",
-            "NEQ",
-            "DE",
-            "DEPOSITO",
-            "TR",
-            "TRANSFERENCIA",
-            "PM",
-            "CR",
-            "CREDITO",
-            "DB",
-            "DEBITO",
-            "CERT",
-            "CERTIFICADO",
-            "CXC",
-            "OT",
-            "MB",
-        )
+    val otrosNoReconocidos =
+        montosPorTipo
+            .filterKeys { it !in KNOWN_PAYMENT_CODES }
+            .values
+            .fold(BigDecimal.ZERO, BigDecimal::add)
 
-    val montoOtros =
-        amountOf("OT", "MB") +
-            montosPorTipo
-                .filterKeys { it !in knownCodes }
-                .values
-                .sum()
+    val montoOtros = (amountOf("OT", "MB") + otrosNoReconocidos).setScale(2, RoundingMode.HALF_UP)
 
     return PaymentBreakdown(
-        efectivo = amountOf("CASH", "EF", "EFE", "EFECTIVO"),
-        cheque = amountOf("CH", "CHEQUE"),
-        tarjeta = amountOf("TDC", "TARJETA", "PV", "POS", "NEQ"),
-        deposito = amountOf("DE", "DEPOSITO"),
-        transferencia = amountOf("TR", "TRANSFERENCIA", "PM"),
-        credito = amountOf("CR", "CREDITO"),
-        debito = amountOf("DB", "DEBITO"),
-        certificado = amountOf("CERT", "CERTIFICADO"),
-        otros = montoOtros,
+        efectivo = amountOf("CASH", "EF", "EFE", "EFECTIVO").toDouble(),
+        cheque = amountOf("CH", "CHEQUE").toDouble(),
+        tarjeta = amountOf("TDC", "TARJETA", "PV", "POS", "NEQ").toDouble(),
+        deposito = amountOf("DE", "DEPOSITO").toDouble(),
+        transferencia = amountOf("TR", "TRANSFERENCIA", "PM").toDouble(),
+        credito = amountOf("CR", "CREDITO").toDouble(),
+        debito = amountOf("DB", "DEBITO").toDouble(),
+        certificado = amountOf("CERT", "CERTIFICADO").toDouble(),
+        otros = montoOtros.toDouble(),
     )
 }
 
