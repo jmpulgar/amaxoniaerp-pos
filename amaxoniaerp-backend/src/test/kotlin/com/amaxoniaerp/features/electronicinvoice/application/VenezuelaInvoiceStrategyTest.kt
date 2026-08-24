@@ -1,7 +1,16 @@
-package com.amaxoniaerp.features.electronicinvoice.domain
+package com.amaxoniaerp.features.electronicinvoice.application
 
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository.AlreadyIssuedResult
+import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
+import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceVEContext
+import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
+import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.VECajaData
+import com.amaxoniaerp.features.electronicinvoice.domain.VECompradorData
+import com.amaxoniaerp.features.electronicinvoice.domain.VEConfigData
+import com.amaxoniaerp.features.electronicinvoice.domain.VECorrelativoReservado
+import com.amaxoniaerp.features.electronicinvoice.domain.VEFacturaData
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaAuthResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClient
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClientException

@@ -1,6 +1,7 @@
-package com.amaxoniaerp.features.electronicinvoice.domain
+package com.amaxoniaerp.features.electronicinvoice.application
 
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
+import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaClientException
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaDocumentoWrapper
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.VenezuelaHkaEmisionResponse

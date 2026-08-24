@@ -1,7 +1,5 @@
 package com.amaxoniaerp.features.electronicinvoice.application
 
-import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceStrategy
-
 /**
  * Puerto (interface) para el obtensor deestrategias FE.
  *

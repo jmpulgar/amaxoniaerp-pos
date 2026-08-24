@@ -1,8 +1,8 @@
 package com.amaxoniaerp.features.sales.application
 
+import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.application.ProcessorFactory
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
-import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceStrategy
 import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest

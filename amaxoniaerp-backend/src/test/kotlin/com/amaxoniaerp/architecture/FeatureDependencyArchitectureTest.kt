@@ -140,15 +140,9 @@ class FeatureDependencyArchitectureTest {
         val CROSS_FEATURE_DATA = Regex("""^import com\.amaxoniaerp\.features\.(\w+)\.data\.""")
 
         /**
-         * Deuda documentada FE (estrategias VE viven bajo domain/ por decisión
-         * previa del PLAN): migrarlas a application exige TASK funcional.
+         * Dominio puro: no se permite ningún import de infraestructura en domain/.
          */
-        val DOMAIN_INFRA_ALLOW_LIST =
-            listOf(
-                "com/amaxoniaerp/features/electronicinvoice/domain/ElectronicInvoiceStrategy.kt",
-                "com/amaxoniaerp/features/electronicinvoice/domain/VenezuelaEmissionEvaluation.kt",
-                "com/amaxoniaerp/features/electronicinvoice/domain/VenezuelaInvoiceStrategy.kt",
-            )
+        val DOMAIN_INFRA_ALLOW_LIST: List<String> = emptyList()
 
         /**
          * Seam legacy: estas rutas resuelven su DB vía DatabaseManager y están

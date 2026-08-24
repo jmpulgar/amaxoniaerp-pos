@@ -3,7 +3,6 @@ package com.amaxoniaerp.features.electronicinvoice.application
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.data.FeResponseUpdate
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
-import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigurationException
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
 import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext

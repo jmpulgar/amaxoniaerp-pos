@@ -1,5 +1,6 @@
-package com.amaxoniaerp.features.electronicinvoice.domain
+package com.amaxoniaerp.features.electronicinvoice.application
 
+import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
 import org.jetbrains.exposed.sql.Database
 
 /**

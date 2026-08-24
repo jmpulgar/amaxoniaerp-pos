@@ -1,13 +1,13 @@
-﻿package com.amaxoniaerp.composition
+package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
 import com.amaxoniaerp.features.creditnotes.application.PanamaCreditNoteProcessor
 import com.amaxoniaerp.features.creditnotes.data.CreditNoteRepository
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.electronicinvoice.application.PanamaInvoiceProcessor
+import com.amaxoniaerp.features.electronicinvoice.application.VenezuelaInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.data.VenezuelaElectronicInvoiceRepository
-import com.amaxoniaerp.features.electronicinvoice.domain.VenezuelaInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaCreditNotePayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaRestClient
