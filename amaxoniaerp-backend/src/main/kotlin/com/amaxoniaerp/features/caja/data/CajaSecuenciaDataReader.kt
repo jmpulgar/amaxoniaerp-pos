@@ -19,6 +19,8 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.leftJoin
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -234,29 +236,36 @@ private class CajaSecuenciaTotals(
 private fun calculateFinancials(ctx: CajaSecuenciaContext): CajaCalculatedFinancials {
     val secuenciaRow = ctx.secuenciaRow
     val formaPagoItems = ctx.details.formaPagoItems
-    val montoEntrada = ctx.totals.montoEntrada
-    val montoSalida = ctx.totals.montoSalida
-    val totalVentas = ctx.totals.totalVentas
-    val totalAnulado = ctx.totals.totalAnulado
+    val montoEntrada = ctx.totals.montoEntrada.toMoney()
+    val montoSalida = ctx.totals.montoSalida.toMoney()
+    val totalVentas = ctx.totals.totalVentas.toMoney()
+    val totalAnulado = ctx.totals.totalAnulado.toMoney()
     val montoEfectivoVentasCalc =
         formaPagoItems
             .filter { it.id > 0 && isCashSigla(it.siglas) }
-            .sumOf { it.monto }
+            .map { it.monto.toMoney() }
+            .fold(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP)
     val montoOtrosTotalCalc =
         formaPagoItems
             .filter { it.id > 0 && !isCashSigla(it.siglas) }
-            .sumOf { it.monto }
-    val montoEfectivoApertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].toDouble()
-    val montoEfectivoTotalCalc = montoEfectivoApertura + montoEfectivoVentasCalc + montoEntrada - montoSalida
-    val montoTotalCalc = montoEfectivoTotalCalc + montoOtrosTotalCalc
-    val montoCierreCalc = montoEfectivoApertura + totalVentas + montoEntrada - montoSalida - totalAnulado
+            .map { it.monto.toMoney() }
+            .fold(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP)
+    val montoEfectivoApertura = secuenciaRow[CajaSecuenciaTable.montoEfectivoApertura].setScale(2, RoundingMode.HALF_UP)
+    val montoEfectivoTotalCalc =
+        (montoEfectivoApertura + montoEfectivoVentasCalc + montoEntrada - montoSalida).setScale(2, RoundingMode.HALF_UP)
+    val montoTotalCalc = (montoEfectivoTotalCalc + montoOtrosTotalCalc).setScale(2, RoundingMode.HALF_UP)
+    val montoCierreCalc =
+        (montoEfectivoApertura + totalVentas + montoEntrada - montoSalida - totalAnulado)
+            .setScale(2, RoundingMode.HALF_UP)
     return CajaCalculatedFinancials(
-        montoEfectivoApertura = montoEfectivoApertura,
-        montoEfectivoVentasCalc = montoEfectivoVentasCalc,
-        montoEfectivoTotalCalc = montoEfectivoTotalCalc,
-        montoOtrosTotalCalc = montoOtrosTotalCalc,
-        montoTotalCalc = montoTotalCalc,
-        montoCierreCalc = montoCierreCalc,
+        montoEfectivoApertura = montoEfectivoApertura.toDouble(),
+        montoEfectivoVentasCalc = montoEfectivoVentasCalc.toDouble(),
+        montoEfectivoTotalCalc = montoEfectivoTotalCalc.toDouble(),
+        montoOtrosTotalCalc = montoOtrosTotalCalc.toDouble(),
+        montoTotalCalc = montoTotalCalc.toDouble(),
+        montoCierreCalc = montoCierreCalc.toDouble(),
     )
 }
 

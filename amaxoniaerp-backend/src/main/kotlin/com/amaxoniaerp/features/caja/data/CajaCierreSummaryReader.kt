@@ -15,6 +15,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.leftJoin
 import org.jetbrains.exposed.sql.select
+import java.math.RoundingMode
 
 internal class CajaHeaderNames(
     val cajaName: String,
@@ -245,11 +246,11 @@ internal fun buildCajaCierreSummary(
     movimientos: MovimientoTotals,
     formas: FormaPagoBreakdown,
 ): CajaCierreSummary {
-    val expectedClose =
-        secuencia.montoApertura +
-            movimientos.totalIncome -
-            movimientos.totalExpense -
-            movimientos.totalCancelled
+    val open = secuencia.montoApertura.toMoney()
+    val income = movimientos.totalIncome.toMoney()
+    val expense = movimientos.totalExpense.toMoney()
+    val cancelled = movimientos.totalCancelled.toMoney()
+    val expectedClose = (open + income - expense - cancelled).setScale(2, RoundingMode.HALF_UP).toDouble()
 
     return CajaCierreSummary(
         idCajaSecuencia = secuencia.idCajaSecuencia,
