@@ -102,6 +102,9 @@ data class PaymentState(
     val assignedAmountMoney: Money
         get() = tenderedAmountMoney + nonCashAssignedMoney
 
+    val assignedText: String
+        get() = Money.format(assignedAmountMoney)
+
     val nonCashPendingMoney: Money
         get() = (totalAmountMoney - assignedAmountMoney).coerceAtLeastZero()
 
@@ -170,6 +173,9 @@ data class PaymentState(
 
     val nonCashAssignedBsText: String
         get() = formatBs(nonCashAssignedMoney)
+
+    val assignedBsText: String
+        get() = formatBs(assignedAmountMoney)
 
     val nonCashPendingBsText: String
         get() = formatBs(nonCashPendingMoney)

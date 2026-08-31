@@ -3,15 +3,21 @@ package com.amaxonia.pos.ui.cart
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -20,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -30,13 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.CartEmptyState
-import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import java.util.Locale
 
 /** Qué valor de un ítem se está editando desde el carrito. */
@@ -234,11 +241,21 @@ internal fun CartTopAppBar(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (state.items.isNotEmpty()) {
-                    Text(
-                        if (state.items.size == 1) "1 artículo" else "${state.items.size} artículos",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.70f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    ) {
+                        Text(
+                            text = if (state.items.size == 1) "1 artículo" else "${state.items.size} artículos",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
                 }
             }
         },
@@ -253,12 +270,19 @@ internal fun CartTopAppBar(
         },
         actions = {
             if (state.items.isNotEmpty()) {
-                IconButton(onClick = onClearCart) {
-                    Icon(
-                        Icons.Default.DeleteSweep,
-                        contentDescription = "Limpiar carrito",
-                        tint = MaterialTheme.colorScheme.error,
-                    )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    IconButton(onClick = onClearCart, modifier = Modifier.size(38.dp)) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = "Limpiar carrito",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         },
@@ -274,11 +298,7 @@ internal fun CartBottomBarArea(
 ) {
     if (state.items.isNotEmpty()) {
         CartBottomBar(
-            total = state.total,
-            secondaryTotal =
-                state.totalBsText
-                    .takeIf { state.isMultiCurrency && it.isNotBlank() }
-                    ?.let { "${formatCurrencyLabel(state.abrMonedaSecundaria)} $it" },
+            state = state,
             onSaveDraft = { viewModel.onAction(CartUiAction.SaveDraft) },
             onCheckout = { viewModel.onAction(CartUiAction.Checkout) },
         )
@@ -294,6 +314,55 @@ internal fun CartScreenContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
+        if (state.sesionMesaId != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                shape = RoundedCornerShape(14.dp),
+                shadowElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.TableRestaurant,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Modo Comanda: ${state.selectedTable?.mesa?.displayName ?: "Mesa"}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        state.selectedTable?.area?.displayName?.takeIf { it.isNotBlank() }?.let { area ->
+                            Text(
+                                text = "Área: $area",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // SECCIÓN CLIENTE + VENDEDOR (panel consolidado)
         CartClientVendorPanel(
             state = state,

@@ -25,9 +25,11 @@ abstract class BaseCreditNoteHeaderTable(
     val codFactura = varchar("cod_factura", S.VARCHAR_LENGTH_36)
     val fechaDevolucion = date("fecha_devolucion")
     val codDevolucionFiscal = varchar("cod_devolucion_fiscal", S.VARCHAR_LENGTH_20).nullable()
-    val observacion = varchar("observacion", S.VARCHAR_LENGTH_300).nullable()
+    val nroz = varchar("nroz", S.VARCHAR_LENGTH_20).default("")
+    val impresoraSerial = varchar("impresora_serial", S.VARCHAR_LENGTH_50).default("")
+    val observacion = varchar("observacion", S.VARCHAR_LENGTH_300).default("")
     val idCliente = varchar("id_cliente", S.VARCHAR_LENGTH_36)
-    val codVendedor = integer("cod_vendedor")
+    val codVendedor = integer("cod_vendedor").nullable()
     val fechaFactura = date("fecha_factura").nullable()
     val subtotal = decimal("subtotal", S.DECIMAL_PRECISION_20, 2)
     val impuesto = decimal("impuesto", S.DECIMAL_PRECISION_20, 2)
@@ -37,33 +39,18 @@ abstract class BaseCreditNoteHeaderTable(
     val periodoDevolucion = varchar("periodo_devolucion", S.VARCHAR_LENGTH_20).nullable()
     val contabilizado = integer("contabilizado").default(0)
     val numcomContabilizado = integer("numcom_contabilizado").default(0)
-    val fechaContabilizado = date("fecha_contabilizado").nullable()
+    val fechaContabilizado = date("fecha_contabilizado")
     val idCajaSecuencia = varchar("id_caja_secuencia", S.VARCHAR_LENGTH_36).nullable()
-    val serieSucursal = varchar("serie_sucursal", S.VARCHAR_LENGTH_10).nullable()
-    val cajaSecuencia = varchar("caja_secuencia", S.VARCHAR_LENGTH_10).nullable()
+    val serieSucursal = varchar("serie_sucursal", S.VARCHAR_LENGTH_10).default("")
+    val cajaSecuencia = varchar("caja_secuencia", S.VARCHAR_LENGTH_10).default("")
     val idSucursal = integer("id_sucursal").nullable()
     val idCaja = varchar("id_caja", S.VARCHAR_LENGTH_36).nullable()
-    val codigoCaja = varchar("codigo_caja", S.VARCHAR_LENGTH_50).nullable()
-    val codCliente = varchar("cod_cliente", S.VARCHAR_LENGTH_80).nullable()
-    val descuentoGlobal = decimal("descuento_global", S.DECIMAL_PRECISION_20, 2).nullable()
-    val pdescuentoGlobal = decimal("pdescuento_global", S.DECIMAL_PRECISION_20, 2).nullable()
-    val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", S.VARCHAR_LENGTH_20).nullable()
+    val codigoCaja = varchar("codigo_caja", S.VARCHAR_LENGTH_50).default("")
+    val codCliente = varchar("cod_cliente", S.VARCHAR_LENGTH_80).default("")
+    val descuentoGlobal = decimal("descuento_global", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val pdescuentoGlobal = decimal("pdescuento_global", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val numeroDocumentoFiscal = varchar("numeroDocumentoFiscal", S.VARCHAR_LENGTH_20).default("")
     val registroMigrado = integer("registro_migrado").default(0)
-
-    override val primaryKey = PrimaryKey(idDevolucion)
-}
-
-/** Venezuela: campos de impresora fiscal VE (nroz / impresora_serial). */
-object CreditNoteHeaderTableVE : BaseCreditNoteHeaderTable() {
-    val nroz = varchar("nroz", S.VARCHAR_LENGTH_20).nullable()
-    val impresoraSerial = varchar("impresora_serial", S.VARCHAR_LENGTH_50).nullable()
-}
-
-/**
- * Panamá: campos de factura electrónica DGI.
- * `cufe` y `qr` son `text` en ambos esquemas pero no existen en VE.
- */
-object CreditNoteHeaderTablePA : BaseCreditNoteHeaderTable() {
     val tipoDocumento = varchar("tipoDocumento", 2).default("04")
     val naturalezaOperacion = varchar("NaturalezaOperacion", 2).default("01")
     val tipoOperacion = integer("tipoOperacion").default(1)
@@ -74,10 +61,25 @@ object CreditNoteHeaderTablePA : BaseCreditNoteHeaderTable() {
     val informacionInteres = varchar("informacionInteres", S.VARCHAR_LENGTH_5000).default("")
     val cufe = text("cufe").default("")
     val qr = text("qr").default("")
-    val fechaRecepcionDGI = datetime("fechaRecepcionDGI").nullable()
+    val fechaRecepcionDGI = datetime("fechaRecepcionDGI")
     val nroProtocoloAutorizacion = varchar("nroProtocoloAutorizacion", S.VARCHAR_LENGTH_200).default("")
-    val fechaLimite = datetime("fechaLimite").nullable()
-    val descuentoGlobalVenta = decimal("descuento_global_venta", S.DECIMAL_PRECISION_20, 2).nullable()
+    val fechaLimite = datetime("fechaLimite")
+
+    override val primaryKey = PrimaryKey(idDevolucion)
+}
+
+/** Venezuela: cabecera `factura_devolucion`. */
+object CreditNoteHeaderTableVE : BaseCreditNoteHeaderTable()
+
+/**
+ * Panamá: campos adicionales de `factura_devolucion` (descuento_parcial, descuento_impuesto, descuento_global_venta, estado_devolucion).
+ */
+object CreditNoteHeaderTablePA : BaseCreditNoteHeaderTable() {
+    val descuentoParcial = decimal("descuento_parcial", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val descuentoImpuesto = decimal("descuento_impuesto", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val descuentoGlobalVenta = decimal("descuento_global_venta", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val estadoDevolucion = varchar("estado_devolucion", 20).nullable()
+    val anular = integer("anular").nullable()
 }
 
 /** Devuelve la tabla correcta según el país. */
@@ -129,6 +131,7 @@ object CreditNoteFacturaTable : Table("factura") {
     val totalizarMontoIva = decimal("totalizar_monto_iva", S.DECIMAL_PRECISION_20, 2)
     val totalizarTotalGeneral = decimal("totalizar_total_general", S.DECIMAL_PRECISION_20, 2)
     val totalTotalFactura = decimal("TotalTotalFactura", S.DECIMAL_PRECISION_20, 2)
+    val cantidadItems = integer("cantidad_items").default(1)
     val formaPago = varchar("formapago", S.VARCHAR_LENGTH_20)
     val idCajaSecuencia = varchar("id_caja_secuencia", S.VARCHAR_LENGTH_36)
     val idCaja = varchar("id_caja", S.VARCHAR_LENGTH_36)
@@ -172,7 +175,6 @@ object CreditNoteCajaTable : Table("caja") {
     val idCaja = varchar("id", S.VARCHAR_LENGTH_36)
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_50).nullable()
     val idSucursal = integer("id_sucursal").nullable()
-    val codAlmacen = integer("cod_almacen").nullable()
     val serieCaja = varchar("serie_caja", S.VARCHAR_LENGTH_10).nullable()
     val impresoraModelo = varchar("impresora_modelo", S.VARCHAR_LENGTH_50).nullable()
     val notacreditoCorrelativo = integer("notacredito_correlativo").nullable()

@@ -172,7 +172,7 @@ class ProcessSaleCreditTest {
 
         assertEquals(100.0, paymentDetail()[SalesFacturaDetalleFormaPagoTablePA.totalizarMontoCxc].toDouble(), 0.0)
         assertEquals(0.0, paymentDetail()[SalesFacturaDetalleFormaPagoTablePA.totalizarMontoOtros].toDouble(), 0.0)
-        assertEquals(listOf("CXC"), cajaPaymentTypes())
+        assertEquals(emptyList<String?>(), cajaPaymentTypes())
     }
 
     @Test

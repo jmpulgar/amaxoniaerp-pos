@@ -1,4 +1,10 @@
 package com.amaxonia.pos.ui.cart
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,14 +23,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
@@ -32,6 +43,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -48,11 +60,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,13 +82,12 @@ import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.payment.FinancialBreakdown
+import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.PosTextStyles
 import com.amaxonia.pos.ui.theme.cartBrandGradient
-
-/** Peso del CTA Cobrar frente a Guardar en la barra inferior del carrito. */
-private const val CHECKOUT_BUTTON_WEIGHT = 1.5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,17 +148,20 @@ fun CartScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bottom bar: total (adaptive) + Guardar borrador / Cobrar $XX.XX (adaptive, nunca elipsis).
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom bar: total (adaptive) + desglose colapsable + Guardar borrador / Cobrar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 internal fun CartBottomBar(
-    total: Double,
-    secondaryTotal: String?,
+    state: CartState,
     onSaveDraft: () -> Unit,
     onCheckout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var breakdownExpanded by remember { mutableStateOf(false) }
+    val total = state.total
+
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
@@ -159,53 +176,130 @@ internal fun CartBottomBar(
                         .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
                         .navigationBarsPadding(),
             ) {
-                CartBottomTotal(total = total, secondaryTotal = secondaryTotal, compact = compact)
+                CartBottomTotalRow(
+                    total = total,
+                    secondaryTotal =
+                        state.totalBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "${formatCurrencyLabel(state.abrMonedaSecundaria)} $it" },
+                    compact = compact,
+                    expanded = breakdownExpanded,
+                    onToggle = { breakdownExpanded = !breakdownExpanded },
+                )
+
+                AnimatedVisibility(
+                    visible = breakdownExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FinancialBreakdown(
+                            snapshot = state.financialSnapshot,
+                            totalFallback =
+                                com.amaxonia.pos.domain.model.money.Money
+                                    .fromDouble(total),
+                            taxLabel = state.taxLabel.takeIf { it.isNotBlank() } ?: "Impuesto",
+                            isMultiCurrency = state.isMultiCurrency,
+                            tasa = state.tasa,
+                            compact = true,
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
-                CartBottomActions(total = total, onSaveDraft = onSaveDraft, onCheckout = onCheckout)
+                CartBottomActions(
+                    isMesaSession = state.sesionMesaId != null,
+                    onSaveDraft = onSaveDraft,
+                    onCheckout = onCheckout,
+                )
             }
         }
     }
 }
 
+/** Fila del total con monto adaptivo, moneda secundaria y flecha que despliega el desglose. */
 @Composable
-private fun CartBottomTotal(
+private fun CartBottomTotalRow(
     total: Double,
     secondaryTotal: String?,
     compact: Boolean,
+    expanded: Boolean,
+    onToggle: () -> Unit,
 ) {
-    val totalStyle =
-        if (compact) {
-            MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
-        } else {
-            PosTextStyles.totalDisplay
-        }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else 180f,
+        label = "breakdownArrow",
+    )
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onToggle)
+                .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "Total",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Column(horizontalAlignment = Alignment.End) {
-            AdaptiveAmountText(
-                text = "$${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-                baseStyle = totalStyle,
-                color = MaterialTheme.colorScheme.primary,
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 16f,
-                    ),
+        Column {
+            Text(
+                "Total",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
-                Text(
-                    secondary,
-                    style = PosTextStyles.amountSecondary,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(
+                if (expanded) "Ocultar desglose" else "Ver desglose",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.End) {
+                val totalStyle =
+                    if (compact) {
+                        MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+                    } else {
+                        PosTextStyles.totalDisplay
+                    }
+                AdaptiveAmountText(
+                    text = "$ ${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
+                    baseStyle = totalStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                    options =
+                        com.amaxonia.pos.ui.common.components
+                            .AdaptiveAmountOptions(minFontSizeSp = 16f),
                 )
+                secondaryTotal?.takeIf { it.isNotBlank() }?.let { secondary ->
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    ) {
+                        Text(
+                            secondary,
+                            style = PosTextStyles.amountSecondary.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+                modifier = Modifier.size(30.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ExpandLess,
+                        contentDescription = if (expanded) "Ocultar desglose" else "Ver desglose",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp).rotate(arrowRotation),
+                    )
+                }
             }
         }
     }
@@ -213,16 +307,37 @@ private fun CartBottomTotal(
 
 @Composable
 private fun CartBottomActions(
-    total: Double,
+    isMesaSession: Boolean = false,
     onSaveDraft: () -> Unit,
     onCheckout: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.weight(1f)) {
-            SaveDraftButton(onClick = onSaveDraft)
+    if (isMesaSession) {
+        Button(
+            onClick = onCheckout,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            contentPadding = PaddingValues(horizontal = 14.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
+        ) {
+            Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Confirmar para Comanda",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
         }
-        Box(modifier = Modifier.weight(CHECKOUT_BUTTON_WEIGHT)) {
-            CheckoutButton(total = total, onClick = onCheckout)
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(modifier = Modifier.weight(1f)) {
+                SaveDraftButton(onClick = onSaveDraft)
+            }
+            Box(modifier = Modifier.weight(1.35f)) {
+                CheckoutButton(onClick = onCheckout)
+            }
         }
     }
 }
@@ -231,15 +346,22 @@ private fun CartBottomActions(
 private fun SaveDraftButton(onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier.fillMaxWidth().height(54.dp),
         contentPadding = PaddingValues(horizontal = 8.dp),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
     ) {
-        Icon(Icons.Default.Save, null, modifier = Modifier.size(18.dp))
+        Icon(Icons.Default.Save, null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             "Guardar",
             style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -247,26 +369,29 @@ private fun SaveDraftButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun CheckoutButton(
-    total: Double,
-    onClick: () -> Unit,
-) {
+private fun CheckoutButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier.fillMaxWidth().height(54.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        shape = MaterialTheme.shapes.medium,
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
     ) {
-        AdaptiveAmountText(
-            text = "Cobrar $${String.format(java.util.Locale.getDefault(), "%.2f", total)}",
-            baseStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+        Text(
+            "Cobrar",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.5.sp,
+            ),
             color = MaterialTheme.colorScheme.onPrimary,
-            options =
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 13f,
-                ),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -284,16 +409,15 @@ internal fun CartClientVendorPanel(
     onChangeSeller: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         CartClientRow(state = state, onSelectClient = onSelectClient, onRemoveClient = onRemoveClient)
         HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f),
             modifier = Modifier.padding(horizontal = 14.dp),
         )
         CartSellerRow(state = state, onChangeSeller = onChangeSeller)
@@ -306,27 +430,37 @@ private fun CartClientRow(
     onSelectClient: () -> Unit,
     onRemoveClient: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable { onSelectClient() }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val selectedClient = state.selectedClient
-        if (selectedClient != null) {
+    val selectedClient = state.selectedClient
+    if (selectedClient != null) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectClient() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             ClientAvatar(
                 clientPhotoUrl = state.selectedClientPhotoUrl,
                 clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Cliente asignado",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(com.amaxonia.pos.ui.theme.SuccessGreen),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Cliente asignado",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     "${selectedClient.firstName} ${selectedClient.lastName}",
                     style = MaterialTheme.typography.titleSmall,
@@ -336,23 +470,62 @@ private fun CartClientRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onRemoveClient) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Quitar cliente",
-                    tint = MaterialTheme.colorScheme.error,
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f),
+            ) {
+                IconButton(onClick = onRemoveClient, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Quitar cliente",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectClient() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.60f),
+                modifier = Modifier.size(40.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Asignar cliente a la venta",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "Opcional para cliente genérico",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        } else {
-            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                "Asignar cliente",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(6.dp).size(18.dp),
+                )
+            }
         }
     }
 }
@@ -370,12 +543,20 @@ private fun CartSellerRow(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.60f),
+            modifier = Modifier.size(40.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+            }
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 "Vendedor asignado",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
@@ -387,16 +568,30 @@ private fun CartSellerRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(
-            Icons.Default.Autorenew,
-            contentDescription = "Cambiar vendedor",
-            tint =
-                if (state.availableSellers.isEmpty()) {
-                    MaterialTheme.colorScheme.outline
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-        )
+        if (state.availableSellers.isNotEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Autorenew,
+                        contentDescription = "Cambiar vendedor",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Cambiar",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -404,11 +599,11 @@ private fun CartSellerRow(
 internal fun CartErrorBanner(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.errorContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -439,7 +634,7 @@ internal fun ClientSucursalSelectorCard(
     val hasMultiple = sucursales.size > 1
 
     Card(
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(16.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -449,12 +644,14 @@ internal fun ClientSucursalSelectorCard(
                         MaterialTheme.colorScheme.surface
                     },
             ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = if (hasMultiple) "Sucursal del cliente" else "Sucursal del cliente asignada",
                 fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -472,6 +669,7 @@ internal fun ClientSucursalSelectorCard(
                         text = "Este cliente tiene varias sucursales. Selecciona una para continuar.",
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             } else {
@@ -513,6 +711,7 @@ private fun SucursalSelectorDropdown(
             isError = isRequiredMissing,
             placeholder = { Text("Seleccionar sucursal") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(12.dp),
             modifier =
                 Modifier
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -554,20 +753,20 @@ private fun ClientAvatar(
     Box(
         modifier =
             modifier
-                .size(40.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(gradient)),
         contentAlignment = Alignment.Center,
     ) {
         if (clientPhotoUrl.isBlank()) {
-            Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
         } else {
             SubcomposeAsyncImage(
                 model = clientPhotoUrl,
                 contentDescription = "Foto cliente",
                 modifier = Modifier.fillMaxSize(),
-                loading = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                error = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                loading = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp) },
+                error = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp) },
                 success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
             )
         }
@@ -591,10 +790,10 @@ internal fun PromotionCartGroup(
         androidx.compose.runtime.mutableStateOf((group.items.firstOrNull()?.promocionVeces ?: 1).toString())
     }
     val times = timesText.toIntOrNull() ?: 0
-    Card(
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ElevatedCard(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -604,9 +803,20 @@ internal fun PromotionCartGroup(
             PromotionGroupItems(group = group, accent = accent)
 
             Spacer(Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Total promoción", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Text(BigDecimalMoneyFormatter.money(group.total), fontWeight = FontWeight.ExtraBold, color = accent, fontSize = 16.sp)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = accent.copy(alpha = 0.12f),
+                ) {
+                    Text(
+                        BigDecimalMoneyFormatter.money(group.total),
+                        fontWeight = FontWeight.ExtraBold,
+                        color = accent,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(10.dp))
@@ -652,7 +862,7 @@ private fun PromotionGroupHeader(
             modifier =
                 Modifier
                     .size(42.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(
                         Brush.linearGradient(
                             listOf(
@@ -663,7 +873,7 @@ private fun PromotionGroupHeader(
                     ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.LocalOffer, contentDescription = null, tint = PosPalette.FixedWhite)
+            Icon(Icons.Default.LocalOffer, contentDescription = null, tint = PosPalette.FixedWhite, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -678,12 +888,17 @@ private fun PromotionGroupHeader(
             Text(
                 "EL PRODUCTO ESTÁ CONFORMADO POR:",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp,
+                fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
-        IconButton(onClick = onRemove) {
-            Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f),
+        ) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(17.dp))
+            }
         }
     }
 }
@@ -700,7 +915,7 @@ private fun PromotionGroupItems(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                         .padding(horizontal = 10.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -731,3 +946,4 @@ private fun PromotionGroupItems(
         }
     }
 }
+

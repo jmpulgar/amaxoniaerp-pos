@@ -1,18 +1,21 @@
 package com.amaxonia.pos.data.printer
 
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readActiveCajaForToday
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.repository.PrinterProvider
 import com.amaxonia.pos.domain.repository.SalesRepository
 import com.amaxonia.pos.domain.usecase.payment.InvoicePrintFeedback
 import com.amaxonia.pos.domain.usecase.payment.InvoicePrintGateway
 
 class DefaultInvoicePrintGateway(
-    private val printerFactory: PrinterFactory,
+    private val printerProvider: PrinterProvider,
     private val localStore: LocalStore,
     private val salesRepository: SalesRepository,
 ) : InvoicePrintGateway {
@@ -25,15 +28,15 @@ class DefaultInvoicePrintGateway(
             VENEZUELA_CODE ->
                 when (localStore.readSelectedPrinterType()) {
                     PrinterType.THE_FACTORY_HKA -> printFiscal(transaction)
-                    PrinterType.SUNMI_V2 -> printSunmi(remoteInvoiceId, countryCode)
+                    PrinterType.SUNMI_V2 -> printSunmi(remoteInvoiceId, countryCode, transaction)
                     else -> null
                 }
-            PANAMA_CODE -> printSunmi(remoteInvoiceId, countryCode)
+            PANAMA_CODE -> printSunmi(remoteInvoiceId, countryCode, transaction)
             else -> null
         }
 
     private suspend fun printFiscal(transaction: Transaction): InvoicePrintFeedback? {
-        val printer = printerFactory.getActivePrinter() ?: return null
+        val printer = printerProvider.getActivePrinter() ?: return null
         return printer.printReceipt(transaction).fold(
             onSuccess = { result -> InvoicePrintFeedback("Imprimiendo recibo...", result.fiscalNumber, result.printerSerial) },
             onFailure = { error -> InvoicePrintFeedback(error.message ?: "No se pudo imprimir el recibo", "", "") },
@@ -43,8 +46,9 @@ class DefaultInvoicePrintGateway(
     private suspend fun printSunmi(
         remoteInvoiceId: String,
         countryCode: String,
+        transaction: Transaction? = null,
     ): InvoicePrintFeedback? {
-        val printer = printerFactory.getActiveTicketPrinter()
+        val printer = printerProvider.getActiveTicketPrinter()
         return when {
             localStore.readSelectedPrinterType() != PrinterType.SUNMI_V2 -> null
             printer == null ->
@@ -53,34 +57,36 @@ class DefaultInvoicePrintGateway(
                     "",
                     "",
                 )
-            else ->
-                salesRepository.getPrintPayload(remoteInvoiceId).fold(
-                    onSuccess = { payload ->
-                        // FASE 2 (Punto 3) — Selector por país para SUNMI_V2, preservando
-                        // el comportamiento anterior como fallback explícito.
-                        //   - THE_FACTORY_HKA (cualquier país) → nunca llega aquí: se enruta a
-                        //     `printFiscal` con comandos nativos HKA-20.
-                        //   - VE  → VenezuelaInvoiceTicketFormatter (factura digital HKA, 40 cols)
-                        //   - PA  → PanamaInvoiceTicketFormatter (CAFE/DGI/QR)
-                        //   - OTRO → se conserva el formatter por defecto que tenía el sistema
-                        //            antes de esta integración (PanamaInvoiceTicketFormatter),
-                        //            para NO romper países distintos de VE/PA.
-                        val ticket =
-                            when (countryCode.uppercase()) {
-                                VENEZUELA_CODE -> VenezuelaInvoiceTicketFormatter().format(payload)
-                                PANAMA_CODE -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
-                                else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
-                            }
-                        when (val result = printer.printTicket(ticket)) {
-                            PrintResult.Success ->
-                                InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
-                            is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
-                        }
-                    },
-                    onFailure = { error ->
-                        InvoicePrintFeedback(error.message ?: "No se pudo obtener el payload de impresión", "", "")
-                    },
-                )
+            else -> {
+                val payloadResult =
+                    if (remoteInvoiceId.isNotBlank() && !remoteInvoiceId.startsWith("OFF-")) {
+                        salesRepository.getPrintPayload(remoteInvoiceId)
+                    } else {
+                        Result.failure(IllegalStateException("Factura offline"))
+                    }
+
+                val payload = payloadResult.getOrElse {
+                    if (transaction != null) {
+                        val company = localStore.readCompanySession()?.company
+                        val caja = localStore.readActiveCajaForToday()
+                        LocalInvoicePrintPayloadMapper.fromTransaction(transaction, company, caja)
+                    } else {
+                        return InvoicePrintFeedback(it.message ?: "No se pudo obtener el payload de impresión", "", "")
+                    }
+                }
+
+                val ticket =
+                    when (countryCode.uppercase()) {
+                        VENEZUELA_CODE -> VenezuelaInvoiceTicketFormatter().format(payload)
+                        PANAMA_CODE -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                        else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+                    }
+                when (val result = printer.printTicket(ticket)) {
+                    PrintResult.Success ->
+                        InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
+                    is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
+                }
+            }
         }
     }
 

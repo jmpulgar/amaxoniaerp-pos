@@ -101,4 +101,17 @@ class CreditNoteRoutesValidationTest {
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertTrue(response.bodyAsText().contains("Fecha inválida"))
         }
+
+    @Test
+    fun `listar facturas elegibles con fecha invalida responde 400`() =
+        app {
+            seedEmptyH2()
+            val response =
+                client.get("/api/pos/notas-credito/facturas?limit=5&fecha_inicio=invalid-date") {
+                    header(HttpHeaders.Authorization, "Bearer ${companyToken()}")
+                    header("Company-DB", companyDb)
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Fecha inválida"))
+        }
 }

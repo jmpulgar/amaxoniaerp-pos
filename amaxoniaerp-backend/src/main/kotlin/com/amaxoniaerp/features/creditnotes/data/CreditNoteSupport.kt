@@ -63,6 +63,23 @@ internal fun resolveFiscalStatus(
         }
     }
 
+internal fun resolvePanamaFiscalStatus(
+    cufe: String,
+    estadoDevolucion: String?,
+): CreditNoteFiscalStatus =
+    when {
+        cufe.trim().isNotBlank() ||
+            estadoDevolucion.equals("PROCESADA", ignoreCase = true) ||
+            estadoDevolucion.equals(CONFIRMED_FISCAL_CODE, ignoreCase = true) ->
+            CreditNoteFiscalStatus.CONFIRMADA
+        estadoDevolucion.equals(REJECTED_FISCAL_CODE, ignoreCase = true) ->
+            CreditNoteFiscalStatus.RECHAZADA
+        estadoDevolucion.equals(UNCERTAIN_FISCAL_CODE, ignoreCase = true) ->
+            CreditNoteFiscalStatus.INCIERTA
+        else ->
+            CreditNoteFiscalStatus.PENDIENTE
+    }
+
 internal fun fiscalStatusCode(status: CreditNoteFiscalStatus): String =
     when (status) {
         CreditNoteFiscalStatus.PENDIENTE -> PENDING_FISCAL_CODE
@@ -94,6 +111,7 @@ internal fun parsePacDate(value: String?): LocalDateTime? {
     if (normalized.isBlank()) return null
     return runCatching { OffsetDateTime.parse(normalized).toLocalDateTime() }
         .recoverCatching { LocalDateTime.parse(normalized) }
+        .recoverCatching { LocalDateTime.parse(normalized.replace(" ", "T")) }
         .recoverCatching { LocalDate.parse(normalized).atStartOfDay() }
         .getOrNull()
 }

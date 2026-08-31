@@ -191,6 +191,14 @@ data class SalePaymentInput(
     val monto: Double,
     val montoRecibido: Double,
     val efectivoCambio: Double = 0.0,
+    val tdcProveedor: String? = null,
+    val tdcNumero: String? = null,
+    val tdcTitular: String? = null,
+    val tdcVencimiento: String? = null,
+    val tdcCvv: String? = null,
+    val codigoVerificacion: String? = null,
+    val idAbonoDetalle: String? = null,
+    val siglas: String? = null,
 )
 
 @Serializable

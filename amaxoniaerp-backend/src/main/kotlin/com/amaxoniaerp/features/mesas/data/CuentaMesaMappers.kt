@@ -8,10 +8,6 @@ import java.math.RoundingMode
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-internal const val ACTIVE = 1
-internal const val INACTIVE = 0
-internal const val NOT_FACTURADO = 0
-internal const val FACTURADO = 1
 internal const val CUENTA_SCALE = 2
 internal const val CUENTA_MAX_ERROR_LEN = 500
 internal val CUENTA_ISO_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
@@ -53,7 +49,7 @@ internal fun ResultRow.toCuentaDetalleResponse(): CuentaDetalleResponse =
         itemPIva = this[CuentaMesaDetalleTable.itemPIva].toDouble(),
         itemTotalSinIva = this[CuentaMesaDetalleTable.itemTotalSinIva].toDouble(),
         itemTotalConIva = this[CuentaMesaDetalleTable.itemTotalConIva].toDouble(),
-        facturado = this[CuentaMesaDetalleTable.facturado] == FACTURADO,
+        facturado = this[CuentaMesaDetalleTable.facturado],
         fechaCreacion = this[CuentaMesaDetalleTable.fechaCreacion].formatCuentaIso(),
     )
 

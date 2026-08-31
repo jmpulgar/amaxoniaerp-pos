@@ -67,10 +67,10 @@ internal fun aplicarFacturacionDetalles(
     CuentaMesaDetalleTable.update(
         {
             (CuentaMesaDetalleTable.cuentaMesaId eq cuentaId) and
-                (CuentaMesaDetalleTable.facturado eq NOT_FACTURADO)
+                (CuentaMesaDetalleTable.facturado eq false)
         },
     ) {
-        it[CuentaMesaDetalleTable.facturado] = FACTURADO
+        it[CuentaMesaDetalleTable.facturado] = true
     }
     return null
 }
@@ -140,7 +140,7 @@ internal fun marcarCuentaPagada(
         it[CuentaMesaTable.codFactura] = codFactura
         it[CuentaMesaTable.fechaFactura] = ahora
         it[CuentaMesaTable.fechaCierre] = ahora
-        it[CuentaMesaTable.activo] = INACTIVE
+        it[CuentaMesaTable.activo] = false
         it[CuentaMesaTable.saldoRestante] = BigDecimal.ZERO
     }
 }

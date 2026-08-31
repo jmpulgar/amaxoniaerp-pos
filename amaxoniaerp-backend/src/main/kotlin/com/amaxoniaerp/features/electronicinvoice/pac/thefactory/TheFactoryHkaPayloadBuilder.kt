@@ -24,11 +24,11 @@ class TheFactoryHkaPayloadBuilder {
         private const val DEFAULT_CPBS_ABREV = "54"
         private const val MIN_DESCRIPTION_LENGTH = 5
         private const val MIN_FORMA_PAGO_DESC_LENGTH = 10
-        private const val DISCOUNT_SCALE = 4
+        private const val DISCOUNT_SCALE = 6
         private const val QUANTITY_SCALE = 3
 
-        // Siglas de formas de pago a ignorar
-        private val IGNORED_PAYMENT_SIGLAS = setOf("CRED", "NC", "RETITBMSINGRE")
+        // Siglas de formas de pago a ignorar (retenciones y notas de crédito)
+        private val IGNORED_PAYMENT_SIGLAS = setOf("NC", "RETITBMSINGRE")
     }
 
     /**
@@ -176,8 +176,27 @@ class TheFactoryHkaPayloadBuilder {
     private fun buildTotales(ctx: InvoiceFEContext): TheFactoryHkaTotalesSubTotales {
         val factura = ctx.factura
 
+        // tiempoPago: "1" contado, "2" crédito, "3" gobierno
+        val creditoTotal =
+            ctx.formasPago
+                .filter { it.siglas?.uppercase()?.trim() in setOf("CXC", "CRED", "CREDITO") || it.formaPagoFact == "01" }
+                .sumOf { it.monto }
+        val inmediatoTotal =
+            ctx.formasPago
+                .filter { it.siglas?.uppercase()?.trim() !in setOf("CXC", "CRED", "CREDITO") && it.formaPagoFact != "01" }
+                .sumOf { it.monto }
+
+        val tiempoPago =
+            when {
+                ctx.factura.tipoVenta == "2" && inmediatoTotal == 0.0 -> "2" // Plazo (100% crédito)
+                creditoTotal > 0.0 && inmediatoTotal > 0.0 -> "3" // Mixto
+                creditoTotal > 0.0 -> "2" // Plazo (100% crédito)
+                ctx.factura.tipoVenta == "2" -> "2" // Plazo
+                else -> "1" // Inmediato (Contado)
+            }
+
         // Formas de pago: filtrar las ignoradas y mapear al catálogo
-        val formasPago = buildFormasPago(ctx.formasPago, ctx.vuelto)
+        val formasPago = buildFormasPago(ctx.formasPago, ctx.vuelto, tiempoPago, factura.totalTotalFactura)
 
         // Bonificaciones globales
         val bonificaciones =
@@ -202,12 +221,29 @@ class TheFactoryHkaPayloadBuilder {
         val totalOTISum = ctx.detalles.sumOf { it.importeOti ?: 0.0 }
         val totalMontoGravado = factura.ivaTotalFactura + totalISC + totalOTISum
 
-        // tiempoPago: "1" contado, "2" crédito, "3" gobierno
-        val tiempoPago =
-            when {
-                ctx.factura.tipoVenta == "2" -> "2" // Crédito
-                else -> "1" // Contado
+        // listaPagoPlazo requerida por DGI Panamá en ventas a crédito ("2") y mixtas ("3")
+        val listaPagoPlazo =
+            if (tiempoPago in setOf("2", "3")) {
+                val fechaVence = formatFechaVencimientoForPayload(factura.fechaFactura)
+                val valorCuota =
+                    if (tiempoPago == "3") {
+                        creditoTotal.formatDecimals(2)
+                    } else {
+                        factura.totalTotalFactura.formatDecimals(2)
+                    }
+                listOf(
+                    TheFactoryHkaPagoPlazo(
+                        fechaVenceCuota = fechaVence,
+                        valorCuota = valorCuota,
+                        infoPagoCuota = "CUOTA 1 DE 1 - CREDITO 30 DIAS",
+                    ),
+                )
+            } else {
+                null
             }
+
+        // Invariante PAC: totalValorRecibido == Σ(valorCuotaPagada de listaFormaPago)
+        val totalValorRecibido = formasPago.sumOf { it.valorCuotaPagada.toDouble() }.formatDecimals(2)
 
         return TheFactoryHkaTotalesSubTotales(
             totalPrecioNeto = factura.montoItemsFactura.formatDecimals(2),
@@ -219,8 +255,7 @@ class TheFactoryHkaPayloadBuilder {
                     if (it > 0) it.formatDecimals(2) else "0.00"
                 },
             totalFactura = factura.totalTotalFactura.formatDecimals(2),
-            totalValorRecibido =
-                ((ctx.montoCancelar ?: factura.totalTotalFactura) + (ctx.vuelto ?: 0.0)).formatDecimals(2),
+            totalValorRecibido = totalValorRecibido,
             vuelto = ctx.vuelto?.formatDecimals(2),
             tiempoPago = tiempoPago,
             nroItems = ctx.detalles.size.toString(),
@@ -228,6 +263,7 @@ class TheFactoryHkaPayloadBuilder {
             listaFormaPago = formasPago,
             listaDescBonificacion = bonificaciones,
             retencion = buildRetencion(ctx.retencion),
+            listaPagoPlazo = listaPagoPlazo,
             listaTotalOTI = totalOTI,
         )
     }
@@ -245,6 +281,8 @@ class TheFactoryHkaPayloadBuilder {
     private fun buildFormasPago(
         formasPago: List<FEFormaPagoData>,
         vuelto: Double?,
+        tiempoPago: String,
+        totalFactura: Double,
     ): List<TheFactoryHkaFormaPago> {
         val cambio = vuelto?.takeIf { it > 0 } ?: 0.0
         val formasPagoFiltradas =
@@ -259,10 +297,18 @@ class TheFactoryHkaPayloadBuilder {
 
         return formasPagoFiltradas
             .mapIndexed { index, fp ->
-                // Mapear al catálogo The Factory (01 a 08), si no existe enviar "99"
-                val formaPagoFact = fp.formaPagoFact?.takeIf { it.isNotBlank() } ?: "99"
+                val siglas = fp.siglas?.uppercase()?.trim().orEmpty()
+                // Mapear al catálogo The Factory (01 a 09), si no existe enviar "99"
+                // 01 = Crédito, 02 = Efectivo, 03 = Tarjeta Crédito, 04 = Tarjeta Débito, 08 = Transf, 09 = Cheque
+                val formaPagoFact =
+                    when {
+                        !fp.formaPagoFact.isNullOrBlank() -> fp.formaPagoFact
+                        siglas in setOf("CXC", "CRED", "CREDITO") -> "01"
+                        fp.isCashPayment() -> "02"
+                        else -> "99"
+                    }
 
-                // Descripción: si es menor a 10 caracteres, concatenar consigo misma
+                // Descripción: obligatorio ÚNICAMENTE si formaPagoFact == "99" (mínimo 10 caracteres)
                 val descripcion =
                     fp.descripcion.let {
                         if (it.length < MIN_FORMA_PAGO_DESC_LENGTH) "$it $it" else it
@@ -275,11 +321,13 @@ class TheFactoryHkaPayloadBuilder {
                 )
             }.ifEmpty {
                 // Fallback: al menos una forma de pago debe existir
+                val defaultForma = if (tiempoPago == "2") "01" else "99"
+                val defaultDesc = if (tiempoPago == "2") "Crédito" else "Otro medio de pago"
                 listOf(
                     TheFactoryHkaFormaPago(
-                        formaPagoFact = "99",
-                        descFormaPago = "Otro medio de pago",
-                        valorCuotaPagada = "0.00",
+                        formaPagoFact = defaultForma,
+                        descFormaPago = if (defaultForma == "99") defaultDesc else null,
+                        valorCuotaPagada = totalFactura.formatDecimals(2),
                     ),
                 )
             }

@@ -170,6 +170,14 @@ data class MarcarCuentaFacturadaResponse(
     val error: String? = null,
 )
 
+@Serializable
+data class SolicitudCuentaResponse(
+    val success: Boolean,
+    val mensaje: String? = null,
+    val sesion: SesionMesaResponse? = null,
+    val error: String? = null,
+)
+
 /** Resultado interno del repositorio de cuenta. Lo traduce el routing a HTTP status. */
 sealed interface CuentaMesaResult {
     data class Creada(

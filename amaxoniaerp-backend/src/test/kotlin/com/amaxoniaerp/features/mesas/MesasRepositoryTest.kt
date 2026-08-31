@@ -244,7 +244,7 @@ class MesasRepositoryTest {
                     it[descripcion] = "area sin imagen del plano"
                     it[imagen] = "   "
                     it[PlantasTable.orden] = 5
-                    it[activo] = 1
+                    it[activo] = true
                 }
             }
 
@@ -324,7 +324,7 @@ class MesasRepositoryTest {
             it[descripcion] = "Descripción de $nombre"
             it[imagen] = "${nombre.lowercase().replace(' ', '_')}.jpg"
             it[PlantasTable.orden] = orden
-            it[activo] = if (activa) 1 else 0
+            it[activo] = activa
         }
     }
 
@@ -368,7 +368,7 @@ class MesasRepositoryTest {
             it[ancho] = BigDecimal("100.00")
             it[alto] = BigDecimal("60.00")
             it[rotacion] = BigDecimal.ZERO
-            it[activo] = if (spec.activa) 1 else 0
+            it[activo] = spec.activa
         }
     }
 

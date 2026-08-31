@@ -80,9 +80,9 @@ fun CreditNoteRepository.finalizePanamaAccepted(
 ): CreateCreditNoteResponse {
     val headerRow = lockHeaderOrThrow(id)
     val currentStatus =
-        resolveFiscalStatus(
-            headerRow[CreditNoteHeaderTablePA.codDevolucionFiscal].orEmpty(),
-            headerRow[CreditNoteHeaderTablePA.numeroDocumentoFiscal].orEmpty(),
+        resolvePanamaFiscalStatus(
+            cufe = headerRow[CreditNoteHeaderTablePA.cufe].orEmpty(),
+            estadoDevolucion = headerRow[CreditNoteHeaderTablePA.estadoDevolucion],
         )
     val earlyResponse =
         when (currentStatus) {
@@ -196,14 +196,17 @@ private fun persistAcceptedHeader(
     cufe: String,
 ) {
     val header = CreditNoteHeaderTablePA
+    val dgiDate = parsePacDate(pacResponse.fechaRecepcionDGI) ?: BusinessClock.nowForCountry("PA")
+    val limitDate = parsePacDate(pacResponse.fechaLimite) ?: BusinessClock.nowForCountry("PA")
+
     header.update({ header.idDevolucion eq id }) {
-        it[codDevolucionFiscal] = CONFIRMED_FISCAL_CODE
         it[header.numeroDocumentoFiscal] = normalizedDocumentNumber
         it[header.cufe] = cufe
-        pacResponse.qr?.let { value -> it[header.qr] = value }
-        pacResponse.nroProtocoloAutorizacion?.let { value -> it[header.nroProtocoloAutorizacion] = value }
-        parsePacDate(pacResponse.fechaRecepcionDGI)?.let { value -> it[header.fechaRecepcionDGI] = value }
-        parsePacDate(pacResponse.fechaLimite)?.let { value -> it[header.fechaLimite] = value }
+        it[header.qr] = pacResponse.qr.orEmpty()
+        it[header.nroProtocoloAutorizacion] = pacResponse.nroProtocoloAutorizacion.orEmpty()
+        it[header.fechaRecepcionDGI] = dgiDate
+        it[header.fechaLimite] = limitDate
+        it[header.estadoDevolucion] = "PROCESADA"
         it[header.informacionInteres] = ""
     }
 }
@@ -231,13 +234,13 @@ fun CreditNoteRepository.markPanamaFiscalStatus(
     val header = CreditNoteHeaderTablePA
     val row = lockHeaderOrThrow(id)
     val currentStatus =
-        resolveFiscalStatus(
-            row[header.codDevolucionFiscal].orEmpty(),
-            row[header.numeroDocumentoFiscal].orEmpty(),
+        resolvePanamaFiscalStatus(
+            cufe = row[header.cufe].orEmpty(),
+            estadoDevolucion = row[header.estadoDevolucion],
         )
     if (currentStatus != CreditNoteFiscalStatus.CONFIRMADA) {
         header.update({ header.idDevolucion eq id }) {
-            it[codDevolucionFiscal] = fiscalStatusCode(status)
+            it[estadoDevolucion] = status.name
             it[informacionInteres] = message.take(MAX_PAC_DIAGNOSTIC_LENGTH)
         }
     }
@@ -255,9 +258,9 @@ fun CreditNoteRepository.recordPanamaDiagnostic(
     val header = CreditNoteHeaderTablePA
     val row = lockHeaderOrThrow(id)
     val currentStatus =
-        resolveFiscalStatus(
-            row[header.codDevolucionFiscal].orEmpty(),
-            row[header.numeroDocumentoFiscal].orEmpty(),
+        resolvePanamaFiscalStatus(
+            cufe = row[header.cufe].orEmpty(),
+            estadoDevolucion = row[header.estadoDevolucion],
         )
     if (currentStatus == CreditNoteFiscalStatus.CONFIRMADA) {
         header.update({ header.idDevolucion eq id }) {

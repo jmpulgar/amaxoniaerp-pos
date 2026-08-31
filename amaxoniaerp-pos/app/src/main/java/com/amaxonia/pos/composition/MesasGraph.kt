@@ -53,6 +53,8 @@ object MesasGraph {
 
     val selectedTableHolder: SelectedTableHolder get() = DependencyContainer.selectedTableHolder
 
+    val sesionMesaIdState get() = DependencyContainer.cartRepository.sesionMesaIdState
+
     val tableAccountPaymentHolder: TableAccountPaymentHolder get() = DependencyContainer.tableAccountPaymentHolder
 
     /** Selecciona la cuenta de mesa que atravesará el flujo de pago estándar. */

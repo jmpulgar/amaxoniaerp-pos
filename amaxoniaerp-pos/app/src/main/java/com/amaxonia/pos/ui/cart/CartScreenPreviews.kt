@@ -73,8 +73,7 @@ internal fun CartBottomBar320() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CartBottomBar(
-                total = 248.75,
-                secondaryTotal = null,
+                state = CartState(total = 248.75),
                 onSaveDraft = {},
                 onCheckout = {},
                 modifier = Modifier.padding(16.dp),
@@ -88,8 +87,7 @@ internal fun CartBottomBarHugeTotal() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CartBottomBar(
-                total = 9_876_543.21,
-                secondaryTotal = null,
+                state = CartState(total = 9_876_543.21),
                 onSaveDraft = {},
                 onCheckout = {},
                 modifier = Modifier.padding(16.dp),
@@ -103,8 +101,14 @@ internal fun CartBottomBarMultiCurrency() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CartBottomBar(
-                total = 1_289.50,
-                secondaryTotal = "Bs. 41264.00",
+                state =
+                    CartState(
+                        total = 1_289.50,
+                        tasa = 32.0,
+                        isMultiCurrency = true,
+                        abrMonedaSecundaria = "BS",
+                        taxLabel = "IVA",
+                    ),
                 onSaveDraft = {},
                 onCheckout = {},
                 modifier = Modifier.padding(16.dp),
@@ -118,8 +122,14 @@ internal fun CartBottomBarLandscapeCompact() =
     PosTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             CartBottomBar(
-                total = 248.75,
-                secondaryTotal = "Bs. 7940.00",
+                state =
+                    CartState(
+                        total = 248.75,
+                        tasa = 32.0,
+                        isMultiCurrency = true,
+                        abrMonedaSecundaria = "BS",
+                        taxLabel = "IVA",
+                    ),
                 onSaveDraft = {},
                 onCheckout = {},
             )

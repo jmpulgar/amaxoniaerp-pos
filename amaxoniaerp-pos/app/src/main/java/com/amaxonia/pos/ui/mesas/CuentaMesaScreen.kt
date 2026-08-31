@@ -138,6 +138,20 @@ fun CuentaMesaScreen(
                         onSelectClient = onSelectClient,
                     )
                 }
+                if (state.pedidosNoEntregados.isNotEmpty()) {
+                    item {
+                        PosFeedbackCard(
+                            title = "Productos en cocina pendientes de entrega",
+                            message = "Hay ${state.pedidosNoEntregados.size} producto(s) en cocina que aún no han sido entregados a la mesa y no pueden incluirse en la cuenta.",
+                            tone = PosVisualTone.Warning,
+                            action =
+                                PosVisualAction(
+                                    label = if (state.isDeliveringAll) "Entregando…" else "Marcar todos como entregados",
+                                    onClick = viewModel::marcarTodosEntregados,
+                                ),
+                        )
+                    }
+                }
                 state.error?.let { message ->
                     item {
                         PosFeedbackCard(

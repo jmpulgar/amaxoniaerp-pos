@@ -82,6 +82,38 @@ class CreditNoteRepositoryEligibilityTest {
             assertEquals(true, exception.message?.contains("excede lo disponible"))
         }
 
+    @Test
+    fun `listEligibleInvoices filters by date range correctly`() =
+        withSeededDatabase {
+            val matching =
+                transaction(database) {
+                    repository.listEligibleInvoices(
+                        countryCode = "PA",
+                        limit = 50,
+                        offset = 0,
+                        search = null,
+                        fechaInicio = LocalDate.of(2026, 1, 1),
+                        fechaFin = LocalDate.of(2026, 1, 31),
+                    )
+                }
+            assertEquals(1L, matching.second)
+            assertEquals(1, matching.first.size)
+
+            val outsideRange =
+                transaction(database) {
+                    repository.listEligibleInvoices(
+                        countryCode = "PA",
+                        limit = 50,
+                        offset = 0,
+                        search = null,
+                        fechaInicio = LocalDate.of(2026, 2, 1),
+                        fechaFin = LocalDate.of(2026, 2, 28),
+                    )
+                }
+            assertEquals(0L, outsideRange.second)
+            assertEquals(0, outsideRange.first.size)
+        }
+
     private val repository = CreditNoteRepository()
     private lateinit var database: Database
 

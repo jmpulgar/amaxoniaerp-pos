@@ -45,16 +45,9 @@ class CuentaMesaViewModel(
             mutableState.update { it.copy(isLoading = true, error = null) }
             if (!cuentaSolicitada) {
                 val solicitud = cuentasRepository.solicitarCuenta(cajaId, areaId, mesaId, sesionId)
-                if (solicitud.isFailure) {
-                    mutableState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = solicitud.exceptionOrNull()?.message ?: "No se pudo solicitar la cuenta",
-                        )
-                    }
-                    return@launch
+                if (solicitud.isSuccess) {
+                    cuentaSolicitada = true
                 }
-                cuentaSolicitada = true
             }
             coroutineScope {
                 val pedidos = async { pedidosRepository.listar(cajaId, areaId, mesaId, sesionId) }
@@ -62,18 +55,60 @@ class CuentaMesaViewModel(
                 val pedidosResult = pedidos.await()
                 val cuentasResult = cuentas.await()
                 val error = pedidosResult.exceptionOrNull() ?: cuentasResult.exceptionOrNull()
+                val todosPedidos = pedidosResult.getOrDefault(emptyList())
                 mutableState.update {
                     it.copy(
-                        pedidos =
-                            pedidosResult
-                                .getOrDefault(emptyList())
-                                .filter { line -> line.estado == EstadoPedidoMesa.ENTREGADA },
+                        pedidos = todosPedidos.filter { line -> line.estado == EstadoPedidoMesa.ENTREGADA },
+                        pedidosNoEntregados =
+                            todosPedidos.filter { line ->
+                                line.estado != EstadoPedidoMesa.ENTREGADA && line.estado != EstadoPedidoMesa.CANCELADA
+                            },
                         cuentas = cuentasResult.getOrDefault(emptyList()),
                         isLoading = false,
                         error = error?.message,
                     )
                 }
             }
+        }
+    }
+
+    fun marcarTodosEntregados() {
+        if (mutableState.value.isDeliveringAll || mutableState.value.isSaving) return
+        val noEntregados = mutableState.value.pedidosNoEntregados
+        if (noEntregados.isEmpty()) return
+
+        viewModelScope.launch {
+            val cajaId = activeCajaReader.activeCaja.value?.idCaja
+            if (cajaId == null) {
+                mutableState.update { it.copy(error = "Debes seleccionar una caja") }
+                return@launch
+            }
+            mutableState.update { it.copy(isDeliveringAll = true, error = null, info = null) }
+            var hayError = false
+            var ultimoError: String? = null
+            for (pedido in noEntregados) {
+                val res =
+                    pedidosRepository.cambiarEstado(
+                        cajaId = cajaId,
+                        areaId = areaId,
+                        mesaId = mesaId,
+                        sesionId = sesionId,
+                        pedidoId = pedido.id,
+                        estado = EstadoPedidoMesa.ENTREGADA,
+                    )
+                if (res.isFailure) {
+                    hayError = true
+                    ultimoError = res.exceptionOrNull()?.message
+                }
+            }
+            mutableState.update {
+                it.copy(
+                    isDeliveringAll = false,
+                    error = if (hayError) (ultimoError ?: "No se pudieron entregar todos los pedidos") else null,
+                    info = if (!hayError) "Todos los productos fueron marcados como entregados" else null,
+                )
+            }
+            load()
         }
     }
 

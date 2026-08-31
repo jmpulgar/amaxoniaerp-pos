@@ -50,6 +50,81 @@ class TheFactoryHkaPayloadBuilderTest {
         )
     }
 
+    @Test
+    fun `100 percent credit sale sets tiempoPago 2, totalValorRecibido, and listaPagoPlazo without infoPagoCuota`() {
+        val payload =
+            TheFactoryHkaPayloadBuilder().build(
+                context(
+                    totalFactura = 23.0,
+                    montoCancelar = 23.0,
+                    vuelto = null,
+                    formasPago =
+                        listOf(
+                            FEFormaPagoData(
+                                siglas = "CXC",
+                                formaPagoFact = "01",
+                                descripcion = "CUENTAS POR COBRAR",
+                                monto = 23.0,
+                                esCash = false,
+                            ),
+                        ),
+                ),
+            )
+
+        val totales = payload.documento.totalesSubTotales
+        assertEquals("23.00", totales.totalFactura)
+        assertEquals("23.00", totales.totalValorRecibido)
+        assertEquals("2", totales.tiempoPago)
+        assertEquals("01", totales.listaFormaPago.single().formaPagoFact)
+        assertEquals("23.00", totales.listaFormaPago.single().valorCuotaPagada)
+        assertEquals(null, totales.listaFormaPago.single().descFormaPago)
+        assertEquals(1, totales.listaPagoPlazo?.size)
+        assertEquals("23.00", totales.listaPagoPlazo?.single()?.valorCuota)
+        assertEquals("CUOTA 1 DE 1 - CREDITO 30 DIAS", totales.listaPagoPlazo?.single()?.infoPagoCuota)
+    }
+
+    @Test
+    fun `mixed sale sets tiempoPago 3, full totalValorRecibido, and listaPagoPlazo with credit portion only`() {
+        val payload =
+            TheFactoryHkaPayloadBuilder().build(
+                context(
+                    totalFactura = 100.0,
+                    montoCancelar = 100.0,
+                    vuelto = null,
+                    formasPago =
+                        listOf(
+                            FEFormaPagoData(
+                                siglas = "EFECTIVO",
+                                formaPagoFact = "02",
+                                descripcion = "EFECTIVO",
+                                monto = 20.0,
+                                esCash = true,
+                            ),
+                            FEFormaPagoData(
+                                siglas = "CXC",
+                                formaPagoFact = "01",
+                                descripcion = "CUENTAS POR COBRAR",
+                                monto = 80.0,
+                                esCash = false,
+                            ),
+                        ),
+                ),
+            )
+
+        val totales = payload.documento.totalesSubTotales
+        assertEquals("100.00", totales.totalFactura)
+        assertEquals("100.00", totales.totalValorRecibido)
+        assertEquals("3", totales.tiempoPago)
+        assertEquals(2, totales.listaFormaPago.size)
+        assertEquals("02", totales.listaFormaPago[0].formaPagoFact)
+        assertEquals("20.00", totales.listaFormaPago[0].valorCuotaPagada)
+        assertEquals("01", totales.listaFormaPago[1].formaPagoFact)
+        assertEquals("80.00", totales.listaFormaPago[1].valorCuotaPagada)
+        assertEquals(1, totales.listaPagoPlazo?.size)
+        assertEquals("80.00", totales.listaPagoPlazo?.single()?.valorCuota)
+        assertEquals("CUOTA 1 DE 1 - CREDITO 30 DIAS", totales.listaPagoPlazo?.single()?.infoPagoCuota)
+    }
+
     private fun context(
         totalFactura: Double,
         montoCancelar: Double?,

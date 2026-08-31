@@ -68,11 +68,29 @@ internal fun mapSummaryRow(
             .filter { it.isNotBlank() }
             .joinToString(" ")
             .ifBlank { "CONSUMIDOR FINAL" }
+
+    val fiscalStatus =
+        if (countryCode.equals("PA", ignoreCase = true) && headerTable is CreditNoteHeaderTablePA) {
+            resolvePanamaFiscalStatus(
+                cufe = row[headerTable.cufe].orEmpty(),
+                estadoDevolucion = row[headerTable.estadoDevolucion],
+            )
+        } else {
+            resolveFiscalStatus(
+                codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
+                numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
+            )
+        }
+
     val fiscalNumber =
-        resolveDisplayFiscalNumber(
-            codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
-            numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
-        )
+        if (countryCode.equals("PA", ignoreCase = true)) {
+            row[headerTable.numeroDocumentoFiscal].orEmpty()
+        } else {
+            resolveDisplayFiscalNumber(
+                codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
+                numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
+            )
+        }
 
     return CreditNoteSummary(
         id = row[headerTable.idDevolucion],
@@ -86,11 +104,7 @@ internal fun mapSummaryRow(
         total = row[headerTable.total].toDouble(),
         subtotal = row[headerTable.subtotal].toDouble(),
         impuesto = row[headerTable.impuesto].toDouble(),
-        fiscalStatus =
-            resolveFiscalStatus(
-                codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty(),
-                numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty(),
-            ),
+        fiscalStatus = fiscalStatus,
         fiscalNumber = fiscalNumber,
         printerSerial =
             if (headerTable is CreditNoteHeaderTableVE) row[headerTable.impresoraSerial].orEmpty() else "",
@@ -112,6 +126,23 @@ internal fun mapHeaderContext(
     val codDevolucionFiscal = row[headerTable.codDevolucionFiscal].orEmpty()
     val numeroDocumentoFiscal = row[headerTable.numeroDocumentoFiscal].orEmpty()
 
+    val fiscalStatus =
+        if (countryCode.equals("PA", ignoreCase = true) && headerTable is CreditNoteHeaderTablePA) {
+            resolvePanamaFiscalStatus(
+                cufe = row[headerTable.cufe].orEmpty(),
+                estadoDevolucion = row[headerTable.estadoDevolucion],
+            )
+        } else {
+            resolveFiscalStatus(codDevolucionFiscal, numeroDocumentoFiscal)
+        }
+
+    val fiscalNumber =
+        if (countryCode.equals("PA", ignoreCase = true)) {
+            numeroDocumentoFiscal
+        } else {
+            resolveDisplayFiscalNumber(codDevolucionFiscal, numeroDocumentoFiscal)
+        }
+
     return CreditNoteHeaderContext(
         id = row[headerTable.idDevolucion],
         codigo = row[headerTable.codDevolucion],
@@ -128,8 +159,8 @@ internal fun mapHeaderContext(
         subtotal = row[headerTable.subtotal],
         impuesto = row[headerTable.impuesto],
         total = row[headerTable.total],
-        fiscalStatus = resolveFiscalStatus(codDevolucionFiscal, numeroDocumentoFiscal),
-        fiscalNumber = resolveDisplayFiscalNumber(codDevolucionFiscal, numeroDocumentoFiscal),
+        fiscalStatus = fiscalStatus,
+        fiscalNumber = fiscalNumber,
         printerSerial =
             if (headerTable is CreditNoteHeaderTableVE) row[headerTable.impresoraSerial].orEmpty() else "",
         originalFiscalNumber =

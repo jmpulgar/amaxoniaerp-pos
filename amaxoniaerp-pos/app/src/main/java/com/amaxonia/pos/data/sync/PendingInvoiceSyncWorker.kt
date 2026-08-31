@@ -34,7 +34,9 @@ class PendingInvoiceSyncWorker(
                 salesApi = SalesApiImpl(ApiClient(apiConfigManager)),
                 localStore = localStore,
             )
-        val dao = AppDatabase.getInstance(applicationContext).pendingInvoiceDao()
+        val database = AppDatabase.getInstance(applicationContext)
+        val dao = database.pendingInvoiceDao()
+        val transactionLogDao = database.transactionLogDao()
         val queue =
             object : PendingInvoiceQueue {
                 override suspend fun recoverInterrupted(
@@ -72,6 +74,13 @@ class PendingInvoiceSyncWorker(
                     nowEpochMillis: Long,
                 ) {
                     dao.markSent(id, result.remoteId, result.remoteNumber, nowEpochMillis)
+                    transactionLogDao.markConfirmed(
+                        id = id,
+                        status = "CONFIRMED",
+                        remoteInvoiceId = result.remoteId,
+                        remoteInvoiceNumber = result.remoteNumber,
+                        updatedAt = nowEpochMillis,
+                    )
                 }
 
                 override suspend fun markRecoverableFailure(
@@ -80,6 +89,12 @@ class PendingInvoiceSyncWorker(
                     nowEpochMillis: Long,
                 ) {
                     dao.markFailed(id, message, nowEpochMillis)
+                    transactionLogDao.markFailed(
+                        id = id,
+                        status = "RETRYABLE_PENDING",
+                        message = message,
+                        updatedAt = nowEpochMillis,
+                    )
                 }
 
                 override suspend fun markPermanentFailure(
@@ -88,6 +103,12 @@ class PendingInvoiceSyncWorker(
                     nowEpochMillis: Long,
                 ) {
                     dao.markInvalid(id, message, nowEpochMillis)
+                    transactionLogDao.markFailed(
+                        id = id,
+                        status = "FAILED",
+                        message = message,
+                        updatedAt = nowEpochMillis,
+                    )
                 }
             }
         val useCase =

@@ -10,6 +10,7 @@ package com.amaxonia.pos.ui.mesas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Deck
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Map
@@ -53,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,9 +66,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.mesas.Mesa
+import com.amaxonia.pos.domain.model.mesas.isActiva
 import com.amaxonia.pos.ui.common.injectedViewModel
 
 /** Ancho mínimo de tile para el grid de mesas: 2 columnas en 320dp, 3 en 480dp, más en tablet. */
@@ -97,27 +104,44 @@ fun AreasMesasScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewModel.onRefreshEstados()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // Mesa pendiente de apertura: se abre el dialog de "cantidad de personas" primero; solo al
     // confirmar se invoca `viewModel.onAbrirSesion(mesaId, cantidad)`. Si la mesa ya estaba
     // ocupada (según `estadosMesas`), en lugar del dialog pedimos la sesión activa para mostrarla.
-    var pendingApertura by remember { mutableStateOf<Mesa?>(null) }
+    var pendingNavigationMesa by remember { mutableStateOf<Mesa?>(null) }
+    var pendingAperturaDialogMesa by remember { mutableStateOf<Mesa?>(null) }
 
-    // Fase 3 - Comanda: cuando se obtiene/recupera sesión para `pendingApertura`, disparamos
-    // la navegación a la pantalla de comanda. Si la sesión llegó por otro camino (ej. otra caja),
-    // el botón Continuar ya la navega directamente en onConfirm.
-    LaunchedEffect(state.activeSesion?.id, pendingApertura?.id) {
+    // Fase 3 - Comanda: cuando se obtiene/recupera sesión para la mesa objetivo, disparamos
+    // la navegación a la comanda sin requerir segundas pulsaciones.
+    LaunchedEffect(state.activeSesion) {
         val sesion = state.activeSesion ?: return@LaunchedEffect
-        val mesaPendiente = pendingApertura ?: return@LaunchedEffect
-        if (sesion.mesaId == mesaPendiente.id && sesion.estado == "ABIERTA") {
-            pendingApertura = null
-            onComenzarPedido(mesaPendiente, sesion.id)
+        val targetMesa = pendingNavigationMesa ?: state.selectedMesa
+        if (targetMesa != null && sesion.mesaId == targetMesa.id && sesion.isActiva) {
+            pendingNavigationMesa = null
+            pendingAperturaDialogMesa = null
+            onComenzarPedido(targetMesa, sesion.id)
         }
     }
 
     LaunchedEffect(state.sesionError) {
         val message = state.sesionError ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message = message, actionLabel = "Cerrar")
+        pendingNavigationMesa = null
+        pendingAperturaDialogMesa = null
         viewModel.onDismissSesionError()
     }
 
@@ -143,10 +167,14 @@ fun AreasMesasScreen(
                     onClear = viewModel::onClearSelection,
                     onConfirm = {
                         val sesion = state.activeSesion
-                        if (sesion != null && sesion.mesaId == mesa.id && sesion.estado == "ABIERTA") {
+                        if (sesion != null && sesion.mesaId == mesa.id && sesion.isActiva) {
                             onComenzarPedido(mesa, sesion.id)
+                        } else if (state.hasEstadosHidratados && state.isOcupada(mesa.id)) {
+                            pendingNavigationMesa = mesa
+                            viewModel.onRecuperarSesionActiva(mesa.id)
                         } else {
-                            abrirORecuperarSesion(mesa, state, viewModel) { pendingApertura = it }
+                            pendingNavigationMesa = mesa
+                            pendingAperturaDialogMesa = mesa
                         }
                     },
                 )
@@ -210,34 +238,18 @@ fun AreasMesasScreen(
     }
 
     // Modal de "cantidad de personas" antes de abrir la sesión.
-    pendingApertura?.let { mesa ->
+    pendingAperturaDialogMesa?.let { mesa ->
         CantidadPersonasDialog(
             mesaLabel = "${mesa.displayName}${mesa.displayCode?.let { " · $it" }.orEmpty()}",
             onConfirm = { cantidad ->
+                pendingAperturaDialogMesa = null
                 viewModel.onAbrirSesion(mesa.id, cantidad)
-                pendingApertura = null
             },
-            onDismiss = { pendingApertura = null },
+            onDismiss = {
+                pendingAperturaDialogMesa = null
+                pendingNavigationMesa = null
+            },
         )
-    }
-}
-
-/**
- * Decide qué hacer al pulsar "Continuar" en la barra de la mesa seleccionada:
- * - Si la mesa ya está ocupada: recupera y muestra la sesión activa (en fases siguientes abrirá
- *   la comanda).
- * - Si está disponible o no hay datos hidratados: pide cantidad de personas y abre sesión.
- */
-private fun abrirORecuperarSesion(
-    mesa: Mesa,
-    state: AreasMesasState,
-    viewModel: AreasMesasViewModel,
-    setPending: (Mesa?) -> Unit,
-) {
-    if (state.hasEstadosHidratados && state.isOcupada(mesa.id)) {
-        viewModel.onRecuperarSesionActiva(mesa.id)
-    } else {
-        setPending(mesa)
     }
 }
 
@@ -449,8 +461,9 @@ internal fun SelectedMesaBar(
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 10.dp,
+        shadowElevation = 12.dp,
         tonalElevation = 2.dp,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
             modifier =
@@ -462,7 +475,7 @@ internal fun SelectedMesaBar(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = MaterialTheme.shapes.medium,
+                    shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
@@ -470,7 +483,7 @@ internal fun SelectedMesaBar(
                         Icon(
                             imageVector = Icons.Default.TableRestaurant,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }
@@ -479,7 +492,7 @@ internal fun SelectedMesaBar(
                     Text(
                         text = mesaName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -487,13 +500,14 @@ internal fun SelectedMesaBar(
                     Text(
                         text = areaName.ifBlank { "Mesa seleccionada" },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -501,15 +515,21 @@ internal fun SelectedMesaBar(
                 OutlinedButton(
                     onClick = onClear,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Text("Cambiar mesa", maxLines = 1)
                 }
                 Button(
                     onClick = onConfirm,
-                    modifier = Modifier.weight(1.4f).heightIn(min = 52.dp),
-                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1.4f).heightIn(min = 50.dp),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text("Continuar", fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }

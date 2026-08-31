@@ -61,7 +61,7 @@ object PedidoMesaTable : Table("pedido_mesa") {
             S.DECIMAL_PRECISION_32,
             S.DECIMAL_SCALE_3,
         ).default(0.toBigDecimal())
-    val activo = integer("activo").default(1)
+    val activo = bool("activo").default(true)
 
     override val primaryKey = PrimaryKey(id)
 

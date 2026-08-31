@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.creditnotes
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,12 +17,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -31,12 +38,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -55,6 +65,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.delay
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -71,6 +89,19 @@ fun CreditNotesScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var processingSeconds by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(state.isSubmitting) {
+        if (!state.isSubmitting) {
+            processingSeconds = 0
+            return@LaunchedEffect
+        }
+        processingSeconds = 0
+        while (true) {
+            delay(1_000)
+            processingSeconds += 1
+        }
+    }
 
     CreditNotesSnackbarEffects(
         state = state,
@@ -114,7 +145,11 @@ fun CreditNotesScreen(
         ) {
             CreditNotesModeContent(state = state, viewModel = viewModel)
 
-            if (state.isLoading || state.isSubmitting) {
+            if (state.isSubmitting) {
+                ProcessingCreditNoteOverlay(
+                    elapsedSeconds = processingSeconds,
+                )
+            } else if (state.isLoading) {
                 CreditNotesLoadingOverlay()
             }
         }
@@ -140,6 +175,11 @@ private fun CreditNotesModeContent(
                 state = state,
                 onSearchChange = viewModel::onInvoiceSearchQueryChange,
                 onSearch = viewModel::searchSourceInvoices,
+                onDateFilterTypeSelect = viewModel::setInvoiceDateFilterType,
+                onCustomFechaInicioChange = viewModel::onCustomInvoiceFechaInicioChange,
+                onCustomFechaFinChange = viewModel::onCustomInvoiceFechaFinChange,
+                onApplyCustomDateFilter = viewModel::applyCustomInvoiceDateFilter,
+                onToggleCustomDateFilter = viewModel::toggleDateFilterCustomExpanded,
                 onSelectInvoice = viewModel::selectInvoice,
             )
         CreditNotesMode.CREATE ->
@@ -162,7 +202,7 @@ private fun CreditNotesModeContent(
     }
 }
 
-/** Velo de carga sobre el contenido durante carga o envío. */
+/** Velo de carga sobre el contenido durante operaciones de consulta simples. */
 @Composable
 private fun CreditNotesLoadingOverlay() {
     Box(
@@ -173,6 +213,137 @@ private fun CreditNotesLoadingOverlay() {
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** Overlay de procesamiento con etapas y contador de segundos estilo Facturación Electrónica Panamá. */
+@Composable
+private fun ProcessingCreditNoteOverlay(
+    elapsedSeconds: Int,
+) {
+    val estimatedSeconds = 30
+    val progress = (elapsedSeconds / estimatedSeconds.toFloat()).coerceIn(0.08f, 0.94f)
+    val secondsLeft = (estimatedSeconds - elapsedSeconds).coerceAtLeast(3)
+    val stageTitle =
+        when {
+            elapsedSeconds < 4 -> "Preparando la nota de crédito"
+            elapsedSeconds < 10 -> "Conectando con facturación electrónica"
+            elapsedSeconds < 24 -> "Esperando autorización de la DGI"
+            else -> "Últimos segundos de validación"
+        }
+    val stageSubtitle =
+        when {
+            elapsedSeconds < 4 -> "Validando nota de crédito, caja e inventario..."
+            elapsedSeconds < 10 -> "Enviando el documento al proveedor fiscal..."
+            elapsedSeconds < 24 -> "TheFactory está procesando el CUFE y el QR..."
+            else -> "La respuesta está tardando un poco más de lo normal, seguimos esperando."
+        }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PosPalette.FixedBlack.copy(alpha = 0.36f))
+                .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(74.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(54.dp),
+                        strokeWidth = 5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    )
+                    Text(
+                        text = "${elapsedSeconds}s",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = "Procesando nota de crédito",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stageTitle,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Text(
+                    text = stageSubtitle,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text =
+                        if (elapsedSeconds < estimatedSeconds) {
+                            "Tiempo estimado restante: ${secondsLeft}s"
+                        } else {
+                            "Está tomando más de lo habitual, no cierres la pantalla."
+                        },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text(
+                        text = "La nota de crédito se está registrando. Evita tocar atrás o cerrar la app.",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -213,6 +384,7 @@ private fun CreditNoteDetailSheetOverlay(
                 detail = selectedCreditNote,
                 isSubmitting = state.isSubmitting,
                 onProcessFiscal = onProcessFiscal,
+                currencySymbol = state.currencySymbol,
             )
         }
     }
@@ -262,18 +434,23 @@ private fun CreditNotesListContent(
             title = "Devoluciones registradas",
             value = state.creditNotes.size.toString(),
             amount = creditNotesTotal,
+            currencySymbol = state.currencySymbol,
         )
         Spacer(modifier = Modifier.height(12.dp))
         if (state.creditNotes.isEmpty()) {
             EmptyState(
                 icon = Icons.AutoMirrored.Filled.ReceiptLong,
-                title = "AÃºn no hay notas de crÃ©dito",
-                subtitle = "Pulsa agregar para seleccionar una factura y generar una devoluciÃ³n",
+                title = "Aún no hay notas de crédito",
+                subtitle = "Pulsa agregar para seleccionar una factura y generar una devolución",
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(state.creditNotes, key = { it.id }) { note ->
-                    CreditNoteCard(note = note, onClick = { onOpenDetail(note.id) })
+                    CreditNoteCard(
+                        note = note, 
+                        onClick = { onOpenDetail(note.id) },
+                        currencySymbol = state.currencySymbol,
+                    )
                 }
             }
         }
@@ -285,16 +462,31 @@ private fun CreditNoteInvoicePickerContent(
     state: CreditNotesState,
     onSearchChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onDateFilterTypeSelect: (InvoiceDateFilterType) -> Unit,
+    onCustomFechaInicioChange: (String) -> Unit,
+    onCustomFechaFinChange: (String) -> Unit,
+    onApplyCustomDateFilter: () -> Unit,
+    onToggleCustomDateFilter: () -> Unit,
     onSelectInvoice: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         SearchRow(value = state.invoiceSearchQuery, placeholder = "Buscar facturas", onValueChange = onSearchChange, onSearch = onSearch)
+        Spacer(modifier = Modifier.height(10.dp))
+        InvoiceDateFilterSection(
+            filter = state.invoiceDateFilter,
+            isCustomExpanded = state.isDateFilterCustomExpanded,
+            onDateFilterTypeSelect = onDateFilterTypeSelect,
+            onCustomFechaInicioChange = onCustomFechaInicioChange,
+            onCustomFechaFinChange = onCustomFechaFinChange,
+            onApplyCustomDateFilter = onApplyCustomDateFilter,
+            onToggleCustomDateFilter = onToggleCustomDateFilter,
+        )
         Spacer(modifier = Modifier.height(12.dp))
         if (state.sourceInvoices.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.Inventory2,
                 title = "No hay facturas elegibles",
-                subtitle = "AparecerÃ¡n aquÃ­ las facturas con saldo disponible para devoluciÃ³n",
+                subtitle = "No se encontraron facturas con saldo disponible para el periodo seleccionado (${state.invoiceDateFilter.displayLabel()})",
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -302,6 +494,118 @@ private fun CreditNoteInvoicePickerContent(
                     SourceInvoiceCard(invoice = invoice, onClick = { onSelectInvoice(invoice.id) })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InvoiceDateFilterSection(
+    filter: InvoiceDateFilter,
+    isCustomExpanded: Boolean,
+    onDateFilterTypeSelect: (InvoiceDateFilterType) -> Unit,
+    onCustomFechaInicioChange: (String) -> Unit,
+    onCustomFechaFinChange: (String) -> Unit,
+    onApplyCustomDateFilter: () -> Unit,
+    onToggleCustomDateFilter: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(InvoiceDateFilterType.entries.toTypedArray(), key = { it.name }) { type ->
+                val isSelected = filter.type == type
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        if (type == InvoiceDateFilterType.PERSONALIZADO && isSelected) {
+                            onToggleCustomDateFilter()
+                        } else {
+                            onDateFilterTypeSelect(type)
+                        }
+                    },
+                    label = { Text(type.label, fontSize = 12.sp) },
+                    leadingIcon = {
+                        val icon =
+                            when (type) {
+                                InvoiceDateFilterType.MES_ACTUAL -> Icons.Default.CalendarMonth
+                                InvoiceDateFilterType.MES_ANTERIOR -> Icons.Default.CalendarToday
+                                InvoiceDateFilterType.TODAS -> Icons.Default.AllInclusive
+                                InvoiceDateFilterType.PERSONALIZADO -> Icons.Default.DateRange
+                            }
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors =
+                        FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                )
+            }
+        }
+
+        AnimatedVisibility(visible = isCustomExpanded || filter.type == InvoiceDateFilterType.PERSONALIZADO) {
+            ElevatedCard(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = filter.customFechaInicio,
+                            onValueChange = onCustomFechaInicioChange,
+                            label = { Text("Desde") },
+                            placeholder = { Text("AAAA-MM-DD") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = filter.customFechaFin,
+                            onValueChange = onCustomFechaFinChange,
+                            label = { Text("Hasta") },
+                            placeholder = { Text("AAAA-MM-DD") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(
+                            onClick = onApplyCustomDateFilter,
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text("Aplicar filtro")
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 2.dp),
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Mostrando: ${filter.displayLabel()}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -333,7 +637,7 @@ private fun CreditNoteCreateContent(
         EmptyState(
             icon = Icons.AutoMirrored.Filled.ReceiptLong,
             title = "Selecciona una factura",
-            subtitle = "El flujo de creaciÃ³n necesita una factura origen",
+            subtitle = "El flujo de creación necesita una factura origen",
         )
         return
     }
@@ -346,13 +650,13 @@ private fun CreditNoteCreateContent(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Generar la Nota de CrÃ©dito",
+                    "Generar la Nota de Crédito",
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    "Se anularÃ¡ la factura y se devolverÃ¡ la totalidad de las lÃ­neas.",
+                    "Se anulará la factura y se devolverá la totalidad de las líneas.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                 )
@@ -420,19 +724,19 @@ private fun CreditNoteSourceSummaryCard(invoice: CreditNoteSourceInvoiceDetailDt
                         fontSize = 14.sp,
                     )
                 }
-                if (invoice.tasa != null) {
+                if (invoice.tasa != null && invoice.tasa > 1.0) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Tasa (Bs)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                         Text("Bs ${formatAmount(invoice.tasa)}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
                     }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total USD", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Text("USD ${formatAmount(invoice.totalUsd)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total Bs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    Text("Bs ${formatAmount(invoice.totalBs)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total USD", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        Text("USD ${formatAmount(invoice.totalUsd)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total Bs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        Text("Bs ${formatAmount(invoice.totalBs)}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
                 }
             }
         }
@@ -488,7 +792,7 @@ private fun CreditNoteFormFieldsSection(
             )
         }
         OutlinedTextField(value = state.form.observacion, onValueChange = fields.onObservacionChange, label = {
-            Text("ObservaciÃ³n")
+            Text("Observación")
         }, modifier = Modifier.fillMaxWidth())
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -519,7 +823,7 @@ private fun CreditNoteAbonoSection(
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Â¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("¿Desea generar abono a cuenta del cliente?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 AbonoYesNoOptions(
                     selected = state.form.generarAbono,
                     onSelect = onGenerarAbonoChange,
@@ -616,7 +920,7 @@ private fun CreditNoteSubmitButton(
         if (isSubmitting) {
             androidx.compose.material3.CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
         } else {
-            Text("Generar nota de crÃ©dito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Generar nota de crédito", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

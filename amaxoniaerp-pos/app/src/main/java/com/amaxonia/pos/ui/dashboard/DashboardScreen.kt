@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
@@ -33,10 +34,13 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.EditNote
@@ -61,6 +65,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -162,8 +167,11 @@ fun DashboardScreen(
     onNavigateToCierreCaja: () -> Unit = {},
     onNavigateToDraftInvoices: () -> Unit = {},
     onNavigateToAreasMesas: () -> Unit = {},
+    onNavigateToComanda: (areaId: Int, mesaId: Int, sesionId: Int) -> Unit = { _, _, _ -> },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val selectedTable by AppGraph.mesas.selectedTableHolder.selectedTable.collectAsStateWithLifecycle()
+    val sesionMesaId by AppGraph.mesas.sesionMesaIdState.collectAsStateWithLifecycle()
     val currentOnNavigateToCart by rememberUpdatedState(onNavigateToCart)
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
@@ -724,6 +732,18 @@ fun DashboardScreen(
                     onAperturar = { viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive) },
                     onSeleccionar = { viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true)) },
                 )
+
+                val activeTable = selectedTable
+                val activeSesion = sesionMesaId
+                if (activeTable != null && activeSesion != null) {
+                    MesaActiveOrderBanner(
+                        mesaName = activeTable.mesa.displayName,
+                        areaName = activeTable.area.displayName,
+                        onReturnToComanda = {
+                            onNavigateToComanda(activeTable.area.id, activeTable.mesa.id, activeSesion)
+                        },
+                    )
+                }
 
                 // --- Contenido Principal ---
                 Box(modifier = Modifier.weight(1f)) {
@@ -1334,4 +1354,75 @@ private fun AperturaCajaDialog(
             TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancelar") }
         },
     )
+}
+
+@Composable
+private fun MesaActiveOrderBanner(
+    mesaName: String,
+    areaName: String,
+    onReturnToComanda: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.TableRestaurant,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Comanda activa: $mesaName",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (areaName.isNotBlank()) {
+                        Text(
+                            text = areaName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            FilledTonalButton(
+                onClick = onReturnToComanda,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    "Volver",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
 }

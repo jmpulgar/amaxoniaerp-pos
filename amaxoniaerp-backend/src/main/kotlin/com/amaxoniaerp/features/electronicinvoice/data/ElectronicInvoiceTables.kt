@@ -188,6 +188,7 @@ object FECajaNuevaDetalleReadTable : Table("caja_nueva_detalle") {
     val cajaId = varchar("caja_id", S.VARCHAR_LENGTH_36)
     val idFormaPago = integer("id_forma_pago").nullable()
     val monto = decimal("monto", S.DECIMAL_PRECISION_10, 2).nullable()
+    val montoOriginal = decimal("monto_original", S.DECIMAL_PRECISION_10, 2).nullable()
 
     override val primaryKey = PrimaryKey(cajaDetalleId)
 }

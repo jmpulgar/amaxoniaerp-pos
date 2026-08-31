@@ -22,6 +22,7 @@ import com.amaxoniaerp.features.creditnotes.domain.CreditNoteSourceInvoiceListRe
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteValidationException
 import com.amaxoniaerp.features.creditnotes.domain.CreditNotesListResponse
 import com.amaxoniaerp.features.creditnotes.domain.PreparedCreditNote
+import java.time.LocalDate
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
@@ -47,9 +48,11 @@ class CreditNoteService(
         limit: Int,
         offset: Long,
         search: String?,
+        fechaInicio: LocalDate? = null,
+        fechaFin: LocalDate? = null,
     ): CreditNoteSourceInvoiceListResponse =
         dbQuery(database) {
-            val (data, total) = repository.listEligibleInvoices(countryCode, limit, offset, search)
+            val (data, total) = repository.listEligibleInvoices(countryCode, limit, offset, search, fechaInicio, fechaFin)
             CreditNoteSourceInvoiceListResponse(data = data, total = total)
         }
 

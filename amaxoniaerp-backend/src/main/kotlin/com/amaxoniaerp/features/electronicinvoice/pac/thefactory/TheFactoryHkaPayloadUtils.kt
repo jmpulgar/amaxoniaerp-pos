@@ -59,6 +59,23 @@ internal fun formatFechaEmisionForPayload(fecha: String?): String {
 }
 
 /**
+ * Formatea la fecha de vencimiento al formato ISO 8601 (yyyy-MM-dd'T'HH:mm:ss) para cuotas a crédito.
+ */
+internal fun formatFechaVencimientoForPayload(fecha: String?): String {
+    return try {
+        val baseDate =
+            if (!fecha.isNullOrBlank()) {
+                LocalDate.parse(fecha.trim().take(ISO_DATE_LENGTH))
+            } else {
+                LocalDate.now()
+            }
+        baseDate.plusDays(30).format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
+    } catch (_: Exception) {
+        LocalDate.now().plusDays(30).format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
+    }
+}
+
+/**
  * Extensión para formatear Double a String con N decimales exactos.
  */
 internal fun Double.formatDecimals(scale: Int): String =

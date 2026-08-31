@@ -29,7 +29,7 @@ internal fun areaActivaPerteneceASucursal(
         .where {
             (PlantasTable.id eq areaId) and
                 (PlantasTable.sucursalId eq sucursalId) and
-                (PlantasTable.activo eq ACTIVE)
+                (PlantasTable.activo eq true)
         }.limit(1)
         .singleOrNull() != null
 
@@ -44,13 +44,13 @@ internal fun mesaActivaPerteneceAArea(
             .limit(1)
             .singleOrNull()
             ?: return false to false
-    return true to (row[MesasTable.activo] == ACTIVE)
+    return true to row[MesasTable.activo]
 }
 
 internal fun existeSesionActiva(mesaId: Int): Boolean =
     SesionMesaTable
         .selectAll()
-        .where { (SesionMesaTable.mesaId eq mesaId) and (SesionMesaTable.activo eq ACTIVE) }
+        .where { (SesionMesaTable.mesaId eq mesaId) and (SesionMesaTable.activo eq true) }
         .limit(1)
         .singleOrNull() != null
 
@@ -58,7 +58,7 @@ internal fun sesionActivaDeMesa(mesaId: Int): SesionMesaResponse? {
     val row =
         SesionMesaTable
             .selectAll()
-            .where { (SesionMesaTable.mesaId eq mesaId) and (SesionMesaTable.activo eq ACTIVE) }
+            .where { (SesionMesaTable.mesaId eq mesaId) and (SesionMesaTable.activo eq true) }
             .orderBy(SesionMesaTable.fechaApertura to SortOrder.DESC)
             .limit(1)
             .singleOrNull()
@@ -72,16 +72,20 @@ internal fun sesionesActivasByMesa(mesas: Set<Int>): Map<Int, SesionMesaResponse
     return SesionMesaTable
         .selectAll()
         .where {
-            (SesionMesaTable.mesaId inList mesas) and (SesionMesaTable.activo eq ACTIVE)
+            (SesionMesaTable.mesaId inList mesas) and (SesionMesaTable.activo eq true)
         }.map { it.toSesionMesaResponse(usuarioByCod = usuarioById) }
         .associateBy { it.mesaId }
 }
 
 internal fun usuariosById(): Map<Int, String> =
-    UsersTable
-        .selectAll()
-        .map { it[UsersTable.codUsuario] to it[UsersTable.usuario] }
-        .toMap()
+    try {
+        UsersTable
+            .select(UsersTable.codUsuario, UsersTable.usuario)
+            .map { it[UsersTable.codUsuario] to it[UsersTable.usuario] }
+            .toMap()
+    } catch (_: Exception) {
+        emptyMap()
+    }
 
 internal fun sucursalDeCaja(cajaId: String): Int? =
     CajaTable
@@ -90,6 +94,6 @@ internal fun sucursalDeCaja(cajaId: String): Int? =
         .limit(1)
         .singleOrNull()
         ?.let { row ->
-            val activo = row[CajaTable.codEstatus] == ACTIVE
+            val activo = row[CajaTable.codEstatus] == 1
             if (activo) row[CajaTable.idSucursal] else null
         }

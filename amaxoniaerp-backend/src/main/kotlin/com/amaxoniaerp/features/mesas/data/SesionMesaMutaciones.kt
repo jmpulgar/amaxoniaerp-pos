@@ -44,7 +44,7 @@ internal fun abrirInterno(scope: AbrirSesionScope): SesionMesaResult =
                 it[SesionMesaTable.cantidadPersonas] = scope.cantidadPersonas
                 it[SesionMesaTable.estado] = EstadoSesionMesa.ABIERTA.codigo
                 it[SesionMesaTable.fechaApertura] = ahora
-                it[SesionMesaTable.activo] = ACTIVE
+                it[SesionMesaTable.activo] = true
             }[SesionMesaTable.id]
 
         val usuariosById = usuariosById()
@@ -89,6 +89,9 @@ internal fun transicionarSesionCuenta(
         val estadoActual =
             EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
                 ?: return@run SesionMesaResult.SesionYaFinalizada
+        if (estadoActual == destino) {
+            return@run SesionMesaResult.Closed(sesion.toSesionMesaResponse())
+        }
         val valido =
             (estadoActual == EstadoSesionMesa.ABIERTA && destino == EstadoSesionMesa.CUENTA_SOLICITADA) ||
                 (estadoActual == EstadoSesionMesa.CUENTA_SOLICITADA && destino == EstadoSesionMesa.ABIERTA)
@@ -125,7 +128,7 @@ internal fun cerrarPorPagoInterno(sesionId: Int): SesionMesaResult =
         SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
             it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
             it[SesionMesaTable.fechaCierre] = ahora
-            it[SesionMesaTable.activo] = INACTIVE
+            it[SesionMesaTable.activo] = false
         }
         SesionMesaResult.Closed(
             sesion.toSesionMesaResponse().copy(
@@ -175,7 +178,7 @@ internal fun mutarSesionInterno(
             SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
                 it[SesionMesaTable.estado] = destino.codigo
                 it[SesionMesaTable.fechaCierre] = ahora
-                it[SesionMesaTable.activo] = INACTIVE
+                it[SesionMesaTable.activo] = false
             }
         }
 

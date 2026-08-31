@@ -69,9 +69,55 @@ class CuentaMesaViewModelTest {
             assertEquals(1, cuentas.solicitarCalls)
             val state = vm.state.value
             assertEquals(listOf(1), state.pedidos.map { it.id })
+            assertEquals(listOf(2), state.pedidosNoEntregados.map { it.id })
             assertTrue(state.cuentas.isNotEmpty())
             assertNull(state.error)
             assertTrue(!state.isLoading)
+        }
+
+    @Test
+    fun `marcarTodosEntregados avanza los pedidos pendientes a ENTREGADA y recarga`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var pedidosActuales = pedidos
+            val pedidosRepo =
+                object : PedidosMesaRepository by FakePedidosMesaRepository() {
+                    override suspend fun listar(
+                        cajaId: String,
+                        areaId: Int,
+                        mesaId: Int,
+                        sesionId: Int,
+                        estado: String?,
+                    ): Result<List<PedidoMesa>> = Result.success(pedidosActuales)
+
+                    override suspend fun cambiarEstado(
+                        cajaId: String,
+                        areaId: Int,
+                        mesaId: Int,
+                        sesionId: Int,
+                        pedidoId: Int,
+                        estado: String,
+                    ): Result<PedidoMesa> {
+                        pedidosActuales =
+                            pedidosActuales.map {
+                                if (it.id == pedidoId) it.copy(estado = estado) else it
+                            }
+                        return Result.success(PedidoMesa(id = pedidoId, estado = estado))
+                    }
+                }
+            val vm = cuentaViewModel(pedidos = pedidosRepo)
+
+            vm.load()
+            advanceUntilIdle()
+
+            assertEquals(listOf(2), vm.state.value.pedidosNoEntregados.map { it.id })
+            assertEquals(listOf(1), vm.state.value.pedidos.map { it.id })
+
+            vm.marcarTodosEntregados()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.pedidosNoEntregados.isEmpty())
+            assertEquals(listOf(1, 2), vm.state.value.pedidos.map { it.id })
+            assertEquals("Todos los productos fueron marcados como entregados", vm.state.value.info)
         }
 
     @Test
@@ -90,7 +136,7 @@ class CuentaMesaViewModelTest {
         }
 
     @Test
-    fun `fallo al solicitar la cuenta expone el mensaje fallback`() =
+    fun `fallo al solicitar la cuenta no bloquea listar pedidos y cuentas`() =
         runTest(mainDispatcherRule.dispatcher) {
             val cuentas =
                 FakeCuentaMesaRepository(solicitarResult = Result.failure(IllegalStateException()))
@@ -99,8 +145,9 @@ class CuentaMesaViewModelTest {
             vm.load()
             advanceUntilIdle()
 
-            assertEquals("No se pudo solicitar la cuenta", vm.state.value.error)
-            assertEquals(0, cuentas.listarCalls)
+            assertEquals(1, cuentas.solicitarCalls)
+            assertEquals(1, cuentas.listarCalls)
+            assertNull(vm.state.value.error)
         }
 
     @Test
@@ -249,8 +296,8 @@ class CuentaMesaViewModelTest {
         }
 
     private fun cuentaViewModel(
-        cuentas: FakeCuentaMesaRepository = FakeCuentaMesaRepository(),
-        pedidos: FakePedidosMesaRepository = FakePedidosMesaRepository(),
+        cuentas: CuentaMesaRepository = FakeCuentaMesaRepository(),
+        pedidos: PedidosMesaRepository = FakePedidosMesaRepository(),
         caja: Caja? = activeCaja,
     ): CuentaMesaViewModel =
         CuentaMesaViewModel(

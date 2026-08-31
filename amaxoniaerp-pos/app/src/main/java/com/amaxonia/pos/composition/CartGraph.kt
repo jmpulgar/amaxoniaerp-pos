@@ -23,6 +23,7 @@ object CartGraph {
                         DependencyContainer.posConfigurationRepository,
                         DependencyContainer.imageUrlResolver,
                     ),
+                    DependencyContainer.selectedTableHolder,
                 ),
             configurationCoordinator =
                 CartConfigurationCoordinator(

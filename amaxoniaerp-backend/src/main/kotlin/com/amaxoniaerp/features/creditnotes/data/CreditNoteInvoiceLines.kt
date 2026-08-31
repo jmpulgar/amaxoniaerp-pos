@@ -59,11 +59,15 @@ private fun rejectedCreditNoteIdsPA(): Set<String> =
         CreditNoteHeaderTablePA
             .selectAll()
             .mapNotNull { row ->
-                row[CreditNoteHeaderTablePA.codDevolucionFiscal]
-                    .orEmpty()
-                    .trim()
-                    .takeIf { it.equals(REJECTED_FISCAL_CODE, ignoreCase = true) }
-                    ?.let { row[CreditNoteHeaderTablePA.idDevolucion] }
+                val estado = row[CreditNoteHeaderTablePA.estadoDevolucion].orEmpty().trim()
+                val fiscal = row[CreditNoteHeaderTablePA.codDevolucionFiscal].orEmpty().trim()
+                if (estado.equals(REJECTED_FISCAL_CODE, ignoreCase = true) ||
+                    fiscal.equals(REJECTED_FISCAL_CODE, ignoreCase = true)
+                ) {
+                    row[CreditNoteHeaderTablePA.idDevolucion]
+                } else {
+                    null
+                }
             }.toSet()
     } catch (_: ExposedSQLException) {
         emptySet()

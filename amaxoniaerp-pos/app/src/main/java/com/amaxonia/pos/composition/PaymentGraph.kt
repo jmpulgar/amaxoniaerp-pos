@@ -1,7 +1,10 @@
 package com.amaxonia.pos.composition
 
+import com.amaxonia.pos.data.local.readActiveCajaForToday
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.saveLastPaymentSuccess
+import com.amaxonia.pos.data.printer.LocalInvoicePrintPayloadMapper
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
@@ -68,9 +71,22 @@ object PaymentGraph {
         return when {
             ticketPrinter == null -> Result.failure(IllegalStateException("Impresora SUNMI no disponible"))
             else -> {
+                val payloadResult =
+                    if (transactionId.isNotBlank() && !transactionId.startsWith("OFF-")) {
+                        DependencyContainer.salesRepository.getPrintPayload(transactionId)
+                    } else {
+                        Result.failure(IllegalStateException("Factura offline"))
+                    }
                 val payload =
-                    DependencyContainer.salesRepository.getPrintPayload(transactionId).getOrElse { error ->
-                        return Result.failure(error)
+                    payloadResult.getOrElse { error ->
+                        val company = DependencyContainer.localStore.readCompanySession()?.company
+                        val caja = DependencyContainer.localStore.readActiveCajaForToday()
+                        val transaction = DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrNull()
+                        if (transaction != null) {
+                            LocalInvoicePrintPayloadMapper.fromTransaction(transaction, company, caja)
+                        } else {
+                            return Result.failure(error)
+                        }
                     }
                 val countryCode =
                     DependencyContainer.localStore

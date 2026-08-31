@@ -85,7 +85,7 @@ private fun Throwable.toAuthenticationException(): Throwable =
         is SocketTimeoutException,
         is IOException,
         -> AuthenticationConnectivityException(this)
-        else -> UnexpectedAuthenticationException(message ?: "No se pudo iniciar sesiÃ³n", this)
+        else -> UnexpectedAuthenticationException(message ?: "No se pudo iniciar sesión", this)
     }
 
 private fun com.amaxonia.pos.data.remote.dto.LoginResponse.toDomain(isOffline: Boolean): AuthSession =

@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -92,18 +93,13 @@ fun SalonPlan(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    val isDark = isSystemInDarkTheme()
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-    val primary = MaterialTheme.colorScheme.primary
-    val surface = MaterialTheme.colorScheme.surface
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-    val outline = MaterialTheme.colorScheme.outline
-    // Colores para "Ocupada": tertiaryContainer (amarillo cálido) para distinguirla de la
-    // seleccionada (primary). DISPONIBLE usa surface + outline, como antes.
-    val ocupadaFill = MaterialTheme.colorScheme.tertiaryContainer
-    val ocupadaBorder = MaterialTheme.colorScheme.tertiary
-    val cuentaFill = MaterialTheme.colorScheme.errorContainer
-    val cuentaBorder = MaterialTheme.colorScheme.error
-    val labelColor = MaterialTheme.colorScheme.onSurface
+
+    val dispColors = MesaVisualColors.getColors(estado = EstadoMesaOperativo.DISPONIBLE, isSelected = false, isDark = isDark)
+    val ocupadaColors = MesaVisualColors.getColors(estado = EstadoMesaOperativo.OCUPADA, isSelected = false, isDark = isDark)
+    val cuentaColors = MesaVisualColors.getColors(estado = ESTADO_CUENTA_SOLICITADA, isSelected = false, isDark = isDark)
+    val selectedColors = MesaVisualColors.getColors(estado = null, isSelected = true, isDark = isDark)
 
     Box(
         modifier =
@@ -142,36 +138,13 @@ fun SalonPlan(
             offsetY = offsetY,
             selectedMesaId = selectedMesaId,
             onMesaClick = onMesaClick,
-            primary = primary,
-            primaryContainer = primaryContainer,
-            surface = surface,
-            outline = outline,
-            ocupadaFill = ocupadaFill,
-            ocupadaBorder = ocupadaBorder,
-            cuentaFill = cuentaFill,
-            cuentaBorder = cuentaBorder,
-            labelColor = labelColor,
+            disponibleColors = dispColors,
+            ocupadaColors = ocupadaColors,
+            cuentaColors = cuentaColors,
+            selectedColors = selectedColors,
             estadosByMesaId = estadosByMesaId,
             modifier = Modifier.fillMaxSize(),
         )
-
-        Surface(
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth()
-                    .padding(8.dp),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            shadowElevation = 2.dp,
-        ) {
-            MesaStateLegend(
-                totalMesas = mesas.size,
-                estados = estadosByMesaId.values,
-                isLoading = false,
-                modifier = Modifier.padding(8.dp),
-            )
-        }
 
         Surface(
             modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
@@ -201,7 +174,7 @@ fun SalonPlan(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 72.dp, end = 10.dp),
+                        .padding(10.dp),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 3.dp,
@@ -233,15 +206,10 @@ private fun PlanoCanvas(
     offsetY: Float,
     selectedMesaId: Int?,
     onMesaClick: (Int) -> Unit,
-    primary: Color,
-    primaryContainer: Color,
-    surface: Color,
-    outline: Color,
-    ocupadaFill: Color,
-    ocupadaBorder: Color,
-    cuentaFill: Color,
-    cuentaBorder: Color,
-    labelColor: Color,
+    disponibleColors: MesaThemeColors,
+    ocupadaColors: MesaThemeColors,
+    cuentaColors: MesaThemeColors,
+    selectedColors: MesaThemeColors,
     estadosByMesaId: Map<Int, String>,
     modifier: Modifier,
 ) {
@@ -283,19 +251,12 @@ private fun PlanoCanvas(
                     val height = mesa.alto.toFloat().coerceAtLeast(1f)
                     val cx = (mesa.posicionX + mesa.ancho / 2.0).toFloat()
                     val cy = (mesa.posicionY + mesa.alto / 2.0).toFloat()
-                    val fill =
+                    val targetColors =
                         when {
-                            isSelected -> primaryContainer
-                            isCuentaSolicitada -> cuentaFill
-                            isOcupada -> ocupadaFill
-                            else -> surface
-                        }
-                    val borderColor =
-                        when {
-                            isSelected -> primary
-                            isCuentaSolicitada -> cuentaBorder
-                            isOcupada -> ocupadaBorder
-                            else -> outline
+                            isSelected -> selectedColors
+                            isCuentaSolicitada -> cuentaColors
+                            isOcupada -> ocupadaColors
+                            else -> disponibleColors
                         }
                     val borderWidth =
                         when {
@@ -311,11 +272,11 @@ private fun PlanoCanvas(
                         width = width,
                         height = height,
                         rotDeg = mesa.rotacion.toFloat(),
-                        fill = fill,
-                        borderColor = borderColor,
+                        fill = targetColors.bg,
+                        borderColor = targetColors.border,
                         borderWidth = borderWidth,
                         label = mesa.displayCode ?: mesa.displayName,
-                        labelColor = labelColor,
+                        labelColor = targetColors.text,
                     )
                 }
             }

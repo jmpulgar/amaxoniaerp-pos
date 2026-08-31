@@ -6,6 +6,8 @@ import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.ItemCarrito
+import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
+import com.amaxonia.pos.domain.model.mesas.SelectedTable
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,6 +35,10 @@ data class CartState(
     val clientSucursales: List<ClientBranch> = emptyList(),
     val selectedClientSucursal: ClientBranch? = null,
     val cartActionError: String? = null,
+    val financialSnapshot: SaleFinancialSnapshot? = null,
+    val taxLabel: String = "",
+    val sesionMesaId: Int? = null,
+    val selectedTable: SelectedTable? = null,
 ) {
     // Conversión Bs en BigDecimal (mismo camino que PaymentScreen:Money.times)
     // para no multiplicar en Double; el formateo "%.2f" legacy se preserva.

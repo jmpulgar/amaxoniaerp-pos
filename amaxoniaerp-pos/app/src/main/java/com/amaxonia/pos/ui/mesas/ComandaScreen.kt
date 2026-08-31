@@ -25,15 +25,20 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.LocalDining
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.RoomService
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -53,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +95,7 @@ fun ComandaScreen(
     viewModel: ComandaViewModel,
     cartViewModel: CartViewModel,
     onBack: () -> Unit,
+    onAgregarProductos: () -> Unit = {},
     onCuenta: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -124,13 +131,20 @@ fun ComandaScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onAgregarProductos) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Agregar productos",
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                     TextButton(onClick = onCuenta) {
                         Icon(
                             Icons.AutoMirrored.Filled.ReceiptLong,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )
-                        Spacer(Modifier.size(6.dp))
+                        Spacer(Modifier.size(4.dp))
                         Text("Cuenta")
                     }
                 },
@@ -145,6 +159,8 @@ fun ComandaScreen(
             state = state,
             cartLinesPendientes = cartState.displayItems,
             onEnviarComanda = viewModel::enviarComanda,
+            onAgregarProductos = onAgregarProductos,
+            onCuenta = onCuenta,
             onCambiarEstado = viewModel::cambiarEstado,
             onReintentar = { viewModel.cargar(skipSpinner = false) },
             contentPadding = padding,
@@ -157,6 +173,8 @@ private fun ComandaBody(
     state: ComandaState,
     cartLinesPendientes: List<ItemCarrito>,
     onEnviarComanda: () -> Unit,
+    onAgregarProductos: () -> Unit,
+    onCuenta: () -> Unit,
     onCambiarEstado: (Int, String) -> Unit,
     onReintentar: () -> Unit,
     contentPadding: PaddingValues,
@@ -204,10 +222,66 @@ private fun ComandaBody(
         }
         if (cartLinesPendientes.isEmpty() && state.pendientes.isEmpty()) {
             item {
-                EmptyHint(
-                    title = "Todo está enviado",
-                    text = "Los nuevos productos que agregues aparecerán aquí antes de enviarlos.",
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        ),
+                    border = CardDefaults.outlinedCardBorder(),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RestaurantMenu,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Text(
+                            text = "Mesa abierta sin consumos pendientes",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = "Agrega productos al pedido de esta mesa o consulta la cuenta.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(
+                                onClick = onAgregarProductos,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Agregar productos", maxLines = 1)
+                            }
+                            OutlinedButton(
+                                onClick = onCuenta,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ReceiptLong,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Ver cuenta", maxLines = 1)
+                            }
+                        }
+                    }
+                }
             }
         }
         items(cartLinesPendientes, key = { "cart-${it.id}" }) { display ->
@@ -218,23 +292,37 @@ private fun ComandaBody(
         }
         if (cartLinesPendientes.isNotEmpty() || state.pendientes.isNotEmpty()) {
             item {
-                Button(
-                    onClick = onEnviarComanda,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                    enabled = !state.isSending,
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (state.isSending) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                        Spacer(Modifier.size(8.dp))
-                    } else {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
+                    Button(
+                        onClick = onEnviarComanda,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                        enabled = !state.isSending,
+                    ) {
+                        if (state.isSending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Spacer(Modifier.size(8.dp))
+                        } else {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                            Spacer(Modifier.size(8.dp))
+                        }
+                        Text(if (state.isSending) "Enviando a cocina…" else "Enviar comanda a cocina")
                     }
-                    Text(if (state.isSending) "Enviando a cocina…" else "Enviar comanda a cocina")
+
+                    OutlinedButton(
+                        onClick = onAgregarProductos,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Agregar más productos al pedido")
+                    }
                 }
             }
         }
@@ -257,6 +345,53 @@ private fun ComandaBody(
         } else {
             items(state.enviados, key = { "env-${it.id}" }) { pedido ->
                 LineRowPedido(pedido, onCambiarEstado = onCambiarEstado)
+            }
+        }
+
+        // Acceso directo a la cuenta de la mesa
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = "Cuenta de la mesa",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Consulta los consumos entregados, divide y realiza el cobro.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        )
+                    }
+                    Button(
+                        onClick = onCuenta,
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                            ),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Cuenta")
+                    }
+                }
             }
         }
     }

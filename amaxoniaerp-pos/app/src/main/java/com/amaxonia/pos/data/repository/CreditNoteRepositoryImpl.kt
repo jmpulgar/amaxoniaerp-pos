@@ -28,9 +28,19 @@ class CreditNoteRepositoryImpl(
             api.getCreditNoteDetail(authHeader = authHeader, companyDb = companyDb, id = id)
         }
 
-    override suspend fun getSourceInvoices(search: String?): Result<CreditNoteSourceInvoiceListResponseDto> =
+    override suspend fun getSourceInvoices(
+        search: String?,
+        fechaInicio: String?,
+        fechaFin: String?,
+    ): Result<CreditNoteSourceInvoiceListResponseDto> =
         runRequest { authHeader, companyDb ->
-            api.getSourceInvoices(authHeader = authHeader, companyDb = companyDb, search = search)
+            api.getSourceInvoices(
+                authHeader = authHeader,
+                companyDb = companyDb,
+                search = search,
+                fechaInicio = fechaInicio,
+                fechaFin = fechaFin,
+            )
         }
 
     override suspend fun getSourceInvoiceDetail(id: String): Result<CreditNoteSourceInvoiceDetailDto> =

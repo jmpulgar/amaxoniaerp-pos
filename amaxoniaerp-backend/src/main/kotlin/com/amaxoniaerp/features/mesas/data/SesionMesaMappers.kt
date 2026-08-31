@@ -8,11 +8,15 @@ import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDateTime
 
 internal fun usuarioNombre(usuarioId: Int): String? =
-    UsersTable
-        .selectAll()
-        .where { UsersTable.codUsuario eq usuarioId }
-        .singleOrNull()
-        ?.get(UsersTable.usuario)
+    try {
+        UsersTable
+            .select(UsersTable.usuario)
+            .where { UsersTable.codUsuario eq usuarioId }
+            .singleOrNull()
+            ?.get(UsersTable.usuario)
+    } catch (_: Exception) {
+        null
+    }
 
 /**
  * Construye una respuesta sintética cuando acabamos de insertar/actualizar y tenemos los
@@ -64,7 +68,7 @@ internal fun ResultRow.toSesionMesaResponse(usuarioByCod: Map<Int, String> = emp
         estado = this[SesionMesaTable.estado],
         fechaApertura = this[SesionMesaTable.fechaApertura].formatSesionIso(),
         fechaCierre = this[SesionMesaTable.fechaCierre]?.formatSesionIso(),
-        activo = this[SesionMesaTable.activo] == ACTIVE,
+        activo = this[SesionMesaTable.activo],
     )
 
 internal fun LocalDateTime.formatSesionIso(): String = SESION_ISO_FORMATTER.format(this)

@@ -233,7 +233,7 @@ class TheFactoryRapidPayClient(
                 error("No hay comando de pasarela configurado para esta forma de pago")
             }
         if (amount > MAX_GATEWAY_AMOUNT) {
-            error("Monto excede mÃ¡ximo permitido por plataforma financiera (999999999.99)")
+            error("Monto excede máximo permitido por plataforma financiera (999999999.99)")
         }
         val amountCents =
             (amount.coerceAtLeast(MIN_GATEWAY_AMOUNT) * AMOUNT_CENTS_SCALE)
@@ -247,7 +247,7 @@ class TheFactoryRapidPayClient(
                 .uppercase()
                 .filter { it.isLetterOrDigit() }
                 .take(COMMERCE_RIF_MAX_LENGTH)
-                .ifBlank { error("RIF de comercio invÃ¡lido. Configura parametros_generales.rif") }
+                .ifBlank { error("RIF de comercio inválido. Configura parametros_generales.rif") }
 
         // Manual HKA V1.0.2: K{gateway}V{amount16}|{ci/rif}|{rifComercio}|
         return "$prefix$amountCents|$customer|$commerce|"

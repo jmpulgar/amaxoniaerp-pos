@@ -48,7 +48,7 @@ class HkaConnectionHelper(
                     errorMessage =
                         when (e) {
                             is java.net.SocketTimeoutException -> "Timeout: No se pudo conectar a $ip:$port"
-                            else -> e.message ?: "Error de conexiÃ³n desconocido"
+                            else -> e.message ?: "Error de conexión desconocido"
                         },
                 )
             }
@@ -80,7 +80,7 @@ class HkaConnectionHelper(
                     }
                     val bytes =
                         encrypted.bytes
-                            ?: error("Cifrado devolviÃ³ bytes nulos")
+                            ?: error("Cifrado devolvió bytes nulos")
 
                     socket.getOutputStream().apply {
                         write(bytes)
@@ -93,11 +93,11 @@ class HkaConnectionHelper(
                     SafeLog.d(TAG, "Fiscal status response received")
 
                     if (response.isEmpty()) {
-                        error("La impresora no respondiÃ³")
+                        error("La impresora no respondió")
                     }
 
                     if (response[0].toInt() and BYTE_MASK == NAK) {
-                        error("La impresora respondiÃ³ con NAK (error)")
+                        error("La impresora respondió con NAK (error)")
                     }
 
                     parseStatus(response)
@@ -108,7 +108,7 @@ class HkaConnectionHelper(
                     success = false,
                     errorMessage =
                         when (e) {
-                            is java.net.SocketTimeoutException -> "Timeout: La impresora no respondiÃ³"
+                            is java.net.SocketTimeoutException -> "Timeout: La impresora no respondió"
                             else -> e.message ?: "Error desconocido al consultar estado"
                         },
                 )
@@ -175,30 +175,30 @@ class HkaConnectionHelper(
         val hex = Integer.toHexString(statusByte)
         return when (hex) {
             "40" -> "Modo Entrenamiento, en Espera"
-            "41" -> "Modo Entrenamiento, en TransacciÃ³n Fiscal"
-            "42" -> "Modo Entrenamiento, en TransacciÃ³n No Fiscal"
+            "41" -> "Modo Entrenamiento, en Transacción Fiscal"
+            "42" -> "Modo Entrenamiento, en Transacción No Fiscal"
             "60" -> "Modo Fiscal, en Espera"
             "68" -> "Modo Fiscal, MF llena, en Espera"
-            "61" -> "Modo Fiscal, en TransacciÃ³n Fiscal"
-            "69" -> "Modo Fiscal, MF llena, en TransacciÃ³n Fiscal"
-            "62" -> "Modo Fiscal, en TransacciÃ³n No Fiscal"
-            "6a" -> "Modo Fiscal, MF llena, en TransacciÃ³n No Fiscal"
+            "61" -> "Modo Fiscal, en Transacción Fiscal"
+            "69" -> "Modo Fiscal, MF llena, en Transacción Fiscal"
+            "62" -> "Modo Fiscal, en Transacción No Fiscal"
+            "6a" -> "Modo Fiscal, MF llena, en Transacción No Fiscal"
             else -> "Estado desconocido (0x$hex)"
         }
     }
 
-/**
+    /**
      * Describe el error del equipo fiscal a partir del byte de error.
      * Mapeo 1:1 del when original del parseStatus (SDK PrinterStatus).
      */
     internal fun describePrinterError(errorByte: Int): String {
         val hex = Integer.toHexString(errorByte)
         return when (hex) {
-            "40" -> "NingÃºn error"
+            "40" -> "Ningún error"
             "48" -> "Error gaveta"
             "41" -> "Sin papel"
-            "42" -> "Error mecÃ¡nico / papel"
-            "43" -> "Error mecÃ¡nico y fin de papel"
+            "42" -> "Error mecánico / papel"
+            "43" -> "Error mecánico y fin de papel"
             "60" -> "Error fiscal"
             "64" -> "Error en memoria fiscal"
             "6c" -> "Memoria fiscal llena"

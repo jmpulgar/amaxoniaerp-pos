@@ -449,7 +449,7 @@ object DependencyContainer {
         cuentaMesaRepository = CuentaMesaRepositoryImpl(CuentaMesaApiImpl(apiClient), localStore)
         salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
         creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
-        _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore)
+        _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore, database.pendingInvoiceDao())
         apiTransactionRepository = _apiTransactionRepository
         clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())
         clientFormCatalogSource =
@@ -535,7 +535,13 @@ object DependencyContainer {
             }
         queueOfflineInvoiceUseCase =
             QueueOfflineInvoiceUseCase(
-                writer = RoomOfflineInvoiceWriter(pendingInvoiceDao),
+                writer =
+                    RoomOfflineInvoiceWriter(
+                        dao = pendingInvoiceDao,
+                        onQueued = {
+                            SyncScheduler.enqueuePendingInvoices(appContext)
+                        },
+                    ),
                 idGenerator = UuidGenerator,
                 clock = SystemAppClock(),
             )

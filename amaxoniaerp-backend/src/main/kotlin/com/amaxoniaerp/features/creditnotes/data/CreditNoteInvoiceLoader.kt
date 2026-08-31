@@ -68,8 +68,14 @@ internal fun loadInvoiceHeader(invoiceId: String): InvoiceHeader? {
 internal fun loadClient(idCliente: String): ClientContext {
     val row =
         ClientsTable
-            .selectAll()
-            .where { ClientsTable.idCliente eq idCliente }
+            .select(
+                ClientsTable.codCliente,
+                ClientsTable.nombre,
+                ClientsTable.apellido,
+                ClientsTable.rif,
+                ClientsTable.direccion,
+                ClientsTable.telefonos,
+            ).where { ClientsTable.idCliente eq idCliente }
             .limit(1)
             .firstOrNull()
 
@@ -118,8 +124,15 @@ internal fun resolveCajaContext(idCajaSecuencia: String): CajaContext {
                 JoinType.INNER,
                 CreditNoteCajaSecuenciaTable.idCaja,
                 CreditNoteCajaTable.idCaja,
-            ).selectAll()
-            .where { CreditNoteCajaSecuenciaTable.idCajaSecuencia eq idCajaSecuencia }
+            ).select(
+                CreditNoteCajaTable.idCaja,
+                CreditNoteCajaTable.idSucursal,
+                CreditNoteCajaTable.codigo,
+                CreditNoteCajaTable.serieCaja,
+                CreditNoteCajaTable.impresoraModelo,
+                CreditNoteCajaSecuenciaTable.serieSucursal,
+                CreditNoteCajaSecuenciaTable.secuencia,
+            ).where { CreditNoteCajaSecuenciaTable.idCajaSecuencia eq idCajaSecuencia }
             .limit(1)
             .firstOrNull()
             ?: throw CreditNoteValidationException("No se encontró la caja secuencia indicada")

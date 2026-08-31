@@ -34,7 +34,7 @@ object CuentaMesaTable : Table("cuenta_mesa") {
     val fechaFactura = datetime("fecha_factura").nullable()
     val fechaCreacion = datetime("fecha_creacion")
     val fechaCierre = datetime("fecha_cierre").nullable()
-    val activo = integer("activo").default(1)
+    val activo = bool("activo").default(true)
 
     override val primaryKey = PrimaryKey(id)
 
@@ -70,7 +70,7 @@ object CuentaMesaDetalleTable : Table("cuenta_mesa_detalle") {
     val itemPIva = decimal("item_piva", S.DECIMAL_PRECISION_10, 2).default(0.toBigDecimal())
     val itemTotalSinIva = decimal("item_totalsiniva", S.DECIMAL_PRECISION_20, 2)
     val itemTotalConIva = decimal("item_totalconiva", S.DECIMAL_PRECISION_20, 2)
-    val facturado = integer("facturado").default(0)
+    val facturado = bool("facturado").default(false)
     val fechaCreacion = datetime("fecha_creacion")
 
     override val primaryKey = PrimaryKey(id)

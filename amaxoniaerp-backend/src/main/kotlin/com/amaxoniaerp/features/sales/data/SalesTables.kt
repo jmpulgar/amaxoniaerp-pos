@@ -450,7 +450,7 @@ object SalesCajaNuevaDetalleFormaPagoTable : Table("caja_nueva_detalle_forma_pag
     val cajaDetalleFormaPagoId = varchar("caja_detalle_forma_pago_id", S.VARCHAR_LENGTH_36)
     val cajaId = varchar("caja_id", S.VARCHAR_LENGTH_36)
     val cajaDetalleId = varchar("caja_detalle_id", S.VARCHAR_LENGTH_36)
-    val tipoMovimiento = varchar("tipo_movimiento", S.VARCHAR_LENGTH_5).nullable()
+    val tipoMovimiento = varchar("tipo_movimiento", S.VARCHAR_LENGTH_20).nullable()
     val idFormaPago = integer("id_forma_pago").nullable()
     val comprobante = varchar("comprobante", S.VARCHAR_LENGTH_50)
     val concepto = varchar("concepto", S.VARCHAR_LENGTH_300)

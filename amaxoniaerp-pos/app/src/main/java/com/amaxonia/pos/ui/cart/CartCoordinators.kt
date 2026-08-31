@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.repository.ClientBranchRepository
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
+import com.amaxonia.pos.domain.repository.SelectedTableHolder
 import com.amaxonia.pos.domain.repository.getDisplayItems
 import com.amaxonia.pos.domain.repository.removeClient
 import com.amaxonia.pos.domain.repository.setClient
@@ -33,14 +34,31 @@ class CartStateCoordinator(
     private val sessionReader: DashboardSessionReader,
     private val clientBranchRepository: ClientBranchRepository,
     private val resolveClientImageUrl: ResolveClientImageUrlUseCase,
+    private val selectedTableHolder: SelectedTableHolder? = null,
 ) {
     fun start(
         scope: CoroutineScope,
         state: MutableStateFlow<CartState>,
     ) {
         scope.launch {
+            cartRepository.sesionMesaIdState.collect { sesionId ->
+                state.update { it.copy(sesionMesaId = sesionId) }
+            }
+        }
+        if (selectedTableHolder != null) {
+            scope.launch {
+                selectedTableHolder.selectedTable.collect { table ->
+                    state.update { it.copy(selectedTable = table) }
+                }
+            }
+        }
+        scope.launch {
+            val countryCode = sessionReader.currentCountry()?.code
             state.update {
-                it.copy(isPanama = sessionReader.currentCountry()?.code.equals(PANAMA_CODE, ignoreCase = true))
+                it.copy(
+                    isPanama = countryCode.equals(PANAMA_CODE, ignoreCase = true),
+                    taxLabel = taxLabelFor(countryCode),
+                )
             }
         }
         scope.launch {
@@ -102,6 +120,7 @@ class CartStateCoordinator(
                 // Fallback de suma en Money (BigDecimal): evita acumular
                 // residuo IEEE-754 cuando no hay snapshot financiero.
                 total = financialSnapshot?.total ?: items.fold(Money.ZERO) { acc, item -> acc + Money.fromDouble(item.total) }.toDouble(),
+                financialSnapshot = financialSnapshot,
                 selectedClient = client,
                 selectedClientPhotoUrl = if (client == null) "" else it.selectedClientPhotoUrl,
                 cartActionError = if (client == null) null else it.cartActionError,
@@ -113,8 +132,9 @@ class CartStateCoordinator(
         client: Client?,
         state: MutableStateFlow<CartState>,
     ) {
-        val isPanama = sessionReader.currentCountry()?.code.equals(PANAMA_CODE, ignoreCase = true)
-        state.update { it.copy(isPanama = isPanama) }
+        val countryCode = sessionReader.currentCountry()?.code
+        val isPanama = countryCode.equals(PANAMA_CODE, ignoreCase = true)
+        state.update { it.copy(isPanama = isPanama, taxLabel = taxLabelFor(countryCode)) }
         if (!isPanama || client == null) {
             cartRepository.setClientSucursales(emptyList())
         } else {
@@ -128,6 +148,14 @@ class CartStateCoordinator(
             clientRepository.getDefaultClient().onSuccess(cartRepository::setClient)
         }
     }
+
+    /** Etiqueta de impuesto por país (mismo criterio que PaymentViewModel). */
+    private fun taxLabelFor(countryCode: String?): String =
+        when (countryCode?.uppercase()) {
+            "PA" -> "ITBMS"
+            "VE" -> "IVA"
+            else -> "Impuesto"
+        }
 
     private companion object {
         const val PANAMA_CODE = "PA"

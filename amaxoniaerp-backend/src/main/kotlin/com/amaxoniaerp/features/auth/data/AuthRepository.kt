@@ -28,7 +28,7 @@ class AuthRepository(
                         id = row[UsersTable.codUsuario],
                         username = row[UsersTable.usuario],
                         companyCodesRaw = row[UsersTable.codEmpresas],
-                        role = row[UsersTable.perfil],
+                        role = row[UsersTable.perfil].toString(),
                         levelId = row[UsersTable.nivelId],
                     )
                 }.singleOrNull()
@@ -44,7 +44,7 @@ class AuthRepository(
                         id = row[UsersTable.codUsuario],
                         username = row[UsersTable.usuario],
                         companyCodesRaw = row[UsersTable.codEmpresas],
-                        role = row[UsersTable.perfil],
+                        role = row[UsersTable.perfil].toString(),
                         levelId = row[UsersTable.nivelId],
                     )
                 }.singleOrNull()

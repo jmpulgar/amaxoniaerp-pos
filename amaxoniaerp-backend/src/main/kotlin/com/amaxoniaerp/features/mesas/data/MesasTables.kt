@@ -18,7 +18,7 @@ object PlantasTable : Table("plantas") {
     val descripcion = text("descripcion").nullable()
     val imagen = text("imagen").nullable()
     val orden = integer("orden").nullable()
-    val activo = integer("activo").default(1)
+    val activo = bool("activo").default(true)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -43,7 +43,7 @@ object MesasTable : Table("mesas") {
     val ancho = decimal("ancho", S.DECIMAL_PRECISION_14, 2).nullable()
     val alto = decimal("alto", S.DECIMAL_PRECISION_14, 2).nullable()
     val rotacion = decimal("rotacion", S.DECIMAL_PRECISION_14, 2).nullable()
-    val activo = integer("activo").default(1)
+    val activo = bool("activo").default(true)
 
     override val primaryKey = PrimaryKey(id)
 }

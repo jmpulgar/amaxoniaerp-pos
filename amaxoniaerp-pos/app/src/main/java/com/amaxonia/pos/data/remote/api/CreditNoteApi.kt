@@ -26,6 +26,8 @@ interface CreditNoteApi {
         authHeader: String,
         companyDb: String,
         search: String? = null,
+        fechaInicio: String? = null,
+        fechaFin: String? = null,
     ): Result<CreditNoteSourceInvoiceListResponseDto>
 
     suspend fun getSourceInvoiceDetail(

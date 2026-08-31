@@ -281,7 +281,7 @@ abstract class CuentaMesaRepositoryTestBase {
             it[sucursalId] = 1
             it[PlantasTable.nombre] = "Salón principal"
             it[PlantasTable.orden] = 1
-            it[activo] = 1
+            it[activo] = true
         }
     }
 
@@ -294,7 +294,7 @@ abstract class CuentaMesaRepositoryTestBase {
                 it[MesasTable.nombre] = "Mesa $id"
                 it[capacidad] = 4
                 it[forma] = "rectangular"
-                it[activo] = if (activa) 1 else 0
+                it[activo] = activa
             }
         }
     }

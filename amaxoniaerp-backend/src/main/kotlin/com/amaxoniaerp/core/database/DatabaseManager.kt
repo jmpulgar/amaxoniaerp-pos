@@ -8,9 +8,10 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 private const val DATABASE_POOL_MAX_SIZE = 10
-private const val DATABASE_POOL_IDLE_TIMEOUT_MS = 300_000L
-private const val DATABASE_CONNECTION_TIMEOUT_MS = 20_000L
-private const val DATABASE_CONNECTION_MAX_LIFETIME_MS = 1_200_000L
+private const val DATABASE_POOL_IDLE_TIMEOUT_MS = 120_000L // 2 minutos
+private const val DATABASE_CONNECTION_TIMEOUT_MS = 20_000L // 20 segundos
+private const val DATABASE_CONNECTION_MAX_LIFETIME_MS = 240_000L // 4 minutos (menor que wait_timeout de MySQL)
+private const val DATABASE_KEEPALIVE_TIME_MS = 60_000L // 1 minuto (mantiene conexiones vivas en el pool)
 
 /**
  * Parámetros JDBC comunes para MySQL (fechas 0000-00-00 convertidas a null), **sin** `serverTimezone`.
@@ -76,9 +77,11 @@ object DatabaseManager {
         )
     }
 
-    // Cache de DataSources
+    // Cache de DataSources y Databases Exposed
     private val configDataSources = mutableMapOf<String, HikariDataSource>()
+    private val configDatabases = mutableMapOf<String, Database>()
     private val companyDataSources = mutableMapOf<String, HikariDataSource>()
+    private val companyDatabases = mutableMapOf<String, Database>()
 
     /**
      * Carga la configuración de un país desde el lookup inyectado (env + .env).
@@ -140,13 +143,15 @@ object DatabaseManager {
             countryConfigs[upperCode]
                 ?: throw IllegalArgumentException("País no soportado: $countryCode")
 
-        return synchronized(configDataSources) {
-            val dataSource =
-                configDataSources.getOrPut(upperCode) {
-                    logger.info("Creando pool de conexión para CONFIG DB de $upperCode (${config.host})")
-                    createDataSource(config.buildConfigJdbcUrl(), config.user, config.password)
-                }
-            Database.connect(dataSource)
+        return synchronized(configDatabases) {
+            configDatabases.getOrPut(upperCode) {
+                val dataSource =
+                    configDataSources.getOrPut(upperCode) {
+                        logger.info("Creando pool de conexión para CONFIG DB de $upperCode (${config.host})")
+                        createDataSource(config.buildConfigJdbcUrl(), config.user, config.password)
+                    }
+                Database.connect(dataSource)
+            }
         }
     }
 
@@ -170,17 +175,19 @@ object DatabaseManager {
             countryConfigs[upperCode]
                 ?: throw IllegalArgumentException("País no soportado: $countryCode")
 
-        return synchronized(companyDataSources) {
-            val dataSource =
-                companyDataSources.getOrPut(cacheKey) {
-                    logger.info("Creando pool de conexión para COMPANY DB $companyDbName en $upperCode")
-                    createDataSource(
-                        config.buildCompanyJdbcUrl(companyDbName),
-                        config.user,
-                        config.password,
-                    )
-                }
-            Database.connect(dataSource)
+        return synchronized(companyDatabases) {
+            companyDatabases.getOrPut(cacheKey) {
+                val dataSource =
+                    companyDataSources.getOrPut(cacheKey) {
+                        logger.info("Creando pool de conexión para COMPANY DB $companyDbName en $upperCode")
+                        createDataSource(
+                            config.buildCompanyJdbcUrl(companyDbName),
+                            config.user,
+                            config.password,
+                        )
+                    }
+                Database.connect(dataSource)
+            }
         }
     }
 
@@ -200,9 +207,10 @@ object DatabaseManager {
                 driverClassName = "com.mysql.cj.jdbc.Driver"
                 maximumPoolSize = DATABASE_POOL_MAX_SIZE
                 minimumIdle = 2
-                idleTimeout = DATABASE_POOL_IDLE_TIMEOUT_MS // 5 minutos
+                idleTimeout = DATABASE_POOL_IDLE_TIMEOUT_MS // 2 minutos
                 connectionTimeout = DATABASE_CONNECTION_TIMEOUT_MS // 20 segundos
-                maxLifetime = DATABASE_CONNECTION_MAX_LIFETIME_MS // 20 minutos
+                maxLifetime = DATABASE_CONNECTION_MAX_LIFETIME_MS // 4 minutos
+                keepaliveTime = DATABASE_KEEPALIVE_TIME_MS // 1 minuto
                 isAutoCommit = false
                 transactionIsolation = "TRANSACTION_READ_COMMITTED"
                 addDataSourceProperty("cachePrepStmts", "true")

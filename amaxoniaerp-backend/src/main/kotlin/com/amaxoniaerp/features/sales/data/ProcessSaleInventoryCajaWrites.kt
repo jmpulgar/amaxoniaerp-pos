@@ -291,6 +291,12 @@ private fun insertCajaDetallePagos(
     insertCajaNuevaDetalleFormaPagoBatch(ctx, ids, items)
 }
 
+private fun isCreditPayment(pago: SalePaymentInput): Boolean {
+    val tipo = pago.tipoMovimiento?.trim()?.uppercase().orEmpty()
+    val siglas = pago.siglas?.trim()?.uppercase().orEmpty()
+    return tipo in setOf("CXC", "CR", "CRED", "CREDITO") || siglas in setOf("CXC", "CR", "CRED", "CREDITO")
+}
+
 private fun insertCajaNuevaDetalleBatch(
     ctx: SaleWriteContext,
     ids: CajaEntryIds,
@@ -299,13 +305,14 @@ private fun insertCajaNuevaDetalleBatch(
     val cajaNuevaDetalleTable = SalesCajaNuevaDetalleTableFactory.forCountry(ctx.monetaryContext.countryCode)
     cajaNuevaDetalleTable.batchInsert(items) { item ->
         val pago = item.pago
+        val isCredit = isCreditPayment(pago)
         this[cajaNuevaDetalleTable.cajaDetalleId] = item.detalleId
         this[cajaNuevaDetalleTable.cajaId] = ids.cajaId
         this[cajaNuevaDetalleTable.idFormaPago] = pago.idFormaPago
         this[cajaNuevaDetalleTable.idTransaccion] = ids.transactionId
         this[cajaNuevaDetalleTable.cajaReciboId] = ids.cajaReciboId
-        this[cajaNuevaDetalleTable.monto] = item.montoPagoBase
-        this[cajaNuevaDetalleTable.montoOriginal] = BigDecimal.ZERO.setScale(2)
+        this[cajaNuevaDetalleTable.monto] = if (isCredit) BigDecimal.ZERO.setScale(2) else item.montoPagoBase
+        this[cajaNuevaDetalleTable.montoOriginal] = item.montoPagoBase
         this[cajaNuevaDetalleTable.concepto] = null
         this[cajaNuevaDetalleTable.usuarioCreacion] =
             ctx.request.factura.usuarioCreacion
@@ -334,24 +341,55 @@ private fun insertCajaNuevaDetalleFormaPagoBatch(
     ids: CajaEntryIds,
     items: List<PagoDetallePair>,
 ) {
-    SalesCajaNuevaDetalleFormaPagoTable.batchInsert(items) { item ->
+    val qualifyingItems =
+        items.mapNotNull { item ->
+            val tipo = resolveCajaDetalleFormaPagoTipoMovimiento(item.pago)
+            if (tipo != null) item to tipo else null
+        }
+    if (qualifyingItems.isEmpty()) return
+
+    SalesCajaNuevaDetalleFormaPagoTable.batchInsert(qualifyingItems) { (item, tipoMovimiento) ->
         val pago = item.pago
         this[SalesCajaNuevaDetalleFormaPagoTable.cajaDetalleFormaPagoId] = UUID.randomUUID().toString()
         this[SalesCajaNuevaDetalleFormaPagoTable.cajaId] = ids.cajaId
         this[SalesCajaNuevaDetalleFormaPagoTable.cajaDetalleId] = item.detalleId
-        this[SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento] = pago.tipoMovimiento
+        this[SalesCajaNuevaDetalleFormaPagoTable.tipoMovimiento] = tipoMovimiento
         this[SalesCajaNuevaDetalleFormaPagoTable.idFormaPago] = pago.idFormaPago
         this[SalesCajaNuevaDetalleFormaPagoTable.comprobante] = "FACT"
         this[SalesCajaNuevaDetalleFormaPagoTable.concepto] = "Ingreso por venta"
         this[SalesCajaNuevaDetalleFormaPagoTable.monto] = item.montoPagoBase
         this[SalesCajaNuevaDetalleFormaPagoTable.montoOriginal] = item.montoPagoBase
-        this[SalesCajaNuevaDetalleFormaPagoTable.tdcProveedor] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.tdcNumero] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.tdcTitular] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.tdcVencimiento] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.tdcCvv] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.codigoVerificacion] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.idAbonoDetalle] = ""
-        this[SalesCajaNuevaDetalleFormaPagoTable.efectivoCambio] = ctx.monetaryContext.toBase(pago.efectivoCambio)
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcProveedor] = pago.tdcProveedor.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcNumero] = pago.tdcNumero.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcTitular] = pago.tdcTitular.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcVencimiento] = pago.tdcVencimiento.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.tdcCvv] = pago.tdcCvv.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.codigoVerificacion] = pago.codigoVerificacion.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.idAbonoDetalle] = pago.idAbonoDetalle.orEmpty()
+        this[SalesCajaNuevaDetalleFormaPagoTable.efectivoCambio] =
+            if (tipoMovimiento == "CASH") ctx.monetaryContext.toBase(pago.efectivoCambio) else BigDecimal.ZERO.setScale(2)
+    }
+}
+
+/**
+ * Determina si un pago califica para inserción en `caja_nueva_detalle_forma_pago`.
+ * Solo se insertan filas en estos 4 casos específicos:
+ * 1. Efectivo con vuelto -> 'CASH'
+ * 2. Tarjeta de crédito -> 'TDC'
+ * 3. Nequi -> 'NEQ'
+ * 4. Uso de anticipos -> 'ANTICIPO'
+ *
+ * En crédito puro (CXC) o formas bancarias estándar NO se inserta ninguna fila.
+ */
+internal fun resolveCajaDetalleFormaPagoTipoMovimiento(pago: SalePaymentInput): String? {
+    val tipo = pago.tipoMovimiento?.trim()?.uppercase().orEmpty()
+    val siglas = pago.siglas?.trim()?.uppercase().orEmpty()
+
+    return when {
+        tipo in setOf("CASH", "EF", "EFE", "EFECTIVO") || siglas in setOf("EF", "EFE", "EFECTIVO", "CASH") || pago.efectivoCambio > 0.0 -> "CASH"
+        tipo in setOf("TDC", "TC") || siglas in setOf("TDC", "TC", "TARJETA") || !pago.tdcNumero.isNullOrBlank() -> "TDC"
+        tipo in setOf("NEQ", "NEQUI") || siglas in setOf("NEQ", "NEQUI") || !pago.codigoVerificacion.isNullOrBlank() -> "NEQ"
+        tipo in setOf("ANTICIPO", "ABONO") || siglas in setOf("ANTICIPO", "ABONO") || !pago.idAbonoDetalle.isNullOrBlank() -> "ANTICIPO"
+        else -> null
     }
 }

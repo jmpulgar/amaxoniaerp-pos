@@ -121,7 +121,9 @@ private fun ConnectivityEffect(
     LaunchedEffect(isOnline) {
         if (!hasSeenConnectivityState) {
             hasSeenConnectivityState = true
-            if (!isOnline) {
+            if (isOnline) {
+                AppGraph.sync.enqueuePendingInvoices(context)
+            } else {
                 snackbarHostState.showSnackbar(
                     message = "Sin conexión. Puedes seguir trabajando offline.",
                     duration = SnackbarDuration.Long,
@@ -267,6 +269,9 @@ private fun NavGraphBuilder.dashboardDestination(
             onNavigateToCierreCaja = { navController.navigateFromDrawer("cierre_caja") },
             onNavigateToDraftInvoices = { navController.navigateFromDrawer("draft_invoices") },
             onNavigateToAreasMesas = { navController.navigateFromDrawer("areas_mesas") },
+            onNavigateToComanda = { areaId, mesaId, sesionId ->
+                navController.navigate("comanda/$areaId/$mesaId/$sesionId")
+            },
         )
     }
 }
@@ -326,6 +331,9 @@ private fun NavGraphBuilder.comandaDestination(navController: NavController) {
             viewModel = comandaViewModel,
             cartViewModel = cartViewModel,
             onBack = { navController.popBackStack() },
+            onAgregarProductos = {
+                navController.navigate("dashboard")
+            },
             onCuenta = {
                 navController.navigate("cuenta_mesa/$areaId/$mesaId/$sesionId")
             },
@@ -507,7 +515,15 @@ private fun NavGraphBuilder.cartDestination(navController: NavController) {
                 }
             },
             onCheckout = { total ->
-                navController.navigate("payment/$total")
+                val sesionId = AppGraph.mesas.sesionMesaIdState.value
+                val selectedTable = AppGraph.mesas.selectedTableHolder.selectedTable.value
+                if (sesionId != null && selectedTable != null) {
+                    navController.navigate("comanda/${selectedTable.area.id}/${selectedTable.mesa.id}/$sesionId") {
+                        popUpTo("dashboard") { inclusive = false }
+                    }
+                } else {
+                    navController.navigate("payment/$total")
+                }
             },
             onSelectClient = {
                 navController.navigate("client_selection_mode")

@@ -7,6 +7,7 @@ import com.amaxoniaerp.features.mesas.domain.EstadoPedidoMesa
 import com.amaxoniaerp.features.mesas.domain.EstadoSesionMesa
 import com.amaxoniaerp.features.mesas.domain.PedidoMesaResponse
 import com.amaxoniaerp.features.mesas.domain.PedidoMesaResult
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -55,7 +56,7 @@ class PedidoMesaRepository {
                         .selectAll()
                         .where {
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
-                                (PedidoMesaTable.activo eq ACTIVE) and
+                                (PedidoMesaTable.activo eq true) and
                                 (PedidoMesaTable.estado eq estado.codigo)
                         }
                 } else {
@@ -63,7 +64,7 @@ class PedidoMesaRepository {
                         .selectAll()
                         .where {
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
-                                (PedidoMesaTable.activo eq ACTIVE)
+                                (PedidoMesaTable.activo eq true)
                         }
                 }
             val pedidos = query.orderBy(PedidoMesaTable.id).map { it.toPedidoMesaResponse(mesaId) }
@@ -84,7 +85,7 @@ class PedidoMesaRepository {
     ): PedidoMesaResult {
         if (request.items.isEmpty()) return PedidoMesaResult.SinItemsParaCrear
 
-        return newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        return newSuspendedTransaction<PedidoMesaResult>(Dispatchers.IO, database) {
             val sesion =
                 sesionActivaPorMesa(sesionId, mesaId)
                     ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
@@ -143,7 +144,7 @@ class PedidoMesaRepository {
         mesaId: Int,
         pedidoIds: List<Int>,
     ): PedidoMesaResult =
-        newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<PedidoMesaResult>(Dispatchers.IO, database) {
             val sesion =
                 sesionActivaPorMesa(sesionId, mesaId)
                     ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
@@ -158,7 +159,7 @@ class PedidoMesaRepository {
                         .where {
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
                                 (PedidoMesaTable.estado eq EstadoPedidoMesa.PENDIENTE.codigo) and
-                                (PedidoMesaTable.activo eq ACTIVE)
+                                (PedidoMesaTable.activo eq true)
                         }.orderBy(PedidoMesaTable.id)
                         .map { it[PedidoMesaTable.id] }
                 } else {
@@ -167,7 +168,7 @@ class PedidoMesaRepository {
                         .where {
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
                                 (PedidoMesaTable.estado eq EstadoPedidoMesa.PENDIENTE.codigo) and
-                                (PedidoMesaTable.activo eq ACTIVE) and
+                                (PedidoMesaTable.activo eq true) and
                                 (PedidoMesaTable.id inList pedidoIds)
                         }.orderBy(PedidoMesaTable.id)
                         .map { it[PedidoMesaTable.id] }
@@ -208,7 +209,7 @@ class PedidoMesaRepository {
         pedidoId: Int,
         destino: EstadoPedidoMesa,
     ): PedidoMesaResult =
-        newSuspendedTransaction<PedidoMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<PedidoMesaResult>(Dispatchers.IO, database) {
             val sesion =
                 sesionActivaPorMesa(sesionId, mesaId)
                     ?: return@newSuspendedTransaction PedidoMesaResult.SesionNoPerteneceMesa
@@ -218,7 +219,7 @@ class PedidoMesaRepository {
                     .where {
                         (PedidoMesaTable.id eq pedidoId) and
                             (PedidoMesaTable.sesionMesaId eq sesion.id) and
-                            (PedidoMesaTable.activo eq ACTIVE)
+                            (PedidoMesaTable.activo eq true)
                     }.singleOrNull()
                     ?: return@newSuspendedTransaction PedidoMesaResult.PedidoNoEncontrado
 
@@ -262,7 +263,7 @@ class PedidoMesaRepository {
             .selectAll()
             .where {
                 (PedidoMesaTable.sesionMesaId eq sesionId) and
-                    (PedidoMesaTable.activo eq ACTIVE) and
+                    (PedidoMesaTable.activo eq true) and
                     (PedidoMesaTable.estado notInList ESTADOS_FINALES_CODIGO)
             }.limit(1)
             .singleOrNull() != null
@@ -335,7 +336,6 @@ class PedidoMesaRepository {
     private fun LocalDateTime.formatIso(): String = ISO_FORMATTER.format(this)
 
     private companion object {
-        const val ACTIVE = 1
         val ISO_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
 
         val ESTADOS_FINALES_CODIGO = listOf(EstadoPedidoMesa.ENTREGADA.codigo, EstadoPedidoMesa.CANCELADA.codigo)

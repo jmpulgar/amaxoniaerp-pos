@@ -6,10 +6,12 @@ import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 
 data class CuentaMesaState(
     val pedidos: List<PedidoMesa> = emptyList(),
+    val pedidosNoEntregados: List<PedidoMesa> = emptyList(),
     val cuentas: List<CuentaMesaResponse> = emptyList(),
     val cantidades: Map<Int, String> = emptyMap(),
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
+    val isDeliveringAll: Boolean = false,
     val error: String? = null,
     val info: String? = null,
 ) {

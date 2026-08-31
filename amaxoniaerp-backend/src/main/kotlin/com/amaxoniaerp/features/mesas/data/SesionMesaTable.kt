@@ -27,7 +27,7 @@ object SesionMesaTable : Table("sesion_mesa") {
     val estado = varchar("estado", S.VARCHAR_LENGTH_30)
     val fechaApertura = datetime("fecha_apertura")
     val fechaCierre = datetime("fecha_cierre").nullable()
-    val activo = integer("activo").default(1)
+    val activo = bool("activo").default(true)
 
     override val primaryKey = PrimaryKey(id)
 }

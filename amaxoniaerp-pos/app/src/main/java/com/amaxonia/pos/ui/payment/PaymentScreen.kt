@@ -7,8 +7,11 @@ import android.content.ComponentName
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -38,12 +41,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AddCard
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,7 +65,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -71,11 +77,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -91,10 +100,10 @@ import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
-import com.amaxonia.pos.ui.common.components.KeypadKey
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosVisualTone
@@ -237,12 +246,8 @@ fun PaymentScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                isLandscape() -> PaymentLandscape(state = state, onAction = onAction)
-                maxWidth < COMPACT_WIDTH_THRESHOLD ->
-                    when (state.selectedMethod) {
-                        PaymentMethod.CASH -> CashPaymentCompact(state = state, onAction = onAction, maxHeight = maxHeight)
-                        PaymentMethod.NON_CASH -> NonCashPaymentCompact(state = state, onAction = onAction)
-                    }
+                isLandscape() -> PaymentLandscape(state = state, onAction = onAction, maxHeight = maxHeight)
+                maxWidth < COMPACT_WIDTH_THRESHOLD -> PaymentPortrait(state = state, onAction = onAction, maxHeight = maxHeight)
                 else -> PaymentWide(state = state, onAction = onAction)
             }
 
@@ -327,84 +332,122 @@ internal fun PaymentHeader(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
+    var breakdownExpanded by remember { mutableStateOf(false) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (breakdownExpanded) 180f else 0f,
+        label = "breakdownArrow",
+    )
     val heroStyle =
         if (compact) {
             MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
         } else {
-            PosTextStyles.totalDisplay
+            MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
         }
+
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(horizontal = if (compact) 14.dp else 16.dp, vertical = if (compact) 10.dp else 14.dp)) {
-            if (!compact) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ) {
-                        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, modifier = Modifier.size(22.dp))
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { breakdownExpanded = !breakdownExpanded }
+                    .padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 16.dp),
+        ) {
+            // Header: Label a la izquierda + Monto destacado a la derecha
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false),
+                ) {
+                    Column {
+                        Text(
+                            text = "Total a pagar",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.40f),
+                            modifier = Modifier.padding(top = 2.dp),
+                        ) {
+                            Text(
+                                text = if (breakdownExpanded) "Ocultar desglose" else "Ver desglose",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
                         }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Total a pagar",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        HeroAmount(state = state, style = heroStyle)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.ExpandMore,
+                                contentDescription = if (breakdownExpanded) "Ocultar desglose" else "Ver desglose",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp).rotate(arrowRotation),
+                            )
+                        }
                     }
                 }
-            } else {
-                Text(
-                    "Total a pagar",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                HeroAmount(state = state, style = heroStyle)
+
+                Column(horizontalAlignment = Alignment.End) {
+                    AdaptiveAmountText(
+                        text = "$ ${state.totalAmountText}",
+                        baseStyle = heroStyle,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.widthIn(max = 240.dp),
+                        options = AdaptiveAmountOptions(minFontSizeSp = 18f),
+                    )
+                    if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                            modifier = Modifier.padding(top = 2.dp),
+                        ) {
+                            Text(
+                                text = "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
+                                style = PosTextStyles.amountSecondary.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(if (compact) 10.dp else 12.dp))
-            FinancialBreakdown(
-                snapshot = state.financialSnapshot,
-                totalFallback = state.totalAmountMoney,
-                taxLabel = state.effectiveTaxLabel,
-                isMultiCurrency = state.isMultiCurrency,
-                tasa = state.tasa,
-                compact = compact,
-            )
+            // Desglose financiero colapsable
+            AnimatedVisibility(
+                visible = breakdownExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FinancialBreakdown(
+                        snapshot = state.financialSnapshot,
+                        totalFallback = state.totalAmountMoney,
+                        taxLabel = state.effectiveTaxLabel,
+                        isMultiCurrency = state.isMultiCurrency,
+                        tasa = state.tasa,
+                        compact = compact,
+                    )
+                }
+            }
         }
-    }
-}
-
-@Composable
-private fun HeroAmount(
-    state: PaymentState,
-    style: androidx.compose.ui.text.TextStyle,
-) {
-    AdaptiveAmountText(
-        text = "$ ${state.totalAmountText}",
-        baseStyle = style,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth(),
-        options =
-            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                minFontSizeSp = 18f,
-            ),
-    )
-    if (state.isMultiCurrency && state.totalAmountBsText.isNotBlank()) {
-        Text(
-            "$SECONDARY_CURRENCY_LABEL ${state.totalAmountBsText}",
-            style = PosTextStyles.amountSecondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -423,8 +466,8 @@ internal fun FinancialBreakdown(
     val total = snapshot?.total ?: totalFallback.toDouble()
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = if (compact) 12.dp else 14.dp, vertical = if (compact) 8.dp else 10.dp)) {
@@ -518,6 +561,11 @@ private fun BreakdownRow(
     }
 }
 
+/**
+ * Selector de pestañas táctil y moderno:
+ * - Efectivo: Icono billetes/efectivo + texto, activo con fondo blanco/superficie, texto primario e indicador.
+ * - No Efectivo (Tarjeta / Otro): Icono tarjeta + texto, inactivo en gris suave.
+ */
 @Composable
 internal fun PaymentMethodSelectorRow(
     selectedMethod: PaymentMethod,
@@ -526,188 +574,154 @@ internal fun PaymentMethodSelectorRow(
     onSelect: (PaymentMethod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
     ) {
-        MethodCard(
-            modifier = Modifier.weight(1f),
-            title = "Efectivo",
-            subtitle = "Billetes / monedas",
-            icon = Icons.Default.Payments,
-            selected = selectedMethod == PaymentMethod.CASH,
-            enabled = cashEnabled,
-            onClick = { onSelect(PaymentMethod.CASH) },
-        )
-        MethodCard(
-            modifier = Modifier.weight(1f),
-            title = "Tarjeta / Otro",
-            subtitle = "TDD · TDC · Transferencia",
-            icon = Icons.Default.AddCard,
-            selected = selectedMethod == PaymentMethod.NON_CASH,
-            enabled = nonCashEnabled,
-            onClick = { onSelect(PaymentMethod.NON_CASH) },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PaymentTabButton(
+                title = "Efectivo",
+                icon = Icons.Default.Payments,
+                selected = selectedMethod == PaymentMethod.CASH,
+                enabled = cashEnabled,
+                onClick = { onSelect(PaymentMethod.CASH) },
+                modifier = Modifier.weight(1f),
+            )
+            PaymentTabButton(
+                title = "Tarjeta / Otro",
+                icon = Icons.Default.CreditCard,
+                selected = selectedMethod == PaymentMethod.NON_CASH,
+                enabled = nonCashEnabled,
+                onClick = { onSelect(PaymentMethod.NON_CASH) },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
 @Composable
-private fun MethodCard(
+private fun PaymentTabButton(
     title: String,
-    subtitle: String,
     icon: ImageVector,
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val borderColor =
-        if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.outlineVariant
-        }
-    val containerColor =
-        if (selected) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surface
-        }
-    val contentColor =
-        if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-    Card(
+    val activeColor = MaterialTheme.colorScheme.primary
+    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.70f)
+    val contentColor = if (selected) activeColor else inactiveColor
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.surface else androidx.compose.ui.graphics.Color.Transparent
+
+    Surface(
         modifier =
             modifier
-                .height(72.dp)
-                .defaultMinSize(minHeight = 64.dp)
+                .height(46.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .clickable(
                     enabled = enabled,
-                    interactionSource = interactionSource,
                     indication = ripple(),
+                    interactionSource = remember { MutableInteractionSource() },
                     onClick = onClick,
                 ),
-        shape = MaterialTheme.shapes.medium,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = if (pressed && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) else containerColor,
-                contentColor = contentColor,
-            ),
-        border =
-            BorderStroke(
-                width = if (selected) 2.dp else 1.dp,
-                color = borderColor,
-            ),
+        color = backgroundColor,
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = if (selected) 2.dp else 0.dp,
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (selected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                        ),
-                contentAlignment = Alignment.Center,
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
+                    tint = contentColor,
+                    modifier = Modifier.size(19.dp),
                 )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
                     color = contentColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) contentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             if (selected) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(24.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-                }
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(0.55f)
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                            .background(activeColor),
+                )
             }
         }
     }
 }
 
-private fun keypadHeightFor(maxHeight: Dp): Dp = (maxHeight.value * 0.40f).coerceIn(196f, 300f).dp
+private fun keypadHeightFor(maxHeight: Dp): Dp = (maxHeight.value * 0.42f).coerceIn(240f, 340f).dp
 
 @Composable
 internal fun PaymentWide(
     state: PaymentState,
     onAction: (PaymentUiAction) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().widthIn(max = 980.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PaymentHeader(
-            state = state,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        PaymentMethodSelectorRow(
-            selectedMethod = state.selectedMethod,
-            cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
-            nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
-            onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                when (state.selectedMethod) {
-                    PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction, modifier = Modifier.fillMaxWidth())
-                    PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
-                }
+    Row(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1.05f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PaymentHeader(state = state)
+            PaymentMethodSelectorRow(
+                selectedMethod = state.selectedMethod,
+                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+            )
+            when (state.selectedMethod) {
+                PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction)
+                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state)
             }
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                when (state.selectedMethod) {
-                    PaymentMethod.CASH ->
-                        CashKeypadBlock(
-                            state = state,
-                            onAction = onAction,
-                            fillRemaining = true,
-                            modifier = Modifier.fillMaxHeight(),
-                        )
-                    PaymentMethod.NON_CASH ->
-                        NonCashListPanel(
-                            state = state,
-                            onAction = onAction,
-                            fillRemaining = true,
-                            modifier = Modifier.fillMaxHeight(),
-                        )
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .weight(0.95f)
+                    .fillMaxHeight()
+                    .padding(start = 0.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+        ) {
+            when (state.selectedMethod) {
+                PaymentMethod.CASH -> {
+                    CashKeypadBlock(
+                        state = state,
+                        onAction = onAction,
+                        fillRemaining = true,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                PaymentMethod.NON_CASH -> {
+                    NonCashListPanel(
+                        state = state,
+                        onAction = onAction,
+                        fillRemaining = true,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }
@@ -718,123 +732,131 @@ internal fun PaymentWide(
 internal fun PaymentLandscape(
     state: PaymentState,
     onAction: (PaymentUiAction) -> Unit,
+    maxHeight: Dp,
 ) {
-    Row(
-        modifier = Modifier.fillMaxSize().padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    val keypadHeight = keypadHeightFor(maxHeight)
+
+    Row(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .weight(1.05f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PaymentHeader(state = state, compact = true, modifier = Modifier.fillMaxWidth())
+            PaymentHeader(state = state, compact = true)
             PaymentMethodSelectorRow(
                 selectedMethod = state.selectedMethod,
                 cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
                 nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
                 onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-                modifier = Modifier.fillMaxWidth(),
             )
             when (state.selectedMethod) {
-                PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction, modifier = Modifier.fillMaxWidth())
-                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
+                PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction)
+                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state)
             }
-            Spacer(modifier = Modifier.height(4.dp))
         }
-        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+
+        Box(
+            modifier =
+                Modifier
+                    .weight(0.95f)
+                    .fillMaxHeight()
+                    .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
+        ) {
             when (state.selectedMethod) {
-                PaymentMethod.CASH ->
+                PaymentMethod.CASH -> {
                     CashKeypadBlock(
                         state = state,
                         onAction = onAction,
                         fillRemaining = true,
-                        modifier = Modifier.fillMaxHeight(),
+                        modifier = Modifier.fillMaxSize(),
+                        keypadHeight = keypadHeight,
                     )
-                PaymentMethod.NON_CASH ->
+                }
+                PaymentMethod.NON_CASH -> {
                     NonCashListPanel(
                         state = state,
                         onAction = onAction,
                         fillRemaining = true,
-                        modifier = Modifier.fillMaxHeight(),
+                        modifier = Modifier.fillMaxSize(),
+                        narrow = true,
                     )
+                }
             }
         }
     }
 }
 
 @Composable
-internal fun CashPaymentCompact(
+internal fun PaymentPortrait(
     state: PaymentState,
     onAction: (PaymentUiAction) -> Unit,
     maxHeight: Dp,
 ) {
     val keypadHeight = keypadHeightFor(maxHeight)
-    if (maxHeight >= COMFORTABLE_HEIGHT_THRESHOLD) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            PaymentHeader(
-                state = state,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            )
-            PaymentMethodSelectorRow(
-                selectedMethod = state.selectedMethod,
-                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
-                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
-                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            CashAmountPanel(
-                state = state,
-                onAction = onAction,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            CashKeypadBlock(
-                state = state,
-                onAction = onAction,
-                fillRemaining = false,
-                keypadHeight = keypadHeight,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
-            )
-        }
-        return
-    }
 
-    val scrollState = rememberScrollState()
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState),
-        ) {
-            PaymentHeader(
+    when (state.selectedMethod) {
+        PaymentMethod.CASH -> {
+            PaymentPortraitCash(
                 state = state,
-                compact = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                onAction = onAction,
+                keypadHeight = keypadHeight,
             )
+        }
+        PaymentMethod.NON_CASH -> {
+            PaymentPortraitNonCash(
+                state = state,
+                onAction = onAction,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaymentPortraitCash(
+    state: PaymentState,
+    onAction: (PaymentUiAction) -> Unit,
+    keypadHeight: Dp,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PaymentHeader(state = state, compact = true)
             PaymentMethodSelectorRow(
                 selectedMethod = state.selectedMethod,
                 cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
                 nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
                 onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             )
-            CashAmountPanel(
-                state = state,
-                onAction = onAction,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            CashAmountPanel(state = state, onAction = onAction)
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
         CashKeypadBlock(
             state = state,
             onAction = onAction,
             fillRemaining = false,
+            modifier = Modifier.fillMaxWidth(),
             keypadHeight = keypadHeight,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
         )
     }
 }
 
 @Composable
-internal fun NonCashPaymentCompact(
+private fun PaymentPortraitNonCash(
     state: PaymentState,
     onAction: (PaymentUiAction) -> Unit,
 ) {
@@ -842,18 +864,18 @@ internal fun NonCashPaymentCompact(
         PaymentHeader(
             state = state,
             compact = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         )
         PaymentMethodSelectorRow(
             selectedMethod = state.selectedMethod,
             cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
             nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
             onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
         )
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             NonCashListPanel(state = state, onAction = onAction, fillRemaining = true, modifier = Modifier.weight(1f).fillMaxWidth())
         }
     }
@@ -873,28 +895,35 @@ private fun CashAmountPanel(
     val isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough
     val isPositive = state.tenderedAmountMoney > Money.ZERO && state.isPaymentEnough
 
-    Column(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Botón de acción rápida superior: Ancho completo para "Monto exacto" con icono de billetera
+        Button(
+            onClick = { onAction(PaymentUiAction.SetExactAmount) },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 2.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Wallet,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Monto recibido",
-                modifier = Modifier.weight(1f),
+                text = "Cobro exacto: $ ${state.totalAmountText}",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
-            FilledTonalButton(
-                onClick = { onAction(PaymentUiAction.SetExactAmount) },
-                modifier = Modifier.height(44.dp),
-                contentPadding = ButtonDefaults.ContentPadding,
-            ) {
-                Icon(Icons.Default.PointOfSale, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Monto exacto", maxLines = 1)
-            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+
         KeypadDisplay(
-            label = "Recibido",
+            label = "Monto recibido",
             amountText = state.tenderedAmountText,
             isError = isInsufficient,
             isPositive = isPositive,
@@ -904,35 +933,28 @@ private fun CashAmountPanel(
                 },
         ) {
             if (state.nonCashAssignedMoney > Money.ZERO) {
-                Text(
-                    "Otras formas: $ ${state.nonCashAssignedText}",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        "Otras formas asignadas: $ ${state.nonCashAssignedText}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
             }
 
-            AnimatedVisibility(
-                visible = isInsufficient,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
-            ) {
-                Text(
-                    text =
-                        buildString {
-                            append("Faltan $ $missingCashAmountText para completar el pago")
-                            if (state.isMultiCurrency && state.missingCashBsText.isNotBlank()) {
-                                append(" ($SECONDARY_CURRENCY_LABEL ${state.missingCashBsText})")
-                            }
-                        },
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    modifier =
-                        Modifier
-                            .padding(top = 10.dp)
-                            .fillMaxWidth(),
-                )
-            }
+            AnimatedChangeDueRow(state = state)
+            AnimatedInsufficientRow(
+                isInsufficient = isInsufficient,
+                missingCashAmountText = missingCashAmountText,
+                missingCashBsText = state.missingCashBsText,
+                isMultiCurrency = state.isMultiCurrency,
+            )
         }
     }
 }
@@ -945,33 +967,122 @@ private fun CashKeypadBlock(
     modifier: Modifier = Modifier,
     keypadHeight: Dp = 280.dp,
 ) {
-    val warningScale by animateFloatAsState(
-        targetValue = if (state.showInsufficientReminder && !state.isPaymentEnough) 1.03f else 1f,
-        label = "cashWarningScale",
-    )
     val isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough
 
     Column(modifier = modifier) {
         Keypad(
             onKey = { key -> onAction(PaymentUiAction.KeyPadInput(key)) },
+            onEnter = { onAction(PaymentUiAction.ProcessPayment) },
+            isProcessing = state.isProcessingPayment,
+            isInsufficient = isInsufficient,
             modifier = if (fillRemaining) Modifier.weight(1f) else Modifier,
             height = if (fillRemaining) null else keypadHeight,
-            actionColumn = {
-                KeypadKey(
-                    text = "Borrar",
-                    modifier = Modifier.fillMaxHeight(),
-                    icon = Icons.AutoMirrored.Filled.Backspace,
-                ) { onAction(PaymentUiAction.KeyPadInput("BACK")) }
-            },
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        PrimaryCtaButton(
-            state = state,
-            warningScale = warningScale,
-            isInsufficient = isInsufficient,
-            onClick = { onAction(PaymentUiAction.ProcessPayment) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+    }
+}
+
+/** Fila animada del cambio (vuelto) cuando el monto recibido ya cubre el total. */
+@Composable
+private fun AnimatedChangeDueRow(state: PaymentState) {
+    val hasChange = state.tenderedAmountMoney > Money.ZERO && state.changeDueMoney > Money.ZERO
+    AnimatedVisibility(
+        visible = hasChange,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }) + scaleIn(initialScale = 0.92f),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = com.amaxonia.pos.ui.theme.ConfirmedContainer,
+            contentColor = com.amaxonia.pos.ui.theme.ConfirmedContent,
+            modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = com.amaxonia.pos.ui.theme.SuccessGreen,
+                    modifier = Modifier.size(26.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Su cambio (vuelto)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = com.amaxonia.pos.ui.theme.SuccessGreen,
+                    )
+                    if (state.isMultiCurrency && state.changeDueBsText.isNotBlank()) {
+                        Text(
+                            "$SECONDARY_CURRENCY_LABEL ${state.changeDueBsText}",
+                            style = PosTextStyles.amountSecondary,
+                            color = com.amaxonia.pos.ui.theme.SuccessGreen.copy(alpha = 0.85f),
+                        )
+                    }
+                }
+                Text(
+                    "$ ${state.changeDueText}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = com.amaxonia.pos.ui.theme.SuccessGreen,
+                )
+            }
+        }
+    }
+}
+
+/** Recordatorio animado del monto faltante para completar el pago. */
+@Composable
+private fun AnimatedInsufficientRow(
+    isInsufficient: Boolean,
+    missingCashAmountText: String,
+    missingCashBsText: String,
+    isMultiCurrency: Boolean,
+) {
+    AnimatedVisibility(
+        visible = isInsufficient,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.50f),
+            modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text =
+                        buildString {
+                            append("Faltan $ $missingCashAmountText para completar el pago")
+                            if (isMultiCurrency && missingCashBsText.isNotBlank()) {
+                                append(" ($SECONDARY_CURRENCY_LABEL $missingCashBsText)")
+                            }
+                        },
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.5.sp,
+                )
+            }
+        }
     }
 }
 
@@ -995,15 +1106,15 @@ internal fun PrimaryCtaButton(
         enabled = !state.isProcessingPayment,
         modifier =
             modifier
-                .height(60.dp)
-                .defaultMinSize(minHeight = 56.dp),
-        shape = MaterialTheme.shapes.medium,
+                .height(58.dp)
+                .defaultMinSize(minHeight = 54.dp),
+        shape = RoundedCornerShape(16.dp),
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = heroColor,
                 contentColor = onHeroColor,
             ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.5.dp, pressedElevation = 5.dp),
     ) {
         if (state.isProcessingPayment) {
             CircularProgressIndicator(
@@ -1055,24 +1166,23 @@ fun NonCashRow(
     narrow: Boolean = false,
 ) {
     val isCxc = forma.siglas?.trim()?.equals("CXC", ignoreCase = true) == true
-    val isPending = pendingAmount.isNotBlank() && pendingAmount != "0.00"
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = CardDefaults.outlinedCardBorder(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PaymentMethodIcon(forma = forma)
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         forma.descripcion ?: "Forma de pago",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -1092,60 +1202,25 @@ fun NonCashRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            if (narrow) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    label = { Text("Monto asignado") },
-                    prefix = { Text("$ ") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                FilledTonalButton(
-                    onClick = onUseExactAmount,
-                    enabled = isPending,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = MaterialTheme.shapes.medium,
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Completar \$$pendingAmount",
-                        maxLines = 1,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
+                        text = forma.siglas.orEmpty().uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = onValueChange,
-                        label = { Text("Monto asignado") },
-                        prefix = { Text("$ ") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    FilledTonalButton(
-                        onClick = onUseExactAmount,
-                        enabled = isPending,
-                        modifier = Modifier.height(52.dp).defaultMinSize(minWidth = 132.dp),
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Completar \$$pendingAmount",
-                            maxLines = 1,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
             }
+            AmountInputRow(
+                value = value,
+                pendingAmount = pendingAmount,
+                onValueChange = onValueChange,
+                onUseExactAmount = onUseExactAmount,
+                narrow = narrow,
+            )
         }
     }
 }

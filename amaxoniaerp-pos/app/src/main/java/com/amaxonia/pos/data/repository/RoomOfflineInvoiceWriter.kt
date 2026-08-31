@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.usecase.payment.OfflineInvoiceWriter
 
 class RoomOfflineInvoiceWriter(
     private val dao: PendingInvoiceDao,
+    private val onQueued: (() -> Unit)? = null,
 ) : OfflineInvoiceWriter {
     override suspend fun write(invoice: OfflineInvoice) {
         dao.insert(
@@ -29,5 +30,6 @@ class RoomOfflineInvoiceWriter(
                 totalMinor = MinorUnitMoney.fromDoubleAsMinor(invoice.total),
             ),
         )
+        onQueued?.invoke()
     }
 }

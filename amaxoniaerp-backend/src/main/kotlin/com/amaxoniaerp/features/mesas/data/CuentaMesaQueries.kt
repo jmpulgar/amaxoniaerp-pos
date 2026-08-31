@@ -47,7 +47,7 @@ internal fun sesionActiva(
             .where {
                 (SesionMesaTable.id eq sesionId) and
                     (SesionMesaTable.mesaId eq mesaId) and
-                    (SesionMesaTable.activo eq ACTIVE)
+                    (SesionMesaTable.activo eq true)
             }
     if (forUpdate) query.forUpdate()
     val row =
@@ -73,7 +73,7 @@ internal fun pedidosFacturablesDeSesion(sesionId: Int): List<PedidoFacturable> {
             .where {
                 (CuentaMesaTable.sesionMesaId eq sesionId) and
                     (CuentaMesaTable.estado eq EstadoCuentaMesa.ACTIVA.codigo) and
-                    (CuentaMesaTable.activo eq ACTIVE)
+                    (CuentaMesaTable.activo eq true)
             }.map { it[CuentaMesaTable.id] }
     val reservado =
         if (cuentasActivas.isEmpty()) {
@@ -91,7 +91,7 @@ internal fun pedidosFacturablesDeSesion(sesionId: Int): List<PedidoFacturable> {
         .selectAll()
         .where {
             (PedidoMesaTable.sesionMesaId eq sesionId) and
-                (PedidoMesaTable.activo eq ACTIVE) and
+                (PedidoMesaTable.activo eq true) and
                 (PedidoMesaTable.estado eq EstadoPedidoMesa.ENTREGADA.codigo)
         }.orderBy(PedidoMesaTable.id)
         .map { row ->
@@ -144,7 +144,7 @@ internal fun existeCuentaActivaEnSesion(sesionId: Int): Boolean =
         .selectAll()
         .where {
             (CuentaMesaTable.sesionMesaId eq sesionId) and
-                (CuentaMesaTable.activo eq ACTIVE) and
+                (CuentaMesaTable.activo eq true) and
                 (CuentaMesaTable.estado eq EstadoCuentaMesa.ACTIVA.codigo)
         }.limit(1)
         .singleOrNull() != null
@@ -154,7 +154,7 @@ internal fun existeSaldoPendienteEnSesion(sesionId: Int): Boolean =
         .selectAll()
         .where {
             (PedidoMesaTable.sesionMesaId eq sesionId) and
-                (PedidoMesaTable.activo eq ACTIVE) and
+                (PedidoMesaTable.activo eq true) and
                 (PedidoMesaTable.estado neq EstadoPedidoMesa.CANCELADA.codigo)
         }.any { row -> row[PedidoMesaTable.cantidadFacturada] < row[PedidoMesaTable.itemCantidad] }
 
@@ -169,7 +169,7 @@ internal fun runCerradoPorPago(sesionId: Int): Boolean =
                 .selectAll()
                 .where {
                     (SesionMesaTable.id eq sesionId) and
-                        (SesionMesaTable.activo eq ACTIVE)
+                        (SesionMesaTable.activo eq true)
                 }.singleOrNull()
                 ?: return false
         val estadoActual =
@@ -180,7 +180,7 @@ internal fun runCerradoPorPago(sesionId: Int): Boolean =
         SesionMesaTable.update({ SesionMesaTable.id eq sesionId }) {
             it[SesionMesaTable.estado] = EstadoSesionMesa.CERRADA_PAGADA.codigo
             it[SesionMesaTable.fechaCierre] = ahora
-            it[SesionMesaTable.activo] = INACTIVE
+            it[SesionMesaTable.activo] = false
         }
         return true
     }

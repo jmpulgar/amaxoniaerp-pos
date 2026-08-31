@@ -40,6 +40,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.YearMonth
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CreditNotesViewModelTest {
@@ -146,22 +147,90 @@ class CreditNotesViewModelTest {
         }
 
     @Test
-    fun `openInvoicePicker cambia de modo y carga facturas origen`() =
+    fun `openInvoicePicker cambia de modo y carga facturas filtradas por mes actual por defecto`() =
         runTest(mainDispatcherRule.dispatcher) {
-            val vm =
-                viewModel(
-                    repo =
-                        FakeCreditNoteRepository().apply {
-                            sourceInvoices = listOf(sourceSummary())
-                        },
-                )
+            val repo =
+                FakeCreditNoteRepository().apply {
+                    sourceInvoices = listOf(sourceSummary())
+                }
+            val vm = viewModel(repo = repo)
 
             advanceUntilIdle()
             vm.openInvoicePicker()
             advanceUntilIdle()
 
             assertEquals(CreditNotesMode.INVOICE_PICKER, vm.state.value.mode)
+            assertEquals(InvoiceDateFilterType.MES_ACTUAL, vm.state.value.invoiceDateFilter.type)
             assertEquals(1, vm.state.value.sourceInvoices.size)
+
+            val ym = YearMonth.now()
+            val expectedStart = ym.atDay(1).toString()
+            val expectedEnd = ym.atEndOfMonth().toString()
+            val lastFilter = repo.requestedSourceInvoiceFilters.last()
+            assertEquals(expectedStart, lastFilter.second)
+            assertEquals(expectedEnd, lastFilter.third)
+        }
+
+    @Test
+    fun `setInvoiceDateFilterType a mes anterior consulta rango de mes anterior`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repo = FakeCreditNoteRepository()
+            val vm = viewModel(repo = repo)
+
+            advanceUntilIdle()
+            vm.openInvoicePicker()
+            advanceUntilIdle()
+
+            vm.setInvoiceDateFilterType(InvoiceDateFilterType.MES_ANTERIOR)
+            advanceUntilIdle()
+
+            assertEquals(InvoiceDateFilterType.MES_ANTERIOR, vm.state.value.invoiceDateFilter.type)
+            val prevYm = YearMonth.now().minusMonths(1)
+            val expectedStart = prevYm.atDay(1).toString()
+            val expectedEnd = prevYm.atEndOfMonth().toString()
+            val lastFilter = repo.requestedSourceInvoiceFilters.last()
+            assertEquals(expectedStart, lastFilter.second)
+            assertEquals(expectedEnd, lastFilter.third)
+        }
+
+    @Test
+    fun `setInvoiceDateFilterType a todas las fechas consulta sin rango de fecha`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repo = FakeCreditNoteRepository()
+            val vm = viewModel(repo = repo)
+
+            advanceUntilIdle()
+            vm.openInvoicePicker()
+            advanceUntilIdle()
+
+            vm.setInvoiceDateFilterType(InvoiceDateFilterType.TODAS)
+            advanceUntilIdle()
+
+            assertEquals(InvoiceDateFilterType.TODAS, vm.state.value.invoiceDateFilter.type)
+            val lastFilter = repo.requestedSourceInvoiceFilters.last()
+            assertNull(lastFilter.second)
+            assertNull(lastFilter.third)
+        }
+
+    @Test
+    fun `applyCustomInvoiceDateFilter consulta con fechas personalizadas`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repo = FakeCreditNoteRepository()
+            val vm = viewModel(repo = repo)
+
+            advanceUntilIdle()
+            vm.openInvoicePicker()
+            advanceUntilIdle()
+
+            vm.onCustomInvoiceFechaInicioChange("2026-03-01")
+            vm.onCustomInvoiceFechaFinChange("2026-03-15")
+            vm.applyCustomInvoiceDateFilter()
+            advanceUntilIdle()
+
+            assertEquals(InvoiceDateFilterType.PERSONALIZADO, vm.state.value.invoiceDateFilter.type)
+            val lastFilter = repo.requestedSourceInvoiceFilters.last()
+            assertEquals("2026-03-01", lastFilter.second)
+            assertEquals("2026-03-15", lastFilter.third)
         }
 
     @Test
@@ -497,8 +566,16 @@ class CreditNotesViewModelTest {
         override suspend fun getCreditNoteDetail(id: String): Result<CreditNoteDetailDto> =
             creditNoteDetail?.let { Result.success(it) } ?: Result.failure(IllegalStateException("no detail"))
 
-        override suspend fun getSourceInvoices(search: String?): Result<CreditNoteSourceInvoiceListResponseDto> =
-            Result.success(CreditNoteSourceInvoiceListResponseDto(data = sourceInvoices, total = sourceInvoices.size.toLong()))
+        val requestedSourceInvoiceFilters = mutableListOf<Triple<String?, String?, String?>>()
+
+        override suspend fun getSourceInvoices(
+            search: String?,
+            fechaInicio: String?,
+            fechaFin: String?,
+        ): Result<CreditNoteSourceInvoiceListResponseDto> {
+            requestedSourceInvoiceFilters += Triple(search, fechaInicio, fechaFin)
+            return Result.success(CreditNoteSourceInvoiceListResponseDto(data = sourceInvoices, total = sourceInvoices.size.toLong()))
+        }
 
         override suspend fun getSourceInvoiceDetail(id: String): Result<CreditNoteSourceInvoiceDetailDto> =
             sourceInvoiceDetailError?.let { Result.failure(it) }

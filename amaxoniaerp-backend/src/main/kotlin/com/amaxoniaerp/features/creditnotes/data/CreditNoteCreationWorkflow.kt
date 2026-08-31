@@ -86,10 +86,8 @@ internal fun insertCreditNoteHeader(input: InsertCreditNoteHeaderInput) {
         it[codFactura] = input.ctx.invoice.idFactura
         it[fechaDevolucion] = input.creditNoteDate
         it[codDevolucionFiscal] = PENDING_FISCAL_CODE
-        if (headerTable is CreditNoteHeaderTableVE) {
-            it[headerTable.nroz] = ""
-            it[headerTable.impresoraSerial] = ""
-        }
+        it[nroz] = ""
+        it[impresoraSerial] = ""
         it[observacion] = input.request.observacion.take(MAX_OBSERVATION_LENGTH)
         it[idCliente] = input.ctx.invoice.idCliente
         it[codVendedor] = input.ctx.invoice.codVendedor
@@ -114,21 +112,24 @@ internal fun insertCreditNoteHeader(input: InsertCreditNoteHeaderInput) {
         it[pdescuentoGlobal] = input.ctx.invoice.totalizarPDescuentoGlobal
         it[numeroDocumentoFiscal] = ""
         it[registroMigrado] = 0
+        it[tipoDocumento] = "04"
+        it[naturalezaOperacion] = "01"
+        it[tipoOperacion] = 1
+        it[formatoCAFE] = 1
+        it[entregaCAFE] = 1
+        it[envioContenedor] = 1
+        it[tipoVenta] = 1
+        it[informacionInteres] = ""
+        it[cufe] = ""
+        it[qr] = ""
+        it[fechaRecepcionDGI] = input.now
+        it[nroProtocoloAutorizacion] = ""
+        it[fechaLimite] = input.now
         if (headerTable is CreditNoteHeaderTablePA) {
-            it[headerTable.tipoDocumento] = "04"
-            it[headerTable.naturalezaOperacion] = "11"
-            it[headerTable.tipoOperacion] = 1
-            it[headerTable.formatoCAFE] = 1
-            it[headerTable.entregaCAFE] = 1
-            it[headerTable.envioContenedor] = 1
-            it[headerTable.tipoVenta] = 1
-            it[headerTable.informacionInteres] = ""
-            it[headerTable.cufe] = ""
-            it[headerTable.qr] = ""
-            it[headerTable.fechaRecepcionDGI] = input.now
-            it[headerTable.nroProtocoloAutorizacion] = ""
-            it[headerTable.fechaLimite] = input.now
+            it[headerTable.descuentoParcial] = BigDecimal.ZERO
+            it[headerTable.descuentoImpuesto] = BigDecimal.ZERO
             it[headerTable.descuentoGlobalVenta] = input.financials.globalDiscount
+            it[headerTable.estadoDevolucion] = "PROCESADA"
         }
     }
 }
@@ -196,6 +197,10 @@ internal data class ApplyCreditNoteEffectsInput(
     val partialPaymentFormId: Int?,
 )
 
+/**
+ * Aplica los efectos comerciales de una NC (inventario, caja y anulación de factura).
+ * Se invoca tras el éxito fiscal (VE directo / PA PAC-accepted).
+ */
 internal fun applyCreditNoteEffects(input: ApplyCreditNoteEffectsInput) {
     if (input.annulInvoiceOnPartial) {
         CreditNoteFacturaTable.update({ CreditNoteFacturaTable.idFactura eq input.invoice.idFactura }) {
@@ -316,6 +321,8 @@ internal fun insertPreparedHeaderPA(input: InsertPreparedHeaderPAInput) {
         it[codFactura] = input.ctx.invoice.idFactura
         it[fechaDevolucion] = input.creditNoteDate
         it[codDevolucionFiscal] = PENDING_FISCAL_CODE
+        it[nroz] = ""
+        it[impresoraSerial] = ""
         it[observacion] = input.request.observacion.take(MAX_OBSERVATION_LENGTH)
         it[idCliente] = input.ctx.invoice.idCliente
         it[codVendedor] = input.ctx.invoice.codVendedor
@@ -341,7 +348,7 @@ internal fun insertPreparedHeaderPA(input: InsertPreparedHeaderPAInput) {
         it[header.numeroDocumentoFiscal] = input.numeroDocumentoFiscal
         it[registroMigrado] = 0
         it[tipoDocumento] = "04"
-        it[naturalezaOperacion] = "11"
+        it[naturalezaOperacion] = "01"
         it[tipoOperacion] = 1
         it[formatoCAFE] = 1
         it[entregaCAFE] = 1
@@ -350,9 +357,12 @@ internal fun insertPreparedHeaderPA(input: InsertPreparedHeaderPAInput) {
         it[informacionInteres] = ""
         it[cufe] = ""
         it[qr] = ""
-        it[fechaRecepcionDGI] = null
+        it[fechaRecepcionDGI] = input.now
         it[nroProtocoloAutorizacion] = ""
-        it[fechaLimite] = null
+        it[fechaLimite] = input.now
+        it[descuentoParcial] = BigDecimal.ZERO
+        it[descuentoImpuesto] = BigDecimal.ZERO
         it[descuentoGlobalVenta] = input.financials.globalDiscount
+        it[estadoDevolucion] = "PENDIENTE"
     }
 }

@@ -288,6 +288,7 @@ internal class CompletePaymentSaleUseCase(
         repositories.state.transaction.saveTransaction(transaction).exceptionOrNull()?.let { error ->
             return operations.failure(error, "La factura quedo pendiente, pero no se pudo guardar la transaccion local")
         }
+        val printResult = operations.printInvoice(input.countryCode, transaction, queued.id)
         return PaymentFlowResult.Success(
             payload =
                 successPayload(
@@ -297,10 +298,10 @@ internal class CompletePaymentSaleUseCase(
                         PaymentCompletion(
                             invoiceCode = queued.localInvoiceNumber,
                             transactionId = queued.id,
-                            printMessage = "Factura pendiente de envio",
+                            printMessage = printResult?.displayMessage ?: "Factura pendiente de envio",
                         ),
                 ),
-            receiptPrintMessage = "Factura guardada offline. Se reenviara al recuperar internet.",
+            receiptPrintMessage = printResult?.displayMessage ?: "Factura guardada offline. Se reenviara al recuperar internet.",
         )
     }
 
@@ -588,6 +589,7 @@ internal class CompletePaymentSaleUseCase(
             isMultiCurrency = input.isMultiCurrency,
             feError = completion.fiscalError,
             tableSessionClosed = completion.tableSessionClosed,
+            isTableSale = sale.request.cuentaMesa != null,
         )
 
     private fun fiscalPrintAmount(

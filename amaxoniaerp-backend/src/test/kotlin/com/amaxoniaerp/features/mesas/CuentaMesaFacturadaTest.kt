@@ -315,7 +315,7 @@ class CuentaMesaFacturadaTest : CuentaMesaRepositoryTestBase() {
                     CuentaMesaDetalleTable
                         .selectAll()
                         .where { CuentaMesaDetalleTable.cuentaMesaId eq cuenta.id }
-                        .all { it[CuentaMesaDetalleTable.facturado] == 1 },
+                        .all { it[CuentaMesaDetalleTable.facturado] },
                 )
             }
         }

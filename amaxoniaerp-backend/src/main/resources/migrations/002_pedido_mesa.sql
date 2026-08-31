@@ -25,9 +25,8 @@ CREATE TABLE IF NOT EXISTS `pedido_mesa` (
     `id`                   INT(11)        NOT NULL AUTO_INCREMENT,
     `sesion_mesa_id`       INT(11)        NOT NULL,
     `comanda_secuencia`    INT(11)        NULL,
-    -- Datos del producto snapshot al momento del pedido (no se relee el catálogo
-    -- al imprimir la comanda ni al facturar; el precio pactado es este).
-    `producto_id`          INT(11)        NOT NULL,
+    -- Datos del producto snapshot al momento del pedido (tabla `item`).
+    `producto_id`          INT(32) UNSIGNED NOT NULL,
     `item_almacen`         INT(11)        NOT NULL DEFAULT 1,
     `item_codigo`          VARCHAR(80)    NOT NULL DEFAULT '',
     `item_descripcion`     VARCHAR(500)   NOT NULL,
@@ -51,11 +50,13 @@ CREATE TABLE IF NOT EXISTS `pedido_mesa` (
     `fecha_envio`          DATETIME       NULL,
     `fecha_entrega`        DATETIME       NULL,
     `activo`               TINYINT(1)     NOT NULL DEFAULT 1,
+    `cantidad_facturada`   DECIMAL(32,3)  NOT NULL DEFAULT 0.000,
     PRIMARY KEY (`id`),
     KEY `ix_pedido_mesa_sesion`      (`sesion_mesa_id`),
     KEY `ix_pedido_mesa_comanda`     (`sesion_mesa_id`, `comanda_secuencia`),
     KEY `ix_pedido_mesa_estado`      (`estado`),
     KEY `ix_pedido_mesa_producto`    (`producto_id`),
-    CONSTRAINT `fk_pedido_mesa_sesion` FOREIGN KEY (`sesion_mesa_id`) REFERENCES `sesion_mesa` (`id`),
-    CONSTRAINT `fk_pedido_mesa_producto` FOREIGN KEY (`producto_id`)  REFERENCES `items` (`id_item`)
+    KEY `ix_pedido_mesa_saldo`       (`sesion_mesa_id`, `estado`, `activo`),
+    CONSTRAINT `fk_pedido_mesa_sesion`   FOREIGN KEY (`sesion_mesa_id`) REFERENCES `sesion_mesa` (`id`),
+    CONSTRAINT `fk_pedido_mesa_producto` FOREIGN KEY (`producto_id`)   REFERENCES `item` (`id_item`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

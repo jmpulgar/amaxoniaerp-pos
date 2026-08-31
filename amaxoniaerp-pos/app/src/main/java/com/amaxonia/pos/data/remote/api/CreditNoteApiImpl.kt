@@ -57,12 +57,16 @@ class CreditNoteApiImpl(
         authHeader: String,
         companyDb: String,
         search: String?,
+        fechaInicio: String?,
+        fechaFin: String?,
     ): Result<CreditNoteSourceInvoiceListResponseDto> =
         getRequest(
             path = "api/pos/notas-credito/facturas",
             tenant = TenantHeaders(authHeader, companyDb),
             serializer = CreditNoteSourceInvoiceListResponseDto.serializer(),
             search = search,
+            fechaInicio = fechaInicio,
+            fechaFin = fechaFin,
             fallbackMessage = "No se pudieron cargar las facturas elegibles",
         )
 
@@ -110,6 +114,8 @@ class CreditNoteApiImpl(
         tenant: TenantHeaders,
         serializer: KSerializer<T>,
         search: String? = null,
+        fechaInicio: String? = null,
+        fechaFin: String? = null,
         fallbackMessage: String,
     ): Result<T> =
         catchingResult {
@@ -119,6 +125,12 @@ class CreditNoteApiImpl(
                     header("Company-DB", tenant.companyDb)
                     if (!search.isNullOrBlank()) {
                         parameter("search", search)
+                    }
+                    if (!fechaInicio.isNullOrBlank()) {
+                        parameter("fecha_inicio", fechaInicio)
+                    }
+                    if (!fechaFin.isNullOrBlank()) {
+                        parameter("fecha_fin", fechaFin)
                     }
                 }
             Result.success(parseResponse(response.bodyAsText(), serializer, fallbackMessage))

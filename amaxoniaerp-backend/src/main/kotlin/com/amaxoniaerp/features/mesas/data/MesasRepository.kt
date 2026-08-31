@@ -67,7 +67,7 @@ class MesasRepository {
             val areas =
                 PlantasTable
                     .selectAll()
-                    .where { (PlantasTable.sucursalId eq sucursalId) and (PlantasTable.activo eq ACTIVE) }
+                    .where { (PlantasTable.sucursalId eq sucursalId) and (PlantasTable.activo eq true) }
                     .orderBy(
                         PlantasTable.orden to SortOrder.ASC_NULLS_LAST,
                         PlantasTable.nombre to SortOrder.ASC,
@@ -104,7 +104,7 @@ class MesasRepository {
                     .where {
                         (PlantasTable.id eq areaId) and
                             (PlantasTable.sucursalId eq sucursalId) and
-                            (PlantasTable.activo eq ACTIVE)
+                            (PlantasTable.activo eq true)
                     }.limit(1)
                     .singleOrNull()
                     ?: return@dbQuery null
@@ -117,7 +117,7 @@ class MesasRepository {
             val mesas =
                 MesasTable
                     .selectAll()
-                    .where { (MesasTable.plantaId eq areaId) and (MesasTable.activo eq ACTIVE) }
+                    .where { (MesasTable.plantaId eq areaId) and (MesasTable.activo eq true) }
                     .orderBy(
                         MesasTable.codigo to SortOrder.ASC_NULLS_LAST,
                         MesasTable.nombre to SortOrder.ASC_NULLS_LAST,
@@ -135,7 +135,7 @@ class MesasRepository {
         val total = MesasTable.id.count()
         return MesasTable
             .select(MesasTable.plantaId, total)
-            .where { (MesasTable.plantaId inList areaIds) and (MesasTable.activo eq ACTIVE) }
+            .where { (MesasTable.plantaId inList areaIds) and (MesasTable.activo eq true) }
             .groupBy(MesasTable.plantaId)
             .associate { row -> row[MesasTable.plantaId] to row[total].toInt() }
     }
@@ -152,7 +152,7 @@ class MesasRepository {
         val assignedCajaIds =
             VendedorTable
                 .select(VendedorTable.codUsuarios, VendedorTable.idCajas)
-                .where { VendedorTable.activo eq ACTIVE }
+                .where { VendedorTable.activo eq ACTIVE_SELLER }
                 .filter { csvContains(it[VendedorTable.codUsuarios], userToken) }
                 .flatMap { csvTokens(it[VendedorTable.idCajas]) }
                 .toSet()
@@ -181,7 +181,7 @@ class MesasRepository {
             descripcion = this[PlantasTable.descripcion]?.trim()?.takeIf(String::isNotBlank),
             imagen = this[PlantasTable.imagen]?.trim()?.takeIf(String::isNotBlank),
             orden = this[PlantasTable.orden] ?: 0,
-            activo = this[PlantasTable.activo] == ACTIVE,
+            activo = this[PlantasTable.activo],
             // Se rellena en listAreas con un único conteo agrupado, no por área.
             cantidadMesasActivas = 0,
         )
@@ -203,11 +203,11 @@ class MesasRepository {
             ancho = this[MesasTable.ancho]?.toDouble() ?: 0.0,
             alto = this[MesasTable.alto]?.toDouble() ?: 0.0,
             rotacion = this[MesasTable.rotacion]?.toDouble() ?: 0.0,
-            activo = this[MesasTable.activo] == ACTIVE,
+            activo = this[MesasTable.activo],
         )
     }
 
     private companion object {
-        const val ACTIVE = 1
+        const val ACTIVE_SELLER = 1
     }
 }

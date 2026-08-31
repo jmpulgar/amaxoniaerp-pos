@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,9 +21,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,20 +77,20 @@ fun CartItemRow(
     allowEditPrice: Boolean,
     allowDiscount: Boolean,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = MaterialTheme.shapes.medium,
+    androidx.compose.material3.ElevatedCard(
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
             CartItemHeaderRow(item = item, onRemove = actions.onRemove)
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             CartItemPriceRow(item = item)
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             CartItemQuantityRow(
                 item = item,
@@ -152,27 +155,31 @@ private fun CartItemHeaderRow(
     item: com.amaxonia.pos.domain.model.CartItem,
     onRemove: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.Top) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             item.product.description,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(36.dp),
+        ) {
             Icon(
                 Icons.Default.Delete,
                 contentDescription = "Quitar del carrito",
-                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
-                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.80f),
+                modifier = Modifier.size(19.dp),
             )
         }
     }
 }
 
-/** Fila 2: precio unitario (flexible) + total de línea (adaptive, nunca desborda). */
+/** Fila 2: precio unitario (flexible) + total de línea en badge destacado. */
 @Composable
 private fun CartItemPriceRow(item: com.amaxonia.pos.domain.model.CartItem) {
     Row(
@@ -185,25 +192,31 @@ private fun CartItemPriceRow(item: com.amaxonia.pos.domain.model.CartItem) {
                 "%.2f",
                 item.unitPriceWithTax,
             )} / ${item.displayUnitLabel.lowercase()}",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(modifier = Modifier.weight(1f))
-        AdaptiveAmountText(
-            text = "$ ${String.format(Locale.getDefault(), "%.2f", item.total)}",
-            baseStyle = PosTextStyles.priceTileLarge,
-            color = MaterialTheme.colorScheme.primary,
-            options = AdaptiveAmountOptions(minFontSizeSp = 13f),
-        )
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+        ) {
+            AdaptiveAmountText(
+                text = "$ ${String.format(Locale.getDefault(), "%.2f", item.total)}",
+                baseStyle = PosTextStyles.priceTileLarge.copy(fontSize = 16.sp),
+                color = MaterialTheme.colorScheme.primary,
+                options = AdaptiveAmountOptions(minFontSizeSp = 12f),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
     }
 }
 
 /**
  * Fila 3: stepper (flexible) + acciones de precio/descuento con targets ≥48dp
- * (IconButton enforza minimum interactive size) y sin solapamiento.
+ * y botones tonales redondeados.
  */
 @Composable
 private fun CartItemQuantityRow(
@@ -224,7 +237,7 @@ private fun CartItemQuantityRow(
         }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         QuantityStepper(
             quantityText = controller.text,
@@ -253,23 +266,35 @@ private fun CartItemEditButtons(
     onEditDiscount: () -> Unit,
 ) {
     if (allowEditPrice) {
-        IconButton(onClick = onEditPrice, modifier = Modifier.size(40.dp)) {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "Editar precio",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.size(40.dp),
+        ) {
+            IconButton(onClick = onEditPrice, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Editar precio",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
     if (allowDiscount) {
-        IconButton(onClick = onEditDiscount, modifier = Modifier.size(40.dp)) {
-            Icon(
-                Icons.Default.Percent,
-                contentDescription = "Aplicar descuento",
-                tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(18.dp),
-            )
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.size(40.dp),
+        ) {
+            IconButton(onClick = onEditDiscount, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Percent,
+                    contentDescription = "Aplicar descuento",
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -291,10 +316,11 @@ private fun CartItemUnitSelector(
         Box {
             AssistChip(
                 onClick = { unitMenuExpanded = true },
-                label = { Text(item.displayUnitLabel) },
+                label = { Text(item.displayUnitLabel, fontWeight = FontWeight.Bold) },
                 leadingIcon = {
-                    Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(15.dp))
                 },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
             )
             DropdownMenu(
                 expanded = unitMenuExpanded,
@@ -330,28 +356,43 @@ private fun CartItemUnitSelector(
 private fun CartItemFootnotes(item: com.amaxonia.pos.domain.model.CartItem) {
     // Descuento (condicional)
     if (item.discountPercent > 0.0) {
-        Text(
-            "Desc: ${String.format(
-                Locale.getDefault(),
-                "%.2f",
-                item.discountPercent,
-            )}% (-$ ${String.format(Locale.getDefault(), "%.2f", item.discountAmountWithoutTax)})",
-            color = MaterialTheme.colorScheme.tertiary,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.40f),
+            modifier = Modifier.padding(top = 6.dp),
+        ) {
+            Text(
+                "Desc: ${String.format(
+                    Locale.getDefault(),
+                    "%.2f",
+                    item.discountPercent,
+                )}% (-$ ${String.format(Locale.getDefault(), "%.2f", item.discountAmountWithoutTax)})",
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+        }
     }
 
     // Lotes asignados (condicional)
     if (item.lotAssignments.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         item.lotAssignments.forEach { lot ->
-            val expiry = if (!lot.vencimiento.isNullOrBlank()) " - Vence: ${lot.vencimiento}" else ""
-            Text(
-                "Lote: ${lot.codigoLote} (${lot.cantidad} uds$expiry)",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val expiry = if (!lot.vencimiento.isNullOrBlank()) " · Vence: ${lot.vencimiento}" else ""
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.padding(top = 2.dp),
+            ) {
+                Text(
+                    "Lote: ${lot.codigoLote} (${lot.cantidad} uds$expiry)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }

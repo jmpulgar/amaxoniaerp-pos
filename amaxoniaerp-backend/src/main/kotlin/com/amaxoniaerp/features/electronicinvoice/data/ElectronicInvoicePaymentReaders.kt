@@ -64,8 +64,10 @@ internal fun loadFormasPago(invoiceId: String): List<FEFormaPagoData> {
         ).selectAll()
         .where { FECajaNuevaDetalleReadTable.cajaId eq cajaId }
         .mapNotNull { row ->
-            val monto = row[FECajaNuevaDetalleReadTable.monto]?.toDouble() ?: return@mapNotNull null
-            if (monto <= 0) return@mapNotNull null
+            val montoDetalle = row[FECajaNuevaDetalleReadTable.monto]?.toDouble() ?: 0.0
+            val montoOriginal = row[FECajaNuevaDetalleReadTable.montoOriginal]?.toDouble() ?: 0.0
+            val monto = if (montoDetalle > 0.0) montoDetalle else montoOriginal
+            if (monto <= 0.0) return@mapNotNull null
 
             val siglas = row.getOrNull(CajaFormaPagoTable.siglas)
             val formaPagoFact = row.getOrNull(CajaFormaPagoTable.formaPagoFact)

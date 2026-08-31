@@ -17,9 +17,12 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
 private const val CUFE_LOG_PREFIX_LENGTH = 20
+private val theFactoryRestClientJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
 /**
  * Adapter Pattern: implementación concreta de [PanamaElectronicInvoiceClient]
@@ -84,7 +87,8 @@ class TheFactoryHkaRestClient(
     ): Result<PacResponse> =
         runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/Enviar"
-            logger.info("Enviando documento electrónico a The Factory HKA: {}", url)
+            val payloadJson = runCatching { theFactoryRestClientJson.encodeToString(TheFactoryHkaDocumentoWrapper.serializer(), payload) }.getOrDefault("<serialización no disponible>")
+            logger.info("[FE-PAC] Enviando documento electrónico a The Factory HKA: {}\nPayload JSON:\n{}", url, payloadJson)
 
             val response: HttpResponse =
                 httpClient.post(url) {
@@ -94,7 +98,7 @@ class TheFactoryHkaRestClient(
                 }
 
             val responseText = response.bodyAsText()
-            logger.debug("Respuesta de The Factory HKA [HTTP {}]: {}", response.status, responseText)
+            logger.info("[FE-PAC] Respuesta recibida de The Factory HKA [HTTP {}]:\n{}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
                 throw PacCommunicationException(

@@ -21,7 +21,11 @@ interface CreditNoteRepository : CreditNoteFiscalConfirmationRepository {
 
     suspend fun getCreditNoteDetail(id: String): Result<CreditNoteDetailDto>
 
-    suspend fun getSourceInvoices(search: String? = null): Result<CreditNoteSourceInvoiceListResponseDto>
+    suspend fun getSourceInvoices(
+        search: String? = null,
+        fechaInicio: String? = null,
+        fechaFin: String? = null,
+    ): Result<CreditNoteSourceInvoiceListResponseDto>
 
     suspend fun getSourceInvoiceDetail(id: String): Result<CreditNoteSourceInvoiceDetailDto>
 

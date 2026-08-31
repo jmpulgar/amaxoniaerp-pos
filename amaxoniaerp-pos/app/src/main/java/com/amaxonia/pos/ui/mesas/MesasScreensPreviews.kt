@@ -75,6 +75,15 @@ private fun MesasGridLandscape() =
         }
     }
 
+@Preview(name = "Mesas grid · Dark mode · 360×640", showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+private fun MesasGridDark() =
+    PosTheme(darkTheme = true) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MesasGridPreviewContent()
+        }
+    }
+
 @Preview(name = "Barra mesa seleccionada · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
 private fun SelectedMesaBarPreview() =

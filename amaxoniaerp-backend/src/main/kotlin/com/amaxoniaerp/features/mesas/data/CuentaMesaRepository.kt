@@ -8,6 +8,7 @@ import com.amaxoniaerp.features.mesas.domain.EstadoCuentaIdempotencia
 import com.amaxoniaerp.features.mesas.domain.EstadoCuentaMesa
 import com.amaxoniaerp.features.mesas.domain.EstadoSesionMesa
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
@@ -80,7 +81,7 @@ class CuentaMesaRepository {
                         (SesionMesaTable.sucursalId eq scope.sucursalId) and
                         (SesionMesaTable.areaId eq scope.areaId) and
                         (SesionMesaTable.mesaId eq scope.mesaId) and
-                        (SesionMesaTable.activo eq ACTIVE)
+                        (SesionMesaTable.activo eq true)
                 }.limit(1)
                 .any()
         }
@@ -122,7 +123,7 @@ class CuentaMesaRepository {
         mesaId: Int,
         request: CrearCuentaRequest,
     ): CuentaMesaResult =
-        newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<CuentaMesaResult>(Dispatchers.IO, database) {
             // Una sesión es el agregado de reserva: el lock serializa divisiones concurrentes
             // para que no compartan cantidades ni numero_cuenta.
             val sesion =
@@ -161,7 +162,7 @@ class CuentaMesaRepository {
         cuentaId: Int,
         idempotencyKey: String,
     ): CuentaMesaResult =
-        newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<CuentaMesaResult>(Dispatchers.IO, database) {
             val sesion =
                 sesionActiva(sesionId, mesaId)
                     ?: return@newSuspendedTransaction CuentaMesaResult.SesionNoPerteneceMesa
@@ -222,7 +223,7 @@ class CuentaMesaRepository {
         database: Database,
         command: MarcarFacturadaCommand,
     ): CuentaMesaResult =
-        newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<CuentaMesaResult>(Dispatchers.IO, database) {
             // 1. Idempotencia: si ya está CONFIRMED para este key, devolver cuenta actual sin mutar.
             val previa =
                 verificarIdempotenciaPrevia(command.idempotencyKey, command.sesionId, command.cuentaId)
@@ -279,7 +280,7 @@ class CuentaMesaRepository {
         idempotencyKey: String,
         errorMensaje: String,
     ): CuentaMesaResult =
-        newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<CuentaMesaResult>(Dispatchers.IO, database) {
             val existente =
                 CuentaMesaIdempotenciaTable
                     .selectAll()
@@ -311,7 +312,7 @@ class CuentaMesaRepository {
         mesaId: Int,
         cuentaId: Int,
     ): CuentaMesaResult =
-        newSuspendedTransaction<CuentaMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<CuentaMesaResult>(Dispatchers.IO, database) {
             val sesion =
                 sesionActiva(sesionId, mesaId, forUpdate = true)
                     ?: return@newSuspendedTransaction CuentaMesaResult.SesionNoPerteneceMesa
@@ -325,7 +326,7 @@ class CuentaMesaRepository {
             CuentaMesaTable.update({ CuentaMesaTable.id eq cuentaId }) {
                 it[CuentaMesaTable.estado] = EstadoCuentaMesa.CANCELADA.codigo
                 it[CuentaMesaTable.fechaCierre] = LocalDateTime.now()
-                it[CuentaMesaTable.activo] = INACTIVE
+                it[CuentaMesaTable.activo] = false
                 it[CuentaMesaTable.saldoRestante] = BigDecimal.ZERO
             }
             val cuentaFinal = cargarCuenta(sesion.id, cuentaId)!!
@@ -365,9 +366,9 @@ class CuentaMesaRepository {
         }
         CuentaMesaDetalleTable.update({
             (CuentaMesaDetalleTable.cuentaMesaId eq validada.context.cuentaMesaId) and
-                (CuentaMesaDetalleTable.facturado eq NOT_FACTURADO)
+                (CuentaMesaDetalleTable.facturado eq false)
         }) {
-            it[facturado] = FACTURADO
+            it[facturado] = true
         }
         marcarCuentaPagada(validada.context.cuentaMesaId, idFactura, codFactura, ahora)
         CuentaMesaIdempotenciaTable.update({ CuentaMesaIdempotenciaTable.idempotencyKey eq idFactura }) {

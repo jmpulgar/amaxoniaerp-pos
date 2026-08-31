@@ -14,6 +14,7 @@ import com.amaxoniaerp.features.mesas.domain.CuentasMesaListResponse
 import com.amaxoniaerp.features.mesas.domain.MarcarCuentaFacturadaRequest
 import com.amaxoniaerp.features.mesas.domain.MarcarCuentaFacturadaResponse
 import com.amaxoniaerp.features.mesas.domain.SesionMesaResult
+import com.amaxoniaerp.features.mesas.domain.SolicitudCuentaResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
@@ -221,7 +222,7 @@ internal class CuentaMesaHandlers(
             is SesionMesaResult.Closed ->
                 call.respond(
                     HttpStatusCode.OK,
-                    mapOf("success" to true, "mensaje" to okMessage, "sesion" to result.sesion),
+                    SolicitudCuentaResponse(success = true, mensaje = okMessage, sesion = result.sesion),
                 )
 
             SesionMesaResult.SesionNoEncontrada ->

@@ -95,7 +95,7 @@ internal fun insertarCuentaConDetalles(
             it[CuentaMesaTable.numeroCuenta] = numeroCuenta
             it[CuentaMesaTable.estado] = EstadoCuentaMesa.ACTIVA.codigo
             it[CuentaMesaTable.fechaCreacion] = ahora
-            it[CuentaMesaTable.activo] = ACTIVE
+            it[CuentaMesaTable.activo] = true
         }[CuentaMesaTable.id]
 
     // Inserta detalles y acumula totales
@@ -131,7 +131,7 @@ internal fun insertarCuentaConDetalles(
             it[CuentaMesaDetalleTable.itemPIva] = row[PedidoMesaTable.itemPIva]
             it[CuentaMesaDetalleTable.itemTotalSinIva] = detalleSub.setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN)
             it[CuentaMesaDetalleTable.itemTotalConIva] = detalleTotal.setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN)
-            it[CuentaMesaDetalleTable.facturado] = NOT_FACTURADO
+            it[CuentaMesaDetalleTable.facturado] = false
             it[CuentaMesaDetalleTable.fechaCreacion] = ahora
         }
         subtotal = subtotal.add(detalleSub.setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN))

@@ -45,7 +45,11 @@ class CreditNotePanamaStagedFlowTest {
                     CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
                 },
             )
-            assertEquals(1, transaction(database) { CreditNoteHeaderTablePA.selectAll().count() })
+            val headerRow = transaction(database) { CreditNoteHeaderTablePA.selectAll().single() }
+            assertEquals("A".repeat(66), headerRow[CreditNoteHeaderTablePA.cufe])
+            assertEquals("QR-TEST", headerRow[CreditNoteHeaderTablePA.qr])
+            assertEquals("PROTO-123", headerRow[CreditNoteHeaderTablePA.nroProtocoloAutorizacion])
+            assertEquals("PROCESADA", headerRow[CreditNoteHeaderTablePA.estadoDevolucion])
             assertEquals(1, transaction(database) { CreditNoteDetailTable.selectAll().count() })
             assertEquals(0, transaction(database) { SalesCajaNuevaTableFactory.forCountry("PA").selectAll().count() })
         }
@@ -190,6 +194,8 @@ class CreditNotePanamaStagedFlowTest {
                     codigo = "200",
                     mensaje = "OK",
                     cufe = "A".repeat(66),
+                    qr = "QR-TEST",
+                    nroProtocoloAutorizacion = "PROTO-123",
                 ),
             numeroDocumentoFiscal = number,
         )

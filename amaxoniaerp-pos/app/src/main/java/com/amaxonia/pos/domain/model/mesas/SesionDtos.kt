@@ -81,9 +81,15 @@ data class SesionMutacionResponse(
 /** Códigos de estado de sesión (reflejan el enum del backend). */
 object EstadoSesionMesa {
     const val ABIERTA = "ABIERTA"
+    const val CUENTA_SOLICITADA = "CUENTA_SOLICITADA"
     const val CERRADA = "CERRADA"
+    const val CERRADA_PAGADA = "CERRADA_PAGADA"
     const val CANCELADA = "CANCELADA"
 }
+
+/** Comprueba si una sesión sigue activa/abierta para operar pedidos y cuentas. */
+val SesionMesa.isActiva: Boolean
+    get() = activo && estado != EstadoSesionMesa.CERRADA && estado != EstadoSesionMesa.CERRADA_PAGADA && estado != EstadoSesionMesa.CANCELADA
 
 /** Estados operativos derivados de la mesa (reflejan el enum del backend). */
 object EstadoMesaOperativo {

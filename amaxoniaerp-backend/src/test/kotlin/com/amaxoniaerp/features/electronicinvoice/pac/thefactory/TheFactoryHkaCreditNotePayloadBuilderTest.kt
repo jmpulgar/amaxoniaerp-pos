@@ -47,7 +47,7 @@ class TheFactoryHkaCreditNotePayloadBuilderTest {
                 """"totalValorRecibido":"10.00","tiempoPago":"1","nroItems":"1","totalTodosItems":"10.65",""" +
                 """"listaDescBonificacion":[{"descDescuento":"Descuento Global","montoDescuento":"0.65"}],""" +
                 """"listaFormaPago":[{"formaPagoFact":"99","descFormaPago":"Otro medio de pago",""" +
-                """"valorCuotaPagada":"0.00"}]}}}""",
+                """"valorCuotaPagada":"10.00"}]}}}""",
             goldenJson,
         )
     }

@@ -39,13 +39,14 @@ import com.amaxonia.pos.ui.theme.PendingContent
 import com.amaxonia.pos.ui.theme.PosPalette
 import java.util.Locale
 
-/** Banner resumen con cantidad y monto total en Bs. */
+/** Banner resumen con cantidad y monto total. */
 @Composable
 internal fun SummaryBanner(
     title: String,
     value: String,
     amount: Double,
     modifier: Modifier = Modifier,
+    currencySymbol: String = "$",
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
@@ -65,7 +66,7 @@ internal fun SummaryBanner(
                 Text("Monto total", color = PosPalette.FixedWhite.copy(alpha = 0.8f), fontSize = 12.sp)
                 // Monto adaptive: totales enormes encogen sin recortarse en 320dp.
                 AdaptiveAmountText(
-                    text = "Bs ${formatAmount(amount)}",
+                    text = "$currencySymbol ${formatAmount(amount)}",
                     baseStyle =
                         MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
@@ -134,3 +135,11 @@ internal fun screenTitle(mode: CreditNotesMode): String =
 
 /** Formatea un monto con dos decimales según el locale. */
 internal fun formatAmount(value: Double): String = String.format(Locale.getDefault(), "%.2f", value)
+
+/** Formatea una cantidad sin decimales si es entera, o con hasta 3 decimales. */
+internal fun formatQuantity(value: Double): String =
+    if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        String.format(Locale.getDefault(), "%.3f", value)
+    }

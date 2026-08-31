@@ -196,20 +196,30 @@ class PanamaInvoiceTicketFormatter {
             return
         }
 
+        val cufe = payload.cufe?.takeIfNotBlank()
+        val qrUrl = payload.qrUrl?.takeIfNotBlank()
+        val fechaDgi = payload.fechaRecepcionDgi?.takeIfNotBlank()
+        val protocolo = payload.protocoloAutorizacion?.takeIfNotBlank()
+
+        if (cufe == null && qrUrl == null && fechaDgi == null && protocolo == null) {
+            add(TicketElement.Feed(FOOTER_FEED))
+            return
+        }
+
         add(TicketElement.Divider)
         add(TicketElement.Text("Consulte por la clave de acceso en:", TicketAlign.CENTER))
         add(TicketElement.Text(DGI_ACCESS_URL, TicketAlign.CENTER))
-        payload.cufe?.takeIfNotBlank()?.let { add(wrapFiscalText(it)) }
-        payload.qrUrl?.takeIfNotBlank()?.let {
+        cufe?.let { add(wrapFiscalText(it)) }
+        qrUrl?.let {
             add(TicketElement.Feed(SINGLE_FEED))
             add(TicketElement.Qr(it, size = PANAMA_QR_SIZE))
         }
-        payload.fechaRecepcionDgi?.takeIfNotBlank()?.let {
+        fechaDgi?.let {
             add(TicketElement.Text("CAFE de emisión previa, transmisión a la", TicketAlign.CENTER))
             add(TicketElement.Text("DIRECCIÓN GENERAL DE INGRESOS hasta", TicketAlign.CENTER))
             add(TicketElement.Text(it, TicketAlign.CENTER))
         }
-        payload.protocoloAutorizacion?.takeIfNotBlank()?.let {
+        protocolo?.let {
             add(TicketElement.Text("Protocolo de autorización:", TicketAlign.CENTER))
             add(wrapFiscalText(it))
         }

@@ -5,6 +5,7 @@ import com.amaxoniaerp.features.mesas.domain.EstadoMesaOperativo
 import com.amaxoniaerp.features.mesas.domain.EstadoSesionMesa
 import com.amaxoniaerp.features.mesas.domain.MesaEstadoResponse
 import com.amaxoniaerp.features.mesas.domain.SesionMesaResult
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -51,7 +52,7 @@ class SesionMesaRepository(
             val mesas =
                 MesasTable
                     .selectAll()
-                    .where { (MesasTable.plantaId eq areaId) and (MesasTable.activo eq ACTIVE) }
+                    .where { (MesasTable.plantaId eq areaId) and (MesasTable.activo eq true) }
                     .orderBy(MesasTable.id)
                     .map { it[MesasTable.id] }
                     .toSet()
@@ -94,7 +95,7 @@ class SesionMesaRepository(
         if (scope.cantidadPersonas <= 0) return SesionMesaResult.CantidadPersonasInvalida
 
         return try {
-            newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+            newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
                 abrirInterno(scope)
             }
         } catch (e: ExposedSQLException) {
@@ -126,7 +127,7 @@ class SesionMesaRepository(
         sesionId: Int,
     ): SesionMesaResult =
         try {
-            newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+            newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
                 mutarSesionInterno(sesionId, EstadoSesionMesa.CERRADA, isCancel = false, pedidos::tieneOperaciones)
             }
         } catch (e: ExposedSQLException) {
@@ -143,7 +144,7 @@ class SesionMesaRepository(
         sesionId: Int,
     ): SesionMesaResult =
         try {
-            newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+            newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
                 mutarSesionInterno(sesionId, EstadoSesionMesa.CANCELADA, isCancel = true, pedidos::tieneOperaciones)
             }
         } catch (e: ExposedSQLException) {
@@ -159,7 +160,7 @@ class SesionMesaRepository(
         database: Database,
         sesionId: Int,
     ): SesionMesaResult =
-        newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
             transicionarSesionCuenta(sesionId, destino = EstadoSesionMesa.CUENTA_SOLICITADA)
         }
 
@@ -171,7 +172,7 @@ class SesionMesaRepository(
         database: Database,
         sesionId: Int,
     ): SesionMesaResult =
-        newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
             transicionarSesionCuenta(sesionId, destino = EstadoSesionMesa.ABIERTA)
         }
 
@@ -185,7 +186,7 @@ class SesionMesaRepository(
         database: Database,
         sesionId: Int,
     ): SesionMesaResult =
-        newSuspendedTransaction<SesionMesaResult>(kotlin.coroutines.coroutineContext, database) {
+        newSuspendedTransaction<SesionMesaResult>(Dispatchers.IO, database) {
             cerrarPorPagoInterno(sesionId)
         }
 }

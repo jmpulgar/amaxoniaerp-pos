@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
+import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,12 @@ class CreditNotesViewModel(
     val formController = CreditNoteFormController(_state)
 
     init {
+        viewModelScope.launch {
+            cajaRepository.activeCaja.collect { caja ->
+                val symbol = caja?.currency?.abrMonedaBase?.let { formatCurrencyLabel(it) } ?: "$"
+                _state.update { it.copy(currencySymbol = symbol) }
+            }
+        }
         refreshAll()
         loadRefundMethods()
     }
@@ -63,6 +70,59 @@ class CreditNotesViewModel(
 
     fun onInvoiceSearchQueryChange(value: String) {
         _state.update { it.copy(invoiceSearchQuery = value) }
+    }
+
+    fun setInvoiceDateFilterType(type: InvoiceDateFilterType) {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = it.invoiceDateFilter.copy(type = type),
+                isDateFilterCustomExpanded = type == InvoiceDateFilterType.PERSONALIZADO,
+            )
+        }
+        if (type != InvoiceDateFilterType.PERSONALIZADO ||
+            (_state.value.invoiceDateFilter.customFechaInicio.isNotBlank() || _state.value.invoiceDateFilter.customFechaFin.isNotBlank())
+        ) {
+            loadSourceInvoices()
+        }
+    }
+
+    fun onCustomInvoiceFechaInicioChange(value: String) {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = it.invoiceDateFilter.copy(customFechaInicio = value),
+            )
+        }
+    }
+
+    fun onCustomInvoiceFechaFinChange(value: String) {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = it.invoiceDateFilter.copy(customFechaFin = value),
+            )
+        }
+    }
+
+    fun toggleDateFilterCustomExpanded() {
+        _state.update { it.copy(isDateFilterCustomExpanded = !it.isDateFilterCustomExpanded) }
+    }
+
+    fun applyCustomInvoiceDateFilter() {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = it.invoiceDateFilter.copy(type = InvoiceDateFilterType.PERSONALIZADO),
+            )
+        }
+        loadSourceInvoices()
+    }
+
+    fun resetInvoiceDateFilterToCurrentMonth() {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = InvoiceDateFilter(type = InvoiceDateFilterType.MES_ACTUAL),
+                isDateFilterCustomExpanded = false,
+            )
+        }
+        loadSourceInvoices()
     }
 
     fun searchCreditNotes() = loadCreditNotes()
@@ -229,11 +289,15 @@ class CreditNotesViewModel(
     private fun loadSourceInvoices() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
+            val (fechaInicio, fechaFin) = _state.value.invoiceDateFilter.resolveDateRange()
             creditNoteRepository
                 .getSourceInvoices(
-                    _state.value.invoiceSearchQuery
-                        .trim()
-                        .ifBlank { null },
+                    search =
+                        _state.value.invoiceSearchQuery
+                            .trim()
+                            .ifBlank { null },
+                    fechaInicio = fechaInicio,
+                    fechaFin = fechaFin,
                 ).fold(
                     onSuccess = { response ->
                         _state.update { it.copy(isLoading = false, sourceInvoices = response.data) }

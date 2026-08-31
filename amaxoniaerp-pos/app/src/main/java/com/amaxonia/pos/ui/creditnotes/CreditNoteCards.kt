@@ -51,6 +51,7 @@ import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 internal fun CreditNoteCard(
     note: CreditNoteSummaryDto,
     onClick: () -> Unit,
+    currencySymbol: String = "$",
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -65,7 +66,7 @@ internal fun CreditNoteCard(
             CreditNoteLeadingIcon()
             Spacer(modifier = Modifier.width(14.dp))
             CreditNoteInfo(note = note, modifier = Modifier.weight(1f))
-            CreditNoteAmount(note)
+            CreditNoteAmount(note = note, currencySymbol = currencySymbol)
         }
     }
 }
@@ -146,10 +147,13 @@ private fun CreditNoteMetadata(
 }
 
 @Composable
-private fun CreditNoteAmount(note: CreditNoteSummaryDto) {
+private fun CreditNoteAmount(
+    note: CreditNoteSummaryDto,
+    currencySymbol: String = "$",
+) {
     Column(horizontalAlignment = Alignment.End) {
         AdaptiveAmountText(
-            text = "Bs ${formatAmount(note.total)}",
+            text = "$currencySymbol ${formatAmount(note.total)}",
             baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
             options = AdaptiveAmountOptions(minFontSizeSp = 11f),
@@ -373,10 +377,3 @@ internal fun RefundMethodSelector(
         }
     }
 }
-
-internal fun formatQuantity(value: Double): String =
-    if (value % 1.0 == 0.0) {
-        value.toInt().toString()
-    } else {
-        String.format(java.util.Locale.getDefault(), "%.3f", value)
-    }

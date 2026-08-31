@@ -88,6 +88,8 @@ internal class CreditNoteHandlers(
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
             val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
             val search = call.request.queryParameters["search"]
+            val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
+            val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
 
             if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
@@ -101,6 +103,8 @@ internal class CreditNoteHandlers(
                     limit = limit,
                     offset = offset,
                     search = search,
+                    fechaInicio = fechaInicio,
+                    fechaFin = fechaFin,
                 ),
             )
         }

@@ -43,7 +43,7 @@ private fun validarSesionVenta(
                     (SesionMesaTable.areaId eq context.areaId) and
                     (SesionMesaTable.mesaId eq context.mesaId) and
                     (SesionMesaTable.cajaId eq request.factura.idCaja) and
-                    (SesionMesaTable.activo eq ACTIVE)
+                    (SesionMesaTable.activo eq true)
             }.singleOrNull()
             ?: throw InvalidSaleRequestException("La sesión de mesa no pertenece a la caja, área o mesa indicadas")
     val estadoSesion = EstadoSesionMesa.fromCodigo(sesion[SesionMesaTable.estado])
@@ -100,7 +100,7 @@ private fun validarPedidosEntregados(
                 .where {
                     (PedidoMesaTable.id eq detalle.pedidoMesaId) and
                         (PedidoMesaTable.sesionMesaId eq context.sesionMesaId) and
-                        (PedidoMesaTable.activo eq ACTIVE)
+                        (PedidoMesaTable.activo eq true)
                 }.singleOrNull()
                 ?: throw InvalidSaleRequestException("Una línea de la cuenta ya no existe")
         validarPedidoEntregado(pedido, detalle)
