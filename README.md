@@ -2,6 +2,8 @@
 
 POS multi-país (Panamá / Venezuela digital / Venezuela HKA-20) con backend Ktor.
 
+Aplicativo para dispositivos Sunmi o cualquier otra marca con sistema operativo Android. Permite facturar desde el dispositivo conectado con Amaxonia ERP o Listo ERP en la nube (online y offline), conectándose con dispositivos HKA-20 e integración de factura digital con The Factory HKA.
+
 ## Layout
 
 ```text
