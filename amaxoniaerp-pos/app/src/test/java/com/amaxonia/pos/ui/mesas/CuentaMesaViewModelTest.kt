@@ -252,6 +252,53 @@ class CuentaMesaViewModelTest {
         }
 
     @Test
+    fun `crearYCobrarCuentaCompleta crea la cuenta y emite efecto de pago inmediatamente cuando no hay cuentas previas`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val cuentas = FakeCuentaMesaRepository(initialCuentas = emptyList())
+            val vm = cuentaViewModel(cuentas = cuentas)
+            vm.load()
+            advanceUntilIdle()
+
+            vm.effects.test {
+                vm.crearYCobrarCuentaCompleta()
+                advanceUntilIdle()
+
+                val effect = awaitItem()
+                assertTrue(effect is CuentaMesaEffect.Pay)
+                assertEquals(2, (effect as CuentaMesaEffect.Pay).cuenta.id)
+                expectNoEvents()
+            }
+
+            val request = cuentas.crearRequests.single()
+            assertTrue(request.incluirTodoPendiente)
+            assertEquals("Cuenta creada", vm.state.value.info)
+        }
+
+    @Test
+    fun `crearYCobrarCuentaCompleta con cuenta activa existente paga directamente la cuenta sin crear una nueva`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val cuentas = FakeCuentaMesaRepository(initialCuentas = listOf(CuentaMesaResponse(id = 7, estado = "ACTIVA")))
+            val vm = cuentaViewModel(cuentas = cuentas)
+            vm.load()
+            advanceUntilIdle()
+
+            vm.effects.test {
+                vm.crearYCobrarCuentaCompleta()
+                advanceUntilIdle()
+
+                val effect = awaitItem()
+                assertTrue(effect is CuentaMesaEffect.Pay)
+                assertEquals(7, (effect as CuentaMesaEffect.Pay).cuenta.id)
+                expectNoEvents()
+            }
+
+            // No debe llamar a crear
+            assertEquals(0, cuentas.crearRequests.size)
+        }
+
+
+
+    @Test
     fun `cancelar con exito informa y recarga`() =
         runTest(mainDispatcherRule.dispatcher) {
             val cuentas = FakeCuentaMesaRepository()
@@ -295,6 +342,99 @@ class CuentaMesaViewModelTest {
             }
         }
 
+    @Test
+    fun `setModo actualiza el modoSeleccionado y limpia el error`() {
+        val vm = cuentaViewModel()
+        vm.setModo(CuentaModo.DIVIDIR)
+        assertEquals(CuentaModo.DIVIDIR, vm.state.value.modoSeleccionado)
+        assertNull(vm.state.value.error)
+
+        vm.setModo(CuentaModo.COMPLETA)
+        assertEquals(CuentaModo.COMPLETA, vm.state.value.modoSeleccionado)
+    }
+
+    @Test
+    fun `setShowHistoricoSheet y setShowCuentasActivasSheet controlan visibilidad de sheets`() {
+        val vm = cuentaViewModel()
+        vm.setShowHistoricoSheet(true)
+        assertTrue(vm.state.value.showHistoricoSheet)
+
+        vm.setShowHistoricoSheet(false)
+        assertTrue(!vm.state.value.showHistoricoSheet)
+
+        vm.setShowCuentasActivasSheet(true)
+        assertTrue(vm.state.value.showCuentasActivasSheet)
+
+        vm.setShowCuentasActivasSheet(false)
+        assertTrue(!vm.state.value.showCuentasActivasSheet)
+    }
+
+    @Test
+    fun `toggleSeleccion selecciona el maximo disponible y deselecciona si ya estaba seleccionado`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val pedidosRepo = FakePedidosMesaRepository(pedidos = pedidos)
+            val vm = cuentaViewModel(pedidos = pedidosRepo)
+            vm.load()
+            advanceUntilIdle()
+
+            // Pedido 1 tiene cantidad = 2.0
+            vm.toggleSeleccion(1)
+            assertEquals(2.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+            assertTrue(vm.state.value.estaSeleccionado(1))
+
+            // Toggle de nuevo -> se deselecciona
+            vm.toggleSeleccion(1)
+            assertEquals(0.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+            assertTrue(!vm.state.value.estaSeleccionado(1))
+        }
+
+    @Test
+    fun `incrementarCantidad y decrementarCantidad ajustan la cantidad respetando limites`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val pedidosRepo = FakePedidosMesaRepository(pedidos = pedidos)
+            val vm = cuentaViewModel(pedidos = pedidosRepo)
+            vm.load()
+            advanceUntilIdle()
+
+            // Pedido 1 tiene cantidad disponible = 2.0
+            vm.incrementarCantidad(1)
+            assertEquals(1.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+
+            vm.incrementarCantidad(1)
+            assertEquals(2.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+
+            // No debe superar disponible (2.0)
+            vm.incrementarCantidad(1)
+            assertEquals(2.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+
+            // Decrementar a 1.0
+            vm.decrementarCantidad(1)
+            assertEquals(1.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+
+            // Decrementar a 0 -> se remueve
+            vm.decrementarCantidad(1)
+            assertEquals(0.0, vm.state.value.cantidadSeleccionada(1), 0.0)
+            assertTrue(!vm.state.value.estaSeleccionado(1))
+        }
+
+    @Test
+    fun `seleccionarTodoParaDividir y deseleccionarTodoParaDividir operan sobre todos los pedidos entregados`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val pedidosRepo = FakePedidosMesaRepository(pedidos = pedidos)
+            val vm = cuentaViewModel(pedidos = pedidosRepo)
+            vm.load()
+            advanceUntilIdle()
+
+            vm.seleccionarTodoParaDividir()
+            assertEquals(1, vm.state.value.itemsDivisionSeleccionadosCount)
+            assertEquals(2.0, vm.state.value.unidadesDivisionSeleccionadas, 0.0)
+
+            vm.deseleccionarTodoParaDividir()
+            assertEquals(0, vm.state.value.itemsDivisionSeleccionadosCount)
+            assertEquals(0.0, vm.state.value.unidadesDivisionSeleccionadas, 0.0)
+        }
+
+
     private fun cuentaViewModel(
         cuentas: CuentaMesaRepository = FakeCuentaMesaRepository(),
         pedidos: PedidosMesaRepository = FakePedidosMesaRepository(),
@@ -327,6 +467,7 @@ class CuentaMesaViewModelTest {
     private class FakeCuentaMesaRepository(
         val solicitarResult: Result<Boolean> = Result.success(true),
         val cancelarResult: Result<CuentaMesaResponse> = Result.success(CuentaMesaResponse()),
+        val initialCuentas: List<CuentaMesaResponse> = listOf(CuentaMesaResponse(id = 1, estado = "ACTIVA")),
     ) : CuentaMesaRepository {
         var solicitarCalls = 0
         var listarCalls = 0
@@ -340,7 +481,7 @@ class CuentaMesaViewModelTest {
             sesionId: Int,
         ): Result<List<CuentaMesaResponse>> {
             listarCalls++
-            return Result.success(listOf(CuentaMesaResponse(id = 1, estado = "ACTIVA")))
+            return Result.success(initialCuentas)
         }
 
         override suspend fun obtener(

@@ -2,6 +2,11 @@
 
 package com.amaxonia.pos.ui.mesas
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,11 +28,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RestaurantMenu
-import androidx.compose.material.icons.filled.Splitscreen
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,12 +48,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -56,16 +64,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
 import com.amaxonia.pos.domain.model.mesas.EstadoCuentaMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.PosEmptyState
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
-import com.amaxonia.pos.ui.common.components.PosSectionHeader
 import com.amaxonia.pos.ui.common.components.PosStatusBadge
 import com.amaxonia.pos.ui.common.components.PosVisualAction
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.theme.PosTextStyles
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +85,7 @@ fun CuentaMesaScreen(
     onPay: (CuentaMesaResponse) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
     LaunchedEffect(Unit) {
         viewModel.load()
         viewModel.effects.collect { effect ->
@@ -92,12 +100,12 @@ fun CuentaMesaScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Cuenta y división",
+                            text = mesaNombre,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = mesaNombre,
+                            text = "Cuenta y división",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -108,6 +116,45 @@ fun CuentaMesaScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
+                actions = {
+                    if (state.cuentasActivas.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setShowCuentasActivasSheet(true) }) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    ) {
+                                        Text("${state.cuentasActivas.size}")
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                                    contentDescription = "Cuentas activas",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                    if (state.historicas.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setShowHistoricoSheet(true) }) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = "Historial",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            CuentaStickyBottomBar(
+                state = state,
+                onCrearCuentaCompleta = viewModel::crearYCobrarCuentaCompleta,
+                onCrearDivision = viewModel::crearDivision,
+                onVerCuentasActivas = { viewModel.setShowCuentasActivasSheet(true) },
             )
         },
     ) { padding ->
@@ -115,34 +162,48 @@ fun CuentaMesaScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentAlignment = Alignment.TopCenter,
         ) {
-            // Solo depende de pedidos+cuentas: memoizar evita re-filtrar (y
-            // re-agrupar reservadoPorPedido) en cada tecla de cantidad.
-            val disponibles =
-                remember(state.pedidos, state.cuentas) {
-                    state.pedidos.filter { state.disponible(it) > 0.0 }
-                }
+            val disponibles = state.pedidosDisponibles
+
             LazyColumn(
                 modifier = Modifier.fillMaxHeight().widthIn(max = 840.dp).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                // Selector de modo superior: Cuenta Completa vs Dividir
                 item {
-                    CuentaOverview(
-                        activeAccounts = state.cuentasActivas.size,
-                        availableProducts = disponibles.size,
+                    CuentaModoSelector(
+                        modoSeleccionado = state.modoSeleccionado,
+                        totalCompleto = state.totalConsumoPendiente,
+                        totalDisponibleProductos = disponibles.size,
+                        cuentasActivasCount = state.cuentasActivas.size,
+                        onModoChange = viewModel::setModo,
                     )
                 }
+
+                // Cliente asignado
                 item {
-                    ClientCard(
+                    CuentaClienteBar(
                         clientName = clientName,
                         onSelectClient = onSelectClient,
                     )
                 }
+
+                // Banner destacado si existen cuentas activas por cobrar
+                if (state.cuentasActivas.isNotEmpty()) {
+                    item {
+                        CuentaActivasBanner(
+                            cuentasActivasCount = state.cuentasActivas.size,
+                            onClickVerCuentas = { viewModel.setShowCuentasActivasSheet(true) },
+                        )
+                    }
+                }
+
+                // Alerta de productos no entregados en cocina
                 if (state.pedidosNoEntregados.isNotEmpty()) {
                     item {
                         PosFeedbackCard(
-                            title = "Productos en cocina pendientes de entrega",
-                            message = "Hay ${state.pedidosNoEntregados.size} producto(s) en cocina que aún no han sido entregados a la mesa y no pueden incluirse en la cuenta.",
+                            title = "Productos pendientes en cocina",
+                            message = "Hay ${state.pedidosNoEntregados.size} producto(s) en cocina que aún no han sido entregados a la mesa.",
                             tone = PosVisualTone.Warning,
                             action =
                                 PosVisualAction(
@@ -152,113 +213,91 @@ fun CuentaMesaScreen(
                         )
                     }
                 }
+
+                // Mensajes de error o éxito
                 state.error?.let { message ->
                     item {
                         PosFeedbackCard(
-                            title = "No pudimos actualizar la cuenta",
+                            title = "No pudimos completar la acción",
                             message = message,
                             tone = PosVisualTone.Error,
                         )
                     }
                 }
+
                 state.info?.let { message ->
                     item {
                         PosFeedbackCard(
-                            title = "Cuenta actualizada",
+                            title = "Operación exitosa",
                             message = message,
                             tone = PosVisualTone.Success,
                         )
                     }
                 }
+
+                // Contenido dinámico según el modo seleccionado
                 if (state.isLoading && state.pedidos.isEmpty() && state.cuentas.isEmpty()) {
                     item { PosLoadingState("Cargando consumos y cuentas…") }
+                } else if (state.modoSeleccionado == CuentaModo.COMPLETA) {
+                    // Modo Cuenta Completa: Resumen claro y limpio
+                    item {
+                        CuentaConsumoResumen(pedidos = disponibles)
+                    }
                 } else {
+                    // Modo Dividir Cuenta: Selección interactiva por producto con steppers
                     item {
-                        FullAccountAction(
-                            isSaving = state.isSaving,
-                            onClick = viewModel::crearCuentaCompleta,
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Elige productos para esta división",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = viewModel::seleccionarTodoParaDividir,
+                                    enabled = disponibles.isNotEmpty(),
+                                ) {
+                                    Icon(Icons.Default.SelectAll, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Todos", style = MaterialTheme.typography.labelMedium)
+                                }
+                                TextButton(
+                                    onClick = viewModel::deseleccionarTodoParaDividir,
+                                    enabled = state.itemsDivisionSeleccionadosCount > 0,
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Limpiar", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
                     }
-                    item {
-                        PosSectionHeader(
-                            title = "Dividir consumo",
-                            subtitle = "Elige cantidades para crear una cuenta separada",
-                            icon = Icons.Default.Splitscreen,
-                        )
-                    }
+
                     if (disponibles.isEmpty()) {
                         item {
                             PosEmptyState(
                                 icon = Icons.Default.RestaurantMenu,
                                 title = "Sin productos disponibles para dividir",
-                                message = "Los consumos pendientes aparecerán aquí.",
+                                message = "Los consumos pendientes aparecerán aquí una vez entregados.",
                             )
                         }
                     } else {
                         items(disponibles, key = { "pedido-${it.id}" }) { pedido ->
-                            SplitProductCard(
+                            SplitProductInteractiveCard(
                                 pedido = pedido,
                                 disponible = state.disponible(pedido),
-                                value = state.cantidades[pedido.id].orEmpty(),
-                                onValueChange = { viewModel.updateCantidad(pedido.id, it) },
+                                selectedQuantity = state.cantidadSeleccionada(pedido.id),
+                                onToggle = { viewModel.toggleSeleccion(pedido.id) },
+                                onIncrease = { viewModel.incrementarCantidad(pedido.id) },
+                                onDecrease = { viewModel.decrementarCantidad(pedido.id) },
                             )
                         }
-                        item {
-                            OutlinedButton(
-                                onClick = viewModel::crearDivision,
-                                enabled = !state.isSaving,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Crear división seleccionada")
-                            }
-                        }
-                    }
-                }
-
-                if (state.cuentasActivas.isNotEmpty()) {
-                    item {
-                        PosSectionHeader(
-                            title = "Cuentas por cobrar",
-                            subtitle = "${state.cuentasActivas.size} pendientes de pago",
-                            icon = Icons.AutoMirrored.Filled.ReceiptLong,
-                        )
-                    }
-                    items(state.cuentasActivas, key = { "cuenta-${it.id}" }) { cuenta ->
-                        CuentaActivaCard(
-                            cuenta = cuenta,
-                            canPay = clientName != null && !state.isSaving,
-                            onPay = { viewModel.pagar(cuenta) },
-                            onCancel = { viewModel.cancelar(cuenta) },
-                        )
-                    }
-                    if (clientName == null) {
-                        item {
-                            PosFeedbackCard(
-                                title = "Selecciona un cliente para cobrar",
-                                message = "La cuenta está lista. Falta asociar el cliente de la factura.",
-                                tone = PosVisualTone.Info,
-                                action =
-                                    PosVisualAction(
-                                        label = "Seleccionar cliente",
-                                        onClick = onSelectClient,
-                                    ),
-                            )
-                        }
-                    }
-                }
-
-                if (state.historicas.isNotEmpty()) {
-                    item {
-                        PosSectionHeader(
-                            title = "Histórico de la mesa",
-                            subtitle = "${state.historicas.size} cuentas finalizadas",
-                            icon = Icons.Default.CheckCircle,
-                        )
-                    }
-                    items(state.historicas, key = { "hist-${it.id}" }) { cuenta ->
-                        HistoricalAccountRow(cuenta)
                     }
                 }
 
@@ -268,199 +307,156 @@ fun CuentaMesaScreen(
             }
         }
     }
-}
 
-@Composable
-private fun CuentaOverview(
-    activeAccounts: Int,
-    availableProducts: Int,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "Cuenta solicitada",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PosStatusBadge(
-                    label = "$activeAccounts por cobrar",
-                    tone = PosVisualTone.Info,
-                    icon = Icons.AutoMirrored.Filled.ReceiptLong,
-                )
-                PosStatusBadge(
-                    label = "$availableProducts productos disponibles",
-                    tone = PosVisualTone.Neutral,
-                    icon = Icons.Default.RestaurantMenu,
-                )
-            }
-        }
+    // Modal Bottom Sheets
+    if (state.showCuentasActivasSheet) {
+        CuentaActivasBottomSheet(
+            cuentasActivas = state.cuentasActivas,
+            canPay = clientName != null && !state.isSaving,
+            onPay = { cuenta ->
+                viewModel.setShowCuentasActivasSheet(false)
+                viewModel.pagar(cuenta)
+            },
+            onCancel = { cuenta ->
+                viewModel.cancelar(cuenta)
+            },
+            onSelectClient = {
+                viewModel.setShowCuentasActivasSheet(false)
+                onSelectClient()
+            },
+            onDismiss = { viewModel.setShowCuentasActivasSheet(false) },
+        )
+    }
+
+    if (state.showHistoricoSheet) {
+        CuentaHistoricoBottomSheet(
+            historicas = state.historicas,
+            onDismiss = { viewModel.setShowHistoricoSheet(false) },
+        )
     }
 }
 
+/** Barra de acción inferior fija con cálculos en tiempo real */
 @Composable
-private fun ClientCard(
-    clientName: String?,
-    onSelectClient: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = CardDefaults.outlinedCardBorder(),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Cliente de la factura",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = clientName ?: "Sin seleccionar",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            TextButton(onClick = onSelectClient) {
-                Text(if (clientName == null) "Seleccionar" else "Cambiar")
-            }
-        }
-    }
-}
-
-@Composable
-private fun FullAccountAction(
-    isSaving: Boolean,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "¿Una sola cuenta?",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Text(
-                text = "Incluye automáticamente todo el consumo pendiente de la mesa.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Button(
-                onClick = onClick,
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text("Crear cuenta completa")
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SplitProductCard(
-    pedido: PedidoMesa,
-    disponible: Double,
-    value: String,
-    onValueChange: (String) -> Unit,
+private fun CuentaStickyBottomBar(
+    state: CuentaMesaState,
+    onCrearCuentaCompleta: () -> Unit,
+    onCrearDivision: () -> Unit,
+    onVerCuentasActivas: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = CardDefaults.outlinedCardBorder(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp,
+        tonalElevation = 3.dp,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = pedido.itemDescripcion.ifBlank { "Producto ${pedido.productoId}" },
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "Disponible ${formatQuantity(disponible)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Box(modifier = Modifier.widthIn(max = 840.dp).fillMaxWidth()) {
+                if (state.modoSeleccionado == CuentaModo.COMPLETA) {
+                    val tieneConsumoPendiente = state.pedidosDisponibles.isNotEmpty()
+                    val tieneCuentasActivas = state.cuentasActivas.isNotEmpty()
+
+                    if (tieneConsumoPendiente || tieneCuentasActivas) {
+                        val total =
+                            if (tieneConsumoPendiente) {
+                                state.totalConsumoPendiente
+                            } else {
+                                state.cuentasActivas.firstOrNull()?.total ?: 0.0
+                            }
+                        Button(
+                            onClick = onCrearCuentaCompleta,
+                            enabled = !state.isSaving && !state.isLoading,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
+                            if (state.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = "Cobrar Cuenta Completa · ${formatMoney(total)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                } else {
+                    // Modo Dividir Cuenta
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AnimatedVisibility(
+                            visible = state.itemsDivisionSeleccionadosCount > 0,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut(),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "${state.itemsDivisionSeleccionadosCount} producto(s) seleccionados",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                AdaptiveAmountText(
+                                    text = formatMoney(state.totalDivisionSeleccionada),
+                                    baseStyle = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    options =
+                                        AdaptiveAmountOptions(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            minFontSizeSp = 14f,
+                                            maxLines = 1,
+                                        ),
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = onCrearDivision,
+                            enabled = state.itemsDivisionSeleccionadosCount > 0 && !state.isSaving && !state.isLoading,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
+                            if (state.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(
+                                text =
+                                    if (state.itemsDivisionSeleccionadosCount > 0) {
+                                        "Crear División · ${formatMoney(state.totalDivisionSeleccionada)}"
+                                    } else {
+                                        "Selecciona productos para dividir"
+                                    },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.width(8.dp))
-                AdaptiveAmountText(
-                    text = formatMoney(pedido.itemTotalConIva),
-                    baseStyle = PosTextStyles.priceTileLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                            minFontSizeSp = 13f,
-                            maxLines = 1,
-                        ),
-                )
             }
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                label = { Text("Cantidad para esta división") },
-                supportingText = { Text("Máximo ${formatQuantity(disponible)}") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }
 
+/** Tarjeta individual de cuenta activa con soporte para cobro y cancelación */
 @Composable
 internal fun CuentaActivaCard(
     cuenta: CuentaMesaResponse,
@@ -515,7 +511,7 @@ internal fun CuentaActivaCard(
                         baseStyle = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         options =
-                            com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                            AdaptiveAmountOptions(
                                 fontWeight = FontWeight.Bold,
                                 minFontSizeSp = 11f,
                                 maxLines = 1,
@@ -532,13 +528,12 @@ internal fun CuentaActivaCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // Total de la cuenta: hero adaptive — montos enormes encogen sin recortarse en 320dp.
                 AdaptiveAmountText(
                     text = formatMoney(cuenta.total),
                     baseStyle = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                     options =
-                        com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
+                        AdaptiveAmountOptions(
                             fontWeight = FontWeight.ExtraBold,
                             minFontSizeSp = 16f,
                             maxLines = 1,
@@ -551,14 +546,16 @@ internal fun CuentaActivaCard(
             ) {
                 OutlinedButton(
                     onClick = onCancel,
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text("Cancelar")
                 }
                 Button(
                     onClick = onPay,
                     enabled = canPay,
-                    modifier = Modifier.weight(1.4f).heightIn(min = 52.dp),
+                    modifier = Modifier.weight(1.4f).heightIn(min = 50.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Text("Cobrar cuenta")
                 }
@@ -567,52 +564,61 @@ internal fun CuentaActivaCard(
     }
 }
 
+/** Tarjeta compatible con versiones previas y previews */
 @Composable
-private fun HistoricalAccountRow(cuenta: CuentaMesaResponse) {
+internal fun SplitProductCard(
+    pedido: PedidoMesa,
+    disponible: Double,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = CardDefaults.outlinedCardBorder(),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Cuenta #${cuenta.numeroCuenta}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                cuenta.codFactura?.takeIf { it.isNotBlank() }?.let {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Factura $it",
+                        text = pedido.itemDescripcion.ifBlank { "Producto ${pedido.productoId}" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "Disponible ${formatQuantity(disponible)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                PosStatusBadge(
-                    label = if (cuenta.estado == EstadoCuentaMesa.PAGADA) "Pagada" else "Cancelada",
-                    tone =
-                        if (cuenta.estado == EstadoCuentaMesa.PAGADA) {
-                            PosVisualTone.Success
-                        } else {
-                            PosVisualTone.Error
-                        },
-                )
-                Text(
-                    text = formatMoney(cuenta.total),
-                    modifier = Modifier.padding(top = 6.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
+                Spacer(Modifier.width(8.dp))
+                AdaptiveAmountText(
+                    text = formatMoney(pedido.itemTotalConIva),
+                    baseStyle = PosTextStyles.priceTileLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    options =
+                        AdaptiveAmountOptions(
+                            minFontSizeSp = 13f,
+                            maxLines = 1,
+                        ),
                 )
             }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text("Cantidad para esta división") },
+                supportingText = { Text("Máximo ${formatQuantity(disponible)}") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
-
-private fun formatMoney(value: Double): String = "$ ${String.format(Locale.US, "%.2f", value)}"
-
-private fun formatQuantity(value: Double): String = String.format(Locale.US, "%.3f", value).trimEnd('0').trimEnd('.')

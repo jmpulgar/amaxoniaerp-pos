@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class CuentaMesaViewModel(
     private val areaId: Int,
@@ -72,6 +73,22 @@ class CuentaMesaViewModel(
         }
     }
 
+    fun setModo(modo: CuentaModo) {
+        mutableState.update { it.copy(modoSeleccionado = modo, error = null) }
+    }
+
+    fun setShowHistoricoSheet(show: Boolean) {
+        mutableState.update { it.copy(showHistoricoSheet = show) }
+    }
+
+    fun setShowCuentasActivasSheet(show: Boolean) {
+        mutableState.update { it.copy(showCuentasActivasSheet = show) }
+    }
+
+    fun clearMessages() {
+        mutableState.update { it.copy(error = null, info = null) }
+    }
+
     fun marcarTodosEntregados() {
         if (mutableState.value.isDeliveringAll || mutableState.value.isSaving) return
         val noEntregados = mutableState.value.pedidosNoEntregados
@@ -120,9 +137,91 @@ class CuentaMesaViewModel(
         mutableState.update { state -> state.copy(cantidades = state.cantidades + (pedidoId to normalized), error = null) }
     }
 
+    fun toggleSeleccion(pedidoId: Int) {
+        val current = mutableState.value
+        val pedido = current.pedidos.find { it.id == pedidoId } ?: return
+        val disponible = current.disponible(pedido)
+        if (current.estaSeleccionado(pedidoId)) {
+            mutableState.update { it.copy(cantidades = it.cantidades - pedidoId, error = null) }
+        } else if (disponible > 0.0) {
+            mutableState.update { it.copy(cantidades = it.cantidades + (pedidoId to formatQuantity(disponible)), error = null) }
+        }
+    }
+
+    fun incrementarCantidad(pedidoId: Int, step: Double = 1.0) {
+        val current = mutableState.value
+        val pedido = current.pedidos.find { it.id == pedidoId } ?: return
+        val disponible = current.disponible(pedido)
+        val actual = current.cantidadSeleccionada(pedidoId)
+        val siguiente = (if (actual <= 0.0) 1.0.coerceAtMost(disponible) else actual + step).coerceAtMost(disponible)
+        mutableState.update { it.copy(cantidades = it.cantidades + (pedidoId to formatQuantity(siguiente)), error = null) }
+    }
+
+    fun decrementarCantidad(pedidoId: Int, step: Double = 1.0) {
+        val current = mutableState.value
+        val actual = current.cantidadSeleccionada(pedidoId)
+        val siguiente = actual - step
+        if (siguiente <= 0.0) {
+            mutableState.update { it.copy(cantidades = it.cantidades - pedidoId, error = null) }
+        } else {
+            mutableState.update { it.copy(cantidades = it.cantidades + (pedidoId to formatQuantity(siguiente)), error = null) }
+        }
+    }
+
+    fun seleccionarTodoParaDividir() {
+        val current = mutableState.value
+        val nuevas = current.pedidosDisponibles.associate { it.id to formatQuantity(current.disponible(it)) }
+        mutableState.update { it.copy(cantidades = nuevas, error = null) }
+    }
+
+    fun deseleccionarTodoParaDividir() {
+        mutableState.update { it.copy(cantidades = emptyMap(), error = null) }
+    }
+
     fun crearCuentaCompleta() {
         crear(CrearCuentaRequest(items = emptyList(), incluirTodoPendiente = true))
     }
+
+    fun crearYCobrarCuentaCompleta() {
+        if (mutableState.value.isSaving) return
+        val activas = mutableState.value.cuentasActivas
+        if (activas.isNotEmpty()) {
+            pagar(activas.first())
+            return
+        }
+
+        viewModelScope.launch {
+            val cajaId = activeCajaReader.activeCaja.value?.idCaja
+            if (cajaId == null) {
+                mutableState.update { it.copy(error = "Debes seleccionar una caja") }
+                return@launch
+            }
+            mutableState.update { it.copy(isSaving = true, error = null, info = null) }
+            val request = CrearCuentaRequest(items = emptyList(), incluirTodoPendiente = true)
+            cuentasRepository.crear(cajaId, areaId, mesaId, sesionId, request).fold(
+                onSuccess = { cuentaCreada ->
+                    mutableState.update { state ->
+                        state.copy(
+                            isSaving = false,
+                            cantidades = emptyMap(),
+                            info = "Cuenta creada",
+                        )
+                    }
+                    pagar(cuentaCreada)
+                    load()
+                },
+                onFailure = { error ->
+                    mutableState.update {
+                        it.copy(
+                            isSaving = false,
+                            error = error.message ?: "No se pudo crear la cuenta",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
 
     fun crearDivision() {
         val current = mutableState.value
@@ -178,7 +277,13 @@ class CuentaMesaViewModel(
             operation(cajaId).fold(
                 onSuccess = {
                     mutableState.update { state ->
-                        state.copy(isSaving = false, cantidades = emptyMap(), info = successMessage)
+                        state.copy(
+                            isSaving = false,
+                            cantidades = emptyMap(),
+                            info = successMessage,
+                            // Si se dividió o se creó una cuenta, abrir sheet de cuentas activas
+                            showCuentasActivasSheet = true,
+                        )
                     }
                     load()
                 },
@@ -187,5 +292,14 @@ class CuentaMesaViewModel(
                 },
             )
         }
+    }
+
+    companion object {
+        fun formatQuantity(value: Double): String =
+            if (value % 1.0 == 0.0) {
+                value.toLong().toString()
+            } else {
+                String.format(Locale.US, "%.3f", value).trimEnd('0').trimEnd('.')
+            }
     }
 }

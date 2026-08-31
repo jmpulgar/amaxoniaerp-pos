@@ -4,11 +4,19 @@ import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
 import com.amaxonia.pos.domain.model.mesas.EstadoCuentaMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 
+enum class CuentaModo {
+    COMPLETA,
+    DIVIDIR,
+}
+
 data class CuentaMesaState(
     val pedidos: List<PedidoMesa> = emptyList(),
     val pedidosNoEntregados: List<PedidoMesa> = emptyList(),
     val cuentas: List<CuentaMesaResponse> = emptyList(),
     val cantidades: Map<Int, String> = emptyMap(),
+    val modoSeleccionado: CuentaModo = CuentaModo.COMPLETA,
+    val showHistoricoSheet: Boolean = false,
+    val showCuentasActivasSheet: Boolean = false,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isDeliveringAll: Boolean = false,
@@ -33,6 +41,46 @@ data class CuentaMesaState(
         (
             pedido.cantidadPendiente - (reservadoPorPedido[pedido.id] ?: 0.0)
         ).coerceAtLeast(0.0)
+
+    val pedidosDisponibles: List<PedidoMesa> by lazy(LazyThreadSafetyMode.NONE) {
+        pedidos.filter { disponible(it) > 0.0 }
+    }
+
+    val totalConsumoPendiente: Double by lazy(LazyThreadSafetyMode.NONE) {
+        pedidos.sumOf { pedido ->
+            val disp = disponible(pedido)
+            if (disp > 0.0 && pedido.itemCantidad > 0.0) {
+                (pedido.itemTotalConIva / pedido.itemCantidad) * disp
+            } else {
+                0.0
+            }
+        }
+    }
+
+    fun cantidadSeleccionada(pedidoId: Int): Double =
+        cantidades[pedidoId]?.toDoubleOrNull() ?: 0.0
+
+    fun estaSeleccionado(pedidoId: Int): Boolean =
+        cantidadSeleccionada(pedidoId) > 0.0
+
+    val totalDivisionSeleccionada: Double by lazy(LazyThreadSafetyMode.NONE) {
+        pedidos.sumOf { pedido ->
+            val qty = cantidadSeleccionada(pedido.id)
+            if (qty > 0.0 && pedido.itemCantidad > 0.0) {
+                (pedido.itemTotalConIva / pedido.itemCantidad) * qty
+            } else {
+                0.0
+            }
+        }
+    }
+
+    val itemsDivisionSeleccionadosCount: Int by lazy(LazyThreadSafetyMode.NONE) {
+        pedidos.count { estaSeleccionado(it.id) }
+    }
+
+    val unidadesDivisionSeleccionadas: Double by lazy(LazyThreadSafetyMode.NONE) {
+        pedidos.sumOf { cantidadSeleccionada(it.id) }
+    }
 
     private class CuentasDerivadas(
         cuentas: List<CuentaMesaResponse>,
