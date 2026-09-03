@@ -37,11 +37,21 @@ sealed class ElectronicInvoiceResult {
         val numeroControlThka: String? = null,
     ) : ElectronicInvoiceResult()
 
-    /** El PAC rechazó el documento o hubo un error de comunicación. */
+    /**
+     * El PAC rechazó el documento o hubo un error de comunicación.
+     *
+     * [reintentable] clasifica el fallo según la taxonomía TFHKA/DGI
+     * ([analizarFalloPac]): true sólo si un reintento directo tiene sentido
+     * (conexión/transporte o procesamiento del PAC); false si requiere
+     * corrección de datos o conciliación. [incidenciasFiscales] contiene los
+     * códigos DGI de 4 dígitos extraídos del mensaje combinado.
+     */
     @Serializable
     data class Failure(
         val codigo: String,
         val mensaje: String,
+        val reintentable: Boolean? = null,
+        val incidenciasFiscales: List<IncidenciaFiscal> = emptyList(),
     ) : ElectronicInvoiceResult()
 
     /** La facturación electrónica no aplica para este país (ej. sin PAC). */
@@ -124,6 +134,32 @@ data class PacResponse(
     val nroProtocoloAutorizacion: String? = null,
     val fechaLimite: String? = null,
 )
+
+/**
+ * Solicitud de conciliación: preguntarle al PAC por el estado de un documento
+ * ya enviado, identificado por su numeración fiscal + sucursal + punto.
+ */
+data class PacEstadoDocumentoSolicitud(
+    val numeroDocumentoFiscal: String,
+    val codigoSucursalEmisor: String,
+    val puntoFacturacionFiscal: String,
+    val tipoDocumento: String? = null,
+)
+
+/**
+ * Estado de un documento en el PAC. [autorizado] es true sólo cuando el PAC
+ * confirma la autorización con un CUFE concreto: es la condición que permite
+ * recuperar el CUFE y persistirlo sin reenviar el documento (anti-1513).
+ */
+data class PacEstadoDocumento(
+    val codigo: String,
+    val mensaje: String,
+    val cufe: String? = null,
+    val fechaRecepcionDGI: String? = null,
+) {
+    val autorizado: Boolean
+        get() = codigo == "200" && !cufe.isNullOrBlank()
+}
 
 // ─── Contexto de datos extraídos de la DB para construir el payload ──────────
 

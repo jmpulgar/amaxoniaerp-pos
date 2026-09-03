@@ -4,6 +4,7 @@ import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.ApiClient
+import com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
 import com.amaxonia.pos.domain.model.sales.EnviarCorreoFacturaResponseDto
@@ -16,6 +17,7 @@ import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
+import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -28,6 +30,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -284,13 +287,78 @@ class SalesApiImpl(
 
             Result.success(parsed)
         }
+
+    override suspend fun getInvoicePdf(
+        authHeader: String,
+        facturaId: String,
+    ): Result<ByteArray> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.get("facturas/$facturaId/pdf") {
+                    header("Authorization", authHeader)
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(response.body())
+            } else {
+                val fallbackResponse =
+                    apiClient.httpClient.get("api/facturacion-electronica/$facturaId/pdf") {
+                        header("Authorization", authHeader)
+                    }
+                if (fallbackResponse.status.value in 200..299) {
+                    Result.success(fallbackResponse.body())
+                } else {
+                    val errorText = runCatching { response.bodyAsText() }.getOrNull()
+                    error(errorText?.takeIf(String::isNotBlank) ?: "El PDF de la factura no está disponible")
+                }
+            }
+        }
+
+    override suspend fun resendElectronicInvoice(
+        authHeader: String,
+        invoiceId: String,
+    ): Result<ElectronicInvoiceResultDto> =
+        catchingResult {
+            val response =
+                apiClient.httpClient.post("api/facturacion-electronica/$invoiceId/enviar") {
+                    header("Authorization", authHeader)
+                    contentType(ContentType.Application.Json)
+                }
+
+            val responseText = response.bodyAsText()
+            if (response.status.value in 200..299) {
+                val parsed = AppJson.decodeFromString(ElectronicInvoiceResultDto.serializer(), responseText)
+                Result.success(parsed)
+            } else {
+                val json = runCatching { AppJson.decodeFromString(JsonElement.serializer(), responseText) }.getOrNull()
+                val errorMsg =
+                    extraerMensajeErrorFe(json as? JsonObject)
+                        ?: "Error al reenviar factura electrónica"
+                error(errorMsg)
+            }
+        }
 }
 
 internal fun HttpRequestBuilder.applyInvoiceHistoryFilter(filter: InvoiceHistoryFilter) {
     filter.search?.takeIf(String::isNotBlank)?.let { parameter("search", it) }
     filter.usuario?.takeIf(String::isNotBlank)?.let { parameter("usuario", it) }
-    filter.sucursalId?.let { parameter("sucursal_id", it) }
     filter.fechaInicio?.takeIf(String::isNotBlank)?.let { parameter("fecha_inicio", it) }
     filter.fechaFin?.takeIf(String::isNotBlank)?.let { parameter("fecha_fin", it) }
-    filter.estatus.takeIf(List<Int>::isNotEmpty)?.let { parameter("estatus", it.joinToString(",")) }
+    filter.cajaId?.takeIf(String::isNotBlank)?.let { parameter("caja_id", it) }
 }
+
+/**
+ * Q3/Q4: extrae el mensaje de error del contrato FE del backend PA
+ * (`{codigo, mensaje, reintentable, ...}`), manteniendo compatibilidad con
+ * las claves legadas `error`/`message`. El [codigo] se prefija para que el
+ * detalle (incluidas las incidencias DGI de 4 dígitos) llegue al operador.
+ */
+internal fun extraerMensajeErrorFe(json: JsonObject?): String? =
+    json?.let { body ->
+        val codigo = (body["codigo"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        val mensaje =
+            listOf("mensaje", "error", "message")
+                .firstNotNullOfOrNull { key -> (body[key] as? JsonPrimitive)?.contentOrNull }
+                ?.takeIf { it.isNotBlank() }
+        if (mensaje != null && codigo != null) "[$codigo] $mensaje" else mensaje
+    }

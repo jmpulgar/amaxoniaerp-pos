@@ -9,6 +9,34 @@ enum class TransactionStatus(
     CANCELLED("ANULADO", 0xFFD32F2F),
 }
 
+enum class ElectronicInvoiceStatus(
+    val label: String,
+    val colorHex: Long,
+) {
+    PENDING("FE Pendiente", 0xFFFFA000),
+    FAILED("FE Fallida", 0xFFD32F2F),
+    SUCCESS("FE Exitosa", 0xFF388E3C),
+    NONE("", 0x00000000),
+}
+
+/**
+ * Q3: criterio FE unificado con el Web. EXITOSA exige CUFE (el backend PA
+ * expone `codigoFiscal` = cufe); sin CUFE la factura es PENDIENTE o FALLIDA
+ * y debe quedar disponible para reenvío, aunque ya tenga número fiscal.
+ */
+fun resolveElectronicInvoiceStatus(
+    estatus: String,
+    transactionStatus: TransactionStatus,
+    codigoFiscal: String,
+): ElectronicInvoiceStatus =
+    when {
+        codigoFiscal.isNotBlank() -> ElectronicInvoiceStatus.SUCCESS
+        estatus.equals("Fallida", ignoreCase = true) || estatus.contains("Error", ignoreCase = true) ->
+            ElectronicInvoiceStatus.FAILED
+        transactionStatus == TransactionStatus.PAID -> ElectronicInvoiceStatus.PENDING
+        else -> ElectronicInvoiceStatus.NONE
+    }
+
 data class Transaction(
     val id: String,
     val invoiceNumber: String,
@@ -17,6 +45,10 @@ data class Transaction(
     val currency: String = "USD",
     val fiscalAmount: Double? = null,
     val status: TransactionStatus = TransactionStatus.PAID,
+    val electronicStatus: ElectronicInvoiceStatus = ElectronicInvoiceStatus.NONE,
+    val codigoFiscal: String = "",
+    val numeroDocumentoFiscal: String = "",
+    val fechaDgi: String = "",
     val dateHeader: String,
     val clienteNombre: String = "",
     val clienteIdentificacion: String = "",

@@ -60,3 +60,28 @@ data class TheFactoryAuthRequest(
     val usuario: String,
     val clave: String,
 )
+
+/**
+ * Body de conciliación para `POST /api/EstadoDocumento`.
+ */
+@Serializable
+data class TheFactoryEstadoDocumentoRequest(
+    val codigoSucursalEmisor: String,
+    val puntoFacturacionFiscal: String,
+    val numeroDocumentoFiscal: String,
+    val tipoDocumento: String? = null,
+    val referenciaExterna: String? = null,
+)
+
+/**
+ * Respuesta del endpoint `POST /api/EstadoDocumento`.
+ */
+@Serializable
+data class TheFactoryEstadoDocumentoResponse(
+    val codigo: String? = null,
+    val resultado: String? = null,
+    val mensaje: String? = null,
+    val cufe: String? = null,
+    val fechaRecepcionDocumento: String? = null,
+    val estado: String? = null,
+)

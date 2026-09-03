@@ -1,7 +1,10 @@
 package com.amaxoniaerp.features.electronicinvoice.pac
 
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
+import com.amaxoniaerp.features.electronicinvoice.domain.PacCommunicationException
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumento
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumentoSolicitud
 import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
@@ -35,6 +38,25 @@ interface PanamaElectronicInvoiceClient {
         token: PacAuthToken,
         payload: TheFactoryHkaDocumentoWrapper,
     ): Result<PacResponse>
+
+    /**
+     * Consulta el estado de un documento previamente enviado (conciliación).
+     *
+     * Ante resultados inciertos (timeout, HTTP 5xx, duplicados 102/1513) permite
+     * recuperar el CUFE de un documento que el PAC ya autorizó, sin reenviarlo.
+     *
+     * El default retorna fallo: un cliente que no soporte conciliación degrada
+     * al comportamiento previo (fallar sin consulta). Los clientes reales
+     * ([TheFactoryHkaRestClient]) lo sobrescriben.
+     */
+    suspend fun consultarEstadoDocumento(
+        baseUrl: String,
+        token: PacAuthToken,
+        solicitud: PacEstadoDocumentoSolicitud,
+    ): Result<PacEstadoDocumento> =
+        Result.failure(
+            PacCommunicationException("El PAC no soporta conciliación por EstadoDocumento"),
+        )
 
     /**
      * Envía el CAFE/PDF del documento autorizado por correo usando el CUFE.

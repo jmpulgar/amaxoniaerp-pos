@@ -79,8 +79,14 @@ open class ElectronicInvoiceRepository {
                     "puntoFacturacionFiscal=$puntoFacturacion",
             )
 
-            // 4. Leer número de documento fiscal desde tabla correlativos
-            val numeroDocFiscal = resolveNumeroDocumentoFiscal()
+            // 4. Número de documento fiscal: reutilizar el persistido en la
+            // factura (reintentos); sólo consumir correlativos si nunca se
+            // asignó (Q1, anti-1513).
+            val numeroDocFiscal =
+                resolverNumeroDocumentoFiscal(
+                    persistido = facturaRow[FEFacturaReadTable.numeroDocumentoFiscal],
+                    siguienteCorrelativo = ::resolveNumeroDocumentoFiscal,
+                )
             logger.info("[FE] numeroDocumentoFiscal=$numeroDocFiscal")
 
             // 5. Mapear factura y cliente (JOIN con paises)
@@ -221,6 +227,20 @@ open class ElectronicInvoiceRepository {
                 .limit(1)
                 .firstOrNull()
                 ?.get(FacturasTablePA.cufe)
+                ?.takeIf { it.isNotBlank() }
+        }
+
+    open suspend fun getInvoiceNumeroDocumentoFiscal(
+        database: Database,
+        invoiceId: String,
+    ): String? =
+        dbQuery(database) {
+            FacturasTablePA
+                .select(FacturasTablePA.numeroDocumentoFiscal)
+                .where { FacturasTablePA.idFactura eq invoiceId }
+                .limit(1)
+                .firstOrNull()
+                ?.get(FacturasTablePA.numeroDocumentoFiscal)
                 ?.takeIf { it.isNotBlank() }
         }
 }

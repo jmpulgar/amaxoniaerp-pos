@@ -19,7 +19,10 @@ abstract class BaseSalesFacturaTable(
     val codFacturaFiscal = varchar("cod_factura_fiscal", S.VARCHAR_LENGTH_10)
     val idCliente = varchar("id_cliente", S.VARCHAR_LENGTH_36)
     val codVendedor = integer("cod_vendedor")
-    val fechaFactura = date("fechaFactura").nullable()
+
+    // Columna física VARCHAR(20) en producción (formato datetime del PHP
+    // legado 'yyyy-MM-dd HH:mm:ss'); ver formatFechaFacturaLegado.
+    val fechaFactura = varchar("fechaFactura", S.VARCHAR_LENGTH_20).nullable()
     val subtotal = decimal("subtotal", S.DECIMAL_PRECISION_20, 2)
     val descuentosItemFactura = decimal("descuentosItemFactura", S.DECIMAL_PRECISION_20, 2)
     val montoItemsFactura = decimal("montoItemsFactura", S.DECIMAL_PRECISION_20, 2)
@@ -228,14 +231,28 @@ object SalesStockTable : Table("item_existencia_almacen") {
     val maximo = long("maximo")
 }
 
-object SalesCajaTable : Table("caja") {
+abstract class BaseSalesCajaTable : Table("caja") {
     val id = varchar("id", S.VARCHAR_LENGTH_36)
     val idSucursal = integer("id_sucursal").nullable()
-    val codAlmacen = integer("cod_almacen").nullable()
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_50).nullable()
     val facturaCorrelativo = integer("factura_correlativo")
 
     override val primaryKey = PrimaryKey(id)
+}
+
+object SalesCajaTableVE : BaseSalesCajaTable() {
+    val codAlmacen = integer("cod_almacen").nullable()
+}
+
+object SalesCajaTablePA : BaseSalesCajaTable()
+
+object SalesCajaTable : BaseSalesCajaTable() {
+    val codAlmacen = integer("cod_almacen").nullable()
+}
+
+object SalesCajaTableFactory {
+    fun forCountry(countryCode: String): BaseSalesCajaTable =
+        if (countryCode.equals("VE", ignoreCase = true)) SalesCajaTableVE else SalesCajaTablePA
 }
 
 object SalesSucursalTable : Table("sucursal") {
@@ -452,17 +469,17 @@ object SalesCajaNuevaDetalleFormaPagoTable : Table("caja_nueva_detalle_forma_pag
     val cajaDetalleId = varchar("caja_detalle_id", S.VARCHAR_LENGTH_36)
     val tipoMovimiento = varchar("tipo_movimiento", S.VARCHAR_LENGTH_20).nullable()
     val idFormaPago = integer("id_forma_pago").nullable()
-    val comprobante = varchar("comprobante", S.VARCHAR_LENGTH_50)
-    val concepto = varchar("concepto", S.VARCHAR_LENGTH_300)
+    val comprobante = varchar("comprobante", S.VARCHAR_LENGTH_50).default("")
+    val concepto = varchar("concepto", S.VARCHAR_LENGTH_300).default("")
     val monto = decimal("monto", S.DECIMAL_PRECISION_10, 2).nullable()
-    val montoOriginal = decimal("monto_original", S.DECIMAL_PRECISION_10, 2)
-    val tdcProveedor = varchar("tdc_proveedor", S.VARCHAR_LENGTH_50)
-    val tdcNumero = varchar("tdc_numero", S.VARCHAR_LENGTH_50)
-    val tdcTitular = varchar("tdc_titular", S.VARCHAR_LENGTH_50)
-    val tdcVencimiento = varchar("tdc_vencimiento", S.VARCHAR_LENGTH_10)
-    val tdcCvv = varchar("tdc_cvv", S.VARCHAR_LENGTH_5)
-    val codigoVerificacion = varchar("codigo_verificacion", S.VARCHAR_LENGTH_50)
-    val idAbonoDetalle = varchar("id_abono_detalle", S.VARCHAR_LENGTH_36)
+    val montoOriginal = decimal("monto_original", S.DECIMAL_PRECISION_10, 2).default(java.math.BigDecimal.ZERO)
+    val tdcProveedor = varchar("tdc_proveedor", S.VARCHAR_LENGTH_50).default("")
+    val tdcNumero = varchar("tdc_numero", S.VARCHAR_LENGTH_50).default("")
+    val tdcTitular = varchar("tdc_titular", S.VARCHAR_LENGTH_50).default("")
+    val tdcVencimiento = varchar("tdc_vencimiento", S.VARCHAR_LENGTH_10).default("")
+    val tdcCvv = varchar("tdc_cvv", S.VARCHAR_LENGTH_5).default("")
+    val codigoVerificacion = varchar("codigo_verificacion", S.VARCHAR_LENGTH_50).default("")
+    val idAbonoDetalle = varchar("id_abono_detalle", S.VARCHAR_LENGTH_36).default("")
     val efectivoCambio = decimal("efectivo_cambio", S.DECIMAL_PRECISION_10, 2).nullable()
 
     override val primaryKey = PrimaryKey(cajaDetalleFormaPagoId)

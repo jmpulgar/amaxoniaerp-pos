@@ -63,6 +63,13 @@ internal fun loadDetallesFE(invoiceId: String): List<FEDetalleData> =
         ).selectAll()
         .where { FEFacturaDetalleReadTable.idFactura eq invoiceId }
         .map { row ->
+            val (codigoCPBS, codigoCPBSAbrev) =
+                resolverCpbs(
+                    idFamiliaDetalle = row.getOrNull(FEFacturaDetalleReadTable.idFamilia),
+                    idSegmentoDetalle = row.getOrNull(FEFacturaDetalleReadTable.idSegmento),
+                    idFamiliaGobItem = row.getOrNull(FEItemReadTable.idFamiliaGob),
+                    idSegmentoGobItem = row.getOrNull(FEItemReadTable.idSegmentoGob),
+                )
             FEDetalleData(
                 descripcion = row[FEFacturaDetalleReadTable.itemDescripcion],
                 codigo = row[FEFacturaDetalleReadTable.itemCodigo],
@@ -70,8 +77,8 @@ internal fun loadDetallesFE(invoiceId: String): List<FEDetalleData> =
                     row
                         .getOrNull(FEUnidadEmpaquesReadTable.simbolo)
                         ?.takeIf { it.isNotBlank() } ?: "und",
-                codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
-                codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
+                codigoCPBS = codigoCPBS,
+                codigoCPBSAbrev = codigoCPBSAbrev,
                 cantidad = row[FEFacturaDetalleReadTable.itemCantidad].toDouble(),
                 precioSinIva = row[FEFacturaDetalleReadTable.itemPrecioSinIva].toDouble(),
                 montoDescuento = row[FEFacturaDetalleReadTable.itemMontoDescuento].toDouble(),
@@ -84,6 +91,20 @@ internal fun loadDetallesFE(invoiceId: String): List<FEDetalleData> =
                 importeOti = row[FEFacturaDetalleReadTable.importeOti]?.toDouble(),
             )
         }
+
+/**
+ * Q8: CPBS fiscal de un ítem. Fuente primaria `factura_detalle.id_familia` /
+ * `id_segmento`; si la venta no los guardó (facturas del POS), fallback a
+ * `item.id_familia_gob` / `id_segmento_gob`.
+ */
+internal fun resolverCpbs(
+    idFamiliaDetalle: Int?,
+    idSegmentoDetalle: Int?,
+    idFamiliaGobItem: Int?,
+    idSegmentoGobItem: Int?,
+): Pair<String?, String?> =
+    (idFamiliaDetalle?.toString() ?: idFamiliaGobItem?.toString()) to
+        (idSegmentoDetalle?.toString() ?: idSegmentoGobItem?.toString())
 
 internal fun resolveCodigoSucursalYPuntoFacturacion(
     cajaId: String,
@@ -164,6 +185,17 @@ internal fun resolveNumeroDocumentoFiscal(): String {
 
     return (row[FECorrelativosTable.contador] + 1).toString()
 }
+
+/**
+ * Q1: en un reintento la factura reutiliza su numeroDocumentoFiscal
+ * persistido (el CUFE es determinista y la DGI deduplica sin emitir 1513);
+ * el correlativo sólo se consume cuando la factura nunca recibió número.
+ * [siguienteCorrelativo] es lazy para no leer `correlativos` de más.
+ */
+internal fun resolverNumeroDocumentoFiscal(
+    persistido: String?,
+    siguienteCorrelativo: () -> String,
+): String = persistido?.takeIf { it.isNotBlank() } ?: siguienteCorrelativo()
 
 internal fun String?.safeIntOrZero(): Int =
     this

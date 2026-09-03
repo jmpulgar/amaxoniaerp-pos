@@ -2,7 +2,9 @@ package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 
 import com.amaxoniaerp.features.electronicinvoice.domain.FEDetalleData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEFormaPagoData
+import com.amaxoniaerp.features.electronicinvoice.domain.FEValidacionException
 import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
+import java.time.Clock
 
 /**
  * Builder Pattern: transforma el [InvoiceFEContext] (datos crudos de la DB)
@@ -17,8 +19,15 @@ import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
  * - Normalización de descripciones (mínimo 5 caracteres)
  * - Mapeo de formas de pago al catálogo The Factory
  * - Manejo de ISC y OTI
+ * - Validación pre-envío de CPBS para clientes gobierno (03)
+ *
+ * @param clock fuente de tiempo; en contingencia "02" la fecha de inicio es
+ *   la hora ACTUAL del envío (nunca la fecha histórica de la factura, que
+ *   hace que la DGI rechace con 1508 si excede las 72 horas).
  */
-class TheFactoryHkaPayloadBuilder {
+class TheFactoryHkaPayloadBuilder(
+    private val clock: Clock = Clock.systemDefaultZone(),
+) {
     companion object {
         private const val DEFAULT_CPBS = "5411"
         private const val DEFAULT_CPBS_ABREV = "54"
@@ -74,9 +83,14 @@ class TheFactoryHkaPayloadBuilder {
         val fechaEmision = formatFechaEmisionForPayload(factura.fechaFactura)
 
         // Contingencia: solo aplica si tipoEmision es "02" o "04".
-        // En modo "02" el flujo legacy usa la fecha actual y motivo fijo.
+        // En "02" la fecha de inicio es la hora ACTUAL del envío (Q7, anti-1508);
+        // en "04" se conserva la fecha configurada en parametros_generales.
         val esContingencia = config.tipoEmision == "02" || config.tipoEmision == "04"
-        val fechaInicioContingencia = if (config.tipoEmision == "02") fechaEmision else config.fechaInicioContingencia
+        val fechaInicioContingencia =
+            when (config.tipoEmision) {
+                "02" -> formatFechaContingenciaForPayload(clock)
+                else -> config.fechaInicioContingencia
+            }
         val motivoContingencia =
             if (config.tipoEmision == "02") {
                 "Problemas de comunicación interna."
@@ -113,6 +127,10 @@ class TheFactoryHkaPayloadBuilder {
         tipoClienteFE: String,
     ): List<TheFactoryHkaItem> {
         val esGobierno = tipoClienteFE == "03"
+
+        if (esGobierno) {
+            validarCpbsGobierno(detalles)
+        }
 
         return detalles.map { det ->
             // Descripción: rellenar con puntos si tiene menos de 5 caracteres
@@ -179,12 +197,26 @@ class TheFactoryHkaPayloadBuilder {
         // tiempoPago: "1" contado, "2" crédito, "3" gobierno
         val creditoTotal =
             ctx.formasPago
-                .filter { it.siglas?.uppercase()?.trim() in setOf("CXC", "CRED", "CREDITO") || it.formaPagoFact == "01" }
-                .sumOf { it.monto }
+                .filter {
+                    it.siglas?.uppercase()?.trim() in
+                        setOf(
+                            "CXC",
+                            "CRED",
+                            "CREDITO",
+                        ) ||
+                        it.formaPagoFact == "01"
+                }.sumOf { it.monto }
         val inmediatoTotal =
             ctx.formasPago
-                .filter { it.siglas?.uppercase()?.trim() !in setOf("CXC", "CRED", "CREDITO") && it.formaPagoFact != "01" }
-                .sumOf { it.monto }
+                .filter {
+                    it.siglas?.uppercase()?.trim() !in
+                        setOf(
+                            "CXC",
+                            "CRED",
+                            "CREDITO",
+                        ) &&
+                        it.formaPagoFact != "01"
+                }.sumOf { it.monto }
 
         val tiempoPago =
             when {
@@ -268,9 +300,7 @@ class TheFactoryHkaPayloadBuilder {
         )
     }
 
-    private fun buildRetencion(
-        retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?,
-    ): TheFactoryHkaRetencion? =
+    private fun buildRetencion(retencion: com.amaxoniaerp.features.electronicinvoice.domain.FERetencionData?): TheFactoryHkaRetencion? =
         retencion?.let {
             TheFactoryHkaRetencion(
                 codigoRetencion = it.codigoRetencion,
@@ -297,7 +327,11 @@ class TheFactoryHkaPayloadBuilder {
 
         return formasPagoFiltradas
             .mapIndexed { index, fp ->
-                val siglas = fp.siglas?.uppercase()?.trim().orEmpty()
+                val siglas =
+                    fp.siglas
+                        ?.uppercase()
+                        ?.trim()
+                        .orEmpty()
                 // Mapear al catálogo The Factory (01 a 09), si no existe enviar "99"
                 // 01 = Crédito, 02 = Efectivo, 03 = Tarjeta Crédito, 04 = Tarjeta Débito, 08 = Transf, 09 = Cheque
                 val formaPagoFact =
@@ -367,6 +401,27 @@ class TheFactoryHkaPayloadBuilder {
             )
         } else {
             null
+        }
+    }
+
+    /**
+     * Q8 (pre-envío): un cliente gobierno (tipoClienteFE 03) exige CPBS en
+     * cada ítem; si falta, se rechaza el documento localmente en vez de
+     * descubrirlo como rechazo DGI 2007 tras gastar un envío al PAC.
+     */
+    private fun validarCpbsGobierno(detalles: List<FEDetalleData>) {
+        val itemsSinCpbs =
+            detalles
+                .withIndex()
+                .filter { (_, det) ->
+                    det.codigoCPBS.isNullOrBlank() || det.codigoCPBSAbrev.isNullOrBlank()
+                }.map { (index, _) -> index + 1 }
+
+        if (itemsSinCpbs.isNotEmpty()) {
+            throw FEValidacionException(
+                "Cliente gobierno (TipoClienteFE 03) sin CPBS en el/los item(es) $itemsSinCpbs. " +
+                    "Configure id_familia_gob / id_segmento_gob del item o corrija el detalle de la factura.",
+            )
         }
     }
 }

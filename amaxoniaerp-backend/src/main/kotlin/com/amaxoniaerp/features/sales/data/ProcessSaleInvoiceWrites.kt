@@ -33,7 +33,7 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.codFacturaFiscal] = f.codFacturaFiscal
         it[facturaTable.idCliente] = f.idCliente
         it[facturaTable.codVendedor] = f.codVendedor
-        it[facturaTable.fechaFactura] = parseDateOrToday(f.fechaFactura, ctx.today)
+        it[facturaTable.fechaFactura] = formatFechaFacturaLegado(f.fechaFactura, ctx.today)
         it[facturaTable.subtotal] = v.subtotalBase
         it[facturaTable.descuentosItemFactura] = v.descuentosItemsBase
         it[facturaTable.montoItemsFactura] = v.montoItemsBase

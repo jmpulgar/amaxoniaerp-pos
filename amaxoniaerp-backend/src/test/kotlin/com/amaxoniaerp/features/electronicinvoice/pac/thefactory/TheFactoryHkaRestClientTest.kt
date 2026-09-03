@@ -3,6 +3,7 @@ package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCommunicationException
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumentoSolicitud
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -393,7 +394,94 @@ class TheFactoryHkaRestClientTest {
         assertTrue(ex.message?.contains("Service Unavailable") == true)
     }
 
+    // ─── EstadoDocumento (conciliación anti-1513) ──────────────────────────
+
+    @Test
+    fun `estado documento autorizado normaliza cufe y fecha de recepcion`() {
+        val client =
+            cliente { req ->
+                assertTrue(req.url.encodedPath.endsWith("/api/EstadoDocumento"))
+                assertEquals(HttpMethod.Post, req.method)
+                assertEquals("Bearer jwt-x", req.headers[HttpHeaders.Authorization])
+                respond(
+                    content =
+                        """{"codigo":"200","mensaje":"OK","resultado":"Autorizado",""" +
+                            """"cufe":"CUFE-REC","fechaRecepcionDocumento":"2026-09-01T10:00:00"}""",
+                    status = HttpStatusCode.OK,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.consultarEstadoDocumento(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    solicitud = solicitudConciliacion(),
+                )
+            }
+        assertTrue(res.isSuccess)
+        val estado = res.getOrThrow()
+        assertEquals("200", estado.codigo)
+        assertTrue(estado.autorizado, "codigo 200 con CUFE debe considerarse autorizado")
+        assertEquals("CUFE-REC", estado.cufe)
+        assertEquals("2026-09-01T10:00:00", estado.fechaRecepcionDGI)
+    }
+
+    @Test
+    fun `estado documento inexistente reporta no autorizado sin fallar`() {
+        val client =
+            cliente {
+                respond(
+                    content = """{"codigo":"102","mensaje":"El documento no existe"}""",
+                    status = HttpStatusCode.OK,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.consultarEstadoDocumento(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    solicitud = solicitudConciliacion(),
+                )
+            }
+        assertTrue(res.isSuccess)
+        val estado = res.getOrThrow()
+        assertFalse(estado.autorizado)
+        assertEquals("102", estado.codigo)
+    }
+
+    @Test
+    fun `HTTP 503 en EstadoDocumento falla con PacCommunicationException`() {
+        val client =
+            cliente {
+                respond(
+                    content = """Service Unavailable""",
+                    status = HttpStatusCode.ServiceUnavailable,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.consultarEstadoDocumento(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    solicitud = solicitudConciliacion(),
+                )
+            }
+        assertTrue(res.isFailure)
+        assertIs<PacCommunicationException>(res.exceptionOrNull())
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────
+
+    private fun solicitudConciliacion() =
+        PacEstadoDocumentoSolicitud(
+            numeroDocumentoFiscal = "00000000000000000042",
+            codigoSucursalEmisor = "0001",
+            puntoFacturacionFiscal = "001",
+            tipoDocumento = "01",
+        )
 
     private fun samplePayload(): TheFactoryHkaDocumentoWrapper =
         TheFactoryHkaDocumentoWrapper(

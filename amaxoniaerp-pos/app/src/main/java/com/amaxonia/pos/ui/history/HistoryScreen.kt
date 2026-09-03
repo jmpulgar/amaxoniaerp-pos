@@ -55,6 +55,7 @@ import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
+import com.amaxonia.pos.ui.common.components.PosDatePickerField
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 import java.util.Locale
@@ -67,7 +68,11 @@ fun HistoryScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     // Detail bottom sheet
-    HistoryDetalleSheet(state = state, onDismiss = viewModel::dismissDetalle)
+    HistoryDetalleSheet(
+        state = state,
+        onDismiss = viewModel::dismissDetalle,
+        onResend = viewModel::resendElectronicInvoice,
+    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -100,6 +105,7 @@ fun HistoryScreen(
 private fun HistoryDetalleSheet(
     state: HistoryState,
     onDismiss: () -> Unit,
+    onResend: (Transaction) -> Unit,
 ) {
     if (!state.showDetalleSheet) return
 
@@ -116,6 +122,10 @@ private fun HistoryDetalleSheet(
             items = state.detalleItems,
             isLoading = state.isLoadingDetalle,
             error = state.detalleError,
+            actionError = state.detalleActionError,
+            actionMessage = state.detalleMessage,
+            isResending = state.isResendingFE,
+            onResend = { state.selectedTransaction?.let(onResend) },
         )
     }
 }
@@ -162,22 +172,15 @@ private fun HistoryFiltersSection(
     )
     AnimatedVisibility(visible = filtersExpanded) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier =
+                Modifier
+                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HistoryIdentityFilters(
-                filter = state.filter,
-                onUsuarioChanged = viewModel::onUsuarioChanged,
-                onSucursalChanged = viewModel::onSucursalChanged,
-            )
             HistoryDateRangeFilters(
                 filter = state.filter,
                 onFechaInicioChanged = viewModel::onFechaInicioChanged,
                 onFechaFinChanged = viewModel::onFechaFinChanged,
-            )
-            HistoryStatusFilter(
-                filter = state.filter,
-                onEstatusChanged = viewModel::onEstatusChanged,
             )
             HistoryFilterActions(
                 onApply = viewModel::applyFilters,
@@ -434,34 +437,6 @@ internal fun HistorySearchField(
 }
 
 @Composable
-internal fun HistoryIdentityFilters(
-    filter: InvoiceHistoryFilter,
-    onUsuarioChanged: (String) -> Unit,
-    onSucursalChanged: (String) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedTextField(
-            value = filter.usuario.orEmpty(),
-            onValueChange = onUsuarioChanged,
-            label = { Text("Usuario") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-            value = filter.sucursalId?.toString().orEmpty(),
-            onValueChange = onSucursalChanged,
-            label = { Text("Sucursal") },
-            supportingText = { Text("ID numérico") },
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
 internal fun HistoryDateRangeFilters(
     filter: InvoiceHistoryFilter,
     onFechaInicioChanged: (String) -> Unit,
@@ -471,38 +446,19 @@ internal fun HistoryDateRangeFilters(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
+        PosDatePickerField(
+            label = "Desde",
             value = filter.fechaInicio.orEmpty(),
             onValueChange = onFechaInicioChanged,
-            label = { Text("Desde") },
-            supportingText = { Text("AAAA-MM-DD") },
-            singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        OutlinedTextField(
+        PosDatePickerField(
+            label = "Hasta",
             value = filter.fechaFin.orEmpty(),
             onValueChange = onFechaFinChanged,
-            label = { Text("Hasta") },
-            supportingText = { Text("AAAA-MM-DD") },
-            singleLine = true,
             modifier = Modifier.weight(1f),
         )
     }
-}
-
-@Composable
-internal fun HistoryStatusFilter(
-    filter: InvoiceHistoryFilter,
-    onEstatusChanged: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = filter.estatus.joinToString(","),
-        onValueChange = onEstatusChanged,
-        label = { Text("Estatus") },
-        supportingText = { Text("Códigos separados por coma") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 @Composable

@@ -15,6 +15,7 @@ import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 private const val INVOICE_USER_LENGTH = 32
@@ -289,4 +290,26 @@ internal fun parseDateOrToday(
 ): LocalDate {
     if (value.isNullOrBlank()) return defaultDate
     return runCatching { LocalDate.parse(value) }.getOrDefault(defaultDate)
+}
+
+private val FECHA_LEGADO_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+/**
+ * Q5: `factura.fechaFactura` es una columna VARCHAR(20) con el formato
+ * datetime del PHP legado y el listado FEL del web filtra con
+ * `F.fechaFactura BETWEEN 'inicio' AND 'fin'` sobre strings datetime.
+ * Guardar sólo 'yyyy-MM-dd' deja la factura fuera del rango del día
+ * ('2026-09-03' < '2026-09-03 00:00:00') y el web deja de listarla.
+ */
+internal fun formatFechaFacturaLegado(
+    value: String?,
+    defaultDate: LocalDate,
+): String {
+    val date =
+        if (value.isNullOrBlank()) {
+            defaultDate
+        } else {
+            runCatching { LocalDate.parse(value.trim().take(10)) }.getOrDefault(defaultDate)
+        }
+    return date.atStartOfDay().format(FECHA_LEGADO_FORMATTER)
 }

@@ -83,6 +83,11 @@ internal class ElectronicInvoiceHandlers(
                 "success" to false,
                 "codigo" to result.codigo,
                 "mensaje" to result.mensaje,
+                "reintentable" to (result.reintentable ?: false),
+                "incidenciasFiscales" to
+                    result.incidenciasFiscales.map {
+                        mapOf("codigo" to it.codigo, "mensaje" to it.mensaje)
+                    },
             ),
         )
 
@@ -111,10 +116,12 @@ internal class ElectronicInvoiceHandlers(
             HttpStatusCode.OK,
             mapOf(
                 "success" to true,
+                "alreadyIssued" to true,
                 "message" to "La factura ya posee numeración fiscal " +
                     "(${result.numeroDocumentoFiscal})",
                 "numeroDocumentoFiscal" to result.numeroDocumentoFiscal,
                 "numeroControl" to (result.numeroControl ?: ""),
+                "cufe" to (result.numeroControl ?: ""),
             ),
         )
 

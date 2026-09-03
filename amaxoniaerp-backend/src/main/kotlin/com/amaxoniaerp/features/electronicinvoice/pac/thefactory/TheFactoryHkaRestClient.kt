@@ -3,6 +3,8 @@ package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCommunicationException
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumento
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumentoSolicitud
 import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceClient
 import io.ktor.client.HttpClient
@@ -22,7 +24,11 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
 private const val CUFE_LOG_PREFIX_LENGTH = 20
-private val theFactoryRestClientJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
+private val theFactoryRestClientJson =
+    Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
 
 /**
  * Adapter Pattern: implementación concreta de [PanamaElectronicInvoiceClient]
@@ -87,8 +93,15 @@ class TheFactoryHkaRestClient(
     ): Result<PacResponse> =
         runCatching {
             val url = "${baseUrl.trimEnd('/')}/api/Enviar"
-            val payloadJson = runCatching { theFactoryRestClientJson.encodeToString(TheFactoryHkaDocumentoWrapper.serializer(), payload) }.getOrDefault("<serialización no disponible>")
-            logger.info("[FE-PAC] Enviando documento electrónico a The Factory HKA: {}\nPayload JSON:\n{}", url, payloadJson)
+            val payloadJson =
+                runCatching {
+                    theFactoryRestClientJson.encodeToString(TheFactoryHkaDocumentoWrapper.serializer(), payload)
+                }.getOrDefault("<serialización no disponible>")
+            logger.info(
+                "[FE-PAC] Enviando documento electrónico a The Factory HKA: {}\nPayload JSON:\n{}",
+                url,
+                payloadJson,
+            )
 
             val response: HttpResponse =
                 httpClient.post(url) {
@@ -121,6 +134,49 @@ class TheFactoryHkaRestClient(
             )
         }.onFailure { e ->
             logger.error("Error enviando documento a The Factory HKA", e)
+        }
+
+    override suspend fun consultarEstadoDocumento(
+        baseUrl: String,
+        token: PacAuthToken,
+        solicitud: PacEstadoDocumentoSolicitud,
+    ): Result<PacEstadoDocumento> =
+        runCatching {
+            val url = "${baseUrl.trimEnd('/')}/api/EstadoDocumento"
+            logger.info("[FE-PAC] Consultando EstadoDocumento para documento {}", solicitud.numeroDocumentoFiscal)
+
+            val response: HttpResponse =
+                httpClient.post(url) {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                    setBody(
+                        TheFactoryEstadoDocumentoRequest(
+                            codigoSucursalEmisor = solicitud.codigoSucursalEmisor,
+                            puntoFacturacionFiscal = solicitud.puntoFacturacionFiscal,
+                            numeroDocumentoFiscal = solicitud.numeroDocumentoFiscal,
+                            tipoDocumento = solicitud.tipoDocumento,
+                        ),
+                    )
+                }
+
+            val responseText = response.bodyAsText()
+            logger.info("[FE-PAC] EstadoDocumento [HTTP {}]: {}", response.status, responseText)
+
+            if (!response.status.isSuccess()) {
+                throw PacCommunicationException(
+                    "Error HTTP ${response.status} en EstadoDocumento. Body: $responseText",
+                )
+            }
+
+            val body = response.body<TheFactoryEstadoDocumentoResponse>()
+            PacEstadoDocumento(
+                codigo = body.codigo ?: response.status.value.toString(),
+                mensaje = body.mensaje ?: body.resultado ?: "",
+                cufe = body.cufe,
+                fechaRecepcionDGI = body.fechaRecepcionDocumento,
+            )
+        }.onFailure { e ->
+            logger.error("Error consultando EstadoDocumento en The Factory HKA", e)
         }
 
     override suspend fun downloadPdf(

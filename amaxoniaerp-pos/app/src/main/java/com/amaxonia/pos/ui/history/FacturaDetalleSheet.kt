@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
@@ -54,6 +56,10 @@ internal fun FacturaDetalleSheetContent(
     items: List<FacturaDetalleItemDto>,
     isLoading: Boolean,
     error: String?,
+    actionError: String? = null,
+    actionMessage: String? = null,
+    isResending: Boolean = false,
+    onResend: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -74,6 +80,20 @@ internal fun FacturaDetalleSheetContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
+        // Q3: FE fallida/pendiente → acción de reenvío visible (paridad con el Web).
+        if (actionError != null) {
+            DetalleAccionBanner(text = actionError, isError = true)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        if (actionMessage != null) {
+            DetalleAccionBanner(text = actionMessage, isError = false)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        if (transaction != null && onResend != null && transaction.esReenviable()) {
+            FacturaDetalleResendButton(isResending = isResending, onResend = onResend)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         FacturaDetalleSectionTitle(
             isLoading = isLoading,
             itemCount = items.size,
@@ -87,6 +107,74 @@ internal fun FacturaDetalleSheetContent(
             items.isEmpty() -> DetalleItemsEmpty()
             else -> DetalleItemsBody(transaction = transaction, items = items)
         }
+    }
+}
+
+/**
+ * Q3: sólo una factura SIN CUFE (pendiente o fallida) y sincronizada es
+ * reenviable — el mismo criterio del Web (`cufe IS NULL`).
+ */
+internal fun Transaction.esReenviable(): Boolean =
+    id.isNotBlank() &&
+        !id.startsWith("OFF-") &&
+        (electronicStatus == ElectronicInvoiceStatus.PENDING || electronicStatus == ElectronicInvoiceStatus.FAILED)
+
+/** Banner con el resultado de la última acción (reenvío FE). */
+@Composable
+private fun DetalleAccionBanner(
+    text: String,
+    isError: Boolean,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor =
+                    if (isError) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+            ),
+    ) {
+        Text(
+            text = text,
+            color =
+                if (isError) {
+                    MaterialTheme.colorScheme.onErrorContainer
+                } else {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                },
+            fontSize = 13.sp,
+            modifier = Modifier.padding(12.dp),
+        )
+    }
+}
+
+/** Botón de reenvío FE con estado de progreso. */
+@Composable
+private fun FacturaDetalleResendButton(
+    isResending: Boolean,
+    onResend: () -> Unit,
+) {
+    Button(
+        onClick = onResend,
+        enabled = !isResending,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (isResending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(
+            text = if (isResending) "Reenviando..." else "Reenviar Factura Electrónica",
+            fontSize = 14.sp,
+        )
     }
 }
 

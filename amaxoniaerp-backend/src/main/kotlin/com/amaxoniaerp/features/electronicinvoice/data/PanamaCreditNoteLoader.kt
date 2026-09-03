@@ -151,6 +151,13 @@ private fun loadCreditNoteDetails(creditNoteId: String): List<FEDetalleData> =
         .where { CreditNoteDetailTable.idDevolucion eq creditNoteId }
         .orderBy(CreditNoteDetailTable.idDevolucionDetalle)
         .map { row ->
+            val (codigoCPBS, codigoCPBSAbrev) =
+                resolverCpbs(
+                    idFamiliaDetalle = row.getOrNull(FEFacturaDetalleReadTable.idFamilia),
+                    idSegmentoDetalle = row.getOrNull(FEFacturaDetalleReadTable.idSegmento),
+                    idFamiliaGobItem = row.getOrNull(FEItemReadTable.idFamiliaGob),
+                    idSegmentoGobItem = row.getOrNull(FEItemReadTable.idSegmentoGob),
+                )
             FEDetalleData(
                 descripcion = row[FEFacturaDetalleReadTable.itemDescripcion],
                 codigo = row[CreditNoteDetailTable.itemCodigo],
@@ -158,8 +165,8 @@ private fun loadCreditNoteDetails(creditNoteId: String): List<FEDetalleData> =
                     row
                         .getOrNull(FEUnidadEmpaquesReadTable.simbolo)
                         ?.takeIf { it.isNotBlank() } ?: "und",
-                codigoCPBS = row.getOrNull(FEFacturaDetalleReadTable.idFamilia)?.toString(),
-                codigoCPBSAbrev = row.getOrNull(FEFacturaDetalleReadTable.idSegmento)?.toString(),
+                codigoCPBS = codigoCPBS,
+                codigoCPBSAbrev = codigoCPBSAbrev,
                 cantidad = row[CreditNoteDetailTable.itemCantidad].toDouble(),
                 precioSinIva = row[CreditNoteDetailTable.itemPrecioSinIva].toDouble(),
                 montoDescuento = row[CreditNoteDetailTable.itemMontoDescuento].toDouble(),

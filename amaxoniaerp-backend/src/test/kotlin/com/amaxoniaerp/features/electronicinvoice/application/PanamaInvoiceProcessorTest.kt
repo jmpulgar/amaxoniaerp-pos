@@ -14,6 +14,8 @@ import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCommunicationException
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumento
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumentoSolicitud
 import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceClient
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
@@ -55,9 +57,14 @@ class PanamaInvoiceProcessorTest {
         var sendCalls = 0
         var emailCalls = 0
         var pdfCalls = 0
+        var estadoCalls = 0
         var authResult: Result<PacAuthToken> = Result.success(PacAuthToken("jwt-ok"))
         var sendResult: Result<PacResponse> =
             Result.success(PacResponse(exitoso = true, codigo = "200", mensaje = "OK", cufe = "CUFE-1"))
+        var estadoResult: Result<PacEstadoDocumento> =
+            Result.success(
+                PacEstadoDocumento(codigo = "102", mensaje = "El documento no existe", cufe = null),
+            )
 
         override suspend fun authenticate(credentials: PacCredentials): Result<PacAuthToken> {
             authCalls++
@@ -72,6 +79,18 @@ class PanamaInvoiceProcessorTest {
             sendCalls++
             return sendResult
         }
+
+        override suspend fun consultarEstadoDocumento(
+            baseUrl: String,
+            token: PacAuthToken,
+            solicitud: PacEstadoDocumentoSolicitud,
+        ): Result<PacEstadoDocumento> {
+            estadoCalls++
+            consultedNumeroDocumento = solicitud.numeroDocumentoFiscal
+            return estadoResult
+        }
+
+        var consultedNumeroDocumento: String? = null
 
         override suspend fun sendEmail(
             baseUrl: String,
@@ -196,19 +215,15 @@ class PanamaInvoiceProcessorTest {
             client.sendResult =
                 Result.success(PacResponse(exitoso = false, codigo = "422", mensaje = "RUC invalido"))
             val repo = FakeRepository(context())
-            val result =
-                try {
-                    processor(repo, client).processElectronicInvoice(database, "F-4")
-                    error("se esperaba escape")
-                } catch (e: RuntimeException) {
-                    e
-                }
-            // Characterization: el rechazo se lanza dentro de un .map{} y escapa
-            // como FeStepFailure (el codigo/mensaje del PAC solo quedan en log;
-            // los callers lo capturan con runCatching generico). Invariantes que
-            // SI se sostienen:
-            assertEquals("FeStepFailure", result::class.simpleName)
+            val result = processor(repo, client).processElectronicInvoice(database, "F-4")
+            // El rechazo se retorna como Failure tipado (codigo/mensaje del PAC
+            // disponibles para los clientes) sin persistir datos fiscales.
+            val failure = assertIs<ElectronicInvoiceResult.Failure>(result)
+            assertEquals("422", failure.codigo)
+            assertEquals("RUC invalido", failure.mensaje)
+            assertEquals(false, failure.reintentable)
             assertEquals(1, client.sendCalls)
+            assertEquals(0, client.estadoCalls, "un rechazo no duplicado no concilia")
             assertEquals(0, repo.updateCalls, "un rechazo no persiste datos fiscales")
             assertEquals(0, repo.incrementCalls, "un rechazo no consume correlativo")
         }
@@ -220,17 +235,11 @@ class PanamaInvoiceProcessorTest {
             client.sendResult =
                 Result.success(PacResponse(exitoso = true, codigo = "200", mensaje = "OK", cufe = null))
             val repo = FakeRepository(context())
-            val result =
-                try {
-                    processor(repo, client).processElectronicInvoice(database, "F-5")
-                    error("se esperaba escape")
-                } catch (e: RuntimeException) {
-                    e
-                }
-            // Mismo mecanismo de escape que el rechazo de negocio (.map{}).
-            assertEquals("FeStepFailure", result::class.simpleName)
+            val result = processor(repo, client).processElectronicInvoice(database, "F-5")
+            val failure = assertIs<ElectronicInvoiceResult.Failure>(result)
             assertEquals(0, repo.updateCalls)
             assertEquals(0, repo.incrementCalls)
+            assertEquals("200", failure.codigo)
         }
 
     @Test
@@ -284,18 +293,13 @@ class PanamaInvoiceProcessorTest {
         }
 
     /**
-     * TASK-103 (matriz fiscal PA) — failure/uncertain: el transporte del
-     * cliente PA envuelve TODO en `Result.failure`, de modo que un timeout
-     * emerge como [IOException] cruda (incierta a nivel transporte). Este
-     * test caracteriza el comportamiento VIGENTE: el procesador PA la
-     * clasifica como fallo determinista `SEND_ERROR` (NO produce
-     * `ElectronicInvoiceResult.Uncertain`; ese productor solo existe en VE).
-     * Promover el timeout PA a Uncertain es una decisión fiscal/PAC — fuera
-     * de alcance. Invariantes que SÍ se sostienen: un fallo de transporte no
-     * persiste datos fiscales ni consume correlativo.
+     * TASK conciliación anti-1513: un timeout es un resultado INCIERTO — el
+     * documento PUDO haberse creado en el PAC. Antes de fallar, el procesador
+     * consulta EstadoDocumento; si el PAC no lo conoce, falla como SEND_ERROR
+     * `reintentable` sin persistir datos fiscales ni consumir correlativo.
      */
     @Test
-    fun `timeout de transporte en el envio se caracteriza como SEND_ERROR sin persistir`() =
+    fun `timeout de transporte concilia con el PAC y sin documento falla reintentable sin persistir`() =
         runBlocking {
             val client = RecordingPacClient()
             client.sendResult = Result.failure(IOException("Timeout esperando DGI"))
@@ -308,6 +312,83 @@ class PanamaInvoiceProcessorTest {
                 "el mensaje debe identificar el problema de comunicación: ${failure.mensaje}",
             )
             assertEquals(1, client.sendCalls)
+            assertEquals(1, client.estadoCalls, "ante un timeout se consulta EstadoDocumento antes de fallar")
+            assertTrue(failure.reintentable == true, "un timeout es reintentable si el PAC no conoce el documento")
+            assertEquals(0, repo.updateCalls)
+            assertEquals(0, repo.incrementCalls)
+        }
+
+    @Test
+    fun `timeout con documento autorizado en el PAC recupera CUFE persiste e incrementa`() =
+        runBlocking {
+            val client = RecordingPacClient()
+            client.sendResult = Result.failure(IOException("Timeout esperando DGI"))
+            client.estadoResult =
+                Result.success(
+                    PacEstadoDocumento(
+                        codigo = "200",
+                        mensaje = "Documento autorizado",
+                        cufe = "CUFE-RECUPERADO",
+                        fechaRecepcionDGI = "2026-09-01T10:00:00",
+                    ),
+                )
+            val repo = FakeRepository(context())
+            val result = processor(repo, client).processElectronicInvoice(database, "F-10")
+            val success = assertIs<ElectronicInvoiceResult.Success>(result)
+            assertEquals("CUFE-RECUPERADO", success.cufe)
+            assertEquals(1, client.estadoCalls)
+            assertEquals("00000000000000000001", client.consultedNumeroDocumento)
+            assertEquals(1, repo.updateCalls, "el CUFE recuperado se persiste en la factura")
+            assertEquals(1, repo.incrementCalls, "el número consumido por la DGI se da por usado")
+        }
+
+    @Test
+    fun `rechazo 1513 de la DGI concilia y recupera el CUFE del primer envio`() =
+        runBlocking {
+            val client = RecordingPacClient()
+            client.sendResult =
+                Result.success(
+                    PacResponse(
+                        exitoso = false,
+                        codigo = "203",
+                        mensaje = "1513-Número del documento fiscal duplicado.",
+                    ),
+                )
+            client.estadoResult =
+                Result.success(
+                    PacEstadoDocumento(
+                        codigo = "200",
+                        mensaje = "Documento autorizado",
+                        cufe = "CUFE-PRIMER-ENVIO",
+                    ),
+                )
+            val repo = FakeRepository(context())
+            val result = processor(repo, client).processElectronicInvoice(database, "F-11")
+            val success = assertIs<ElectronicInvoiceResult.Success>(result)
+            assertEquals("CUFE-PRIMER-ENVIO", success.cufe)
+            assertEquals(1, client.estadoCalls)
+            assertEquals(1, repo.updateCalls)
+            assertEquals(1, repo.incrementCalls)
+        }
+
+    @Test
+    fun `rechazo fiscal 2007 no concilia y no es reintentable`() =
+        runBlocking {
+            val client = RecordingPacClient()
+            client.sendResult =
+                Result.success(
+                    PacResponse(
+                        exitoso = false,
+                        codigo = "203",
+                        mensaje = "2007-Item 1: No informado ningún código de producto en la Codificación Panameña de Bienes y Servicios.",
+                    ),
+                )
+            val repo = FakeRepository(context())
+            val result = processor(repo, client).processElectronicInvoice(database, "F-12")
+            val failure = assertIs<ElectronicInvoiceResult.Failure>(result)
+            assertEquals(listOf("2007"), failure.incidenciasFiscales.map { it.codigo })
+            assertEquals(false, failure.reintentable, "2007 exige corrección de datos, no reintento")
+            assertEquals(0, client.estadoCalls, "2007 exige corrección de datos, no conciliación")
             assertEquals(0, repo.updateCalls)
             assertEquals(0, repo.incrementCalls)
         }

@@ -3,7 +3,9 @@ package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 import com.amaxoniaerp.features.electronicinvoice.domain.FEFormaPagoData
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Clock
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 private const val ITBMS_RATE_7 = 7.0
@@ -59,10 +61,19 @@ internal fun formatFechaEmisionForPayload(fecha: String?): String {
 }
 
 /**
+ * Q7: fecha de inicio de contingencia = hora ACTUAL del envío en ISO 8601 con
+ * offset. Derivarla de la fecha histórica de la factura hace que la DGI
+ * rechace con 1508 ("tiempo excesivo en operación en contingencia") cuando
+ * supera las 72 horas.
+ */
+internal fun formatFechaContingenciaForPayload(clock: Clock): String =
+    OffsetDateTime.now(clock).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+
+/**
  * Formatea la fecha de vencimiento al formato ISO 8601 (yyyy-MM-dd'T'HH:mm:ss) para cuotas a crédito.
  */
-internal fun formatFechaVencimientoForPayload(fecha: String?): String {
-    return try {
+internal fun formatFechaVencimientoForPayload(fecha: String?): String =
+    try {
         val baseDate =
             if (!fecha.isNullOrBlank()) {
                 LocalDate.parse(fecha.trim().take(ISO_DATE_LENGTH))
@@ -73,7 +84,6 @@ internal fun formatFechaVencimientoForPayload(fecha: String?): String {
     } catch (_: Exception) {
         LocalDate.now().plusDays(30).format(DateTimeFormatter.ISO_DATE) + "T00:00:00-05:00"
     }
-}
 
 /**
  * Extensión para formatear Double a String con N decimales exactos.

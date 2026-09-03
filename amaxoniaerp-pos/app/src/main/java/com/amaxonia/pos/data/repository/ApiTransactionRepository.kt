@@ -7,8 +7,11 @@ import com.amaxonia.pos.data.local.currentTenantId
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.api.SalesApi
+import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
+import com.amaxonia.pos.domain.model.resolveElectronicInvoiceStatus
+import com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaSummaryDto
@@ -183,9 +186,22 @@ class ApiTransactionRepository(
             Result.failure(IllegalStateException("No se pudo obtener el detalle de la factura $invoiceId"))
         }
 
+    override suspend fun getInvoicePdf(invoiceId: String): Result<ByteArray> =
+        catchingResult {
+            val authHeader = getAuthHeader()
+            salesApi.getInvoicePdf(authHeader, invoiceId)
+        }
+
+    override suspend fun resendElectronicInvoice(invoiceId: String): Result<ElectronicInvoiceResultDto> =
+        catchingResult {
+            val authHeader = getAuthHeader()
+            salesApi.resendElectronicInvoice(authHeader, invoiceId)
+        }
+
     private suspend fun getLocalPendingTransactions(): List<Transaction> {
-        val tenantId = localStore.currentTenantId() ?: return emptyList()
-        val dao = pendingInvoiceDao ?: return emptyList()
+        val tenantId = localStore.currentTenantId()
+        val dao = pendingInvoiceDao
+        if (tenantId == null || dao == null) return emptyList()
         return dao.getPendingForTenant(tenantId).mapNotNull { entity ->
             runCatching {
                 val req = AppJson.decodeFromString(ProcessSaleRequestDto.serializer(), entity.payloadJson)
@@ -196,6 +212,7 @@ class ApiTransactionRepository(
                     amount = req.factura.totalTotalFactura,
                     currency = req.moneda?.abrMonedaBase ?: "USD",
                     status = TransactionStatus.PENDING,
+                    electronicStatus = ElectronicInvoiceStatus.PENDING,
                     dateHeader = "Pendientes de sincronización",
                     clienteNombre = req.factura.facturarA,
                     clienteIdentificacion = req.factura.facturarARuc,
@@ -219,14 +236,9 @@ class ApiTransactionRepository(
  * Maps the backend FacturaSummaryDto to the app's Transaction domain model.
  */
 private fun FacturaSummaryDto.toTransaction(): Transaction {
-    val status =
-        when {
-            estatus.equals("Anulada", ignoreCase = true) ||
-                estatus.equals("Anulado", ignoreCase = true) -> TransactionStatus.CANCELLED
-            estatus.equals("En Espera", ignoreCase = true) ||
-                estatus.equals("Pendiente", ignoreCase = true) -> TransactionStatus.PENDING
-            else -> TransactionStatus.PAID
-        }
+    val status = resolveTransactionStatus(estatus)
+    // Q3: criterio unificado con el Web — EXITOSA exige CUFE.
+    val electronicStatus = resolveElectronicInvoiceStatus(estatus, status, codigoFiscal)
 
     // fecha comes as "dd/MM/yyyy" from the backend
     val dateHeader = fecha.ifBlank { "Sin fecha" }
@@ -244,6 +256,10 @@ private fun FacturaSummaryDto.toTransaction(): Transaction {
         amount = total,
         currency = moneda,
         status = status,
+        electronicStatus = electronicStatus,
+        codigoFiscal = codigoFiscal,
+        numeroDocumentoFiscal = numeroDocumentoFiscal,
+        fechaDgi = fechaDgi,
         dateHeader = dateHeader,
         clienteNombre = clienteNombre,
         clienteIdentificacion = clienteIdentificacion,
@@ -252,6 +268,15 @@ private fun FacturaSummaryDto.toTransaction(): Transaction {
         abrMonedaSecundaria = abrMonedaSecundaria,
     )
 }
+
+private fun resolveTransactionStatus(estatus: String): TransactionStatus =
+    when {
+        estatus.equals("Anulada", ignoreCase = true) ||
+            estatus.equals("Anulado", ignoreCase = true) -> TransactionStatus.CANCELLED
+        estatus.equals("En Espera", ignoreCase = true) ||
+            estatus.equals("Pendiente", ignoreCase = true) -> TransactionStatus.PENDING
+        else -> TransactionStatus.PAID
+    }
 
 /**
  * Extracts "HH:mm" from a datetime string like "dd/MM/yyyy HH:mm:ss".

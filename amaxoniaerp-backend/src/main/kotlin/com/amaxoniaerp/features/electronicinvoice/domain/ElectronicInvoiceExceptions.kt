@@ -14,6 +14,11 @@ class FEConfigurationException(
     message: String,
 ) : ApiException(ErrorCategory.DomainRule, message)
 
+/** El documento electrónico no cumple validaciones fiscales para enviarse al PAC. */
+class FEValidacionException(
+    message: String,
+) : ApiException(ErrorCategory.DomainRule, message)
+
 /** La factura no existe o no está en estado válido para envío FE. */
 class FEInvoiceNotFoundException(
     message: String,

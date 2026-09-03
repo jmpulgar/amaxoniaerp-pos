@@ -2,17 +2,22 @@ package com.amaxoniaerp.features.electronicinvoice.application
 
 import com.amaxoniaerp.features.electronicinvoice.data.ElectronicInvoiceRepository
 import com.amaxoniaerp.features.electronicinvoice.data.FeResponseUpdate
+import com.amaxoniaerp.features.electronicinvoice.domain.AnalisisFalloPac
 import com.amaxoniaerp.features.electronicinvoice.domain.ElectronicInvoiceResult
 import com.amaxoniaerp.features.electronicinvoice.domain.FEConfigurationException
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
+import com.amaxoniaerp.features.electronicinvoice.domain.FEValidacionException
 import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
 import com.amaxoniaerp.features.electronicinvoice.domain.PacAuthToken
 import com.amaxoniaerp.features.electronicinvoice.domain.PacCredentials
+import com.amaxoniaerp.features.electronicinvoice.domain.PacEstadoDocumentoSolicitud
 import com.amaxoniaerp.features.electronicinvoice.domain.PacResponse
+import com.amaxoniaerp.features.electronicinvoice.domain.analizarFalloPac
 import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceClient
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
+import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.normalizeToTwoDigits
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
@@ -49,6 +54,18 @@ class PanamaInvoiceProcessor(
         invoiceId: String,
     ): ElectronicInvoiceResult =
         run {
+            // ── 0. Idempotencia: si la factura ya tiene CUFE generado, no reenviar al PAC ──
+            val existingCufe = repository.getInvoiceCufe(database, invoiceId)
+            if (!existingCufe.isNullOrBlank()) {
+                logger.info("[FE] Factura {} ya posee CUFE={}. Retornando AlreadyIssued.", invoiceId, existingCufe)
+                val existingDocNumber = repository.getInvoiceNumeroDocumentoFiscal(database, invoiceId).orEmpty()
+                return@run ElectronicInvoiceResult.AlreadyIssued(
+                    country = countryCode,
+                    numeroDocumentoFiscal = existingDocNumber,
+                    numeroControl = existingCufe,
+                )
+            }
+
             // ── 1/1b. Contexto + tipo_facturacion ────────────────────────────────
             val context =
                 loadContextStep(database, invoiceId).getOrElse { e ->
@@ -76,16 +93,31 @@ class PanamaInvoiceProcessor(
                 }
             logPayloadDiagnostics(invoiceId, context, payload)
 
-            // ── 4. Enviar al PAC ─────────────────────────────────────────────────
+            // ── 4. Enviar al PAC (con conciliación ante estados inciertos) ────
             logger.info(
                 "[FE] Enviando documento al PAC: sucursal=${context.codigoSucursalEmisor} " +
                     "punto=${context.puntoFacturacionFiscal} numDocFiscal=${context.factura.numeroDocumentoFiscal} " +
                     "items=${context.detalles.size} formasPago=${context.formasPago.size}",
             )
             val pacAccepted =
-                sendDocumentStep(invoiceId, context, token, payload).getOrElse { e ->
-                    return@run stepFailure(e)
-                }
+                sendDocumentStep(invoiceId, context, token, payload)
+                    .recoverCatching { e ->
+                        // Q2: ante estados inciertos (transporte, duplicados 102/1513,
+                        // errores DGI del PAC) consultar EstadoDocumento antes de
+                        // fallar; si el PAC ya autorizó el documento, se recupera su
+                        // CUFE sin reenviarlo (anti-1513).
+                        val analisis = (e as? FeStepFailure)?.analisis ?: throw e
+                        if (!analisis.requiereConciliacion) throw e
+                        logger.info(
+                            "[FE] Resultado incierto para factura {} (transporte={} incidencias={}): conciliando con EstadoDocumento...",
+                            invoiceId,
+                            analisis.codigoTransporte,
+                            analisis.incidenciasFiscales.joinToString { it.codigo },
+                        )
+                        conciliarDocumentoAceptado(invoiceId, context, token) ?: throw e
+                    }.getOrElse { e ->
+                        return@run stepFailure(e)
+                    }
 
             // ── 6/7. Persistencia post-aceptación (best-effort, log crítico) ─────
             persistAcceptedInvoice(database, invoiceId, context, pacAccepted.response, pacAccepted.cufe)
@@ -131,13 +163,13 @@ class PanamaInvoiceProcessor(
                         "INVOICE_NOT_FOUND",
                         e.message ?: "Factura no encontrada",
                     ),
-                    e,
+                    cause = e,
                 )
             } catch (e: FEConfigurationException) {
                 logger.error("Configuración FE incompleta para factura: {}", invoiceId, e)
                 throw FeStepFailure(
                     ElectronicInvoiceResult.Failure("CONFIG_ERROR", e.message ?: "Configuración FE incompleta"),
-                    e,
+                    cause = e,
                 )
             }
         }.map { ctx ->
@@ -183,6 +215,17 @@ class PanamaInvoiceProcessor(
             payloadBuilder.build(context)
         }.recoverCatching { e ->
             if (e is FeStepFailure) throw e
+            if (e is FEValidacionException) {
+                logger.error("Validación FE falló para factura {}: {}", invoiceId, e.message)
+                throw FeStepFailure(
+                    ElectronicInvoiceResult.Failure(
+                        "VALIDATION_ERROR",
+                        e.message ?: "Documento electrónico inválido",
+                        reintentable = false,
+                    ),
+                    cause = e,
+                )
+            }
             logger.error("Error construyendo payload FE para factura {}", invoiceId, e)
             throw FeStepFailure(
                 ElectronicInvoiceResult.Failure(
@@ -204,7 +247,7 @@ class PanamaInvoiceProcessor(
                 baseUrl = context.config.apiTheFactoryHka,
                 token = token,
                 payload = payload,
-            ).map { response ->
+            ).mapCatching { response ->
                 logger.info(
                     "[FE] Respuesta PAC: exitoso=${response.exitoso} " +
                         "codigo=${response.codigo} mensaje=${response.mensaje} " +
@@ -218,17 +261,31 @@ class PanamaInvoiceProcessor(
                         response.codigo,
                         response.mensaje,
                     )
-                    throw FeStepFailure(ElectronicInvoiceResult.Failure(response.codigo, response.mensaje))
+                    val analisis = analizarFalloPac(response.codigo, response.mensaje)
+                    throw FeStepFailure(
+                        ElectronicInvoiceResult.Failure(
+                            response.codigo,
+                            response.mensaje,
+                            reintentable = analisis.reintentable,
+                            incidenciasFiscales = analisis.incidenciasFiscales,
+                        ),
+                        analisis = analisis,
+                    )
                 }
                 PacAccepted(response = response, cufe = cufe)
             }.recoverCatching { e ->
                 if (e is FeStepFailure) throw e
                 logger.error("Error enviando documento al PAC para factura {}", invoiceId, e)
+                val analisis = analizarFalloPac(codigo = null, mensaje = e.message, falloDeTransporte = true)
                 throw FeStepFailure(
                     ElectronicInvoiceResult.Failure(
                         "SEND_ERROR",
                         "Error de comunicación con el PAC: ${e.message}",
+                        reintentable = analisis.reintentable,
+                        incidenciasFiscales = analisis.incidenciasFiscales,
                     ),
+                    analisis = analisis,
+                    cause = e,
                 )
             }
 
@@ -290,11 +347,76 @@ class PanamaInvoiceProcessor(
     /** Falla interna de un paso del flujo PA; envuelve el resultado final. */
     private class FeStepFailure(
         val result: ElectronicInvoiceResult,
+        val analisis: AnalisisFalloPac? = null,
         cause: Throwable? = null,
     ) : RuntimeException(cause)
 
     /** Desenvuelve la falla de un paso; si no es esperada, la re-lanza. */
     private fun stepFailure(e: Throwable): ElectronicInvoiceResult = (e as? FeStepFailure)?.result ?: throw e
+
+    /**
+     * Q2: pregunta al PAC por el estado del documento enviado. Si ya fue
+     * autorizado, retorna el [PacAccepted] con el CUFE real para que el flujo
+     * normal lo persista (incluido el correlativo); si el PAC no lo conoce o
+     * la consulta falla, retorna null y el fallo original sigue su curso.
+     */
+    private suspend fun conciliarDocumentoAceptado(
+        invoiceId: String,
+        context: InvoiceFEContext,
+        token: PacAuthToken,
+    ): PacAccepted? {
+        val numeroDocumento = context.factura.numeroDocumentoFiscal
+        if (numeroDocumento.isBlank()) {
+            logger.warn("[FE] Conciliación omitida para factura {}: sin numeroDocumentoFiscal", invoiceId)
+            return null
+        }
+
+        val estado =
+            pacClient
+                .consultarEstadoDocumento(
+                    baseUrl = context.config.apiTheFactoryHka,
+                    token = token,
+                    solicitud =
+                        PacEstadoDocumentoSolicitud(
+                            numeroDocumentoFiscal = numeroDocumento,
+                            codigoSucursalEmisor = context.codigoSucursalEmisor,
+                            puntoFacturacionFiscal = context.puntoFacturacionFiscal,
+                            tipoDocumento = normalizeToTwoDigits(context.factura.tipoDocumento),
+                        ),
+                ).getOrElse { e ->
+                    logger.warn("[FE] No se pudo consultar EstadoDocumento para factura {}: {}", invoiceId, e.message)
+                    return null
+                }
+
+        val cufe = estado.cufe?.takeIf { it.isNotBlank() }
+        if (!estado.autorizado || cufe == null) {
+            logger.info(
+                "[FE] Conciliación: el PAC no autorizó el documento {} ([{}] {})",
+                numeroDocumento,
+                estado.codigo,
+                estado.mensaje,
+            )
+            return null
+        }
+
+        logger.info(
+            "[FE] Conciliación exitosa para factura {}: documento {} ya autorizado con CUFE={}",
+            invoiceId,
+            numeroDocumento,
+            cufe.take(CUFE_LOG_PREFIX_LENGTH),
+        )
+        return PacAccepted(
+            response =
+                PacResponse(
+                    exitoso = true,
+                    codigo = estado.codigo,
+                    mensaje = estado.mensaje,
+                    cufe = cufe,
+                    fechaRecepcionDGI = estado.fechaRecepcionDGI,
+                ),
+            cufe = cufe,
+        )
+    }
 
     suspend fun resendInvoiceEmail(
         database: Database,
@@ -319,6 +441,31 @@ class PanamaInvoiceProcessor(
             val token = pacClient.authenticate(credentials).getOrThrow()
 
             sendInvoiceEmailIfPossible(context, token, cufe).getOrThrow()
+        }
+
+    suspend fun downloadInvoicePdf(
+        database: Database,
+        invoiceId: String,
+    ): Result<ByteArray> =
+        runCatching {
+            val context = repository.loadInvoiceContext(database, invoiceId)
+            if (context.config.tipoFacturacion < PAC_FISCAL_TYPE_THRESHOLD) {
+                throw FEConfigurationException("La factura no usa FEL The Factory HKA")
+            }
+
+            val cufe =
+                repository.getInvoiceCufe(database, invoiceId)
+                    ?: throw FEConfigurationException("La factura no tiene CUFE generado")
+
+            val credentials =
+                PacCredentials(
+                    usuario = context.config.tokenEmpresa,
+                    clave = context.config.tokenPassword,
+                    baseUrl = context.config.apiTheFactoryHka,
+                )
+            val token = pacClient.authenticate(credentials).getOrThrow()
+
+            pacClient.downloadPdf(baseUrl = context.config.apiTheFactoryHka, token = token, cufe = cufe).getOrThrow()
         }
 
     private suspend fun sendInvoiceEmailIfPossible(
