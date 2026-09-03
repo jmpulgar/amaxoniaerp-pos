@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,7 +87,7 @@ fun HistoryScreen(
         ) {
             HistoryFiltersSection(state = state, viewModel = viewModel)
 
-            if (!state.isLoading || state.transactions.isNotEmpty()) {
+            if (!state.isLoading) {
                 SummaryBar(
                     totalFacturas = state.summary.totalFacturas,
                     totalMonto = state.summary.ventasNetas,
@@ -185,6 +186,7 @@ private fun HistoryFiltersSection(
             HistoryFilterActions(
                 onApply = viewModel::applyFilters,
                 onClear = viewModel::clearFilters,
+                isApplying = state.isLoading,
             )
         }
     }
@@ -197,7 +199,9 @@ private fun HistoryContent(
     viewModel: HistoryViewModel,
 ) {
     when {
-        state.isLoading && state.transactions.isEmpty() -> HistoryLoadingState()
+        // El loading cubre también el "Aplicar" con lista previa: mientras
+        // refresca, el contenido completo es el estado de carga.
+        state.isLoading -> HistoryLoadingState()
         state.error != null -> HistoryErrorState(error = state.error, onRetry = viewModel::retry)
         state.transactions.isEmpty() -> HistoryEmptyState()
         else ->
@@ -465,6 +469,7 @@ internal fun HistoryDateRangeFilters(
 internal fun HistoryFilterActions(
     onApply: () -> Unit,
     onClear: () -> Unit,
+    isApplying: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -472,15 +477,25 @@ internal fun HistoryFilterActions(
     ) {
         OutlinedButton(
             onClick = onClear,
+            enabled = !isApplying,
             modifier = Modifier.weight(1f).height(48.dp),
         ) {
             Text("Limpiar")
         }
         Button(
             onClick = onApply,
+            enabled = !isApplying,
             modifier = Modifier.weight(1f).height(48.dp),
         ) {
-            Text("Aplicar")
+            if (isApplying) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(if (isApplying) "Aplicando..." else "Aplicar")
         }
     }
 }

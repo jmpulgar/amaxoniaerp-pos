@@ -10,8 +10,8 @@ import com.amaxonia.pos.data.remote.api.SalesApi
 import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
-import com.amaxonia.pos.domain.model.resolveElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto
+import com.amaxonia.pos.domain.model.resolveElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 import com.amaxonia.pos.domain.model.sales.FacturaSummaryDto
