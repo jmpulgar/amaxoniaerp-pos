@@ -46,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -183,10 +182,11 @@ fun KeypadDigitKey(
         ) {
             Text(
                 text = digit,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                ),
+                style =
+                    MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                    ),
                 color = contentColor,
             )
         }
@@ -233,10 +233,11 @@ fun KeypadClearKey(
         ) {
             Text(
                 text = "C",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
-                ),
+                style =
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp,
+                    ),
                 color = contentColor,
             )
         }
@@ -355,11 +356,12 @@ fun KeypadEnterKey(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "ENTER",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 13.sp,
-                        ),
+                        style =
+                            MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.2.sp,
+                                fontSize = 13.sp,
+                            ),
                         color = contentColor,
                     )
                 }
@@ -422,7 +424,14 @@ fun KeypadDisplay(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                color =
+                    if (isError) {
+                        MaterialTheme.colorScheme.error.copy(
+                            alpha = 0.15f,
+                        )
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    },
             ) {
                 Text(
                     text = label,

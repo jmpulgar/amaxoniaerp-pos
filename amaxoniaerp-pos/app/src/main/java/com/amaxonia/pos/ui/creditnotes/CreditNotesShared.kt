@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.creditnotes
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,29 +14,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Print
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
-import com.amaxonia.pos.ui.theme.ConfirmedContainer
-import com.amaxonia.pos.ui.theme.ConfirmedContent
-import com.amaxonia.pos.ui.theme.PendingContainer
-import com.amaxonia.pos.ui.theme.PendingContent
+import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
 import java.util.Locale
 
@@ -84,28 +87,112 @@ internal fun SummaryBanner(
     }
 }
 
-/** Chip con el estado fiscal de la nota de crédito. */
+/** Chip / badge con el estado fiscal o electrónico de la nota de crédito. */
 @Composable
-internal fun FiscalStatusChip(status: CreditNoteFiscalStatusDto) {
-    val isConfirmed = status == CreditNoteFiscalStatusDto.CONFIRMADA
-    AssistChip(
-        onClick = {},
-        label = { Text(if (isConfirmed) "Fiscal confirmada" else "Fiscal pendiente") },
-        leadingIcon = {
+internal fun FiscalStatusChip(
+    status: CreditNoteFiscalStatusDto,
+    modifier: Modifier = Modifier,
+    isPanama: Boolean = false,
+) {
+    val isDark = isSystemInDarkTheme()
+    val visuals =
+        if (isPanama) {
+            when (status) {
+                CreditNoteFiscalStatusDto.CONFIRMADA ->
+                    FiscalBadgeVisuals(
+                        label = "Nota de Crédito Electrónica (NCE)",
+                        icon = Icons.Default.CheckCircle,
+                        container = if (isDark) Color(0xFF0C4A6E) else Color(0xFFE0F2FE),
+                        content = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                    )
+                CreditNoteFiscalStatusDto.PENDIENTE ->
+                    FiscalBadgeVisuals(
+                        label = "NCE pendiente",
+                        icon = Icons.Default.Schedule,
+                        container = if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7),
+                        content = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                    )
+                CreditNoteFiscalStatusDto.RECHAZADA ->
+                    FiscalBadgeVisuals(
+                        label = "NCE rechazada",
+                        icon = Icons.Default.ErrorOutline,
+                        container = MaterialTheme.colorScheme.errorContainer,
+                        content = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                CreditNoteFiscalStatusDto.INCIERTA ->
+                    FiscalBadgeVisuals(
+                        label = "NCE en revisión",
+                        icon = Icons.Default.WarningAmber,
+                        container = if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7),
+                        content = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                    )
+            }
+        } else {
+            when (status) {
+                CreditNoteFiscalStatusDto.CONFIRMADA ->
+                    FiscalBadgeVisuals(
+                        label = "Fiscal confirmada",
+                        icon = Icons.Default.CheckCircle,
+                        container = if (isDark) Color(0xFF064E3B) else Color(0xFFDCFCE7),
+                        content = if (isDark) Color(0xFF4ADE80) else Color(0xFF15803D),
+                    )
+                CreditNoteFiscalStatusDto.PENDIENTE ->
+                    FiscalBadgeVisuals(
+                        label = "Fiscal pendiente",
+                        icon = Icons.Default.Print,
+                        container = if (isDark) Color(0xFF7C2D12) else Color(0xFFFFF3E0),
+                        content = if (isDark) Color(0xFFFB923C) else Color(0xFFE65100),
+                    )
+                CreditNoteFiscalStatusDto.RECHAZADA ->
+                    FiscalBadgeVisuals(
+                        label = "Fiscal rechazada",
+                        icon = Icons.Default.ErrorOutline,
+                        container = MaterialTheme.colorScheme.errorContainer,
+                        content = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                CreditNoteFiscalStatusDto.INCIERTA ->
+                    FiscalBadgeVisuals(
+                        label = "Fiscal incierta",
+                        icon = Icons.Default.WarningAmber,
+                        container = if (isDark) Color(0xFF78350F) else Color(0xFFFEF3C7),
+                        content = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
+                    )
+            }
+        }
+
+    Surface(
+        modifier = modifier,
+        shape = PosExtraShapes.Pill,
+        color = visuals.container,
+        contentColor = visuals.content,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
-                imageVector = if (isConfirmed) Icons.Default.CheckCircle else Icons.Default.Print,
+                imageVector = visuals.icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(15.dp),
             )
-        },
-        colors =
-            AssistChipDefaults.assistChipColors(
-                containerColor = if (isConfirmed) ConfirmedContainer else PendingContainer,
-                labelColor = if (isConfirmed) ConfirmedContent else PendingContent,
-                leadingIconContentColor = if (isConfirmed) ConfirmedContent else PendingContent,
-            ),
-    )
+            Text(
+                text = visuals.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
+
+private data class FiscalBadgeVisuals(
+    val label: String,
+    val icon: ImageVector,
+    val container: Color,
+    val content: Color,
+)
 
 /** Estado vacío con ícono, título y subtítulo. */
 @Composable
@@ -121,6 +208,28 @@ internal fun EmptyState(
             Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(6.dp))
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        }
+    }
+}
+
+/** Estado de carga centrado con indicador circular y mensaje informativo. */
+@Composable
+internal fun CreditNotesLoadingState(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(24.dp),
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

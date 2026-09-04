@@ -43,135 +43,158 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DefaultInvoicePrintGatewayTest {
-
     private lateinit var localStore: LocalStore
     private val printedTickets = mutableListOf<TicketDocument>()
 
-    private val fakeTicketPrinter = object : TicketPrinter {
-        override suspend fun connect(): PrintResult = PrintResult.Success
-        override suspend fun disconnect() {}
-        override suspend fun isAvailable(): Boolean = true
-        override suspend fun printText(text: String): PrintResult = PrintResult.Success
-        override suspend fun printTicket(ticket: TicketDocument): PrintResult {
-            printedTickets.add(ticket)
-            return PrintResult.Success
+    private val fakeTicketPrinter =
+        object : TicketPrinter {
+            override suspend fun connect(): PrintResult = PrintResult.Success
+
+            override suspend fun disconnect() {
+                Unit
+            }
+
+            override suspend fun isAvailable(): Boolean = true
+
+            override suspend fun printText(text: String): PrintResult = PrintResult.Success
+
+            override suspend fun printTicket(ticket: TicketDocument): PrintResult {
+                printedTickets.add(ticket)
+                return PrintResult.Success
+            }
         }
-    }
 
-    private val fakePrinterProvider = object : PrinterProvider {
-        override fun getActivePrinter(): PrinterRepository? = null
-        override fun getActiveTicketPrinter(): TicketPrinter = fakeTicketPrinter
-    }
+    private val fakePrinterProvider =
+        object : PrinterProvider {
+            override fun getActivePrinter(): PrinterRepository? = null
 
-    private val fakeSalesRepository = object : SalesRepository {
-        override suspend fun processSale(payload: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> =
-            error("Not used")
+            override fun getActiveTicketPrinter(): TicketPrinter = fakeTicketPrinter
+        }
 
-        override suspend fun findByCorrelationId(clientCorrelationId: String): Result<ReconciledInvoice?> =
-            error("Not used")
+    private val fakeSalesRepository =
+        object : SalesRepository {
+            override suspend fun processSale(payload: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> = error("Not used")
 
-        override suspend fun confirmFacturaFiscal(
-            facturaId: String,
-            payload: ConfirmFacturaFiscalRequestDto,
-        ): Result<ConfirmFacturaFiscalResponseDto> = error("Not used")
+            override suspend fun findByCorrelationId(clientCorrelationId: String): Result<ReconciledInvoice?> = error("Not used")
 
-        override suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto> =
-            Result.failure(IllegalStateException("Network unavailable"))
+            override suspend fun confirmFacturaFiscal(
+                facturaId: String,
+                payload: ConfirmFacturaFiscalRequestDto,
+            ): Result<ConfirmFacturaFiscalResponseDto> = error("Not used")
 
-        override suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto> =
-            error("Not used")
-    }
+            override suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto> =
+                Result.failure(IllegalStateException("Network unavailable"))
 
-    private val testCompany = CompanySessionSnapshot(
-        token = "test-token",
-        company = CompanyDetailsSnapshot(
-            id = 1,
-            name = "TEST RESTAURANT CORP",
-            adminDb = "admin",
-            accountingDb = "acc",
-            payrollDb = "pay",
-            rif = "J-12345678-0",
-        ),
-    )
+            override suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto> = error("Not used")
 
-    private val testCaja = Caja(
-        idCaja = "1",
-        codCaja = "01",
-        descripcion = "Caja 1",
-        estatus = 1,
-        idSucursal = 1,
-        serieCaja = "P01",
-    )
+            override suspend fun getInvoicePdf(facturaId: String): Result<ByteArray> = error("Not used")
 
-    private val testTransaction = Transaction(
-        id = "OFF-1700000000",
-        invoiceNumber = "OFF-1700000000",
-        time = "12:00 PM",
-        amount = 25.00,
-        currency = "USD",
-        status = TransactionStatus.PENDING,
-        dateHeader = "Miércoles, 26 Agosto 2026",
-        clienteNombre = "Carlos Gonzalez",
-        clienteIdentificacion = "8-765-4321",
-        formaPago = "EFECTIVO",
-        paymentMethods = listOf(
-            TransactionPaymentMethod(description = "Efectivo", sigla = "CASH", amount = 25.00),
-        ),
-        fiscalItems = listOf(
-            TransactionFiscalItem(description = "Menu Ejecutivo", quantity = 2.0, unitPriceWithoutTax = 12.50, iva = 0.0),
-        ),
-    )
+            override suspend fun resendElectronicInvoice(
+                invoiceId: String,
+            ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> = error("Not used")
+        }
+
+    private val testCompany =
+        CompanySessionSnapshot(
+            token = "test-token",
+            company =
+                CompanyDetailsSnapshot(
+                    id = 1,
+                    name = "TEST RESTAURANT CORP",
+                    adminDb = "admin",
+                    accountingDb = "acc",
+                    payrollDb = "pay",
+                    rif = "J-12345678-0",
+                ),
+        )
+
+    private val testCaja =
+        Caja(
+            idCaja = "1",
+            codCaja = "01",
+            descripcion = "Caja 1",
+            estatus = 1,
+            idSucursal = 1,
+            serieCaja = "P01",
+        )
+
+    private val testTransaction =
+        Transaction(
+            id = "OFF-1700000000",
+            invoiceNumber = "OFF-1700000000",
+            time = "12:00 PM",
+            amount = 25.00,
+            currency = "USD",
+            status = TransactionStatus.PENDING,
+            dateHeader = "Miércoles, 26 Agosto 2026",
+            clienteNombre = "Carlos Gonzalez",
+            clienteIdentificacion = "8-765-4321",
+            formaPago = "EFECTIVO",
+            paymentMethods =
+                listOf(
+                    TransactionPaymentMethod(description = "Efectivo", sigla = "CASH", amount = 25.00),
+                ),
+            fiscalItems =
+                listOf(
+                    TransactionFiscalItem(description = "Menu Ejecutivo", quantity = 2.0, unitPriceWithoutTax = 12.50, iva = 0.0),
+                ),
+        )
 
     @Before
-    fun setUp() = runTest {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        localStore = LocalStore(context, FakeSecureKeyValueStore())
-        localStore.saveSelectedCountry(ServerCountries.PANAMA)
-        localStore.saveSelectedPrinterType(PrinterType.SUNMI_V2)
-        localStore.saveCompanySession(testCompany)
-        localStore.saveActiveCaja(testCaja)
-        printedTickets.clear()
-    }
+    fun setUp() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            localStore = LocalStore(context, FakeSecureKeyValueStore())
+            localStore.saveSelectedCountry(ServerCountries.PANAMA)
+            localStore.saveSelectedPrinterType(PrinterType.SUNMI_V2)
+            localStore.saveCompanySession(testCompany)
+            localStore.saveActiveCaja(testCaja)
+            printedTickets.clear()
+        }
 
     @Test
-    fun printsOfflineSunmiTicketUsingLocalFallbackForPanama() = runTest {
-        val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
+    fun printsOfflineSunmiTicketUsingLocalFallbackForPanama() =
+        runTest {
+            val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
 
-        val feedback = gateway.print(
-            countryCode = "PA",
-            transaction = testTransaction,
-            remoteInvoiceId = "OFF-1700000000",
-        )
+            val feedback =
+                gateway.print(
+                    countryCode = "PA",
+                    transaction = testTransaction,
+                    remoteInvoiceId = "OFF-1700000000",
+                )
 
-        assertNotNull(feedback)
-        assertEquals("Ticket SUNMI enviado correctamente", feedback?.displayMessage)
-        assertEquals(1, printedTickets.size)
+            assertNotNull(feedback)
+            assertEquals("Ticket SUNMI enviado correctamente", feedback?.displayMessage)
+            assertEquals(1, printedTickets.size)
 
-        val ticket = printedTickets.first()
-        val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
-        assertTrue(texts.contains("TEST RESTAURANT CORP"))
-        assertTrue(texts.any { it.contains("Menu Ejecutivo") })
-    }
+            val ticket = printedTickets.first()
+            val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+            assertTrue(texts.contains("TEST RESTAURANT CORP"))
+            assertTrue(texts.any { it.contains("Menu Ejecutivo") })
+        }
 
     @Test
-    fun printsOfflineSunmiTicketUsingLocalFallbackForVenezuela() = runTest {
-        localStore.saveSelectedCountry(ServerCountries.VENEZUELA)
-        localStore.saveSelectedPrinterType(PrinterType.SUNMI_V2)
-        val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
+    fun printsOfflineSunmiTicketUsingLocalFallbackForVenezuela() =
+        runTest {
+            localStore.saveSelectedCountry(ServerCountries.VENEZUELA)
+            localStore.saveSelectedPrinterType(PrinterType.SUNMI_V2)
+            val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
 
-        val feedback = gateway.print(
-            countryCode = "VE",
-            transaction = testTransaction,
-            remoteInvoiceId = "OFF-VE-100",
-        )
+            val feedback =
+                gateway.print(
+                    countryCode = "VE",
+                    transaction = testTransaction,
+                    remoteInvoiceId = "OFF-VE-100",
+                )
 
-        assertNotNull(feedback)
-        assertEquals("Ticket SUNMI enviado correctamente", feedback?.displayMessage)
-        assertEquals(1, printedTickets.size)
+            assertNotNull(feedback)
+            assertEquals("Ticket SUNMI enviado correctamente", feedback?.displayMessage)
+            assertEquals(1, printedTickets.size)
 
-        val ticket = printedTickets.first()
-        val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
-        assertTrue(texts.contains("FACTURA"))
-        assertTrue(texts.contains("TEST RESTAURANT CORP"))
-    }
+            val ticket = printedTickets.first()
+            val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+            assertTrue(texts.contains("FACTURA"))
+            assertTrue(texts.contains("TEST RESTAURANT CORP"))
+        }
 }

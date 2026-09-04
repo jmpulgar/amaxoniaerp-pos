@@ -315,7 +315,8 @@ private fun NavGraphBuilder.comandaDestination(navController: NavController) {
         val areaId = entry.arguments?.getInt("areaId") ?: return@composable
         val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
         val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
-        val selected = AppGraph.mesas.selectedTableHolder.selectedTable.value
+        val selected by AppGraph.mesas.selectedTableHolder.selectedTable
+            .collectAsStateWithLifecycle()
         val mesaNombre = selected?.mesa?.displayName ?: "Mesa $mesaId"
         val comandaViewModel =
             remember {
@@ -358,7 +359,8 @@ private fun NavGraphBuilder.cuentaMesaDestination(
         val areaId = entry.arguments?.getInt("areaId") ?: return@composable
         val mesaId = entry.arguments?.getInt("mesaId") ?: return@composable
         val sesionId = entry.arguments?.getInt("sesionId") ?: return@composable
-        val selected = AppGraph.mesas.selectedTableHolder.selectedTable.value
+        val selected by AppGraph.mesas.selectedTableHolder.selectedTable
+            .collectAsStateWithLifecycle()
         val client by cartRepository.selectedClient.collectAsStateWithLifecycle()
         val cuentaViewModel =
             remember(areaId, mesaId, sesionId) {

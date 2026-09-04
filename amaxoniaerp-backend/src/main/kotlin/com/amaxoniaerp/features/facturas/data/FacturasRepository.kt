@@ -18,7 +18,6 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.Query
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.andWhere
@@ -34,10 +33,9 @@ import java.time.format.DateTimeFormatter
 data class FacturasFilter(
     val search: String? = null,
     val usuario: String? = null,
-    val sucursalId: Int? = null,
+    val cajaId: String? = null,
     val fechaInicio: LocalDate? = null,
     val fechaFin: LocalDate? = null,
-    val estatusList: List<Int>? = null,
 )
 
 private val FACTURA_DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -101,7 +99,7 @@ class FacturasRepository {
             val total = query.count()
             val data =
                 query
-                    .orderBy(tabla.fechaFactura to SortOrder.DESC)
+                    .orderBy(tabla.fechaCreacion to SortOrder.DESC, tabla.idFactura to SortOrder.DESC)
                     .limit(limit)
                     .offset(offset)
                     .map { row -> mapRowToFacturaSummary(row, tabla) }
@@ -173,8 +171,8 @@ class FacturasRepository {
         filter.usuario?.takeIf(String::isNotBlank)?.let { usuario ->
             andWhere { tabla.usuarioCreacion eq usuario }
         }
-        filter.sucursalId?.let { sucursalId ->
-            andWhere { tabla.idSucursal eq sucursalId }
+        filter.cajaId?.takeIf(String::isNotBlank)?.let { cajaId ->
+            andWhere { tabla.idCaja eq cajaId }
         }
         filter.fechaInicio?.let { fechaInicio ->
             val start = fechaInicio.atStartOfDay().format(FACTURA_DATE_TIME_FORMAT)
@@ -187,9 +185,6 @@ class FacturasRepository {
                     .atStartOfDay()
                     .format(FACTURA_DATE_TIME_FORMAT)
             andWhere { tabla.fechaCreacion less endExclusive }
-        }
-        filter.estatusList?.takeIf(List<Int>::isNotEmpty)?.let { estatusList ->
-            andWhere { tabla.codEstatus inList estatusList }
         }
         filter.search?.takeIf(String::isNotBlank)?.let { search ->
             val term = "%$search%"

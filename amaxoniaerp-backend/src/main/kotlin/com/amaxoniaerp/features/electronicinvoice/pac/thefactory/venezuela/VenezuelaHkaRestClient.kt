@@ -203,6 +203,5 @@ class VenezuelaHkaRestClient(
         )
     }
 
-    private fun hostOf(url: String): String =
-        runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
+    private fun hostOf(url: String): String = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().ifBlank { "?" }
 }

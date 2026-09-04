@@ -23,20 +23,25 @@ data class CreditNoteFormState(
     val idFormaPagoReintegro: Int? = null,
 )
 
-enum class InvoiceDateFilterType(val label: String) {
+enum class InvoiceDateFilterType(
+    val label: String,
+) {
+    HOY("Hoy"),
     MES_ACTUAL("Mes actual"),
     MES_ANTERIOR("Mes anterior"),
-    TODAS("Todas las fechas"),
     PERSONALIZADO("Personalizado"),
 }
 
 data class InvoiceDateFilter(
-    val type: InvoiceDateFilterType = InvoiceDateFilterType.MES_ACTUAL,
-    val customFechaInicio: String = "",
-    val customFechaFin: String = "",
+    val type: InvoiceDateFilterType = InvoiceDateFilterType.HOY,
+    val customFechaInicio: String = LocalDate.now().toString(),
+    val customFechaFin: String = LocalDate.now().toString(),
 ) {
     fun resolveDateRange(today: LocalDate = LocalDate.now()): Pair<String?, String?> =
         when (type) {
+            InvoiceDateFilterType.HOY -> {
+                today.toString() to today.toString()
+            }
             InvoiceDateFilterType.MES_ACTUAL -> {
                 val ym = YearMonth.from(today)
                 ym.atDay(1).toString() to ym.atEndOfMonth().toString()
@@ -44,9 +49,6 @@ data class InvoiceDateFilter(
             InvoiceDateFilterType.MES_ANTERIOR -> {
                 val ym = YearMonth.from(today).minusMonths(1)
                 ym.atDay(1).toString() to ym.atEndOfMonth().toString()
-            }
-            InvoiceDateFilterType.TODAS -> {
-                null to null
             }
             InvoiceDateFilterType.PERSONALIZADO -> {
                 val inicio = customFechaInicio.trim().ifBlank { null }
@@ -57,6 +59,7 @@ data class InvoiceDateFilter(
 
     fun displayLabel(today: LocalDate = LocalDate.now()): String =
         when (type) {
+            InvoiceDateFilterType.HOY -> "Hoy ($today)"
             InvoiceDateFilterType.MES_ACTUAL -> {
                 val ym = YearMonth.from(today)
                 "Mes actual (${formatYearMonthSpanish(ym)})"
@@ -65,7 +68,6 @@ data class InvoiceDateFilter(
                 val ym = YearMonth.from(today).minusMonths(1)
                 "Mes anterior (${formatYearMonthSpanish(ym)})"
             }
-            InvoiceDateFilterType.TODAS -> "Todas las fechas"
             InvoiceDateFilterType.PERSONALIZADO -> {
                 val (inicio, fin) = resolveDateRange(today)
                 if (inicio != null && fin != null) {
@@ -84,8 +86,18 @@ data class InvoiceDateFilter(
 internal fun formatYearMonthSpanish(ym: YearMonth): String {
     val months =
         arrayOf(
-            "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+            "Ene",
+            "Feb",
+            "Mar",
+            "Abr",
+            "May",
+            "Jun",
+            "Jul",
+            "Ago",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dic",
         )
     val monthName = months.getOrNull(ym.monthValue - 1) ?: ym.month.name
     return "$monthName ${ym.year}"
@@ -109,4 +121,5 @@ data class CreditNotesState(
     val availableRefundMethods: List<FormaPago> = emptyList(),
     val successMessage: String? = null,
     val currencySymbol: String = "$",
+    val isPanama: Boolean = false,
 )

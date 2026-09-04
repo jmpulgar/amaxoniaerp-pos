@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -55,14 +54,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.mesas.Area
 import com.amaxonia.pos.domain.model.mesas.EstadoMesaOperativo
 import com.amaxonia.pos.domain.model.mesas.Mesa
 import com.amaxonia.pos.ui.common.components.PosEmptyState
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosLoadingState
-import com.amaxonia.pos.ui.common.components.PosStatusBadge
 import com.amaxonia.pos.ui.common.components.PosVisualAction
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.theme.PosExtraShapes
@@ -330,7 +327,6 @@ fun MesaStateLegend(
                 containerColor = dispColors.bg,
                 borderColor = dispColors.border.copy(alpha = if (isDark) 0.5f else 0.6f),
                 textColor = dispColors.text,
-                icon = Icons.Default.CheckCircle,
             )
         }
         item {
@@ -341,7 +337,6 @@ fun MesaStateLegend(
                 containerColor = ocupColors.bg,
                 borderColor = ocupColors.border.copy(alpha = if (isDark) 0.5f else 0.6f),
                 textColor = ocupColors.text,
-                icon = Icons.Default.TableRestaurant,
             )
         }
         item {
@@ -352,7 +347,6 @@ fun MesaStateLegend(
                 containerColor = cuentaColors.bg,
                 borderColor = cuentaColors.border.copy(alpha = if (isDark) 0.5f else 0.6f),
                 textColor = cuentaColors.text,
-                icon = Icons.AutoMirrored.Filled.ReceiptLong,
             )
         }
         if (isLoading) {
@@ -360,24 +354,14 @@ fun MesaStateLegend(
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.padding(vertical = 4.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Text(
+                        text = "Actualizando…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Actualizando…",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -392,7 +376,6 @@ private fun LivelyStatusPill(
     containerColor: Color,
     borderColor: Color,
     textColor: Color,
-    icon: ImageVector,
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -441,9 +424,10 @@ fun MesaCard(
     estadoOperativo: String? = null,
 ) {
     val isDark = isSystemInDarkTheme()
-    val visualColors = remember(estadoOperativo, isSelected, isDark) {
-        MesaVisualColors.getColors(estadoOperativo, isSelected, isDark)
-    }
+    val visualColors =
+        remember(estadoOperativo, isSelected, isDark) {
+            MesaVisualColors.getColors(estadoOperativo, isSelected, isDark)
+        }
 
     val containerColor by animateColorAsState(visualColors.bg, label = "mesaContainer")
     val borderColor by animateColorAsState(visualColors.border, label = "mesaBorder")
@@ -507,7 +491,6 @@ fun MesaCard(
             // Ilustración/Glyph visual de la mesa y sus sillas
             MesaVisualShapeGlyph(
                 forma = mesa.forma ?: "rectangular",
-                capacidad = mesa.capacidad,
                 accentColor = visualColors.border,
                 iconColor = visualColors.text,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -554,7 +537,6 @@ fun MesaCard(
 @Composable
 private fun MesaVisualShapeGlyph(
     forma: String,
-    capacidad: Int,
     accentColor: Color,
     iconColor: Color = accentColor,
     modifier: Modifier = Modifier,

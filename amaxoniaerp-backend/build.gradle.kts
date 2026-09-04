@@ -25,6 +25,7 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     ignoreFailures = false
+    config.setFrom(files("config/detekt/detekt.yml"))
 }
 
 ktlint {

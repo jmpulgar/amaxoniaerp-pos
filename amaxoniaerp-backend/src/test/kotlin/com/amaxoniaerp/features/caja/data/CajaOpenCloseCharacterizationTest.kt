@@ -252,15 +252,16 @@ class CajaOpenCloseCharacterizationTest {
         }
 
     @Test
-    fun `saveCajaCierre falla con facturas temporales pendientes`() =
+    fun `saveCajaCierre no es bloqueado por facturas temporales pendientes`() =
         runBlocking {
             seedSecuenciaAbierta(id = SEQ_OPEN, secuencia = "000001", montoApertura = 0.0)
             seedFactura("fac-temp", SEQ_OPEN, formaPago = "contado", codEstatus = 1)
 
             val result = cajaSession.close(database, PA, cierreRequest(id = SEQ_OPEN))
 
-            assertTrue(result.isFailure)
-            assertEquals("Existen facturas temporales pendientes por procesar", result.exceptionOrNull()!!.message)
+            assertTrue(result.isSuccess)
+            val response = result.getOrThrow()
+            assertTrue(response.success)
         }
 
     @Test

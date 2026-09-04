@@ -184,7 +184,7 @@ private fun CreditNoteRepository.resolveFinalizeContext(
                 cajaContext = cajaContext,
                 allReturnedAfterOperation = allReturnedAfterOperation,
                 annulInvoiceOnPartial = true,
-                partialPaymentFormId = null,
+                partialPaymentFormId = if (allReturnedAfterOperation) null else resolveCreditNotePaymentFormId(),
             ),
     )
 }

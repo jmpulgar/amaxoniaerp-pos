@@ -14,12 +14,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,26 +38,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.AddCard
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -115,7 +106,6 @@ import kotlinx.coroutines.delay
 
 internal const val SECONDARY_CURRENCY_LABEL = "Bs."
 private val COMPACT_WIDTH_THRESHOLD = 600.dp
-private val COMFORTABLE_HEIGHT_THRESHOLD = 600.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1025,7 +1015,9 @@ private fun AnimatedChangeDueRow(state: PaymentState) {
                         Text(
                             "$SECONDARY_CURRENCY_LABEL ${state.changeDueBsText}",
                             style = PosTextStyles.amountSecondary,
-                            color = com.amaxonia.pos.ui.theme.SuccessGreen.copy(alpha = 0.85f),
+                            color =
+                                com.amaxonia.pos.ui.theme.SuccessGreen
+                                    .copy(alpha = 0.85f),
                         )
                     }
                 }
@@ -1344,7 +1336,7 @@ private fun ProcessingPaymentOverlay(
                     shape = MaterialTheme.shapes.medium,
                 ) {
                     Text(
-                        text = "La venta se está registrando. Evita tocar atrás o cerrar la app.",
+                        text = "Evita tocar atrás o cerrar la app.",
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,

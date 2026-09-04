@@ -34,4 +34,10 @@ interface SalesRepository {
     suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto>
 
     suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto>
+
+    suspend fun getInvoicePdf(facturaId: String): Result<ByteArray>
+
+    suspend fun resendElectronicInvoice(
+        invoiceId: String,
+    ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto>
 }

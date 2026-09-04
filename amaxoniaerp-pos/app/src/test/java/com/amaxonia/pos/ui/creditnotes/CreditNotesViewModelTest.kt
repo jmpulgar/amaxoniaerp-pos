@@ -147,7 +147,7 @@ class CreditNotesViewModelTest {
         }
 
     @Test
-    fun `openInvoicePicker cambia de modo y carga facturas filtradas por mes actual por defecto`() =
+    fun `openInvoicePicker cambia de modo y carga facturas filtradas por hoy por defecto`() =
         runTest(mainDispatcherRule.dispatcher) {
             val repo =
                 FakeCreditNoteRepository().apply {
@@ -160,15 +160,16 @@ class CreditNotesViewModelTest {
             advanceUntilIdle()
 
             assertEquals(CreditNotesMode.INVOICE_PICKER, vm.state.value.mode)
-            assertEquals(InvoiceDateFilterType.MES_ACTUAL, vm.state.value.invoiceDateFilter.type)
+            assertEquals(InvoiceDateFilterType.HOY, vm.state.value.invoiceDateFilter.type)
             assertEquals(1, vm.state.value.sourceInvoices.size)
 
-            val ym = YearMonth.now()
-            val expectedStart = ym.atDay(1).toString()
-            val expectedEnd = ym.atEndOfMonth().toString()
+            val today =
+                java.time.LocalDate
+                    .now()
+                    .toString()
             val lastFilter = repo.requestedSourceInvoiceFilters.last()
-            assertEquals(expectedStart, lastFilter.second)
-            assertEquals(expectedEnd, lastFilter.third)
+            assertEquals(today, lastFilter.second)
+            assertEquals(today, lastFilter.third)
         }
 
     @Test
@@ -194,7 +195,7 @@ class CreditNotesViewModelTest {
         }
 
     @Test
-    fun `setInvoiceDateFilterType a todas las fechas consulta sin rango de fecha`() =
+    fun `setInvoiceDateFilterType a mes actual consulta con rango de mes actual`() =
         runTest(mainDispatcherRule.dispatcher) {
             val repo = FakeCreditNoteRepository()
             val vm = viewModel(repo = repo)
@@ -203,13 +204,13 @@ class CreditNotesViewModelTest {
             vm.openInvoicePicker()
             advanceUntilIdle()
 
-            vm.setInvoiceDateFilterType(InvoiceDateFilterType.TODAS)
+            vm.setInvoiceDateFilterType(InvoiceDateFilterType.MES_ACTUAL)
             advanceUntilIdle()
 
-            assertEquals(InvoiceDateFilterType.TODAS, vm.state.value.invoiceDateFilter.type)
+            assertEquals(InvoiceDateFilterType.MES_ACTUAL, vm.state.value.invoiceDateFilter.type)
             val lastFilter = repo.requestedSourceInvoiceFilters.last()
-            assertNull(lastFilter.second)
-            assertNull(lastFilter.third)
+            org.junit.Assert.assertNotNull(lastFilter.second)
+            org.junit.Assert.assertNotNull(lastFilter.third)
         }
 
     @Test
@@ -473,24 +474,73 @@ class CreditNotesViewModelTest {
             assertEquals("", vm.state.value.form.observacion)
         }
 
+    @Test
+    fun `al iniciar con pais Panama marca isPanama en true en el estado`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val vm = viewModel(contextReader = DynamicCreditNoteContextReader(countryCode = "PA"))
+
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.isPanama)
+        }
+
+    @Test
+    fun `al iniciar con pais Venezuela marca isPanama en false en el estado`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val vm = viewModel(contextReader = DynamicCreditNoteContextReader(countryCode = "VE"))
+
+            advanceUntilIdle()
+
+            assertFalse(vm.state.value.isPanama)
+        }
+
+    @Test
+    fun `al confirmar fiscalmente en Panama el mensaje de exito usa NCE`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repo =
+                FakeCreditNoteRepository().apply {
+                    creditNoteDetail =
+                        createdDetail.copy(
+                            fiscalStatus = CreditNoteFiscalStatusDto.CONFIRMADA,
+                        )
+                }
+            val vm =
+                viewModel(
+                    repo = repo,
+                    contextReader = DynamicCreditNoteContextReader(countryCode = "PA"),
+                )
+
+            advanceUntilIdle()
+            vm.openCreditNoteDetail("nc-1")
+            advanceUntilIdle()
+
+            vm.processSelectedCreditNoteFiscal()
+            advanceUntilIdle()
+
+            assertEquals("Nota de crédito electrónica (NCE) confirmada", vm.state.value.successMessage)
+        }
+
+    @Suppress("LongParameterList")
     private fun viewModel(
         repo: FakeCreditNoteRepository = FakeCreditNoteRepository(),
         cajaConfig: CajaConfig = CajaConfig(),
         formasPagoResult: Result<List<FormaPago>> = Result.success(emptyList()),
         fiscalPrinter: PrinterRepository? = null,
         confirmationRepository: FakeConfirmationRepository = FakeConfirmationRepository(),
+        contextReader: CreditNoteContextReader = FakeCreditNoteContextReader,
     ): CreditNotesViewModel {
         val processFiscal =
             ProcessCreditNoteFiscalUseCase(
                 confirmationRepository = confirmationRepository,
                 printerProvider = FakePrinterProvider(fiscalPrinter),
-                contextReader = FakeCreditNoteContextReader,
+                contextReader = contextReader,
             )
         return CreditNotesViewModel(
             creditNoteRepository = repo,
             cajaRepository = FakeCajaRepository(cajaConfig),
             formaPagoRepository = FakeFormaPagoRepository(formasPagoResult),
             processCreditNoteFiscal = processFiscal,
+            contextReader = contextReader,
         )
     }
 
@@ -659,6 +709,15 @@ class CreditNotesViewModelTest {
         override suspend fun currentCountryCode() = "VE"
 
         override suspend fun selectedPrinterType() = PrinterType.THE_FACTORY_HKA
+    }
+
+    private class DynamicCreditNoteContextReader(
+        val countryCode: String = "VE",
+        val printerType: PrinterType = PrinterType.THE_FACTORY_HKA,
+    ) : CreditNoteContextReader {
+        override suspend fun currentCountryCode() = countryCode
+
+        override suspend fun selectedPrinterType() = printerType
     }
 
     private class FiscalCreditNotePrinter : PrinterRepository {

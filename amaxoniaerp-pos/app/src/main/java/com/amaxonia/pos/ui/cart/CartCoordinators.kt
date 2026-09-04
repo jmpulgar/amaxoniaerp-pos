@@ -40,6 +40,16 @@ class CartStateCoordinator(
         scope: CoroutineScope,
         state: MutableStateFlow<CartState>,
     ) {
+        observeSessionAndTable(scope, state)
+        observeCartAndClient(scope, state)
+        observeSellersAndBranches(scope, state)
+        ensureDefaultClient(scope)
+    }
+
+    private fun observeSessionAndTable(
+        scope: CoroutineScope,
+        state: MutableStateFlow<CartState>,
+    ) {
         scope.launch {
             cartRepository.sesionMesaIdState.collect { sesionId ->
                 state.update { it.copy(sesionMesaId = sesionId) }
@@ -61,6 +71,12 @@ class CartStateCoordinator(
                 )
             }
         }
+    }
+
+    private fun observeCartAndClient(
+        scope: CoroutineScope,
+        state: MutableStateFlow<CartState>,
+    ) {
         scope.launch {
             cartRepository.cartItems.collect { items ->
                 updateCartState(state, items, cartRepository.selectedClient.value, cartRepository.financialSnapshot.value)
@@ -78,6 +94,12 @@ class CartStateCoordinator(
                 loadClientBranches(client, state)
             }
         }
+    }
+
+    private fun observeSellersAndBranches(
+        scope: CoroutineScope,
+        state: MutableStateFlow<CartState>,
+    ) {
         scope.launch {
             cartRepository.clientSucursales.collect { branches ->
                 state.update {
@@ -104,7 +126,6 @@ class CartStateCoordinator(
         scope.launch {
             cartRepository.availableSellers.collect { sellers -> state.update { it.copy(availableSellers = sellers) } }
         }
-        ensureDefaultClient(scope)
     }
 
     private fun updateCartState(

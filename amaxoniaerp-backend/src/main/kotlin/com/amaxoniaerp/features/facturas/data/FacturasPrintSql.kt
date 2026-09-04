@@ -20,14 +20,16 @@ internal fun queryMany(sql: String): List<SqlRow> =
 internal data class SqlRow(
     private val values: Map<String, Any?>,
 ) {
+    private val lookup = values.mapKeys { it.key.lowercase() }
+
     fun string(column: String): String = stringOrNull(column).orEmpty()
 
-    fun stringOrNull(column: String): String? = values[column]?.toString()?.takeIf { it.isNotBlank() }
+    fun stringOrNull(column: String): String? = lookup[column.lowercase()]?.toString()?.takeIf { it.isNotBlank() }
 
     fun decimal(column: String): BigDecimal = decimalOrNull(column) ?: BigDecimal.ZERO
 
     fun decimalOrNull(column: String): BigDecimal? =
-        when (val value = values[column]) {
+        when (val value = lookup[column.lowercase()]) {
             null -> null
             is BigDecimal -> value
             is Number -> BigDecimal.valueOf(value.toDouble())

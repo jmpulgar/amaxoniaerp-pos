@@ -31,16 +31,22 @@ private class ResumenAccumulator {
         tabla: BaseFacturasTable,
     ) {
         val descripcionEstatus = row[EstatusTable.descripcion] ?: ""
+        val codEstatus = row[tabla.codEstatus] ?: 0
         val total = row[tabla.totalTotalFactura].setScale(2, RoundingMode.HALF_UP)
         val totalGeneral = row[tabla.totalizarTotalGeneral].setScale(2, RoundingMode.HALF_UP)
         val isAnulada =
             descripcionEstatus.equals("Anulada", ignoreCase = true) ||
-                descripcionEstatus.equals("Anulado", ignoreCase = true)
+                descripcionEstatus.equals("Anulado", ignoreCase = true) ||
+                codEstatus == 3
+        val isPagada =
+            descripcionEstatus.equals("Pagada", ignoreCase = true) ||
+                descripcionEstatus.equals("Pagado", ignoreCase = true) ||
+                codEstatus == 2
 
         if (tabla is FacturasTableVE) {
-            addVE(row, tabla, isAnulada, total, totalGeneral)
+            addVE(row, tabla, isAnulada, isPagada, total, totalGeneral)
         } else {
-            addGeneric(isAnulada, total, totalGeneral)
+            addGeneric(isAnulada, isPagada, total, totalGeneral)
         }
     }
 
@@ -48,6 +54,7 @@ private class ResumenAccumulator {
         row: ResultRow,
         tabla: FacturasTableVE,
         isAnulada: Boolean,
+        isPagada: Boolean,
         total: BigDecimal,
         totalGeneral: BigDecimal,
     ) {
@@ -59,7 +66,7 @@ private class ResumenAccumulator {
             cancelaciones = (cancelaciones + total).setScale(2, RoundingMode.HALF_UP)
             cancelacionesRef = (cancelacionesRef + totalRefRow).setScale(2, RoundingMode.HALF_UP)
             totalAnuladas++
-        } else {
+        } else if (isPagada) {
             ventasBrutas = (ventasBrutas + totalGeneral).setScale(2, RoundingMode.HALF_UP)
             ventasNetas = (ventasNetas + total).setScale(2, RoundingMode.HALF_UP)
             ventasBrutasRef = (ventasBrutasRef + totalRefRow).setScale(2, RoundingMode.HALF_UP)
@@ -90,13 +97,14 @@ private class ResumenAccumulator {
 
     private fun addGeneric(
         isAnulada: Boolean,
+        isPagada: Boolean,
         total: BigDecimal,
         totalGeneral: BigDecimal,
     ) {
         if (isAnulada) {
             cancelaciones = (cancelaciones + total).setScale(2, RoundingMode.HALF_UP)
             totalAnuladas++
-        } else {
+        } else if (isPagada) {
             ventasBrutas = (ventasBrutas + totalGeneral).setScale(2, RoundingMode.HALF_UP)
             ventasNetas = (ventasNetas + total).setScale(2, RoundingMode.HALF_UP)
             totalPagadas++

@@ -59,4 +59,22 @@ class SalesRepositoryImpl(
                     ?: error("No autorizado: primero selecciona una empresa")
             salesApi.sendReceiptEmail(authHeader = "Bearer $token", facturaId = facturaId)
         }
+
+    override suspend fun getInvoicePdf(facturaId: String): Result<ByteArray> =
+        catchingResult {
+            val token =
+                localStore.readCompanySession()?.token
+                    ?: error("No autorizado: primero selecciona una empresa")
+            salesApi.getInvoicePdf(authHeader = "Bearer $token", facturaId = facturaId)
+        }
+
+    override suspend fun resendElectronicInvoice(
+        invoiceId: String,
+    ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> =
+        catchingResult {
+            val token =
+                localStore.readCompanySession()?.token
+                    ?: error("No autorizado: primero selecciona una empresa")
+            salesApi.resendElectronicInvoice(authHeader = "Bearer $token", invoiceId = invoiceId)
+        }
 }

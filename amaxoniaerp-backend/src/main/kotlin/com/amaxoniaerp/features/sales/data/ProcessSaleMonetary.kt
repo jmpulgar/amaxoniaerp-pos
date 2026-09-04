@@ -19,8 +19,7 @@ private const val EXCHANGE_RATE_SCALE = 8
 
 internal fun Double.toMoney(): BigDecimal = toScaledBigDecimal(2)
 
-internal fun Double.toScaledBigDecimal(scale: Int): BigDecimal =
-    BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
+internal fun Double.toScaledBigDecimal(scale: Int): BigDecimal = BigDecimal.valueOf(this).setScale(scale, RoundingMode.HALF_UP)
 
 internal data class MonetaryContext(
     val countryCode: String,

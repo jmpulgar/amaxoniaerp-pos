@@ -228,11 +228,27 @@ class HistoryViewModel(
             _state.update { it.copy(isReprinting = true, detalleActionError = null, detalleMessage = null) }
             val countryCode = sessionReader?.currentCountry()?.code ?: DEFAULT_COUNTRY_CODE
             val feedback = printInvoiceUseCase(countryCode, transaction, transaction.id)
-            _state.update {
-                it.copy(
-                    isReprinting = false,
-                    detalleMessage = feedback?.displayMessage ?: "Ticket reimpreso correctamente",
-                )
+            if (feedback == null) {
+                _state.update {
+                    it.copy(
+                        isReprinting = false,
+                        detalleActionError = "No hay una impresora compatible configurada en Ajustes",
+                    )
+                }
+            } else if (!feedback.isSuccess) {
+                _state.update {
+                    it.copy(
+                        isReprinting = false,
+                        detalleActionError = feedback.displayMessage,
+                    )
+                }
+            } else {
+                _state.update {
+                    it.copy(
+                        isReprinting = false,
+                        detalleMessage = feedback.displayMessage,
+                    )
+                }
             }
         }
     }
@@ -248,42 +264,7 @@ class HistoryViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isDownloadingPdf = true, detalleActionError = null, detalleMessage = null) }
             transactionRepository.getInvoicePdf(transaction.id).fold(
-                onSuccess = { bytes ->
-                    runCatching {
-                        val cleanNum =
-                            transaction.invoiceNumber
-                                .replace('/', '_')
-                                .replace('\\', '_')
-                        val pdfFile = File(context.cacheDir, "factura_$cleanNum.pdf")
-                        pdfFile.writeBytes(bytes)
-                        val uri =
-                            FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                pdfFile,
-                            )
-                        val intent =
-                            Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "application/pdf")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                        context.startActivity(intent)
-                        _state.update {
-                            it.copy(
-                                isDownloadingPdf = false,
-                                detalleMessage = "PDF descargado correctamente",
-                            )
-                        }
-                    }.onFailure { ex ->
-                        _state.update {
-                            it.copy(
-                                isDownloadingPdf = false,
-                                detalleActionError = "No se pudo abrir el PDF: ${ex.message}",
-                            )
-                        }
-                    }
-                },
+                onSuccess = { bytes -> openPdfFile(context, transaction, bytes) },
                 onFailure = { error ->
                     _state.update {
                         it.copy(
@@ -293,6 +274,43 @@ class HistoryViewModel(
                     }
                 },
             )
+        }
+    }
+
+    private fun openPdfFile(
+        context: Context,
+        transaction: Transaction,
+        bytes: ByteArray,
+    ) {
+        runCatching {
+            val cleanNum = transaction.invoiceNumber.replace('/', '_').replace('\\', '_')
+            val pdfFile = File(context.cacheDir, "factura_$cleanNum.pdf").apply { writeBytes(bytes) }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+            val intent =
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/pdf")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            context.startActivity(intent)
+            _state.update {
+                it.copy(
+                    isDownloadingPdf = false,
+                    detalleMessage = "PDF descargado correctamente",
+                )
+            }
+        }.onFailure { ex ->
+            val errorMsg =
+                if (ex is android.content.ActivityNotFoundException) {
+                    "No hay una aplicación instalada para abrir archivos PDF"
+                } else {
+                    "No se pudo abrir el PDF: ${ex.message}"
+                }
+            _state.update {
+                it.copy(
+                    isDownloadingPdf = false,
+                    detalleActionError = errorMsg,
+                )
+            }
         }
     }
 

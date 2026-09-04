@@ -29,9 +29,9 @@ class FacturasRepositoryFilterTest {
         }
 
     @Test
-    fun sucursalFiltersInvoiceBranch() =
+    fun cajaFiltersInvoiceCashRegister() =
         withSeededDatabase {
-            val (facturas, total) = list(FacturasFilter(sucursalId = 2))
+            val (facturas, total) = list(FacturasFilter(cajaId = "caja-2"))
 
             assertEquals(1L, total)
             assertEquals(listOf("factura-2"), facturas.map { it.id })
@@ -76,7 +76,7 @@ class FacturasRepositoryFilterTest {
             val filter =
                 FacturasFilter(
                     usuario = "alice",
-                    sucursalId = 1,
+                    cajaId = "caja-1",
                     fechaInicio = java.time.LocalDate.of(2026, 1, 3),
                     fechaFin = java.time.LocalDate.of(2026, 1, 3),
                 )
@@ -92,7 +92,7 @@ class FacturasRepositoryFilterTest {
     @Test
     fun summaryAndListUseTheSameFilteredUniverse() =
         withSeededDatabase {
-            val filter = FacturasFilter(usuario = "alice", sucursalId = 1)
+            val filter = FacturasFilter(usuario = "alice", cajaId = "caja-1")
             val (facturas, total) = list(filter)
             val resumen = repository.getResumen(database, "VE", filter)
 
@@ -100,6 +100,72 @@ class FacturasRepositoryFilterTest {
             assertEquals(facturas.size, resumen.totalFacturas)
             assertEquals(facturas.sumOf { it.total }, resumen.ventasNetas)
         }
+
+    @Test
+    fun `panama schema does not require or query numero_control_thka`() {
+        val databaseName = UUID.randomUUID().toString().replace("-", "")
+        val panamaDb =
+            Database.connect(
+                url = "jdbc:h2:mem:facturas_pa_$databaseName;MODE=MySQL;DB_CLOSE_DELAY=-1",
+                driver = "org.h2.Driver",
+            )
+        transaction(panamaDb) {
+            SchemaUtils.create(FacturasTablePA, FacturasClientesTable, EstatusTable)
+            FacturasClientesTable.insert {
+                it[idCliente] = "cliente-pa"
+                it[nombre] = "Empresa Panamá"
+                it[apellido] = null
+                it[rif] = "155123456"
+                it[codCliente] = "C-PA"
+            }
+            EstatusTable.insert {
+                it[codEstatus] = 1
+                it[descripcion] = "Pagada"
+            }
+            FacturasTablePA.insert {
+                it[idFactura] = "factura-pa-1"
+                it[codFactura] = "INV-PA-001"
+                it[codFacturaFiscal] = "CF-PA-001"
+                it[numeroDocumentoFiscal] = null
+                it[idCliente] = "cliente-pa"
+                it[codVendedor] = 1
+                it[codEstatus] = 1
+                it[idSucursal] = 1
+                it[idCaja] = "caja-pa"
+                it[fechaFactura] = "2026-01-01"
+                it[fechaCreacion] = "2026-01-01 10:00:00"
+                it[totalTotalFactura] = 150.0.toBigDecimal()
+                it[totalizarTotalGeneral] = 150.0.toBigDecimal()
+                it[formaPago] = "contado"
+                it[tipoFactura] = "VENTA"
+                it[usuarioCreacion] = "admin"
+                it[cufe] = "CUFE-12345"
+            }
+        }
+
+        try {
+            runBlocking {
+                val (facturas, total) =
+                    repository.listFacturas(
+                        database = panamaDb,
+                        countryCode = "PA",
+                        limit = 100,
+                        offset = 0,
+                        filter = FacturasFilter(),
+                    )
+                assertEquals(1L, total)
+                assertEquals("factura-pa-1", facturas.first().id)
+                assertEquals("CUFE-12345", facturas.first().codigoFiscal)
+
+                val resumen = repository.getResumen(panamaDb, "PA", FacturasFilter())
+                assertEquals(1, resumen.totalFacturas)
+            }
+        } finally {
+            transaction(panamaDb) {
+                SchemaUtils.drop(FacturasTablePA, FacturasClientesTable, EstatusTable)
+            }
+        }
+    }
 
     private val repository = FacturasRepository()
     private lateinit var database: Database
@@ -160,8 +226,7 @@ class FacturasRepositoryFilterTest {
                 code = "INV-001"
                 clientId = "cliente-1"
                 user = "alice"
-                branchId =
-                    1
+                cajaId = "caja-1"
                 createdAt = "2026-01-01 10:00:00"
                 total = 100.0
             },
@@ -172,8 +237,7 @@ class FacturasRepositoryFilterTest {
                 code = "INV-002"
                 clientId = "cliente-2"
                 user = "bob"
-                branchId =
-                    2
+                cajaId = "caja-2"
                 createdAt = "2026-01-02 23:59:59"
                 total = 200.0
             },
@@ -184,8 +248,7 @@ class FacturasRepositoryFilterTest {
                 code = "INV-003"
                 clientId = "cliente-1"
                 user = "alice"
-                branchId =
-                    1
+                cajaId = "caja-1"
                 createdAt = "2026-01-03 12:00:00"
                 total = 300.0
             },
@@ -197,7 +260,7 @@ class FacturasRepositoryFilterTest {
         var code: String = ""
         var clientId: String = ""
         var user: String = ""
-        var branchId: Int = 1
+        var cajaId: String = "caja-1"
         var createdAt: String = ""
         var total: Double = 0.0
     }
@@ -213,8 +276,8 @@ class FacturasRepositoryFilterTest {
             it[idCliente] = seed.clientId
             it[codVendedor] = 1
             it[codEstatus] = 1
-            it[idSucursal] = seed.branchId
-            it[idCaja] = "caja-1"
+            it[idSucursal] = 1
+            it[idCaja] = seed.cajaId
             it[fechaFactura] = seed.createdAt.substringBefore(' ')
             it[fechaCreacion] = seed.createdAt
             it[totalTotalFactura] = seed.total.toBigDecimal()

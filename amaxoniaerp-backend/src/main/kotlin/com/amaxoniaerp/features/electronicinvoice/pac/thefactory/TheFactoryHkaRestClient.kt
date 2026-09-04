@@ -17,13 +17,20 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
+import java.util.Base64
 
 private const val CUFE_LOG_PREFIX_LENGTH = 20
+private const val RESPONSE_LOG_PREVIEW_LENGTH = 200
+private val PDF_MAGIC_BYTES = byteArrayOf(0x25, 0x50, 0x44, 0x46) // "%PDF"
 private val theFactoryRestClientJson =
     Json {
         prettyPrint = true
@@ -184,27 +191,124 @@ class TheFactoryHkaRestClient(
         token: PacAuthToken,
         cufe: String,
     ): Result<ByteArray> =
-        runCatching {
-            val url = "${baseUrl.trimEnd('/')}/api/DescargaPDF"
-            logger.info("Descargando PDF de The Factory HKA para CUFE: {}", cufe)
+        downloadDocument(
+            baseUrl = baseUrl,
+            token = token,
+            cufe = cufe,
+            tipoArchivo = "pdf",
+            fallbackEndpoint = "DescargaPDF",
+            fileDescription = "PDF",
+            isRawContent = ::isRawPdf,
+        )
 
-            val response: HttpResponse =
+    override suspend fun downloadXml(
+        baseUrl: String,
+        token: PacAuthToken,
+        cufe: String,
+    ): Result<ByteArray> =
+        downloadDocument(
+            baseUrl = baseUrl,
+            token = token,
+            cufe = cufe,
+            tipoArchivo = "xml",
+            fallbackEndpoint = "DescargaXML",
+            fileDescription = "XML",
+            isRawContent = ::isRawXml,
+        )
+
+    private suspend fun downloadDocument(
+        baseUrl: String,
+        token: PacAuthToken,
+        cufe: String,
+        tipoArchivo: String,
+        fallbackEndpoint: String,
+        fileDescription: String,
+        isRawContent: (ContentType?, ByteArray) -> Boolean,
+    ): Result<ByteArray> =
+        runCatching {
+            val url = "${baseUrl.trimEnd('/')}/api/Descarga"
+            logger.info("Descargando {} de The Factory HKA para CUFE: {}", fileDescription, cufe)
+
+            var response: HttpResponse =
                 httpClient.post(url) {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "Bearer ${token.token}")
-                    setBody(mapOf("cufe" to cufe))
+                    setBody(TheFactoryDescargaArchivoRequest(cufe = cufe, tipoArchivo = tipoArchivo))
                 }
 
+            if (response.status == HttpStatusCode.NotFound) {
+                val fallbackUrl = "${baseUrl.trimEnd('/')}/api/$fallbackEndpoint"
+                logger.info("Endpoint /api/Descarga no encontrado. Intentando con {}", fallbackUrl)
+                response =
+                    httpClient.post(fallbackUrl) {
+                        contentType(ContentType.Application.Json)
+                        header(HttpHeaders.Authorization, "Bearer ${token.token}")
+                        setBody(TheFactoryDescargaArchivoRequest(cufe = cufe, tipoArchivo = tipoArchivo))
+                    }
+            }
+
             if (!response.status.isSuccess()) {
+                val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
                 throw PacCommunicationException(
-                    "Error HTTP ${response.status} al descargar PDF de The Factory HKA",
+                    "Error HTTP ${response.status} al descargar $fileDescription de The Factory HKA. Body: $errorBody",
                 )
             }
 
-            response.body<ByteArray>()
+            val contentType = response.contentType()
+            val rawBytes = response.body<ByteArray>()
+
+            if (isRawContent(contentType, rawBytes)) {
+                rawBytes
+            } else {
+                val responseText = rawBytes.decodeToString()
+                logger.info(
+                    "Respuesta Descarga The Factory HKA [HTTP {}]: {}",
+                    response.status,
+                    responseText.take(RESPONSE_LOG_PREVIEW_LENGTH),
+                )
+                val jsonObject =
+                    runCatching {
+                        theFactoryRestClientJson.parseToJsonElement(responseText).jsonObject
+                    }.getOrNull()
+
+                val base64Content =
+                    jsonObject?.get("archivo")?.jsonPrimitive?.contentOrNull
+                        ?: jsonObject?.get("Archivo")?.jsonPrimitive?.contentOrNull
+
+                if (!base64Content.isNullOrBlank()) {
+                    Base64.getDecoder().decode(base64Content.trim())
+                } else {
+                    val msg =
+                        jsonObject?.get("mensaje")?.jsonPrimitive?.contentOrNull
+                            ?: jsonObject?.get("Mensaje")?.jsonPrimitive?.contentOrNull
+                            ?: jsonObject?.get("resultado")?.jsonPrimitive?.contentOrNull
+                            ?: jsonObject?.get("Resultado")?.jsonPrimitive?.contentOrNull
+                            ?: "Respuesta de The Factory HKA sin archivo descargable"
+                    throw PacCommunicationException(msg)
+                }
+            }
         }.onFailure { e ->
-            logger.error("Error descargando PDF de The Factory HKA para CUFE: {}", cufe, e)
+            logger.error("Error descargando {} de The Factory HKA para CUFE: {}", fileDescription, cufe, e)
         }
+
+    private fun isRawPdf(
+        contentType: ContentType?,
+        bytes: ByteArray,
+    ): Boolean {
+        if (contentType?.match(ContentType.Application.Pdf) == true) return true
+        if (bytes.size < PDF_MAGIC_BYTES.size) return false
+        return bytes.take(PDF_MAGIC_BYTES.size).toByteArray().contentEquals(PDF_MAGIC_BYTES)
+    }
+
+    private fun isRawXml(
+        contentType: ContentType?,
+        bytes: ByteArray,
+    ): Boolean {
+        if (contentType?.match(ContentType.Application.Xml) == true) return true
+        if (contentType?.match(ContentType.Text.Xml) == true) return true
+        val trimmed = bytes.take(10).toByteArray().decodeToString().trimStart()
+        return trimmed.startsWith("<?xml") || trimmed.startsWith("<")
+    }
 
     override suspend fun sendEmail(
         baseUrl: String,

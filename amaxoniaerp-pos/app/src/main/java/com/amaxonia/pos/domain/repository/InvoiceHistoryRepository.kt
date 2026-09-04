@@ -1,14 +1,14 @@
 package com.amaxonia.pos.domain.repository
 
+import com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
 
 data class InvoiceHistoryFilter(
     val search: String? = null,
     val usuario: String? = null,
-    val sucursalId: Int? = null,
     val fechaInicio: String? = null,
     val fechaFin: String? = null,
-    val estatus: List<Int> = emptyList(),
+    val cajaId: String? = null,
 )
 
 data class InvoiceHistoryPage(
@@ -32,4 +32,8 @@ interface InvoiceHistoryRepository : TransactionRepository {
     suspend fun getSummary(filter: InvoiceHistoryFilter = InvoiceHistoryFilter()): Result<InvoiceHistorySummary>
 
     suspend fun getInvoiceDetail(invoiceId: String): Result<FacturaDetalleResponseDto>
+
+    suspend fun getInvoicePdf(invoiceId: String): Result<ByteArray>
+
+    suspend fun resendElectronicInvoice(invoiceId: String): Result<ElectronicInvoiceResultDto>
 }

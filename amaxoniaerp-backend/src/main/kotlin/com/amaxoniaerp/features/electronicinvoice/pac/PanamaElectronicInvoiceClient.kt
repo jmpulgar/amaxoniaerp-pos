@@ -76,4 +76,16 @@ interface PanamaElectronicInvoiceClient {
         token: PacAuthToken,
         cufe: String,
     ): Result<ByteArray>
+
+    /**
+     * Descarga el XML del documento autorizado usando el CUFE.
+     */
+    suspend fun downloadXml(
+        baseUrl: String,
+        token: PacAuthToken,
+        cufe: String,
+    ): Result<ByteArray> =
+        Result.failure(
+            PacCommunicationException("El PAC no soporta descarga de XML"),
+        )
 }

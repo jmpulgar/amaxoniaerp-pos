@@ -1,5 +1,7 @@
 package com.amaxoniaerp.features.electronicinvoice.pac.thefactory
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 // ─── DTOs de respuesta específicos de The Factory HKA ────────────────────────
@@ -84,4 +86,16 @@ data class TheFactoryEstadoDocumentoResponse(
     val cufe: String? = null,
     val fechaRecepcionDocumento: String? = null,
     val estado: String? = null,
+)
+
+/**
+ * Body del endpoint `POST /api/Descarga`.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class TheFactoryDescargaArchivoRequest(
+    val cufe: String? = null,
+    val numeroDocumento: String? = null,
+    @EncodeDefault
+    val tipoArchivo: String = "pdf",
 )

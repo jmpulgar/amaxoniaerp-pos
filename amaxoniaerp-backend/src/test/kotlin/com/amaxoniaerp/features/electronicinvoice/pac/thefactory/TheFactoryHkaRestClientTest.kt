@@ -14,6 +14,7 @@ import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
@@ -291,14 +292,36 @@ class TheFactoryHkaRestClientTest {
         assertNull(res.getOrNull())
     }
 
-    // ─── Descarga de PDF ───────────────────────────────────────────────────
+    // ─── Descarga de PDF y XML ─────────────────────────────────────────────
 
     @Test
-    fun `descarga de PDF exitosa retorna los bytes crudos`() {
+    fun `serializacion de TheFactoryDescargaArchivoRequest no omite tipoArchivo con encodeDefaults false`() {
+        val reqDefault = TheFactoryDescargaArchivoRequest(cufe = "CUFE-123")
+        val jsonDefault = feJson.encodeToString(TheFactoryDescargaArchivoRequest.serializer(), reqDefault)
+        assertTrue(jsonDefault.contains(""""tipoArchivo":"pdf""""), "Debe incluir tipoArchivo=pdf por defecto")
+        assertTrue(jsonDefault.contains(""""cufe":"CUFE-123""""))
+
+        val reqExplicit = TheFactoryDescargaArchivoRequest(cufe = "CUFE-456", tipoArchivo = "pdf")
+        val jsonExplicit = feJson.encodeToString(TheFactoryDescargaArchivoRequest.serializer(), reqExplicit)
+        assertTrue(jsonExplicit.contains(""""tipoArchivo":"pdf""""), "Debe incluir tipoArchivo=pdf explicito")
+
+        val reqXml = TheFactoryDescargaArchivoRequest(cufe = "CUFE-789", tipoArchivo = "xml")
+        val jsonXml = feJson.encodeToString(TheFactoryDescargaArchivoRequest.serializer(), reqXml)
+        assertTrue(jsonXml.contains(""""tipoArchivo":"xml""""), "Debe incluir tipoArchivo=xml")
+    }
+
+    @Test
+    fun `descarga de PDF exitosa retorna los bytes crudos y envia tipoArchivo pdf`() {
         val pdfBytes = "%PDF-1.7 contenido simulado".toByteArray()
         val client =
             cliente { req ->
-                assertTrue(req.url.encodedPath.endsWith("/api/DescargaPDF"))
+                assertTrue(req.url.encodedPath.endsWith("/api/Descarga") || req.url.encodedPath.endsWith("/api/DescargaPDF"))
+                val bodyText = when (val b = req.body) {
+                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                    else -> ""
+                }
+                assertTrue(bodyText.contains(""""tipoArchivo":"pdf""""), "El body debe contener tipoArchivo=pdf")
+                assertTrue(bodyText.contains(""""cufe":"CUFE-PDF-1""""), "El body debe contener el CUFE")
                 respond(
                     content = pdfBytes,
                     status = HttpStatusCode.OK,
@@ -315,6 +338,100 @@ class TheFactoryHkaRestClientTest {
             }
         assertTrue(res.isSuccess)
         assertEquals(pdfBytes.toList(), res.getOrThrow().toList())
+    }
+
+    @Test
+    fun `descarga de PDF exitosa con JSON Base64 decodifica el archivo correctamente`() {
+        val pdfContent = "%PDF-1.7 contenido decodificado".toByteArray()
+        val base64String =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(pdfContent)
+        val jsonResponse = """{"codigo":200,"resultado":"Exitoso","mensaje":"Documento descargado","archivo":"$base64String"}"""
+        val client =
+            cliente { req ->
+                assertTrue(req.url.encodedPath.endsWith("/api/Descarga"))
+                val bodyText = when (val b = req.body) {
+                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                    else -> ""
+                }
+                assertTrue(bodyText.contains(""""tipoArchivo":"pdf""""), "El body debe contener tipoArchivo=pdf")
+                respond(
+                    content = jsonResponse,
+                    status = HttpStatusCode.OK,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.downloadPdf(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    cufe = "CUFE-PDF-BASE64",
+                )
+            }
+        assertTrue(res.isSuccess)
+        assertEquals(pdfContent.toList(), res.getOrThrow().toList())
+    }
+
+    @Test
+    fun `descarga de PDF con error de negocio 109 tipoArchivo es requerido falla con PacCommunicationException`() {
+        val client =
+            cliente { req ->
+                assertTrue(req.url.encodedPath.endsWith("/api/Descarga"))
+                respond(
+                    content = """{"Codigo":109,"Resultado":"Error","Mensaje":"tipoArchivo es requerido"}""",
+                    status = HttpStatusCode.OK,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.downloadPdf(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    cufe = "CUFE-ERR-109",
+                )
+            }
+        assertTrue(res.isFailure)
+        val ex = res.exceptionOrNull()
+        assertIs<PacCommunicationException>(ex)
+        assertTrue(ex.message?.contains("tipoArchivo es requerido") == true)
+    }
+
+    @Test
+    fun `descarga de XML exitosa envia tipoArchivo xml y decodifica correctamente`() {
+        val xmlContent = "<rFE>xml simulado</rFE>".toByteArray()
+        val base64String =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(xmlContent)
+        val jsonResponse = """{"codigo":200,"resultado":"Exitoso","mensaje":"Documento descargado","archivo":"$base64String"}"""
+        val client =
+            cliente { req ->
+                assertTrue(req.url.encodedPath.endsWith("/api/Descarga"))
+                val bodyText = when (val b = req.body) {
+                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                    else -> ""
+                }
+                assertTrue(bodyText.contains(""""tipoArchivo":"xml""""), "El body debe contener tipoArchivo=xml")
+                assertTrue(bodyText.contains(""""cufe":"CUFE-XML-1""""), "El body debe contener el CUFE")
+                respond(
+                    content = jsonResponse,
+                    status = HttpStatusCode.OK,
+                    headers = jsonHeaders,
+                )
+            }
+        val res =
+            runBlocking {
+                client.downloadXml(
+                    baseUrl = credentials.baseUrl,
+                    token = PacAuthToken("jwt-x"),
+                    cufe = "CUFE-XML-1",
+                )
+            }
+        assertTrue(res.isSuccess)
+        assertEquals(xmlContent.toList(), res.getOrThrow().toList())
     }
 
     @Test

@@ -24,22 +24,40 @@ class DefaultInvoicePrintGateway(
         transaction: Transaction,
         remoteInvoiceId: String,
     ): InvoicePrintFeedback? =
-        when (countryCode) {
+        when (countryCode.uppercase()) {
             VENEZUELA_CODE ->
                 when (localStore.readSelectedPrinterType()) {
                     PrinterType.THE_FACTORY_HKA -> printFiscal(transaction)
                     PrinterType.SUNMI_V2 -> printSunmi(remoteInvoiceId, countryCode, transaction)
                     else -> null
                 }
-            PANAMA_CODE -> printSunmi(remoteInvoiceId, countryCode, transaction)
+            PANAMA_CODE ->
+                when (localStore.readSelectedPrinterType()) {
+                    PrinterType.SUNMI_V2 -> printSunmi(remoteInvoiceId, countryCode, transaction)
+                    else -> null
+                }
             else -> null
         }
 
     private suspend fun printFiscal(transaction: Transaction): InvoicePrintFeedback? {
         val printer = printerProvider.getActivePrinter() ?: return null
         return printer.printReceipt(transaction).fold(
-            onSuccess = { result -> InvoicePrintFeedback("Imprimiendo recibo...", result.fiscalNumber, result.printerSerial) },
-            onFailure = { error -> InvoicePrintFeedback(error.message ?: "No se pudo imprimir el recibo", "", "") },
+            onSuccess = { result ->
+                InvoicePrintFeedback(
+                    displayMessage = "Imprimiendo recibo...",
+                    fiscalNumber = result.fiscalNumber,
+                    printerSerial = result.printerSerial,
+                    isSuccess = true,
+                )
+            },
+            onFailure = { error ->
+                InvoicePrintFeedback(
+                    displayMessage = error.message ?: "No se pudo imprimir el recibo",
+                    fiscalNumber = "",
+                    printerSerial = "",
+                    isSuccess = false,
+                )
+            },
         )
     }
 
@@ -56,6 +74,7 @@ class DefaultInvoicePrintGateway(
                     "Impresora SUNMI no disponible. Puedes reintentar la impresión desde el historial.",
                     "",
                     "",
+                    isSuccess = false,
                 )
             else -> {
                 val payloadResult =
@@ -65,15 +84,21 @@ class DefaultInvoicePrintGateway(
                         Result.failure(IllegalStateException("Factura offline"))
                     }
 
-                val payload = payloadResult.getOrElse {
-                    if (transaction != null) {
-                        val company = localStore.readCompanySession()?.company
-                        val caja = localStore.readActiveCajaForToday()
-                        LocalInvoicePrintPayloadMapper.fromTransaction(transaction, company, caja)
-                    } else {
-                        return InvoicePrintFeedback(it.message ?: "No se pudo obtener el payload de impresión", "", "")
+                val payload =
+                    payloadResult.getOrElse {
+                        if (transaction != null) {
+                            val company = localStore.readCompanySession()?.company
+                            val caja = localStore.readActiveCajaForToday()
+                            LocalInvoicePrintPayloadMapper.fromTransaction(transaction, company, caja)
+                        } else {
+                            return InvoicePrintFeedback(
+                                displayMessage = it.message ?: "No se pudo obtener el payload de impresión",
+                                fiscalNumber = "",
+                                printerSerial = "",
+                                isSuccess = false,
+                            )
+                        }
                     }
-                }
 
                 val ticket =
                     when (countryCode.uppercase()) {
@@ -83,8 +108,8 @@ class DefaultInvoicePrintGateway(
                     }
                 when (val result = printer.printTicket(ticket)) {
                     PrintResult.Success ->
-                        InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI")
-                    is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI")
+                        InvoicePrintFeedback("Ticket SUNMI enviado correctamente", payload.cufe.orEmpty(), "SUNMI", isSuccess = true)
+                    is PrintResult.Error -> InvoicePrintFeedback(result.message, payload.cufe.orEmpty(), "SUNMI", isSuccess = false)
                 }
             }
         }

@@ -52,6 +52,7 @@ internal fun CreditNoteDetailSheet(
     isSubmitting: Boolean,
     onProcessFiscal: () -> Unit,
     currencySymbol: String = "$",
+    isPanama: Boolean = false,
 ) {
     val scrollState = rememberScrollState()
 
@@ -64,8 +65,8 @@ internal fun CreditNoteDetailSheet(
                 .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        CreditNoteDetailHeader(detail = detail)
-        CreditNoteDetailInfoCard(detail = detail)
+        CreditNoteDetailHeader(detail = detail, isPanama = isPanama)
+        CreditNoteDetailInfoCard(detail = detail, isPanama = isPanama)
 
         if (detail.observacion.isNotBlank()) {
             CreditNoteDetailObservacionCard(observacion = detail.observacion)
@@ -92,7 +93,10 @@ internal fun CreditNoteDetailSheet(
 
 /** Encabezado con código, estado fiscal y número de documento fiscal si aplica. */
 @Composable
-private fun CreditNoteDetailHeader(detail: CreditNoteDetailDto) {
+private fun CreditNoteDetailHeader(
+    detail: CreditNoteDetailDto,
+    isPanama: Boolean = false,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -121,7 +125,7 @@ private fun CreditNoteDetailHeader(detail: CreditNoteDetailDto) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FiscalStatusChip(status = detail.fiscalStatus)
+                FiscalStatusChip(status = detail.fiscalStatus, isPanama = isPanama)
             }
         }
     }
@@ -131,6 +135,7 @@ private fun CreditNoteDetailHeader(detail: CreditNoteDetailDto) {
 @Composable
 private fun CreditNoteDetailInfoCard(
     detail: CreditNoteDetailDto,
+    isPanama: Boolean = false,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -180,7 +185,11 @@ private fun CreditNoteDetailInfoCard(
 
             if (detail.fiscalNumber.isNotBlank()) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("N° Documento Fiscal", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(
+                        if (isPanama) "N° de Documento (NCE)" else "N° Documento Fiscal",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
                     Text(detail.fiscalNumber, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
                 }
             }
@@ -335,10 +344,11 @@ private fun CreditNoteProductLineRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val subinfo = listOfNotNull(
-                line.codigo.takeIf { it.isNotBlank() },
-                if (line.pIva > 0) "IVA ${formatAmount(line.pIva)}%" else "Exento",
-            ).joinToString(" • ")
+            val subinfo =
+                listOfNotNull(
+                    line.codigo.takeIf { it.isNotBlank() },
+                    if (line.pIva > 0) "IVA ${formatAmount(line.pIva)}%" else "Exento",
+                ).joinToString(" • ")
             if (subinfo.isNotBlank()) {
                 Text(
                     text = subinfo,
@@ -447,4 +457,3 @@ private fun ProcessFiscalButton(
         }
     }
 }
-

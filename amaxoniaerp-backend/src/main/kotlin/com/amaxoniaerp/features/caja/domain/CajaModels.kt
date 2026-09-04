@@ -77,7 +77,7 @@ data class AperturaRequest(
     val montoApertura: Double,
     val idVendedor: Int? = null,
     val secuencia: String? = null,
-    val serieSucursal: String,
+    val serieSucursal: String = "",
     val idSucursal: Int? = null,
     val facturaInicial: Int = 0,
     val notacreditoInicial: Int = 0,
@@ -254,7 +254,33 @@ data class CajaCierreSaveRequest(
     @SerialName("detalle_formapago") val detalleFormaPago: List<CajaCierreFormaPagoRequest> = emptyList(),
     @SerialName("observacion_cierre") val observacionCierre: String? = null,
     @SerialName("numero_cierre_fiscal") val numeroCierreFiscal: String? = null,
-)
+) {
+    constructor(
+        id: String,
+        montoTotal: Double = 0.0,
+        montoEfectivoTotal: Double = 0.0,
+        montoOtrosTotal: Double = 0.0,
+        observacionCierre: String? = null,
+    ) : this(
+        id = id,
+        montoEfectivoVentas = montoEfectivoTotal,
+        montoEfectivoEntrada = 0.0,
+        montoEfectivoSalida = 0.0,
+        montoEfectivoTotal = montoEfectivoTotal,
+        montoEfectivoCierre = montoEfectivoTotal,
+        montoEfectivoDiferencia = 0.0,
+        montoOtrosTotal = montoOtrosTotal,
+        montoOtrosCierre = montoOtrosTotal,
+        montoOtrosDiferencia = 0.0,
+        montoTotal = montoTotal,
+        montoCierre = montoTotal,
+        montoDiferencia = 0.0,
+        detalle = emptyList(),
+        detalleFormaPago = emptyList(),
+        observacionCierre = observacionCierre,
+        numeroCierreFiscal = null,
+    )
+}
 
 @Serializable
 data class CajaCierreDetalleRequest(

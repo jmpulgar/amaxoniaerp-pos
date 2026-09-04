@@ -89,7 +89,11 @@ object EstadoSesionMesa {
 
 /** Comprueba si una sesión sigue activa/abierta para operar pedidos y cuentas. */
 val SesionMesa.isActiva: Boolean
-    get() = activo && estado != EstadoSesionMesa.CERRADA && estado != EstadoSesionMesa.CERRADA_PAGADA && estado != EstadoSesionMesa.CANCELADA
+    get() =
+        activo &&
+            estado != EstadoSesionMesa.CERRADA &&
+            estado != EstadoSesionMesa.CERRADA_PAGADA &&
+            estado != EstadoSesionMesa.CANCELADA
 
 /** Estados operativos derivados de la mesa (reflejan el enum del backend). */
 object EstadoMesaOperativo {

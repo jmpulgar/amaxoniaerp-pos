@@ -13,8 +13,7 @@ import com.amaxoniaerp.features.caja.domain.CajaSecuenciaGuard
  * activa abierta por el workflow. No abre transacciones propias.
  */
 class ExposedCajaSessionStore : CajaSessionStore {
-    override fun findOpenSecuencias(idCaja: String): List<CajaSecuencia> =
-        findOpenSecuenciaRows(idCaja).map(::mapOpenSecuenciaRow)
+    override fun findOpenSecuencias(idCaja: String): List<CajaSecuencia> = findOpenSecuenciaRows(idCaja).map(::mapOpenSecuenciaRow)
 
     override fun findSecuenciaGuard(idSecuencia: String): CajaSecuenciaGuard? = readSessionGuard(idSecuencia)
 

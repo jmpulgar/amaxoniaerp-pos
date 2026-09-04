@@ -13,36 +13,20 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-object LocalInvoicePrintPayloadMapper {
+private const val PERCENT_DIVISOR = 100.0
 
+object LocalInvoicePrintPayloadMapper {
     fun fromRequest(
         request: ProcessSaleRequestDto,
         company: CompanyDetailsSnapshot? = null,
         caja: Caja? = null,
     ): FacturaPrintPayloadDto {
         val invoice = request.factura
-        val items = request.items.map { item ->
-            val taxAmount = (item.itemTotalConIva - item.itemTotalSinIva).coerceAtLeast(0.0)
-            ProductoPrintDto(
-                nombre = item.itemDescripcion,
-                cantidad = formatQuantity(item.itemCantidadTotal),
-                unidad = item.itemUnidadEmpaque.ifBlank { "UND" },
-                precioUnitario = formatMoney(item.itemPrecioSinIva),
-                descuento = formatMoney(item.itemMontoDescuento),
-                impuesto = formatMoney(taxAmount),
-                total = formatMoney(item.itemTotalConIva),
-                codigo = item.itemCodigo.takeIf { it.isNotBlank() },
-                tasaImpuesto = formatTaxRate(item.itemPIva),
-            )
-        }
-        val pagos = request.pagos.map { pago ->
-            PagoPrintDto(
-                metodo = pago.tipoMovimiento,
-                monto = formatMoney(pago.monto),
-            )
-        }
-        val dateIso = invoice.fechaFactura?.takeIf { it.isNotBlank() }
-            ?: LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        val items = mapRequestItems(request)
+        val pagos = mapRequestPagos(request)
+        val dateIso =
+            invoice.fechaFactura?.takeIf { it.isNotBlank() }
+                ?: LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
 
         val isMultiCurrency = request.moneda?.multiMoneda.equals("SI", ignoreCase = true)
 
@@ -50,24 +34,8 @@ object LocalInvoicePrintPayloadMapper {
             facturaId = request.idFactura.orEmpty(),
             numeroFactura = request.codFactura ?: invoice.serieSucursal.ifBlank { invoice.idCajaSecuencia },
             fecha = dateIso,
-            empresa = EmpresaPrintDto(
-                nombre = company?.name?.ifBlank { null } ?: "AMAXONIA",
-                ruc = company?.rif?.takeIf { it.isNotBlank() },
-                direccion = null,
-                telefono = null,
-                tienda = caja?.sucursalNombre ?: caja?.sucursalCodigo ?: "Sucursal ${invoice.idSucursal}",
-                caja = caja?.descripcion ?: caja?.codCaja ?: "Caja ${invoice.codigoCaja}",
-            ),
-            cliente = if (invoice.facturarA.isNotBlank()) {
-                ClientePrintDto(
-                    nombre = invoice.facturarA,
-                    documento = invoice.facturarARuc.takeIf { it.isNotBlank() && it != "CF" },
-                    sucursal = null,
-                    sucursalDireccion = invoice.facturarADireccion.takeIf { it.isNotBlank() },
-                    digitoVerificador = null,
-                    tipoReceptor = null,
-                )
-            } else null,
+            empresa = buildEmpresaDto(company, caja, invoice.idSucursal, invoice.codigoCaja),
+            cliente = buildClienteDto(invoice.facturarA, invoice.facturarARuc, invoice.facturarADireccion),
             vendedor = caja?.defaultSellerName ?: invoice.codVendedor.toString(),
             productos = items,
             subtotal = formatMoney(invoice.subtotal),
@@ -101,33 +69,8 @@ object LocalInvoicePrintPayloadMapper {
         company: CompanyDetailsSnapshot? = null,
         caja: Caja? = null,
     ): FacturaPrintPayloadDto {
-        val products = transaction.fiscalItems.map { item ->
-            val totalSinIva = item.quantity * item.unitPriceWithoutTax
-            val taxAmount = totalSinIva * (item.iva / 100.0)
-            val totalConIva = totalSinIva + taxAmount
-            ProductoPrintDto(
-                nombre = item.description,
-                cantidad = formatQuantity(item.quantity),
-                unidad = "UND",
-                precioUnitario = formatMoney(item.unitPriceWithoutTax),
-                descuento = "0.00",
-                impuesto = formatMoney(taxAmount),
-                total = formatMoney(totalConIva),
-                codigo = null,
-                tasaImpuesto = formatTaxRate(item.iva),
-            )
-        }
-        val payments = if (transaction.paymentMethods.isNotEmpty()) {
-            transaction.paymentMethods.map { pm ->
-                PagoPrintDto(
-                    metodo = pm.sigla.ifBlank { pm.description.ifBlank { "PAGO" } },
-                    monto = formatMoney(pm.amount),
-                )
-            }
-        } else {
-            listOf(PagoPrintDto(metodo = transaction.formaPago.ifBlank { "CONTADO" }, monto = formatMoney(transaction.amount)))
-        }
-
+        val products = mapTransactionProducts(transaction)
+        val payments = mapTransactionPayments(transaction)
         val totalTax = products.sumOf { it.impuesto.toDoubleOrNull() ?: 0.0 }
         val subtotal = products.sumOf { (it.precioUnitario.toDoubleOrNull() ?: 0.0) * (it.cantidad.toDoubleOrNull() ?: 1.0) }
 
@@ -135,18 +78,22 @@ object LocalInvoicePrintPayloadMapper {
             facturaId = transaction.id,
             numeroFactura = transaction.invoiceNumber,
             fecha = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            empresa = EmpresaPrintDto(
-                nombre = company?.name?.ifBlank { null } ?: "AMAXONIA",
-                ruc = company?.rif?.takeIf { it.isNotBlank() },
-                tienda = caja?.sucursalNombre ?: caja?.sucursalCodigo,
-                caja = caja?.descripcion ?: caja?.codCaja,
-            ),
-            cliente = if (transaction.clienteNombre.isNotBlank()) {
-                ClientePrintDto(
-                    nombre = transaction.clienteNombre,
-                    documento = transaction.clienteIdentificacion.takeIf { it.isNotBlank() },
-                )
-            } else null,
+            empresa =
+                EmpresaPrintDto(
+                    nombre = company?.name?.ifBlank { null } ?: "AMAXONIA",
+                    ruc = company?.rif?.takeIf { it.isNotBlank() },
+                    tienda = caja?.sucursalNombre ?: caja?.sucursalCodigo,
+                    caja = caja?.descripcion ?: caja?.codCaja,
+                ),
+            cliente =
+                if (transaction.clienteNombre.isNotBlank()) {
+                    ClientePrintDto(
+                        nombre = transaction.clienteNombre,
+                        documento = transaction.clienteIdentificacion.takeIf { it.isNotBlank() },
+                    )
+                } else {
+                    null
+                },
             vendedor = caja?.defaultSellerName,
             productos = products,
             subtotal = formatMoney(subtotal),
@@ -174,6 +121,93 @@ object LocalInvoicePrintPayloadMapper {
             totalDivisa = transaction.totalRef?.let { formatMoney(it) },
         )
     }
+
+    private fun mapRequestItems(request: ProcessSaleRequestDto): List<ProductoPrintDto> =
+        request.items.map { item ->
+            val taxAmount = (item.itemTotalConIva - item.itemTotalSinIva).coerceAtLeast(0.0)
+            ProductoPrintDto(
+                nombre = item.itemDescripcion,
+                cantidad = formatQuantity(item.itemCantidadTotal),
+                unidad = item.itemUnidadEmpaque.ifBlank { "UND" },
+                precioUnitario = formatMoney(item.itemPrecioSinIva),
+                descuento = formatMoney(item.itemMontoDescuento),
+                impuesto = formatMoney(taxAmount),
+                total = formatMoney(item.itemTotalConIva),
+                codigo = item.itemCodigo.takeIf { it.isNotBlank() },
+                tasaImpuesto = formatTaxRate(item.itemPIva),
+            )
+        }
+
+    private fun mapRequestPagos(request: ProcessSaleRequestDto): List<PagoPrintDto> =
+        request.pagos.map { pago ->
+            PagoPrintDto(
+                metodo = pago.tipoMovimiento,
+                monto = formatMoney(pago.monto),
+            )
+        }
+
+    private fun mapTransactionProducts(transaction: Transaction): List<ProductoPrintDto> =
+        transaction.fiscalItems.map { item ->
+            val totalSinIva = item.quantity * item.unitPriceWithoutTax
+            val taxAmount = totalSinIva * (item.iva / PERCENT_DIVISOR)
+            val totalConIva = totalSinIva + taxAmount
+            ProductoPrintDto(
+                nombre = item.description,
+                cantidad = formatQuantity(item.quantity),
+                unidad = "UND",
+                precioUnitario = formatMoney(item.unitPriceWithoutTax),
+                descuento = "0.00",
+                impuesto = formatMoney(taxAmount),
+                total = formatMoney(totalConIva),
+                codigo = null,
+                tasaImpuesto = formatTaxRate(item.iva),
+            )
+        }
+
+    private fun mapTransactionPayments(transaction: Transaction): List<PagoPrintDto> =
+        if (transaction.paymentMethods.isNotEmpty()) {
+            transaction.paymentMethods.map { pm ->
+                PagoPrintDto(
+                    metodo = pm.sigla.ifBlank { pm.description.ifBlank { "PAGO" } },
+                    monto = formatMoney(pm.amount),
+                )
+            }
+        } else {
+            listOf(PagoPrintDto(metodo = transaction.formaPago.ifBlank { "CONTADO" }, monto = formatMoney(transaction.amount)))
+        }
+
+    private fun buildEmpresaDto(
+        company: CompanyDetailsSnapshot?,
+        caja: Caja?,
+        idSucursal: Int,
+        codigoCaja: String,
+    ): EmpresaPrintDto =
+        EmpresaPrintDto(
+            nombre = company?.name?.ifBlank { null } ?: "AMAXONIA",
+            ruc = company?.rif?.takeIf { it.isNotBlank() },
+            direccion = null,
+            telefono = null,
+            tienda = caja?.sucursalNombre ?: caja?.sucursalCodigo ?: "Sucursal $idSucursal",
+            caja = caja?.descripcion ?: caja?.codCaja ?: "Caja $codigoCaja",
+        )
+
+    private fun buildClienteDto(
+        facturarA: String,
+        facturarARuc: String,
+        facturarADireccion: String,
+    ): ClientePrintDto? =
+        if (facturarA.isNotBlank()) {
+            ClientePrintDto(
+                nombre = facturarA,
+                documento = facturarARuc.takeIf { it.isNotBlank() && it != "CF" },
+                sucursal = null,
+                sucursalDireccion = facturarADireccion.takeIf { it.isNotBlank() },
+                digitoVerificador = null,
+                tipoReceptor = null,
+            )
+        } else {
+            null
+        }
 
     private fun formatMoney(amount: Double): String = String.format(Locale.US, "%.2f", amount)
 

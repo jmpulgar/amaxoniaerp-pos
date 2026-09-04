@@ -28,17 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Splitscreen
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,7 +47,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
@@ -64,13 +58,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
 import com.amaxonia.pos.domain.model.mesas.EstadoCuentaMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
@@ -81,8 +73,6 @@ import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosStatusBadge
 import com.amaxonia.pos.ui.common.components.PosVisualAction
 import com.amaxonia.pos.ui.common.components.PosVisualTone
-import com.amaxonia.pos.ui.theme.PosExtraShapes
-import com.amaxonia.pos.ui.theme.PosTextStyles
 import java.util.Locale
 
 /** Selector principal de modo: Cuenta Completa vs Dividir Cuenta */
@@ -143,7 +133,14 @@ private fun ModoDecisionCard(
         label = "contentColor",
     )
     val subtitleColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue =
+            if (isSelected) {
+                MaterialTheme.colorScheme.onPrimary.copy(
+                    alpha = 0.85f,
+                )
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         label = "subtitleColor",
     )
     val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
@@ -169,7 +166,14 @@ private fun ModoDecisionCard(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer,
+                    color =
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimary.copy(
+                                alpha = 0.2f,
+                            )
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer
+                        },
                     contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(40.dp),
                 ) {
@@ -521,8 +525,7 @@ fun SplitProductInteractiveCard(
                             .background(
                                 MaterialTheme.colorScheme.surface,
                                 RoundedCornerShape(10.dp),
-                            )
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            ).padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -548,7 +551,14 @@ fun SplitProductInteractiveCard(
                                 imageVector = if (selectedQuantity <= 1.0) Icons.Default.Close else Icons.Default.Remove,
                                 contentDescription = "Disminuir",
                                 modifier = Modifier.size(18.dp),
-                                tint = if (selectedQuantity <= 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint =
+                                    if (selectedQuantity <=
+                                        1.0
+                                    ) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                             )
                         }
 

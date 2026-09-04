@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,12 +68,15 @@ fun HistoryScreen(
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     // Detail bottom sheet
     HistoryDetalleSheet(
         state = state,
         onDismiss = viewModel::dismissDetalle,
         onResend = viewModel::resendElectronicInvoice,
+        onReprint = viewModel::reprintInvoice,
+        onDownloadPdf = { transaction -> viewModel.downloadAndOpenPdf(context, transaction) },
     )
 
     Scaffold(
@@ -107,6 +111,8 @@ private fun HistoryDetalleSheet(
     state: HistoryState,
     onDismiss: () -> Unit,
     onResend: (Transaction) -> Unit,
+    onReprint: (Transaction) -> Unit,
+    onDownloadPdf: (Transaction) -> Unit,
 ) {
     if (!state.showDetalleSheet) return
 
@@ -127,6 +133,10 @@ private fun HistoryDetalleSheet(
             actionMessage = state.detalleMessage,
             isResending = state.isResendingFE,
             onResend = { state.selectedTransaction?.let(onResend) },
+            isReprinting = state.isReprinting,
+            onReprint = { state.selectedTransaction?.let(onReprint) },
+            isDownloadingPdf = state.isDownloadingPdf,
+            onDownloadPdf = { state.selectedTransaction?.let(onDownloadPdf) },
         )
     }
 }

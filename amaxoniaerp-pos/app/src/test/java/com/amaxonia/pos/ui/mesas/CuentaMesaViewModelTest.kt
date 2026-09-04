@@ -109,14 +109,29 @@ class CuentaMesaViewModelTest {
             vm.load()
             advanceUntilIdle()
 
-            assertEquals(listOf(2), vm.state.value.pedidosNoEntregados.map { it.id })
-            assertEquals(listOf(1), vm.state.value.pedidos.map { it.id })
+            assertEquals(
+                listOf(2),
+                vm.state.value.pedidosNoEntregados
+                    .map { it.id },
+            )
+            assertEquals(
+                listOf(1),
+                vm.state.value.pedidos
+                    .map { it.id },
+            )
 
             vm.marcarTodosEntregados()
             advanceUntilIdle()
 
-            assertTrue(vm.state.value.pedidosNoEntregados.isEmpty())
-            assertEquals(listOf(1, 2), vm.state.value.pedidos.map { it.id })
+            assertTrue(
+                vm.state.value.pedidosNoEntregados
+                    .isEmpty(),
+            )
+            assertEquals(
+                listOf(1, 2),
+                vm.state.value.pedidos
+                    .map { it.id },
+            )
             assertEquals("Todos los productos fueron marcados como entregados", vm.state.value.info)
         }
 
@@ -296,8 +311,6 @@ class CuentaMesaViewModelTest {
             assertEquals(0, cuentas.crearRequests.size)
         }
 
-
-
     @Test
     fun `cancelar con exito informa y recarga`() =
         runTest(mainDispatcherRule.dispatcher) {
@@ -433,7 +446,6 @@ class CuentaMesaViewModelTest {
             assertEquals(0, vm.state.value.itemsDivisionSeleccionadosCount)
             assertEquals(0.0, vm.state.value.unidadesDivisionSeleccionadas, 0.0)
         }
-
 
     private fun cuentaViewModel(
         cuentas: CuentaMesaRepository = FakeCuentaMesaRepository(),

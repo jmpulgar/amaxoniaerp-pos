@@ -20,27 +20,28 @@ internal fun resolveWarehouseContext(
     cajaId: String,
 ): WarehouseContext {
     val isVE = countryCode.equals("VE", ignoreCase = true)
+    val cajaTable = SalesCajaTableFactory.forCountry(countryCode)
     val columns =
-        if (isVE) {
-            listOf(SalesCajaTable.idSucursal, SalesCajaTable.codAlmacen)
+        if (isVE && cajaTable is SalesCajaTableVE) {
+            listOf(cajaTable.idSucursal, cajaTable.codAlmacen)
         } else {
-            listOf(SalesCajaTable.idSucursal)
+            listOf(cajaTable.idSucursal)
         }
     val caja =
-        SalesCajaTable
+        cajaTable
             .select(columns)
-            .where { SalesCajaTable.id eq cajaId }
+            .where { cajaTable.id eq cajaId }
             .limit(1)
             .firstOrNull()
             ?: throw InvalidSaleRequestException("No se encontró caja para id_caja=$cajaId")
 
     val cajaWarehouseId =
-        if (isVE) {
-            caja.getOrNull(SalesCajaTable.codAlmacen)?.takeIf { it > 0 }
+        if (isVE && cajaTable is SalesCajaTableVE) {
+            caja.getOrNull(cajaTable.codAlmacen)?.takeIf { it > 0 }
         } else {
             null
         }
-    val cajaSucursalId = caja[SalesCajaTable.idSucursal]
+    val cajaSucursalId = caja[cajaTable.idSucursal]
     val serieSucursal = cajaSucursalId?.let(::serieDeSucursal)
     val globalWarehouseId = globalWarehouse(countryCode)
 

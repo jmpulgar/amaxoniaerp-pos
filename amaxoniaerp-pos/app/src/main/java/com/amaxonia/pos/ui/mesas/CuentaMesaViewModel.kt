@@ -148,7 +148,10 @@ class CuentaMesaViewModel(
         }
     }
 
-    fun incrementarCantidad(pedidoId: Int, step: Double = 1.0) {
+    fun incrementarCantidad(
+        pedidoId: Int,
+        step: Double = 1.0,
+    ) {
         val current = mutableState.value
         val pedido = current.pedidos.find { it.id == pedidoId } ?: return
         val disponible = current.disponible(pedido)
@@ -157,7 +160,10 @@ class CuentaMesaViewModel(
         mutableState.update { it.copy(cantidades = it.cantidades + (pedidoId to formatQuantity(siguiente)), error = null) }
     }
 
-    fun decrementarCantidad(pedidoId: Int, step: Double = 1.0) {
+    fun decrementarCantidad(
+        pedidoId: Int,
+        step: Double = 1.0,
+    ) {
         val current = mutableState.value
         val actual = current.cantidadSeleccionada(pedidoId)
         val siguiente = actual - step
@@ -221,7 +227,6 @@ class CuentaMesaViewModel(
             )
         }
     }
-
 
     fun crearDivision() {
         val current = mutableState.value

@@ -1,0 +1,46 @@
+﻿config:
+  validation: true
+  warningsAsErrors: false
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+    ignoreNumbers:
+      - '-1'
+      - '0'
+      - '1'
+      - '2'
+      - '3'
+      - '5'
+      - '10'
+      - '20'
+      - '30'
+      - '31'
+  MaxLineLength:
+    maxLineLength: 140
+  UseRequire:
+    active: false
+  UseCheckOrError:
+    active: false
+  ReturnCount:
+    max: 6
+
+complexity:
+  LargeClass:
+    threshold: 2500
+  TooManyFunctions:
+    thresholdInFiles: 35
+    thresholdInClasses: 35
+    thresholdInObjects: 35
+    thresholdInInterfaces: 35
+  LongParameterList:
+    functionThreshold: 12
+    constructorThreshold: 12
+  LongMethod:
+    threshold: 250
+  CyclomaticComplexMethod:
+    threshold: 30

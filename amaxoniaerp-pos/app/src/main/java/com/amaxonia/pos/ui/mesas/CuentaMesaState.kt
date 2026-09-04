@@ -57,11 +57,9 @@ data class CuentaMesaState(
         }
     }
 
-    fun cantidadSeleccionada(pedidoId: Int): Double =
-        cantidades[pedidoId]?.toDoubleOrNull() ?: 0.0
+    fun cantidadSeleccionada(pedidoId: Int): Double = cantidades[pedidoId]?.toDoubleOrNull() ?: 0.0
 
-    fun estaSeleccionado(pedidoId: Int): Boolean =
-        cantidadSeleccionada(pedidoId) > 0.0
+    fun estaSeleccionado(pedidoId: Int): Boolean = cantidadSeleccionada(pedidoId) > 0.0
 
     val totalDivisionSeleccionada: Double by lazy(LazyThreadSafetyMode.NONE) {
         pedidos.sumOf { pedido ->

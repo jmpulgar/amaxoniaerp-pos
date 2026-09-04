@@ -28,7 +28,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.RestaurantMenu
@@ -62,7 +61,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.domain.model.mesas.CuentaMesaResponse
-import com.amaxonia.pos.domain.model.mesas.EstadoCuentaMesa
 import com.amaxonia.pos.domain.model.mesas.PedidoMesa
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
@@ -154,7 +152,6 @@ fun CuentaMesaScreen(
                 state = state,
                 onCrearCuentaCompleta = viewModel::crearYCobrarCuentaCompleta,
                 onCrearDivision = viewModel::crearDivision,
-                onVerCuentasActivas = { viewModel.setShowCuentasActivasSheet(true) },
             )
         },
     ) { padding ->
@@ -203,7 +200,8 @@ fun CuentaMesaScreen(
                     item {
                         PosFeedbackCard(
                             title = "Productos pendientes en cocina",
-                            message = "Hay ${state.pedidosNoEntregados.size} producto(s) en cocina que aún no han sido entregados a la mesa.",
+                            message =
+                                "Hay ${state.pedidosNoEntregados.size} producto(s) en cocina que aún no han sido entregados a la mesa.",
                             tone = PosVisualTone.Warning,
                             action =
                                 PosVisualAction(
@@ -342,7 +340,6 @@ private fun CuentaStickyBottomBar(
     state: CuentaMesaState,
     onCrearCuentaCompleta: () -> Unit,
     onCrearDivision: () -> Unit,
-    onVerCuentasActivas: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(

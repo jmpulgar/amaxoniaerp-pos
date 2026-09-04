@@ -201,7 +201,7 @@ class PanamaInvoiceTicketFormatter {
         val fechaDgi = payload.fechaRecepcionDgi?.takeIfNotBlank()
         val protocolo = payload.protocoloAutorizacion?.takeIfNotBlank()
 
-        if (cufe == null && qrUrl == null && fechaDgi == null && protocolo == null) {
+        if (listOfNotNull(cufe, qrUrl, fechaDgi, protocolo).isEmpty()) {
             add(TicketElement.Feed(FOOTER_FEED))
             return
         }

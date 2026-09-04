@@ -18,4 +18,9 @@ data class HistoryState(
     val isLoadingDetalle: Boolean = false,
     val detalleError: String? = null,
     val showDetalleSheet: Boolean = false,
+    val isReprinting: Boolean = false,
+    val isDownloadingPdf: Boolean = false,
+    val isResendingFE: Boolean = false,
+    val detalleMessage: String? = null,
+    val detalleActionError: String? = null,
 )

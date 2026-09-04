@@ -31,6 +31,5 @@ object BusinessClock {
     fun todayForCountry(countryCode: String): LocalDate = nowForCountry(countryCode).toLocalDate()
 
     /** Año de dos dígitos (p. ej. 26) según la fecha civil en la zona del país. */
-    fun yearTwoDigitsForCountry(countryCode: String): Int =
-        Year.from(todayForCountry(countryCode)).value % TWO_DIGIT_YEAR_MODULUS
+    fun yearTwoDigitsForCountry(countryCode: String): Int = Year.from(todayForCountry(countryCode)).value % TWO_DIGIT_YEAR_MODULUS
 }

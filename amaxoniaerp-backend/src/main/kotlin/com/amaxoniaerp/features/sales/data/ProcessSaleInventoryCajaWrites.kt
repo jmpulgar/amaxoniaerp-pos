@@ -292,8 +292,16 @@ private fun insertCajaDetallePagos(
 }
 
 private fun isCreditPayment(pago: SalePaymentInput): Boolean {
-    val tipo = pago.tipoMovimiento?.trim()?.uppercase().orEmpty()
-    val siglas = pago.siglas?.trim()?.uppercase().orEmpty()
+    val tipo =
+        pago.tipoMovimiento
+            ?.trim()
+            ?.uppercase()
+            .orEmpty()
+    val siglas =
+        pago.siglas
+            ?.trim()
+            ?.uppercase()
+            .orEmpty()
     return tipo in setOf("CXC", "CR", "CRED", "CREDITO") || siglas in setOf("CXC", "CR", "CRED", "CREDITO")
 }
 
@@ -367,7 +375,13 @@ private fun insertCajaNuevaDetalleFormaPagoBatch(
         this[SalesCajaNuevaDetalleFormaPagoTable.codigoVerificacion] = pago.codigoVerificacion.orEmpty()
         this[SalesCajaNuevaDetalleFormaPagoTable.idAbonoDetalle] = pago.idAbonoDetalle.orEmpty()
         this[SalesCajaNuevaDetalleFormaPagoTable.efectivoCambio] =
-            if (tipoMovimiento == "CASH") ctx.monetaryContext.toBase(pago.efectivoCambio) else BigDecimal.ZERO.setScale(2)
+            if (tipoMovimiento ==
+                "CASH"
+            ) {
+                ctx.monetaryContext.toBase(pago.efectivoCambio)
+            } else {
+                BigDecimal.ZERO.setScale(2)
+            }
     }
 }
 
@@ -382,14 +396,38 @@ private fun insertCajaNuevaDetalleFormaPagoBatch(
  * En crédito puro (CXC) o formas bancarias estándar NO se inserta ninguna fila.
  */
 internal fun resolveCajaDetalleFormaPagoTipoMovimiento(pago: SalePaymentInput): String? {
-    val tipo = pago.tipoMovimiento?.trim()?.uppercase().orEmpty()
-    val siglas = pago.siglas?.trim()?.uppercase().orEmpty()
+    val tipo =
+        pago.tipoMovimiento
+            ?.trim()
+            ?.uppercase()
+            .orEmpty()
+    val siglas =
+        pago.siglas
+            ?.trim()
+            ?.uppercase()
+            .orEmpty()
 
     return when {
-        tipo in setOf("CASH", "EF", "EFE", "EFECTIVO") || siglas in setOf("EF", "EFE", "EFECTIVO", "CASH") || pago.efectivoCambio > 0.0 -> "CASH"
-        tipo in setOf("TDC", "TC") || siglas in setOf("TDC", "TC", "TARJETA") || !pago.tdcNumero.isNullOrBlank() -> "TDC"
-        tipo in setOf("NEQ", "NEQUI") || siglas in setOf("NEQ", "NEQUI") || !pago.codigoVerificacion.isNullOrBlank() -> "NEQ"
-        tipo in setOf("ANTICIPO", "ABONO") || siglas in setOf("ANTICIPO", "ABONO") || !pago.idAbonoDetalle.isNullOrBlank() -> "ANTICIPO"
+        tipo in setOf("CASH", "EF", "EFE", "EFECTIVO") ||
+            siglas in setOf("EF", "EFE", "EFECTIVO", "CASH") ||
+            pago.efectivoCambio > 0.0 -> "CASH"
+        tipo in
+            setOf(
+                "TDC",
+                "TC",
+            ) ||
+            siglas in setOf("TDC", "TC", "TARJETA") ||
+            !pago.tdcNumero.isNullOrBlank() -> "TDC"
+        tipo in
+            setOf(
+                "NEQ",
+                "NEQUI",
+            ) ||
+            siglas in setOf("NEQ", "NEQUI") ||
+            !pago.codigoVerificacion.isNullOrBlank() -> "NEQ"
+        tipo in setOf("ANTICIPO", "ABONO") ||
+            siglas in setOf("ANTICIPO", "ABONO") ||
+            !pago.idAbonoDetalle.isNullOrBlank() -> "ANTICIPO"
         else -> null
     }
 }

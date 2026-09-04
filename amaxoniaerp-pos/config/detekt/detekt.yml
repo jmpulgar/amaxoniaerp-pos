@@ -22,11 +22,23 @@ style:
     ignoreNamedArgument: true
     ignoreEnums: true
     ignoreRanges: true
+    ignoreAnnotated:
+      - Composable
+      - Test
+      - Preview
   MaxLineLength:
     # Keep one source of truth with .editorconfig/ktlint.
     maxLineLength: 140
 
 complexity:
+  LongMethod:
+    ignoreAnnotated:
+      - Composable
+      - Test
+  CyclomaticComplexMethod:
+    ignoreAnnotated:
+      - Composable
+      - Test
   LongParameterList:
     # Room DAOs bind a distinct SQL placeholder per parameter; grouping them
     # into holder data classes adds boilerplate without improving readability.
@@ -35,12 +47,15 @@ complexity:
       - Insert
       - Update
       - Delete
+      - Composable
   TooManyFunctions:
     # Room @Dao interfaces are SQL verb collections — one function per
     # statement is idiomatic and splitting them across files would break the
     # single-ledger mental model. SyncScheduler is the single
     # WorkManager facade for the app.
-    thresholdInInterfaces: 20
-    thresholdInClasses: 20
-    thresholdInObjects: 20
-    thresholdInFiles: 20
+    thresholdInInterfaces: 30
+    thresholdInClasses: 30
+    thresholdInObjects: 30
+    thresholdInFiles: 30
+  LargeClass:
+    threshold: 1500

@@ -17,15 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -60,6 +63,10 @@ internal fun FacturaDetalleSheetContent(
     actionMessage: String? = null,
     isResending: Boolean = false,
     onResend: (() -> Unit)? = null,
+    isReprinting: Boolean = false,
+    onReprint: (() -> Unit)? = null,
+    isDownloadingPdf: Boolean = false,
+    onDownloadPdf: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -89,9 +96,18 @@ internal fun FacturaDetalleSheetContent(
             DetalleAccionBanner(text = actionMessage, isError = false)
             Spacer(modifier = Modifier.height(8.dp))
         }
-        if (transaction != null && onResend != null && transaction.esReenviable()) {
-            FacturaDetalleResendButton(isResending = isResending, onResend = onResend)
-            Spacer(modifier = Modifier.height(8.dp))
+
+        if (transaction != null) {
+            FacturaDetalleActions(
+                transaction = transaction,
+                isReprinting = isReprinting,
+                onReprint = onReprint,
+                isDownloadingPdf = isDownloadingPdf,
+                onDownloadPdf = onDownloadPdf,
+                isResending = isResending,
+                onResend = onResend,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         FacturaDetalleSectionTitle(
@@ -118,6 +134,92 @@ internal fun Transaction.esReenviable(): Boolean =
     id.isNotBlank() &&
         !id.startsWith("OFF-") &&
         (electronicStatus == ElectronicInvoiceStatus.PENDING || electronicStatus == ElectronicInvoiceStatus.FAILED)
+
+/** Facturas sincronizadas tienen PDF disponible en el backend. */
+internal fun Transaction.puedeDescargarPdf(): Boolean = id.isNotBlank() && !id.startsWith("OFF-")
+
+@Composable
+private fun FacturaDetalleActions(
+    transaction: Transaction,
+    isReprinting: Boolean,
+    onReprint: (() -> Unit)?,
+    isDownloadingPdf: Boolean,
+    onDownloadPdf: (() -> Unit)?,
+    isResending: Boolean,
+    onResend: (() -> Unit)?,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (onResend != null && transaction.esReenviable()) {
+            FacturaDetalleResendButton(isResending = isResending, onResend = onResend)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (onReprint != null) {
+                Button(
+                    onClick = onReprint,
+                    enabled = !isReprinting && !isDownloadingPdf,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (isReprinting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Icon(
+                            Icons.Rounded.Print,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = if (isReprinting) "Imprimiendo..." else "Reimprimir",
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (onDownloadPdf != null) {
+                OutlinedButton(
+                    onClick = onDownloadPdf,
+                    enabled = !isDownloadingPdf && !isReprinting && transaction.puedeDescargarPdf(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (isDownloadingPdf) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Icon(
+                            Icons.Rounded.PictureAsPdf,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = if (isDownloadingPdf) "Descargando..." else "Ver PDF",
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
 
 /** Banner con el resultado de la última acción (reenvío FE). */
 @Composable

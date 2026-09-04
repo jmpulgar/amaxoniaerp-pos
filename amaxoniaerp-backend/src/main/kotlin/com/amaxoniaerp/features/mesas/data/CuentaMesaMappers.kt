@@ -55,10 +55,8 @@ internal fun ResultRow.toCuentaDetalleResponse(): CuentaDetalleResponse =
 
 internal fun LocalDateTime.formatCuentaIso(): String = CUENTA_ISO_FORMATTER.format(this)
 
-internal fun dinero(value: Double): BigDecimal =
-    BigDecimal.valueOf(value).setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN)
+internal fun dinero(value: Double): BigDecimal = BigDecimal.valueOf(value).setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN)
 
-internal fun cantidad(value: Double): BigDecimal =
-    BigDecimal.valueOf(value).setScale(QUANTITY_SCALE, RoundingMode.HALF_EVEN)
+internal fun cantidad(value: Double): BigDecimal = BigDecimal.valueOf(value).setScale(QUANTITY_SCALE, RoundingMode.HALF_EVEN)
 
 internal fun cantidadMesaScale(value: BigDecimal): BigDecimal = value.setScale(CUENTA_SCALE, RoundingMode.HALF_EVEN)

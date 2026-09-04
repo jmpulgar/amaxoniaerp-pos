@@ -85,8 +85,7 @@ class PromotionsRepository {
         )
     }
 
-    private fun ResultSet.getTimestampOrNull(column: String): Timestamp? =
-        runCatching { getTimestamp(column) }.getOrNull()
+    private fun ResultSet.getTimestampOrNull(column: String): Timestamp? = runCatching { getTimestamp(column) }.getOrNull()
 
     private fun ResultSet.getBigDecimalOrZero(column: String): BigDecimal =
         runCatching { getBigDecimal(column) }.getOrNull() ?: BigDecimal.ZERO

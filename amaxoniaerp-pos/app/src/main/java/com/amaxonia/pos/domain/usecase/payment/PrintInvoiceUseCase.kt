@@ -6,6 +6,7 @@ data class InvoicePrintFeedback(
     val displayMessage: String,
     val fiscalNumber: String,
     val printerSerial: String,
+    val isSuccess: Boolean = true,
 )
 
 fun interface InvoicePrintGateway {

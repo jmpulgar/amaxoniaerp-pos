@@ -4,19 +4,34 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.datetime
 import com.amaxoniaerp.core.database.SchemaDimensions as S
 
-object CajaTable : Table("caja") {
+abstract class BaseCajaTable : Table("caja") {
     val idCaja = varchar("id", S.VARCHAR_LENGTH_36)
     val codCaja = varchar("codigo", S.VARCHAR_LENGTH_50).nullable()
     val descripcion = varchar("descripcion", S.VARCHAR_LENGTH_100).nullable()
     val codEstatus = integer("activo").default(1)
     val idSucursal = integer("id_sucursal").nullable()
-    val codAlmacen = integer("cod_almacen").nullable()
     val serieCaja = varchar("serie_caja", S.VARCHAR_LENGTH_10)
     val caja = varchar("caja", S.VARCHAR_LENGTH_50).nullable()
     val fondoApertura = decimal("fondo_apertura", S.DECIMAL_PRECISION_10, 2).nullable()
     val impresoraModelo = varchar("impresora_modelo", S.VARCHAR_LENGTH_50).nullable()
+    val codigoSucursalEmisor = varchar("CodigoSucursalEmisor", S.VARCHAR_LENGTH_20).nullable()
+    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", S.VARCHAR_LENGTH_10).nullable()
 
     override val primaryKey = PrimaryKey(idCaja)
+}
+
+object CajaTableVE : BaseCajaTable() {
+    val codAlmacen = integer("cod_almacen").nullable()
+}
+
+object CajaTablePA : BaseCajaTable()
+
+object CajaTable : BaseCajaTable() {
+    val codAlmacen = integer("cod_almacen").nullable()
+}
+
+object CajaTableFactory {
+    fun forCountry(countryCode: String): BaseCajaTable = if (countryCode.equals("VE", ignoreCase = true)) CajaTableVE else CajaTablePA
 }
 
 object SucursalTable : Table("sucursal") {

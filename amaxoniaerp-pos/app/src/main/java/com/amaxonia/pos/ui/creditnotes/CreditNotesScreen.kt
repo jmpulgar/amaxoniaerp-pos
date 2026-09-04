@@ -16,15 +16,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DateRange
@@ -44,39 +45,37 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Surface
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.runtime.mutableIntStateOf
-import kotlinx.coroutines.delay
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteSourceInvoiceDetailDto
+import com.amaxonia.pos.ui.common.components.PosDatePickerField
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,7 +127,7 @@ fun CreditNotesScreen(
         floatingActionButton = {
             if (state.mode == CreditNotesMode.LIST) {
                 FloatingActionButton(
-                    onClick = viewModel::openInvoicePicker,
+                    onClick = { if (!state.isLoading) viewModel.openInvoicePicker() },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = PosPalette.FixedWhite,
                 ) {
@@ -149,8 +148,6 @@ fun CreditNotesScreen(
                 ProcessingCreditNoteOverlay(
                     elapsedSeconds = processingSeconds,
                 )
-            } else if (state.isLoading) {
-                CreditNotesLoadingOverlay()
             }
         }
     }
@@ -202,25 +199,9 @@ private fun CreditNotesModeContent(
     }
 }
 
-/** Velo de carga sobre el contenido durante operaciones de consulta simples. */
-@Composable
-private fun CreditNotesLoadingOverlay() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(PosPalette.FixedBlack.copy(alpha = 0.08f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
 /** Overlay de procesamiento con etapas y contador de segundos estilo Facturación Electrónica Panamá. */
 @Composable
-private fun ProcessingCreditNoteOverlay(
-    elapsedSeconds: Int,
-) {
+private fun ProcessingCreditNoteOverlay(elapsedSeconds: Int) {
     val estimatedSeconds = 30
     val progress = (elapsedSeconds / estimatedSeconds.toFloat()).coerceIn(0.08f, 0.94f)
     val secondsLeft = (estimatedSeconds - elapsedSeconds).coerceAtLeast(3)
@@ -336,7 +317,7 @@ private fun ProcessingCreditNoteOverlay(
                     shape = MaterialTheme.shapes.medium,
                 ) {
                     Text(
-                        text = "La nota de crédito se está registrando. Evita tocar atrás o cerrar la app.",
+                        text = "Evita tocar atrás o cerrar la app.",
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
@@ -385,6 +366,7 @@ private fun CreditNoteDetailSheetOverlay(
                 isSubmitting = state.isSubmitting,
                 onProcessFiscal = onProcessFiscal,
                 currencySymbol = state.currencySymbol,
+                isPanama = state.isPanama,
             )
         }
     }
@@ -437,20 +419,35 @@ private fun CreditNotesListContent(
             currencySymbol = state.currencySymbol,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        if (state.creditNotes.isEmpty()) {
-            EmptyState(
-                icon = Icons.AutoMirrored.Filled.ReceiptLong,
-                title = "Aún no hay notas de crédito",
-                subtitle = "Pulsa agregar para seleccionar una factura y generar una devolución",
-            )
-        } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.creditNotes, key = { it.id }) { note ->
-                    CreditNoteCard(
-                        note = note, 
-                        onClick = { onOpenDetail(note.id) },
-                        currencySymbol = state.currencySymbol,
-                    )
+        when {
+            state.isLoading && state.creditNotes.isEmpty() -> {
+                CreditNotesLoadingState(message = "Cargando notas de crédito...")
+            }
+            !state.isLoading && state.creditNotes.isEmpty() -> {
+                EmptyState(
+                    icon = Icons.AutoMirrored.Filled.ReceiptLong,
+                    title = "Aún no hay notas de crédito",
+                    subtitle = "Pulsa agregar para seleccionar una factura y generar una devolución",
+                )
+            }
+            else -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(state.creditNotes, key = { it.id }) { note ->
+                            CreditNoteCard(
+                                note = note,
+                                onClick = { if (!state.isLoading) onOpenDetail(note.id) },
+                                currencySymbol = state.currencySymbol,
+                                isPanama = state.isPanama,
+                            )
+                        }
+                    }
+                    if (state.isLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -482,16 +479,35 @@ private fun CreditNoteInvoicePickerContent(
             onToggleCustomDateFilter = onToggleCustomDateFilter,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        if (state.sourceInvoices.isEmpty()) {
-            EmptyState(
-                icon = Icons.Default.Inventory2,
-                title = "No hay facturas elegibles",
-                subtitle = "No se encontraron facturas con saldo disponible para el periodo seleccionado (${state.invoiceDateFilter.displayLabel()})",
-            )
-        } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.sourceInvoices, key = { it.id }) { invoice ->
-                    SourceInvoiceCard(invoice = invoice, onClick = { onSelectInvoice(invoice.id) })
+        when {
+            state.isLoading && state.sourceInvoices.isEmpty() -> {
+                CreditNotesLoadingState(message = "Buscando facturas elegibles...")
+            }
+            !state.isLoading && state.sourceInvoices.isEmpty() -> {
+                EmptyState(
+                    icon = Icons.Default.Inventory2,
+                    title = "No hay facturas elegibles",
+                    subtitle =
+                        "No se encontraron facturas con saldo disponible para el periodo seleccionado " +
+                            "(${state.invoiceDateFilter.displayLabel()})",
+                )
+            }
+            else -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(state.sourceInvoices, key = { it.id }) { invoice ->
+                            SourceInvoiceCard(
+                                invoice = invoice,
+                                onClick = { if (!state.isLoading) onSelectInvoice(invoice.id) },
+                            )
+                        }
+                    }
+                    if (state.isLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         }
@@ -529,9 +545,9 @@ private fun InvoiceDateFilterSection(
                     leadingIcon = {
                         val icon =
                             when (type) {
+                                InvoiceDateFilterType.HOY -> Icons.Default.CalendarToday
                                 InvoiceDateFilterType.MES_ACTUAL -> Icons.Default.CalendarMonth
                                 InvoiceDateFilterType.MES_ANTERIOR -> Icons.Default.CalendarToday
-                                InvoiceDateFilterType.TODAS -> Icons.Default.AllInclusive
                                 InvoiceDateFilterType.PERSONALIZADO -> Icons.Default.DateRange
                             }
                         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -558,20 +574,16 @@ private fun InvoiceDateFilterSection(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedTextField(
+                        PosDatePickerField(
+                            label = "Desde",
                             value = filter.customFechaInicio,
                             onValueChange = onCustomFechaInicioChange,
-                            label = { Text("Desde") },
-                            placeholder = { Text("AAAA-MM-DD") },
-                            singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
-                        OutlinedTextField(
+                        PosDatePickerField(
+                            label = "Hasta",
                             value = filter.customFechaFin,
                             onValueChange = onCustomFechaFinChange,
-                            label = { Text("Hasta") },
-                            placeholder = { Text("AAAA-MM-DD") },
-                            singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -634,11 +646,15 @@ private fun CreditNoteCreateContent(
 ) {
     val invoice = state.selectedInvoice
     if (invoice == null) {
-        EmptyState(
-            icon = Icons.AutoMirrored.Filled.ReceiptLong,
-            title = "Selecciona una factura",
-            subtitle = "El flujo de creación necesita una factura origen",
-        )
+        if (state.isLoading) {
+            CreditNotesLoadingState(message = "Cargando detalle de la factura...")
+        } else {
+            EmptyState(
+                icon = Icons.AutoMirrored.Filled.ReceiptLong,
+                title = "Selecciona una factura",
+                subtitle = "El flujo de creación necesita una factura origen",
+            )
+        }
         return
     }
 

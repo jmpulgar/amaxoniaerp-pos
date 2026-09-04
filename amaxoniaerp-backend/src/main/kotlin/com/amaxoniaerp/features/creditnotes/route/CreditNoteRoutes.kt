@@ -61,6 +61,17 @@ internal class CreditNoteHandlers(
             val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
             val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
 
+            if (fechaInicio != null && fechaFin != null) {
+                if (fechaFin.isBefore(fechaInicio)) {
+                    throw CreditNoteValidationException("La fecha final debe ser mayor o igual a la fecha inicial")
+                }
+                if (java.time.temporal.ChronoUnit.DAYS
+                        .between(fechaInicio, fechaFin) > 31
+                ) {
+                    throw CreditNoteValidationException("El rango de consulta no puede superar 1 mes")
+                }
+            }
+
             if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
                 return@run
@@ -88,8 +99,19 @@ internal class CreditNoteHandlers(
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_CREDIT_NOTE_PAGE_LIMIT
             val offset = call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L
             val search = call.request.queryParameters["search"]
-            val fechaInicio = call.request.queryParameters["fecha_inicio"]?.let(::parseDateOrBadRequest)
-            val fechaFin = call.request.queryParameters["fecha_fin"]?.let(::parseDateOrBadRequest)
+            val fechaInicioParam = call.request.queryParameters["fecha_inicio"]
+            val fechaFinParam = call.request.queryParameters["fecha_fin"]
+            val fechaInicio = fechaInicioParam?.let(::parseDateOrBadRequest) ?: LocalDate.now()
+            val fechaFin = fechaFinParam?.let(::parseDateOrBadRequest) ?: LocalDate.now()
+
+            if (fechaFin.isBefore(fechaInicio)) {
+                throw CreditNoteValidationException("La fecha final debe ser mayor o igual a la fecha inicial")
+            }
+            if (java.time.temporal.ChronoUnit.DAYS
+                    .between(fechaInicio, fechaFin) > 31
+            ) {
+                throw CreditNoteValidationException("El rango de consulta no puede superar 1 mes")
+            }
 
             if (limit <= 0 || limit > MAX_CREDIT_NOTE_PAGE_LIMIT || offset < 0) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))

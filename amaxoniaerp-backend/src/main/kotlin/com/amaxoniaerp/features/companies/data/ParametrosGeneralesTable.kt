@@ -38,6 +38,17 @@ object ParametrosGeneralesTablePA : BaseParametrosGeneralesTable() {
     val facturarCero = bool("facturar_cero").default(false)
     val impresionDirecta = bool("impresion_directa").default(false)
     val tipoFacturacion = integer("tipo_facturacion").default(0)
+    val tokenEmpresa = varchar("token_empresa", S.VARCHAR_LENGTH_500).nullable()
+    val tokenPassword = varchar("token_password", S.VARCHAR_LENGTH_500).nullable()
+    val direccionEnvio = varchar("direccion_envio", S.VARCHAR_LENGTH_500).nullable()
+    val apiTheFactoryHka = varchar("api_thefactoryhka", S.VARCHAR_LENGTH_500).nullable()
+    val tipoEmision = varchar("tipoEmision", S.VARCHAR_LENGTH_5).nullable()
+    val destinoOperacion = varchar("destinoOperacion", S.VARCHAR_LENGTH_5).nullable()
+    val procesoGeneracion = varchar("procesoGeneracion", S.VARCHAR_LENGTH_5).nullable()
+    val codigoSucursalEmisor = varchar("codigoSucursalEmisor", S.VARCHAR_LENGTH_20).nullable()
+    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", S.VARCHAR_LENGTH_10).nullable()
+    val fechaInicioContingencia = varchar("fechaInicioContingencia", S.VARCHAR_LENGTH_30).nullable()
+    val motivoContingencia = varchar("motivoContingencia", S.VARCHAR_LENGTH_300).nullable()
 }
 
 /** Devuelve la tabla correcta según el país. */

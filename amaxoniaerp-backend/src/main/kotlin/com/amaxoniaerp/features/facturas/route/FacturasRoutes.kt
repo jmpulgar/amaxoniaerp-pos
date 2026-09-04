@@ -7,18 +7,24 @@ import com.amaxoniaerp.features.facturas.data.FacturasFilter
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.facturas.domain.FacturasListResponse
+import io.ktor.http.ContentDisposition
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 private const val DEFAULT_PAGE_LIMIT = 100
 private const val MAX_PAGE_LIMIT = 1_000
@@ -36,6 +42,7 @@ fun Route.facturasRoutes(
             get("/by-id-factura/{idFactura}") { handlers.porIdFactura(call) }
             get("/{id}/detalle") { handlers.detalle(call) }
             get("/{id}/print-payload") { handlers.printPayload(call) }
+            get("/{id}/pdf") { handlers.descargarPdf(call) }
             patch("/{id}/confirmacion-fiscal") { handlers.confirmarFiscal(call) }
             post("/{id}/enviar-correo") { handlers.enviarCorreo(call) }
         }
@@ -197,6 +204,39 @@ internal class FacturasHandlers(
             )
         }
 
+    suspend fun descargarPdf(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+            if (!ctx.countryCode.equals("PA", ignoreCase = true)) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "La descarga de PDF FEL solo está disponible para Panamá"),
+                )
+                return@run
+            }
+
+            val companyDb = ctx.connectDatabase()
+            panamaInvoiceProcessor.downloadInvoicePdf(companyDb, facturaId).fold(
+                onSuccess = { bytes ->
+                    call.response.header(
+                        HttpHeaders.ContentDisposition,
+                        ContentDisposition.Attachment
+                            .withParameter(ContentDisposition.Parameters.FileName, "factura-$facturaId.pdf")
+                            .toString(),
+                    )
+                    call.respondBytes(bytes, ContentType.Application.Pdf)
+                },
+                onFailure = { throwable ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to (throwable.message ?: "No se pudo descargar el PDF de la factura")),
+                    )
+                },
+            )
+        }
+
     private suspend inline fun <reified T> ApplicationCall.respondFactura(value: T?) {
         if (value == null) {
             respond(HttpStatusCode.NotFound, mapOf("error" to "Factura no encontrada"))
@@ -221,26 +261,28 @@ internal class FacturasHandlers(
 
 private fun Parameters.toFacturasFilter(): Result<FacturasFilter> =
     runCatching {
-        val fechaInicio = this["fecha_inicio"]?.let(::parseFacturasDate)
-        val fechaFin = this["fecha_fin"]?.let(::parseFacturasDate)
-        val sucursalValue = this["sucursal_id"]?.takeIf(String::isNotBlank)
-        val sucursalId =
-            sucursalValue?.let { value ->
-                requireNotNull(value.toIntOrNull()) { "Invalid sucursal_id" }
+        val fechaInicio = this["fecha_inicio"]?.takeIf(String::isNotBlank)?.let(::parseFacturasDate)
+        val fechaFin = this["fecha_fin"]?.takeIf(String::isNotBlank)?.let(::parseFacturasDate)
+        val cajaId =
+            this["caja_id"]?.takeIf(String::isNotBlank)
+                ?: this["id_caja"]?.takeIf(String::isNotBlank)
+                ?: this["cajaId"]?.takeIf(String::isNotBlank)
+
+        if (fechaInicio != null && fechaFin != null) {
+            if (fechaFin.isBefore(fechaInicio)) {
+                throw IllegalArgumentException("La fecha final debe ser mayor o igual a la fecha inicial")
             }
-        val estatusList =
-            this["estatus"]
-                ?.takeIf(String::isNotBlank)
-                ?.split(",")
-                ?.mapNotNull { it.trim().toIntOrNull() }
+            if (ChronoUnit.DAYS.between(fechaInicio, fechaFin) > 31) {
+                throw IllegalArgumentException("El rango de consulta no puede superar 1 mes")
+            }
+        }
 
         FacturasFilter(
-            search = this["search"],
-            usuario = this["usuario"],
-            sucursalId = sucursalId,
+            search = this["search"]?.takeIf(String::isNotBlank),
+            usuario = this["usuario"]?.takeIf(String::isNotBlank),
+            cajaId = cajaId,
             fechaInicio = fechaInicio,
             fechaFin = fechaFin,
-            estatusList = estatusList,
         )
     }
 

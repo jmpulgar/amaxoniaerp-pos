@@ -15,19 +15,17 @@ class SalesApiFilterTest {
             InvoiceHistoryFilter(
                 search = "INV-001",
                 usuario = "alice",
-                sucursalId = 7,
+                cajaId = "caja-1",
                 fechaInicio = "2026-01-01",
                 fechaFin = "2026-01-31",
-                estatus = listOf(1, 2),
             ),
         )
 
         assertEquals("INV-001", request.url.parameters["search"])
         assertEquals("alice", request.url.parameters["usuario"])
-        assertEquals("7", request.url.parameters["sucursal_id"])
+        assertEquals("caja-1", request.url.parameters["caja_id"])
         assertEquals("2026-01-01", request.url.parameters["fecha_inicio"])
         assertEquals("2026-01-31", request.url.parameters["fecha_fin"])
-        assertEquals("1,2", request.url.parameters["estatus"])
     }
 
     @Test
@@ -38,9 +36,8 @@ class SalesApiFilterTest {
 
         assertNull(request.url.parameters["search"])
         assertNull(request.url.parameters["usuario"])
-        assertNull(request.url.parameters["sucursal_id"])
+        assertNull(request.url.parameters["caja_id"])
         assertNull(request.url.parameters["fecha_inicio"])
         assertNull(request.url.parameters["fecha_fin"])
-        assertNull(request.url.parameters["estatus"])
     }
 }

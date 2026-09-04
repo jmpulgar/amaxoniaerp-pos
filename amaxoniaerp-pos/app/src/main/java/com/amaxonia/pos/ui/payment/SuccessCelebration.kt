@@ -1,3 +1,5 @@
+@file:Suppress("MagicNumber")
+
 package com.amaxonia.pos.ui.payment
 
 import androidx.compose.animation.core.Animatable
@@ -73,19 +75,21 @@ internal fun CelebrationHero(modifier: Modifier = Modifier) {
     val breathingPulse by infiniteTransition.animateFloat(
         initialValue = 0.985f,
         targetValue = 1.025f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "BreathingPulse",
     )
     val sparkleTwinkle by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "SparkleTwinkle",
     )
 
@@ -117,19 +121,21 @@ internal fun CelebrationHero(modifier: Modifier = Modifier) {
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(HERO_HEIGHT_DP.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(HERO_HEIGHT_DP.dp),
         contentAlignment = Alignment.Center,
     ) {
         ConfettiBurst(modifier = Modifier.size(HERO_CANVAS_SIZE_DP.dp))
 
         Canvas(
-            modifier = Modifier
-                .size(HERO_CANVAS_SIZE_DP.dp)
-                .graphicsLayer {
-                    alpha = entranceProgress.value
-                },
+            modifier =
+                Modifier
+                    .size(HERO_CANVAS_SIZE_DP.dp)
+                    .graphicsLayer {
+                        alpha = entranceProgress.value
+                    },
         ) {
             val cx = size.width / 2f
             val cy = size.height / 2f
@@ -168,28 +174,33 @@ internal fun CelebrationHero(modifier: Modifier = Modifier) {
                 )
 
                 // Contenido dentro del disco azul (recortado)
-                val clipCirclePath = Path().apply {
-                    addOval(
-                        androidx.compose.ui.geometry.Rect(
-                            center = Offset(cx, cy),
-                            radius = discRadius,
-                        ),
-                    )
-                }
+                val clipCirclePath =
+                    Path().apply {
+                        addOval(
+                            androidx.compose.ui.geometry.Rect(
+                                center = Offset(cx, cy),
+                                radius = discRadius,
+                            ),
+                        )
+                    }
 
                 clipPath(clipCirclePath) {
                     // Líneas de fondo decorativas dentro del disco azul
-                    val wavePath = Path().apply {
-                        moveTo(cx - discRadius, cy + discRadius * 0.4f)
-                        cubicTo(
-                            cx - discRadius * 0.4f, cy + discRadius * 0.1f,
-                            cx + discRadius * 0.2f, cy + discRadius * 0.7f,
-                            cx + discRadius, cy + discRadius * 0.35f,
-                        )
-                        lineTo(cx + discRadius, cy + discRadius)
-                        lineTo(cx - discRadius, cy + discRadius)
-                        close()
-                    }
+                    val wavePath =
+                        Path().apply {
+                            moveTo(cx - discRadius, cy + discRadius * 0.4f)
+                            cubicTo(
+                                cx - discRadius * 0.4f,
+                                cy + discRadius * 0.1f,
+                                cx + discRadius * 0.2f,
+                                cy + discRadius * 0.7f,
+                                cx + discRadius,
+                                cy + discRadius * 0.35f,
+                            )
+                            lineTo(cx + discRadius, cy + discRadius)
+                            lineTo(cx - discRadius, cy + discRadius)
+                            close()
+                        }
                     drawPath(
                         path = wavePath,
                         color = Color.White.copy(alpha = 0.12f),
@@ -293,11 +304,12 @@ internal fun CelebrationHero(modifier: Modifier = Modifier) {
 
                     // 5. Checkmark animado dentro del badge
                     if (checkProgress.value > 0f) {
-                        val checkPath = Path().apply {
-                            moveTo(cx - 4.2.dp.toPx(), badgeCenterY + 0.6.dp.toPx())
-                            lineTo(cx - 1.2.dp.toPx(), badgeCenterY + 3.6.dp.toPx())
-                            lineTo(cx + 4.8.dp.toPx(), badgeCenterY - 2.8.dp.toPx())
-                        }
+                        val checkPath =
+                            Path().apply {
+                                moveTo(cx - 4.2.dp.toPx(), badgeCenterY + 0.6.dp.toPx())
+                                lineTo(cx - 1.2.dp.toPx(), badgeCenterY + 3.6.dp.toPx())
+                                lineTo(cx + 4.8.dp.toPx(), badgeCenterY - 2.8.dp.toPx())
+                            }
 
                         val measurer = PathMeasure().apply { setPath(checkPath, forceClosed = false) }
                         val visibleSegment = Path()
@@ -311,11 +323,12 @@ internal fun CelebrationHero(modifier: Modifier = Modifier) {
                         drawPath(
                             path = visibleSegment,
                             color = Color.White,
-                            style = Stroke(
-                                width = 2.2.dp.toPx(),
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round,
-                            ),
+                            style =
+                                Stroke(
+                                    width = 2.2.dp.toPx(),
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round,
+                                ),
                         )
                     }
                 }
@@ -334,14 +347,15 @@ private fun DrawScope.drawSparkleStar(
 ) {
     if (radius <= 0f) return
     val innerRadius = radius * 0.28f
-    val starPath = Path().apply {
-        moveTo(cx, cy - radius)
-        quadraticTo(cx, cy - innerRadius, cx + radius, cy)
-        quadraticTo(cx + innerRadius, cy, cx, cy + radius)
-        quadraticTo(cx, cy + innerRadius, cx - radius, cy)
-        quadraticTo(cx - innerRadius, cy, cx, cy - radius)
-        close()
-    }
+    val starPath =
+        Path().apply {
+            moveTo(cx, cy - radius)
+            quadraticTo(cx, cy - innerRadius, cx + radius, cy)
+            quadraticTo(cx + innerRadius, cy, cx, cy + radius)
+            quadraticTo(cx, cy + innerRadius, cx - radius, cy)
+            quadraticTo(cx - innerRadius, cy, cx, cy - radius)
+            close()
+        }
     rotate(rotationDegrees, pivot = Offset(cx, cy)) {
         drawPath(path = starPath, color = color)
     }
@@ -358,14 +372,15 @@ private data class ConfettiParticle(
 /** Partículas determinísticas para una explosión radial limpia y festiva. */
 private fun buildCelebrationParticles(): List<ConfettiParticle> {
     val random = Random(CONFETTI_RANDOM_SEED)
-    val palette = listOf(
-        Color(0xFF3B82F6), // Royal Blue
-        Color(0xFF60A5FA), // Light Blue
-        Color(0xFF10B981), // Emerald Green
-        Color(0xFFF59E0B), // Amber Gold
-        Color(0xFF8B5CF6), // Purple
-        Color(0xFFFFFFFF), // Crisp White
-    )
+    val palette =
+        listOf(
+            Color(0xFF3B82F6), // Royal Blue
+            Color(0xFF60A5FA), // Light Blue
+            Color(0xFF10B981), // Emerald Green
+            Color(0xFFF59E0B), // Amber Gold
+            Color(0xFF8B5CF6), // Purple
+            Color(0xFFFFFFFF), // Crisp White
+        )
 
     return List(CONFETTI_PARTICLE_COUNT) { index ->
         val angleDegrees = (360f / CONFETTI_PARTICLE_COUNT) * index + random.nextFloat() * 10f
@@ -399,10 +414,11 @@ private fun ConfettiBurst(modifier: Modifier = Modifier) {
                     .coerceIn(ANIMATION_START_FRACTION, ANIMATION_END_FRACTION)
             if (localProgress > ANIMATION_START_FRACTION && localProgress < ANIMATION_END_FRACTION) {
                 val distance = maxRadius * particle.travelFraction * localProgress
-                val particleCenter = Offset(
-                    x = center.x + (cos(particle.angleRadians) * distance),
-                    y = center.y + (sin(particle.angleRadians) * distance),
-                )
+                val particleCenter =
+                    Offset(
+                        x = center.x + (cos(particle.angleRadians) * distance),
+                        y = center.y + (sin(particle.angleRadians) * distance),
+                    )
                 val alpha = (1f - localProgress).coerceIn(0f, 1f)
                 drawCircle(
                     color = particle.color.copy(alpha = alpha),

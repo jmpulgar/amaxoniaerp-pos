@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.history
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
@@ -130,7 +132,15 @@ private fun TransactionCardInfo(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(6.dp))
-        StatusBadge(status = transaction.status)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            StatusBadge(status = transaction.status)
+            if (transaction.electronicStatus != ElectronicInvoiceStatus.NONE) {
+                ElectronicStatusBadge(status = transaction.electronicStatus)
+            }
+        }
         Spacer(modifier = Modifier.height(6.dp))
         TransactionMetadataRow(transaction)
     }
@@ -199,6 +209,29 @@ private fun TransactionCardAmount(transaction: Transaction) {
 /** Badge de estado de la transacción con color semántico. */
 @Composable
 internal fun StatusBadge(status: TransactionStatus) {
+    val backgroundColor = Color(status.colorHex).copy(alpha = 0.1f)
+    val textColor = Color(status.colorHex)
+
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(backgroundColor)
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = status.label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+        )
+    }
+}
+
+/** Badge de estado de facturación electrónica ("FE Pendiente", "FE Fallida", "FE Exitosa"). */
+@Composable
+internal fun ElectronicStatusBadge(status: ElectronicInvoiceStatus) {
+    if (status == ElectronicInvoiceStatus.NONE) return
     val backgroundColor = Color(status.colorHex).copy(alpha = 0.1f)
     val textColor = Color(status.colorHex)
 

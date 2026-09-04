@@ -29,18 +29,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.EditNote
@@ -170,7 +168,8 @@ fun DashboardScreen(
     onNavigateToComanda: (areaId: Int, mesaId: Int, sesionId: Int) -> Unit = { _, _, _ -> },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val selectedTable by AppGraph.mesas.selectedTableHolder.selectedTable.collectAsStateWithLifecycle()
+    val selectedTable by AppGraph.mesas.selectedTableHolder.selectedTable
+        .collectAsStateWithLifecycle()
     val sesionMesaId by AppGraph.mesas.sesionMesaIdState.collectAsStateWithLifecycle()
     val currentOnNavigateToCart by rememberUpdatedState(onNavigateToCart)
     LaunchedEffect(viewModel) {

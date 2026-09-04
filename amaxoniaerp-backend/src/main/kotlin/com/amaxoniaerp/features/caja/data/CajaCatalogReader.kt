@@ -53,9 +53,7 @@ internal fun loadCajaCatalogParams(countryCode: String): CajaCatalogParams {
     return CajaCatalogParams(globalDefaultWarehouse, defaultTaxRate, defaultFormaPagoId, currency)
 }
 
-private fun selectParametrosRow(
-    parametrosTable: com.amaxoniaerp.features.companies.data.BaseParametrosGeneralesTable,
-): ResultRow? {
+private fun selectParametrosRow(parametrosTable: com.amaxoniaerp.features.companies.data.BaseParametrosGeneralesTable): ResultRow? {
     val parametrosTableVE = parametrosTable as? ParametrosGeneralesTableVE
     val slice =
         if (parametrosTableVE != null) {
@@ -240,7 +238,12 @@ internal fun mapCajaRows(
 
             val idCaja = row[CajaTable.idCaja]
             val idSucursal = row[CajaTable.idSucursal]
-            val cajaWarehouse = row.getOrNull(CajaTable.codAlmacen)?.takeIf { it > 0 }
+            val cajaWarehouse =
+                if (isVE) {
+                    row.getOrNull(CajaTable.codAlmacen)?.takeIf { it > 0 }
+                } else {
+                    null
+                }
             val resolvedDefaultWarehouse =
                 cajaWarehouse
                     ?: idSucursal?.let { defaultBySucursal[it] }
@@ -261,7 +264,7 @@ internal fun mapCajaRows(
                 descripcion = row[CajaTable.descripcion],
                 estatus = row[CajaTable.codEstatus],
                 idSucursal = idSucursal,
-                codAlmacen = row.getOrNull(CajaTable.codAlmacen),
+                codAlmacen = if (isVE) row.getOrNull(CajaTable.codAlmacen) else null,
                 defaultWarehouseId = resolvedDefaultWarehouse,
                 defaultSellerId = defaultSeller?.id,
                 defaultSellerName = defaultSeller?.nombre,

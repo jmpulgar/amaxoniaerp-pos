@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -106,6 +108,17 @@ internal fun CreditNoteCardsPreviewContent() {
                 ),
             onClick = {},
         )
+        CreditNoteCard(
+            note =
+                previewNote(
+                    id = "3",
+                    total = 150.0,
+                    fiscal = CreditNoteFiscalStatusDto.CONFIRMADA,
+                    cliente = "Distribuidora Panamá S.A.",
+                ),
+            onClick = {},
+            isPanama = true,
+        )
     }
 }
 
@@ -149,3 +162,25 @@ private fun previewSourceInvoice(
         items = PREVIEW_SOURCE_ITEMS,
         moneda = "USD",
     )
+
+@Preview(name = "Invoice Picker · Loading · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
+@Composable
+internal fun InvoicePickerLoadingPreview() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CreditNotesLoadingState(message = "Buscando facturas elegibles...")
+        }
+    }
+
+@Preview(name = "Invoice Picker · Empty · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
+@Composable
+internal fun InvoicePickerEmptyPreview() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            EmptyState(
+                icon = Icons.Default.Inventory2,
+                title = "No hay facturas elegibles",
+                subtitle = "No se encontraron facturas con saldo disponible para el periodo seleccionado (Hoy)",
+            )
+        }
+    }

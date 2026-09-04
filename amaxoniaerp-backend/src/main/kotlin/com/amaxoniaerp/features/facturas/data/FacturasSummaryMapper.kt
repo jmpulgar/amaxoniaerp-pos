@@ -64,9 +64,7 @@ private fun resolveCodigoFiscal(
     tabla: BaseFacturasTable,
 ): String? =
     if (tabla is FacturasTablePA) {
-        val cufe = row[tabla.cufe]
-        val codFiscal = row[tabla.codFacturaFiscal]
-        if (cufe.isNullOrBlank()) codFiscal else cufe
+        row[tabla.cufe]?.takeIf { it.isNotBlank() }
     } else {
         row[tabla.codFacturaFiscal]
     }

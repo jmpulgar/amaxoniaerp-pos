@@ -60,4 +60,14 @@ interface SalesApi {
         authHeader: String,
         facturaId: String,
     ): Result<EnviarCorreoFacturaResponseDto>
+
+    suspend fun getInvoicePdf(
+        authHeader: String,
+        facturaId: String,
+    ): Result<ByteArray>
+
+    suspend fun resendElectronicInvoice(
+        authHeader: String,
+        invoiceId: String,
+    ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto>
 }

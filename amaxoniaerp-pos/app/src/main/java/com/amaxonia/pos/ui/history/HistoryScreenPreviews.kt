@@ -20,8 +20,6 @@ private const val HUGE_TOTAL = 9_876_543.21
 private const val LARGE_AMOUNT_THRESHOLD = 1_000.0
 private const val SECONDARY_RATE = 40.0
 private const val SUMMARY_INVOICE_COUNT = 248
-private const val PAID_STATUS_ID = 1
-private const val CANCELLED_STATUS_ID = 3
 
 @Preview(name = "Filtros plegados · 320×568", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
@@ -47,14 +45,12 @@ internal fun HistoryFiltersExpanded360() =
                 InvoiceHistoryFilter(
                     search = "FAC-2026",
                     usuario = "jperez",
-                    sucursalId = 12,
                     fechaInicio = "2026-08-01",
                     fechaFin = "2026-08-14",
-                    estatus = listOf(PAID_STATUS_ID, CANCELLED_STATUS_ID),
                 )
             Column(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HistorySearchField(
                     value = filter.search.orEmpty(),
@@ -62,9 +58,7 @@ internal fun HistoryFiltersExpanded360() =
                     filtersExpanded = true,
                     onToggleFilters = {},
                 )
-                HistoryIdentityFilters(filter, {}, {})
                 HistoryDateRangeFilters(filter, {}, {})
-                HistoryStatusFilter(filter, {})
                 HistoryFilterActions({}, {})
             }
         }

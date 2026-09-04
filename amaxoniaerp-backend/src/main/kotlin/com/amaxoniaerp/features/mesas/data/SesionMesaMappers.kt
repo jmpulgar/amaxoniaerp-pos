@@ -4,7 +4,6 @@ import com.amaxoniaerp.features.auth.data.UsersTable
 import com.amaxoniaerp.features.mesas.domain.SesionMesaResponse
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDateTime
 
 internal fun usuarioNombre(usuarioId: Int): String? =

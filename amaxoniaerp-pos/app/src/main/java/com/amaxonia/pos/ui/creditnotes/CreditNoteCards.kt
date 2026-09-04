@@ -51,10 +51,12 @@ import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 internal fun CreditNoteCard(
     note: CreditNoteSummaryDto,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     currencySymbol: String = "$",
+    isPanama: Boolean = false,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
@@ -65,7 +67,7 @@ internal fun CreditNoteCard(
         ) {
             CreditNoteLeadingIcon()
             Spacer(modifier = Modifier.width(14.dp))
-            CreditNoteInfo(note = note, modifier = Modifier.weight(1f))
+            CreditNoteInfo(note = note, modifier = Modifier.weight(1f), isPanama = isPanama)
             CreditNoteAmount(note = note, currencySymbol = currencySymbol)
         }
     }
@@ -94,6 +96,7 @@ private fun CreditNoteLeadingIcon() {
 private fun CreditNoteInfo(
     note: CreditNoteSummaryDto,
     modifier: Modifier = Modifier,
+    isPanama: Boolean = false,
 ) {
     Column(modifier = modifier) {
         Text(
@@ -105,7 +108,7 @@ private fun CreditNoteInfo(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(6.dp))
-        FiscalStatusChip(status = note.fiscalStatus)
+        FiscalStatusChip(status = note.fiscalStatus, isPanama = isPanama)
         Spacer(modifier = Modifier.height(6.dp))
         CreditNoteMetadata(date = note.fecha, clientName = note.clienteNombre)
     }

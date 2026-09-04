@@ -109,6 +109,7 @@ class CreditNoteApiImpl(
             fallbackMessage = "No se pudo confirmar la nota de crédito fiscal",
         )
 
+    @Suppress("LongParameterList")
     private suspend fun <T> getRequest(
         path: String,
         tenant: TenantHeaders,

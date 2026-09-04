@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.repository.CajaRepository
+import com.amaxonia.pos.domain.repository.CreditNoteContextReader
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
+import com.amaxonia.pos.domain.util.DateRangeValidator
 import com.amaxonia.pos.ui.payment.formatCurrencyLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ class CreditNotesViewModel(
     private val cajaRepository: CajaRepository,
     private val formaPagoRepository: FormaPagoRepository,
     private val processCreditNoteFiscal: ProcessCreditNoteFiscalUseCase,
+    private val contextReader: CreditNoteContextReader? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CreditNotesState())
     val state: StateFlow<CreditNotesState> = _state.asStateFlow()
@@ -36,6 +39,11 @@ class CreditNotesViewModel(
                 val symbol = caja?.currency?.abrMonedaBase?.let { formatCurrencyLabel(it) } ?: "$"
                 _state.update { it.copy(currencySymbol = symbol) }
             }
+        }
+        viewModelScope.launch {
+            val countryCode = contextReader?.currentCountryCode()
+            val isPanama = countryCode.equals(PANAMA_CODE, ignoreCase = true)
+            _state.update { it.copy(isPanama = isPanama) }
         }
         refreshAll()
         loadRefundMethods()
@@ -80,7 +88,12 @@ class CreditNotesViewModel(
             )
         }
         if (type != InvoiceDateFilterType.PERSONALIZADO ||
-            (_state.value.invoiceDateFilter.customFechaInicio.isNotBlank() || _state.value.invoiceDateFilter.customFechaFin.isNotBlank())
+            (
+                _state.value.invoiceDateFilter.customFechaInicio
+                    .isNotBlank() ||
+                    _state.value.invoiceDateFilter.customFechaFin
+                        .isNotBlank()
+            )
         ) {
             loadSourceInvoices()
         }
@@ -107,9 +120,28 @@ class CreditNotesViewModel(
     }
 
     fun applyCustomInvoiceDateFilter() {
+        val customStart = _state.value.invoiceDateFilter.customFechaInicio
+        val customEnd = _state.value.invoiceDateFilter.customFechaFin
+        val validationError = DateRangeValidator.validate(customStart, customEnd)
+        if (validationError != null) {
+            _state.update { it.copy(error = validationError) }
+            return
+        }
         _state.update {
             it.copy(
                 invoiceDateFilter = it.invoiceDateFilter.copy(type = InvoiceDateFilterType.PERSONALIZADO),
+                error = null,
+            )
+        }
+        loadSourceInvoices()
+    }
+
+    fun resetInvoiceDateFilterToToday() {
+        _state.update {
+            it.copy(
+                invoiceDateFilter = InvoiceDateFilter(type = InvoiceDateFilterType.HOY),
+                isDateFilterCustomExpanded = false,
+                error = null,
             )
         }
         loadSourceInvoices()
@@ -120,6 +152,7 @@ class CreditNotesViewModel(
             it.copy(
                 invoiceDateFilter = InvoiceDateFilter(type = InvoiceDateFilterType.MES_ACTUAL),
                 isDateFilterCustomExpanded = false,
+                error = null,
             )
         }
         loadSourceInvoices()
@@ -257,7 +290,11 @@ class CreditNotesViewModel(
                     selectedCreditNote = processed,
                     successMessage =
                         if (processed.fiscalStatus == CreditNoteFiscalStatusDto.CONFIRMADA) {
-                            "Nota de crédito fiscal confirmada"
+                            if (it.isPanama) {
+                                "Nota de crédito electrónica (NCE) confirmada"
+                            } else {
+                                "Nota de crédito fiscal confirmada"
+                            }
                         } else {
                             it.successMessage
                         },
@@ -269,7 +306,7 @@ class CreditNotesViewModel(
 
     private fun loadCreditNotes() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true) }
             creditNoteRepository
                 .getCreditNotes(
                     _state.value.searchQuery
@@ -287,9 +324,14 @@ class CreditNotesViewModel(
     }
 
     private fun loadSourceInvoices() {
+        val (fechaInicio, fechaFin) = _state.value.invoiceDateFilter.resolveDateRange()
+        val validationError = DateRangeValidator.validate(fechaInicio, fechaFin)
+        if (validationError != null) {
+            _state.update { it.copy(isLoading = false, error = validationError) }
+            return
+        }
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            val (fechaInicio, fechaFin) = _state.value.invoiceDateFilter.resolveDateRange()
+            _state.update { it.copy(isLoading = true) }
             creditNoteRepository
                 .getSourceInvoices(
                     search =
@@ -337,5 +379,9 @@ class CreditNotesViewModel(
         val result = processCreditNoteFiscal(detail, force)
         result.errorMessage?.let { message -> _state.update { it.copy(error = message) } }
         return result.detail
+    }
+
+    private companion object {
+        const val PANAMA_CODE = "PA"
     }
 }

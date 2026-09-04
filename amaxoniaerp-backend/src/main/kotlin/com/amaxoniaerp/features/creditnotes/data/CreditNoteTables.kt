@@ -77,7 +77,12 @@ object CreditNoteHeaderTableVE : BaseCreditNoteHeaderTable()
 object CreditNoteHeaderTablePA : BaseCreditNoteHeaderTable() {
     val descuentoParcial = decimal("descuento_parcial", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
     val descuentoImpuesto = decimal("descuento_impuesto", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
-    val descuentoGlobalVenta = decimal("descuento_global_venta", S.DECIMAL_PRECISION_20, 2).default(java.math.BigDecimal.ZERO)
+    val descuentoGlobalVenta =
+        decimal(
+            "descuento_global_venta",
+            S.DECIMAL_PRECISION_20,
+            2,
+        ).default(java.math.BigDecimal.ZERO)
     val estadoDevolucion = varchar("estado_devolucion", 20).nullable()
     val anular = integer("anular").nullable()
 }
@@ -166,6 +171,14 @@ object CreditNoteFacturaDetalleTable : Table("factura_detalle") {
     val codVendedor = integer("cod_vendedor")
     val itemCodigo = varchar("_item_codigo", S.VARCHAR_LENGTH_50).nullable()
     val itemReferencia = varchar("_item_referencia", S.VARCHAR_LENGTH_50).nullable()
+    val itemUnidadEmpaque = varchar("_item_unidad_empaque", S.VARCHAR_LENGTH_20).nullable()
+    val fechaCreacion = datetime("fecha_creacion").nullable()
+    val idSegmento = integer("id_segmento").nullable()
+    val idFamilia = integer("id_familia").nullable()
+    val porcentajeIsc = decimal("porcentaje_isc", S.DECIMAL_PRECISION_10, 2).nullable()
+    val importeIsc = decimal("importe_isc", S.DECIMAL_PRECISION_20, 2).nullable()
+    val idOti = integer("id_oti").nullable()
+    val importeOti = decimal("importe_oti", S.DECIMAL_PRECISION_20, 2).nullable()
     val anulado = bool("anulado").default(false)
 
     override val primaryKey = PrimaryKey(idDetalleFactura)
@@ -174,9 +187,16 @@ object CreditNoteFacturaDetalleTable : Table("factura_detalle") {
 object CreditNoteCajaTable : Table("caja") {
     val idCaja = varchar("id", S.VARCHAR_LENGTH_36)
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_50).nullable()
+    val descripcion = varchar("descripcion", S.VARCHAR_LENGTH_100).nullable()
+    val codEstatus = integer("activo").default(1)
     val idSucursal = integer("id_sucursal").nullable()
+    val codAlmacen = integer("cod_almacen").nullable()
     val serieCaja = varchar("serie_caja", S.VARCHAR_LENGTH_10).nullable()
+    val caja = varchar("caja", S.VARCHAR_LENGTH_50).nullable()
+    val fondoApertura = decimal("fondo_apertura", S.DECIMAL_PRECISION_10, 2).nullable()
     val impresoraModelo = varchar("impresora_modelo", S.VARCHAR_LENGTH_50).nullable()
+    val codigoSucursalEmisor = varchar("CodigoSucursalEmisor", S.VARCHAR_LENGTH_20).nullable()
+    val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", S.VARCHAR_LENGTH_10).nullable()
     val notacreditoCorrelativo = integer("notacredito_correlativo").nullable()
     val abonoCorrelativo = integer("abono_correlativo").nullable()
     val certificadoCorrelativo = integer("certificado_correlativo").nullable()
@@ -187,8 +207,25 @@ object CreditNoteCajaTable : Table("caja") {
 object CreditNoteCajaSecuenciaTable : Table("caja_secuencia") {
     val idCajaSecuencia = varchar("id", S.VARCHAR_LENGTH_36)
     val idCaja = varchar("id_caja", S.VARCHAR_LENGTH_36)
+    val idVendedor = integer("id_vendedor").nullable()
     val secuencia = varchar("secuencia", S.VARCHAR_LENGTH_10).nullable()
     val serieSucursal = varchar("serie_sucursal", S.VARCHAR_LENGTH_10).nullable()
+    val fechaApertura = datetime("fecha_apertura").nullable()
+    val fechaCierre = datetime("fecha_cierre").nullable()
+    val montoEfectivoApertura =
+        decimal(
+            "monto_efectivo_apertura",
+            S.DECIMAL_PRECISION_10,
+            2,
+        ).default(java.math.BigDecimal.ZERO)
+    val montoEfectivoCierre =
+        decimal(
+            "monto_efectivo_cierre",
+            S.DECIMAL_PRECISION_10,
+            2,
+        ).nullable().default(java.math.BigDecimal.ZERO)
+    val usuario = varchar("usuario", S.VARCHAR_LENGTH_40).nullable()
+    val estatus = integer("estatus").default(1)
 
     override val primaryKey = PrimaryKey(idCajaSecuencia)
 }

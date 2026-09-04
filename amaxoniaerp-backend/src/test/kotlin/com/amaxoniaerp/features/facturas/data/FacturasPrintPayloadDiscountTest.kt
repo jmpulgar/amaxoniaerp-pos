@@ -39,19 +39,6 @@ class FacturasPrintPayloadDiscountTest {
             )
         transaction(database) {
             SchemaUtils.create(FacturasTableVE, FacturasClientesTable, EstatusTable, SalesFacturaDetalleTable)
-            // The raw SQL in `getPrintPayload` references legacy string-typed columns and tables
-            // that are not modeled in `BaseFacturasTable` (they exist only in the production
-            // schema). Add them here so the in-memory H2 mirrors what the real MySQL DB exposes.
-            exec("ALTER TABLE factura ADD COLUMN subtotal DECIMAL(20, 2) DEFAULT 0")
-            exec("ALTER TABLE factura ADD COLUMN totalizar_base_imponible DECIMAL(20, 2) DEFAULT 0")
-            exec("ALTER TABLE factura ADD COLUMN totalizar_monto_iva DECIMAL(20, 2) DEFAULT 0")
-            exec("ALTER TABLE factura ADD COLUMN facturar_a VARCHAR(255) DEFAULT ''")
-            exec("ALTER TABLE factura ADD COLUMN facturar_a_ruc VARCHAR(50) DEFAULT ''")
-            exec("ALTER TABLE factura ADD COLUMN facturar_a_direccion VARCHAR(255) DEFAULT ''")
-            exec("ALTER TABLE factura ADD COLUMN facturar_a_telefono VARCHAR(50) DEFAULT ''")
-            exec("ALTER TABLE factura ADD COLUMN cliente_sucursal_id VARCHAR(36)")
-            // Venezuela persisted after HKA issuance; raw SELECT reads it directly.
-            exec("ALTER TABLE factura ADD COLUMN numero_control_thka VARCHAR(50)")
             // Auxiliary tables LEFT JOINed by the print-payload query. Empty is fine for the
             // discount aggregation path under test.
             exec("CREATE TABLE IF NOT EXISTS parametros_generales (id INT, rif VARCHAR(50))")

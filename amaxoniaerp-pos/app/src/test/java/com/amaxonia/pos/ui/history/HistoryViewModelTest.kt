@@ -1,19 +1,32 @@
 package com.amaxonia.pos.ui.history
 
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.caja.AperturaRequest
+import com.amaxonia.pos.domain.model.caja.Caja
+import com.amaxonia.pos.domain.model.caja.CajaSecuencia
+import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
+import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
+import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
+import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleResponseDto
+import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.repository.InvoiceHistoryPage
 import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
 import com.amaxonia.pos.domain.repository.InvoiceHistorySummary
+import com.amaxonia.pos.domain.usecase.payment.InvoicePrintFeedback
+import com.amaxonia.pos.domain.usecase.payment.PrintInvoiceUseCase
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryViewModelTest {
@@ -24,7 +37,8 @@ class HistoryViewModelTest {
     fun initialStateLoadsPageAndBackendSummary() =
         runTest(mainDispatcherRule.dispatcher) {
             val repository = FakeInvoiceHistoryRepository()
-            val viewModel = HistoryViewModel(repository)
+            val fixedToday = LocalDate.of(2026, 9, 3)
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), todayProvider = { fixedToday })
 
             advanceUntilIdle()
 
@@ -32,31 +46,36 @@ class HistoryViewModelTest {
             assertEquals(250L, viewModel.state.value.totalTransactions)
             assertEquals(250, viewModel.state.value.summary.totalFacturas)
             assertEquals(1, repository.filters.size)
-            assertEquals(InvoiceHistoryFilter(), repository.filters.single())
+            assertEquals(
+                InvoiceHistoryFilter(
+                    fechaInicio = "2026-09-03",
+                    fechaFin = "2026-09-03",
+                    cajaId = "caja-1",
+                ),
+                repository.filters.single(),
+            )
         }
 
     @Test
     fun applyAndClearFiltersUseTheCurrentFilter() =
         runTest(mainDispatcherRule.dispatcher) {
             val repository = FakeInvoiceHistoryRepository()
-            val viewModel = HistoryViewModel(repository)
+            val fixedToday = LocalDate.of(2026, 9, 3)
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), todayProvider = { fixedToday })
             advanceUntilIdle()
 
             viewModel.onUsuarioChanged("alice")
-            viewModel.onSucursalChanged("7")
             viewModel.onFechaInicioChanged("2026-01-01")
             viewModel.onFechaFinChanged("2026-01-31")
-            viewModel.onEstatusChanged("1,2")
             viewModel.applyFilters()
             advanceUntilIdle()
 
             assertEquals(
                 InvoiceHistoryFilter(
                     usuario = "alice",
-                    sucursalId = 7,
                     fechaInicio = "2026-01-01",
                     fechaFin = "2026-01-31",
-                    estatus = listOf(1, 2),
+                    cajaId = "caja-1",
                 ),
                 repository.filters.last(),
             )
@@ -64,14 +83,21 @@ class HistoryViewModelTest {
             viewModel.clearFilters()
             advanceUntilIdle()
 
-            assertEquals(InvoiceHistoryFilter(), repository.filters.last())
+            assertEquals(
+                InvoiceHistoryFilter(
+                    fechaInicio = "2026-09-03",
+                    fechaFin = "2026-09-03",
+                    cajaId = "caja-1",
+                ),
+                repository.filters.last(),
+            )
         }
 
     @Test
     fun searchUsesDebounceBeforeReloading() =
         runTest(mainDispatcherRule.dispatcher) {
             val repository = FakeInvoiceHistoryRepository()
-            val viewModel = HistoryViewModel(repository)
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository())
             advanceUntilIdle()
             val initialCalls = repository.filters.size
 
@@ -84,6 +110,123 @@ class HistoryViewModelTest {
 
             assertEquals("INV-001", repository.filters.last().search)
         }
+
+    @Test
+    fun reprintInvoiceShowsErrorWhenPrintServiceUnavailable() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), printInvoiceUseCase = null)
+            advanceUntilIdle()
+
+            val transaction = Transaction(id = "tx-1", invoiceNumber = "INV-1", time = "12:00", amount = 10.0, dateHeader = "Hoy")
+            viewModel.reprintInvoice(transaction)
+            advanceUntilIdle()
+
+            assertEquals("Servicio de impresión no disponible", viewModel.state.value.detalleActionError)
+            assertEquals(false, viewModel.state.value.isReprinting)
+        }
+
+    @Test
+    fun reprintInvoiceShowsErrorWhenNoPrinterConfigured() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val printUseCase = PrintInvoiceUseCase { _, _, _ -> null }
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), printInvoiceUseCase = printUseCase)
+            advanceUntilIdle()
+
+            val transaction = Transaction(id = "tx-1", invoiceNumber = "INV-1", time = "12:00", amount = 10.0, dateHeader = "Hoy")
+            viewModel.reprintInvoice(transaction)
+            advanceUntilIdle()
+
+            assertEquals("No hay una impresora compatible configurada en Ajustes", viewModel.state.value.detalleActionError)
+            assertEquals(false, viewModel.state.value.isReprinting)
+        }
+
+    @Test
+    fun reprintInvoiceShowsSuccessMessageOnSuccessfulPrint() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val printUseCase =
+                PrintInvoiceUseCase { _, _, _ ->
+                    InvoicePrintFeedback(
+                        displayMessage = "Ticket SUNMI enviado correctamente",
+                        fiscalNumber = "CUFE-123",
+                        printerSerial = "SUNMI",
+                        isSuccess = true,
+                    )
+                }
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), printInvoiceUseCase = printUseCase)
+            advanceUntilIdle()
+
+            val transaction = Transaction(id = "tx-1", invoiceNumber = "INV-1", time = "12:00", amount = 10.0, dateHeader = "Hoy")
+            viewModel.reprintInvoice(transaction)
+            advanceUntilIdle()
+
+            assertEquals("Ticket SUNMI enviado correctamente", viewModel.state.value.detalleMessage)
+            assertNull(viewModel.state.value.detalleActionError)
+            assertEquals(false, viewModel.state.value.isReprinting)
+        }
+
+    @Test
+    fun reprintInvoiceShowsErrorMessageOnFailedPrint() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val printUseCase =
+                PrintInvoiceUseCase { _, _, _ ->
+                    InvoicePrintFeedback(
+                        displayMessage = "Papel agotado en impresora SUNMI",
+                        fiscalNumber = "",
+                        printerSerial = "SUNMI",
+                        isSuccess = false,
+                    )
+                }
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository(), printInvoiceUseCase = printUseCase)
+            advanceUntilIdle()
+
+            val transaction = Transaction(id = "tx-1", invoiceNumber = "INV-1", time = "12:00", amount = 10.0, dateHeader = "Hoy")
+            viewModel.reprintInvoice(transaction)
+            advanceUntilIdle()
+
+            assertEquals("Papel agotado en impresora SUNMI", viewModel.state.value.detalleActionError)
+            assertNull(viewModel.state.value.detalleMessage)
+            assertEquals(false, viewModel.state.value.isReprinting)
+        }
+
+    private class FakeCajaRepository(
+        caja: Caja? =
+            Caja(
+                idCaja = "caja-1",
+                codCaja = "C1",
+                descripcion = "Caja 1",
+                estatus = 1,
+                idSucursal = 1,
+                serieCaja = "S1",
+            ),
+    ) : CajaRepository {
+        override val activeCaja = MutableStateFlow(caja)
+        override val activeCajaName = MutableStateFlow(caja?.descripcion.orEmpty())
+        override val activeCajaSecuencia = MutableStateFlow<CajaSecuencia?>(null)
+
+        override suspend fun getCajas(): Result<List<Caja>> = Result.success(emptyList())
+
+        override suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String> = Result.success("000001")
+
+        override suspend fun restoreActiveCajaIfValid() = Unit
+
+        override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> = Result.failure(NotImplementedError())
+
+        override suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse> = Result.failure(NotImplementedError())
+
+        override suspend fun closeCaja(request: CierreCajaRequest): Result<CierreCajaResponse> = Result.failure(NotImplementedError())
+
+        override suspend fun getCierreSummary(): Result<CierreCajaSummary> = Result.failure(NotImplementedError())
+
+        override suspend fun setActiveCaja(caja: Caja) = Unit
+
+        override suspend fun clearActiveCaja() = Unit
+
+        override suspend fun markSequenceClosed() = Unit
+    }
 
     private class FakeInvoiceHistoryRepository : InvoiceHistoryRepository {
         val filters = mutableListOf<InvoiceHistoryFilter>()
@@ -116,5 +259,18 @@ class HistoryViewModelTest {
 
         override suspend fun getInvoiceDetail(invoiceId: String): Result<FacturaDetalleResponseDto> =
             Result.success(FacturaDetalleResponseDto(invoiceId, transaction.invoiceNumber, emptyList()))
+
+        override suspend fun getInvoicePdf(invoiceId: String): Result<ByteArray> = Result.success(ByteArray(0))
+
+        override suspend fun resendElectronicInvoice(
+            invoiceId: String,
+        ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> =
+            Result.success(
+                com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto(
+                    success = true,
+                    cufe = "CUFE-1",
+                    qr = "QR-1",
+                ),
+            )
     }
 }

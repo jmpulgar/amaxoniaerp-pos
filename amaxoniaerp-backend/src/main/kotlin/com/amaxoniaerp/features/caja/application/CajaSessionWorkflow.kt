@@ -46,10 +46,6 @@ class CajaSessionWorkflow(
                     error("La secuencia de caja ya se encuentra cerrada")
                 }
 
-                if (store.countFacturasTemporalesPendientes(countryCode, request.id) > 0) {
-                    error("Existen facturas temporales pendientes por procesar")
-                }
-
                 val now = BusinessClock.nowForCountry(countryCode)
                 store.writeCierre(request, now, guard.serieSucursal)
 

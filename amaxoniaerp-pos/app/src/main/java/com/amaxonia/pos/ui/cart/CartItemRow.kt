@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -80,7 +79,9 @@ fun CartItemRow(
     androidx.compose.material3.ElevatedCard(
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        shape =
+            androidx.compose.foundation.shape
+                .RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
@@ -200,7 +201,9 @@ private fun CartItemPriceRow(item: com.amaxonia.pos.domain.model.CartItem) {
         )
         Spacer(modifier = Modifier.weight(1f))
         Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            shape =
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
         ) {
             AdaptiveAmountText(
@@ -267,7 +270,9 @@ private fun CartItemEditButtons(
 ) {
     if (allowEditPrice) {
         Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            shape =
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
             modifier = Modifier.size(40.dp),
         ) {
@@ -283,7 +288,9 @@ private fun CartItemEditButtons(
     }
     if (allowDiscount) {
         Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            shape =
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
             modifier = Modifier.size(40.dp),
         ) {
@@ -320,7 +327,9 @@ private fun CartItemUnitSelector(
                 leadingIcon = {
                     Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(15.dp))
                 },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                shape =
+                    androidx.compose.foundation.shape
+                        .RoundedCornerShape(8.dp),
             )
             DropdownMenu(
                 expanded = unitMenuExpanded,
@@ -357,7 +366,9 @@ private fun CartItemFootnotes(item: com.amaxonia.pos.domain.model.CartItem) {
     // Descuento (condicional)
     if (item.discountPercent > 0.0) {
         Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+            shape =
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(6.dp),
             color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.40f),
             modifier = Modifier.padding(top = 6.dp),
         ) {
@@ -381,7 +392,9 @@ private fun CartItemFootnotes(item: com.amaxonia.pos.domain.model.CartItem) {
         item.lotAssignments.forEach { lot ->
             val expiry = if (!lot.vencimiento.isNullOrBlank()) " · Vence: ${lot.vencimiento}" else ""
             Surface(
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                shape =
+                    androidx.compose.foundation.shape
+                        .RoundedCornerShape(6.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 modifier = Modifier.padding(top = 2.dp),
             ) {

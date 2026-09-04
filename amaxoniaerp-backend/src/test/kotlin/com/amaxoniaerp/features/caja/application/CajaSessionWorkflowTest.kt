@@ -54,7 +54,7 @@ class CajaSessionWorkflowTest {
             val write = store.writtenCierres.single()
             assertEquals(SEQ, write.first.id)
             assertEquals("A", write.third)
-            assertEquals(listOf("findSecuenciaGuard", "countFacturasTemporales", "writeCierre"), store.calls)
+            assertEquals(listOf("findSecuenciaGuard", "writeCierre"), store.calls)
         }
 
     @Test
@@ -81,16 +81,19 @@ class CajaSessionWorkflowTest {
         }
 
     @Test
-    fun `close falla con facturas temporales pendientes y no escribe nada`() =
+    fun `close no bloquea ni falla con facturas temporales pendientes`() =
         runBlocking {
             store.guard = CajaSecuenciaGuard(cerrada = false, serieSucursal = "A")
             store.temporalesPendientes = 1
 
             val result = workflow.close(database, PA, cierreRequest(SEQ))
 
-            assertEquals("Existen facturas temporales pendientes por procesar", result.exceptionOrNull()!!.message)
-            assertTrue("writeCierre" !in store.calls)
-            assertEquals(listOf("findSecuenciaGuard", "countFacturasTemporales"), store.calls)
+            val response = result.getOrThrow()
+            assertTrue(response.success)
+            assertEquals("Cierre de caja guardado correctamente", response.message)
+            assertEquals(SEQ, response.id)
+            assertTrue("writeCierre" in store.calls)
+            assertEquals(listOf("findSecuenciaGuard", "writeCierre"), store.calls)
         }
 
     @Test

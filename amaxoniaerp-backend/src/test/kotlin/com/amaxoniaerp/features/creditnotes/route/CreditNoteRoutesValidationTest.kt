@@ -114,4 +114,43 @@ class CreditNoteRoutesValidationTest {
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertTrue(response.bodyAsText().contains("Fecha inválida"))
         }
+
+    @Test
+    fun `listar facturas elegibles con fechaFin anterior a fechaInicio responde 400`() =
+        app {
+            seedEmptyH2()
+            val response =
+                client.get("/api/pos/notas-credito/facturas?limit=5&fecha_inicio=2026-08-15&fecha_fin=2026-08-01") {
+                    header(HttpHeaders.Authorization, "Bearer ${companyToken()}")
+                    header("Company-DB", companyDb)
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("La fecha final debe ser mayor o igual a la fecha inicial"))
+        }
+
+    @Test
+    fun `listar facturas elegibles con rango mayor a 1 mes responde 400`() =
+        app {
+            seedEmptyH2()
+            val response =
+                client.get("/api/pos/notas-credito/facturas?limit=5&fecha_inicio=2026-06-01&fecha_fin=2026-08-01") {
+                    header(HttpHeaders.Authorization, "Bearer ${companyToken()}")
+                    header("Company-DB", companyDb)
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("El rango de consulta no puede superar 1 mes"))
+        }
+
+    @Test
+    fun `listar notas credito con rango mayor a 1 mes responde 400`() =
+        app {
+            seedEmptyH2()
+            val response =
+                client.get("/api/pos/notas-credito?limit=5&fecha_inicio=2026-06-01&fecha_fin=2026-08-01") {
+                    header(HttpHeaders.Authorization, "Bearer ${companyToken()}")
+                    header("Company-DB", companyDb)
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("El rango de consulta no puede superar 1 mes"))
+        }
 }

@@ -8,12 +8,12 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
@@ -131,20 +131,29 @@ fun CreditNoteRepository.listEligibleInvoices(
     if (fechaInicio != null && fechaFin != null) {
         query.andWhere {
             (CreditNoteFacturaTable.fechaFactura.between(fechaInicio, fechaFin)) or
-                (CreditNoteFacturaTable.fechaFactura.isNull() and CreditNoteFacturaTable.fechaCreacion.between(
-                    fechaInicio.atStartOfDay(),
-                    fechaFin.plusDays(1).atStartOfDay().minusNanos(1),
-                ))
+                (
+                    CreditNoteFacturaTable.fechaFactura.isNull() and
+                        CreditNoteFacturaTable.fechaCreacion.between(
+                            fechaInicio.atStartOfDay(),
+                            fechaFin.plusDays(1).atStartOfDay().minusNanos(1),
+                        )
+                )
         }
     } else if (fechaInicio != null) {
         query.andWhere {
             (CreditNoteFacturaTable.fechaFactura greaterEq fechaInicio) or
-                (CreditNoteFacturaTable.fechaFactura.isNull() and (CreditNoteFacturaTable.fechaCreacion greaterEq fechaInicio.atStartOfDay()))
+                (
+                    CreditNoteFacturaTable.fechaFactura.isNull() and
+                        (CreditNoteFacturaTable.fechaCreacion greaterEq fechaInicio.atStartOfDay())
+                )
         }
     } else if (fechaFin != null) {
         query.andWhere {
             (CreditNoteFacturaTable.fechaFactura lessEq fechaFin) or
-                (CreditNoteFacturaTable.fechaFactura.isNull() and (CreditNoteFacturaTable.fechaCreacion less fechaFin.plusDays(1).atStartOfDay()))
+                (
+                    CreditNoteFacturaTable.fechaFactura.isNull() and
+                        (CreditNoteFacturaTable.fechaCreacion less fechaFin.plusDays(1).atStartOfDay())
+                )
         }
     }
 
@@ -159,6 +168,11 @@ fun CreditNoteRepository.listEligibleInvoices(
         }
     }
 
+    val totalCount = query.count()
+    if (totalCount == 0L) {
+        return emptyList<CreditNoteSourceInvoiceSummary>() to 0L
+    }
+
     val invoiceRows =
         query
             .orderBy(CreditNoteFacturaTable.fechaCreacion to SortOrder.DESC)
@@ -167,7 +181,7 @@ fun CreditNoteRepository.listEligibleInvoices(
             .toList()
 
     if (invoiceRows.isEmpty()) {
-        return emptyList<CreditNoteSourceInvoiceSummary>() to 0L
+        return emptyList<CreditNoteSourceInvoiceSummary>() to totalCount
     }
 
     val invoiceIds = invoiceRows.map { it[CreditNoteFacturaTable.idFactura] }
@@ -180,29 +194,33 @@ fun CreditNoteRepository.listEligibleInvoices(
             ).where { CreditNoteFacturaDetalleTable.idFactura inList invoiceIds }
             .toList()
 
-    val detailToInvoice = detailRows.associate {
-        it[CreditNoteFacturaDetalleTable.idDetalleFactura] to it[CreditNoteFacturaDetalleTable.idFactura]
-    }
+    val detailToInvoice =
+        detailRows.associate {
+            it[CreditNoteFacturaDetalleTable.idDetalleFactura] to it[CreditNoteFacturaDetalleTable.idFactura]
+        }
     val detailIds = detailToInvoice.keys.toList()
 
-    val itemCountsByInvoice = detailRows
-        .groupBy { it[CreditNoteFacturaDetalleTable.idFactura] }
-        .mapValues { (_, rows) -> rows.size }
+    val itemCountsByInvoice =
+        detailRows
+            .groupBy { it[CreditNoteFacturaDetalleTable.idFactura] }
+            .mapValues { (_, rows) -> rows.size }
 
-    val returnedByInvoice = if (detailIds.isNotEmpty()) {
-        val returnedRows = CreditNoteDetailTable
-            .select(CreditNoteDetailTable.idDetalleFactura, CreditNoteDetailTable.itemTotalConIva)
-            .where { CreditNoteDetailTable.idDetalleFactura inList detailIds }
-            .toList()
+    val returnedByInvoice =
+        if (detailIds.isNotEmpty()) {
+            val returnedRows =
+                CreditNoteDetailTable
+                    .select(CreditNoteDetailTable.idDetalleFactura, CreditNoteDetailTable.itemTotalConIva)
+                    .where { CreditNoteDetailTable.idDetalleFactura inList detailIds }
+                    .toList()
 
-        returnedRows
-            .groupBy { detailToInvoice[it[CreditNoteDetailTable.idDetalleFactura]] }
-            .mapValues { (_, rows) ->
-                rows.fold(BigDecimal.ZERO) { acc, r -> acc + r[CreditNoteDetailTable.itemTotalConIva] }
-            }
-    } else {
-        emptyMap()
-    }
+            returnedRows
+                .groupBy { detailToInvoice[it[CreditNoteDetailTable.idDetalleFactura]] }
+                .mapValues { (_, rows) ->
+                    rows.fold(BigDecimal.ZERO) { acc, r -> acc + r[CreditNoteDetailTable.itemTotalConIva] }
+                }
+        } else {
+            emptyMap()
+        }
 
     val summaries =
         invoiceRows.mapNotNull { row ->
@@ -216,13 +234,19 @@ fun CreditNoteRepository.listEligibleInvoices(
             } else {
                 val clientNombre = row.getOrNull(ClientsTable.nombre).orEmpty()
                 val clientApellido = row.getOrNull(ClientsTable.apellido).orEmpty()
-                val clientFull = "$clientNombre $clientApellido".trim().ifBlank {
-                    row[CreditNoteFacturaTable.facturarA].ifBlank { "CONSUMIDOR FINAL" }
-                }
-                val clientRif = row.getOrNull(ClientsTable.rif).orEmpty().ifBlank {
-                    row[CreditNoteFacturaTable.facturarARuc].ifBlank { "CF" }
-                }
-                val fecha = formatDate(row[CreditNoteFacturaTable.fechaFactura] ?: row[CreditNoteFacturaTable.fechaCreacion]?.toLocalDate())
+                val clientFull =
+                    "$clientNombre $clientApellido".trim().ifBlank {
+                        row[CreditNoteFacturaTable.facturarA].ifBlank { "CONSUMIDOR FINAL" }
+                    }
+                val clientRif =
+                    row.getOrNull(ClientsTable.rif).orEmpty().ifBlank {
+                        row[CreditNoteFacturaTable.facturarARuc].ifBlank { "CF" }
+                    }
+                val fecha =
+                    formatDate(
+                        row[CreditNoteFacturaTable.fechaFactura]
+                            ?: row[CreditNoteFacturaTable.fechaCreacion]?.toLocalDate(),
+                    )
                 CreditNoteSourceInvoiceSummary(
                     id = invoiceId,
                     codigo = row[CreditNoteFacturaTable.codFactura],
@@ -239,11 +263,17 @@ fun CreditNoteRepository.listEligibleInvoices(
             }
         }
 
-    return summaries to summaries.size.toLong()
+    val finalTotalCount =
+        if (offset == 0L && (invoiceRows.size < limit || summaries.isEmpty())) {
+            summaries.size.toLong()
+        } else {
+            totalCount
+        }
+
+    return summaries to finalTotalCount
 }
 
 fun CreditNoteRepository.getSourceInvoiceDetail(
     invoiceId: String,
     countryCode: String = "VE",
-): com.amaxoniaerp.features.creditnotes.domain.CreditNoteSourceInvoiceDetailResponse? =
-    buildSourceInvoiceDetail(invoiceId, countryCode)
+): com.amaxoniaerp.features.creditnotes.domain.CreditNoteSourceInvoiceDetailResponse? = buildSourceInvoiceDetail(invoiceId, countryCode)

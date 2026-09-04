@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -380,10 +380,11 @@ private fun CheckoutButton(onClick: () -> Unit) {
     ) {
         Text(
             "Cobrar",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.5.sp,
-            ),
+            style =
+                MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.5.sp,
+                ),
             color = MaterialTheme.colorScheme.onPrimary,
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -803,7 +804,11 @@ internal fun PromotionCartGroup(
             PromotionGroupItems(group = group, accent = accent)
 
             Spacer(Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Total promoción", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -897,7 +902,12 @@ private fun PromotionGroupHeader(
             color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f),
         ) {
             IconButton(onClick = onRemove, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Quitar promoción", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(17.dp))
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Quitar promoción",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(17.dp),
+                )
             }
         }
     }
@@ -946,4 +956,3 @@ private fun PromotionGroupItems(
         }
     }
 }
-

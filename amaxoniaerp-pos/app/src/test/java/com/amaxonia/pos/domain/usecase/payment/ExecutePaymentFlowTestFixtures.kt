@@ -335,6 +335,13 @@ internal class FakeSalesRepository(
 
     override suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto> =
         Result.failure(UnsupportedOperationException("Not used"))
+
+    override suspend fun getInvoicePdf(facturaId: String): Result<ByteArray> = Result.failure(UnsupportedOperationException("Not used"))
+
+    override suspend fun resendElectronicInvoice(
+        invoiceId: String,
+    ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> =
+        Result.failure(UnsupportedOperationException("Not used"))
 }
 
 internal class FakePaymentGateway(

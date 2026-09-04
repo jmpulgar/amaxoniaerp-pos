@@ -62,6 +62,12 @@ class ConfirmFiscalDocumentUseCaseTest {
 
         override suspend fun sendReceiptEmail(facturaId: String): Result<EnviarCorreoFacturaResponseDto> = unused()
 
+        override suspend fun getInvoicePdf(facturaId: String): Result<ByteArray> = unused()
+
+        override suspend fun resendElectronicInvoice(
+            invoiceId: String,
+        ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> = unused()
+
         private fun <T> unused(): Result<T> = Result.failure(UnsupportedOperationException("Not used"))
     }
 

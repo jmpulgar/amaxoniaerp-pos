@@ -19,5 +19,6 @@ object CreditNotesGraph {
                     DependencyContainer.printerFactory,
                     DependencyContainer.posConfigurationRepository,
                 ),
+            contextReader = DependencyContainer.posConfigurationRepository,
         )
 }
