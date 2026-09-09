@@ -52,6 +52,7 @@ import com.amaxonia.pos.ui.payment.SuccessScreen
 import com.amaxonia.pos.ui.products.ProductFormScreen
 import com.amaxonia.pos.ui.products.ProductListScreen
 import com.amaxonia.pos.ui.reports.ReportsScreen
+import com.amaxonia.pos.ui.offlinesettings.OfflineSettingsScreen
 import com.amaxonia.pos.ui.settings.SettingsScreen
 import com.amaxonia.pos.ui.sync.SyncScreen
 import com.amaxonia.pos.ui.theme.OfflineRed
@@ -264,6 +265,7 @@ private fun NavGraphBuilder.dashboardDestination(
             onNavigateToCreditNotes = { navController.navigateFromDrawer("credit_notes") },
             onNavigateToReports = { navController.navigateFromDrawer("reports") },
             onNavigateToPrinterSettings = { navController.navigateFromDrawer("printer_settings") },
+            onNavigateToOfflineSettings = { navController.navigateFromDrawer("offline_settings") },
             onNavigateToCart = { navController.navigate("cart") },
             onStartNewOrder = { navController.navigateFromDrawer("client_selection_mode") },
             onNavigateToCierreCaja = { navController.navigateFromDrawer("cierre_caja") },
@@ -389,6 +391,16 @@ private fun NavGraphBuilder.operationsDestinations(navController: NavController)
         SettingsScreen(onBack = { navController.popBackStack() })
     }
 
+    composable("offline_settings") {
+        val offlineViewModel =
+            remember {
+                com.amaxonia.pos.composition.AppGraph.sync.offlineSettingsViewModel()
+            }
+        OfflineSettingsScreen(
+            viewModel = offlineViewModel,
+            onBack = { navController.popBackStack() },
+        )
+    }
     composable("draft_invoices") {
         DraftInvoicesScreen(
             onBack = { navController.popBackStack() },
@@ -473,28 +485,17 @@ private fun NavGraphBuilder.clientsDestinations(
     }
 }
 
-/** Destinations de productos: listado y formulario. */
+/**
+ * Destinations de productos.
+ *
+ * D1 (ADR-007 / PLAN §0): el catálogo se administra exclusivamente desde el
+ * ERP/web; el POS solo consulta el listado. La ruta `product_form` quedó
+ * fuera de navegación junto con el alta/edición desde el POS.
+ */
 private fun NavGraphBuilder.productsDestinations(navController: NavController) {
     composable("products_list") {
         ProductListScreen(
             onBack = { navController.popBackStack() },
-            onNavigateToForm = { productId ->
-                val route = if (productId != null) "product_form/$productId" else "product_form/new"
-                navController.navigate(route)
-            },
-        )
-    }
-
-    composable(
-        route = "product_form/{productId}",
-        arguments = listOf(navArgument("productId") { type = NavType.StringType }),
-    ) { backStackEntry ->
-        val idArg = backStackEntry.arguments?.getString("productId")
-        val productId = if (idArg == "new") null else idArg
-        ProductFormScreen(
-            productId = productId,
-            onBack = { navController.popBackStack() },
-            onSaveSuccess = { navController.popBackStack() },
         )
     }
 }

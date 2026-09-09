@@ -4,14 +4,28 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 
 @Dao
 interface ClientDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ClientEntity>)
 
+    @Upsert
+    suspend fun upsertAll(items: List<ClientEntity>)
+
     @Query("SELECT * FROM clients WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): ClientEntity?
+
+    @Query("DELETE FROM clients WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    /** Purga de alcance (ADR-008): conserva solo clientes de las sucursales dadas. */
+    @Query("DELETE FROM clients WHERE idSucursal IS NULL OR idSucursal NOT IN (:sucursalIds)")
+    suspend fun deleteBySucursalesNotIn(sucursalIds: List<Int>)
+
+    @Query("SELECT COUNT(*) FROM clients WHERE status = 1")
+    suspend fun count(): Int
 
     @Query("SELECT * FROM clients ORDER BY name, lastName LIMIT :limit OFFSET :offset")
     suspend fun getPaged(
@@ -40,6 +54,12 @@ interface ClientSucursalDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ClientSucursalEntity>)
 
+    @Upsert
+    suspend fun upsertAll(items: List<ClientSucursalEntity>)
+
+    @Query("DELETE FROM client_sucursales WHERE sucursalId = :sucursalId")
+    suspend fun deleteById(sucursalId: Int)
+
     @Query("DELETE FROM client_sucursales WHERE clienteCodigo = :clienteCodigo")
     suspend fun deleteByClientCode(clienteCodigo: String)
 
@@ -52,19 +72,43 @@ interface ClientSucursalDao {
 
 @Dao
 interface ProductDao {
+    /**
+     * D4: la superficie de venta solo expone ítems activos (`estatus = 'A'`;
+     * valor a confirmar en staging). El registro inactivo permanece en la BD.
+     * Nota: 'A' está literal en las queries; única fuente: PLAN §5.1-5.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ProductEntity>)
 
-    @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
+    @Upsert
+    suspend fun upsertAll(items: List<ProductEntity>)
+
+    @Query("DELETE FROM products WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    /** Purga de alcance (ADR-008): conserva solo productos de los departamentos dados. */
+    @Query("DELETE FROM products WHERE department NOT IN (:departmentIds)")
+    suspend fun deleteByDepartmentsNotIn(departmentIds: List<Int>)
+
+    @Query("SELECT * FROM products WHERE id = :id AND estatus = 'A' LIMIT 1")
     suspend fun getById(id: String): ProductEntity?
 
-    @Query("SELECT * FROM products ORDER BY description LIMIT :limit OFFSET :offset")
+    @Query(
+        "SELECT * FROM products WHERE (barcode1 = :code OR barcode2 = :code OR barcode3 = :code) " +
+            "AND estatus = 'A' LIMIT 1",
+    )
+    suspend fun getByBarcode(code: String): ProductEntity?
+
+    @Query("SELECT * FROM products WHERE estatus = 'A' ORDER BY description LIMIT :limit OFFSET :offset")
     suspend fun getPaged(
         limit: Int,
         offset: Int,
     ): List<ProductEntity>
 
-    @Query("SELECT * FROM products WHERE department = :departmentId ORDER BY description LIMIT :limit OFFSET :offset")
+    @Query(
+        "SELECT * FROM products WHERE department = :departmentId AND estatus = 'A' " +
+            "ORDER BY description LIMIT :limit OFFSET :offset",
+    )
     suspend fun getPagedByDepartment(
         departmentId: Int,
         limit: Int,
@@ -73,12 +117,13 @@ interface ProductDao {
 
     @Query(
         "SELECT * FROM products " +
-            "WHERE code LIKE :query COLLATE NOCASE " +
+            "WHERE estatus = 'A' AND (" +
+            "code LIKE :query COLLATE NOCASE " +
             "OR description LIKE :query COLLATE NOCASE " +
             "OR reference LIKE :query COLLATE NOCASE " +
             "OR barcode1 LIKE :query COLLATE NOCASE " +
             "OR barcode2 LIKE :query COLLATE NOCASE " +
-            "OR barcode3 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE) " +
             "ORDER BY description LIMIT :limit OFFSET :offset",
     )
     suspend fun searchPaged(
@@ -89,7 +134,7 @@ interface ProductDao {
 
     @Query(
         "SELECT * FROM products " +
-            "WHERE department = :departmentId AND (" +
+            "WHERE department = :departmentId AND estatus = 'A' AND (" +
             "code LIKE :query COLLATE NOCASE " +
             "OR description LIKE :query COLLATE NOCASE " +
             "OR reference LIKE :query COLLATE NOCASE " +
@@ -104,6 +149,13 @@ interface ProductDao {
         limit: Int,
         offset: Int,
     ): List<ProductEntity>
+
+    /** Resync: borra TODO el catálogo de productos (nunca toca ventas). */
+    @Query("DELETE FROM products")
+    suspend fun clearAll()
+
+    @Query("SELECT COUNT(*) FROM products WHERE estatus = 'A'")
+    suspend fun count(): Int
 }
 
 @Dao
@@ -160,6 +212,12 @@ interface AddressLevel3Dao {
 interface ClientTypeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ClientTypeEntity>)
+
+    @Upsert
+    suspend fun upsertAll(items: List<ClientTypeEntity>)
+
+    @Query("DELETE FROM client_types WHERE id = :id")
+    suspend fun deleteById(id: Int)
 
     @Query("SELECT * FROM client_types ORDER BY name")
     suspend fun getAll(): List<ClientTypeEntity>

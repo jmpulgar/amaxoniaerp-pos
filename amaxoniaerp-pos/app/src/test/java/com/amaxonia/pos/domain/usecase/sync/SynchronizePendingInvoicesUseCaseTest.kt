@@ -1,6 +1,7 @@
 package com.amaxonia.pos.domain.usecase.sync
 
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
+import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
 import com.amaxonia.pos.domain.model.sales.SalePaymentSummaryDto
 import com.amaxonia.pos.domain.system.AppClock
@@ -218,7 +219,70 @@ class SynchronizePendingInvoicesUseCaseTest {
         id: String = "local-1",
         invoiceNumber: String = "OFF-001",
         payloadJson: String = "valid",
-    ): PendingInvoiceRecord = PendingInvoiceRecord(id, invoiceNumber, payloadJson)
+        retryCount: Int = 0,
+    ): PendingInvoiceRecord = PendingInvoiceRecord(id, invoiceNumber, payloadJson, retryCount)
+
+    @Test
+    fun conflicto409ConReconciliadorResuelveComoSent() =
+        runTest {
+            val queue = FakeQueue(record())
+            val sut =
+                SynchronizePendingInvoicesUseCase(
+                    queue = queue,
+                    decoder = PendingSaleDecoder { Result.success(request("local-1", "OFF-001")) },
+                    gateway =
+                        object : PendingSaleGateway {
+                            override suspend fun submit(request: ProcessSaleRequestDto): Result<SynchronizedInvoice> =
+                                Result.failure(
+                                    DuplicateInvoiceException(clientCorrelationId = "local-1", message = "duplicada"),
+                                )
+                        },
+                    clock = clock,
+                    config = SyncRetryConfig(reconciler = { Result.success(SynchronizedInvoice("remote-server", "F001-00001")) }),
+                )
+
+            assertEquals(PendingInvoiceSyncResult.Success, sut("t$1"))
+            assertTrue(queue.events.any { it == "sent:local-1:remote-server" })
+        }
+
+    @Test
+    fun conflicto409SinReconciliadorQuedaRecoverableParaNoPerderLaVenta() =
+        runTest {
+            val queue = FakeQueue(record())
+            val sut =
+                useCase(queue) {
+                    Result.failure(
+                        DuplicateInvoiceException(clientCorrelationId = "local-1", message = "duplicada"),
+                    )
+                }
+
+            assertEquals(PendingInvoiceSyncResult.Retry, sut("t$1"))
+            assertTrue(queue.events.any { it == "recoverable:local-1" })
+        }
+
+    @Test
+    fun rechazo400DominioMarcaRejectedYNoSeReintenta() =
+        runTest {
+            val queue = FakeQueue(record())
+            val sut =
+                useCase(queue) {
+                    Result.failure(InvoiceDomainRejectedException("Stock insuficiente: item=1, disponible=0"))
+                }
+
+            assertEquals(PendingInvoiceSyncResult.Success, sut("t$1"))
+            assertTrue(queue.events.any { it == "rejected:local-1" })
+        }
+
+    @Test
+    fun topeDeIntentosAlcanzadoSuspendeLaFila() =
+        runTest {
+            val atLimit = 19
+            val queue = FakeQueue(record(retryCount = atLimit))
+            val sut = useCase(queue) { Result.failure(IllegalStateException("timeout")) }
+
+            assertEquals(PendingInvoiceSyncResult.Success, sut("t$1"))
+            assertTrue(queue.events.any { it == "suspended:local-1" })
+        }
 
     private fun request(
         id: String? = null,
@@ -329,6 +393,23 @@ class SynchronizePendingInvoicesUseCaseTest {
         ) {
             events += "permanent:$id"
             pendingRecords.removeAll { it.id == id }
+        }
+
+        override suspend fun markRejected(
+            id: String,
+            message: String,
+            nowEpochMillis: Long,
+        ) {
+            events += "rejected:$id"
+            pendingRecords.removeAll { it.id == id }
+        }
+
+        override suspend fun markSuspended(
+            id: String,
+            message: String,
+            nowEpochMillis: Long,
+        ) {
+            events += "suspended:$id"
         }
     }
 }

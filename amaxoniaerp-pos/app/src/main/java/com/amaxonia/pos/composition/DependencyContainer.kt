@@ -10,6 +10,14 @@ import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.db.TransactionLogDao
 import com.amaxonia.pos.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.pos.data.printer.HkaConnectionHelper
+import com.amaxonia.pos.data.remote.SyncApi
+import com.amaxonia.pos.data.sync.OfflineSyncSettingsStore
+import com.amaxonia.pos.data.sync.SyncEngine
+import com.amaxonia.pos.data.sync.OfflineSyncSettingsRepositoryImpl
+import com.amaxonia.pos.domain.repository.OfflineSyncSettingsRepository
+import com.amaxonia.pos.data.remote.SyncScopeQuery
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.printer.HkaFiscalDeviceDiagnostics
 import com.amaxonia.pos.data.printer.HkaPaymentGateway
 import com.amaxonia.pos.data.printer.PrinterFactory
@@ -129,6 +137,12 @@ object DependencyContainer {
     private var initialized = false
     private lateinit var appContext: Context
 
+    /** Contexto de aplicación para programar trabajo en segundo plano (SyncScheduler). */
+    fun syncAppContext(): Context {
+        check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
+        return appContext
+    }
+
     /**
      * Evento one-shot para pedir que el Dashboard abra el diálogo de apertura de
      * caja al recibir el foco (p. ej. tras cerrar caja y pulsar "Aperturar nueva
@@ -213,6 +227,10 @@ object DependencyContainer {
     lateinit var cajaRepository: CajaRepository
         private set
     lateinit var formaPagoRepository: FormaPagoRepository
+    lateinit var offlineSyncSettingsStore: OfflineSyncSettingsStore
+    lateinit var syncApi: SyncApi
+    lateinit var syncEngine: SyncEngine
+    lateinit var offlineSyncSettingsRepository: OfflineSyncSettingsRepository
         private set
     lateinit var areaRepository: AreaRepository
         private set
@@ -441,8 +459,30 @@ object DependencyContainer {
                 com.amaxonia.pos.data.remote.api
                     .CajaApiImpl(apiClient),
                 localStore,
+                database.cajaSesionDao(),
             )
-        formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, networkMonitor)
+        formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, database.paymentMethodDao(), networkMonitor)
+        offlineSyncSettingsStore = OfflineSyncSettingsStore(syncAppContext())
+        syncApi = SyncApi(apiService)
+        syncEngine =
+            SyncEngine(
+                database = database,
+                api = syncApi,
+                scopeProvider = { offlineSyncSettingsStore.load() },
+                tenantProvider = {
+                    localStore.readCompanySession()?.let { SaleTenant.idFor(it.company.id) }
+                },
+                tokenProvider = { localStore.readCompanySession()?.token },
+            )
+        offlineSyncSettingsRepository =
+            OfflineSyncSettingsRepositoryImpl(
+                database = database,
+                syncApi = syncApi,
+                localStore = localStore,
+                productRepository = productRepository,
+                scopeStore = offlineSyncSettingsStore,
+                bootstrapEnqueuer = { SyncScheduler.enqueueBootstrap(syncAppContext(), requiresCharging = false) },
+            )
         areaRepository = AreaRepositoryImpl(AreasApiImpl(apiClient), localStore, localStore, networkMonitor)
         sesionMesaRepository = SesionMesaRepositoryImpl(SesionMesaApiImpl(apiClient), localStore)
         pedidosMesaRepository = PedidosMesaRepositoryImpl(PedidosMesaApiImpl(apiClient), localStore)

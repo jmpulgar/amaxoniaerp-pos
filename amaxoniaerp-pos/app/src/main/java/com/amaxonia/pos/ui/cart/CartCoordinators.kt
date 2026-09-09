@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.cart
 
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.computeFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.repository.ActiveCajaReader
 import com.amaxonia.pos.domain.repository.CartRepository
@@ -134,14 +135,21 @@ class CartStateCoordinator(
         client: Client?,
         financialSnapshot: com.amaxonia.pos.domain.model.SaleFinancialSnapshot? = cartRepository.financialSnapshot.value,
     ) {
+        val snapshot = financialSnapshot ?: if (items.isEmpty()) null else items.computeFinancialSnapshot()
+        runCatching {
+            com.amaxonia.pos.core.logging.SafeLog.d(
+                "POS-TOTALS",
+                "updateCartState -> itemsCount=${items.size}, client=${client?.code ?: "none"}, snapshot=[gross=${snapshot?.subtotalGross}, disc=${snapshot?.itemDiscounts}, net=${snapshot?.subtotalNet}, tax=${snapshot?.tax}, tot=${snapshot?.total}]"
+            )
+        }
         state.update {
             it.copy(
                 items = items,
                 displayItems = cartRepository.getDisplayItems(),
                 // Fallback de suma en Money (BigDecimal): evita acumular
                 // residuo IEEE-754 cuando no hay snapshot financiero.
-                total = financialSnapshot?.total ?: items.fold(Money.ZERO) { acc, item -> acc + Money.fromDouble(item.total) }.toDouble(),
-                financialSnapshot = financialSnapshot,
+                total = snapshot?.total ?: items.fold(Money.ZERO) { acc, item -> acc + Money.fromDouble(item.total) }.toDouble(),
+                financialSnapshot = snapshot,
                 selectedClient = client,
                 selectedClientPhotoUrl = if (client == null) "" else it.selectedClientPhotoUrl,
                 cartActionError = if (client == null) null else it.cartActionError,
@@ -280,8 +288,17 @@ class CartActionHandler(
             is CartUiAction.UpdateItemPrice -> {
                 if (state.value.allowEditPrices) cartRepository.updateItemPrice(action.productId, action.unitPriceWithTax)
             }
+            is CartUiAction.UpdateItemPriceLevel -> {
+                cartRepository.updateItemPriceLevel(action.productId, action.priceLevelLabel)
+            }
             is CartUiAction.UpdateItemDiscount -> {
-                if (state.value.allowDiscounts) cartRepository.updateItemDiscount(action.productId, action.discountPercent)
+                runCatching {
+                    com.amaxonia.pos.core.logging.SafeLog.d(
+                        "POS-TOTALS",
+                        "CartActionHandler.UpdateItemDiscount: productId=${action.productId}, discount=${action.discountPercent}, allowDiscounts=${state.value.allowDiscounts}"
+                    )
+                }
+                cartRepository.updateItemDiscount(action.productId, action.discountPercent)
             }
         }
     }

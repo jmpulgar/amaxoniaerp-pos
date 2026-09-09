@@ -20,6 +20,7 @@ data class Client(
     val id: String = UUID.randomUUID().toString(),
     val code: String = "",
     val clientTypeId: Int = 1,
+    val codTipoPrecio: Int = 2,
     val taxpayerType: TaxpayerType = TaxpayerType.NATURAL,
     val ruc: String = "",
     val cedula: String = "",

@@ -18,6 +18,7 @@ data class Client(
     val email: String,
     val status: Boolean,
     val clientTypeId: Int,
+    val codTipoPrecio: Int = 2,
     val taxpayerTypeId: Int,
     val foreignAuthTypeId: String? = null,
     val countryId: Int,

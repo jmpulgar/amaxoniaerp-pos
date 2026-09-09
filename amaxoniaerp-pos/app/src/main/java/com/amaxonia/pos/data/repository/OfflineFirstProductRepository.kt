@@ -135,7 +135,17 @@ class OfflineFirstProductRepository(
         departmentId: Int?,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize))
+    ): Result<List<Product>> {
+        // Escaneo de código de barras (hot path): match exacto indexado
+        // primero, offline y en <50ms; si no hay match, búsqueda normal.
+        val trimmed = query.trim()
+        if (trimmed.length >= MIN_BARCODE_LENGTH && trimmed.all { it.isDigit() }) {
+            productDao.getByBarcode(trimmed)?.let { exact ->
+                return Result.success(listOf(exact.toDomain()))
+            }
+        }
+        return fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize))
+    }
 
     override suspend fun saveProduct(product: Product): Result<Unit> {
         val token =
@@ -163,6 +173,8 @@ class OfflineFirstProductRepository(
     ): Int = (page - 1).coerceAtLeast(0) * pageSize
 
     private companion object {
+        const val MIN_BARCODE_LENGTH = 6
+
         const val NO_COMPANY_ERROR = "No hay empresa seleccionada"
         const val FULL_CATALOG_PAGE_SIZE = 500
         const val SEARCH_PAGE_SIZE = 100

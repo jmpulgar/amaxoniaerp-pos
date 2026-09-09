@@ -2,6 +2,7 @@ package com.amaxonia.pos.data.local.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.amaxonia.pos.domain.model.PriceLevel
 
@@ -25,6 +26,9 @@ data class ClientEntity(
     val addressLevel3: String,
     @ColumnInfo(defaultValue = "0") val permiteCredito: Boolean = false,
     @ColumnInfo(defaultValue = "0") val diasCredito: Int = 0,
+    @ColumnInfo(defaultValue = "2") val codTipoPrecio: Int = 2,
+    /** Sucursal de Amaxonia propietaria del cliente (filtro de alcance, ADR-008). */
+    val idSucursal: Int? = null,
 )
 
 @Entity(tableName = "client_sucursales")
@@ -41,7 +45,16 @@ data class ClientSucursalEntity(
 
 // ... (El resto de las entidades ProductEntity, CountryEntity, etc. déjalas igual) ...
 // Copia aquí abajo el resto de las entidades que ya tenías (ProductEntity, etc) sin cambios.
-@Entity(tableName = "products")
+@Entity(
+    tableName = "products",
+    indices = [
+        Index("barcode1"),
+        Index("barcode2"),
+        Index("barcode3"),
+        Index("department"),
+        Index("description"),
+    ],
+)
 data class ProductEntity(
     @PrimaryKey val id: String,
     val code: String,
@@ -58,6 +71,12 @@ data class ProductEntity(
     val bulkQuantity: Double = 1.0,
     val portionUnit: String? = null,
     val unitOrPackage: String = "UNIDAD",
+    /**
+     * Estado del ítem en el ERP (D4): solo los activos se venden; el registro
+     * nunca se borra físicamente para proteger la integridad de ventas previas.
+     * Valor de "activo" a confirmar en staging (default 'A').
+     */
+    @ColumnInfo(defaultValue = "A") val estatus: String = "A",
     val prices: List<PriceLevel>,
 )
 

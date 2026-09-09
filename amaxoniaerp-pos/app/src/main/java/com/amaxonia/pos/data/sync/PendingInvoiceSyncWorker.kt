@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.currentTenantId
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
@@ -18,6 +19,7 @@ import com.amaxonia.pos.domain.usecase.sync.PendingInvoiceRecord
 import com.amaxonia.pos.domain.usecase.sync.PendingInvoiceSyncResult
 import com.amaxonia.pos.domain.usecase.sync.PendingSaleDecoder
 import com.amaxonia.pos.domain.usecase.sync.PendingSaleGateway
+import com.amaxonia.pos.domain.usecase.sync.SyncRetryConfig
 import com.amaxonia.pos.domain.usecase.sync.SynchronizePendingInvoicesUseCase
 import com.amaxonia.pos.domain.usecase.sync.SynchronizedInvoice
 
@@ -29,9 +31,10 @@ class PendingInvoiceSyncWorker(
         val apiConfigManager = ApiConfigManager.getInstance()
         val localStore = LocalStore(applicationContext)
         localStore.readSelectedCountry()?.let { apiConfigManager.updateBaseUrl(it) }
+        val salesApi = SalesApiImpl(ApiClient(apiConfigManager))
         val salesRepository =
             SalesRepositoryImpl(
-                salesApi = SalesApiImpl(ApiClient(apiConfigManager)),
+                salesApi = salesApi,
                 localStore = localStore,
             )
         val database = AppDatabase.getInstance(applicationContext)
@@ -51,7 +54,12 @@ class PendingInvoiceSyncWorker(
                         emptyList()
                     } else {
                         dao.getPendingForTenant(tenantId).map { invoice ->
-                            PendingInvoiceRecord(invoice.id, invoice.localInvoiceNumber, invoice.payloadJson)
+                            PendingInvoiceRecord(
+                                id = invoice.id,
+                                localInvoiceNumber = invoice.localInvoiceNumber,
+                                payloadJson = invoice.payloadJson,
+                                retryCount = invoice.retryCount,
+                            )
                         }
                     }
 
@@ -97,6 +105,36 @@ class PendingInvoiceSyncWorker(
                     )
                 }
 
+                /** Rechazo de dominio (400): terminal, visible con motivo, jamás se reenvía. */
+                override suspend fun markRejected(
+                    id: String,
+                    message: String,
+                    nowEpochMillis: Long,
+                ) {
+                    dao.markRejected(id, message, nowEpochMillis)
+                    transactionLogDao.markFailed(
+                        id = id,
+                        status = "REJECTED",
+                        message = message,
+                        updatedAt = nowEpochMillis,
+                    )
+                }
+
+                /** Tope de reintentos alcanzado: excluida del loop hasta intervención. */
+                override suspend fun markSuspended(
+                    id: String,
+                    message: String,
+                    nowEpochMillis: Long,
+                ) {
+                    dao.markFailed(id, message, nowEpochMillis)
+                    transactionLogDao.markFailed(
+                        id = id,
+                        status = "SUSPENDED",
+                        message = message,
+                        updatedAt = nowEpochMillis,
+                    )
+                }
+
                 override suspend fun markPermanentFailure(
                     id: String,
                     message: String,
@@ -126,6 +164,19 @@ class PendingInvoiceSyncWorker(
                             }
                     },
                 clock = SystemAppClock(),
+                config =
+                    SyncRetryConfig(
+                        reconciler = { correlationId ->
+                            val token = localStore.readCompanySession()?.token.orEmpty()
+                            salesApi
+                                .findByCorrelationId(authHeader = "Bearer $token", clientCorrelationId = correlationId)
+                                .map { reconciled ->
+                                    checkNotNull(reconciled) {
+                                        "La factura ya existe pero no pudo recuperarse del servidor"
+                                    }.let { SynchronizedInvoice(it.idFactura, it.codFactura) }
+                                }
+                        },
+                    ),
             )
 
         return when (useCase(localStore.currentTenantId())) {

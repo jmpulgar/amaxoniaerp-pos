@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
+import androidx.room.Upsert
 
 @Entity(tableName = "promociones")
 data class PromocionEntity(
@@ -54,6 +55,18 @@ interface PromocionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDetalles(items: List<PromocionDetalleEntity>)
+
+    @Upsert
+    suspend fun upsertPromociones(items: List<PromocionEntity>)
+
+    @Upsert
+    suspend fun upsertDetalles(items: List<PromocionDetalleEntity>)
+
+    @Query("DELETE FROM promociones WHERE id = :id")
+    suspend fun deletePromocionById(id: String)
+
+    @Query("DELETE FROM promocion_detalles WHERE id = :id")
+    suspend fun deleteDetalleById(id: String)
 
     @Query("DELETE FROM promociones")
     suspend fun clearPromociones()

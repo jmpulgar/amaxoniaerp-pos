@@ -24,8 +24,12 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         PromocionEntity::class,
         PromocionDetalleEntity::class,
         TransactionLogEntity::class,
+        SyncStateEntity::class,
+        PaymentMethodEntity::class,
+        CajaPaymentMethodEntity::class,
+        CajaSesionEntity::class,
     ],
-    version = 18,
+    version = 20,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -53,6 +57,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun promocionDao(): PromocionDao
 
     abstract fun transactionLogDao(): TransactionLogDao
+
+    abstract fun syncStateDao(): SyncStateDao
+
+    abstract fun paymentMethodDao(): PaymentMethodDao
+
+    abstract fun cajaSesionDao(): CajaSesionDao
 
     companion object {
         @Volatile
@@ -746,6 +756,87 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_invoices_tenantId ON pending_invoices(tenantId)")
                 }
             }
+        internal val MIGRATION_18_19 =
+            object : Migration(18, 19) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE clients ADD COLUMN codTipoPrecio INTEGER NOT NULL DEFAULT 2")
+                }
+            }
+
+        /**
+         * v20 — Sync offline (ADR-007/008, PLAN §5.1):
+         * `estatus` en products (D4), índices de barcode/descripción,
+         * `sync_state` (checkpoint transaccional), `payment_methods` +
+         * `caja_payment_methods` (formas de pago a Room) y `caja_sesion`
+         * (sesión persistente que sobrevive reinicios offline).
+         */
+        internal val MIGRATION_19_20 =
+            object : Migration(19, 20) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE products ADD COLUMN estatus TEXT NOT NULL DEFAULT 'A'")
+                    db.execSQL("ALTER TABLE clients ADD COLUMN idSucursal INTEGER")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode1 ON products(barcode1)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode2 ON products(barcode2)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode3 ON products(barcode3)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_products_department ON products(department)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_products_description ON products(description)")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS sync_state (" +
+                            "tenantId TEXT NOT NULL, " +
+                            "scope TEXT NOT NULL, " +
+                            "cursor INTEGER NOT NULL DEFAULT 0, " +
+                            "snapshotId INTEGER NOT NULL DEFAULT 0, " +
+                            "afterId TEXT, " +
+                            "status TEXT NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(tenantId, scope)" +
+                            ")",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS payment_methods (" +
+                            "idFormaPago INTEGER NOT NULL, " +
+                            "siglas TEXT, " +
+                            "codigo INTEGER, " +
+                            "descripcion TEXT, " +
+                            "idCajaTpConcepto INTEGER, " +
+                            "cuentaContable TEXT, " +
+                            "idCajaTpRegistro INTEGER, " +
+                            "formaPagoFact TEXT, " +
+                            "activo INTEGER NOT NULL, " +
+                            "pos INTEGER NOT NULL, " +
+                            "imagen TEXT NOT NULL, " +
+                            "grupo INTEGER NOT NULL, " +
+                            "orden INTEGER NOT NULL, " +
+                            "idBancoCuenta INTEGER NOT NULL, " +
+                            "idBancoOperacion INTEGER NOT NULL, " +
+                            "tipoMoneda TEXT, " +
+                            "PRIMARY KEY(idFormaPago)" +
+                            ")",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS caja_payment_methods (" +
+                            "idCaja TEXT NOT NULL, " +
+                            "idFormaPago INTEGER NOT NULL, " +
+                            "activo INTEGER, " +
+                            "PRIMARY KEY(idCaja, idFormaPago)" +
+                            ")",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS caja_sesion (" +
+                            "localId TEXT NOT NULL, " +
+                            "cajaId TEXT NOT NULL, " +
+                            "serverSecuenciaId TEXT, " +
+                            "estado TEXT NOT NULL, " +
+                            "openedAt INTEGER NOT NULL, " +
+                            "closedAt INTEGER, " +
+                            "userId TEXT NOT NULL, " +
+                            "tenantId TEXT NOT NULL, " +
+                            "secuenciaJson TEXT NOT NULL DEFAULT '', " +
+                            "PRIMARY KEY(localId)" +
+                            ")",
+                    )
+                }
+            }
 
         internal val ALL_MIGRATIONS =
             arrayOf(
@@ -766,6 +857,8 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_15_16,
                 MIGRATION_16_17,
                 MIGRATION_17_18,
+                MIGRATION_18_19,
+                MIGRATION_19_20,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -793,6 +886,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_15_16,
                         MIGRATION_16_17,
                         MIGRATION_17_18,
+                        MIGRATION_18_19,
+                        MIGRATION_19_20,
                     ).build()
                     .also { instance = it }
             }

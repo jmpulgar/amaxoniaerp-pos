@@ -22,6 +22,9 @@ data class ClientDto(
     // --------------------
     val countryId: Int? = null,
     val clientTypeId: Int? = null,
+    val codTipoPrecio: Int? = null,
+    @kotlinx.serialization.SerialName("cod_tipo_precio")
+    val codTipoPrecioSnake: Int? = null,
     val addressLevel1: String? = null,
     val addressLevel2: String? = null,
     val addressLevel3: String? = null,

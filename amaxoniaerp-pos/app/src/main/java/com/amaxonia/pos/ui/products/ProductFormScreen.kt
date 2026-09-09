@@ -1,5 +1,12 @@
 package com.amaxonia.pos.ui.products
 
+/**
+ * IMPORTANTE (decisión D1, 2026-09-04): el alta/edición de productos desde el
+ * POS quedó DESHABILITADA — el catálogo se administra exclusivamente desde el
+ * ERP/web. Esta pantalla quedó fuera del grafo de navegación
+ * (AppNavigation.productsDestinations) y no debe re-conectarse sin una
+ * decisión de producto que reabra el flujo POS→server.
+ */
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

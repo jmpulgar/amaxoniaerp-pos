@@ -61,6 +61,19 @@ fun ProductDto.toDomain(): Product {
         } else {
             generateDefaultPrices()
         }
+    val rawTaxRate = taxRate ?: taxRateSnake ?: iva
+    val resolvedIsExempt = isExempt ?: isExemptSnake ?: exento ?: false
+    val priceDerivedTax = mappedPrices.firstNotNullOfOrNull { p ->
+        if (p.pricePlusTax > p.price && p.price > 0.0) {
+            ((p.pricePlusTax - p.price) / p.price) * 100.0
+        } else null
+    }
+    val effectiveTaxRate = when {
+        resolvedIsExempt -> 0.0
+        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
+        priceDerivedTax != null && priceDerivedTax > 0.0 -> priceDerivedTax
+        else -> 7.0
+    }
     return Product(
         id = id ?: UUID.randomUUID().toString(),
         code = code.orEmpty(),
@@ -78,8 +91,8 @@ fun ProductDto.toDomain(): Product {
         line = line.orEmpty(),
         gobSegment = gobSegment.orEmpty(),
         gobFamily = gobFamily.orEmpty(),
-        isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
-        taxRate = taxRate.orZero(),
+        isExempt = resolvedIsExempt,
+        taxRate = effectiveTaxRate,
         costActual = costActual.orZero(),
         costAverage = costAverage.orZero(),
         costPrevious = costPrevious.orZero(),
@@ -188,6 +201,7 @@ fun ClientDto.toDomain(): Client =
         addressLevel3 = addressLevel3.orEmpty(),
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
+        codTipoPrecio = codTipoPrecio ?: codTipoPrecioSnake ?: 2,
         // CORRECCIÓN 2: Mapear tipo de identificación extranjera
         foreignIdType = foreignAuthTypeId.toForeignIdType(),
         foreignIdNumber = if (clientTypeId == 4) identification.orEmpty() else "",

@@ -21,12 +21,21 @@ object ClientsTable : Table("clientes") {
     val pais = integer("pais").default(1)
     val paisExtranjero = integer("paisExtranjero").nullable()
     val codTipoCliente = integer("cod_tipo_cliente").default(1)
+    val codTipoPrecio = integer("cod_tipo_precio").default(2)
     val tipoContribuyente = integer("tipo_contribuyente").default(1)
     val fecha = varchar("fecha", S.VARCHAR_LENGTH_64).nullable()
     val permiteCredito = bool("permitecredito").default(false)
     val limite = double("limite").default(0.0)
     val dias = integer("dias").default(0)
     val foto = varchar("foto", S.VARCHAR_LENGTH_120).nullable()
+
+    /**
+     * Sucursal de Amaxonia propietaria del cliente (`sucursal.id`), confirmada
+     * por negocio (2026-09-04). Solo lectura para el filtro de alcance de
+     * sincronización de clientes (ADR-008); nullable porque columnas legacy
+     * pueden venir sin asignar.
+     */
+    val idSucursal = integer("id_sucursal").nullable()
 
     override val primaryKey = PrimaryKey(idCliente)
 }

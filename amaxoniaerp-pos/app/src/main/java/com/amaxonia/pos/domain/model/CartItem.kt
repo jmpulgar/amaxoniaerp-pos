@@ -28,11 +28,23 @@ data class CartItem(
     val promocionGrupo: String = "",
     val promocionDetalleId: String = "",
     val promocionVeces: Int = 1,
+    val selectedPriceLabel: String = "A",
+    val isManualPrice: Boolean = false,
 ) {
     val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
 
     val taxRate: Double
-        get() = if (product.isExempt) 0.0 else product.taxRate.coerceAtLeast(0.0)
+        get() {
+            if (product.isExempt) return 0.0
+            if (product.taxRate > 0.0) return product.taxRate
+            val priceDerivedTax = product.prices.firstNotNullOfOrNull { p ->
+                if (p.pricePlusTax > p.price && p.price > 0.0) {
+                    ((p.pricePlusTax - p.price) / p.price) * 100.0
+                } else null
+            }
+            if (priceDerivedTax != null && priceDerivedTax > 0.0) return priceDerivedTax
+            return 7.0
+        }
 
     val bulkQuantity: Double
         get() = product.bulkQuantity.takeIf { it > 0.0 } ?: 1.0
@@ -61,3 +73,59 @@ data class CartItem(
     val total: Double
         get() = totalWithTax
 }
+
+fun codTipoPrecioToLabel(codTipoPrecio: Int?): String =
+    when (codTipoPrecio) {
+        1, 2 -> "A"
+        3 -> "B"
+        4 -> "C"
+        5 -> "D"
+        6 -> "E"
+        7 -> "F"
+        else -> "A"
+    }
+
+fun List<CartItem>.computeFinancialSnapshot(): SaleFinancialSnapshot {
+    if (isEmpty()) {
+        return SaleFinancialSnapshot(0.0, 0.0, 0.0, 0.0, 0.0)
+    }
+    val subtotalGross =
+        fold(com.amaxonia.pos.domain.model.money.Money.ZERO) { sum, item ->
+            sum + com.amaxonia.pos.domain.model.money.Money.fromDouble(item.subtotalWithoutTax)
+        }
+    val itemDiscounts =
+        fold(com.amaxonia.pos.domain.model.money.Money.ZERO) { sum, item ->
+            sum + com.amaxonia.pos.domain.model.money.Money.fromDouble(item.discountAmountWithoutTax)
+        }
+    val subtotalNet =
+        fold(com.amaxonia.pos.domain.model.money.Money.ZERO) { sum, item ->
+            sum + com.amaxonia.pos.domain.model.money.Money.fromDouble(item.totalWithoutTax)
+        }
+    val totalMoney =
+        fold(com.amaxonia.pos.domain.model.money.Money.ZERO) { sum, item ->
+            sum + com.amaxonia.pos.domain.model.money.Money.fromDouble(item.totalWithTax)
+        }
+    val tax = (totalMoney - subtotalNet).coerceAtLeast(com.amaxonia.pos.domain.model.money.Money.ZERO)
+
+    runCatching {
+        forEachIndexed { index, item ->
+            com.amaxonia.pos.core.logging.SafeLog.d(
+                "POS-TOTALS",
+                "Item[$index]: ${item.product.description} | Price: ${item.unitPriceWithTax} (${item.selectedPriceLabel}) | Qty: ${item.quantityDecimal} | TaxRate: ${item.taxRate}% (isExempt=${item.product.isExempt}) | Disc: ${item.discountPercent}% | SubWithoutTax: ${item.subtotalWithoutTax} | DiscAmount: ${item.discountAmountWithoutTax} | TotWithoutTax: ${item.totalWithoutTax} | TotWithTax: ${item.totalWithTax}",
+            )
+        }
+        com.amaxonia.pos.core.logging.SafeLog.d(
+            "POS-TOTALS",
+            "FinancialSnapshot -> Gross: ${subtotalGross.toDouble()} | Discounts: ${itemDiscounts.toDouble()} | Net: ${subtotalNet.toDouble()} | Tax: ${tax.toDouble()} | Total: ${totalMoney.toDouble()}",
+        )
+    }
+
+    return SaleFinancialSnapshot(
+        subtotalGross = subtotalGross.toDouble(),
+        itemDiscounts = itemDiscounts.toDouble(),
+        subtotalNet = subtotalNet.toDouble(),
+        tax = tax.toDouble(),
+        total = totalMoney.toDouble(),
+    )
+}
+

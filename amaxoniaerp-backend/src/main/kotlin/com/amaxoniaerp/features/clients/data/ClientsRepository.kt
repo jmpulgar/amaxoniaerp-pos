@@ -257,6 +257,7 @@ class ClientsRepository {
             email = row[ClientsTable.email],
             status = row[ClientsTable.estado] == "A",
             clientTypeId = row[ClientsTable.codTipoCliente],
+            codTipoPrecio = row[ClientsTable.codTipoPrecio],
             taxpayerTypeId = row[ClientsTable.tipoContribuyente],
             foreignAuthTypeId = row[ClientsTable.tipoIdentificacionExtranjera],
             countryId = row[ClientsTable.pais],

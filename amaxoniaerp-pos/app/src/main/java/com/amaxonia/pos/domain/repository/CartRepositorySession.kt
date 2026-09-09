@@ -3,6 +3,7 @@ package com.amaxonia.pos.domain.repository
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.ItemCarrito
+import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.update
 
@@ -47,16 +48,61 @@ fun CartRepository.unbindSesionMesa() {
 
 /** Selecciona el cliente de la transacción y resetea su sucursal. */
 fun CartRepository.setClient(client: Client) {
+    runCatching {
+        com.amaxonia.pos.core.logging.SafeLog.d(
+            "POS-CLIENT-PRICE",
+            "setClient -> id=${client.id}, code=${client.code}, name=${client.firstName} ${client.lastName}, codTipoPrecio=${client.codTipoPrecio} -> label=${codTipoPrecioToLabel(client.codTipoPrecio)}"
+        )
+    }
     selectedClientState.value = client
     selectedClientSucursalState.value = null
     clientSucursalesState.value = emptyList()
+    recalculateCartPricesForClient(client)
 }
 
 /** Quita el cliente y su sucursal de la transacción. */
 fun CartRepository.removeClient() {
+    runCatching {
+        com.amaxonia.pos.core.logging.SafeLog.d("POS-CLIENT-PRICE", "removeClient -> reset to default price level (A)")
+    }
     selectedClientState.value = null
     selectedClientSucursalState.value = null
     clientSucursalesState.value = emptyList()
+    recalculateCartPricesForClient(null)
+}
+
+/** Recalcula los precios de los productos en el carrito según la lista de precios del cliente. */
+fun CartRepository.recalculateCartPricesForClient(client: Client?) {
+    val targetLabel = codTipoPrecioToLabel(client?.codTipoPrecio)
+    runCatching {
+        com.amaxonia.pos.core.logging.SafeLog.d(
+            "POS-CLIENT-PRICE",
+            "recalculateCartPricesForClient: client=${client?.code}, codTipoPrecio=${client?.codTipoPrecio} -> targetLabel=$targetLabel, itemsCount=${cartItemsState.value.size}"
+        )
+    }
+    cartItemsState.update { items ->
+        items.map { item ->
+            if (!item.isPromotionLine && !item.isManualPrice) {
+                val (effectiveLabel, newPrice) = resolveItemPrice(item.product, item.itemUnitPackage, targetLabel)
+                val levelDiscount = item.product.prices.firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }?.discountPercent ?: 0.0
+                val newDiscount = if (levelDiscount > 0.0 || item.discountPercent == 0.0) levelDiscount else item.discountPercent
+                runCatching {
+                    com.amaxonia.pos.core.logging.SafeLog.d(
+                        "POS-CLIENT-PRICE",
+                        "Item [${item.product.id}] ${item.product.description}: oldPrice=${item.unitPriceWithTax} (${item.selectedPriceLabel}) -> newPrice=$newPrice ($effectiveLabel), disc=$newDiscount"
+                    )
+                }
+                item.copy(
+                    selectedPriceLabel = effectiveLabel,
+                    unitPriceWithTax = newPrice,
+                    discountPercent = newDiscount,
+                )
+            } else {
+                item
+            }
+        }
+    }
+    invalidateFinancialSnapshot()
 }
 
 /** Fija la sucursal seleccionada del cliente actual. */

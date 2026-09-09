@@ -56,7 +56,7 @@ interface PendingInvoiceDao {
      */
     @Query(
         "SELECT * FROM pending_invoices WHERE tenantId = :tenantId " +
-            "AND status IN ('PENDING', 'FAILED') " +
+            "AND status IN ('PENDING', 'FAILED') AND retryCount < 20 " +
             "ORDER BY createdAt ASC LIMIT :limit",
     )
     suspend fun getPendingForTenant(
@@ -98,6 +98,13 @@ interface PendingInvoiceDao {
         id: String,
         message: String,
         updatedAt: Long = System.currentTimeMillis(),
+    )
+
+    @Query("UPDATE pending_invoices SET status = 'REJECTED', lastError = :message, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun markRejected(
+        id: String,
+        message: String,
+        updatedAt: Long,
     )
 
     @Query("UPDATE pending_invoices SET status = 'INVALID', lastError = :message, updatedAt = :updatedAt WHERE id = :id")

@@ -322,7 +322,7 @@ internal fun PaymentHeader(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    var breakdownExpanded by remember { mutableStateOf(false) }
+    var breakdownExpanded by remember { mutableStateOf(true) }
     val arrowRotation by animateFloatAsState(
         targetValue = if (breakdownExpanded) 180f else 0f,
         label = "breakdownArrow",

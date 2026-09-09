@@ -87,12 +87,12 @@ suspend fun LocalStore.saveAllowDiscounts(enabled: Boolean) {
 
 fun LocalStore.allowEditPricesFlow(): Flow<Boolean> =
     dataStore.data.map { prefs ->
-        prefs[allowEditPricesKey] ?: false
+        prefs[allowEditPricesKey] ?: true
     }
 
 fun LocalStore.allowDiscountsFlow(): Flow<Boolean> =
     dataStore.data.map { prefs ->
-        prefs[allowDiscountsKey] ?: false
+        prefs[allowDiscountsKey] ?: true
     }
 
 suspend fun LocalStore.readAllowEditPrices(): Boolean = allowEditPricesFlow().first()

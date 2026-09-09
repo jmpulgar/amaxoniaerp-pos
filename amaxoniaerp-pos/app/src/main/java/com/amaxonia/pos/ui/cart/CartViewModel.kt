@@ -26,8 +26,8 @@ data class CartState(
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
     val orderSuccessMessage: String? = null,
-    val allowEditPrices: Boolean = false,
-    val allowDiscounts: Boolean = false,
+    val allowEditPrices: Boolean = true,
+    val allowDiscounts: Boolean = true,
     val tasa: Double = 0.0,
     val abrMonedaSecundaria: String = "",
     val isMultiCurrency: Boolean = false,
@@ -88,6 +88,11 @@ sealed interface CartUiAction {
     data class UpdateItemPrice(
         val productId: String,
         val unitPriceWithTax: Double,
+    ) : CartEditableUiAction
+
+    data class UpdateItemPriceLevel(
+        val productId: String,
+        val priceLevelLabel: String,
     ) : CartEditableUiAction
 
     data class UpdateItemDiscount(

@@ -67,6 +67,20 @@ class AppDatabaseMigrationTest {
     fun `base creada en v17 migra al schema actual`() = migrateFrom(17)
 
     @Test
+    fun `base creada en v18 migra al schema actual`() = migrateFrom(18)
+
+    @Test
+    fun `migracion 18 a 19 agrega columna codTipoPrecio a clients con default 2`() {
+        val db = openMigratedFrom(18)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            assertTrue("columna 'codTipoPrecio' debe existir en clients", sqlite.hasColumn("clients", "codTipoPrecio"))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `migracion 17 a 18 rellena minor units de draft_invoices y elimina total legado de pending_invoices`() {
         val db = openMigratedFrom(17)
         try {
@@ -229,6 +243,6 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 18
+        const val SCHEMA_VERSION = 20
     }
 }

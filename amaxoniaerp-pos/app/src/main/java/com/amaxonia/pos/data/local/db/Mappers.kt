@@ -40,6 +40,7 @@ fun ClientDto.toEntity(): ClientEntity =
         addressLevel3 = addressLevel3.orEmpty(),
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
+        codTipoPrecio = codTipoPrecio ?: codTipoPrecioSnake ?: 2,
     )
 
 fun ClientEntity.toDomain(): Client {
@@ -70,6 +71,7 @@ fun ClientEntity.toDomain(): Client {
         addressLevel3 = addressLevel3,
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
+        codTipoPrecio = codTipoPrecio,
     )
 }
 
@@ -88,8 +90,15 @@ fun ClientSucursalDto.toEntity(): ClientSucursalEntity =
 // --- KEEP THE REST OF THE MAPPERS AS IS ---
 // (Copia el resto de mappers de Productos, Countries, etc. igual que antes)
 
-fun ProductDto.toEntity(): ProductEntity =
-    ProductEntity(
+fun ProductDto.toEntity(): ProductEntity {
+    val rawTaxRate = taxRate ?: taxRateSnake ?: iva
+    val resolvedIsExempt = isExempt ?: isExemptSnake ?: exento ?: false
+    val effectiveTaxRate = when {
+        resolvedIsExempt -> 0.0
+        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
+        else -> 7.0
+    }
+    return ProductEntity(
         id = id ?: code.orEmpty(),
         code = code.orEmpty(),
         description = description.orEmpty(),
@@ -98,8 +107,8 @@ fun ProductDto.toEntity(): ProductEntity =
         barcode2 = barcode2.orEmpty(),
         barcode3 = barcode3.orEmpty(),
         department = department?.toIntOrNull() ?: 0,
-        isExempt = isExempt ?: ((taxRate ?: 0.0) <= 0.0),
-        taxRate = taxRate ?: 0.0,
+        isExempt = resolvedIsExempt,
+        taxRate = effectiveTaxRate,
         costActual = costActual ?: 0.0,
         unitPackage = unitPackage.orEmpty(),
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
@@ -107,6 +116,7 @@ fun ProductDto.toEntity(): ProductEntity =
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
         prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices(),
     )
+}
 
 fun ProductEntity.toDomain(): Product =
     Product(

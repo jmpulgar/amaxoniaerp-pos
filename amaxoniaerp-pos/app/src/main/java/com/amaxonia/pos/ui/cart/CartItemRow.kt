@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
@@ -66,6 +67,7 @@ class CartItemActions(
     val onRemove: () -> Unit,
     val onUnitChange: (String) -> Unit,
     val onQuantityChange: (Int) -> Unit,
+    val onPriceLevelChange: (String) -> Unit = {},
     val edit: CartItemEditActions,
 )
 
@@ -100,8 +102,16 @@ fun CartItemRow(
                 allowDiscount = allowDiscount,
             )
 
-            if (item.product.canSwitchUnit) {
+            if (!item.isPromotionLine) {
                 Spacer(modifier = Modifier.height(8.dp))
+                CartItemPriceLevelSelector(
+                    item = item,
+                    onPriceLevelChange = actions.onPriceLevelChange,
+                )
+            }
+
+            if (item.product.canSwitchUnit) {
+                Spacer(modifier = Modifier.height(6.dp))
                 CartItemUnitSelector(item = item, onUnitChange = actions.onUnitChange)
             }
 
@@ -301,6 +311,104 @@ private fun CartItemEditButtons(
                     tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(18.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartItemPriceLevelSelector(
+    item: com.amaxonia.pos.domain.model.CartItem,
+    onPriceLevelChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var priceMenuExpanded by remember { mutableStateOf(false) }
+    val availableLevels =
+        remember(item.product.prices) {
+            val positive = item.product.prices.filter { it.pricePlusTax > 0.0 || it.price > 0.0 }
+            if (positive.isNotEmpty()) positive else item.product.prices
+        }
+
+    val currentLabelText =
+        if (item.isManualPrice) {
+            "Precio Manual"
+        } else {
+            "Lista ${item.selectedPriceLabel}"
+        }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
+    ) {
+        Text(
+            "Precio:",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Box {
+            AssistChip(
+                onClick = { priceMenuExpanded = true },
+                label = {
+                    Text(
+                        currentLabelText,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.LocalOffer,
+                        contentDescription = "Cambiar lista de precios",
+                        modifier = Modifier.size(14.dp),
+                    )
+                },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            )
+            DropdownMenu(
+                expanded = priceMenuExpanded,
+                onDismissRequest = { priceMenuExpanded = false },
+            ) {
+                availableLevels.forEach { level ->
+                    val isSelected =
+                        !item.isManualPrice && item.selectedPriceLabel.equals(level.label, ignoreCase = true)
+                    val levelPrice =
+                        if (item.itemUnitPackage == "EMPAQUE" || item.product.bulkQuantity <= 1.0) {
+                            level.pricePlusTax.takeIf { it > 0.0 } ?: level.price
+                        } else {
+                            level.unitPricePlusTax.takeIf { it > 0.0 } ?: level.unitPrice.takeIf { it > 0.0 } ?: level.pricePlusTax
+                        }
+                    val formattedPrice = String.format(Locale.getDefault(), "%.2f", levelPrice)
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "Lista ${level.label}",
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color =
+                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    "$ $formattedPrice",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        },
+                        onClick = {
+                            priceMenuExpanded = false
+                            onPriceLevelChange(level.label)
+                        },
+                    )
+                }
             }
         }
     }

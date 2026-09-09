@@ -159,7 +159,7 @@ internal fun CartBottomBar(
     onCheckout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var breakdownExpanded by remember { mutableStateOf(false) }
+    var breakdownExpanded by remember { mutableStateOf(true) }
     val total = state.total
 
     Surface(

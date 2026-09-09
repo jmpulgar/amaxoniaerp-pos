@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
@@ -31,7 +30,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +64,12 @@ import com.amaxonia.pos.domain.model.ProductWarehouseStock
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 
+/**
+ * Listado de productos del POS (búsqueda + consulta de stock).
+ *
+ * D1 (ADR-007 / PLAN §0): el catálogo se administra EXCLUSIVAMENTE desde el
+ * ERP/web. Este screen es de solo lectura: sin alta ni edición de productos.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductListScreen(
@@ -74,7 +78,6 @@ fun ProductListScreen(
             AppGraph.products.productListViewModel()
         },
     onBack: () -> Unit,
-    onNavigateToForm: (String?) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -94,13 +97,6 @@ fun ProductListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ProductsTopBar(onBack = onBack) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onNavigateToForm(null) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) { Icon(Icons.Default.Add, null) }
-        },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
             ProductListErrorCard(error = state.error, onRetry = viewModel::retry)
@@ -120,7 +116,6 @@ fun ProductListScreen(
                     state = state,
                     viewModel = viewModel,
                     listState = listState,
-                    onNavigateToForm = onNavigateToForm,
                     onSelectStock = { stock -> selectedStock = stock },
                 )
             }
@@ -202,7 +197,6 @@ private fun ProductListItems(
     state: ProductListState,
     viewModel: ProductListViewModel,
     listState: LazyListState,
-    onNavigateToForm: (String?) -> Unit,
     onSelectStock: (ProductStock) -> Unit,
 ) {
     LazyColumn(
@@ -226,7 +220,6 @@ private fun ProductListItems(
                             val stock = state.stockByProductId[product.id]
                             if (stock != null) onSelectStock(stock)
                         },
-                        onClick = { onNavigateToForm(product.id) },
                     ),
             )
         }
@@ -243,7 +236,6 @@ private fun ProductListItems(
 /** Acciones de la tarjeta de producto en la lista. */
 class ProductItemActions(
     val onStockClick: () -> Unit,
-    val onClick: () -> Unit,
 )
 
 @Composable
@@ -255,9 +247,8 @@ fun ProductItem(
     actions: ProductItemActions,
 ) {
     val onStockClick = actions.onStockClick
-    val onClick = actions.onClick
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(0.dp),

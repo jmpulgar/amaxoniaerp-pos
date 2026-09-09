@@ -3,11 +3,57 @@ package com.amaxoniaerp.features.items.data
 import com.amaxoniaerp.features.items.domain.ItemStockByWarehouse
 import com.amaxoniaerp.features.items.domain.PriceLevel
 import com.amaxoniaerp.features.items.domain.Product
+import com.amaxoniaerp.features.sync.domain.PriceLevelSyncDto
+import com.amaxoniaerp.features.sync.domain.ProductSyncDto
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigDecimal
 
 private const val PERCENT_BASE = 100.0
+
+/**
+ * DTO slim de sincronización (mismo resultado que mapRowToProduct + estatus).
+ * Reutiliza la derivación exacta de precios/impuestos para que el POS y el
+ * ERP calculen idéntico el hash canónico de contenido.
+ */
+internal fun mapRowToProductSync(
+    row: ResultRow,
+    countryCode: String,
+): ProductSyncDto {
+    val product = mapRowToProduct(row, countryCode)
+    val table = ItemsTableFactory.getTableForCountry(countryCode)
+    return ProductSyncDto(
+        id = product.id,
+        code = product.code,
+        description = product.description,
+        reference = product.reference,
+        barcode1 = product.barcode1,
+        barcode2 = product.barcode2,
+        barcode3 = product.barcode3,
+        department = product.department.toIntOrNull() ?: 0,
+        isExempt = product.isExempt,
+        taxRate = product.taxRate,
+        costActual = product.costActual,
+        unitPackage = product.unitPackage,
+        bulkQuantity = product.bulkQuantity,
+        portionUnit = product.portionUnit,
+        unitOrPackage = product.unitOrPackage,
+        estatus = row.getOrNull(table.estatus),
+        prices =
+            product.prices.map { level ->
+                PriceLevelSyncDto(
+                    label = level.label,
+                    price = level.price,
+                    utilityPercent = level.utilityPercent,
+                    pricePlusUtility = level.pricePlusUtility,
+                    pricePlusTax = level.pricePlusTax,
+                    unitPrice = level.unitPrice,
+                    unitPricePlusTax = level.unitPricePlusTax,
+                    discountPercent = level.discountPercent,
+                )
+            },
+    )
+}
 
 internal fun mapRowToProduct(
     row: ResultRow,

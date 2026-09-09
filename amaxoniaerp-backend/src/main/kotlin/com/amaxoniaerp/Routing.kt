@@ -20,6 +20,7 @@ import com.amaxoniaerp.features.mesas.sesionMesaRouting
 import com.amaxoniaerp.features.pos.posRouting
 import com.amaxoniaerp.features.promotions.route.promotionsRoutes
 import com.amaxoniaerp.features.sales.route.salesRoutes
+import com.amaxoniaerp.features.sync.route.syncRoutes
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -120,6 +121,7 @@ private fun Route.installCoreRoutes() {
 
 private fun Route.installPosRoutes(deps: AppDependencies) {
     itemsRoutes(deps.repositories.itemsRepository)
+    syncRoutes(deps.repositories.syncRepository, deps.repositories.itemsRepository)
     cajaRouting(deps.caja.cajaRepository, deps.caja.cajaSession)
     posRouting(deps.repositories.formasPagoRepository)
     mesasRouting(deps.repositories.mesasRepository)

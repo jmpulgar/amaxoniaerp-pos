@@ -16,8 +16,27 @@ El POS debe operar 100% offline (escaneo→precio <150 ms) con un catálogo de ~
 
 ## Consequences
 
-- El backend requiere trabajo nuevo (tabla de feed, endpoints `/api/sync/v1/*`, hooks de escritura en los repositorios de catálogo y prune de retención). Los endpoints actuales no cambian: las apps en producción siguen operando (más lentas) hasta actualizar.
-- Los borrados dejan de ser invisibles: eliminar un producto/cliente en el ERP ahora exige escribir su tombstone en el feed (regla de desarrollo del backend).
+- El backend requiere trabajo nuevo: tabla `catalog_changes` (identity-only, una
+  por DB de empresa), **triggers AFTER INSERT/UPDATE/DELETE obligatorios** en las
+  8 tablas fuente (script `migrations/005_catalog_changes.sql`, aplicación por
+  país con ventana coordinada) y endpoints `/api/sync/v1/*`. Los endpoints
+  actuales no cambian: las apps en producción siguen operando (más lentas) hasta
+  actualizar.
+- El payload del delta se **hidrata al leer** (la fila vigente por `entity_id`):
+  los triggers no serializan JSON y existe una única implementación canónica
+  del DTO (Kotlin, módulo `CatalogContentHash` duplicado verbatim backend/POS,
+  fijado por test cruzado).
+- La reconciliación usa **hash de contenido** (XXH64 sobre id + campos canónicos
+  del DTO, agregado por suma modular): detecta filas divergentes en contenido,
+  no solo en pertenencia.
+- Los borrados dejan de ser invisibles: eliminar un producto/cliente en el ERP
+  dispara el tombstone por trigger. Regla de desarrollo: cualquier tabla fuente
+  NUEVA requiere sus 3 triggers.
+- **Las escrituras de catálogo desde el POS fueron eliminadas (D1, 2026-09-04)**:
+  `ProductFormScreen` quedó fuera de navegación — el catálogo se administra
+  exclusivamente desde el ERP/web (D2: única fuente de verdad, sin conflictos
+  bidireccionales). El feed es 100% server/ERP-authored y su distribución a los
+  dispositivos corre por los mismos triggers.
 - Un dispositivo que permanezca inactivo más que la retención (30 días) recibe `410 Gone` y ejecuta resync completo automático — comportamiento esperado, no error.
 - El cursor es local y transaccional con los datos aplicados: un crash entre lotes nunca pierde ni duplica cambios.
 - El stock (`item_existencia_almacen`) queda explícitamente **fuera** del feed (dato caliente); su único juez sigue siendo el servidor vía `validar_stock` por tenant.

@@ -3,9 +3,12 @@ package com.amaxonia.pos.domain.repository
 import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.ClientBranch
+import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
+import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
+import com.amaxonia.pos.domain.model.computeFinancialSnapshot
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,19 +63,69 @@ class CartRepository {
         _financialSnapshot.value = snapshot
     }
 
-    private fun invalidateFinancialSnapshot() {
-        if (_financialSnapshot.value != null) _financialSnapshot.value = null
+    internal fun invalidateFinancialSnapshot() {
+        val items = cartItemsState.value
+        _financialSnapshot.value = if (items.isEmpty()) null else items.computeFinancialSnapshot()
     }
+
+    fun resolveItemPrice(
+        product: Product,
+        unit: String,
+        targetLabel: String,
+    ): Pair<String, Double> {
+        val targetLevel = product.prices.firstOrNull { it.label.equals(targetLabel, ignoreCase = true) }
+        val targetPrice = targetLevel?.let { calculatePriceForLevel(product, it, unit) } ?: 0.0
+        if (targetPrice > 0.0) {
+            return (targetLevel?.label ?: targetLabel) to targetPrice
+        }
+        val defaultLevel =
+            product.prices.firstOrNull { it.label.equals("A", ignoreCase = true) }
+                ?: product.prices.firstOrNull()
+        val defaultPrice = defaultLevel?.let { calculatePriceForLevel(product, it, unit) } ?: 0.0
+        return (defaultLevel?.label ?: "A") to defaultPrice
+    }
+
+    fun calculatePriceForLevel(
+        product: Product,
+        level: PriceLevel,
+        unit: String,
+    ): Double {
+        return if (unit == "UNIDAD" && product.bulkQuantity > 1.0) {
+            level.unitPricePlusTax.takeIf { it > 0.0 }
+                ?: level.unitPrice.takeIf { it > 0.0 }?.let { up ->
+                    if (product.isExempt || product.taxRate <= 0.0) up else up * (1.0 + product.taxRate / PERCENT_DIVISOR)
+                }
+                ?: level.pricePlusTax.takeIf { it > 0.0 }
+                ?: level.price.takeIf { it > 0.0 }?.let { p ->
+                    if (product.isExempt || product.taxRate <= 0.0) p else p * (1.0 + product.taxRate / PERCENT_DIVISOR)
+                }
+                ?: 0.0
+        } else {
+            level.pricePlusTax.takeIf { it > 0.0 }
+                ?: level.price.takeIf { it > 0.0 }?.let { p ->
+                    if (product.isExempt || product.taxRate <= 0.0) p else p * (1.0 + product.taxRate / PERCENT_DIVISOR)
+                }
+                ?: 0.0
+        }
+    }
+
+    private fun priceForUnit(
+        product: Product,
+        unit: String,
+        label: String = "A",
+    ): Double = resolveItemPrice(product, unit, label).second
 
     fun addToCart(
         product: Product,
         quantity: Int = 1,
     ) {
-        invalidateFinancialSnapshot()
         val safeQuantity = quantity.coerceAtLeast(1)
         val currentSellerId = currentSellerState.value?.id ?: 0
         val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
-        val defaultPrice = priceForUnit(product, defaultUnit)
+        val clientLabel = codTipoPrecioToLabel(selectedClientState.value?.codTipoPrecio)
+        val (effectiveLabel, initialPrice) = resolveItemPrice(product, defaultUnit, clientLabel)
+        val effectiveLevel = product.prices.firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }
+        val initialDiscount = effectiveLevel?.discountPercent ?: 0.0
         cartItemsState.update { currentItems ->
             val existingIndex = currentItems.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
             if (existingIndex != -1) {
@@ -94,33 +147,20 @@ class CartRepository {
                         quantityDecimal = safeQuantity.toDouble(),
                         itemUnitPackage = defaultUnit,
                         codVendedor = currentSellerId,
-                        unitPriceWithTax = defaultPrice,
+                        unitPriceWithTax = initialPrice,
+                        discountPercent = initialDiscount,
+                        selectedPriceLabel = effectiveLabel,
+                        isManualPrice = false,
                     )
             }
         }
-    }
-
-    private fun priceForUnit(
-        product: Product,
-        unit: String,
-    ): Double {
-        val price = product.prices.firstOrNull()
-        return if (unit == "UNIDAD" && product.bulkQuantity > 1.0) {
-            price?.unitPricePlusTax?.takeIf { it > 0.0 }
-                ?: price?.unitPrice?.takeIf { it > 0.0 }?.let { unitPrice ->
-                    if (product.isExempt || product.taxRate <= 0.0) unitPrice else unitPrice * (1.0 + product.taxRate / PERCENT_DIVISOR)
-                }
-                ?: 0.0
-        } else {
-            price?.pricePlusTax ?: 0.0
-        }
+        invalidateFinancialSnapshot()
     }
 
     fun addPromotionToCart(
         promocion: Promocion,
         times: Int = 1,
     ) {
-        invalidateFinancialSnapshot()
         val safeTimes = times.coerceAtLeast(1)
         val currentSellerId = currentSellerState.value?.id ?: 0
         cartItemsState.update { currentItems ->
@@ -162,6 +202,7 @@ class CartRepository {
                 }
             currentItems + promotionLines
         }
+        invalidateFinancialSnapshot()
     }
 
     fun increaseQuantity(productId: String) {
@@ -186,7 +227,6 @@ class CartRepository {
             removeItem(productId)
             return
         }
-        invalidateFinancialSnapshot()
         cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine) {
@@ -196,6 +236,7 @@ class CartRepository {
                 }
             }
         }
+        invalidateFinancialSnapshot()
     }
 
     fun updatePromotionQuantity(
@@ -206,20 +247,20 @@ class CartRepository {
             removePromotion(promocionId)
             return
         }
-        invalidateFinancialSnapshot()
         cartItemsState.update { items ->
             updatePromotionLines(items, promocionId, times, append = false)
         }
+        invalidateFinancialSnapshot()
     }
 
     fun removeItem(productId: String) {
-        invalidateFinancialSnapshot()
         cartItemsState.update { items -> items.filter { it.product.id != productId || it.isPromotionLine } }
+        invalidateFinancialSnapshot()
     }
 
     fun removePromotion(promotionId: String) {
-        invalidateFinancialSnapshot()
         cartItemsState.update { items -> items.filter { it.promocionId != promotionId } }
+        invalidateFinancialSnapshot()
     }
 
     private fun updatePromotionLines(
@@ -247,25 +288,54 @@ class CartRepository {
         productId: String,
         unitPriceWithTax: Double,
     ) {
-        invalidateFinancialSnapshot()
         val safePrice = unitPriceWithTax.coerceAtLeast(0.0)
         cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId) {
-                    item.copy(unitPriceWithTax = safePrice)
+                    item.copy(unitPriceWithTax = safePrice, isManualPrice = true)
                 } else {
                     item
                 }
             }
         }
+        invalidateFinancialSnapshot()
+    }
+
+    fun updateItemPriceLevel(
+        productId: String,
+        priceLevelLabel: String,
+    ) {
+        cartItemsState.update { items ->
+            items.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    val (effectiveLabel, newPrice) = resolveItemPrice(item.product, item.itemUnitPackage, priceLevelLabel)
+                    val effectiveLevel = item.product.prices.firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }
+                    val levelDiscount = effectiveLevel?.discountPercent ?: 0.0
+                    item.copy(
+                        selectedPriceLabel = effectiveLabel,
+                        unitPriceWithTax = newPrice,
+                        discountPercent = if (levelDiscount > 0.0 || item.discountPercent == 0.0) levelDiscount else item.discountPercent,
+                        isManualPrice = false,
+                    )
+                } else {
+                    item
+                }
+            }
+        }
+        invalidateFinancialSnapshot()
     }
 
     fun updateItemDiscount(
         productId: String,
         discountPercent: Double,
     ) {
-        invalidateFinancialSnapshot()
         val safeDiscount = discountPercent.coerceIn(MIN_DISCOUNT_PERCENT, MAX_DISCOUNT_PERCENT)
+        runCatching {
+            com.amaxonia.pos.core.logging.SafeLog.d(
+                "POS-TOTALS",
+                "updateItemDiscount: productId=$productId, requested=$discountPercent, safeDiscount=$safeDiscount"
+            )
+        }
         cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId) {
@@ -275,26 +345,30 @@ class CartRepository {
                 }
             }
         }
+        invalidateFinancialSnapshot()
     }
 
     fun updateItemUnit(
         productId: String,
         unit: String,
     ) {
-        invalidateFinancialSnapshot()
         val normalizedUnit = if (unit == "UNIDAD") "UNIDAD" else "EMPAQUE"
         cartItemsState.update { items ->
             items.map { item ->
                 if (item.product.id == productId && !item.isPromotionLine && item.product.canSwitchUnit) {
+                    val targetLabel = if (item.isManualPrice) "A" else item.selectedPriceLabel
+                    val (effectiveLabel, newPrice) = resolveItemPrice(item.product, normalizedUnit, targetLabel)
                     item.copy(
                         itemUnitPackage = normalizedUnit,
-                        unitPriceWithTax = priceForUnit(item.product, normalizedUnit),
+                        selectedPriceLabel = if (item.isManualPrice) item.selectedPriceLabel else effectiveLabel,
+                        unitPriceWithTax = if (item.isManualPrice) item.unitPriceWithTax else newPrice,
                     )
                 } else {
                     item
                 }
             }
         }
+        invalidateFinancialSnapshot()
     }
 
     fun clearCart() {

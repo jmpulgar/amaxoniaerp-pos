@@ -2,6 +2,9 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.db.CajaSesionEntity
+import com.amaxonia.pos.data.local.db.CajaSesionDao
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.clearActiveCaja
 import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
@@ -10,6 +13,7 @@ import com.amaxonia.pos.data.remote.api.CajaApi
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.model.caja.CierreCajaFormaPagoItem
 import com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine
 import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
@@ -21,10 +25,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 
 class CajaRepositoryImpl(
     private val cajaApi: CajaApi,
     private val localStore: LocalStore,
+    private val cajaSesionDao: CajaSesionDao,
 ) : CajaRepository {
     private val _activeCajaName = MutableStateFlow("Caja no seleccionada")
     override val activeCajaName: StateFlow<String> = _activeCajaName.asStateFlow()
@@ -57,6 +63,7 @@ class CajaRepositoryImpl(
         if (caja != null) {
             _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
             _activeCaja.update { caja }
+            restorePersistedSesion(caja.idCaja)
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
@@ -93,6 +100,7 @@ class CajaRepositoryImpl(
             result.onSuccess { response ->
                 activeSecuencia = response.cajaSecuencia
                 _activeCajaSecuencia.update { response.cajaSecuencia }
+                persistSesionAbierta(request.idCaja, response.cajaSecuencia)
             }
             result
         }
@@ -105,6 +113,7 @@ class CajaRepositoryImpl(
             result.onSuccess {
                 activeSecuencia = null
                 _activeCajaSecuencia.update { null }
+                markSesionCerrada()
             }
             result
         }
@@ -245,6 +254,54 @@ class CajaRepositoryImpl(
         // descarta la secuencia, dejando el estado en "pendiente de apertura".
         activeSecuencia = null
         _activeCajaSecuencia.update { null }
+    }
+
+    // ------------------------------------------------------------------
+    // Sesión de caja persistente (F4, PLAN §5.1-4): sobrevive reinicios
+    // offline. El check de status NUNCA bloquea la venta sin red.
+    // ------------------------------------------------------------------
+
+    private suspend fun persistSesionAbierta(
+        cajaId: String,
+        cajaSecuencia: com.amaxonia.pos.domain.model.caja.CajaSecuencia?,
+    ) {
+        val tenantId = tenantId()
+        val abierta = cajaSesionDao.getAbierta(tenantId)
+        cajaSesionDao.upsert(
+            com.amaxonia.pos.data.local.db.CajaSesionEntity(
+                localId = abierta?.localId ?: java.util.UUID.randomUUID().toString(),
+                cajaId = cajaId,
+                serverSecuenciaId = cajaSecuencia?.idCajaSecuencia ?: abierta?.serverSecuenciaId,
+                estado = "ABIERTA",
+                openedAt = abierta?.openedAt ?: System.currentTimeMillis(),
+                userId = abierta?.userId.orEmpty(),
+                tenantId = tenantId,
+                secuenciaJson = cajaSecuencia?.let { AppJson.encodeToString(com.amaxonia.pos.domain.model.caja.CajaSecuencia.serializer(), it) }.orEmpty(),
+            ),
+        )
+    }
+
+    private suspend fun markSesionCerrada() {
+        val tenantId = tenantId()
+        cajaSesionDao.getAbierta(tenantId)?.let { sesion ->
+            cajaSesionDao.upsert(sesion.copy(estado = "CERRADA", closedAt = System.currentTimeMillis()))
+        }
+    }
+
+    private suspend fun restorePersistedSesion(cajaId: String) {
+        val tenantId = tenantId()
+        val sesion = cajaSesionDao.getAbierta(tenantId) ?: return
+        val secuencia =
+            runCatching {
+                AppJson.decodeFromString(com.amaxonia.pos.domain.model.caja.CajaSecuencia.serializer(), sesion.secuenciaJson)
+            }.getOrNull()
+        activeSecuencia = secuencia
+        _activeCajaSecuencia.update { secuencia }
+    }
+
+    private suspend fun tenantId(): String {
+        val session = localStore.readCompanySession()
+        return SaleTenant.idFor(session?.company?.id ?: 0)
     }
 
     private suspend fun getAuthHeader(): String {

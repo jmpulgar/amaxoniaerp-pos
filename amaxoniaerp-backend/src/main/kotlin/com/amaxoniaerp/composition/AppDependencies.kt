@@ -16,6 +16,7 @@ import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
+import com.amaxoniaerp.features.sync.data.SyncRepository
 
 /**
  * Composition root del backend: constructor DI manual como estrategia canónica.
@@ -45,6 +46,7 @@ class Repositories {
     val formasPagoRepository = FormasPagoRepository()
     val promotionsRepository = PromotionsRepository()
     val mesasRepository = MesasRepository()
+    val syncRepository = SyncRepository()
 }
 
 /** Caja: módulo profundo de sesión (apertura atómica/cierre/estado) sobre el repositorio de queries. */

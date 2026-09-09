@@ -21,7 +21,15 @@ data class ProductDto(
     val gobSegment: String? = null,
     val gobFamily: String? = null,
     val isExempt: Boolean? = null,
+    @kotlinx.serialization.SerialName("is_exempt")
+    val isExemptSnake: Boolean? = null,
+    @kotlinx.serialization.SerialName("exento")
+    val exento: Boolean? = null,
     val taxRate: Double? = null,
+    @kotlinx.serialization.SerialName("tax_rate")
+    val taxRateSnake: Double? = null,
+    @kotlinx.serialization.SerialName("iva")
+    val iva: Double? = null,
     val costActual: Double? = null,
     val costAverage: Double? = null,
     val costPrevious: Double? = null,

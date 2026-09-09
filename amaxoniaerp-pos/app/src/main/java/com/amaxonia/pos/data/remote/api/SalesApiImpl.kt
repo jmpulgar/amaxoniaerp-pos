@@ -17,6 +17,7 @@ import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
 import com.amaxonia.pos.domain.model.sales.ReconciledInvoice
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
+import com.amaxonia.pos.domain.usecase.sync.InvoiceDomainRejectedException
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
@@ -55,6 +56,14 @@ class SalesApiImpl(
                 }
 
             val responseText = response.bodyAsText()
+            if (response.status.value == 400) {
+                val reason400 =
+                    runCatching {
+                        val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)
+                        if (json is JsonObject) json["error"]?.jsonPrimitive?.contentOrNull else null
+                    }.getOrNull()
+                throw InvoiceDomainRejectedException(reason400 ?: "La venta fue rechazada por reglas del ERP")
+            }
             if (response.status.value == HTTP_CONFLICT) {
                 val correlationId = payload.idFactura.orEmpty()
                 val reason =
