@@ -17,8 +17,6 @@ import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.TaxpayerType
 import com.amaxonia.pos.domain.model.generateDefaultPrices
 
-private const val DEFAULT_TAX_RATE = 7.0
-
 // --- CLIENT MAPPERS ---
 
 fun ClientDto.toEntity(): ClientEntity =
@@ -92,20 +90,14 @@ fun ClientSucursalDto.toEntity(): ClientSucursalEntity =
 // --- KEEP THE REST OF THE MAPPERS AS IS ---
 // (Copia el resto de mappers de Productos, Countries, etc. igual que antes)
 
-private fun ProductDto.resolvedPrices(): List<PriceLevel> =
-    if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices()
-
-private fun ProductDto.resolvedTaxRate(isExempt: Boolean): Double {
-    val rawTaxRate = taxRate ?: taxRateSnake ?: iva
-    return when {
-        isExempt -> 0.0
-        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
-        else -> DEFAULT_TAX_RATE
-    }
-}
-
 fun ProductDto.toEntity(): ProductEntity {
+    val rawTaxRate = taxRate ?: taxRateSnake ?: iva
     val resolvedIsExempt = isExempt ?: isExemptSnake ?: exento ?: false
+    val effectiveTaxRate = when {
+        resolvedIsExempt -> 0.0
+        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
+        else -> 7.0
+    }
     return ProductEntity(
         id = id ?: code.orEmpty(),
         code = code.orEmpty(),
@@ -116,13 +108,13 @@ fun ProductDto.toEntity(): ProductEntity {
         barcode3 = barcode3.orEmpty(),
         department = department?.toIntOrNull() ?: 0,
         isExempt = resolvedIsExempt,
-        taxRate = resolvedTaxRate(resolvedIsExempt),
+        taxRate = effectiveTaxRate,
         costActual = costActual ?: 0.0,
         unitPackage = unitPackage.orEmpty(),
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
-        prices = resolvedPrices(),
+        prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices(),
     )
 }
 
