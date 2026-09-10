@@ -42,12 +42,16 @@ object ClientsTable : Table("clientes") {
 
 class LenientIntegerColumnType : org.jetbrains.exposed.sql.ColumnType<Int>() {
     override fun sqlType(): String = "VARCHAR(36)"
-    override fun valueFromDB(value: Any): Int = when (value) {
-        is Number -> value.toInt()
-        is String -> value.trim().toIntOrNull() ?: 0
-        else -> 0
-    }
+
+    override fun valueFromDB(value: Any): Int =
+        when (value) {
+            is Number -> value.toInt()
+            is String -> value.trim().toIntOrNull() ?: 0
+            else -> 0
+        }
+
     override fun notNullValueToDB(value: Int): Any = value.toString()
+
     override fun nonNullValueToString(value: Int): String = "'$value'"
 }
 

@@ -10,7 +10,10 @@ interface SyncStateDao {
     suspend fun upsert(state: SyncStateEntity)
 
     @Query("SELECT * FROM sync_state WHERE tenantId = :tenantId AND scope = :scope LIMIT 1")
-    suspend fun get(tenantId: String, scope: String): SyncStateEntity?
+    suspend fun get(
+        tenantId: String,
+        scope: String,
+    ): SyncStateEntity?
 
     @Query("DELETE FROM sync_state WHERE tenantId = :tenantId")
     suspend fun clearForTenant(tenantId: String)

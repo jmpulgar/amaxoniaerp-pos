@@ -5,24 +5,23 @@ import androidx.test.core.app.ApplicationProvider
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.remote.SyncApiClient
 import com.amaxonia.pos.data.remote.SyncCursorExpiredApiException
-import com.amaxonia.pos.data.sync.SyncEngine
+import com.amaxonia.pos.data.remote.SyncScopeQuery
+import com.amaxonia.pos.data.sync.OfflineSyncScope
+import com.amaxonia.pos.data.sync.PriceLevelSyncDto
+import com.amaxonia.pos.data.sync.ProductSyncDto
 import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
+import com.amaxonia.pos.data.sync.SyncCatalogItemDto
 import com.amaxonia.pos.data.sync.SyncDeltaChangeDto
 import com.amaxonia.pos.data.sync.SyncDeltaResponseDto
+import com.amaxonia.pos.data.sync.SyncEngine
 import com.amaxonia.pos.data.sync.SyncManifestDto
 import com.amaxonia.pos.data.sync.SyncScopePreviewDto
-import com.amaxonia.pos.data.remote.SyncScopeQuery
-import com.amaxonia.pos.data.sync.SyncCatalogItemDto
-import com.amaxonia.pos.data.sync.OfflineSyncScope
-import com.amaxonia.pos.data.sync.ProductSyncDto
-import com.amaxonia.pos.data.sync.PriceLevelSyncDto
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -43,9 +42,11 @@ private fun productDto(
         department = 1,
         taxRate = taxRate,
         estatus = "A",
-        prices = listOf(
-            com.amaxonia.pos.data.sync.PriceLevelSyncDto(label = "A", price = 10.0, pricePlusTax = 11.6),
-        ),
+        prices =
+            listOf(
+                com.amaxonia.pos.data.sync
+                    .PriceLevelSyncDto(label = "A", price = 10.0, pricePlusTax = 11.6),
+            ),
     )
 
 private fun jsonOf(dto: ProductSyncDto): JsonElement = Json.encodeToJsonElement(ProductSyncDto.serializer(), dto)
@@ -116,7 +117,6 @@ private class FakeSyncApi : SyncApiClient {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class SyncEngineTest {
-
     private lateinit var database: AppDatabase
     private val fakeApi = FakeSyncApi()
     private val scope = OfflineSyncScope.ALL
@@ -156,74 +156,77 @@ class SyncEngineTest {
     }
 
     @Test
-    fun `bootstrap carga el catálogo y siembra el cursor con el snapshot`() = runBlocking {
-        seedProductBootstrap()
+    fun `bootstrap carga el catálogo y siembra el cursor con el snapshot`() =
+        runBlocking {
+            seedProductBootstrap()
 
-        val outcome = engine().runBootstrap()
+            val outcome = engine().runBootstrap()
 
-        val success = outcome as SyncEngine.Outcome.Success
-        assertTrue(success.bootstrapped)
-        val products = database.productDao().getPaged(limit = 100, offset = 0)
-        assertEquals(3, products.size)
-        val global = database.syncStateDao().get("T1", "GLOBAL")!!
-        assertEquals(100L, global.cursor)
-        assertEquals("UP_TO_DATE", global.status)
-    }
-
-    @Test
-    fun `delta aplica upserts y deletes y avanza el cursor`() = runBlocking {
-        seedProductBootstrap()
-        engine().runBootstrap()
-
-        val updated = productDto("P1", taxRate = 21.0)
-        val deleted = productDto("P2")
-        val upsertJson = jsonOf(updated)
-        val deleteJson = jsonOf(deleted)
-        fakeApi.deltaPages +=
-            SyncDeltaResponseDto(
-                changes =
-                    listOf(
-                        com.amaxonia.pos.data.sync.SyncDeltaChangeDto(
-                            changeId = 101,
-                            entityType = "PRODUCT",
-                            entityId = "P1",
-                            op = "UPSERT",
-                            payload = upsertJson,
-                        ),
-                        com.amaxonia.pos.data.sync.SyncDeltaChangeDto(
-                            changeId = 102,
-                            entityType = "PRODUCT",
-                            entityId = "P2",
-                            op = "DELETE",
-                            payload = deleteJson,
-                        ),
-                    ),
-                nextCursor = 102,
-                hasMore = false,
-            )
-
-        val outcome = engine().runIncremental()
-
-        val success = outcome as SyncEngine.Outcome.Success
-        assertEquals(2, success.changesApplied)
-        val p1 = database.productDao().getById("P1")
-        assertEquals(21.0, p1?.taxRate)
-        assertNull(database.productDao().getById("P2"))
-        assertEquals(102L, database.syncStateDao().get("T1", "GLOBAL")?.cursor)
-    }
+            val success = outcome as SyncEngine.Outcome.Success
+            assertTrue(success.bootstrapped)
+            val products = database.productDao().getPaged(limit = 100, offset = 0)
+            assertEquals(3, products.size)
+            val global = database.syncStateDao().get("T1", "GLOBAL")!!
+            assertEquals(100L, global.cursor)
+            assertEquals("UP_TO_DATE", global.status)
+        }
 
     @Test
-    fun `cursor expirado dispara resync completo automatico`() = runBlocking {
-        seedProductBootstrap()
-        engine().runBootstrap()
+    fun `delta aplica upserts y deletes y avanza el cursor`() =
+        runBlocking {
+            seedProductBootstrap()
+            engine().runBootstrap()
 
-        seedProductBootstrap() // repone páginas de bootstrap para el resync
-        fakeApi.changesError = SyncCursorExpiredApiException(oldestRetainedChangeId = 90)
+            val updated = productDto("P1", taxRate = 21.0)
+            val deleted = productDto("P2")
+            val upsertJson = jsonOf(updated)
+            val deleteJson = jsonOf(deleted)
+            fakeApi.deltaPages +=
+                SyncDeltaResponseDto(
+                    changes =
+                        listOf(
+                            com.amaxonia.pos.data.sync.SyncDeltaChangeDto(
+                                changeId = 101,
+                                entityType = "PRODUCT",
+                                entityId = "P1",
+                                op = "UPSERT",
+                                payload = upsertJson,
+                            ),
+                            com.amaxonia.pos.data.sync.SyncDeltaChangeDto(
+                                changeId = 102,
+                                entityType = "PRODUCT",
+                                entityId = "P2",
+                                op = "DELETE",
+                                payload = deleteJson,
+                            ),
+                        ),
+                    nextCursor = 102,
+                    hasMore = false,
+                )
 
-        val outcome = engine().runIncremental()
+            val outcome = engine().runIncremental()
 
-        val success = outcome as SyncEngine.Outcome.Success
-        assertTrue(success.bootstrapped)
-        assertEquals(3, database.productDao().getPaged(limit = 100, offset = 0).size)
-    }
+            val success = outcome as SyncEngine.Outcome.Success
+            assertEquals(2, success.changesApplied)
+            val p1 = database.productDao().getById("P1")
+            assertEquals(21.0, p1?.taxRate)
+            assertNull(database.productDao().getById("P2"))
+            assertEquals(102L, database.syncStateDao().get("T1", "GLOBAL")?.cursor)
+        }
+
+    @Test
+    fun `cursor expirado dispara resync completo automatico`() =
+        runBlocking {
+            seedProductBootstrap()
+            engine().runBootstrap()
+
+            seedProductBootstrap() // repone páginas de bootstrap para el resync
+            fakeApi.changesError = SyncCursorExpiredApiException(oldestRetainedChangeId = 90)
+
+            val outcome = engine().runIncremental()
+
+            val success = outcome as SyncEngine.Outcome.Success
+            assertTrue(success.bootstrapped)
+            assertEquals(3, database.productDao().getPaged(limit = 100, offset = 0).size)
+        }
 }

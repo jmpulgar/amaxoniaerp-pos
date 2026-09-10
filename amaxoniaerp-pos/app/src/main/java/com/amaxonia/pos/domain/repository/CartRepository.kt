@@ -85,35 +85,25 @@ class CartRepository {
         return (defaultLevel?.label ?: "A") to defaultPrice
     }
 
+    private fun applyTax(
+        product: Product,
+        amount: Double,
+    ): Double = if (product.isExempt || product.taxRate <= 0.0) amount else amount * (1.0 + product.taxRate / PERCENT_DIVISOR)
+
     fun calculatePriceForLevel(
         product: Product,
         level: PriceLevel,
         unit: String,
     ): Double {
-        return if (unit == "UNIDAD" && product.bulkQuantity > 1.0) {
-            level.unitPricePlusTax.takeIf { it > 0.0 }
-                ?: level.unitPrice.takeIf { it > 0.0 }?.let { up ->
-                    if (product.isExempt || product.taxRate <= 0.0) up else up * (1.0 + product.taxRate / PERCENT_DIVISOR)
-                }
-                ?: level.pricePlusTax.takeIf { it > 0.0 }
-                ?: level.price.takeIf { it > 0.0 }?.let { p ->
-                    if (product.isExempt || product.taxRate <= 0.0) p else p * (1.0 + product.taxRate / PERCENT_DIVISOR)
-                }
-                ?: 0.0
-        } else {
-            level.pricePlusTax.takeIf { it > 0.0 }
-                ?: level.price.takeIf { it > 0.0 }?.let { p ->
-                    if (product.isExempt || product.taxRate <= 0.0) p else p * (1.0 + product.taxRate / PERCENT_DIVISOR)
-                }
-                ?: 0.0
+        val isUnidadBulk = unit == "UNIDAD" && product.bulkQuantity > 1.0
+        return when {
+            isUnidadBulk && level.unitPricePlusTax > 0.0 -> level.unitPricePlusTax
+            isUnidadBulk && level.unitPrice > 0.0 -> applyTax(product, level.unitPrice)
+            level.pricePlusTax > 0.0 -> level.pricePlusTax
+            level.price > 0.0 -> applyTax(product, level.price)
+            else -> 0.0
         }
     }
-
-    private fun priceForUnit(
-        product: Product,
-        unit: String,
-        label: String = "A",
-    ): Double = resolveItemPrice(product, unit, label).second
 
     fun addToCart(
         product: Product,
@@ -333,7 +323,7 @@ class CartRepository {
         runCatching {
             com.amaxonia.pos.core.logging.SafeLog.d(
                 "POS-TOTALS",
-                "updateItemDiscount: productId=$productId, requested=$discountPercent, safeDiscount=$safeDiscount"
+                "updateItemDiscount: productId=$productId, requested=$discountPercent, safeDiscount=$safeDiscount",
             )
         }
         cartItemsState.update { items ->

@@ -2,12 +2,12 @@ package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.core.result.catchingResult
 import com.amaxonia.pos.data.local.LocalStore
-import com.amaxonia.pos.data.local.readCompanySession
-import com.amaxonia.pos.data.local.readFormasPago
-import com.amaxonia.pos.data.local.saveFormasPago
 import com.amaxonia.pos.data.local.db.CajaPaymentMethodEntity
 import com.amaxonia.pos.data.local.db.PaymentMethodDao
 import com.amaxonia.pos.data.local.db.PaymentMethodEntity
+import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.readFormasPago
+import com.amaxonia.pos.data.local.saveFormasPago
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.api.FormaPagoApi
 import com.amaxonia.pos.domain.model.payment.FormaPago
@@ -47,8 +47,7 @@ class FormaPagoRepositoryImpl(
                 .onSuccess { formasPago ->
                     localStore.saveFormasPago(cajaId, formasPago)
                     upsertToRoom(formasPago, cajaId)
-                }
-                .recoverCatching { error ->
+                }.recoverCatching { error ->
                     val fromRoom = readFromRoom(cajaId)
                     when {
                         fromRoom.isNotEmpty() -> fromRoom

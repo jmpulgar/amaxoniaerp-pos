@@ -6,8 +6,8 @@ import androidx.work.WorkerParameters
 import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.currentTenantId
-import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.db.AppDatabase
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.api.SalesApiImpl
@@ -30,7 +30,11 @@ class PendingInvoiceSyncWorker(
     override suspend fun doWork(): Result {
         val localStore = LocalStore(applicationContext)
         val companyCountry =
-            localStore.readCompanySession()?.company?.countryCode?.takeIf { it.isNotBlank() }
+            localStore
+                .readCompanySession()
+                ?.company
+                ?.countryCode
+                ?.takeIf { it.isNotBlank() }
                 ?: localStore.currentCountryCode()
         if (!companyCountry.equals("PA", ignoreCase = true)) {
             return Result.success()

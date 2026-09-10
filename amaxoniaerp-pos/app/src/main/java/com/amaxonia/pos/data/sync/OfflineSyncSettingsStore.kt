@@ -12,8 +12,9 @@ import kotlinx.coroutines.flow.first
  * Persistencia del alcance de sincronización offline (ADR-008, PLAN §18).
  * Conjuntos vacíos = sincronizar TODO. Vive en DataStore por empresa/dispositivo.
  */
-class OfflineSyncSettingsStore(context: Context) {
-
+class OfflineSyncSettingsStore(
+    context: Context,
+) {
     private val dataStore = LocalStore(context).dataStore
 
     suspend fun load(): OfflineSyncScope {

@@ -47,12 +47,11 @@ import com.amaxonia.pos.ui.login.LoginScreen
 import com.amaxonia.pos.ui.mesas.AreasMesasScreen
 import com.amaxonia.pos.ui.mesas.ComandaScreen
 import com.amaxonia.pos.ui.mesas.CuentaMesaScreen
+import com.amaxonia.pos.ui.offlinesettings.OfflineSettingsScreen
 import com.amaxonia.pos.ui.payment.PaymentScreen
 import com.amaxonia.pos.ui.payment.SuccessScreen
-import com.amaxonia.pos.ui.products.ProductFormScreen
 import com.amaxonia.pos.ui.products.ProductListScreen
 import com.amaxonia.pos.ui.reports.ReportsScreen
-import com.amaxonia.pos.ui.offlinesettings.OfflineSettingsScreen
 import com.amaxonia.pos.ui.settings.SettingsScreen
 import com.amaxonia.pos.ui.sync.SyncScreen
 import com.amaxonia.pos.ui.theme.OfflineRed
@@ -117,7 +116,11 @@ private fun ConnectivityEffect(
     val isOnline by AppGraph.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
         initialValue = AppGraph.networkMonitor.isOnline(),
     )
-    val localStore = remember(context) { com.amaxonia.pos.data.local.LocalStore(context) }
+    val localStore =
+        remember(context) {
+            com.amaxonia.pos.data.local
+                .LocalStore(context)
+        }
     var hasSeenConnectivityState by remember { mutableStateOf(false) }
 
     LaunchedEffect(isOnline) {
@@ -402,7 +405,8 @@ private fun NavGraphBuilder.operationsDestinations(navController: NavController)
     composable("offline_settings") {
         val offlineViewModel =
             remember {
-                com.amaxonia.pos.composition.AppGraph.sync.offlineSettingsViewModel()
+                com.amaxonia.pos.composition.AppGraph.sync
+                    .offlineSettingsViewModel()
             }
         OfflineSettingsScreen(
             viewModel = offlineViewModel,

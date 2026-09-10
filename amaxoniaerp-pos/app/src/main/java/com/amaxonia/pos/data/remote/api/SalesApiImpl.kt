@@ -39,6 +39,7 @@ class SalesApiImpl(
     private val apiClient: ApiClient,
 ) : SalesApi {
     private companion object {
+        const val HTTP_BAD_REQUEST = 400
         const val HTTP_CONFLICT = 409
         const val HTTP_NOT_FOUND: Int = 404
     }
@@ -56,7 +57,7 @@ class SalesApiImpl(
                 }
 
             val responseText = response.bodyAsText()
-            if (response.status.value == 400) {
+            if (response.status.value == HTTP_BAD_REQUEST) {
                 val reason400 =
                     runCatching {
                         val json = AppJson.decodeFromString(JsonElement.serializer(), responseText)

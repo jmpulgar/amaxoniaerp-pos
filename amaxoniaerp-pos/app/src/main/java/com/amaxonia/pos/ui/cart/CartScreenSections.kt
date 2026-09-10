@@ -454,12 +454,12 @@ private fun buildCartItemActions(
         onQuantityChange = { quantity ->
             viewModel.onAction(CartUiAction.UpdateItemQuantity(item.product.id, quantity))
         },
-        onPriceLevelChange = { level ->
-            viewModel.onAction(CartUiAction.UpdateItemPriceLevel(item.product.id, level))
-        },
         edit =
             CartItemEditActions(
                 onEditPrice = { onStartEdit(CartEditTarget.PRICE, item) },
                 onEditDiscount = { onStartEdit(CartEditTarget.DISCOUNT, item) },
+                onPriceLevelChange = { level ->
+                    viewModel.onAction(CartUiAction.UpdateItemPriceLevel(item.product.id, level))
+                },
             ),
     )

@@ -17,7 +17,7 @@ class PanamaInvoiceTicketFormatterTest {
         val actual = PanamaInvoiceTicketFormatter().format(payload()).elements.joinToString("\n", transform = ::serialize)
         val uri = checkNotNull(javaClass.classLoader?.getResource("golden/panama-invoice-ticket.txt")).toURI()
 
-        assertEquals(File(uri).readText().trimEnd(), actual)
+        assertEquals(File(uri).readText().replace("\r\n", "\n").trimEnd(), actual)
     }
 
     @Test

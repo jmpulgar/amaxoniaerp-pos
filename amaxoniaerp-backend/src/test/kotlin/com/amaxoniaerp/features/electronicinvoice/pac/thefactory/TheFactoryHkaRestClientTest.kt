@@ -316,10 +316,11 @@ class TheFactoryHkaRestClientTest {
         val client =
             cliente { req ->
                 assertTrue(req.url.encodedPath.endsWith("/api/Descarga") || req.url.encodedPath.endsWith("/api/DescargaPDF"))
-                val bodyText = when (val b = req.body) {
-                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
-                    else -> ""
-                }
+                val bodyText =
+                    when (val b = req.body) {
+                        is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                        else -> ""
+                    }
                 assertTrue(bodyText.contains(""""tipoArchivo":"pdf""""), "El body debe contener tipoArchivo=pdf")
                 assertTrue(bodyText.contains(""""cufe":"CUFE-PDF-1""""), "El body debe contener el CUFE")
                 respond(
@@ -351,10 +352,11 @@ class TheFactoryHkaRestClientTest {
         val client =
             cliente { req ->
                 assertTrue(req.url.encodedPath.endsWith("/api/Descarga"))
-                val bodyText = when (val b = req.body) {
-                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
-                    else -> ""
-                }
+                val bodyText =
+                    when (val b = req.body) {
+                        is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                        else -> ""
+                    }
                 assertTrue(bodyText.contains(""""tipoArchivo":"pdf""""), "El body debe contener tipoArchivo=pdf")
                 respond(
                     content = jsonResponse,
@@ -410,10 +412,11 @@ class TheFactoryHkaRestClientTest {
         val client =
             cliente { req ->
                 assertTrue(req.url.encodedPath.endsWith("/api/Descarga"))
-                val bodyText = when (val b = req.body) {
-                    is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
-                    else -> ""
-                }
+                val bodyText =
+                    when (val b = req.body) {
+                        is OutgoingContent.ByteArrayContent -> b.bytes().decodeToString()
+                        else -> ""
+                    }
                 assertTrue(bodyText.contains(""""tipoArchivo":"xml""""), "El body debe contener tipoArchivo=xml")
                 assertTrue(bodyText.contains(""""cufe":"CUFE-XML-1""""), "El body debe contener el CUFE")
                 respond(

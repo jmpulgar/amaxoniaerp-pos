@@ -178,7 +178,10 @@ open class ProcessSaleTransactionalRepository(
         )
     }
 
-    private fun resolveSafeIdCajaSecuencia(idCaja: String, rawIdCajaSecuencia: String): String {
+    private fun resolveSafeIdCajaSecuencia(
+        idCaja: String,
+        rawIdCajaSecuencia: String,
+    ): String {
         val trimmed = rawIdCajaSecuencia.trim()
         val isOfflineOrInvalid = trimmed.isBlank() || trimmed.startsWith("OFFLINE-") || trimmed.length > SEQUENCE_ID_MAX_LENGTH
         if (!isOfflineOrInvalid) {

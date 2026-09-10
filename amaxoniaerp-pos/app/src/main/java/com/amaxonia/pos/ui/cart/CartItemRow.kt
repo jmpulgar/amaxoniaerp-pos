@@ -58,18 +58,20 @@ internal fun sanitizeQuantityInput(value: String): String =
 class CartItemEditActions(
     val onEditPrice: () -> Unit,
     val onEditDiscount: () -> Unit,
+    val onPriceLevelChange: (String) -> Unit = {},
 )
 
-/** Callbacks del renglón de carrito, agrupados para la fila de ítem. */
 class CartItemActions(
     val onIncrease: () -> Unit,
     val onDecrease: () -> Unit,
     val onRemove: () -> Unit,
     val onUnitChange: (String) -> Unit,
     val onQuantityChange: (Int) -> Unit,
-    val onPriceLevelChange: (String) -> Unit = {},
     val edit: CartItemEditActions,
-)
+) {
+    val onPriceLevelChange: (String) -> Unit
+        get() = edit.onPriceLevelChange
+}
 
 @Composable
 fun CartItemRow(
@@ -364,7 +366,9 @@ private fun CartItemPriceLevelSelector(
                         modifier = Modifier.size(14.dp),
                     )
                 },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                shape =
+                    androidx.compose.foundation.shape
+                        .RoundedCornerShape(8.dp),
             )
             DropdownMenu(
                 expanded = priceMenuExpanded,

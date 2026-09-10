@@ -59,9 +59,15 @@ class RoomOfflineInvoiceWriterTest {
                 Unit
             }
 
-            override suspend fun markRejected(id: String, message: String, updatedAt: Long) {}
+            override suspend fun markRejected(
+                id: String,
+                message: String,
+                updatedAt: Long,
+            ) {
+                Unit
+            }
 
-        override suspend fun markInvalid(
+            override suspend fun markInvalid(
                 id: String,
                 message: String,
                 updatedAt: Long,

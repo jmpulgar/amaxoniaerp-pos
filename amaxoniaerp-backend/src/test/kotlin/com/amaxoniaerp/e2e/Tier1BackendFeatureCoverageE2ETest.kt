@@ -1150,6 +1150,7 @@ class Tier1BackendFeatureCoverageE2ETest {
                 SalesCajaNuevaDetalleTableFactory.forCountry("PA"),
                 SalesCajaNuevaReciboTableFactory.forCountry("PA"),
             )
+            exec("ALTER TABLE factura ADD COLUMN IF NOT EXISTS numero_control_thka VARCHAR(50)")
             seedCore()
         }
 

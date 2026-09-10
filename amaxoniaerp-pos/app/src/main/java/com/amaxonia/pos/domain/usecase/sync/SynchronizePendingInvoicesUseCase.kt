@@ -4,6 +4,11 @@ import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.system.AppClock
 import java.time.Duration
 
+private const val SEQUENCE_ID_MAX_LENGTH = 36
+private const val DEFAULT_INTERRUPTED_LEASE_MINUTES = 15L
+private const val DEFAULT_CLAIM_LEASE_MINUTES = 2L
+private const val DEFAULT_MAX_SUBMIT_ATTEMPTS_COUNT = 20
+
 data class PendingInvoiceRecord(
     val id: String,
     val localInvoiceNumber: String,
@@ -22,7 +27,9 @@ data class SynchronizedInvoice(
  * lote agotado, almacén inválido). Estado TERMINAL: la factura jamás se
  * reenvía automáticamente — requiere acción del cajero/supervisor (PLAN §11.2).
  */
-class InvoiceDomainRejectedException(message: String) : RuntimeException(message)
+class InvoiceDomainRejectedException(
+    message: String,
+) : RuntimeException(message)
 
 /**
  * Reconcilia una factura que el servidor ya conoce (HTTP 409) consultándola
@@ -112,12 +119,11 @@ sealed interface PendingInvoiceSyncResult {
 }
 
 data class SyncRetryConfig(
-    val interruptedLease: Duration = Duration.ofMinutes(15),
-    val claimLease: Duration = Duration.ofMinutes(2),
+    val interruptedLease: Duration = Duration.ofMinutes(DEFAULT_INTERRUPTED_LEASE_MINUTES),
+    val claimLease: Duration = Duration.ofMinutes(DEFAULT_CLAIM_LEASE_MINUTES),
     val reconciler: InvoiceReconciler? = null,
-    val maxSubmitAttempts: Int = 20,
+    val maxSubmitAttempts: Int = DEFAULT_MAX_SUBMIT_ATTEMPTS_COUNT,
 )
-
 
 class SynchronizePendingInvoicesUseCase(
     private val queue: PendingInvoiceQueue,
@@ -133,61 +139,79 @@ class SynchronizePendingInvoicesUseCase(
      * tenants when the user has not yet re-logged into a company.
      */
     suspend operator fun invoke(tenantId: String?): PendingInvoiceSyncResult {
-        var requiresRetry = false
-        var stopProcessing = false
         if (tenantId == null) return PendingInvoiceSyncResult.Success
+        var requiresRetry = false
         val now = clock.now().toEpochMilli()
         queue.recoverInterrupted(now - config.interruptedLease.toMillis(), now)
 
-        queue.pending(tenantId).forEach { invoice ->
-            if (stopProcessing) return@forEach
-            if (!invoice.countryCode.equals("PA", ignoreCase = true)) {
-                return@forEach
+        for (invoice in queue.pending(tenantId)) {
+            when (syncInvoice(invoice, now)) {
+                FailureOutcome.StopAndRetry -> {
+                    requiresRetry = true
+                    break
+                }
+                FailureOutcome.Continue -> Unit
             }
-            val claimDeadline = now + config.claimLease.toMillis()
-            val claimed = queue.tryClaim(invoice.id, now = now, leasedUntil = claimDeadline)
-            if (claimed == 0) return@forEach
-            queue.markSending(invoice.id, clock.now().toEpochMilli())
-            val decoded =
-                decoder.decode(invoice.payloadJson).getOrElse { error ->
-                    queue.markPermanentFailure(
-                        invoice.id,
-                        error.message ?: "Payload local inválido",
-                        clock.now().toEpochMilli(),
-                    )
-                    return@forEach
-                }
-            val sanitizedFactura =
-                if (decoded.factura.idCajaSecuencia.length > 36 || decoded.factura.idCajaSecuencia.startsWith("OFFLINE-")) {
-                    decoded.factura.copy(
-                        idCajaSecuencia = decoded.factura.idCajaSecuencia.removePrefix("OFFLINE-").take(36),
-                    )
-                } else {
-                    decoded.factura
-                }
-            val idempotentRequest =
-                decoded.copy(
-                    idFactura = decoded.idFactura ?: invoice.id,
-                    codFactura = decoded.codFactura ?: invoice.localInvoiceNumber,
-                    factura = sanitizedFactura,
-                )
-            gateway.submit(idempotentRequest).fold(
-                onSuccess = { result ->
-                    queue.markSent(invoice.id, result, clock.now().toEpochMilli())
-                },
-                onFailure = { error ->
-                    when (handleSubmissionFailure(invoice, error, now)) {
-                        FailureOutcome.StopAndRetry -> {
-                            requiresRetry = true
-                            stopProcessing = true
-                        }
-                        FailureOutcome.Continue -> Unit
-                    }
-                },
-            )
         }
 
         return if (requiresRetry) PendingInvoiceSyncResult.Retry else PendingInvoiceSyncResult.Success
+    }
+
+    private fun sanitizeFactura(factura: ProcessSaleFacturaPayload): ProcessSaleFacturaPayload =
+        if (factura.idCajaSecuencia.length > SEQUENCE_ID_MAX_LENGTH ||
+            factura.idCajaSecuencia.startsWith("OFFLINE-")
+        ) {
+            factura.copy(
+                idCajaSecuencia =
+                    factura.idCajaSecuencia
+                        .removePrefix("OFFLINE-")
+                        .take(SEQUENCE_ID_MAX_LENGTH),
+            )
+        } else {
+            factura
+        }
+
+    private suspend fun claimAndDecode(
+        invoice: PendingInvoiceRecord,
+        now: Long,
+    ): ProcessSaleRequestDto? {
+        val claimDeadline = now + config.claimLease.toMillis()
+        if (!invoice.countryCode.equals("PA", ignoreCase = true) ||
+            queue.tryClaim(invoice.id, now = now, leasedUntil = claimDeadline) == 0
+        ) {
+            return null
+        }
+        queue.markSending(invoice.id, clock.now().toEpochMilli())
+        val decodedResult = decoder.decode(invoice.payloadJson)
+        val decoded = decodedResult.getOrNull()
+        return if (decoded != null) {
+            decoded.copy(
+                idFactura = decoded.idFactura ?: invoice.id,
+                codFactura = decoded.codFactura ?: invoice.localInvoiceNumber,
+                factura = sanitizeFactura(decoded.factura),
+            )
+        } else {
+            val errorMsg = decodedResult.exceptionOrNull()?.message ?: "Payload local inválido"
+            queue.markPermanentFailure(invoice.id, errorMsg, clock.now().toEpochMilli())
+            null
+        }
+    }
+
+    private suspend fun syncInvoice(
+        invoice: PendingInvoiceRecord,
+        now: Long,
+    ): FailureOutcome {
+        val request = claimAndDecode(invoice, now) ?: return FailureOutcome.Continue
+        var outcome = FailureOutcome.Continue
+        gateway.submit(request).fold(
+            onSuccess = { result ->
+                queue.markSent(invoice.id, result, clock.now().toEpochMilli())
+            },
+            onFailure = { error ->
+                outcome = handleSubmissionFailure(invoice, error, now)
+            },
+        )
+        return outcome
     }
 
     private enum class FailureOutcome {
@@ -245,11 +269,8 @@ class SynchronizePendingInvoicesUseCase(
         }
 
     private companion object {
-        /** Leases de la cola de reenvío: recuperación de envíos interrumpidos y claim atómico por factura. */
-        val DEFAULT_INTERRUPTED_LEASE: Duration = Duration.ofMinutes(15)
-        val DEFAULT_CLAIM_LEASE: Duration = Duration.ofMinutes(2)
-
-        /** Tope de reintentos transitorios antes de SUSPENDED (debe coincidir con el filtro del DAO). */
-        const val DEFAULT_MAX_SUBMIT_ATTEMPTS = 20
+        val DEFAULT_INTERRUPTED_LEASE: Duration = Duration.ofMinutes(DEFAULT_INTERRUPTED_LEASE_MINUTES)
+        val DEFAULT_CLAIM_LEASE: Duration = Duration.ofMinutes(DEFAULT_CLAIM_LEASE_MINUTES)
+        const val DEFAULT_MAX_SUBMIT_ATTEMPTS = DEFAULT_MAX_SUBMIT_ATTEMPTS_COUNT
     }
 }

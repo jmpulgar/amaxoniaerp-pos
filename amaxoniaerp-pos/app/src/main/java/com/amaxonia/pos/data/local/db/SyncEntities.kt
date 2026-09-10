@@ -1,6 +1,5 @@
 package com.amaxonia.pos.data.local.db
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 

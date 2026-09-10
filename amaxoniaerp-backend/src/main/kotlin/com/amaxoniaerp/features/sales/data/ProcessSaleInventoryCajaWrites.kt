@@ -18,6 +18,7 @@ import java.util.UUID
 private const val INVENTORY_QUANTITY_SCALE = 4
 private const val TWO_DIGIT_YEAR_MODULUS = 100
 private const val STANDARD_USER_LENGTH = 20
+private const val SEQUENCE_ID_MAX_LENGTH = 36
 
 internal fun updateInventoryAndKardex(ctx: SaleWriteContext) {
     val physicalItems = ctx.request.items.filter { it.esProductoFisico }
@@ -216,7 +217,9 @@ private fun insertCajaNueva(
         it[cajaNuevaTable.idProveedor] = ""
         it[cajaNuevaTable.idOrdenPago] = ""
         it[cajaNuevaTable.serieSucursal] = ctx.request.factura.serieSucursal
-        it[cajaNuevaTable.idCajaSecuencia] = ctx.request.factura.idCajaSecuencia.take(36)
+        it[cajaNuevaTable.idCajaSecuencia] =
+            ctx.request.factura.idCajaSecuencia
+                .take(SEQUENCE_ID_MAX_LENGTH)
         it[cajaNuevaTable.idPedido] = ""
         it[cajaNuevaTable.idAbono] = ""
         it[cajaNuevaTable.idNotaCredito] = ""

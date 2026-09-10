@@ -1,7 +1,6 @@
 package com.amaxonia.pos.domain.repository
 
 import com.amaxonia.pos.domain.model.offline.OfflineCatalogEntry
-import com.amaxonia.pos.domain.model.offline.OfflineScopeSelection
 import kotlinx.coroutines.flow.StateFlow
 
 enum class OfflineSettingsStatus {

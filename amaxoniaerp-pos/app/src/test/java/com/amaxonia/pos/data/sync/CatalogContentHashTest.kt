@@ -141,33 +141,35 @@ class CatalogContentHashTest {
 
     @Test
     fun `PriceLevel del dominio mapea a digest sin alterar el hash`() {
-        val domainLevels = levels(12.34)
-            .map {
-                PriceLevel(
-                    label = it.label,
-                    price = it.price,
-                    utilityPercent = it.utilityPercent,
-                    pricePlusUtility = it.pricePlusUtility,
-                    pricePlusTax = it.pricePlusTax,
-                    unitPrice = it.unitPrice,
-                    unitPricePlusTax = it.unitPricePlusTax,
-                    discountPercent = it.discountPercent,
-                )
-            }
+        val domainLevels =
+            levels(12.34)
+                .map {
+                    PriceLevel(
+                        label = it.label,
+                        price = it.price,
+                        utilityPercent = it.utilityPercent,
+                        pricePlusUtility = it.pricePlusUtility,
+                        pricePlusTax = it.pricePlusTax,
+                        unitPrice = it.unitPrice,
+                        unitPricePlusTax = it.unitPricePlusTax,
+                        discountPercent = it.discountPercent,
+                    )
+                }
 
         val fixture = product(id = "ITM-FIXTURE-001", price1 = 12.34, barcode1 = "7450000987654")
-        val digestsFromDomain = domainLevels.map { level ->
-            CatalogContentHash.PriceLevelDigest(
-                label = level.label,
-                price = level.price,
-                utilityPercent = level.utilityPercent,
-                pricePlusUtility = level.pricePlusUtility,
-                pricePlusTax = level.pricePlusTax,
-                unitPrice = level.unitPrice,
-                unitPricePlusTax = level.unitPricePlusTax,
-                discountPercent = level.discountPercent,
-            )
-        }
+        val digestsFromDomain =
+            domainLevels.map { level ->
+                CatalogContentHash.PriceLevelDigest(
+                    label = level.label,
+                    price = level.price,
+                    utilityPercent = level.utilityPercent,
+                    pricePlusUtility = level.pricePlusUtility,
+                    pricePlusTax = level.pricePlusTax,
+                    unitPrice = level.unitPrice,
+                    unitPricePlusTax = level.unitPricePlusTax,
+                    discountPercent = level.discountPercent,
+                )
+            }
         val fromDomain = fixture.copy(prices = digestsFromDomain)
 
         assertEquals(CatalogContentHash.productRowHash(fixture), CatalogContentHash.productRowHash(fromDomain))

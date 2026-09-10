@@ -139,7 +139,9 @@ class CartStateCoordinator(
         runCatching {
             com.amaxonia.pos.core.logging.SafeLog.d(
                 "POS-TOTALS",
-                "updateCartState -> itemsCount=${items.size}, client=${client?.code ?: "none"}, snapshot=[gross=${snapshot?.subtotalGross}, disc=${snapshot?.itemDiscounts}, net=${snapshot?.subtotalNet}, tax=${snapshot?.tax}, tot=${snapshot?.total}]"
+                "updateCartState -> itemsCount=${items.size}, client=${client?.code ?: "none"}, " +
+                    "snapshot=[gross=${snapshot?.subtotalGross}, disc=${snapshot?.itemDiscounts}, " +
+                    "net=${snapshot?.subtotalNet}, tax=${snapshot?.tax}, tot=${snapshot?.total}]",
             )
         }
         state.update {
@@ -295,7 +297,8 @@ class CartActionHandler(
                 runCatching {
                     com.amaxonia.pos.core.logging.SafeLog.d(
                         "POS-TOTALS",
-                        "CartActionHandler.UpdateItemDiscount: productId=${action.productId}, discount=${action.discountPercent}, allowDiscounts=${state.value.allowDiscounts}"
+                        "CartActionHandler.UpdateItemDiscount: productId=${action.productId}, " +
+                            "discount=${action.discountPercent}, allowDiscounts=${state.value.allowDiscounts}",
                     )
                 }
                 cartRepository.updateItemDiscount(action.productId, action.discountPercent)

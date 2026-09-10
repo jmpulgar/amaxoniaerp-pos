@@ -1,7 +1,7 @@
 package com.amaxonia.pos.data.remote
 
-import com.amaxonia.pos.data.sync.SyncCatalogItemDto
 import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
+import com.amaxonia.pos.data.sync.SyncCatalogItemDto
 import com.amaxonia.pos.data.sync.SyncDeltaResponseDto
 import com.amaxonia.pos.data.sync.SyncManifestDto
 import com.amaxonia.pos.data.sync.SyncScopePreviewDto
@@ -12,8 +12,9 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 
 /** El servidor podó cambios que el dispositivo aún necesita → resync completo. */
-class SyncCursorExpiredApiException(val oldestRetainedChangeId: Long) :
-    RuntimeException("CURSOR_EXPIRED (oldest=$oldestRetainedChangeId)")
+class SyncCursorExpiredApiException(
+    val oldestRetainedChangeId: Long,
+) : RuntimeException("CURSOR_EXPIRED (oldest=$oldestRetainedChangeId)")
 
 /**
  * Contrato del sync incremental (/api/sync/v1). El alcance offline viaja en

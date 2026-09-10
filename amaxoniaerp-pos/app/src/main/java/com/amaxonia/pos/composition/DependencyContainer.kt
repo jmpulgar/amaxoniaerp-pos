@@ -8,16 +8,9 @@ import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.DraftInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.db.TransactionLogDao
+import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.pos.data.printer.HkaConnectionHelper
-import com.amaxonia.pos.data.remote.SyncApi
-import com.amaxonia.pos.data.sync.OfflineSyncSettingsStore
-import com.amaxonia.pos.data.sync.SyncEngine
-import com.amaxonia.pos.data.sync.OfflineSyncSettingsRepositoryImpl
-import com.amaxonia.pos.domain.repository.OfflineSyncSettingsRepository
-import com.amaxonia.pos.data.remote.SyncScopeQuery
-import com.amaxonia.pos.domain.model.tenant.SaleTenant
-import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.printer.HkaFiscalDeviceDiagnostics
 import com.amaxonia.pos.data.printer.HkaPaymentGateway
 import com.amaxonia.pos.data.printer.PrinterFactory
@@ -29,6 +22,7 @@ import com.amaxonia.pos.data.remote.ApiServerEnvironment
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.RemoteImageUrlResolver
+import com.amaxonia.pos.data.remote.SyncApi
 import com.amaxonia.pos.data.remote.api.AreasApiImpl
 import com.amaxonia.pos.data.remote.api.CreditNoteApiImpl
 import com.amaxonia.pos.data.remote.api.CuentaMesaApiImpl
@@ -64,10 +58,14 @@ import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.SesionMesaRepositoryImpl
 import com.amaxonia.pos.data.sync.CatalogDaos
 import com.amaxonia.pos.data.sync.CatalogSyncer
+import com.amaxonia.pos.data.sync.OfflineSyncSettingsRepositoryImpl
+import com.amaxonia.pos.data.sync.OfflineSyncSettingsStore
+import com.amaxonia.pos.data.sync.SyncEngine
 import com.amaxonia.pos.data.sync.SyncScheduler
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
 import com.amaxonia.pos.domain.model.printer.FiscalDeviceDiagnostics
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.AddressCatalogRepository
 import com.amaxonia.pos.domain.repository.AreaRepository
 import com.amaxonia.pos.domain.repository.AuthRepository
@@ -85,6 +83,7 @@ import com.amaxonia.pos.domain.repository.FormaPagoRepository
 import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import com.amaxonia.pos.domain.repository.InMemoryTableAccountPaymentHolder
 import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
+import com.amaxonia.pos.domain.repository.OfflineSyncSettingsRepository
 import com.amaxonia.pos.domain.repository.PedidosMesaRepository
 import com.amaxonia.pos.domain.repository.PendingSalesReader
 import com.amaxonia.pos.domain.repository.ProductLotRepository
@@ -462,6 +461,27 @@ object DependencyContainer {
                 database.cajaSesionDao(),
             )
         formaPagoRepository = FormaPagoRepositoryImpl(FormaPagoApiImpl(apiClient), localStore, database.paymentMethodDao(), networkMonitor)
+        initializeSyncComponents(database)
+        areaRepository = AreaRepositoryImpl(AreasApiImpl(apiClient), localStore, localStore, networkMonitor)
+        sesionMesaRepository = SesionMesaRepositoryImpl(SesionMesaApiImpl(apiClient), localStore)
+        pedidosMesaRepository = PedidosMesaRepositoryImpl(PedidosMesaApiImpl(apiClient), localStore)
+        cuentaMesaRepository = CuentaMesaRepositoryImpl(CuentaMesaApiImpl(apiClient), localStore)
+        salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
+        creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
+        _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore, database.pendingInvoiceDao())
+        apiTransactionRepository = _apiTransactionRepository
+        clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())
+        clientFormCatalogSource =
+            OfflineFirstClientFormCatalogSource(
+                apiService = apiService,
+                localStore = localStore,
+                networkMonitor = networkMonitor,
+                localAddressCatalogs = addressCatalogRepository,
+                localClientTypes = clientTypeRepository,
+            )
+    }
+
+    private fun initializeSyncComponents(database: AppDatabase) {
         offlineSyncSettingsStore = OfflineSyncSettingsStore(syncAppContext())
         syncApi = SyncApi(apiService)
         syncEngine =
@@ -482,23 +502,6 @@ object DependencyContainer {
                 productRepository = productRepository,
                 scopeStore = offlineSyncSettingsStore,
                 bootstrapEnqueuer = { SyncScheduler.enqueueBootstrap(syncAppContext(), requiresCharging = false) },
-            )
-        areaRepository = AreaRepositoryImpl(AreasApiImpl(apiClient), localStore, localStore, networkMonitor)
-        sesionMesaRepository = SesionMesaRepositoryImpl(SesionMesaApiImpl(apiClient), localStore)
-        pedidosMesaRepository = PedidosMesaRepositoryImpl(PedidosMesaApiImpl(apiClient), localStore)
-        cuentaMesaRepository = CuentaMesaRepositoryImpl(CuentaMesaApiImpl(apiClient), localStore)
-        salesRepository = SalesRepositoryImpl(SalesApiImpl(apiClient), localStore)
-        creditNoteRepository = CreditNoteRepositoryImpl(CreditNoteApiImpl(apiClient), localStore)
-        _apiTransactionRepository = ApiTransactionRepository(SalesApiImpl(apiClient), localStore, database.pendingInvoiceDao())
-        apiTransactionRepository = _apiTransactionRepository
-        clientTypeRepository = LocalClientTypeRepository(database.clientTypeDao())
-        clientFormCatalogSource =
-            OfflineFirstClientFormCatalogSource(
-                apiService = apiService,
-                localStore = localStore,
-                networkMonitor = networkMonitor,
-                localAddressCatalogs = addressCatalogRepository,
-                localClientTypes = clientTypeRepository,
             )
     }
 

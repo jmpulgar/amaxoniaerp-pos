@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 
 private const val SHORT_CODE_LENGTH = 10
 private const val DEFAULT_TERM_PAYMENT_ID = 3
+private const val SEQUENCE_ID_MAX_LENGTH = 36
 
 /** Contexto compartido por las escrituras de factura dentro de la transacción de venta. */
 internal data class SaleWriteContext(
@@ -68,7 +69,7 @@ internal fun insertFactura(ctx: SaleWriteContext) {
             ctx.today.monthValue
                 .toString()
                 .padStart(2, '0')
-        it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia.take(36)
+        it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia.take(SEQUENCE_ID_MAX_LENGTH)
         it[facturaTable.numcomContabilizado] = 0
         it[facturaTable.fechaContabilizado] = ctx.today
         it[facturaTable.serieSucursal] = f.serieSucursal.take(SHORT_CODE_LENGTH)

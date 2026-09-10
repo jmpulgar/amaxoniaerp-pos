@@ -5,9 +5,9 @@ import com.amaxonia.pos.data.local.db.ClientEntity
 import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.data.local.db.ClientTypeEntity
 import com.amaxonia.pos.data.local.db.PaymentMethodEntity
+import com.amaxonia.pos.data.local.db.ProductEntity
 import com.amaxonia.pos.data.local.db.PromocionDetalleEntity
 import com.amaxonia.pos.data.local.db.PromocionEntity
-import com.amaxonia.pos.data.local.db.ProductEntity
 import com.amaxonia.pos.domain.model.PriceLevel
 
 fun ProductSyncDto.toEntity(): ProductEntity =
@@ -28,18 +28,19 @@ fun ProductSyncDto.toEntity(): ProductEntity =
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage,
         estatus = estatus ?: "A",
-        prices = prices.map { level ->
-            PriceLevel(
-                label = level.label,
-                price = level.price,
-                utilityPercent = level.utilityPercent,
-                pricePlusUtility = level.pricePlusUtility,
-                pricePlusTax = level.pricePlusTax,
-                unitPrice = level.unitPrice,
-                unitPricePlusTax = level.unitPricePlusTax,
-                discountPercent = level.discountPercent,
-            )
-        },
+        prices =
+            prices.map { level ->
+                PriceLevel(
+                    label = level.label,
+                    price = level.price,
+                    utilityPercent = level.utilityPercent,
+                    pricePlusUtility = level.pricePlusUtility,
+                    pricePlusTax = level.pricePlusTax,
+                    unitPrice = level.unitPrice,
+                    unitPricePlusTax = level.unitPricePlusTax,
+                    discountPercent = level.discountPercent,
+                )
+            },
     )
 
 fun ClientSyncDto.toEntity(): ClientEntity =

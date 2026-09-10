@@ -367,8 +367,7 @@ private fun HistoryOfflineBanner() {
                 .background(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                ).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

@@ -78,4 +78,3 @@ fun Transaction.isOfflinePending(): Boolean =
     id.startsWith("OFF-") ||
         invoiceNumber.startsWith("OFF-") ||
         status == TransactionStatus.PENDING
-

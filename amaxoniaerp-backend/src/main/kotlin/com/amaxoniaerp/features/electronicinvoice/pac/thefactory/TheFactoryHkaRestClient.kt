@@ -306,7 +306,12 @@ class TheFactoryHkaRestClient(
     ): Boolean {
         if (contentType?.match(ContentType.Application.Xml) == true) return true
         if (contentType?.match(ContentType.Text.Xml) == true) return true
-        val trimmed = bytes.take(10).toByteArray().decodeToString().trimStart()
+        val trimmed =
+            bytes
+                .take(10)
+                .toByteArray()
+                .decodeToString()
+                .trimStart()
         return trimmed.startsWith("<?xml") || trimmed.startsWith("<")
     }
 

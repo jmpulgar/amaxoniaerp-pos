@@ -1,11 +1,11 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.core.result.catchingResult
-import com.amaxonia.pos.data.local.LocalStore
-import com.amaxonia.pos.data.local.db.CajaSesionEntity
-import com.amaxonia.pos.data.local.db.CajaSesionDao
 import com.amaxonia.pos.data.local.AppJson
+import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.clearActiveCaja
+import com.amaxonia.pos.data.local.db.CajaSesionDao
+import com.amaxonia.pos.data.local.db.CajaSesionEntity
 import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.saveActiveCaja
@@ -13,19 +13,18 @@ import com.amaxonia.pos.data.remote.api.CajaApi
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaStatusResponse
-import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.model.caja.CierreCajaFormaPagoItem
 import com.amaxonia.pos.domain.model.caja.CierreCajaPaymentLine
 import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
 import com.amaxonia.pos.domain.model.caja.CierreCajaResponse
 import com.amaxonia.pos.domain.model.caja.CierreCajaSummary
+import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.SessionConfigurationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.Json
 
 class CajaRepositoryImpl(
     private val cajaApi: CajaApi,
@@ -63,7 +62,7 @@ class CajaRepositoryImpl(
         if (caja != null) {
             _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
             _activeCaja.update { caja }
-            restorePersistedSesion(caja.idCaja)
+            restorePersistedSesion()
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
@@ -269,14 +268,25 @@ class CajaRepositoryImpl(
         val abierta = cajaSesionDao.getAbierta(tenantId)
         cajaSesionDao.upsert(
             com.amaxonia.pos.data.local.db.CajaSesionEntity(
-                localId = abierta?.localId ?: java.util.UUID.randomUUID().toString(),
+                localId =
+                    abierta?.localId ?: java.util.UUID
+                        .randomUUID()
+                        .toString(),
                 cajaId = cajaId,
                 serverSecuenciaId = cajaSecuencia?.idCajaSecuencia ?: abierta?.serverSecuenciaId,
                 estado = "ABIERTA",
                 openedAt = abierta?.openedAt ?: System.currentTimeMillis(),
                 userId = abierta?.userId.orEmpty(),
                 tenantId = tenantId,
-                secuenciaJson = cajaSecuencia?.let { AppJson.encodeToString(com.amaxonia.pos.domain.model.caja.CajaSecuencia.serializer(), it) }.orEmpty(),
+                secuenciaJson =
+                    cajaSecuencia
+                        ?.let {
+                            AppJson.encodeToString(
+                                com.amaxonia.pos.domain.model.caja.CajaSecuencia
+                                    .serializer(),
+                                it,
+                            )
+                        }.orEmpty(),
             ),
         )
     }
@@ -288,12 +298,16 @@ class CajaRepositoryImpl(
         }
     }
 
-    private suspend fun restorePersistedSesion(cajaId: String) {
+    private suspend fun restorePersistedSesion() {
         val tenantId = tenantId()
         val sesion = cajaSesionDao.getAbierta(tenantId) ?: return
         val secuencia =
             runCatching {
-                AppJson.decodeFromString(com.amaxonia.pos.domain.model.caja.CajaSecuencia.serializer(), sesion.secuenciaJson)
+                AppJson.decodeFromString(
+                    com.amaxonia.pos.domain.model.caja.CajaSecuencia
+                        .serializer(),
+                    sesion.secuenciaJson,
+                )
             }.getOrNull()
         activeSecuencia = secuencia
         _activeCajaSecuencia.update { secuencia }

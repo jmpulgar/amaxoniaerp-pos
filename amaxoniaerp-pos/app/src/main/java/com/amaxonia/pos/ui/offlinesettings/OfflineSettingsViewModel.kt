@@ -1,7 +1,6 @@
 package com.amaxonia.pos.ui.offlinesettings
 
 import androidx.lifecycle.ViewModel
-import com.amaxonia.pos.domain.repository.OfflineSettingsStatus
 import com.amaxonia.pos.domain.repository.OfflineSettingsUiModel
 import com.amaxonia.pos.domain.repository.OfflineSyncSettingsRepository
 import kotlinx.coroutines.flow.StateFlow
@@ -9,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 class OfflineSettingsViewModel(
     private val repository: OfflineSyncSettingsRepository,
 ) : ViewModel() {
-
     val uiState: StateFlow<OfflineSettingsUiModel> = repository.uiState
 
     fun start() = repository.start()

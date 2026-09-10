@@ -21,6 +21,9 @@ import com.amaxonia.pos.domain.model.TaxpayerType
 import com.amaxonia.pos.domain.model.generateDefaultPrices
 import java.util.UUID
 
+private const val PERCENT_MULTIPLIER = 100.0
+private const val DEFAULT_TAX_RATE = 7.0
+
 private fun priceByLabel(
     prices: List<PriceLevel>,
     label: String,
@@ -53,6 +56,27 @@ fun CompanyDetailsDto.toSelectedCompany(): SelectedCompany =
         rif = rif.orEmpty(),
     )
 
+private fun resolveEffectiveTaxRate(
+    resolvedIsExempt: Boolean,
+    rawTaxRate: Double?,
+    prices: List<PriceLevel>,
+): Double {
+    if (resolvedIsExempt) return 0.0
+    val derivedTax =
+        prices.firstNotNullOfOrNull { p ->
+            if (p.pricePlusTax > p.price && p.price > 0.0) {
+                ((p.pricePlusTax - p.price) / p.price) * PERCENT_MULTIPLIER
+            } else {
+                null
+            }
+        }
+    return when {
+        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
+        derivedTax != null && derivedTax > 0.0 -> derivedTax
+        else -> DEFAULT_TAX_RATE
+    }
+}
+
 // --- Product Mappers ---
 fun ProductDto.toDomain(): Product {
     val mappedPrices =
@@ -63,17 +87,7 @@ fun ProductDto.toDomain(): Product {
         }
     val rawTaxRate = taxRate ?: taxRateSnake ?: iva
     val resolvedIsExempt = isExempt ?: isExemptSnake ?: exento ?: false
-    val priceDerivedTax = mappedPrices.firstNotNullOfOrNull { p ->
-        if (p.pricePlusTax > p.price && p.price > 0.0) {
-            ((p.pricePlusTax - p.price) / p.price) * 100.0
-        } else null
-    }
-    val effectiveTaxRate = when {
-        resolvedIsExempt -> 0.0
-        rawTaxRate != null && rawTaxRate > 0.0 -> rawTaxRate
-        priceDerivedTax != null && priceDerivedTax > 0.0 -> priceDerivedTax
-        else -> 7.0
-    }
+    val effectiveTaxRate = resolveEffectiveTaxRate(resolvedIsExempt, rawTaxRate, mappedPrices)
     return Product(
         id = id ?: UUID.randomUUID().toString(),
         code = code.orEmpty(),

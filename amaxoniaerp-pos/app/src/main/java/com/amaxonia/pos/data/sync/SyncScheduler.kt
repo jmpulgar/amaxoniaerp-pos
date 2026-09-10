@@ -98,7 +98,10 @@ object SyncScheduler {
      * solo Wi-Fi (red no medida) con el dispositivo cargando (Q10/§17), o
      * invocación manual explícita desde "Ajustes Offline".
      */
-    fun enqueueBootstrap(context: Context, requiresCharging: Boolean = true) {
+    fun enqueueBootstrap(
+        context: Context,
+        requiresCharging: Boolean = true,
+    ) {
         val constraints =
             Constraints
                 .Builder()

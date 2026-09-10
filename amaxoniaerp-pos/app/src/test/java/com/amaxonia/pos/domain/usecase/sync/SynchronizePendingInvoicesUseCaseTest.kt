@@ -1,10 +1,10 @@
 package com.amaxonia.pos.domain.usecase.sync
 
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
-import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import com.amaxonia.pos.domain.model.sales.SaleInvoiceDto
 import com.amaxonia.pos.domain.model.sales.SalePaymentSummaryDto
 import com.amaxonia.pos.domain.system.AppClock
+import com.amaxonia.pos.domain.usecase.payment.DuplicateInvoiceException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

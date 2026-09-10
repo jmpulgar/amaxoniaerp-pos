@@ -313,7 +313,7 @@ internal class AssemblePreparedSaleUseCase(
             idSucursal = caja.idSucursal ?: DEFAULT_SHOP_ID,
             idCaja = caja.idCaja,
             codigoCaja = caja.codCaja.orEmpty(),
-            idCajaSecuencia = (ready.sequence?.idCajaSecuencia ?: caja.idCaja).take(36),
+            idCajaSecuencia = (ready.sequence?.idCajaSecuencia ?: caja.idCaja).take(SEQUENCE_ID_MAX_LENGTH),
             serieSucursal = ready.sequence?.serieSucursal ?: caja.serieSucursal ?: caja.serieCaja,
             formaPago = input.paymentCondition.wireValue,
             codEstatus = PROCESSED_STATUS,
@@ -449,3 +449,4 @@ private const val DEFAULT_SELLER_ID = 1
 private const val DEFAULT_SHOP_ID = 1
 private const val DEFAULT_WAREHOUSE_ID = 0
 private const val PROCESSED_STATUS = 2
+private const val SEQUENCE_ID_MAX_LENGTH = 36

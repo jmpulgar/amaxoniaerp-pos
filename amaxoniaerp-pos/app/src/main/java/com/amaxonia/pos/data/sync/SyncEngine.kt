@@ -1,20 +1,20 @@
 package com.amaxonia.pos.data.sync
 
 import androidx.room.withTransaction
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.CajaPaymentMethodEntity
 import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.data.local.db.ClientTypeEntity
 import com.amaxonia.pos.data.local.db.PaymentMethodEntity
+import com.amaxonia.pos.data.local.db.ProductEntity
 import com.amaxonia.pos.data.local.db.PromocionDetalleEntity
 import com.amaxonia.pos.data.local.db.PromocionEntity
-import com.amaxonia.pos.data.local.db.ProductEntity
 import com.amaxonia.pos.data.local.db.SyncStateEntity
-import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.remote.SyncApiClient
-import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
-import com.amaxonia.pos.data.remote.SyncScopeQuery
 import com.amaxonia.pos.data.remote.SyncCursorExpiredApiException
+import com.amaxonia.pos.data.remote.SyncScopeQuery
+import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
 import kotlinx.serialization.json.JsonElement
 
 private const val SCOPE_GLOBAL = "GLOBAL"
@@ -24,6 +24,7 @@ private data class SyncContext(
     val tenant: String,
     val token: String,
 )
+
 private const val STATE_BOOTSTRAPPING = "BOOTSTRAPPING"
 private const val STATE_UP_TO_DATE = "UP_TO_DATE"
 private const val PAGE_LIMIT = 1_000
@@ -66,7 +67,9 @@ class SyncEngine(
             val changesApplied: Int,
         ) : Outcome
 
-        data class Error(val message: String) : Outcome
+        data class Error(
+            val message: String,
+        ) : Outcome
     }
 
     /** Sync incremental explícito (usado por el worker y reconciliación). */

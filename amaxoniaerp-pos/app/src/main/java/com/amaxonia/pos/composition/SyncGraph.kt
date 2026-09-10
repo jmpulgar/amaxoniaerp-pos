@@ -15,8 +15,7 @@ import com.amaxonia.pos.ui.sync.SyncViewModel
 object SyncGraph {
     fun syncViewModel(): SyncViewModel = SyncViewModel(DependencyContainer.catalogSyncer)
 
-    fun offlineSettingsViewModel(): OfflineSettingsViewModel =
-        OfflineSettingsViewModel(DependencyContainer.offlineSyncSettingsRepository)
+    fun offlineSettingsViewModel(): OfflineSettingsViewModel = OfflineSettingsViewModel(DependencyContainer.offlineSyncSettingsRepository)
 
     fun schedulePeriodic(context: Context) = SyncScheduler.schedulePeriodic(context)
 

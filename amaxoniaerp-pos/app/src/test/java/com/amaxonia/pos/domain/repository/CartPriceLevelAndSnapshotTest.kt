@@ -1,11 +1,9 @@
 package com.amaxonia.pos.domain.repository
 
-import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
-import com.amaxonia.pos.domain.model.computeFinancialSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -85,7 +83,13 @@ class CartPriceLevelAndSnapshotTest {
     fun `setClient recalculates prices of items already in cart`() {
         // Add item initially with default price A
         cartRepository.addToCart(sampleProduct, 2)
-        assertEquals(11.60, cartRepository.cartItems.value.first().unitPriceWithTax, 0.001)
+        assertEquals(
+            11.60,
+            cartRepository.cartItems.value
+                .first()
+                .unitPriceWithTax,
+            0.001,
+        )
 
         // Select client with Price C (8.12 with tax)
         val clientC = Client(id = "cli-c", firstName = "Client C", codTipoPrecio = 4)
@@ -124,7 +128,11 @@ class CartPriceLevelAndSnapshotTest {
     fun `updateItemPriceLevel changes price to selected level and clears isManualPrice`() {
         cartRepository.addToCart(sampleProduct, 1)
         cartRepository.updateItemPrice("prod-1", 15.0)
-        assertTrue(cartRepository.cartItems.value.first().isManualPrice)
+        assertTrue(
+            cartRepository.cartItems.value
+                .first()
+                .isManualPrice,
+        )
 
         // Select List B explicitly
         cartRepository.updateItemPriceLevel("prod-1", "B")

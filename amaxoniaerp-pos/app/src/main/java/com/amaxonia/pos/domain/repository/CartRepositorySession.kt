@@ -51,7 +51,8 @@ fun CartRepository.setClient(client: Client) {
     runCatching {
         com.amaxonia.pos.core.logging.SafeLog.d(
             "POS-CLIENT-PRICE",
-            "setClient -> id=${client.id}, code=${client.code}, name=${client.firstName} ${client.lastName}, codTipoPrecio=${client.codTipoPrecio} -> label=${codTipoPrecioToLabel(client.codTipoPrecio)}"
+            "setClient -> id=${client.id}, code=${client.code}, name=${client.firstName} ${client.lastName}, " +
+                "codTipoPrecio=${client.codTipoPrecio} -> label=${codTipoPrecioToLabel(client.codTipoPrecio)}",
         )
     }
     selectedClientState.value = client
@@ -63,7 +64,8 @@ fun CartRepository.setClient(client: Client) {
 /** Quita el cliente y su sucursal de la transacción. */
 fun CartRepository.removeClient() {
     runCatching {
-        com.amaxonia.pos.core.logging.SafeLog.d("POS-CLIENT-PRICE", "removeClient -> reset to default price level (A)")
+        com.amaxonia.pos.core.logging.SafeLog
+            .d("POS-CLIENT-PRICE", "removeClient -> reset to default price level (A)")
     }
     selectedClientState.value = null
     selectedClientSucursalState.value = null
@@ -77,19 +79,25 @@ fun CartRepository.recalculateCartPricesForClient(client: Client?) {
     runCatching {
         com.amaxonia.pos.core.logging.SafeLog.d(
             "POS-CLIENT-PRICE",
-            "recalculateCartPricesForClient: client=${client?.code}, codTipoPrecio=${client?.codTipoPrecio} -> targetLabel=$targetLabel, itemsCount=${cartItemsState.value.size}"
+            "recalculateCartPricesForClient: client=${client?.code}, " +
+                "codTipoPrecio=${client?.codTipoPrecio} -> targetLabel=$targetLabel, itemsCount=${cartItemsState.value.size}",
         )
     }
     cartItemsState.update { items ->
         items.map { item ->
             if (!item.isPromotionLine && !item.isManualPrice) {
                 val (effectiveLabel, newPrice) = resolveItemPrice(item.product, item.itemUnitPackage, targetLabel)
-                val levelDiscount = item.product.prices.firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }?.discountPercent ?: 0.0
+                val levelDiscount =
+                    item.product.prices
+                        .firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }
+                        ?.discountPercent ?: 0.0
                 val newDiscount = if (levelDiscount > 0.0 || item.discountPercent == 0.0) levelDiscount else item.discountPercent
                 runCatching {
                     com.amaxonia.pos.core.logging.SafeLog.d(
                         "POS-CLIENT-PRICE",
-                        "Item [${item.product.id}] ${item.product.description}: oldPrice=${item.unitPriceWithTax} (${item.selectedPriceLabel}) -> newPrice=$newPrice ($effectiveLabel), disc=$newDiscount"
+                        "Item [${item.product.id}] ${item.product.description}: " +
+                            "oldPrice=${item.unitPriceWithTax} (${item.selectedPriceLabel}) -> " +
+                            "newPrice=$newPrice ($effectiveLabel), disc=$newDiscount",
                     )
                 }
                 item.copy(

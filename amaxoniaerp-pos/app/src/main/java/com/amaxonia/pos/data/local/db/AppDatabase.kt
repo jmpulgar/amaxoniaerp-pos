@@ -770,6 +770,64 @@ abstract class AppDatabase : RoomDatabase() {
          * `caja_payment_methods` (formas de pago a Room) y `caja_sesion`
          * (sesión persistente que sobrevive reinicios offline).
          */
+        private fun createMigration19To20Tables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS sync_state (" +
+                    "tenantId TEXT NOT NULL, " +
+                    "scope TEXT NOT NULL, " +
+                    "cursor INTEGER NOT NULL DEFAULT 0, " +
+                    "snapshotId INTEGER NOT NULL DEFAULT 0, " +
+                    "afterId TEXT, " +
+                    "status TEXT NOT NULL, " +
+                    "updatedAt INTEGER NOT NULL, " +
+                    "PRIMARY KEY(tenantId, scope)" +
+                    ")",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS payment_methods (" +
+                    "idFormaPago INTEGER NOT NULL, " +
+                    "siglas TEXT, " +
+                    "codigo INTEGER, " +
+                    "descripcion TEXT, " +
+                    "idCajaTpConcepto INTEGER, " +
+                    "cuentaContable TEXT, " +
+                    "idCajaTpRegistro INTEGER, " +
+                    "formaPagoFact TEXT, " +
+                    "activo INTEGER NOT NULL, " +
+                    "pos INTEGER NOT NULL, " +
+                    "imagen TEXT NOT NULL, " +
+                    "grupo INTEGER NOT NULL, " +
+                    "orden INTEGER NOT NULL, " +
+                    "idBancoCuenta INTEGER NOT NULL, " +
+                    "idBancoOperacion INTEGER NOT NULL, " +
+                    "tipoMoneda TEXT, " +
+                    "PRIMARY KEY(idFormaPago)" +
+                    ")",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS caja_payment_methods (" +
+                    "idCaja TEXT NOT NULL, " +
+                    "idFormaPago INTEGER NOT NULL, " +
+                    "activo INTEGER, " +
+                    "PRIMARY KEY(idCaja, idFormaPago)" +
+                    ")",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS caja_sesion (" +
+                    "localId TEXT NOT NULL, " +
+                    "cajaId TEXT NOT NULL, " +
+                    "serverSecuenciaId TEXT, " +
+                    "estado TEXT NOT NULL, " +
+                    "openedAt INTEGER NOT NULL, " +
+                    "closedAt INTEGER, " +
+                    "userId TEXT NOT NULL, " +
+                    "tenantId TEXT NOT NULL, " +
+                    "secuenciaJson TEXT NOT NULL DEFAULT '', " +
+                    "PRIMARY KEY(localId)" +
+                    ")",
+            )
+        }
+
         internal val MIGRATION_19_20 =
             object : Migration(19, 20) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -780,61 +838,7 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode3 ON products(barcode3)")
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_products_department ON products(department)")
                     db.execSQL("CREATE INDEX IF NOT EXISTS index_products_description ON products(description)")
-                    db.execSQL(
-                        "CREATE TABLE IF NOT EXISTS sync_state (" +
-                            "tenantId TEXT NOT NULL, " +
-                            "scope TEXT NOT NULL, " +
-                            "cursor INTEGER NOT NULL DEFAULT 0, " +
-                            "snapshotId INTEGER NOT NULL DEFAULT 0, " +
-                            "afterId TEXT, " +
-                            "status TEXT NOT NULL, " +
-                            "updatedAt INTEGER NOT NULL, " +
-                            "PRIMARY KEY(tenantId, scope)" +
-                            ")",
-                    )
-                    db.execSQL(
-                        "CREATE TABLE IF NOT EXISTS payment_methods (" +
-                            "idFormaPago INTEGER NOT NULL, " +
-                            "siglas TEXT, " +
-                            "codigo INTEGER, " +
-                            "descripcion TEXT, " +
-                            "idCajaTpConcepto INTEGER, " +
-                            "cuentaContable TEXT, " +
-                            "idCajaTpRegistro INTEGER, " +
-                            "formaPagoFact TEXT, " +
-                            "activo INTEGER NOT NULL, " +
-                            "pos INTEGER NOT NULL, " +
-                            "imagen TEXT NOT NULL, " +
-                            "grupo INTEGER NOT NULL, " +
-                            "orden INTEGER NOT NULL, " +
-                            "idBancoCuenta INTEGER NOT NULL, " +
-                            "idBancoOperacion INTEGER NOT NULL, " +
-                            "tipoMoneda TEXT, " +
-                            "PRIMARY KEY(idFormaPago)" +
-                            ")",
-                    )
-                    db.execSQL(
-                        "CREATE TABLE IF NOT EXISTS caja_payment_methods (" +
-                            "idCaja TEXT NOT NULL, " +
-                            "idFormaPago INTEGER NOT NULL, " +
-                            "activo INTEGER, " +
-                            "PRIMARY KEY(idCaja, idFormaPago)" +
-                            ")",
-                    )
-                    db.execSQL(
-                        "CREATE TABLE IF NOT EXISTS caja_sesion (" +
-                            "localId TEXT NOT NULL, " +
-                            "cajaId TEXT NOT NULL, " +
-                            "serverSecuenciaId TEXT, " +
-                            "estado TEXT NOT NULL, " +
-                            "openedAt INTEGER NOT NULL, " +
-                            "closedAt INTEGER, " +
-                            "userId TEXT NOT NULL, " +
-                            "tenantId TEXT NOT NULL, " +
-                            "secuenciaJson TEXT NOT NULL DEFAULT '', " +
-                            "PRIMARY KEY(localId)" +
-                            ")",
-                    )
+                    createMigration19To20Tables(db)
                 }
             }
 

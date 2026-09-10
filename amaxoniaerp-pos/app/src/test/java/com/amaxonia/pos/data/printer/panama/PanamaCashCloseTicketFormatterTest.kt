@@ -15,7 +15,7 @@ class PanamaCashCloseTicketFormatterTest {
     fun `cash close ticket matches characterized golden`() {
         val actual = PanamaCashCloseTicketFormatter().format(payload()).elements.joinToString("\n", transform = ::serialize)
         val uri = checkNotNull(javaClass.classLoader?.getResource("golden/panama-cash-close-ticket.txt")).toURI()
-        val expected = File(uri).readText().trimEnd()
+        val expected = File(uri).readText().replace("\r\n", "\n").trimEnd()
 
         assertEquals(expected, actual)
     }

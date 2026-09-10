@@ -397,24 +397,20 @@ class HistoryViewModel(
     }
 }
 
+private val NETWORK_ERROR_KEYWORDS =
+    listOf(
+        "failed to connect",
+        "unable to resolve host",
+        "network is unreachable",
+        "connection refused",
+        "timeout",
+    )
+
 private fun isNetworkError(throwable: Throwable): Boolean {
     var cause: Throwable? = throwable
     while (cause != null) {
-        if (cause is java.io.IOException ||
-            cause is java.net.SocketException ||
-            cause is java.net.UnknownHostException ||
-            cause is java.net.ConnectException ||
-            cause is java.net.SocketTimeoutException
-        ) {
-            return true
-        }
-        val msg = cause.message?.lowercase() ?: ""
-        if (msg.contains("failed to connect") ||
-            msg.contains("unable to resolve host") ||
-            msg.contains("network is unreachable") ||
-            msg.contains("connection refused") ||
-            msg.contains("timeout")
-        ) {
+        val msg = cause.message?.lowercase().orEmpty()
+        if (cause is java.io.IOException || NETWORK_ERROR_KEYWORDS.any { msg.contains(it) }) {
             return true
         }
         cause = cause.cause

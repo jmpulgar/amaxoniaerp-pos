@@ -33,10 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.OfflineSettingsStatus
-import com.amaxonia.pos.domain.model.offline.OfflineCatalogEntry
-import com.amaxonia.pos.domain.repository.OfflineSettingsUiModel
 
 /**
  * "Ajustes Offline" (ADR-008): define qué parte del catálogo se sincroniza
@@ -99,8 +96,11 @@ fun OfflineSettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            if (state.syncEnabled) "El catálogo seleccionado se descargará para trabajar sin red."
-                            else "Deshabilitado. El terminal consultará en línea para ahorrar recursos.",
+                            if (state.syncEnabled) {
+                                "El catálogo seleccionado se descargará para trabajar sin red."
+                            } else {
+                                "Deshabilitado. El terminal consultará en línea para ahorrar recursos."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }

@@ -23,22 +23,20 @@ class OfflineSyncWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-
     override suspend fun doWork(): Result {
         val settings = OfflineSyncSettingsStore(applicationContext)
         val forceBootstrap = inputData.getBoolean(KEY_FORCE_BOOTSTRAP, false)
         val currentScope = settings.load()
+        val localStore = LocalStore(applicationContext)
+        val session = localStore.readCompanySession()
 
-        if (!currentScope.enabled && !forceBootstrap) {
+        if ((!currentScope.enabled && !forceBootstrap) || session == null) {
             return Result.success()
         }
 
         val apiConfigManager = ApiConfigManager.getInstance()
         val apiService = ApiService(ApiClient(apiConfigManager))
-        val localStore = LocalStore(applicationContext)
         val database = AppDatabase.getInstance(applicationContext)
-
-        val session = localStore.readCompanySession() ?: return Result.success()
         val tenantId = SaleTenant.idFor(session.company.id)
         val token = session.token
 
