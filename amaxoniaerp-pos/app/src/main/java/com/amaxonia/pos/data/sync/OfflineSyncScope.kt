@@ -5,6 +5,7 @@ package com.amaxonia.pos.data.sync
  * Conjuntos vacíos = TODOS.
  */
 data class OfflineSyncScope(
+    val enabled: Boolean = false,
     val departmentIds: Set<Int> = emptySet(),
     val branchIds: Set<Int> = emptySet(),
 ) {
@@ -12,6 +13,7 @@ data class OfflineSyncScope(
     val allClients: Boolean get() = branchIds.isEmpty()
 
     companion object {
-        val ALL = OfflineSyncScope()
+        val DISABLED = OfflineSyncScope(enabled = false)
+        val ALL = OfflineSyncScope(enabled = true)
     }
 }

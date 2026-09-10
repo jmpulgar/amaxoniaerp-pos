@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.isOfflinePending
 import com.amaxonia.pos.domain.model.sales.FacturaDetalleItemDto
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
@@ -63,6 +64,7 @@ internal fun FacturaDetalleSheetContent(
     actionMessage: String? = null,
     isResending: Boolean = false,
     onResend: (() -> Unit)? = null,
+    onSyncPending: (() -> Unit)? = null,
     isReprinting: Boolean = false,
     onReprint: (() -> Unit)? = null,
     isDownloadingPdf: Boolean = false,
@@ -75,11 +77,9 @@ internal fun FacturaDetalleSheetContent(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp),
     ) {
-        // Header
         if (transaction != null) {
             FacturaDetalleHeader(transaction = transaction)
 
-            // Client + payment info
             FacturaDetalleClientCard(transaction = transaction)
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -87,7 +87,6 @@ internal fun FacturaDetalleSheetContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Q3: FE fallida/pendiente → acción de reenvío visible (paridad con el Web).
         if (actionError != null) {
             DetalleAccionBanner(text = actionError, isError = true)
             Spacer(modifier = Modifier.height(8.dp))
@@ -106,6 +105,7 @@ internal fun FacturaDetalleSheetContent(
                 onDownloadPdf = onDownloadPdf,
                 isResending = isResending,
                 onResend = onResend,
+                onSyncPending = onSyncPending,
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -126,17 +126,12 @@ internal fun FacturaDetalleSheetContent(
     }
 }
 
-/**
- * Q3: sólo una factura SIN CUFE (pendiente o fallida) y sincronizada es
- * reenviable — el mismo criterio del Web (`cufe IS NULL`).
- */
 internal fun Transaction.esReenviable(): Boolean =
     id.isNotBlank() &&
-        !id.startsWith("OFF-") &&
+        !isOfflinePending() &&
         (electronicStatus == ElectronicInvoiceStatus.PENDING || electronicStatus == ElectronicInvoiceStatus.FAILED)
 
-/** Facturas sincronizadas tienen PDF disponible en el backend. */
-internal fun Transaction.puedeDescargarPdf(): Boolean = id.isNotBlank() && !id.startsWith("OFF-")
+internal fun Transaction.puedeDescargarPdf(): Boolean = id.isNotBlank() && !isOfflinePending()
 
 @Composable
 private fun FacturaDetalleActions(
@@ -147,12 +142,33 @@ private fun FacturaDetalleActions(
     onDownloadPdf: (() -> Unit)?,
     isResending: Boolean,
     onResend: (() -> Unit)?,
+    onSyncPending: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (onResend != null && transaction.esReenviable()) {
+        if (transaction.isOfflinePending()) {
+            if (onSyncPending != null) {
+                Button(
+                    onClick = onSyncPending,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        Icons.Rounded.Receipt,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Sincronizar Venta con Servidor",
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        } else if (onResend != null && transaction.esReenviable()) {
             FacturaDetalleResendButton(isResending = isResending, onResend = onResend)
         }
         Row(

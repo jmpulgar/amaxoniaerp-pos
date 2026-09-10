@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.sync
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.amaxonia.pos.data.local.LocalStore
@@ -18,6 +19,7 @@ class OfflineSyncSettingsStore(context: Context) {
     suspend fun load(): OfflineSyncScope {
         val prefs = dataStore.data.first()
         return OfflineSyncScope(
+            enabled = prefs[KEY_ENABLED] ?: false,
             departmentIds = parseIds(prefs[KEY_DEPT_IDS]),
             branchIds = parseIds(prefs[KEY_BRANCH_IDS]),
         )
@@ -25,6 +27,7 @@ class OfflineSyncSettingsStore(context: Context) {
 
     suspend fun save(scope: OfflineSyncScope) {
         dataStore.edit { prefs ->
+            prefs[KEY_ENABLED] = scope.enabled
             if (scope.allProducts) {
                 prefs.remove(KEY_DEPT_IDS)
             } else {
@@ -47,6 +50,7 @@ class OfflineSyncSettingsStore(context: Context) {
             .orEmpty()
 
     private companion object {
+        val KEY_ENABLED = booleanPreferencesKey("offline_sync_enabled")
         val KEY_DEPT_IDS = stringPreferencesKey("offline_sync_dept_ids")
         val KEY_BRANCH_IDS = stringPreferencesKey("offline_sync_branch_ids")
     }

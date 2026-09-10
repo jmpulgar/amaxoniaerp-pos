@@ -64,7 +64,9 @@ class DashboardCajaCoordinator(
             verifying.value = true
             cajaRepository.restoreActiveCajaIfValid()
             verifyActiveSession()
-            loadCajas(state)
+            if (connectivity.isOnline() || cajaRepository.activeCaja.value == null) {
+                loadCajas(state)
+            }
             verifying.value = false
         }
     }
@@ -132,13 +134,25 @@ class DashboardCajaCoordinator(
                 }
             },
             onFailure = { error ->
-                val shouldShowSelector = keepSelectorVisible || cajaRepository.activeCaja.value == null
-                state.update {
-                    it.copy(
-                        isLoadingCajas = false,
-                        showCajaSelector = shouldShowSelector,
-                        error = "Error al cargar cajas: ${error.message}",
-                    )
+                val activeCaja = cajaRepository.activeCaja.value
+                val isOffline = !connectivity.isOnline()
+                if (isOffline && activeCaja != null) {
+                    state.update {
+                        it.copy(
+                            isLoadingCajas = false,
+                            showCajaSelector = false,
+                            error = null,
+                        )
+                    }
+                } else {
+                    val shouldShowSelector = keepSelectorVisible || activeCaja == null
+                    state.update {
+                        it.copy(
+                            isLoadingCajas = false,
+                            showCajaSelector = shouldShowSelector,
+                            error = if (isOffline) null else "Error al cargar cajas: ${error.message}",
+                        )
+                    }
                 }
             },
         )

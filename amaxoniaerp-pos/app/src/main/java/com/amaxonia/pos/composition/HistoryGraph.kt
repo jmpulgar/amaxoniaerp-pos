@@ -10,5 +10,6 @@ object HistoryGraph {
             cajaRepository = DependencyContainer.cajaRepository,
             printInvoiceUseCase = DependencyContainer.printInvoiceUseCase,
             sessionReader = DependencyContainer.posConfigurationRepository,
+            networkMonitor = DependencyContainer.networkMonitor,
         )
 }

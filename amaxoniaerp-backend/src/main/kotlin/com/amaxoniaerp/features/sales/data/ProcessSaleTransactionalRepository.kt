@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.sales.data
 
 import com.amaxoniaerp.core.time.BusinessClock
+import com.amaxoniaerp.features.caja.data.CajaSecuenciaTable
+import com.amaxoniaerp.features.caja.data.findOpenSecuenciaRows
 import com.amaxoniaerp.features.clients.data.ClientSucursalTable
 import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
 import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
@@ -23,6 +25,7 @@ import java.util.UUID
 
 private const val SHORT_CODE_LENGTH = 10
 private const val CLIENT_CODE_LENGTH = 9
+private const val SEQUENCE_ID_MAX_LENGTH = 36
 
 /**
  * Repositorio transaccional de procesamiento de ventas.
@@ -151,6 +154,7 @@ open class ProcessSaleTransactionalRepository(
                 serieSucursal =
                     context.serieSucursal
                         ?: request.factura.serieSucursal.take(SHORT_CODE_LENGTH),
+                idCajaSecuencia = resolveSafeIdCajaSecuencia(request.factura.idCaja, request.factura.idCajaSecuencia),
             )
         val normalizedPayments =
             request.pagos.map { payment ->
@@ -172,6 +176,23 @@ open class ProcessSaleTransactionalRepository(
             items = normalizedItems,
             pagos = normalizedPayments,
         )
+    }
+
+    private fun resolveSafeIdCajaSecuencia(idCaja: String, rawIdCajaSecuencia: String): String {
+        val trimmed = rawIdCajaSecuencia.trim()
+        val isOfflineOrInvalid = trimmed.isBlank() || trimmed.startsWith("OFFLINE-") || trimmed.length > SEQUENCE_ID_MAX_LENGTH
+        if (!isOfflineOrInvalid) {
+            return trimmed
+        }
+        val openSecuenciaId =
+            runCatching {
+                findOpenSecuenciaRows(idCaja).firstOrNull()?.get(CajaSecuenciaTable.idCajaSecuencia)
+            }.getOrNull()
+        if (!openSecuenciaId.isNullOrBlank()) {
+            return openSecuenciaId.take(SEQUENCE_ID_MAX_LENGTH)
+        }
+        val fallback = trimmed.removePrefix("OFFLINE-").trim()
+        return if (fallback.isNotBlank()) fallback.take(SEQUENCE_ID_MAX_LENGTH) else idCaja.take(SEQUENCE_ID_MAX_LENGTH)
     }
 
     private fun validateDuplicateInvoice(

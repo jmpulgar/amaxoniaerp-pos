@@ -12,6 +12,7 @@ enum class OfflineSettingsStatus {
 
 data class OfflineSettingsUiModel(
     val status: OfflineSettingsStatus = OfflineSettingsStatus.IDLE,
+    val syncEnabled: Boolean = false,
     val productModeAll: Boolean = true,
     val clientModeAll: Boolean = true,
     val departments: List<Department> = emptyList(),
@@ -31,6 +32,8 @@ interface OfflineSyncSettingsRepository {
     val uiState: StateFlow<OfflineSettingsUiModel>
 
     fun start()
+
+    fun setSyncEnabled(enabled: Boolean)
 
     fun setProductModeAll(all: Boolean)
 

@@ -35,9 +35,20 @@ object ClientsTable : Table("clientes") {
      * sincronización de clientes (ADR-008); nullable porque columnas legacy
      * pueden venir sin asignar.
      */
-    val idSucursal = integer("id_sucursal").nullable()
+    val idSucursal = registerColumn<Int>("id_sucursal", LenientIntegerColumnType()).nullable()
 
     override val primaryKey = PrimaryKey(idCliente)
+}
+
+class LenientIntegerColumnType : org.jetbrains.exposed.sql.ColumnType<Int>() {
+    override fun sqlType(): String = "VARCHAR(36)"
+    override fun valueFromDB(value: Any): Int = when (value) {
+        is Number -> value.toInt()
+        is String -> value.trim().toIntOrNull() ?: 0
+        else -> 0
+    }
+    override fun notNullValueToDB(value: Int): Any = value.toString()
+    override fun nonNullValueToString(value: Int): String = "'$value'"
 }
 
 object ClientSucursalTable : Table("cliente_sucursal") {

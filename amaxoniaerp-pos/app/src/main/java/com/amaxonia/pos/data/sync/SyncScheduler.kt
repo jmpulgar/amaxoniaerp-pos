@@ -134,7 +134,7 @@ object SyncScheduler {
         val request = pendingInvoiceRequest(constraints)
         WorkManager.getInstance(context).enqueueUniqueWork(
             PENDING_INVOICES_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request,
         )
     }

@@ -12,6 +12,7 @@ data class HistoryState(
     val filter: InvoiceHistoryFilter = InvoiceHistoryFilter(),
     val summary: InvoiceHistorySummary = InvoiceHistorySummary(),
     val error: String? = null,
+    val isOffline: Boolean = false,
     // Detail bottom sheet state
     val selectedTransaction: Transaction? = null,
     val detalleItems: List<FacturaDetalleItemDto> = emptyList(),

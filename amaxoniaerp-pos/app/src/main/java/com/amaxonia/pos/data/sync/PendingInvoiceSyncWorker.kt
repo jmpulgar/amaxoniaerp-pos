@@ -28,8 +28,15 @@ class PendingInvoiceSyncWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val apiConfigManager = ApiConfigManager.getInstance()
         val localStore = LocalStore(applicationContext)
+        val companyCountry =
+            localStore.readCompanySession()?.company?.countryCode?.takeIf { it.isNotBlank() }
+                ?: localStore.currentCountryCode()
+        if (!companyCountry.equals("PA", ignoreCase = true)) {
+            return Result.success()
+        }
+
+        val apiConfigManager = ApiConfigManager.getInstance()
         localStore.readSelectedCountry()?.let { apiConfigManager.updateBaseUrl(it) }
         val salesApi = SalesApiImpl(ApiClient(apiConfigManager))
         val salesRepository =
@@ -56,6 +63,7 @@ class PendingInvoiceSyncWorker(
                         dao.getPendingForTenant(tenantId).map { invoice ->
                             PendingInvoiceRecord(
                                 id = invoice.id,
+                                countryCode = invoice.countryCode,
                                 localInvoiceNumber = invoice.localInvoiceNumber,
                                 payloadJson = invoice.payloadJson,
                                 retryCount = invoice.retryCount,

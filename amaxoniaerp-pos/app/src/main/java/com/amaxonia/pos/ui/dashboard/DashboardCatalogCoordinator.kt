@@ -228,12 +228,9 @@ class DashboardCatalogCoordinator(
                         it.copy(bestSellers = products, isLoadingBestSellers = false, error = null)
                     }
                 },
-                onFailure = { error ->
+                onFailure = {
                     state.update {
-                        it.copy(
-                            isLoadingBestSellers = false,
-                            error = error.message ?: "Error al cargar productos más vendidos",
-                        )
+                        it.copy(isLoadingBestSellers = false)
                     }
                 },
             )

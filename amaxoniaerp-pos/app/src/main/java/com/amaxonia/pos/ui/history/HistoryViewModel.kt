@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.pos.domain.model.ElectronicInvoiceStatus
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.isOfflinePending
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
@@ -28,6 +29,7 @@ class HistoryViewModel(
     private val cajaRepository: CajaRepository,
     private val printInvoiceUseCase: PrintInvoiceUseCase? = null,
     private val sessionReader: DashboardSessionReader? = null,
+    private val networkMonitor: com.amaxonia.pos.data.remote.NetworkMonitor? = null,
     private val todayProvider: () -> LocalDate = { LocalDate.now() },
 ) : ViewModel() {
     private companion object {
@@ -126,8 +128,10 @@ class HistoryViewModel(
 
     private suspend fun refresh(filter: InvoiceHistoryFilter) {
         _state.update { it.copy(isLoading = true, error = null) }
+        val isNetworkOffline = networkMonitor?.isOnline() == false
         transactionRepository.getTransactions(filter = filter, limit = PAGE_SIZE).fold(
             onSuccess = { page ->
+                val isOffline = page.isOffline || isNetworkOffline
                 transactionRepository.getSummary(filter).fold(
                     onSuccess = { summary ->
                         _state.update {
@@ -137,27 +141,40 @@ class HistoryViewModel(
                                 totalTransactions = page.total,
                                 summary = summary,
                                 error = null,
+                                isOffline = isOffline,
                             )
                         }
                     },
                     onFailure = { exception ->
+                        val offline = isOffline || isNetworkError(exception)
                         _state.update {
                             it.copy(
                                 isLoading = false,
                                 transactions = page.transactions,
                                 totalTransactions = page.total,
-                                error = exception.message ?: "Error al cargar resumen de facturas",
+                                error = if (offline) null else (exception.message ?: "Error al cargar resumen de facturas"),
+                                isOffline = offline,
                             )
                         }
                     },
                 )
             },
             onFailure = { exception ->
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Error al cargar transacciones",
-                    )
+                if (isNetworkError(exception) || isNetworkOffline) {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            error = null,
+                            isOffline = true,
+                        )
+                    }
+                } else {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            error = exception.message ?: "Error al cargar transacciones",
+                        )
+                    }
                 }
             },
         )
@@ -257,7 +274,7 @@ class HistoryViewModel(
         context: Context,
         transaction: Transaction,
     ) {
-        if (transaction.id.isBlank() || transaction.id.startsWith("OFF-")) {
+        if (transaction.id.isBlank() || transaction.isOfflinePending()) {
             _state.update { it.copy(detalleActionError = "El PDF no está disponible para facturas no sincronizadas") }
             return
         }
@@ -314,8 +331,17 @@ class HistoryViewModel(
         }
     }
 
+    fun showOfflineSyncInitiated() {
+        _state.update {
+            it.copy(
+                detalleActionError = null,
+                detalleMessage = "Sincronización iniciada con el servidor",
+            )
+        }
+    }
+
     fun resendElectronicInvoice(transaction: Transaction) {
-        if (transaction.id.isBlank() || transaction.id.startsWith("OFF-")) {
+        if (transaction.id.isBlank() || transaction.isOfflinePending()) {
             _state.update { it.copy(detalleActionError = "No se puede reenviar una factura no sincronizada") }
             return
         }
@@ -369,4 +395,29 @@ class HistoryViewModel(
             )
         }
     }
+}
+
+private fun isNetworkError(throwable: Throwable): Boolean {
+    var cause: Throwable? = throwable
+    while (cause != null) {
+        if (cause is java.io.IOException ||
+            cause is java.net.SocketException ||
+            cause is java.net.UnknownHostException ||
+            cause is java.net.ConnectException ||
+            cause is java.net.SocketTimeoutException
+        ) {
+            return true
+        }
+        val msg = cause.message?.lowercase() ?: ""
+        if (msg.contains("failed to connect") ||
+            msg.contains("unable to resolve host") ||
+            msg.contains("network is unreachable") ||
+            msg.contains("connection refused") ||
+            msg.contains("timeout")
+        ) {
+            return true
+        }
+        cause = cause.cause
+    }
+    return false
 }

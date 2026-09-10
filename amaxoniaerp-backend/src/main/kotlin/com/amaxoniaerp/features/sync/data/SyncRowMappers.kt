@@ -38,7 +38,7 @@ internal fun mapClientSync(row: ResultRow): ClientSyncDto =
         permiteCredito = row[ClientsTable.permiteCredito],
         limite = row[ClientsTable.limite],
         dias = row[ClientsTable.dias],
-        idSucursal = row[ClientsTable.idSucursal],
+        idSucursal = row[ClientsTable.idSucursal]?.takeIf { it > 0 },
     )
 
 internal fun mapClientBranchSync(row: ResultRow): ClientBranchSyncDto =

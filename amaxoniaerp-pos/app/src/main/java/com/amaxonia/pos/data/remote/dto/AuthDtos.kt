@@ -44,6 +44,7 @@ data class SelectCompanyResponse(
     val success: Boolean,
     val token: String,
     val currentCompany: CompanyDetailsDto,
+    val countryCode: String? = null,
 )
 
 @Serializable
@@ -54,4 +55,5 @@ data class CompanyDetailsDto(
     val accountingDb: String = "",
     val payrollDb: String = "",
     val rif: String? = null,
+    val countryCode: String? = null,
 )

@@ -9,6 +9,7 @@ data class PendingInvoiceRecord(
     val localInvoiceNumber: String,
     val payloadJson: String,
     val retryCount: Int = 0,
+    val countryCode: String = "PA",
 )
 
 data class SynchronizedInvoice(
@@ -139,12 +140,10 @@ class SynchronizePendingInvoicesUseCase(
         queue.recoverInterrupted(now - config.interruptedLease.toMillis(), now)
 
         queue.pending(tenantId).forEach { invoice ->
-            // F3: un fallo transitorio detiene el resto del lote — las filas
-            // siguientes esperan al siguiente intento (orden preservado).
             if (stopProcessing) return@forEach
-            // Item 4 / CON-001. Atomic claim: if another worker instance already
-            // holds the lease on this row, affectedRows == 0 and we skip so the
-            // same invoice is never submitted twice by concurrent dispatch.
+            if (!invoice.countryCode.equals("PA", ignoreCase = true)) {
+                return@forEach
+            }
             val claimDeadline = now + config.claimLease.toMillis()
             val claimed = queue.tryClaim(invoice.id, now = now, leasedUntil = claimDeadline)
             if (claimed == 0) return@forEach
@@ -158,10 +157,19 @@ class SynchronizePendingInvoicesUseCase(
                     )
                     return@forEach
                 }
+            val sanitizedFactura =
+                if (decoded.factura.idCajaSecuencia.length > 36 || decoded.factura.idCajaSecuencia.startsWith("OFFLINE-")) {
+                    decoded.factura.copy(
+                        idCajaSecuencia = decoded.factura.idCajaSecuencia.removePrefix("OFFLINE-").take(36),
+                    )
+                } else {
+                    decoded.factura
+                }
             val idempotentRequest =
                 decoded.copy(
                     idFactura = decoded.idFactura ?: invoice.id,
                     codFactura = decoded.codFactura ?: invoice.localInvoiceNumber,
+                    factura = sanitizedFactura,
                 )
             gateway.submit(idempotentRequest).fold(
                 onSuccess = { result ->

@@ -73,3 +73,9 @@ data class TransactionFiscalItem(
     val unitPriceWithoutTax: Double = 0.0,
     val iva: Double = 0.0,
 )
+
+fun Transaction.isOfflinePending(): Boolean =
+    id.startsWith("OFF-") ||
+        invoiceNumber.startsWith("OFF-") ||
+        status == TransactionStatus.PENDING
+

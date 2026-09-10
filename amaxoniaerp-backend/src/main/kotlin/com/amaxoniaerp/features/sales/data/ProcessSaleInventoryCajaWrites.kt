@@ -216,7 +216,7 @@ private fun insertCajaNueva(
         it[cajaNuevaTable.idProveedor] = ""
         it[cajaNuevaTable.idOrdenPago] = ""
         it[cajaNuevaTable.serieSucursal] = ctx.request.factura.serieSucursal
-        it[cajaNuevaTable.idCajaSecuencia] = ctx.request.factura.idCajaSecuencia
+        it[cajaNuevaTable.idCajaSecuencia] = ctx.request.factura.idCajaSecuencia.take(36)
         it[cajaNuevaTable.idPedido] = ""
         it[cajaNuevaTable.idAbono] = ""
         it[cajaNuevaTable.idNotaCredito] = ""

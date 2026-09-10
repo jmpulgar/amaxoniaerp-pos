@@ -62,6 +62,7 @@ class OfflineSyncSettingsRepositoryImpl(
             _uiState.update {
                 it.copy(
                     status = OfflineSettingsStatus.IDLE,
+                    syncEnabled = saved.enabled,
                     productModeAll = saved.allProducts,
                     clientModeAll = saved.allClients,
                     selectedDepartmentIds = saved.departmentIds,
@@ -71,6 +72,10 @@ class OfflineSyncSettingsRepositoryImpl(
                 )
             }
         }
+    }
+
+    override fun setSyncEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(syncEnabled = enabled) }
     }
 
     override fun setProductModeAll(all: Boolean) {
@@ -124,20 +129,33 @@ class OfflineSyncSettingsRepositoryImpl(
         _uiState.update { it.copy(status = OfflineSettingsStatus.APPLYING) }
         val departmentIds = if (current.productModeAll) emptySet() else current.selectedDepartmentIds
         val branchIds = if (current.clientModeAll) emptySet() else current.selectedSucursalIds.mapNotNull { it.toIntOrNull() }.toSet()
+        val newScope =
+            OfflineSyncScope(
+                enabled = current.syncEnabled,
+                departmentIds = departmentIds,
+                branchIds = branchIds,
+            )
         ioScope.launch {
-            scopeStore.save(OfflineSyncScope(departmentIds = departmentIds, branchIds = branchIds))
-            val purge =
-                syncEngine.purgeForScope(
-                    OfflineSyncScope(departmentIds = departmentIds, branchIds = branchIds),
-                )
-            bootstrapEnqueuer()
-            _uiState.update {
-                it.copy(
-                    status = OfflineSettingsStatus.IDLE,
-                    message =
-                        if (purge is SyncEngine.Outcome.Error) purge.message
-                        else "Alcance guardado. Re-sincronización encolada (Wi-Fi y cargador).",
-                )
+            scopeStore.save(newScope)
+            if (current.syncEnabled) {
+                val purge = syncEngine.purgeForScope(newScope)
+                bootstrapEnqueuer()
+                _uiState.update {
+                    it.copy(
+                        status = OfflineSettingsStatus.IDLE,
+                        message =
+                            if (purge is SyncEngine.Outcome.Error) purge.message
+                            else "Alcance guardado. Re-sincronización encolada (Wi-Fi y cargador).",
+                    )
+                }
+            } else {
+                syncEngine.purgeForScope(OfflineSyncScope(enabled = false))
+                _uiState.update {
+                    it.copy(
+                        status = OfflineSettingsStatus.IDLE,
+                        message = "Sincronización offline deshabilitada.",
+                    )
+                }
             }
         }
     }

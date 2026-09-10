@@ -68,7 +68,7 @@ internal fun insertFactura(ctx: SaleWriteContext) {
             ctx.today.monthValue
                 .toString()
                 .padStart(2, '0')
-        it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia
+        it[facturaTable.idCajaSecuencia] = f.idCajaSecuencia.take(36)
         it[facturaTable.numcomContabilizado] = 0
         it[facturaTable.fechaContabilizado] = ctx.today
         it[facturaTable.serieSucursal] = f.serieSucursal.take(SHORT_CODE_LENGTH)

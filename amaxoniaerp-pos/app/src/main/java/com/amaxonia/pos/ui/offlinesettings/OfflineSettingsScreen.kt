@@ -84,49 +84,78 @@ fun OfflineSettingsScreen(
                 }
             }
 
-            ScopeSection(
-                title = "Productos",
-                subtitle = "Qué productos estarán disponibles sin red",
-                modeAll = state.productModeAll,
-                onModeAllChange = viewModel::setProductModeAll,
-                preview = state.productPreview,
-                itemCount = state.departments.size,
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
-                    items(state.departments, key = { it.id }) { department ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = department.id in state.selectedDepartmentIds,
-                                onCheckedChange = { viewModel.toggleDepartment(department.id) },
-                            )
-                            Text(department.name, style = MaterialTheme.typography.bodyMedium)
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text(
+                            "Habilitar Catálogo Offline",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            if (state.syncEnabled) "El catálogo seleccionado se descargará para trabajar sin red."
+                            else "Deshabilitado. El terminal consultará en línea para ahorrar recursos.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
+                    Switch(
+                        checked = state.syncEnabled,
+                        onCheckedChange = viewModel::setSyncEnabled,
+                    )
                 }
             }
 
-            ScopeSection(
-                title = "Clientes",
-                subtitle = "Qué clientes estarán disponibles sin red",
-                modeAll = state.clientModeAll,
-                onModeAllChange = viewModel::setClientModeAll,
-                preview = state.clientPreview,
-                itemCount = state.sucursales.size,
-            ) {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
-                    items(state.sucursales, key = { it.id }) { sucursal ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = sucursal.id in state.selectedSucursalIds,
-                                onCheckedChange = { viewModel.toggleSucursal(sucursal.id) },
-                            )
-                            Text(sucursal.nombre ?: sucursal.id, style = MaterialTheme.typography.bodyMedium)
+            if (state.syncEnabled) {
+                ScopeSection(
+                    title = "Productos",
+                    subtitle = "Qué productos estarán disponibles sin red",
+                    modeAll = state.productModeAll,
+                    onModeAllChange = viewModel::setProductModeAll,
+                    preview = state.productPreview,
+                    itemCount = state.departments.size,
+                ) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                        items(state.departments, key = { it.id }) { department ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = department.id in state.selectedDepartmentIds,
+                                    onCheckedChange = { viewModel.toggleDepartment(department.id) },
+                                )
+                                Text(department.name, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+
+                ScopeSection(
+                    title = "Clientes",
+                    subtitle = "Qué clientes estarán disponibles sin red",
+                    modeAll = state.clientModeAll,
+                    onModeAllChange = viewModel::setClientModeAll,
+                    preview = state.clientPreview,
+                    itemCount = state.sucursales.size,
+                ) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                        items(state.sucursales, key = { it.id }) { sucursal ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = sucursal.id in state.selectedSucursalIds,
+                                    onCheckedChange = { viewModel.toggleSucursal(sucursal.id) },
+                                )
+                                Text(sucursal.nombre ?: sucursal.id, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }
@@ -140,7 +169,7 @@ fun OfflineSettingsScreen(
                 if (state.status == OfflineSettingsStatus.APPLYING) {
                     CircularProgressIndicator(modifier = Modifier.padding(2.dp))
                 } else {
-                    Text("Aplicar y re-sincronizar")
+                    Text(if (state.syncEnabled) "Aplicar y sincronizar" else "Guardar ajustes")
                 }
             }
         }

@@ -189,6 +189,7 @@ class LocalStore(
                 adminDb = session.company.adminDb,
                 contableDb = session.company.accountingDb,
                 nominaDb = session.company.payrollDb,
+                countryCode = session.company.countryCode.ifBlank { currentCountryCode() },
             )
         }
 
@@ -262,6 +263,7 @@ data class CompanyDetailsSnapshot(
     val accountingDb: String,
     val payrollDb: String,
     val rif: String = "",
+    val countryCode: String = "",
 )
 
 @Serializable
@@ -335,7 +337,7 @@ fun LoginResponse.toSnapshot(): AuthSnapshot =
         companies = companies.map { CompanySnapshot(id = it.id, name = it.name, rif = it.rif) },
     )
 
-fun CompanyDetailsDto.toSnapshot(): CompanyDetailsSnapshot =
+fun CompanyDetailsDto.toSnapshot(fallbackCountryCode: String = ""): CompanyDetailsSnapshot =
     CompanyDetailsSnapshot(
         id = id,
         name = name,
@@ -343,4 +345,5 @@ fun CompanyDetailsDto.toSnapshot(): CompanyDetailsSnapshot =
         accountingDb = accountingDb,
         payrollDb = payrollDb,
         rif = rif.orEmpty(),
+        countryCode = countryCode?.takeIf { it.isNotBlank() } ?: fallbackCountryCode,
     )

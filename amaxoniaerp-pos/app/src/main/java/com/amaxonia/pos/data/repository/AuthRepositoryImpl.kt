@@ -55,10 +55,11 @@ class AuthRepositoryImpl(
                     token = authSnapshot.token,
                     request = SelectCompanyRequest(companyId),
                 )
+            val countryCode = response.countryCode ?: response.currentCompany.countryCode ?: localStore.currentCountryCode()
             val sessionSnapshot =
                 CompanySessionSnapshot(
                     token = response.token,
-                    company = response.currentCompany.toSnapshot(),
+                    company = response.currentCompany.toSnapshot(countryCode),
                 )
             localStore.saveCompanySession(sessionSnapshot)
             response.toDomain(isOffline = false)

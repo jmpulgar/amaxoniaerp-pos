@@ -28,6 +28,7 @@ data class SaleTenant(
     val adminDb: String,
     val contableDb: String,
     val nominaDb: String,
+    val countryCode: String = "",
 ) {
     fun matches(activeTenantId: String?): Boolean = activeTenantId != null && activeTenantId == tenantId
 

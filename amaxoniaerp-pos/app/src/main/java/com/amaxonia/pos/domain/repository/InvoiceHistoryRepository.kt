@@ -14,6 +14,7 @@ data class InvoiceHistoryFilter(
 data class InvoiceHistoryPage(
     val transactions: List<com.amaxonia.pos.domain.model.Transaction>,
     val total: Long,
+    val isOffline: Boolean = false,
 )
 
 data class InvoiceHistorySummary(

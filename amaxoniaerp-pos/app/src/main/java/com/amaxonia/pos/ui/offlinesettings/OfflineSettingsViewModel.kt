@@ -14,6 +14,8 @@ class OfflineSettingsViewModel(
 
     fun start() = repository.start()
 
+    fun setSyncEnabled(enabled: Boolean) = repository.setSyncEnabled(enabled)
+
     fun setProductModeAll(all: Boolean) = repository.setProductModeAll(all)
 
     fun toggleDepartment(id: Int) = repository.toggleDepartment(id)

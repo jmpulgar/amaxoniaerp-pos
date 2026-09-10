@@ -152,7 +152,7 @@ class SyncRepository(
                     val meta = rs.metaData
                     val cols = (1..meta.columnCount).associateBy { meta.getColumnLabel(it).lowercase() }
                     val idIdx = firstColumn(cols, "id", "cod_sucursal", "codigo")
-                    val nameIdx = firstColumn(cols, "nombre", "descripcion", "denominacion")
+                    val nameIdx = firstColumn(cols, "nombre", "sucursal", "descripcion", "denominacion")
                     buildList {
                         while (rs.next()) {
                             add(

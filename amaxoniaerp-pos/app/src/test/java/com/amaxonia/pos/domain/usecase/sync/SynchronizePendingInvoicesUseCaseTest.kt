@@ -220,7 +220,54 @@ class SynchronizePendingInvoicesUseCaseTest {
         invoiceNumber: String = "OFF-001",
         payloadJson: String = "valid",
         retryCount: Int = 0,
-    ): PendingInvoiceRecord = PendingInvoiceRecord(id, invoiceNumber, payloadJson, retryCount)
+        countryCode: String = "PA",
+    ): PendingInvoiceRecord = PendingInvoiceRecord(id, invoiceNumber, payloadJson, retryCount, countryCode)
+
+    @Test
+    fun nonPanamaInvoiceIsNotSubmittedAndRemainsInQueue() =
+        runTest {
+            val queue = FakeQueue(record(countryCode = "VE"))
+            var submissions = 0
+            val sut =
+                useCase(queue) {
+                    submissions += 1
+                    Result.success(SynchronizedInvoice("remote-1", "F001"))
+                }
+
+            assertEquals(PendingInvoiceSyncResult.Success, sut("t$1"))
+            assertEquals(0, submissions)
+            assertEquals(listOf("recover"), queue.events)
+        }
+
+    @Test
+    fun offlineCajaSecuenciaOver36CharsIsSanitizedBeforeSubmission() =
+        runTest {
+            val queue = FakeQueue(record())
+            val longSequenceId = "OFFLINE-0c8beb08-f61d-11ec-8ac4-76ef9644317f"
+            var submittedSequenceId: String? = null
+            val customRequest =
+                request().let {
+                    it.copy(factura = it.factura.copy(idCajaSecuencia = longSequenceId))
+                }
+            val sut =
+                SynchronizePendingInvoicesUseCase(
+                    queue = queue,
+                    decoder = PendingSaleDecoder { Result.success(customRequest) },
+                    gateway =
+                        object : PendingSaleGateway {
+                            override suspend fun submit(request: ProcessSaleRequestDto): Result<SynchronizedInvoice> {
+                                submittedSequenceId = request.factura.idCajaSecuencia
+                                return Result.success(SynchronizedInvoice("remote-1", "F001"))
+                            }
+                        },
+                    clock = clock,
+                )
+
+            val result = sut("t$1")
+            assertEquals(PendingInvoiceSyncResult.Success, result)
+            assertEquals("0c8beb08-f61d-11ec-8ac4-76ef9644317f", submittedSequenceId)
+            assertTrue(submittedSequenceId!!.length <= 36)
+        }
 
     @Test
     fun conflicto409ConReconciliadorResuelveComoSent() =

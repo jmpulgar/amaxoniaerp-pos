@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.history
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -75,6 +77,10 @@ fun HistoryScreen(
         state = state,
         onDismiss = viewModel::dismissDetalle,
         onResend = viewModel::resendElectronicInvoice,
+        onSyncPending = {
+            AppGraph.sync.enqueuePendingInvoices(context)
+            viewModel.showOfflineSyncInitiated()
+        },
         onReprint = viewModel::reprintInvoice,
         onDownloadPdf = { transaction -> viewModel.downloadAndOpenPdf(context, transaction) },
     )
@@ -111,6 +117,7 @@ private fun HistoryDetalleSheet(
     state: HistoryState,
     onDismiss: () -> Unit,
     onResend: (Transaction) -> Unit,
+    onSyncPending: () -> Unit,
     onReprint: (Transaction) -> Unit,
     onDownloadPdf: (Transaction) -> Unit,
 ) {
@@ -133,6 +140,7 @@ private fun HistoryDetalleSheet(
             actionMessage = state.detalleMessage,
             isResending = state.isResendingFE,
             onResend = { state.selectedTransaction?.let(onResend) },
+            onSyncPending = onSyncPending,
             isReprinting = state.isReprinting,
             onReprint = { state.selectedTransaction?.let(onReprint) },
             isDownloadingPdf = state.isDownloadingPdf,
@@ -213,12 +221,18 @@ private fun HistoryContent(
         // refresca, el contenido completo es el estado de carga.
         state.isLoading -> HistoryLoadingState()
         state.error != null -> HistoryErrorState(error = state.error, onRetry = viewModel::retry)
+        state.isOffline && state.transactions.isEmpty() -> HistoryOfflineEmptyState()
         state.transactions.isEmpty() -> HistoryEmptyState()
         else ->
-            HistoryTransactionsList(
-                transactions = state.transactions,
-                onTransactionClick = viewModel::onTransactionClick,
-            )
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (state.isOffline) {
+                    HistoryOfflineBanner()
+                }
+                HistoryTransactionsList(
+                    transactions = state.transactions,
+                    onTransactionClick = viewModel::onTransactionClick,
+                )
+            }
     }
 }
 
@@ -305,6 +319,70 @@ private fun HistoryEmptyState() {
                 color = MaterialTheme.colorScheme.outline,
             )
         }
+    }
+}
+
+@Composable
+private fun HistoryOfflineEmptyState() {
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        ) {
+            Icon(
+                Icons.Rounded.CloudOff,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(64.dp),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "Sin conexion a internet",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Solamente se mostrarán las transacciones que se hicieron de manera offline hasta que vuelva a haber conexión.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.outline,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryOfflineBanner() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            Icons.Rounded.CloudOff,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = "Modo sin conexión: mostrando transacciones locales de este dispositivo",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

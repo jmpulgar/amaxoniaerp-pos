@@ -117,13 +117,17 @@ private fun ConnectivityEffect(
     val isOnline by AppGraph.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
         initialValue = AppGraph.networkMonitor.isOnline(),
     )
+    val localStore = remember(context) { com.amaxonia.pos.data.local.LocalStore(context) }
     var hasSeenConnectivityState by remember { mutableStateOf(false) }
 
     LaunchedEffect(isOnline) {
+        val isPanama = localStore.currentCountryCode().equals("PA", ignoreCase = true)
         if (!hasSeenConnectivityState) {
             hasSeenConnectivityState = true
             if (isOnline) {
-                AppGraph.sync.enqueuePendingInvoices(context)
+                if (isPanama) {
+                    AppGraph.sync.enqueuePendingInvoices(context)
+                }
             } else {
                 snackbarHostState.showSnackbar(
                     message = "Sin conexión. Puedes seguir trabajando offline.",
@@ -136,8 +140,12 @@ private fun ConnectivityEffect(
         snackbarHostState.showSnackbar(
             message =
                 if (isOnline) {
-                    AppGraph.sync.enqueuePendingInvoices(context)
-                    "Conexión restaurada. Reenviando pendientes..."
+                    if (isPanama) {
+                        AppGraph.sync.enqueuePendingInvoices(context)
+                        "Conexión restaurada. Reenviando pendientes..."
+                    } else {
+                        "Conexión restaurada."
+                    }
                 } else {
                     "Sin conexión. Puedes seguir trabajando offline."
                 },

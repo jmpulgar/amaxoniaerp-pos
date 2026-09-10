@@ -28,6 +28,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class ProcessSaleCreditTest {
     private lateinit var database: Database
@@ -221,6 +222,27 @@ class ProcessSaleCreditTest {
                     .single()[SalesCajaNuevaTableVE.status]
             },
         )
+    }
+
+    @Test
+    fun `idCajaSecuencia mayor a 36 caracteres se normaliza sin error`() {
+        database = createDatabase("PA")
+        val offlineLongSequence = "OFFLINE-0c8beb08-f61d-11ec-8ac4-76ef9644317f"
+        val req =
+            request(payments = listOf(cashPayment(100.0))).let {
+                it.copy(factura = it.factura.copy(idCajaSecuencia = offlineLongSequence))
+            }
+
+        process("PA", req)
+
+        val storedSeq =
+            transaction(database) {
+                SalesFacturaTablePA
+                    .select(SalesFacturaTablePA.idCajaSecuencia)
+                    .first()[SalesFacturaTablePA.idCajaSecuencia]
+            }
+        assertTrue(storedSeq.length <= 36)
+        assertEquals("0c8beb08-f61d-11ec-8ac4-76ef9644317f", storedSeq)
     }
 
     private fun createDatabase(countryCode: String): Database {

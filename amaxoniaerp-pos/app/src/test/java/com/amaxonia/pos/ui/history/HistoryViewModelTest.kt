@@ -1,6 +1,7 @@
 package com.amaxonia.pos.ui.history
 
 import com.amaxonia.pos.domain.model.Transaction
+import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSecuencia
@@ -192,6 +193,66 @@ class HistoryViewModelTest {
             assertEquals(false, viewModel.state.value.isReprinting)
         }
 
+    @Test
+    fun resendElectronicInvoiceBlocksOfflinePendingInvoiceWithUuid() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository())
+            advanceUntilIdle()
+
+            val offlineTransaction =
+                Transaction(
+                    id = "c7b91d4e-8f2a-4c12-9b34-123456789abc",
+                    invoiceNumber = "OFF-1725983412345",
+                    time = "--:--",
+                    amount = 50.0,
+                    status = TransactionStatus.PENDING,
+                    dateHeader = "Hoy",
+                )
+            viewModel.resendElectronicInvoice(offlineTransaction)
+            advanceUntilIdle()
+
+            assertEquals("No se puede reenviar una factura no sincronizada", viewModel.state.value.detalleActionError)
+            assertEquals(0, repository.resendCalls)
+        }
+
+    @Test
+    fun resendElectronicInvoiceSucceedsForSyncedInvoice() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository())
+            advanceUntilIdle()
+
+            val syncedTransaction =
+                Transaction(
+                    id = "inv-123",
+                    invoiceNumber = "FAC-0001",
+                    time = "10:00",
+                    amount = 50.0,
+                    status = TransactionStatus.PAID,
+                    dateHeader = "Hoy",
+                )
+            viewModel.resendElectronicInvoice(syncedTransaction)
+            advanceUntilIdle()
+
+            assertEquals(1, repository.resendCalls)
+            assertNull(viewModel.state.value.detalleActionError)
+            assertEquals("Factura electrónica transmitida exitosamente", viewModel.state.value.detalleMessage)
+        }
+
+    @Test
+    fun showOfflineSyncInitiatedSetsMessage() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeInvoiceHistoryRepository()
+            val viewModel = HistoryViewModel(repository, FakeCajaRepository())
+            advanceUntilIdle()
+
+            viewModel.showOfflineSyncInitiated()
+
+            assertNull(viewModel.state.value.detalleActionError)
+            assertEquals("Sincronización iniciada con el servidor", viewModel.state.value.detalleMessage)
+        }
+
     private class FakeCajaRepository(
         caja: Caja? =
             Caja(
@@ -262,15 +323,19 @@ class HistoryViewModelTest {
 
         override suspend fun getInvoicePdf(invoiceId: String): Result<ByteArray> = Result.success(ByteArray(0))
 
+        var resendCalls = 0
+
         override suspend fun resendElectronicInvoice(
             invoiceId: String,
-        ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> =
-            Result.success(
+        ): Result<com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto> {
+            resendCalls++
+            return Result.success(
                 com.amaxonia.pos.domain.model.electronicinvoice.ElectronicInvoiceResultDto(
                     success = true,
                     cufe = "CUFE-1",
                     qr = "QR-1",
                 ),
             )
+        }
     }
 }

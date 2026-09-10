@@ -313,7 +313,7 @@ internal class AssemblePreparedSaleUseCase(
             idSucursal = caja.idSucursal ?: DEFAULT_SHOP_ID,
             idCaja = caja.idCaja,
             codigoCaja = caja.codCaja.orEmpty(),
-            idCajaSecuencia = ready.sequence?.idCajaSecuencia ?: "OFFLINE-${caja.idCaja}",
+            idCajaSecuencia = (ready.sequence?.idCajaSecuencia ?: caja.idCaja).take(36),
             serieSucursal = ready.sequence?.serieSucursal ?: caja.serieSucursal ?: caja.serieCaja,
             formaPago = input.paymentCondition.wireValue,
             codEstatus = PROCESSED_STATUS,
