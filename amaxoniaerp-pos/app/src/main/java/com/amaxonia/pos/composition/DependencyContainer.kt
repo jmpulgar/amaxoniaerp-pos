@@ -44,6 +44,7 @@ import com.amaxonia.pos.data.repository.JsonDraftInvoiceRestorer
 import com.amaxonia.pos.data.repository.LocalAddressCatalogRepository
 import com.amaxonia.pos.data.repository.LocalClientTypeRepository
 import com.amaxonia.pos.data.repository.LocalPosConfigurationRepository
+import com.amaxonia.pos.data.repository.OfflineFirstClientBranchRepository
 import com.amaxonia.pos.data.repository.OfflineFirstClientFormCatalogSource
 import com.amaxonia.pos.data.repository.OfflineFirstClientRepository
 import com.amaxonia.pos.data.repository.OfflineFirstProductRepository
@@ -510,7 +511,13 @@ object DependencyContainer {
         draftInvoiceDao = database.draftInvoiceDao()
         draftInvoiceRepository = RoomDraftInvoiceRepository(draftInvoiceDao)
         clientSucursalDao = database.clientSucursalDao()
-        clientBranchRepository = RoomClientBranchRepository(clientSucursalDao)
+        clientBranchRepository =
+            OfflineFirstClientBranchRepository(
+                apiService = apiService,
+                localStore = localStore,
+                dao = clientSucursalDao,
+                networkMonitor = networkMonitor,
+            )
         pendingInvoiceDao = database.pendingInvoiceDao()
         pendingSalesReader = RoomPendingSalesReader(pendingInvoiceDao)
     }

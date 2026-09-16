@@ -178,9 +178,9 @@ class ClientsRepository {
             val clientCode =
                 ClientsTable
                     .select(ClientsTable.codCliente)
-                    .where { ClientsTable.idCliente eq clientId }
+                    .where { (ClientsTable.idCliente eq clientId) or (ClientsTable.codCliente eq clientId) }
                     .map { it[ClientsTable.codCliente].take(CLIENT_CODE_LENGTH) }
-                    .singleOrNull()
+                    .firstOrNull()
                     ?: return@dbQuery emptyList()
 
             ClientSucursalTable
