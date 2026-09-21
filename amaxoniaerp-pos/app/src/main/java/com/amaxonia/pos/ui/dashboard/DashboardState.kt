@@ -50,6 +50,7 @@ data class DashboardState(
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
     val cajaPrincipalNombre: String = "Caja no seleccionada",
+    val activeCajaId: String? = null,
     val sucursalNombre: String = "Sucursal",
     // -------------------
     // --- CAJA STATE ---
@@ -58,6 +59,10 @@ data class DashboardState(
     val showCajaSelector: Boolean = false,
     val hasActiveCaja: Boolean = false,
     val cajaSession: CajaSessionStatus = CajaSessionStatus.VERIFICANDO,
+    val cajaFechaApertura: String? = null,
+    val isCajaDiaAnterior: Boolean = false,
+    val showAvisoCajaAnterior: Boolean = false,
+    val isRenovandoCaja: Boolean = false,
     val showAperturaPrompt: Boolean = false,
     val aperturaCandidate: Caja? = null,
     // -------------------
@@ -109,6 +114,11 @@ sealed interface DashboardCajaUiAction : DashboardUiAction {
         val show: Boolean,
     ) : DashboardCajaUiAction
 
+    /** Selecciona una caja desde el selector y sincroniza su estado de sesión. */
+    data class SelectCaja(
+        val caja: Caja,
+    ) : DashboardCajaUiAction
+
     /** Solicita mostrar el diálogo de apertura para la [caja] indicada. */
     data class RequestApertura(
         val caja: Caja,
@@ -130,6 +140,9 @@ sealed interface DashboardCajaUiAction : DashboardUiAction {
     data object PrintAutomaticCloseTicket : DashboardCajaUiAction
 
     data object DismissAutomaticCloseTicket : DashboardCajaUiAction
+
+    data object DismissAvisoCajaAnterior : DashboardCajaUiAction
+    data object RenovarCajaDiaAnterior : DashboardCajaUiAction
 }
 
 sealed interface DashboardSaleUiAction : DashboardUiAction {

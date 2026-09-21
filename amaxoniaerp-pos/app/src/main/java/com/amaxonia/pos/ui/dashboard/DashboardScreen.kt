@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -57,6 +59,14 @@ import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.TableRestaurant
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PointOfSale
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -102,6 +112,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -127,10 +138,14 @@ import com.amaxonia.pos.ui.common.components.PosMoneyInput
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.shortName
+import com.amaxonia.pos.ui.theme.ConfirmedContainer
+import com.amaxonia.pos.ui.theme.ConfirmedContent
 import com.amaxonia.pos.ui.theme.InfoBlue
 import com.amaxonia.pos.ui.theme.NeutralGray
 import com.amaxonia.pos.ui.theme.OfflineRed
 import com.amaxonia.pos.ui.theme.OnlineGreen
+import com.amaxonia.pos.ui.theme.PendingContainer
+import com.amaxonia.pos.ui.theme.PendingContent
 import com.amaxonia.pos.ui.theme.PosExtraShapes
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.SuccessGreen
@@ -314,6 +329,104 @@ fun DashboardScreen(
         )
     }
 
+    if (state.showAvisoCajaAnterior) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onAction(DashboardCajaUiAction.DismissAvisoCajaAnterior) },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            icon = {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(PendingContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = null,
+                        tint = WarningOrange,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = "Caja de día anterior abierta",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "La caja actual está abierta desde el ${state.cajaFechaApertura ?: "un día anterior"}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Para registrar las ventas en la jornada correspondiente y mantener los reportes al día, realiza el cierre de la jornada previa de esta caja.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.onAction(DashboardCajaUiAction.DismissAvisoCajaAnterior) },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = "Continuar",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.onAction(DashboardCajaUiAction.RenovarCajaDiaAnterior)
+                        },
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = PosPalette.FixedWhite,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Cerrar y abrir",
+                            color = PosPalette.FixedWhite,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            },
+        )
+    }
+
     // --- CajaSelectorSheet (replaces old AlertDialog) ---
     if (state.showCajaSelector) {
         CajaSelectorSheet(
@@ -321,10 +434,11 @@ fun DashboardScreen(
             isLoading = state.isLoadingCajas,
             errorMessage = state.error,
             canDismiss = state.hasActiveCaja,
+            selectedCajaId = state.activeCajaId,
             actions =
                 CajaSelectorActions(
-                    onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.RequestApertura(caja)) },
-                    onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch()) },
+                    onSelectCaja = { caja -> viewModel.onAction(DashboardCajaUiAction.SelectCaja(caja)) },
+                    onReload = { viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true)) },
                     onDismiss = {
                         if (state.hasActiveCaja) {
                             viewModel.onAction(DashboardCajaUiAction.SetSelectorVisible(false))
@@ -736,8 +850,12 @@ fun DashboardScreen(
                 CajaStatusBanner(
                     session = state.cajaSession,
                     cajaName = state.cajaPrincipalNombre,
+                    fechaApertura = state.cajaFechaApertura,
+                    isDiaAnterior = state.isCajaDiaAnterior,
+                    isRenovando = state.isRenovandoCaja,
                     onAperturar = { viewModel.onAction(DashboardCajaUiAction.RequestAperturaActive) },
                     onSeleccionar = { viewModel.onAction(DashboardCajaUiAction.Fetch(forceShowSelector = true)) },
+                    onRenovar = { viewModel.onAction(DashboardCajaUiAction.RenovarCajaDiaAnterior) },
                 )
 
                 val activeTable = selectedTable
@@ -1191,133 +1309,309 @@ fun DrawerMenuItem(
 }
 
 /**
- * Caja status banner with an urgency hierarchy: the happy path (ABIERTA) stays quiet so it
- * doesn't dominate the screen, while a caja needing attention (PENDIENTE_APERTURA) is prominent
- * with a filled action button.
+ * Caja status banner with an urgency hierarchy: the happy path (ABIERTA) stays quiet and clean,
+ * using soft rounded card styling aligned with the rest of the POS interface, while a caja needing
+ * attention (PENDIENTE_APERTURA) or from a previous day is prominently styled.
  */
 @Composable
 private fun CajaStatusBanner(
     session: CajaSessionStatus,
     cajaName: String,
+    fechaApertura: String? = null,
+    isDiaAnterior: Boolean = false,
+    isRenovando: Boolean = false,
     onAperturar: () -> Unit,
     onSeleccionar: () -> Unit,
+    onRenovar: () -> Unit = {},
 ) {
     when (session) {
         CajaSessionStatus.ABIERTA ->
-            CajaStatusBannerLow(
-                accent = SuccessGreen,
-                icon = Icons.Default.CheckCircle,
-                text = if (cajaName.isBlank()) "Caja abierta" else "Caja abierta · $cajaName",
+            CajaStatusBannerOpen(
+                cajaName = cajaName,
+                fechaApertura = fechaApertura,
+                isDiaAnterior = isDiaAnterior,
+                isRenovando = isRenovando,
+                onRenovar = onRenovar,
+                onCambiarCaja = onSeleccionar,
             )
         CajaSessionStatus.PENDIENTE_APERTURA ->
-            CajaStatusBannerProminent(
+            CajaStatusBannerAction(
                 accent = WarningOrange,
-                icon = Icons.Default.Lock,
+                containerColor = PendingContainer,
+                borderColor = WarningOrange.copy(alpha = 0.35f),
+                icon = Icons.Rounded.Lock,
                 title = "Caja cerrada · pendiente de apertura",
                 subtitle = "Apertura $cajaName para poder facturar",
                 actionLabel = "Aperturar",
                 onAction = onAperturar,
             )
         CajaSessionStatus.SIN_CAJA ->
-            CajaStatusBannerProminent(
-                accent = NeutralGray,
-                icon = Icons.Default.PointOfSale,
+            CajaStatusBannerAction(
+                accent = MaterialTheme.colorScheme.primary,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                icon = Icons.Rounded.PointOfSale,
                 title = "Sin caja seleccionada",
                 subtitle = "Selecciona una caja para comenzar a vender",
                 actionLabel = "Seleccionar",
                 onAction = onSeleccionar,
             )
         CajaSessionStatus.VERIFICANDO ->
-            CajaStatusBannerLoading(accent = InfoBlue)
+            CajaStatusBannerLoading()
     }
 }
 
 @Composable
-private fun CajaStatusBannerLow(
-    accent: androidx.compose.ui.graphics.Color,
-    icon: ImageVector,
-    text: String,
+private fun CajaStatusBannerOpen(
+    cajaName: String,
+    fechaApertura: String? = null,
+    isDiaAnterior: Boolean = false,
+    isRenovando: Boolean = false,
+    onRenovar: () -> Unit = {},
+    onCambiarCaja: () -> Unit = {},
 ) {
-    Row(
+    if (isRenovando) {
+        Surface(
+            color = PendingContainer,
+            border = BorderStroke(1.dp, WarningOrange.copy(alpha = 0.35f)),
+            shape = RoundedCornerShape(12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(
+                    color = WarningOrange,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Cerrando sesión anterior y abriendo nueva caja…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PendingContent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        return
+    }
+
+    val containerColor = if (isDiaAnterior) PendingContainer else ConfirmedContainer
+    val borderColor = if (isDiaAnterior) WarningOrange.copy(alpha = 0.35f) else ConfirmedContent.copy(alpha = 0.2f)
+    val contentColor = if (isDiaAnterior) PendingContent else ConfirmedContent
+    val iconVector = if (isDiaAnterior) Icons.Rounded.Warning else Icons.Rounded.CheckCircle
+    val labelText =
+        when {
+            isDiaAnterior && cajaName.isBlank() -> "Caja abierta (Jornada anterior)"
+            isDiaAnterior -> "Caja abierta (Jornada anterior) · $cajaName"
+            cajaName.isBlank() -> "Caja abierta"
+            else -> "Caja abierta · $cajaName"
+        }
+
+    Surface(
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
+        shape = RoundedCornerShape(12.dp),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Box(modifier = Modifier.width(3.dp).height(14.dp).background(accent, MaterialTheme.shapes.extraSmall))
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(contentColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = labelText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (!fechaApertura.isNullOrBlank()) {
+                    Surface(
+                        shape = PosExtraShapes.Pill,
+                        color = PosPalette.FixedWhite,
+                        border =
+                            BorderStroke(
+                                1.dp,
+                                if (isDiaAnterior) WarningOrange.copy(alpha = 0.35f) else ConfirmedContent.copy(alpha = 0.2f),
+                            ),
+                        modifier = if (isDiaAnterior) Modifier.clickable { onRenovar() } else Modifier,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarToday,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Text(
+                                text = fechaApertura,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
+                                color = contentColor,
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    shape = PosExtraShapes.Pill,
+                    color = PosPalette.FixedWhite,
+                    border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+                    modifier = Modifier.clickable { onCambiarCaja() },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SwapHoriz,
+                            contentDescription = "Cambiar caja",
+                            tint = contentColor,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = "Cambiar",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = contentColor,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun CajaStatusBannerLoading(accent: androidx.compose.ui.graphics.Color) {
-    Row(
+private fun CajaStatusBannerLoading() {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        shape = RoundedCornerShape(12.dp),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(accent.copy(alpha = 0.08f))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            "Verificando caja…",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                color = InfoBlue,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                "Verificando caja…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
 @Composable
-// Firma mantiene contenido y acción explícitos del banner reutilizado.
 @Suppress("LongParameterList")
-private fun CajaStatusBannerProminent(
+private fun CajaStatusBannerAction(
     accent: androidx.compose.ui.graphics.Color,
+    containerColor: androidx.compose.ui.graphics.Color,
+    borderColor: androidx.compose.ui.graphics.Color,
     icon: ImageVector,
     title: String,
     subtitle: String,
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Row(
+    Surface(
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
+        shape = RoundedCornerShape(12.dp),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(accent.copy(alpha = 0.14f))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = accent, style = MaterialTheme.typography.titleSmall)
-            Text(
-                subtitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(
-            onClick = onAction,
-            shape = MaterialTheme.shapes.small,
-            colors = ButtonDefaults.buttonColors(containerColor = accent),
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(actionLabel, color = PosPalette.FixedWhite, style = MaterialTheme.typography.labelLarge)
+            Box(
+                modifier =
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(19.dp))
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = accent,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = onAction,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accent),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = actionLabel,
+                    color = PosPalette.FixedWhite,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
         }
     }
 }

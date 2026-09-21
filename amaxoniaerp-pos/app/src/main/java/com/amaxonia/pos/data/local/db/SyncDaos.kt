@@ -56,6 +56,18 @@ interface CajaSesionDao {
     )
     suspend fun getAbierta(tenantId: String): CajaSesionEntity?
 
+    @Query(
+        "SELECT * FROM caja_sesion WHERE tenantId = :tenantId AND cajaId = :cajaId AND estado = 'ABIERTA' " +
+            "ORDER BY openedAt DESC LIMIT 1",
+    )
+    suspend fun getAbiertaPorCaja(tenantId: String, cajaId: String): CajaSesionEntity?
+
+    @Query(
+        "UPDATE caja_sesion SET estado = 'CERRADA', closedAt = :closedAt " +
+            "WHERE tenantId = :tenantId AND cajaId = :cajaId AND estado = 'ABIERTA'",
+    )
+    suspend fun markCerradaPorCaja(tenantId: String, cajaId: String, closedAt: Long)
+
     @Query("SELECT * FROM caja_sesion WHERE localId = :localId LIMIT 1")
     suspend fun getByLocalId(localId: String): CajaSesionEntity?
 }

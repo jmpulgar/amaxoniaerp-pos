@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.repository.setSellerContext
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintOutcome
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
 import com.amaxonia.pos.domain.usecase.caja.CashCloseTicketPayloadBuilder
+import com.amaxonia.pos.domain.util.CajaDateParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,6 +27,12 @@ class DashboardCajaCoordinator(
     /** True mientras se consulta el estado de la caja contra el backend. */
     private val verifying = MutableStateFlow(false)
 
+    /** Registra la última secuencia por la que ya se mostró el aviso de día anterior. */
+    private var lastPromptedSecuenciaId: String? = null
+
+    /** Trabajo en curso de carga de cajas para evitar condiciones de carrera entre cargas en segundo plano. */
+    private var loadCajasJob: kotlinx.coroutines.Job? = null
+
     fun start(
         scope: CoroutineScope,
         state: MutableStateFlow<DashboardState>,
@@ -41,14 +48,29 @@ class DashboardCajaCoordinator(
                 cajaRepository.activeCajaSecuencia,
                 verifying,
             ) { caja, secuencia, isVerifying ->
-                Triple(caja, secuencia, isVerifying)
+                val validSecuencia = secuencia?.takeIf { it.idCaja == caja?.idCaja }
+                Triple(caja, validSecuencia, isVerifying)
             }.collect { (caja, secuencia, isVerifying) ->
                 val branchName = caja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal"
+                val rawFecha = secuencia?.fechaApertura
+                val formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
+                val isDiaAnterior = secuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                val seqId = secuencia?.idCajaSecuencia
+                val shouldPrompt = !isVerifying && isDiaAnterior && !seqId.isNullOrBlank() && seqId != lastPromptedSecuenciaId
+                if (shouldPrompt) {
+                    lastPromptedSecuenciaId = seqId
+                } else if (seqId == null || !isDiaAnterior) {
+                    lastPromptedSecuenciaId = null
+                }
                 state.update {
                     it.copy(
+                        activeCajaId = caja?.idCaja,
                         sucursalNombre = branchName,
                         hasActiveCaja = caja != null,
                         cajaSession = resolveSession(caja, secuencia, isVerifying),
+                        cajaFechaApertura = formattedFecha,
+                        isCajaDiaAnterior = isDiaAnterior,
+                        showAvisoCajaAnterior = if (shouldPrompt) true else (if (!isVerifying && isDiaAnterior) it.showAvisoCajaAnterior else false),
                     )
                 }
                 caja?.let {
@@ -65,7 +87,8 @@ class DashboardCajaCoordinator(
             cajaRepository.restoreActiveCajaIfValid()
             verifyActiveSession()
             if (connectivity.isOnline() || cajaRepository.activeCaja.value == null) {
-                loadCajas(state)
+                loadCajasJob?.cancel()
+                loadCajasJob = scope.launch { loadCajas(state) }
             }
             verifying.value = false
         }
@@ -79,10 +102,7 @@ class DashboardCajaCoordinator(
         when {
             isVerifying -> CajaSessionStatus.VERIFICANDO
             caja == null -> CajaSessionStatus.SIN_CAJA
-            !secuencia?.idCajaSecuencia.isNullOrBlank() -> CajaSessionStatus.ABIERTA
-            // Offline no podemos validar la secuencia contra el backend y el flujo
-            // de pago permite ventas offline; no bloqueamos una caja seleccionada.
-            !connectivity.isOnline() -> CajaSessionStatus.ABIERTA
+            secuencia != null && !secuencia.idCajaSecuencia.isNullOrBlank() && secuencia.idCaja == caja.idCaja -> CajaSessionStatus.ABIERTA
             else -> CajaSessionStatus.PENDIENTE_APERTURA
         }
 
@@ -103,7 +123,8 @@ class DashboardCajaCoordinator(
         state: MutableStateFlow<DashboardState>,
         forceShowSelector: Boolean = false,
     ) {
-        scope.launch { loadCajas(state, forceShowSelector) }
+        loadCajasJob?.cancel()
+        loadCajasJob = scope.launch { loadCajas(state, forceShowSelector) }
     }
 
     private suspend fun loadCajas(
@@ -114,17 +135,24 @@ class DashboardCajaCoordinator(
         state.update { it.copy(isLoadingCajas = true, showCajaSelector = keepSelectorVisible) }
         cajaRepository.getCajas().fold(
             onSuccess = { cajas ->
+                val currentActive = cajaRepository.activeCaja.value
+                val isCurrentActiveValid = currentActive != null && cajas.any { it.idCaja == currentActive.idCaja }
+                if (currentActive != null && !isCurrentActiveValid) {
+                    // La caja activa en memoria/caché no pertenece a las cajas asignadas al usuario
+                    cajaRepository.clearActiveCaja()
+                    state.update { it.copy(activeCajaId = null) }
+                }
+
                 val activeCaja = cajaRepository.activeCaja.value
                 val onlyAvailableCaja = cajas.singleOrNull()
-                if (!forceShowSelector && activeCaja == null && onlyAvailableCaja != null) {
-                    // Auto-seleccionamos la única caja, pero NO abrimos secuencia en
-                    // silencio: verificamos su estado real para que quede ABIERTA solo
-                    // si el backend confirma secuencia abierta; si no, PENDIENTE_APERTURA.
+                if (!forceShowSelector && !state.value.showCajaSelector && activeCaja == null && onlyAvailableCaja != null) {
+                    // Auto-seleccionamos la única caja solo si el usuario no tiene abierto el selector
                     cajaRepository.setActiveCaja(onlyAvailableCaja)
                     verifyActiveSession()
                 }
+                // Si el selector ya estaba visible o se forzó, jamás debe cerrarse por una carga en segundo plano.
                 val shouldShowSelector =
-                    forceShowSelector || (cajaRepository.activeCaja.value == null && onlyAvailableCaja == null)
+                    keepSelectorVisible || state.value.showCajaSelector || (cajaRepository.activeCaja.value == null && onlyAvailableCaja == null)
                 state.update {
                     it.copy(
                         availableCajas = cajas,
@@ -136,23 +164,13 @@ class DashboardCajaCoordinator(
             onFailure = { error ->
                 val activeCaja = cajaRepository.activeCaja.value
                 val isOffline = !connectivity.isOnline()
-                if (isOffline && activeCaja != null) {
-                    state.update {
-                        it.copy(
-                            isLoadingCajas = false,
-                            showCajaSelector = false,
-                            error = null,
-                        )
-                    }
-                } else {
-                    val shouldShowSelector = keepSelectorVisible || activeCaja == null
-                    state.update {
-                        it.copy(
-                            isLoadingCajas = false,
-                            showCajaSelector = shouldShowSelector,
-                            error = if (isOffline) null else "Error al cargar cajas: ${error.message}",
-                        )
-                    }
+                val shouldShowSelector = keepSelectorVisible || state.value.showCajaSelector || activeCaja == null
+                state.update {
+                    it.copy(
+                        isLoadingCajas = false,
+                        showCajaSelector = shouldShowSelector,
+                        error = if (isOffline) null else "Error al cargar cajas: ${error.message}",
+                    )
                 }
             },
         )
@@ -166,6 +184,7 @@ class DashboardCajaCoordinator(
         state.update {
             it.copy(
                 showCajaSelector = false,
+                showAvisoCajaAnterior = false,
                 showAperturaPrompt = true,
                 aperturaCandidate = caja,
             )
@@ -241,6 +260,79 @@ class DashboardCajaCoordinator(
                 },
                 onFailure = { error ->
                     state.update { it.copy(isLoadingCajas = false, error = "Error al abrir caja: ${error.message}") }
+                },
+            )
+        }
+    }
+
+    private fun renovarCajaDiaAnterior(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
+        val caja =
+            cajaRepository.activeCaja.value
+                ?: state.value.availableCajas.firstOrNull { it.caja == state.value.cajaPrincipalNombre }
+                ?: state.value.availableCajas.singleOrNull()
+                ?: return
+
+        scope.launch {
+            state.update {
+                it.copy(
+                    showAvisoCajaAnterior = false,
+                    isRenovandoCaja = true,
+                )
+            }
+            val closedSequenceId =
+                cajaRepository
+                    .checkCajaStatus(caja.idCaja)
+                    .getOrNull()
+                    ?.takeIf { it.isOpen }
+                    ?.cajaSecuencia
+                    ?.idCajaSecuencia
+            val sequence =
+                cajaRepository.getNextSecuenciaCodigo(caja.idCaja).getOrElse { error ->
+                    state.update {
+                        it.copy(
+                            isRenovandoCaja = false,
+                            error = "Error al obtener correlativo de caja: ${error.message}",
+                        )
+                    }
+                    return@launch
+                }
+            val request =
+                AperturaRequest(
+                    idCaja = caja.idCaja,
+                    montoApertura = 0.0,
+                    idVendedor = state.value.currentSeller?.id ?: caja.defaultSellerId,
+                    secuencia = sequence,
+                    serieSucursal = caja.serieSucursal ?: caja.serieCaja,
+                    idSucursal = caja.idSucursal,
+                    facturaInicial = 0,
+                    notacreditoInicial = 0,
+                    devolucionInicial = 0,
+                    zInicial = 0,
+                )
+            cajaRepository.openCaja(request).fold(
+                onSuccess = {
+                    cajaRepository.setActiveCaja(caja)
+                    val ticketOffer =
+                        closedSequenceId?.let { sequenceId ->
+                            buildAutomaticCloseTicketOffer(caja, sequenceId)
+                        }
+                    state.update { current ->
+                        current.copy(
+                            isRenovandoCaja = false,
+                            automaticCloseTicketOffer = ticketOffer,
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    state.update {
+                        it.copy(
+                            isRenovandoCaja = false,
+                            error = "Error al renovar caja: ${error.message}",
+                        )
+                    }
                 },
             )
         }
@@ -322,6 +414,7 @@ class DashboardCajaCoordinator(
             is DashboardCajaUiAction.Fetch -> fetch(scope, state, action.forceShowSelector)
             is DashboardCajaUiAction.SelectAndOpen -> selectAndOpen(scope, state, action.caja, action.openingAmount)
             is DashboardCajaUiAction.SetSelectorVisible -> setSelectorVisible(state, action.show)
+            is DashboardCajaUiAction.SelectCaja -> selectCaja(scope, state, action.caja)
             is DashboardCajaUiAction.RequestApertura -> requestApertura(state, action.caja)
             DashboardCajaUiAction.RequestAperturaActive -> {
                 val activeCaja = cajaRepository.activeCaja.value ?: state.value.availableCajas.singleOrNull()
@@ -338,6 +431,42 @@ class DashboardCajaCoordinator(
             DashboardCajaUiAction.PrintAutomaticCloseTicket -> printAutomaticCloseTicket(scope, state)
             DashboardCajaUiAction.DismissAutomaticCloseTicket ->
                 state.update { it.copy(automaticCloseTicketOffer = null) }
+            DashboardCajaUiAction.DismissAvisoCajaAnterior ->
+                state.update { it.copy(showAvisoCajaAnterior = false) }
+            DashboardCajaUiAction.RenovarCajaDiaAnterior ->
+                renovarCajaDiaAnterior(scope, state)
+        }
+    }
+
+    private fun selectCaja(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+        caja: Caja,
+    ) {
+        state.update {
+            it.copy(
+                activeCajaId = caja.idCaja,
+                cajaPrincipalNombre = caja.caja ?: caja.descripcion ?: "Caja Principal",
+                cajaSession = CajaSessionStatus.VERIFICANDO,
+                showCajaSelector = false,
+                showAvisoCajaAnterior = false,
+                isCajaDiaAnterior = false,
+                cajaFechaApertura = null,
+            )
+        }
+        lastPromptedSecuenciaId = null
+        scope.launch {
+            verifying.value = true
+            cajaRepository.setActiveCaja(caja)
+            if (connectivity.isOnline()) {
+                val status = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()
+                verifying.value = false
+                if (status != null && !status.isOpen) {
+                    requestApertura(state, caja)
+                }
+            } else {
+                verifying.value = false
+            }
         }
     }
 

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class CajaStatusResponse(
-    val isOpen: Boolean = true,
+    val isOpen: Boolean = false,
     val cajaSecuencia: CajaSecuencia? = null,
     val error: String? = null,
 )

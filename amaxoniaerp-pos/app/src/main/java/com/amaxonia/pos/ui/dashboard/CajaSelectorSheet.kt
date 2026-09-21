@@ -2,6 +2,7 @@ package com.amaxonia.pos.ui.dashboard
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +63,7 @@ fun CajaSelectorSheet(
     errorMessage: String?,
     canDismiss: Boolean,
     actions: CajaSelectorActions,
+    selectedCajaId: String? = null,
 ) {
     val onSelectCaja = actions.onSelectCaja
     val onReload = actions.onReload
@@ -69,13 +72,17 @@ fun CajaSelectorSheet(
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
             confirmValueChange = { targetValue ->
-                canDismiss || targetValue != SheetValue.Hidden
+                if (isLoading) {
+                    false
+                } else {
+                    canDismiss || targetValue != SheetValue.Hidden
+                }
             },
         )
 
     ModalBottomSheet(
         onDismissRequest = {
-            if (canDismiss) {
+            if (canDismiss && !isLoading) {
                 onDismiss()
             }
         },
@@ -98,6 +105,7 @@ fun CajaSelectorSheet(
                 cajas = cajas,
                 isLoading = isLoading,
                 errorMessage = errorMessage,
+                selectedCajaId = selectedCajaId,
                 onSelectCaja = onSelectCaja,
             )
         }
@@ -140,10 +148,11 @@ private fun CajaSelectorBody(
     cajas: List<Caja>,
     isLoading: Boolean,
     errorMessage: String?,
+    selectedCajaId: String?,
     onSelectCaja: (Caja) -> Unit,
 ) {
     when {
-        isLoading -> {
+        isLoading && cajas.isEmpty() -> {
             Box(
                 modifier =
                     Modifier
@@ -154,7 +163,7 @@ private fun CajaSelectorBody(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
-        errorMessage != null -> {
+        errorMessage != null && cajas.isEmpty() -> {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors =
@@ -186,14 +195,23 @@ private fun CajaSelectorBody(
             }
         }
         else -> {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(cajas, key = { it.idCaja }) { caja ->
-                    CajaCard(
-                        caja = caja,
-                        onClick = { onSelectCaja(caja) },
+            Column {
+                if (isLoading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                }
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(cajas, key = { it.idCaja }) { caja ->
+                        CajaCard(
+                            caja = caja,
+                            isSelected = caja.idCaja == selectedCajaId,
+                            onClick = { onSelectCaja(caja) },
+                        )
+                    }
                 }
             }
         }
@@ -203,6 +221,7 @@ private fun CajaSelectorBody(
 @Composable
 private fun CajaCard(
     caja: Caja,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
 ) {
     val isActive = caja.estatus == 1
@@ -210,13 +229,24 @@ private fun CajaCard(
         targetValue = if (isActive) CajaAvailable else CajaInactive,
         label = "cajaStatusColor",
     )
+    val cardShape = RoundedCornerShape(16.dp)
+    val cardModifier =
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelected) {
+                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, cardShape)
+                } else {
+                    Modifier
+                },
+            )
 
     ElevatedCard(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = cardModifier,
+        shape = cardShape,
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp),
     ) {
         Row(
             modifier =
@@ -253,6 +283,24 @@ private fun CajaCard(
             }
 
             Spacer(modifier = Modifier.width(8.dp))
+
+            if (isSelected) {
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "Activa",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+            }
 
             // Status badge
             CajaStatusBadge(statusColor = statusColor, isActive = isActive)

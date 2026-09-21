@@ -62,7 +62,7 @@ class CajaRepositoryImpl(
         if (caja != null) {
             _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
             _activeCaja.update { caja }
-            restorePersistedSesion()
+            restorePersistedSesion(caja.idCaja)
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
@@ -77,15 +77,19 @@ class CajaRepositoryImpl(
             val companyDb = getCompanyDb()
             val result = cajaApi.checkCajaStatus(cajaId, authHeader, companyDb)
             result.onSuccess { response ->
-                if (response.isOpen && response.cajaSecuencia != null) {
-                    activeSecuencia = response.cajaSecuencia
-                    _activeCajaSecuencia.update { response.cajaSecuencia }
-                } else {
-                    // El backend indica que la caja no tiene secuencia abierta:
-                    // limpiamos la secuencia para que el estado refleje la realidad
-                    // (pendiente de apertura) y no se permita facturar.
-                    activeSecuencia = null
-                    _activeCajaSecuencia.update { null }
+                if (_activeCaja.value?.idCaja == cajaId) {
+                    if (response.isOpen && response.cajaSecuencia != null && response.cajaSecuencia.idCaja == cajaId) {
+                        activeSecuencia = response.cajaSecuencia
+                        _activeCajaSecuencia.update { response.cajaSecuencia }
+                        persistSesionAbierta(cajaId, response.cajaSecuencia)
+                    } else {
+                        // El backend indica que la caja no tiene secuencia abierta (o no coincide):
+                        // limpiamos la secuencia para que el estado refleje la realidad
+                        // (pendiente de apertura) y no se permita facturar.
+                        activeSecuencia = null
+                        _activeCajaSecuencia.update { null }
+                        markSesionCerrada(cajaId)
+                    }
                 }
             }
             result
@@ -108,11 +112,12 @@ class CajaRepositoryImpl(
         catchingResult {
             val authHeader = getAuthHeader()
             val companyDb = getCompanyDb()
+            val activeCajaId = _activeCaja.value?.idCaja
             val result = cajaApi.closeCaja(request, authHeader, companyDb)
             result.onSuccess {
                 activeSecuencia = null
                 _activeCajaSecuencia.update { null }
-                markSesionCerrada()
+                markSesionCerrada(activeCajaId)
             }
             result
         }
@@ -235,8 +240,18 @@ class CajaRepositoryImpl(
         }
 
     override suspend fun setActiveCaja(caja: Caja) {
+        val currentCaja = _activeCaja.value
+        val isDifferentCaja = currentCaja?.idCaja != caja.idCaja
+        if (isDifferentCaja) {
+            // Limpia la secuencia en memoria de la caja anterior antes de emitir la nueva
+            activeSecuencia = null
+            _activeCajaSecuencia.update { null }
+        }
         _activeCajaName.update { caja.caja ?: caja.descripcion ?: "Caja Principal" }
         _activeCaja.update { caja }
+        if (isDifferentCaja) {
+            restorePersistedSesion(caja.idCaja)
+        }
         localStore.saveActiveCaja(caja)
     }
 
@@ -251,8 +266,12 @@ class CajaRepositoryImpl(
     override suspend fun markSequenceClosed() {
         // Conserva la caja seleccionada (memoria y almacenamiento local) y solo
         // descarta la secuencia, dejando el estado en "pendiente de apertura".
+        val activeCajaId = _activeCaja.value?.idCaja
         activeSecuencia = null
         _activeCajaSecuencia.update { null }
+        if (activeCajaId != null) {
+            markSesionCerrada(activeCajaId)
+        }
     }
 
     // ------------------------------------------------------------------
@@ -265,7 +284,7 @@ class CajaRepositoryImpl(
         cajaSecuencia: com.amaxonia.pos.domain.model.caja.CajaSecuencia?,
     ) {
         val tenantId = tenantId()
-        val abierta = cajaSesionDao.getAbierta(tenantId)
+        val abierta = cajaSesionDao.getAbiertaPorCaja(tenantId, cajaId)
         cajaSesionDao.upsert(
             com.amaxonia.pos.data.local.db.CajaSesionEntity(
                 localId =
@@ -291,16 +310,25 @@ class CajaRepositoryImpl(
         )
     }
 
-    private suspend fun markSesionCerrada() {
+    private suspend fun markSesionCerrada(cajaId: String? = null) {
         val tenantId = tenantId()
-        cajaSesionDao.getAbierta(tenantId)?.let { sesion ->
-            cajaSesionDao.upsert(sesion.copy(estado = "CERRADA", closedAt = System.currentTimeMillis()))
+        if (cajaId != null) {
+            cajaSesionDao.markCerradaPorCaja(tenantId, cajaId, System.currentTimeMillis())
+        } else {
+            cajaSesionDao.getAbierta(tenantId)?.let { sesion ->
+                cajaSesionDao.upsert(sesion.copy(estado = "CERRADA", closedAt = System.currentTimeMillis()))
+            }
         }
     }
 
-    private suspend fun restorePersistedSesion() {
+    private suspend fun restorePersistedSesion(cajaId: String? = null) {
         val tenantId = tenantId()
-        val sesion = cajaSesionDao.getAbierta(tenantId) ?: return
+        val sesion =
+            if (cajaId != null) {
+                cajaSesionDao.getAbiertaPorCaja(tenantId, cajaId)
+            } else {
+                cajaSesionDao.getAbierta(tenantId)
+            } ?: return
         val secuencia =
             runCatching {
                 AppJson.decodeFromString(
@@ -309,8 +337,15 @@ class CajaRepositoryImpl(
                     sesion.secuenciaJson,
                 )
             }.getOrNull()
-        activeSecuencia = secuencia
-        _activeCajaSecuencia.update { secuencia }
+        val activeCajaId = _activeCaja.value?.idCaja
+        // Solo asignamos si corresponde a la caja activa actual y la secuencia tiene el mismo idCaja
+        if (activeCajaId != null && sesion.cajaId == activeCajaId && secuencia?.idCaja == activeCajaId) {
+            activeSecuencia = secuencia
+            _activeCajaSecuencia.update { secuencia }
+        } else {
+            activeSecuencia = null
+            _activeCajaSecuencia.update { null }
+        }
     }
 
     private suspend fun tenantId(): String {
