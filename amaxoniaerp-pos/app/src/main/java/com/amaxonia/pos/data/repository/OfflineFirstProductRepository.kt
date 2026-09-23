@@ -17,6 +17,7 @@ import com.amaxonia.pos.data.remote.getProductById
 import com.amaxonia.pos.data.remote.getSections
 import com.amaxonia.pos.data.remote.getSubFamilies
 import com.amaxonia.pos.data.remote.updateProduct
+import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
 import com.amaxonia.pos.domain.repository.Department
@@ -33,8 +34,9 @@ class OfflineFirstProductRepository(
     localStore: LocalStore,
     productDao: ProductDao,
     networkMonitor: NetworkMonitor,
+    offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) : ProductRepository {
-    private val fetch = ProductFetchPolicy(apiService, localStore, productDao, networkMonitor)
+    private val fetch = ProductFetchPolicy(apiService, localStore, productDao, networkMonitor, offlineScopeProvider)
     private val cache = ProductPageCache(productDao)
     private val localStore = localStore
     private val apiService = apiService

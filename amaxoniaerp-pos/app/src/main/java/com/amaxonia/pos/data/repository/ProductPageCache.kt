@@ -9,6 +9,7 @@ import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.getProducts
+import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Product
 
 /**
@@ -62,6 +63,7 @@ internal class ProductFetchPolicy(
     private val localStore: LocalStore,
     private val productDao: ProductDao,
     private val networkMonitor: NetworkMonitor,
+    private val offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) {
     private val cache = ProductPageCache(productDao)
 
@@ -105,7 +107,17 @@ internal class ProductFetchPolicy(
                     page = CatalogPage(limit = limit, offset = offset, search = query),
                     departmentId = departmentId,
                 )
-            productDao.insertAll(response.data.map { it.toEntity() })
+            val entities = response.data.map { it.toEntity() }
+            val scope = offlineScopeProvider()
+            val entitiesToCache =
+                if (scope.enabled && !scope.allProducts) {
+                    entities.filter { it.department in scope.departmentIds }
+                } else {
+                    entities
+                }
+            if (entitiesToCache.isNotEmpty()) {
+                productDao.insertAll(entitiesToCache)
+            }
             response.data.map { it.toDomain() }
         }.recoverCatching { error ->
             cache.page(departmentId, query, limit, offset).ifEmpty { throw error }

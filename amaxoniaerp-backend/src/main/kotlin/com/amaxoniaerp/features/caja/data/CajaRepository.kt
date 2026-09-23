@@ -87,6 +87,7 @@ class CajaRepository {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
             val activeSellers = loadActiveSellers()
-            mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers)
+            val warehouseNames = loadWarehouseNames()
+            mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames)
         }
 }

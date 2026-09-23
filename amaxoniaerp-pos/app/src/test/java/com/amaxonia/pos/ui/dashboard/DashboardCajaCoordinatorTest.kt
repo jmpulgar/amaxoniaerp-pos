@@ -593,6 +593,63 @@ class DashboardCajaCoordinatorTest {
             testJob.cancel()
         }
 
+    @Test
+    fun `caja activa actualiza sucursal y almacen en el estado`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val fakeRepo = FakeCajaRepository()
+            val coordinator = buildCoordinator(fakeRepo)
+            val state = MutableStateFlow(DashboardState())
+            val testJob = kotlinx.coroutines.Job()
+            val coordinatorScope = kotlinx.coroutines.CoroutineScope(coroutineContext + testJob)
+
+            coordinator.start(coordinatorScope, state)
+            advanceUntilIdle()
+
+            val cajaConAlmacenNombre =
+                Caja(
+                    idCaja = "caja-1",
+                    codCaja = "C1",
+                    caja = "Caja Principal",
+                    descripcion = "Caja 1",
+                    estatus = 1,
+                    idSucursal = 1,
+                    serieCaja = "C01",
+                    sucursalNombre = "Sucursal Norte",
+                    almacenNombre = "Almacén Central",
+                    defaultSellerId = 1,
+                    defaultSellerName = "Vendedor",
+                    availableSellers = emptyList(),
+                )
+            fakeRepo.setActiveCaja(cajaConAlmacenNombre)
+            advanceUntilIdle()
+
+            org.junit.Assert.assertEquals("Sucursal Norte", state.value.sucursalNombre)
+            org.junit.Assert.assertEquals("Almacén Central", state.value.almacenNombre)
+
+            val cajaConIdAlmacen =
+                Caja(
+                    idCaja = "caja-2",
+                    codCaja = "C2",
+                    caja = "Caja 2",
+                    descripcion = "Caja 2",
+                    estatus = 1,
+                    idSucursal = 2,
+                    serieCaja = "C02",
+                    sucursalNombre = "Sucursal Sur",
+                    defaultWarehouseId = 3,
+                    defaultSellerId = 1,
+                    defaultSellerName = "Vendedor",
+                    availableSellers = emptyList(),
+                )
+            fakeRepo.setActiveCaja(cajaConIdAlmacen)
+            advanceUntilIdle()
+
+            org.junit.Assert.assertEquals("Sucursal Sur", state.value.sucursalNombre)
+            org.junit.Assert.assertEquals("Almacén 3", state.value.almacenNombre)
+
+            testJob.cancel()
+        }
+
     private class FakeCajaRepository : CajaRepository {
         val activeCajaState = MutableStateFlow<Caja?>(null)
         override val activeCaja get() = activeCajaState

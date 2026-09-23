@@ -52,6 +52,7 @@ data class DashboardState(
     val cajaPrincipalNombre: String = "Caja no seleccionada",
     val activeCajaId: String? = null,
     val sucursalNombre: String = "Sucursal",
+    val almacenNombre: String = "Almacén principal",
     // -------------------
     // --- CAJA STATE ---
     val availableCajas: List<Caja> = emptyList(),

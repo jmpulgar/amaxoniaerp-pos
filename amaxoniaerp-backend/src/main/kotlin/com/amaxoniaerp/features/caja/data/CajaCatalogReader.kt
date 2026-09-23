@@ -208,12 +208,25 @@ internal fun loadActiveSellers(): List<SellerRecord> =
             )
         }
 
+internal fun loadWarehouseNames(): Map<Int, String> =
+    runCatching {
+        com.amaxoniaerp.features.items.data.AlmacenTable
+            .select(
+                com.amaxoniaerp.features.items.data.AlmacenTable.codAlmacen,
+                com.amaxoniaerp.features.items.data.AlmacenTable.descripcion,
+            ).associate { row ->
+                row[com.amaxoniaerp.features.items.data.AlmacenTable.codAlmacen] to
+                    (row[com.amaxoniaerp.features.items.data.AlmacenTable.descripcion]?.takeIf { it.isNotBlank() } ?: "")
+            }
+    }.getOrDefault(emptyMap())
+
 internal fun mapCajaRows(
     countryCode: String,
     userId: Int,
     params: CajaCatalogParams,
     defaultBySucursal: Map<Int, Int?>,
     activeSellers: List<SellerRecord>,
+    warehouseNames: Map<Int, String> = emptyMap(),
 ): List<Caja> {
     val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
     val userIdToken = userId.toString()
@@ -277,6 +290,7 @@ internal fun mapCajaRows(
                 sucursalNombre = nombreSucursal,
                 sucursalCodigo = row[SucursalTable.codigo],
                 codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
+                almacenNombre = resolvedDefaultWarehouse?.let { warehouseNames[it] }?.takeIf { it.isNotBlank() },
             )
         }.filter { caja -> assignedCajaIds.isEmpty() || caja.idCaja in assignedCajaIds }
 }

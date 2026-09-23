@@ -11,6 +11,7 @@ import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.data.sync.OfflineSyncScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -108,7 +109,25 @@ class OfflineFirstProductRepositoryTest {
             assertEquals("Sin conexión", result.exceptionOrNull()?.message)
         }
 
-    private fun repository(online: Boolean): OfflineFirstProductRepository {
+    @Test
+    fun `getAllProducts offline devuelve todos los productos descargados sin filtrar por departamento`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            seed(
+                product("1", "a", "Cafetera", department = "1"),
+                product("2", "b", "Tostadora", department = "2"),
+            )
+            val repository = repository(online = false, scope = OfflineSyncScope(enabled = true, departmentIds = setOf(1)))
+
+            val result = repository.getAllProducts(departmentId = null)
+
+            assertEquals(setOf("1", "2"), result.getOrThrow().map { it.id }.toSet())
+        }
+
+    private fun repository(
+        online: Boolean,
+        scope: com.amaxonia.pos.data.sync.OfflineSyncScope = com.amaxonia.pos.data.sync.OfflineSyncScope.ALL,
+    ): OfflineFirstProductRepository {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val configManager =
             ApiConfigManager().apply {
@@ -120,6 +139,7 @@ class OfflineFirstProductRepositoryTest {
             localStore = store,
             productDao = db.productDao(),
             networkMonitor = SettableNetworkMonitor(context, online),
+            offlineScopeProvider = { scope },
         )
     }
 
@@ -131,5 +151,6 @@ class OfflineFirstProductRepositoryTest {
         id: String,
         code: String,
         description: String,
-    ): ProductDto = ProductDto(id = id, code = code, description = description)
+        department: String = "0",
+    ): ProductDto = ProductDto(id = id, code = code, description = description, department = department)
 }

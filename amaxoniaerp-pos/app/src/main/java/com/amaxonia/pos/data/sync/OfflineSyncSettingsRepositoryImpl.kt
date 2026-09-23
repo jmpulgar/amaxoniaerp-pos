@@ -78,7 +78,13 @@ class OfflineSyncSettingsRepositoryImpl(
     }
 
     override fun setProductModeAll(all: Boolean) {
-        _uiState.update { it.copy(productModeAll = all) }
+        _uiState.update { current ->
+            current.copy(
+                productModeAll = all,
+                selectedDepartmentIds = if (all) emptySet() else current.selectedDepartmentIds,
+            )
+        }
+        refreshPreview()
     }
 
     override fun toggleDepartment(id: Int) {
@@ -89,13 +95,22 @@ class OfflineSyncSettingsRepositoryImpl(
                 } else {
                     current.selectedDepartmentIds + id
                 }
-            current.copy(selectedDepartmentIds = selected)
+            current.copy(
+                selectedDepartmentIds = selected,
+                productModeAll = false,
+            )
         }
         refreshPreview()
     }
 
     override fun setClientModeAll(all: Boolean) {
-        _uiState.update { it.copy(clientModeAll = all) }
+        _uiState.update { current ->
+            current.copy(
+                clientModeAll = all,
+                selectedSucursalIds = if (all) emptySet() else current.selectedSucursalIds,
+            )
+        }
+        refreshPreview()
     }
 
     override fun toggleSucursal(id: String) {
@@ -106,7 +121,10 @@ class OfflineSyncSettingsRepositoryImpl(
                 } else {
                     current.selectedSucursalIds + id
                 }
-            current.copy(selectedSucursalIds = selected)
+            current.copy(
+                selectedSucursalIds = selected,
+                clientModeAll = false,
+            )
         }
         refreshPreview()
     }
@@ -150,15 +168,29 @@ class OfflineSyncSettingsRepositoryImpl(
             scopeStore.save(newScope)
             if (current.syncEnabled) {
                 val purge = syncEngine.purgeForScope(newScope)
+                if (purge is SyncEngine.Outcome.Error) {
+                    _uiState.update {
+                        it.copy(
+                            status = OfflineSettingsStatus.IDLE,
+                            message = purge.message,
+                        )
+                    }
+                    return@launch
+                }
+                _uiState.update {
+                    it.copy(message = "Sincronizando catálogo offline...")
+                }
+                val syncResult = syncEngine.runBootstrap()
                 bootstrapEnqueuer()
                 _uiState.update {
                     it.copy(
                         status = OfflineSettingsStatus.IDLE,
                         message =
-                            if (purge is SyncEngine.Outcome.Error) {
-                                purge.message
-                            } else {
-                                "Alcance guardado. Re-sincronización encolada (Wi-Fi y cargador)."
+                            when (syncResult) {
+                                is SyncEngine.Outcome.Success ->
+                                    "Catálogo sincronizado (${syncResult.changesApplied} elementos descargados)."
+                                is SyncEngine.Outcome.Error ->
+                                    "Alcance guardado. Error al descargar: ${syncResult.message}. Sincronización re-encolada en segundo plano."
                             },
                     )
                 }

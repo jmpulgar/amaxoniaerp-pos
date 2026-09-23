@@ -334,14 +334,14 @@ class SyncCatalogReader {
     // Queries base con alcance
     // ------------------------------------------------------------------
 
-    /** Resolved-department ∈ alcance: (dep_id>0 ∧ dep_id∈ids) ∨ (dep_id≤0 ∧ cod_dep∈ids). */
+    /** Resolved-department ∈ alcance: dep_id ∈ ids ∨ cod_dep ∈ ids. */
     private fun departmentScopeCondition(
         table: BaseItemsTable,
         scope: SyncScope,
     ): Op<Boolean> =
         with(org.jetbrains.exposed.sql.SqlExpressionBuilder) {
-            ((table.departamentoId greater 0) and (table.departamentoId inList scope.departmentIds.toList())) or
-                ((table.departamentoId lessEq 0) and (table.codDepartamento inList scope.departmentIds.toList()))
+            (table.departamentoId inList scope.departmentIds.toList()) or
+                (table.codDepartamento inList scope.departmentIds.toList())
         }
 
     private fun productQuery(

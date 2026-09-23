@@ -31,6 +31,8 @@ data class Caja(
     val sucursalNombre: String? = null,
     val sucursalCodigo: String? = null,
     val codigoSucursalEmisor: String? = null,
+    @SerialName("almacen_nombre")
+    val almacenNombre: String? = null,
 )
 
 @Serializable

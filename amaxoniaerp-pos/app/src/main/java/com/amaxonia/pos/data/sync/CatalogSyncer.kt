@@ -32,6 +32,7 @@ class CatalogSyncer(
     private val apiService: ApiService,
     private val localStore: LocalStore,
     daos: CatalogDaos,
+    private val offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) : com.amaxonia.pos.domain.repository.CatalogSynchronization {
     private val clientDao = daos.clientDao
     private val clientSucursalDao = daos.clientSucursalDao
@@ -111,6 +112,7 @@ class CatalogSyncer(
         token: String,
         pageSize: Int,
     ) {
+        val scope = offlineScopeProvider()
         var offset = 0
         while (true) {
             val response =
@@ -119,7 +121,16 @@ class CatalogSyncer(
                     page = CatalogPage(limit = pageSize, offset = offset, includeTotal = false),
                 )
             if (response.data.isEmpty()) break
-            productDao.insertAll(response.data.map { it.toEntity() })
+            val entities = response.data.map { it.toEntity() }
+            val entitiesToCache =
+                if (scope.enabled && !scope.allProducts) {
+                    entities.filter { it.department in scope.departmentIds }
+                } else {
+                    entities
+                }
+            if (entitiesToCache.isNotEmpty()) {
+                productDao.insertAll(entitiesToCache)
+            }
             offset += pageSize
         }
     }

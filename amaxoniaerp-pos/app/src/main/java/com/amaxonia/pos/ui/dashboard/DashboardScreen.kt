@@ -850,6 +850,8 @@ fun DashboardScreen(
                 CajaStatusBanner(
                     session = state.cajaSession,
                     cajaName = state.cajaPrincipalNombre,
+                    sucursalName = state.sucursalNombre,
+                    almacenName = state.almacenNombre,
                     fechaApertura = state.cajaFechaApertura,
                     isDiaAnterior = state.isCajaDiaAnterior,
                     isRenovando = state.isRenovandoCaja,
@@ -1317,6 +1319,8 @@ fun DrawerMenuItem(
 private fun CajaStatusBanner(
     session: CajaSessionStatus,
     cajaName: String,
+    sucursalName: String = "",
+    almacenName: String = "",
     fechaApertura: String? = null,
     isDiaAnterior: Boolean = false,
     isRenovando: Boolean = false,
@@ -1328,6 +1332,8 @@ private fun CajaStatusBanner(
         CajaSessionStatus.ABIERTA ->
             CajaStatusBannerOpen(
                 cajaName = cajaName,
+                sucursalName = sucursalName,
+                almacenName = almacenName,
                 fechaApertura = fechaApertura,
                 isDiaAnterior = isDiaAnterior,
                 isRenovando = isRenovando,
@@ -1364,6 +1370,8 @@ private fun CajaStatusBanner(
 @Composable
 private fun CajaStatusBannerOpen(
     cajaName: String,
+    sucursalName: String = "",
+    almacenName: String = "",
     fechaApertura: String? = null,
     isDiaAnterior: Boolean = false,
     isRenovando: Boolean = false,
@@ -1412,8 +1420,21 @@ private fun CajaStatusBannerOpen(
             isDiaAnterior && cajaName.isBlank() -> "Caja abierta (Jornada anterior)"
             isDiaAnterior -> "Caja abierta (Jornada anterior) · $cajaName"
             cajaName.isBlank() -> "Caja abierta"
-            else -> "Caja abierta · $cajaName"
+            else -> "$cajaName"
         }
+    val branchDisplay =
+        when {
+            sucursalName.isBlank() -> null
+            sucursalName.startsWith("Sucursal", ignoreCase = true) -> sucursalName
+            else -> "Sucursal: $sucursalName"
+        }
+    val warehouseDisplay =
+        when {
+            almacenName.isBlank() -> null
+            almacenName.startsWith("Almacén", ignoreCase = true) || almacenName.startsWith("Almacen", ignoreCase = true) -> almacenName
+            else -> "Almacén: $almacenName"
+        }
+    val locationText = listOfNotNull(branchDisplay, warehouseDisplay).joinToString("  •  ")
 
     Surface(
         color = containerColor,
@@ -1424,50 +1445,79 @@ private fun CajaStatusBannerOpen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(contentColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = iconVector,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(17.dp),
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = labelText,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
-                color = contentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(modifier = Modifier.weight(1f))
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (!fechaApertura.isNullOrBlank()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(contentColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = iconVector,
+                        contentDescription = null,
+                        tint = contentColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = labelText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
+                    color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (!fechaApertura.isNullOrBlank()) {
+                        Surface(
+                            shape = PosExtraShapes.Pill,
+                            color = PosPalette.FixedWhite,
+                            border =
+                                BorderStroke(
+                                    1.dp,
+                                    if (isDiaAnterior) WarningOrange.copy(alpha = 0.35f) else ConfirmedContent.copy(alpha = 0.2f),
+                                ),
+                            modifier = if (isDiaAnterior) Modifier.clickable { onRenovar() } else Modifier,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CalendarToday,
+                                    contentDescription = null,
+                                    tint = contentColor,
+                                    modifier = Modifier.size(13.dp),
+                                )
+                                Text(
+                                    text = fechaApertura,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
+                                    color = contentColor,
+                                )
+                            }
+                        }
+                    }
                     Surface(
                         shape = PosExtraShapes.Pill,
                         color = PosPalette.FixedWhite,
-                        border =
-                            BorderStroke(
-                                1.dp,
-                                if (isDiaAnterior) WarningOrange.copy(alpha = 0.35f) else ConfirmedContent.copy(alpha = 0.2f),
-                            ),
-                        modifier = if (isDiaAnterior) Modifier.clickable { onRenovar() } else Modifier,
+                        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+                        modifier = Modifier.clickable { onCambiarCaja() },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -1475,45 +1525,31 @@ private fun CajaStatusBannerOpen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.CalendarToday,
-                                contentDescription = null,
+                                imageVector = Icons.Rounded.SwapHoriz,
+                                contentDescription = "Cambiar caja",
                                 tint = contentColor,
-                                modifier = Modifier.size(13.dp),
+                                modifier = Modifier.size(14.dp),
                             )
                             Text(
-                                text = fechaApertura,
+                                text = "Cambiar",
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (isDiaAnterior) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = contentColor,
                             )
                         }
                     }
                 }
-                Surface(
-                    shape = PosExtraShapes.Pill,
-                    color = PosPalette.FixedWhite,
-                    border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable { onCambiarCaja() },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.SwapHoriz,
-                            contentDescription = "Cambiar caja",
-                            tint = contentColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            text = "Cambiar",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = contentColor,
-                        )
-                    }
-                }
+            }
+            if (locationText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = locationText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.85f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 36.dp),
+                )
             }
         }
     }

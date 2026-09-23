@@ -52,6 +52,11 @@ class DashboardCajaCoordinator(
                 Triple(caja, validSecuencia, isVerifying)
             }.collect { (caja, secuencia, isVerifying) ->
                 val branchName = caja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal"
+                val warehouseName =
+                    caja?.almacenNombre?.takeIf(String::isNotBlank)
+                        ?: caja?.defaultWarehouseId?.let { "Almacén $it" }
+                        ?: caja?.codAlmacen?.takeIf { it > 0 }?.let { "Almacén $it" }
+                        ?: "Almacén principal"
                 val rawFecha = secuencia?.fechaApertura
                 val formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
                 val isDiaAnterior = secuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
@@ -66,6 +71,7 @@ class DashboardCajaCoordinator(
                     it.copy(
                         activeCajaId = caja?.idCaja,
                         sucursalNombre = branchName,
+                        almacenNombre = warehouseName,
                         hasActiveCaja = caja != null,
                         cajaSession = resolveSession(caja, secuencia, isVerifying),
                         cajaFechaApertura = formattedFecha,

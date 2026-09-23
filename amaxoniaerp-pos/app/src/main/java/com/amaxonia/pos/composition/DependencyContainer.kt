@@ -409,6 +409,7 @@ object DependencyContainer {
                 apiService = apiService,
                 localStore = localStore,
                 daos = CatalogDaos.from(database),
+                offlineScopeProvider = { offlineSyncSettingsStore.load() },
             )
         initialized = true
     }
@@ -440,9 +441,17 @@ object DependencyContainer {
 
     /** Repositorios respaldados por la API remota. */
     private fun initializeRemoteRepositories(database: AppDatabase) {
+        offlineSyncSettingsStore = OfflineSyncSettingsStore(syncAppContext())
         authRepository = AuthRepositoryImpl(apiService, localStore)
         companyRepository = CachedCompanyRepository(localStore)
-        productRepository = OfflineFirstProductRepository(apiService, localStore, database.productDao(), networkMonitor)
+        productRepository =
+            OfflineFirstProductRepository(
+                apiService = apiService,
+                localStore = localStore,
+                productDao = database.productDao(),
+                networkMonitor = networkMonitor,
+                offlineScopeProvider = { offlineSyncSettingsStore.load() },
+            )
         promotionRepository =
             PromotionRepositoryImpl(apiService, localStore, database.promocionDao(), database.productDao(), networkMonitor)
         reportRepository = ApiReportRepository(apiService, localStore)
@@ -483,7 +492,6 @@ object DependencyContainer {
     }
 
     private fun initializeSyncComponents(database: AppDatabase) {
-        offlineSyncSettingsStore = OfflineSyncSettingsStore(syncAppContext())
         syncApi = SyncApi(apiService)
         syncEngine =
             SyncEngine(

@@ -101,11 +101,12 @@ object SyncScheduler {
     fun enqueueBootstrap(
         context: Context,
         requiresCharging: Boolean = true,
+        unmeteredOnly: Boolean = false,
     ) {
         val constraints =
             Constraints
                 .Builder()
-                .setRequiredNetworkType(NetworkType.UNMETERED)
+                .setRequiredNetworkType(if (unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
                 .setRequiresCharging(requiresCharging)
                 .build()
         val request =

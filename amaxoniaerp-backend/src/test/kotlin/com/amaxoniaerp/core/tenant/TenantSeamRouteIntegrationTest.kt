@@ -7,6 +7,7 @@ import com.amaxoniaerp.features.caja.data.SucursalAlmacenTable
 import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTablePA
+import com.amaxoniaerp.features.items.data.AlmacenTable
 import com.amaxoniaerp.loadJwtConfig
 import com.amaxoniaerp.module
 import com.auth0.jwt.JWT
@@ -96,6 +97,7 @@ class TenantSeamRouteIntegrationTest {
                 SucursalAlmacenTable,
                 VendedorTable,
                 ParametrosGeneralesTablePA,
+                AlmacenTable,
             )
             CajaTable.insert {
                 it[idCaja] = "1"
