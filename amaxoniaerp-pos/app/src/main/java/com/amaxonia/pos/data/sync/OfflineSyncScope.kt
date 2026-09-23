@@ -14,6 +14,9 @@ data class OfflineSyncScope(
     val allProducts: Boolean get() = departmentIds.isEmpty()
     val allClients: Boolean get() = branchIds.isEmpty()
 
+    fun isDepartmentVisible(id: Int): Boolean = allProducts || id in departmentIds
+    fun isBranchVisible(id: Int): Boolean = allClients || id in branchIds
+
     fun toSelection(): OfflineScopeSelection =
         OfflineScopeSelection(
             departmentIds = departmentIds,

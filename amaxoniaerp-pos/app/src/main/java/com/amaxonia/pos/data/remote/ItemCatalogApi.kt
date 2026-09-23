@@ -34,6 +34,8 @@ suspend fun ApiService.getProducts(
     token: String,
     page: CatalogPage,
     departmentId: Int? = null,
+    departmentIds: List<Int>? = null,
+    itemType: String? = null,
 ): PagedResponse<ProductDto> =
     client
         .get("items") {
@@ -49,6 +51,12 @@ suspend fun ApiService.getProducts(
                 }
                 if (departmentId != null && departmentId > 0) {
                     parameters.append("departmentId", departmentId.toString())
+                }
+                if (!departmentIds.isNullOrEmpty()) {
+                    parameters.append("departmentIds", departmentIds.joinToString(","))
+                }
+                if (!itemType.isNullOrBlank()) {
+                    parameters.append("itemType", itemType)
                 }
             }
         }.body()

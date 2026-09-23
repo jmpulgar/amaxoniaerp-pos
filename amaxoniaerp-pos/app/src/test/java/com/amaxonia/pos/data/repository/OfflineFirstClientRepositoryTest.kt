@@ -147,7 +147,44 @@ class OfflineFirstClientRepositoryTest {
             assertEquals("Ana", result.getOrThrow().firstName)
         }
 
-    private fun repository(online: Boolean): OfflineFirstClientRepository {
+    @Test
+    fun `getAllClients offline respeta el alcance de visibilidad de sucursales`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            db.clientDao().insertAll(
+                listOf(
+                    entity("1", name = "Cliente Sucursal 10", idSucursal = 10),
+                    entity("2", name = "Cliente Sucursal 20", idSucursal = 20),
+                ),
+            )
+            val repository = repository(online = false, scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)))
+
+            val result = repository.getAllClients(page = 1, pageSize = 10)
+
+            assertEquals(listOf("Cliente Sucursal 10"), result.getOrThrow().map { it.firstName })
+        }
+
+    @Test
+    fun `searchClients offline respeta el alcance de visibilidad de sucursales`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            db.clientDao().insertAll(
+                listOf(
+                    entity("1", name = "Juan Sucursal 10", idSucursal = 10),
+                    entity("2", name = "Juan Sucursal 20", idSucursal = 20),
+                ),
+            )
+            val repository = repository(online = false, scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)))
+
+            val result = repository.searchClients("Juan", page = 1, pageSize = 10)
+
+            assertEquals(listOf("Juan Sucursal 10"), result.getOrThrow().map { it.firstName })
+        }
+
+    private fun repository(
+        online: Boolean,
+        scope: com.amaxonia.pos.data.sync.OfflineSyncScope = com.amaxonia.pos.data.sync.OfflineSyncScope.ALL,
+    ): OfflineFirstClientRepository {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val configManager =
             ApiConfigManager().apply {
@@ -159,6 +196,7 @@ class OfflineFirstClientRepositoryTest {
             localStore = store,
             clientDao = db.clientDao(),
             networkMonitor = SettableNetworkMonitor(context, online),
+            offlineScopeProvider = { scope },
         )
     }
 
@@ -171,6 +209,32 @@ class OfflineFirstClientRepositoryTest {
         name: String,
         lastName: String = "",
     ): ClientDto = ClientDto(id = id, code = id, name = name, lastName = lastName)
+
+    private fun entity(
+        id: String,
+        name: String,
+        lastName: String = "",
+        idSucursal: Int? = null,
+    ): com.amaxonia.pos.data.local.db.ClientEntity =
+        com.amaxonia.pos.data.local.db.ClientEntity(
+            id = id,
+            code = id,
+            identification = "RUC-$id",
+            dv = "0",
+            name = name,
+            lastName = lastName,
+            address = "Calle 1",
+            phone = "123456",
+            email = "client@test.com",
+            status = true,
+            clientTypeId = 1,
+            taxpayerTypeId = 1,
+            countryId = 1,
+            addressLevel1 = "",
+            addressLevel2 = "",
+            addressLevel3 = "",
+            idSucursal = idSucursal,
+        )
 
     private fun domainClient(
         id: String,

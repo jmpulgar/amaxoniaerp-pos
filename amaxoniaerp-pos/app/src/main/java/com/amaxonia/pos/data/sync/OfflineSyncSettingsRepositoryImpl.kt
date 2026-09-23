@@ -103,6 +103,26 @@ class OfflineSyncSettingsRepositoryImpl(
         refreshPreview()
     }
 
+    override fun selectAllDepartments(ids: Set<Int>) {
+        _uiState.update { current ->
+            current.copy(
+                selectedDepartmentIds = ids,
+                productModeAll = false,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun clearDepartments() {
+        _uiState.update { current ->
+            current.copy(
+                selectedDepartmentIds = emptySet(),
+                productModeAll = false,
+            )
+        }
+        refreshPreview()
+    }
+
     override fun setClientModeAll(all: Boolean) {
         _uiState.update { current ->
             current.copy(
@@ -123,6 +143,26 @@ class OfflineSyncSettingsRepositoryImpl(
                 }
             current.copy(
                 selectedSucursalIds = selected,
+                clientModeAll = false,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun selectAllSucursales(ids: Set<String>) {
+        _uiState.update { current ->
+            current.copy(
+                selectedSucursalIds = ids,
+                clientModeAll = false,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun clearSucursales() {
+        _uiState.update { current ->
+            current.copy(
+                selectedSucursalIds = emptySet(),
                 clientModeAll = false,
             )
         }
@@ -188,9 +228,9 @@ class OfflineSyncSettingsRepositoryImpl(
                         message =
                             when (syncResult) {
                                 is SyncEngine.Outcome.Success ->
-                                    "Catálogo sincronizado (${syncResult.changesApplied} elementos descargados)."
+                                    "Ajustes de visibilidad guardados y catálogo sincronizado (${syncResult.changesApplied} elementos descargados)."
                                 is SyncEngine.Outcome.Error ->
-                                    "Alcance guardado. Error al descargar: ${syncResult.message}. Sincronización re-encolada en segundo plano."
+                                    "Ajustes de visibilidad guardados. Error al descargar: ${syncResult.message}. Sincronización re-encolada en segundo plano."
                             },
                     )
                 }
@@ -199,7 +239,7 @@ class OfflineSyncSettingsRepositoryImpl(
                 _uiState.update {
                     it.copy(
                         status = OfflineSettingsStatus.IDLE,
-                        message = "Sincronización offline deshabilitada.",
+                        message = "Ajustes de visibilidad guardados. Modo offline desactivado (los datos no se descargarán al terminal).",
                     )
                 }
             }

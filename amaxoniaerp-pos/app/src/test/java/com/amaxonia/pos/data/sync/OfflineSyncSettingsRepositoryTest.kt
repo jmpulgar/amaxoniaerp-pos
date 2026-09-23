@@ -123,4 +123,30 @@ class OfflineSyncSettingsRepositoryTest {
         assertTrue(repository.uiState.value.clientModeAll)
         assertTrue(repository.uiState.value.selectedSucursalIds.isEmpty())
     }
+
+    @Test
+    fun `selectAllDepartments asigna conjunto y desactiva productModeAll`() {
+        repository.setProductModeAll(true)
+        repository.selectAllDepartments(setOf(1, 2, 3))
+
+        assertFalse(repository.uiState.value.productModeAll)
+        assertEquals(setOf(1, 2, 3), repository.uiState.value.selectedDepartmentIds)
+
+        repository.clearDepartments()
+        assertFalse(repository.uiState.value.productModeAll)
+        assertTrue(repository.uiState.value.selectedDepartmentIds.isEmpty())
+    }
+
+    @Test
+    fun `selectAllSucursales asigna conjunto y desactiva clientModeAll`() {
+        repository.setClientModeAll(true)
+        repository.selectAllSucursales(setOf("1", "2"))
+
+        assertFalse(repository.uiState.value.clientModeAll)
+        assertEquals(setOf("1", "2"), repository.uiState.value.selectedSucursalIds)
+
+        repository.clearSucursales()
+        assertFalse(repository.uiState.value.clientModeAll)
+        assertTrue(repository.uiState.value.selectedSucursalIds.isEmpty())
+    }
 }

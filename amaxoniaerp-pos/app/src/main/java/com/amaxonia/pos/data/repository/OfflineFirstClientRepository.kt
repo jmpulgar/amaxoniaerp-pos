@@ -11,6 +11,7 @@ import com.amaxonia.pos.data.remote.createClient
 import com.amaxonia.pos.data.remote.getClients
 import com.amaxonia.pos.data.remote.getDefaultClient
 import com.amaxonia.pos.data.remote.updateClient
+import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.repository.ClientRepository
 
@@ -19,6 +20,7 @@ class OfflineFirstClientRepository(
     private val localStore: LocalStore,
     private val clientDao: ClientDao,
     private val networkMonitor: NetworkMonitor,
+    private val offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) : ClientRepository {
     override suspend fun getDefaultClient(): Result<Client> {
         val token =
@@ -28,10 +30,14 @@ class OfflineFirstClientRepository(
         return runCatching {
             val dto = apiService.getDefaultClient(token)
             val client = dto.toDomain()
-            clientDao.insertAll(listOf(dto.toEntity()))
+            val scope = offlineScopeProvider()
+            if (scope.enabled) {
+                clientDao.insertAll(listOf(dto.toEntity()))
+            }
             client
         }.recoverCatching { error ->
-            val cached = clientDao.getPaged(limit = 1, offset = 0).firstOrNull()?.toDomain()
+            val scope = offlineScopeProvider()
+            val cached = getCachedClients(limit = 1, offset = 0, scope = scope).firstOrNull()
             cached ?: throw error
         }
     }
@@ -42,9 +48,10 @@ class OfflineFirstClientRepository(
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
+        val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
+                val cached = getCachedClients(pageSize, offset, scope)
                 if (cached.isNotEmpty()) {
                     Result.success(cached)
                 } else {
@@ -54,11 +61,16 @@ class OfflineFirstClientRepository(
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
             else ->
                 runCatching {
-                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = null)
-                    clientDao.insertAll(response.data.map { it.toEntity() })
+                    val branchIds = if (scope.allClients) null else scope.branchIds.toList()
+                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = null, branchIds = branchIds)
+                    if (scope.enabled) {
+                        val entities = response.data.map { it.toEntity() }
+                        val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
+                        if (toCache.isNotEmpty()) clientDao.insertAll(toCache)
+                    }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = clientDao.getPaged(pageSize, offset).map { it.toDomain() }
+                    val cached = getCachedClients(pageSize, offset, scope)
                     if (cached.isNotEmpty()) cached else throw error
                 }
         }
@@ -73,25 +85,7 @@ class OfflineFirstClientRepository(
         }
     }
 
-    override suspend fun searchClients(query: String): Result<List<Client>> {
-        val token = localStore.readCompanySession()?.token
-        return when {
-            !networkMonitor.isOnline() -> {
-                val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-                Result.success(cached)
-            }
-            token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
-            else ->
-                runCatching {
-                    val response = apiService.getClients(token, limit = 100, offset = 0, search = query)
-                    clientDao.insertAll(response.data.map { it.toEntity() })
-                    response.data.map { it.toDomain() }
-                }.recoverCatching { error ->
-                    val cached = clientDao.searchPaged(normalizeQuery(query), limit = 100, offset = 0).map { it.toDomain() }
-                    if (cached.isNotEmpty()) cached else throw error
-                }
-        }
-    }
+    override suspend fun searchClients(query: String): Result<List<Client>> = searchClients(query, page = 1, pageSize = 100)
 
     override suspend fun searchClients(
         query: String,
@@ -100,23 +94,58 @@ class OfflineFirstClientRepository(
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
+        val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-                Result.success(cached.map { it.toDomain() })
+                val cached = searchCachedClients(query, pageSize, offset, scope)
+                Result.success(cached)
             }
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
             else ->
                 runCatching {
-                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = query)
-                    clientDao.insertAll(response.data.map { it.toEntity() })
+                    val branchIds = if (scope.allClients) null else scope.branchIds.toList()
+                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = query, branchIds = branchIds)
+                    if (scope.enabled) {
+                        val entities = response.data.map { it.toEntity() }
+                        val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
+                        if (toCache.isNotEmpty()) clientDao.insertAll(toCache)
+                    }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = clientDao.searchPaged(normalizeQuery(query), limit = pageSize, offset = offset)
-                    val mapped = cached.map { it.toDomain() }
-                    if (mapped.isNotEmpty()) mapped else throw error
+                    val cached = searchCachedClients(query, pageSize, offset, scope)
+                    if (cached.isNotEmpty()) cached else throw error
                 }
         }
+    }
+
+    private suspend fun getCachedClients(
+        limit: Int,
+        offset: Int,
+        scope: OfflineSyncScope,
+    ): List<Client> {
+        val entities =
+            if (scope.allClients) {
+                clientDao.getPaged(limit, offset)
+            } else {
+                clientDao.getPagedBySucursales(scope.branchIds.toList(), limit, offset)
+            }
+        return entities.map { it.toDomain() }
+    }
+
+    private suspend fun searchCachedClients(
+        query: String,
+        limit: Int,
+        offset: Int,
+        scope: OfflineSyncScope,
+    ): List<Client> {
+        val normalized = normalizeQuery(query)
+        val entities =
+            if (scope.allClients) {
+                clientDao.searchPaged(normalized, limit = limit, offset = offset)
+            } else {
+                clientDao.searchPagedBySucursales(normalized, scope.branchIds.toList(), limit = limit, offset = offset)
+            }
+        return entities.map { it.toDomain() }
     }
 
     override suspend fun saveClient(client: Client): Result<Unit> {
@@ -131,7 +160,10 @@ class OfflineFirstClientRepository(
                 } else {
                     apiService.updateClient(token, client.id, request)
                 }
-            clientDao.insertAll(listOf(saved.toEntity()))
+            val scope = offlineScopeProvider()
+            if (scope.enabled) {
+                clientDao.insertAll(listOf(saved.toEntity()))
+            }
         }
     }
 

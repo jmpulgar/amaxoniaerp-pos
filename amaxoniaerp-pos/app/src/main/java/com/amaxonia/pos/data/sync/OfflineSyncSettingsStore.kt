@@ -6,7 +6,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.sync.OfflineSyncScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /**
  * Persistencia del alcance de sincronización offline (ADR-008, PLAN §18).
@@ -16,6 +19,18 @@ class OfflineSyncSettingsStore(
     context: Context,
 ) {
     private val dataStore = LocalStore(context).dataStore
+
+    val scopeFlow: Flow<OfflineSyncScope> =
+        dataStore.data.map { prefs ->
+            OfflineSyncScope(
+                enabled = prefs[KEY_ENABLED] ?: false,
+                departmentIds = parseIds(prefs[KEY_DEPT_IDS]),
+                branchIds = parseIds(prefs[KEY_BRANCH_IDS]),
+            )
+        }.distinctUntilChanged()
+
+    val scopeSelectionFlow: Flow<com.amaxonia.pos.domain.model.offline.OfflineScopeSelection> =
+        scopeFlow.map { it.toSelection() }.distinctUntilChanged()
 
     suspend fun load(): OfflineSyncScope {
         val prefs = dataStore.data.first()

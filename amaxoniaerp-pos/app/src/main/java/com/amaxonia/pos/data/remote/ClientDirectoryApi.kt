@@ -24,6 +24,7 @@ suspend fun ApiService.getClients(
     offset: Int,
     search: String?,
     includeTotal: Boolean? = null,
+    branchIds: List<Int>? = null,
 ): PagedResponse<ClientDto> =
     client
         .get("clients") {
@@ -36,6 +37,9 @@ suspend fun ApiService.getClients(
                 }
                 if (includeTotal != null) {
                     parameters.append("includeTotal", includeTotal.toString())
+                }
+                if (!branchIds.isNullOrEmpty()) {
+                    parameters.append("branchIds", branchIds.joinToString(","))
                 }
             }
         }.body()

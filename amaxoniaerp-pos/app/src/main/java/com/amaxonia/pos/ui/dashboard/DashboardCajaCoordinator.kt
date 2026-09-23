@@ -12,6 +12,8 @@ import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
 import com.amaxonia.pos.domain.usecase.caja.CashCloseTicketPayloadBuilder
 import com.amaxonia.pos.domain.util.CajaDateParser
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
@@ -94,9 +96,17 @@ class DashboardCajaCoordinator(
             verifyActiveSession()
             if (connectivity.isOnline() || cajaRepository.activeCaja.value == null) {
                 loadCajasJob?.cancel()
-                loadCajasJob = scope.launch { loadCajas(state) }
+                loadCajasJob =
+                    scope.launch {
+                        try {
+                            loadCajas(state)
+                        } finally {
+                            verifying.value = false
+                        }
+                    }
+            } else {
+                verifying.value = false
             }
-            verifying.value = false
         }
     }
 
@@ -133,6 +143,24 @@ class DashboardCajaCoordinator(
         loadCajasJob = scope.launch { loadCajas(state, forceShowSelector) }
     }
 
+    /**
+     * Busca la primera caja que tenga una sesión abierta en el backend,
+     * evaluando concurrentemente las cajas candidatas para evitar latencias secuenciales.
+     */
+    private suspend fun findFirstOpenCaja(cajas: List<Caja>): Caja? {
+        if (cajas.isEmpty()) return null
+        return coroutineScope {
+            val deferredStatuses =
+                cajas.map { caja ->
+                    async {
+                        val isOpen = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()?.isOpen == true
+                        if (isOpen) caja else null
+                    }
+                }
+            deferredStatuses.mapNotNull { it.await() }.firstOrNull()
+        }
+    }
+
     private suspend fun loadCajas(
         state: MutableStateFlow<DashboardState>,
         forceShowSelector: Boolean = false,
@@ -151,14 +179,22 @@ class DashboardCajaCoordinator(
 
                 val activeCaja = cajaRepository.activeCaja.value
                 val onlyAvailableCaja = cajas.singleOrNull()
-                if (!forceShowSelector && !state.value.showCajaSelector && activeCaja == null && onlyAvailableCaja != null) {
-                    // Auto-seleccionamos la única caja solo si el usuario no tiene abierto el selector
-                    cajaRepository.setActiveCaja(onlyAvailableCaja)
+                val targetCaja =
+                    if (!forceShowSelector && !state.value.showCajaSelector && activeCaja == null) {
+                        onlyAvailableCaja ?: findFirstOpenCaja(cajas)
+                    } else {
+                        null
+                    }
+
+                if (targetCaja != null) {
+                    cajaRepository.setActiveCaja(targetCaja)
                     verifyActiveSession()
                 }
+
                 // Si el selector ya estaba visible o se forzó, jamás debe cerrarse por una carga en segundo plano.
+                // Si no hay caja activa (ej. múltiples cajas y ninguna abierta), se muestra el selector.
                 val shouldShowSelector =
-                    keepSelectorVisible || state.value.showCajaSelector || (cajaRepository.activeCaja.value == null && onlyAvailableCaja == null)
+                    keepSelectorVisible || state.value.showCajaSelector || cajaRepository.activeCaja.value == null
                 state.update {
                     it.copy(
                         availableCajas = cajas,

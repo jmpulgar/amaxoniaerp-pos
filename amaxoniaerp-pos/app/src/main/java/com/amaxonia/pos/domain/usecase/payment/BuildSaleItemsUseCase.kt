@@ -72,7 +72,7 @@ class BuildSaleItemsUseCase {
             cantidadBulto = bulkQuantity.toInt().coerceAtLeast(1),
             unidadEmpaque = product.packageLabel,
             itemUnidadEmpaque = itemUnitPackage,
-            esProductoFisico = true,
+            esProductoFisico = !product.isService,
             itemCodigo = product.code,
             itemReferencia = product.reference,
             idSegmento = product.gobSegment.toIntOrNull(),

@@ -166,6 +166,12 @@ internal class ItemsHandlers(
             val search = call.request.queryParameters["search"]
             val includeTotal = call.request.queryParameters["includeTotal"]?.toBooleanStrictOrNull() ?: true
             val departmentIdParam = call.request.queryParameters["departmentId"]?.toIntOrNull()
+            val departmentIdsParam =
+                (call.request.queryParameters["departmentIds"] ?: call.request.queryParameters["deptIds"])
+                    ?.split(',')
+                    ?.mapNotNull { it.trim().toIntOrNull() }
+                    ?.filter { it > 0 }
+            val itemTypeParam = call.request.queryParameters["itemType"] ?: call.request.queryParameters["type"]
 
             if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
@@ -186,6 +192,8 @@ internal class ItemsHandlers(
                             search = search,
                             includeTotal = includeTotal,
                             departmentId = departmentIdParam,
+                            departmentIds = departmentIdsParam,
+                            itemType = itemTypeParam,
                         ),
                 )
 

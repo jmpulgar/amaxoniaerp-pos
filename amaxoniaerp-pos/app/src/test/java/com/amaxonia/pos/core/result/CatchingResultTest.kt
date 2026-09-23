@@ -27,4 +27,12 @@ class CatchingResultTest {
             val thrown = runCatching { catchingResult<Unit> { throw fatal } }.exceptionOrNull()
             assertTrue(thrown === fatal)
         }
+
+    @Test
+    fun `rethrows CancellationException to honor cooperative coroutine cancellation`() =
+        runTest {
+            val cancellation = kotlinx.coroutines.CancellationException("cancelled")
+            val thrown = runCatching { catchingResult<Unit> { throw cancellation } }.exceptionOrNull()
+            assertTrue(thrown === cancellation)
+        }
 }

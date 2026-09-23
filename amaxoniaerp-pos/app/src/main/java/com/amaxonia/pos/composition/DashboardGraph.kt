@@ -32,6 +32,7 @@ object DashboardGraph {
                     DependencyContainer.posConfigurationRepository,
                     DependencyContainer.serverEnvironment,
                     DashboardProductMapper(DependencyContainer.imageUrlResolver),
+                    DependencyContainer.offlineSyncSettingsStore.scopeSelectionFlow,
                 ),
             cartCoordinator =
                 DashboardCartCoordinator(

@@ -31,6 +31,13 @@ interface ProductCatalogReader {
         departmentId: Int?,
         page: Int,
         pageSize: Int,
+    ): Result<List<Product>> = getAllProducts(departmentId, page, pageSize, null)
+
+    suspend fun getAllProducts(
+        departmentId: Int?,
+        page: Int,
+        pageSize: Int,
+        itemType: String?,
     ): Result<List<Product>> =
         getAllProducts(departmentId).map { products ->
             val startIndex = ((page - 1).coerceAtLeast(0)) * pageSize
@@ -67,6 +74,14 @@ interface ProductCatalogReader {
         departmentId: Int?,
         page: Int,
         pageSize: Int,
+    ): Result<List<Product>> = searchProducts(query, departmentId, page, pageSize, null)
+
+    suspend fun searchProducts(
+        query: String,
+        departmentId: Int?,
+        page: Int,
+        pageSize: Int,
+        itemType: String?,
     ): Result<List<Product>> = searchProducts(query, page, pageSize)
 }
 

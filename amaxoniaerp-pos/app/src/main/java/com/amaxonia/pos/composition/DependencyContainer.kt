@@ -455,7 +455,14 @@ object DependencyContainer {
         promotionRepository =
             PromotionRepositoryImpl(apiService, localStore, database.promocionDao(), database.productDao(), networkMonitor)
         reportRepository = ApiReportRepository(apiService, localStore)
-        clientRepository = OfflineFirstClientRepository(apiService, localStore, database.clientDao(), networkMonitor)
+        clientRepository =
+            OfflineFirstClientRepository(
+                apiService = apiService,
+                localStore = localStore,
+                clientDao = database.clientDao(),
+                networkMonitor = networkMonitor,
+                offlineScopeProvider = { offlineSyncSettingsStore.load() },
+            )
         addressCatalogRepository =
             LocalAddressCatalogRepository(
                 countryDao = database.countryDao(),

@@ -110,7 +110,7 @@ class OfflineFirstProductRepositoryTest {
         }
 
     @Test
-    fun `getAllProducts offline devuelve todos los productos descargados sin filtrar por departamento`() =
+    fun `getAllProducts offline respeta el alcance de visibilidad cuando departmentId es null`() =
         runTest {
             store.saveCompanySession(testCompanySession())
             seed(
@@ -121,7 +121,43 @@ class OfflineFirstProductRepositoryTest {
 
             val result = repository.getAllProducts(departmentId = null)
 
-            assertEquals(setOf("1", "2"), result.getOrThrow().map { it.id }.toSet())
+            assertEquals(setOf("1"), result.getOrThrow().map { it.id }.toSet())
+        }
+
+    @Test
+    fun `getAllProducts offline filtra por itemType producto o servicio`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            seed(
+                product("1", "a", "Cafetera", department = "1", isService = false),
+                product("2", "b", "Instalacion", department = "1", isService = true),
+            )
+            val repository = repository(online = false)
+
+            val productsOnly = repository.getAllProducts(departmentId = 1, page = 1, pageSize = 10, itemType = "PRODUCT")
+            val servicesOnly = repository.getAllProducts(departmentId = 1, page = 1, pageSize = 10, itemType = "SERVICE")
+            val all = repository.getAllProducts(departmentId = 1, page = 1, pageSize = 10, itemType = null)
+
+            assertEquals(listOf("1"), productsOnly.getOrThrow().map { it.id })
+            assertEquals(listOf("2"), servicesOnly.getOrThrow().map { it.id })
+            assertEquals(setOf("1", "2"), all.getOrThrow().map { it.id }.toSet())
+        }
+
+    @Test
+    fun `searchProducts offline busca por codigo barras y filtra por itemType`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            seed(
+                product("1", "a", "Cafetera", barcode1 = "770123456", isService = false),
+                product("2", "b", "Mantenimiento Cafetera", barcode1 = "770123456", isService = true),
+            )
+            val repository = repository(online = false)
+
+            val searchServices = repository.searchProducts(query = "770123456", departmentId = null, page = 1, pageSize = 10, itemType = "SERVICE")
+            val searchProducts = repository.searchProducts(query = "770123456", departmentId = null, page = 1, pageSize = 10, itemType = "PRODUCT")
+
+            assertEquals(listOf("2"), searchServices.getOrThrow().map { it.id })
+            assertEquals(listOf("1"), searchProducts.getOrThrow().map { it.id })
         }
 
     private fun repository(
@@ -152,5 +188,15 @@ class OfflineFirstProductRepositoryTest {
         code: String,
         description: String,
         department: String = "0",
-    ): ProductDto = ProductDto(id = id, code = code, description = description, department = department)
+        barcode1: String? = null,
+        isService: Boolean = false,
+    ): ProductDto =
+        ProductDto(
+            id = id,
+            code = code,
+            description = description,
+            department = department,
+            barcode1 = barcode1,
+            isService = isService,
+        )
 }

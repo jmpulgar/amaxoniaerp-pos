@@ -21,6 +21,12 @@ data class AutomaticCloseTicketOffer(
     val unavailableReason: String? = null,
 )
 
+enum class ItemTypeFilter(val label: String) {
+    ALL("Todos"),
+    PRODUCT("Productos"),
+    SERVICE("Servicios"),
+}
+
 data class DashboardProduct(
     val id: String,
     val name: String,
@@ -32,6 +38,7 @@ data class DashboardProduct(
     val code: String? = null,
     val sku: String? = null,
     val barcode: String? = null,
+    val isService: Boolean = false,
     val sourceProduct: Product? = null,
 )
 
@@ -70,7 +77,9 @@ data class DashboardState(
     val selectedCategory: String = "Todos los productos",
     val departments: List<Department> = emptyList(),
     val selectedDepartmentId: Int? = null,
+    val selectedItemType: ItemTypeFilter = ItemTypeFilter.ALL,
     val showDepartmentPicker: Boolean = false,
+    val isFilterModalOpen: Boolean = false,
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val page: Int = 1,
@@ -97,6 +106,17 @@ data class DashboardState(
 
     val isInitialBestSellersLoading: Boolean
         get() = isLoadingBestSellers && bottomSelected == 1 && bestSellers.isEmpty()
+
+    val activeFilterCount: Int
+        get() {
+            var count = 0
+            if (selectedDepartmentId != null) count++
+            if (selectedItemType != ItemTypeFilter.ALL) count++
+            return count
+        }
+
+    val hasActiveFilters: Boolean
+        get() = activeFilterCount > 0
 }
 
 sealed interface DashboardUiAction
@@ -214,6 +234,8 @@ sealed interface DashboardCatalogUiAction : DashboardUiAction {
 
     sealed interface Department : DashboardCatalogUiAction
 
+    sealed interface Filter : DashboardCatalogUiAction
+
     data object LoadMoreProducts : Paging
 
     data object ToggleSearch : Search
@@ -230,6 +252,8 @@ sealed interface DashboardCatalogUiAction : DashboardUiAction {
 
     data object Retry : Paging
 
+    data object RefreshCatalog : Paging
+
     data class SetDepartmentPicker(
         val show: Boolean,
     ) : Department
@@ -237,4 +261,19 @@ sealed interface DashboardCatalogUiAction : DashboardUiAction {
     data class SelectDepartment(
         val departmentId: Int?,
     ) : Department
+
+    data class SetFilterModalOpen(
+        val open: Boolean,
+    ) : Filter
+
+    data class SelectItemType(
+        val type: ItemTypeFilter,
+    ) : Filter
+
+    data object ClearFilters : Filter
+
+    data class ApplyFilters(
+        val departmentId: Int?,
+        val itemType: ItemTypeFilter,
+    ) : Filter
 }

@@ -77,6 +77,7 @@ data class ProductEntity(
      * Valor de "activo" a confirmar en staging (default 'A').
      */
     @ColumnInfo(defaultValue = "A") val estatus: String = "A",
+    @ColumnInfo(defaultValue = "0") val isService: Boolean = false,
     val prices: List<PriceLevel>,
 )
 

@@ -34,9 +34,14 @@ class ClientsRepository {
         offset: Long,
         search: String?,
         includeTotal: Boolean,
+        branchIds: List<Int>? = null,
     ): Pair<List<Client>, Long> =
         dbQuery(database) {
             val query = ClientsTable.selectAll()
+
+            if (!branchIds.isNullOrEmpty()) {
+                query.andWhere { ClientsTable.idSucursal inList branchIds }
+            }
 
             if (!search.isNullOrBlank()) {
                 val pattern = "%$search%"

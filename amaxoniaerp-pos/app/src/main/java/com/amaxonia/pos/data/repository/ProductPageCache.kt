@@ -11,6 +11,7 @@ import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.getProducts
 import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Product
+import kotlinx.coroutines.CancellationException
 
 /**
  * Lector de páginas cacheadas de productos (Room) usado como fallback offline
@@ -26,27 +27,46 @@ internal class ProductPageCache(
         query: String?,
         limit: Int,
         offset: Int,
+        itemType: String? = null,
+        scope: OfflineSyncScope = OfflineSyncScope.ALL,
     ): List<Product> {
-        val normalized = query?.trim()?.let { if (it.isEmpty()) "%" else "%$it%" }
+        val isServiceInt =
+            when (itemType?.uppercase()) {
+                "SERVICE", "SERVICIO" -> 1
+                "PRODUCT", "PRODUCTO" -> 0
+                else -> null
+            }
+        val normalized = query?.trim()?.takeIf { it.isNotEmpty() }?.let { "%$it%" }
         val entities =
             if (normalized != null) {
-                if (departmentId == null) {
-                    productDao.searchPaged(normalized, limit = limit, offset = offset)
-                } else {
-                    productDao.searchPagedByDepartment(normalized, departmentId, limit = limit, offset = offset)
+                when {
+                    departmentId != null ->
+                        productDao.searchPagedByDepartment(normalized, departmentId, limit = limit, offset = offset, isService = isServiceInt)
+                    !scope.allProducts ->
+                        productDao.searchPagedByDepartments(normalized, scope.departmentIds.toList(), limit = limit, offset = offset, isService = isServiceInt)
+                    else ->
+                        productDao.searchPaged(normalized, limit = limit, offset = offset, isService = isServiceInt)
                 }
             } else {
-                if (departmentId == null) {
-                    productDao.getPaged(limit = limit, offset = offset)
-                } else {
-                    productDao.getPagedByDepartment(departmentId, limit = limit, offset = offset)
+                when {
+                    departmentId != null ->
+                        productDao.getPagedByDepartment(departmentId, limit = limit, offset = offset, isService = isServiceInt)
+                    !scope.allProducts ->
+                        productDao.getPagedByDepartments(scope.departmentIds.toList(), limit = limit, offset = offset, isService = isServiceInt)
+                    else ->
+                        productDao.getPaged(limit = limit, offset = offset, isService = isServiceInt)
                 }
             }
         return entities.map { it.toDomain() }
     }
 
     /** Catálogo completo cacheado (hasta [FULL_CACHE_SIZE] filas). */
-    suspend fun fullCatalog(): List<Product> = productDao.getPaged(limit = FULL_CACHE_SIZE, offset = 0).map { it.toDomain() }
+    suspend fun fullCatalog(scope: OfflineSyncScope = OfflineSyncScope.ALL): List<Product> =
+        if (scope.allProducts) {
+            productDao.getPaged(limit = FULL_CACHE_SIZE, offset = 0).map { it.toDomain() }
+        } else {
+            productDao.getPagedByDepartments(scope.departmentIds.toList(), limit = FULL_CACHE_SIZE, offset = 0).map { it.toDomain() }
+        }
 
     private companion object {
         const val FULL_CACHE_SIZE = 1000
@@ -62,10 +82,11 @@ internal class ProductFetchPolicy(
     private val apiService: ApiService,
     private val localStore: LocalStore,
     private val productDao: ProductDao,
-    private val networkMonitor: NetworkMonitor,
+    networkMonitor: NetworkMonitor,
     private val offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) {
     private val cache = ProductPageCache(productDao)
+    private val networkMonitor = networkMonitor
 
     /** Catálogos sin caché local: exige token y conexión, o falla con mensaje de negocio. */
     suspend fun <T> onlineCatalog(block: suspend (String) -> List<T>): Result<List<T>> {
@@ -86,10 +107,14 @@ internal class ProductFetchPolicy(
         query: String?,
         limit: Int,
         offset: Int,
+        itemType: String? = null,
     ): Result<List<Product>> =
         when {
-            !networkMonitor.isOnline() -> Result.success(cache.page(departmentId, query, limit, offset))
-            else -> remotePageWithCacheFallback(departmentId, query, limit, offset)
+            !networkMonitor.isOnline() -> {
+                val scope = offlineScopeProvider()
+                Result.success(cache.page(departmentId, query, limit, offset, itemType, scope))
+            }
+            else -> remotePageWithCacheFallback(departmentId, query, limit, offset, itemType)
         }
 
     private suspend fun remotePageWithCacheFallback(
@@ -97,30 +122,37 @@ internal class ProductFetchPolicy(
         query: String?,
         limit: Int,
         offset: Int,
+        itemType: String? = null,
     ): Result<List<Product>> {
         val token = localStore.readCompanySession()?.token
         if (token.isNullOrBlank()) return Result.failure(IllegalStateException(NO_COMPANY_ERROR))
+        val scope = offlineScopeProvider()
+        val deptIds = if (scope.allProducts || departmentId != null) null else scope.departmentIds.toList()
         return runCatching {
             val response =
                 apiService.getProducts(
                     token,
                     page = CatalogPage(limit = limit, offset = offset, search = query),
                     departmentId = departmentId,
+                    departmentIds = deptIds,
+                    itemType = itemType,
                 )
-            val entities = response.data.map { it.toEntity() }
-            val scope = offlineScopeProvider()
-            val entitiesToCache =
-                if (scope.enabled && !scope.allProducts) {
-                    entities.filter { it.department in scope.departmentIds }
-                } else {
-                    entities
+            if (scope.enabled) {
+                val entities = response.data.map { it.toEntity() }
+                val entitiesToCache =
+                    if (!scope.allProducts) {
+                        entities.filter { it.department in scope.departmentIds }
+                    } else {
+                        entities
+                    }
+                if (entitiesToCache.isNotEmpty()) {
+                    productDao.insertAll(entitiesToCache)
                 }
-            if (entitiesToCache.isNotEmpty()) {
-                productDao.insertAll(entitiesToCache)
             }
             response.data.map { it.toDomain() }
         }.recoverCatching { error ->
-            cache.page(departmentId, query, limit, offset).ifEmpty { throw error }
+            if (error is CancellationException) throw error
+            cache.page(departmentId, query, limit, offset, itemType, scope).ifEmpty { throw error }
         }
     }
 

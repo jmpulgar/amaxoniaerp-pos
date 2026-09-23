@@ -114,6 +114,7 @@ fun ProductDto.toEntity(): ProductEntity {
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
+        isService = isService ?: (tipoProd == 1) ?: (codItemForma == 2) ?: false,
         prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices(),
     )
 }
@@ -135,6 +136,7 @@ fun ProductEntity.toDomain(): Product =
         bulkQuantity = bulkQuantity.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.ifBlank { "UNIDAD" },
+        isService = isService,
         prices = prices.ifEmpty { generateDefaultPrices() },
     )
 

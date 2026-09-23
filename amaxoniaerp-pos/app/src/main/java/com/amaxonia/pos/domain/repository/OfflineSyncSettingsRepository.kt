@@ -38,9 +38,17 @@ interface OfflineSyncSettingsRepository {
 
     fun toggleDepartment(id: Int)
 
+    fun selectAllDepartments(ids: Set<Int>)
+
+    fun clearDepartments()
+
     fun setClientModeAll(all: Boolean)
 
     fun toggleSucursal(id: String)
+
+    fun selectAllSucursales(ids: Set<String>)
+
+    fun clearSucursales()
 
     fun refreshPreview()
 

@@ -35,6 +35,7 @@ data class Product(
     val bulkQuantity: Double = 1.0,
     val portionUnit: String? = null,
     val unitOrPackage: String = "UNIDAD",
+    val isService: Boolean = false,
     val prices: List<PriceLevel> = generateDefaultPrices(),
 ) {
     val canSwitchUnit: Boolean

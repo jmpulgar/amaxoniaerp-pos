@@ -60,8 +60,14 @@ internal class ClientsHandlers(
                 return@run
             }
 
+            val branchIds =
+                call.request.queryParameters["branchIds"]
+                    ?.split(',')
+                    ?.mapNotNull { it.trim().toIntOrNull() }
+                    ?.filter { it > 0 }
+
             val companyDb = ctx.connectDatabase()
-            val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal)
+            val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal, branchIds)
             call.respond(ClientsListResponse(data = clients, total = total))
         }
 

@@ -20,6 +20,7 @@ class DashboardProductMapper(
             category = product.department.ifEmpty { "General" },
             code = product.code,
             barcode = product.barcode1,
+            isService = product.isService,
             sourceProduct = product,
         )
 

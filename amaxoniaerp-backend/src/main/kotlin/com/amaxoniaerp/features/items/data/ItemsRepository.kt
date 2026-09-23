@@ -11,6 +11,8 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -65,12 +67,32 @@ class ItemsRepository {
                     (table.codItem like "%${query.search}%") or
                         (table.descripcion1 like "%${query.search}%") or
                         (table.codigoBarras like "%${query.search}%") or
+                        (table.codigoBarras2 like "%${query.search}%") or
+                        (table.codigoBarras3 like "%${query.search}%") or
                         (table.referencia like "%${query.search}%")
+                }
+            }
+            if (!query.departmentIds.isNullOrEmpty()) {
+                select.andWhere {
+                    (table.departamentoId inList query.departmentIds) or (table.codDepartamento inList query.departmentIds)
                 }
             }
             if (query.departmentId != null && query.departmentId > 0) {
                 select.andWhere {
                     (table.departamentoId eq query.departmentId) or (table.codDepartamento eq query.departmentId)
+                }
+            }
+            when (query.itemType?.uppercase()) {
+                "SERVICE", "SERVICIO" -> {
+                    select.andWhere {
+                        (table.tipoProd eq 1) or (table.codItemForma eq 2)
+                    }
+                }
+                "PRODUCT", "PRODUCTO" -> {
+                    select.andWhere {
+                        (table.tipoProd.isNull() or (table.tipoProd neq 1)) and
+                            (table.codItemForma.isNull() or (table.codItemForma neq 2))
+                    }
                 }
             }
 
@@ -229,4 +251,6 @@ data class ItemsListQuery(
     val search: String?,
     val includeTotal: Boolean,
     val departmentId: Int? = null,
+    val departmentIds: List<Int>? = null,
+    val itemType: String? = null,
 )

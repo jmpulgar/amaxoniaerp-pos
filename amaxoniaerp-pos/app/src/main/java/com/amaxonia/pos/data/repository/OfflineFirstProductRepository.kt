@@ -42,6 +42,7 @@ class OfflineFirstProductRepository(
     private val apiService = apiService
     private val productDao = productDao
     private val networkMonitor = networkMonitor
+    private val offlineScopeProvider = offlineScopeProvider
 
     override suspend fun getDepartments(): Result<List<Department>> =
         fetch.onlineCatalog { token ->
@@ -81,20 +82,22 @@ class OfflineFirstProductRepository(
     override suspend fun getAllProducts(): Result<List<Product>> = getAllProducts(null)
 
     override suspend fun getAllProducts(departmentId: Int?): Result<List<Product>> {
+        val scope = offlineScopeProvider()
         if (!networkMonitor.isOnline()) {
-            val cached = cache.fullCatalog()
+            val cached = cache.fullCatalog(scope)
             return if (cached.isNotEmpty()) Result.success(cached) else Result.failure(IllegalStateException(NO_COMPANY_ERROR))
         }
         return fetch
             .pageWithCacheFallback(departmentId, null, FULL_CATALOG_PAGE_SIZE, 0)
-            .recoverCatching { error -> cache.fullCatalog().ifEmpty { throw error } }
+            .recoverCatching { error -> cache.fullCatalog(scope).ifEmpty { throw error } }
     }
 
     override suspend fun getAllProducts(
         departmentId: Int?,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, null, pageSize, pageOffset(page, pageSize))
+        itemType: String?,
+    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, null, pageSize, pageOffset(page, pageSize), itemType)
 
     override suspend fun getProductById(id: String): Result<Product> {
         val token = localStore.readCompanySession()?.token
@@ -137,16 +140,20 @@ class OfflineFirstProductRepository(
         departmentId: Int?,
         page: Int,
         pageSize: Int,
+        itemType: String?,
     ): Result<List<Product>> {
         // Escaneo de código de barras (hot path): match exacto indexado
         // primero, offline y en <50ms; si no hay match, búsqueda normal.
         val trimmed = query.trim()
         if (trimmed.length >= MIN_BARCODE_LENGTH && trimmed.all { it.isDigit() }) {
             productDao.getByBarcode(trimmed)?.let { exact ->
-                return Result.success(listOf(exact.toDomain()))
+                val exactProduct = exact.toDomain()
+                if (itemType.isNullOrBlank() || (itemType.equals("SERVICE", true) && exactProduct.isService) || (itemType.equals("PRODUCT", true) && !exactProduct.isService)) {
+                    return Result.success(listOf(exactProduct))
+                }
             }
         }
-        return fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize))
+        return fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize), itemType)
     }
 
     override suspend fun saveProduct(product: Product): Result<Unit> {

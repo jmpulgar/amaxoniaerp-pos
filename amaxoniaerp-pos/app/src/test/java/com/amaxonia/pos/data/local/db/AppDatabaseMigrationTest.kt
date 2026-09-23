@@ -70,6 +70,23 @@ class AppDatabaseMigrationTest {
     fun `base creada en v18 migra al schema actual`() = migrateFrom(18)
 
     @Test
+    fun `base creada en v19 migra al schema actual`() = migrateFrom(19)
+
+    @Test
+    fun `base creada en v20 migra al schema actual`() = migrateFrom(20)
+
+    @Test
+    fun `migracion 20 a 21 agrega columna isService a products con default 0`() {
+        val db = openMigratedFrom(20)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            assertTrue("columna 'isService' debe existir en products", sqlite.hasColumn("products", "isService"))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `migracion 18 a 19 agrega columna codTipoPrecio a clients con default 2`() {
         val db = openMigratedFrom(18)
         try {
@@ -243,6 +260,6 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 20
+        const val SCHEMA_VERSION = 21
     }
 }

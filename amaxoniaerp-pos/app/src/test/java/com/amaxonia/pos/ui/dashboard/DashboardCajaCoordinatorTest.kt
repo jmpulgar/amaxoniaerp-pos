@@ -650,6 +650,111 @@ class DashboardCajaCoordinatorTest {
             testJob.cancel()
         }
 
+    @Test
+    fun `loadCajas con multiples cajas y una abierta autoselecciona la abierta sin mostrar selector`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val fakeRepo = FakeCajaRepository()
+            val coordinator = buildCoordinator(fakeRepo)
+            val state = MutableStateFlow(DashboardState())
+            val testJob = kotlinx.coroutines.Job()
+            val coordinatorScope = kotlinx.coroutines.CoroutineScope(coroutineContext + testJob)
+
+            val caja1 = Caja(idCaja = "caja-1", codCaja = "C1", caja = "Caja 1", descripcion = "Caja 1", estatus = 1, idSucursal = 1, serieCaja = "C01", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja2 = Caja(idCaja = "caja-2", codCaja = "C2", caja = "Caja 2", descripcion = "Caja 2", estatus = 1, idSucursal = 1, serieCaja = "C02", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja3 = Caja(idCaja = "caja-3", codCaja = "C3", caja = "Caja 3", descripcion = "Caja 3", estatus = 1, idSucursal = 1, serieCaja = "C03", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+
+            fakeRepo.cajasList = listOf(caja1, caja2, caja3)
+            fakeRepo.openCajaIds = setOf("caja-2")
+
+            coordinator.start(coordinatorScope, state)
+            advanceUntilIdle()
+
+            org.junit.Assert.assertEquals("caja-2", fakeRepo.activeCaja.value?.idCaja)
+            assertFalse(state.value.showCajaSelector)
+            org.junit.Assert.assertEquals(CajaSessionStatus.ABIERTA, state.value.cajaSession)
+
+            testJob.cancel()
+        }
+
+    @Test
+    fun `loadCajas con multiples cajas abiertas autoselecciona la primera abierta en orden de lista`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val fakeRepo = FakeCajaRepository()
+            val coordinator = buildCoordinator(fakeRepo)
+            val state = MutableStateFlow(DashboardState())
+            val testJob = kotlinx.coroutines.Job()
+            val coordinatorScope = kotlinx.coroutines.CoroutineScope(coroutineContext + testJob)
+
+            val caja1 = Caja(idCaja = "caja-1", codCaja = "C1", caja = "Caja 1", descripcion = "Caja 1", estatus = 1, idSucursal = 1, serieCaja = "C01", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja2 = Caja(idCaja = "caja-2", codCaja = "C2", caja = "Caja 2", descripcion = "Caja 2", estatus = 1, idSucursal = 1, serieCaja = "C02", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja3 = Caja(idCaja = "caja-3", codCaja = "C3", caja = "Caja 3", descripcion = "Caja 3", estatus = 1, idSucursal = 1, serieCaja = "C03", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+
+            fakeRepo.cajasList = listOf(caja1, caja2, caja3)
+            // Cajas 2 y 3 abiertas, caja 1 cerrada
+            fakeRepo.openCajaIds = setOf("caja-2", "caja-3")
+
+            coordinator.start(coordinatorScope, state)
+            advanceUntilIdle()
+
+            // Debe autoseleccionar caja-2 por ser la primera abierta en el orden de la lista
+            org.junit.Assert.assertEquals("caja-2", fakeRepo.activeCaja.value?.idCaja)
+            assertFalse(state.value.showCajaSelector)
+            org.junit.Assert.assertEquals(CajaSessionStatus.ABIERTA, state.value.cajaSession)
+
+            testJob.cancel()
+        }
+
+    @Test
+    fun `loadCajas con todas las cajas abiertas autoselecciona la primera de la lista`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val fakeRepo = FakeCajaRepository()
+            val coordinator = buildCoordinator(fakeRepo)
+            val state = MutableStateFlow(DashboardState())
+            val testJob = kotlinx.coroutines.Job()
+            val coordinatorScope = kotlinx.coroutines.CoroutineScope(coroutineContext + testJob)
+
+            val caja1 = Caja(idCaja = "caja-1", codCaja = "C1", caja = "Caja 1", descripcion = "Caja 1", estatus = 1, idSucursal = 1, serieCaja = "C01", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja2 = Caja(idCaja = "caja-2", codCaja = "C2", caja = "Caja 2", descripcion = "Caja 2", estatus = 1, idSucursal = 1, serieCaja = "C02", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+
+            fakeRepo.cajasList = listOf(caja1, caja2)
+            // Todas abiertas
+            fakeRepo.openCajaIds = setOf("caja-1", "caja-2")
+
+            coordinator.start(coordinatorScope, state)
+            advanceUntilIdle()
+
+            org.junit.Assert.assertEquals("caja-1", fakeRepo.activeCaja.value?.idCaja)
+            assertFalse(state.value.showCajaSelector)
+            org.junit.Assert.assertEquals(CajaSessionStatus.ABIERTA, state.value.cajaSession)
+
+            testJob.cancel()
+        }
+
+    @Test
+    fun `loadCajas con multiples cajas y ninguna abierta muestra selector de cajas`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val fakeRepo = FakeCajaRepository()
+            val coordinator = buildCoordinator(fakeRepo)
+            val state = MutableStateFlow(DashboardState())
+            val testJob = kotlinx.coroutines.Job()
+            val coordinatorScope = kotlinx.coroutines.CoroutineScope(coroutineContext + testJob)
+
+            val caja1 = Caja(idCaja = "caja-1", codCaja = "C1", caja = "Caja 1", descripcion = "Caja 1", estatus = 1, idSucursal = 1, serieCaja = "C01", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+            val caja2 = Caja(idCaja = "caja-2", codCaja = "C2", caja = "Caja 2", descripcion = "Caja 2", estatus = 1, idSucursal = 1, serieCaja = "C02", defaultSellerId = 1, defaultSellerName = "V", availableSellers = emptyList())
+
+            fakeRepo.cajasList = listOf(caja1, caja2)
+            fakeRepo.openCajaIds = emptySet()
+
+            coordinator.start(coordinatorScope, state)
+            advanceUntilIdle()
+
+            org.junit.Assert.assertNull(fakeRepo.activeCaja.value)
+            assertTrue(state.value.showCajaSelector)
+            org.junit.Assert.assertEquals(2, state.value.availableCajas.size)
+
+            testJob.cancel()
+        }
+
     private class FakeCajaRepository : CajaRepository {
         val activeCajaState = MutableStateFlow<Caja?>(null)
         override val activeCaja get() = activeCajaState
@@ -657,12 +762,33 @@ class DashboardCajaCoordinatorTest {
         override val activeCajaSecuencia = MutableStateFlow<CajaSecuencia?>(null)
         var lastOpenRequest: AperturaRequest? = null
         var cajasList: List<Caja> = emptyList()
+        var openCajaIds: Set<String> = emptySet()
 
         override suspend fun getCajas(): Result<List<Caja>> = Result.success(cajasList)
         override suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String> = Result.success("001")
         override suspend fun restoreActiveCajaIfValid() = Unit
-        override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> =
-            Result.success(CajaStatusResponse(isOpen = false, cajaSecuencia = null))
+        override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> {
+            val isOpen = cajaId in openCajaIds
+            val secuencia =
+                if (isOpen) {
+                    CajaSecuencia(
+                        idCajaSecuencia = "seq-$cajaId",
+                        idCaja = cajaId,
+                        fechaApertura = "${LocalDate.now()} 10:00:00",
+                        montoApertura = 100.0,
+                        estatus = 1,
+                        usuarioApertura = "cajero",
+                        serieSucursal = "SUC-1",
+                        idSucursal = 1,
+                    )
+                } else {
+                    null
+                }
+            if (activeCajaState.value?.idCaja == cajaId) {
+                activeCajaSecuencia.value = secuencia
+            }
+            return Result.success(CajaStatusResponse(isOpen = isOpen, cajaSecuencia = secuencia))
+        }
         override suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse> {
             lastOpenRequest = request
             return Result.success(CajaStatusResponse(isOpen = true, cajaSecuencia = null))

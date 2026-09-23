@@ -18,9 +18,17 @@ class OfflineSettingsViewModel(
 
     fun toggleDepartment(id: Int) = repository.toggleDepartment(id)
 
+    fun selectAllDepartments(ids: Set<Int>) = repository.selectAllDepartments(ids)
+
+    fun clearDepartments() = repository.clearDepartments()
+
     fun setClientModeAll(all: Boolean) = repository.setClientModeAll(all)
 
     fun toggleSucursal(id: String) = repository.toggleSucursal(id)
+
+    fun selectAllSucursales(ids: Set<String>) = repository.selectAllSucursales(ids)
+
+    fun clearSucursales() = repository.clearSucursales()
 
     fun refreshPreview() = repository.refreshPreview()
 

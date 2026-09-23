@@ -89,6 +89,7 @@ internal fun mapRowToProduct(
         bulkQuantity = row.getOrNull(table.cantidadBulto)?.toDouble()?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = row.getOrNull(table.unidadPorcion),
         unitOrPackage = row.getOrNull(table.unidadOEmpaque).orEmpty().ifBlank { "UNIDAD" },
+        isService = (row.getOrNull(table.tipoProd) == 1) || (row.getOrNull(table.codItemForma) == 2),
         prices = createPriceLevels(row, table),
         gobSegment = "",
         gobFamily = "",

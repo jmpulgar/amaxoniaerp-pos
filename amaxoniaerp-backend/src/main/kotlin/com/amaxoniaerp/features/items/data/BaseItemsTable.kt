@@ -1,7 +1,29 @@
 package com.amaxoniaerp.features.items.data
 
+import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.ColumnType
 import org.jetbrains.exposed.sql.Table
 import com.amaxoniaerp.core.database.SchemaDimensions as S
+
+/**
+ * Tipo de columna entero tolerante a valores booleanos (TINYINT(1)/BIT(1) de MySQL)
+ * o cadenas, evitando errores de deserialización en Exposed.
+ */
+class FlexibleIntColumnType : ColumnType<Int>() {
+    override fun sqlType(): String = "INTEGER"
+
+    override fun valueFromDB(value: Any): Int =
+        when (value) {
+            is Number -> value.toInt()
+            is Boolean -> if (value) 1 else 0
+            is String -> value.trim().toIntOrNull() ?: 0
+            else -> 0
+        }
+
+    override fun notNullValueToDB(value: Int): Any = value
+}
+
+fun Table.flexibleInt(name: String): Column<Int> = registerColumn(name, FlexibleIntColumnType())
 
 /**
  * Tabla base abstracta con campos comunes de item para todos los países.
@@ -90,8 +112,8 @@ abstract class BaseItemsTable(
 
     // Estado
     val estatus = varchar("estatus", 1).default("A")
-    val codItemForma = integer("cod_item_forma").default(1)
-    val tipoProd = integer("tipo_prod").default(2)
+    val codItemForma = flexibleInt("cod_item_forma").default(1)
+    val tipoProd = flexibleInt("tipo_prod").default(2)
 
     // Auditoría
     val usuarioCreacion = varchar("usuario_creacion", S.VARCHAR_LENGTH_60).default("API")

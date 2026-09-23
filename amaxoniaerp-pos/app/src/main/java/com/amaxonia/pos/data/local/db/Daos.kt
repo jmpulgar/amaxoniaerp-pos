@@ -34,6 +34,16 @@ interface ClientDao {
     ): List<ClientEntity>
 
     @Query(
+        "SELECT * FROM clients WHERE idSucursal IN (:sucursalIds) " +
+            "ORDER BY name, lastName LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getPagedBySucursales(
+        sucursalIds: List<Int>,
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
+
+    @Query(
         "SELECT * FROM clients " +
             "WHERE name LIKE :query COLLATE NOCASE " +
             "OR lastName LIKE :query COLLATE NOCASE " +
@@ -44,6 +54,23 @@ interface ClientDao {
     )
     suspend fun searchPaged(
         query: String,
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
+
+    @Query(
+        "SELECT * FROM clients " +
+            "WHERE idSucursal IN (:sucursalIds) AND (" +
+            "name LIKE :query COLLATE NOCASE " +
+            "OR lastName LIKE :query COLLATE NOCASE " +
+            "OR identification LIKE :query COLLATE NOCASE " +
+            "OR phone LIKE :query COLLATE NOCASE " +
+            "OR email LIKE :query COLLATE NOCASE) " +
+            "ORDER BY name, lastName LIMIT :limit OFFSET :offset",
+    )
+    suspend fun searchPagedBySucursales(
+        query: String,
+        sucursalIds: List<Int>,
         limit: Int,
         offset: Int,
     ): List<ClientEntity>
@@ -99,25 +126,44 @@ interface ProductDao {
     )
     suspend fun getByBarcode(code: String): ProductEntity?
 
-    @Query("SELECT * FROM products WHERE estatus = 'A' ORDER BY description LIMIT :limit OFFSET :offset")
+    @Query(
+        "SELECT * FROM products WHERE estatus = 'A' " +
+            "AND (:isService IS NULL OR isService = :isService) " +
+            "ORDER BY description LIMIT :limit OFFSET :offset",
+    )
     suspend fun getPaged(
         limit: Int,
         offset: Int,
+        isService: Int? = null,
     ): List<ProductEntity>
 
     @Query(
         "SELECT * FROM products WHERE department = :departmentId AND estatus = 'A' " +
+            "AND (:isService IS NULL OR isService = :isService) " +
             "ORDER BY description LIMIT :limit OFFSET :offset",
     )
     suspend fun getPagedByDepartment(
         departmentId: Int,
         limit: Int,
         offset: Int,
+        isService: Int? = null,
+    ): List<ProductEntity>
+
+    @Query(
+        "SELECT * FROM products WHERE department IN (:departmentIds) AND estatus = 'A' " +
+            "AND (:isService IS NULL OR isService = :isService) " +
+            "ORDER BY description LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getPagedByDepartments(
+        departmentIds: List<Int>,
+        limit: Int,
+        offset: Int,
+        isService: Int? = null,
     ): List<ProductEntity>
 
     @Query(
         "SELECT * FROM products " +
-            "WHERE estatus = 'A' AND (" +
+            "WHERE estatus = 'A' AND (:isService IS NULL OR isService = :isService) AND (" +
             "code LIKE :query COLLATE NOCASE " +
             "OR description LIKE :query COLLATE NOCASE " +
             "OR reference LIKE :query COLLATE NOCASE " +
@@ -130,11 +176,12 @@ interface ProductDao {
         query: String,
         limit: Int,
         offset: Int,
+        isService: Int? = null,
     ): List<ProductEntity>
 
     @Query(
         "SELECT * FROM products " +
-            "WHERE department = :departmentId AND estatus = 'A' AND (" +
+            "WHERE department = :departmentId AND estatus = 'A' AND (:isService IS NULL OR isService = :isService) AND (" +
             "code LIKE :query COLLATE NOCASE " +
             "OR description LIKE :query COLLATE NOCASE " +
             "OR reference LIKE :query COLLATE NOCASE " +
@@ -148,6 +195,26 @@ interface ProductDao {
         departmentId: Int,
         limit: Int,
         offset: Int,
+        isService: Int? = null,
+    ): List<ProductEntity>
+
+    @Query(
+        "SELECT * FROM products " +
+            "WHERE department IN (:departmentIds) AND estatus = 'A' AND (:isService IS NULL OR isService = :isService) AND (" +
+            "code LIKE :query COLLATE NOCASE " +
+            "OR description LIKE :query COLLATE NOCASE " +
+            "OR reference LIKE :query COLLATE NOCASE " +
+            "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE) " +
+            "ORDER BY description LIMIT :limit OFFSET :offset",
+    )
+    suspend fun searchPagedByDepartments(
+        query: String,
+        departmentIds: List<Int>,
+        limit: Int,
+        offset: Int,
+        isService: Int? = null,
     ): List<ProductEntity>
 
     /** Resync: borra TODO el catálogo de productos (nunca toca ventas). */

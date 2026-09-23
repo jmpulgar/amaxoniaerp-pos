@@ -43,6 +43,11 @@ data class ProductDto(
     val bulkQuantity: Double? = null,
     val portionUnit: String? = null,
     val unitOrPackage: String? = null,
+    val isService: Boolean? = null,
+    @kotlinx.serialization.SerialName("tipo_prod")
+    val tipoProd: Int? = null,
+    @kotlinx.serialization.SerialName("cod_item_forma")
+    val codItemForma: Int? = null,
     val prices: List<PriceDto> = emptyList(),
 )
 
