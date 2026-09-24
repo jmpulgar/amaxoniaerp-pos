@@ -7,7 +7,6 @@ import com.amaxoniaerp.features.electronicinvoice.domain.InvoiceFEContext
 import com.amaxoniaerp.features.electronicinvoice.domain.PanamaCreditNotePayloadContext
 import com.amaxoniaerp.features.facturas.data.FacturasTablePA
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.get
 import org.jetbrains.exposed.sql.insert

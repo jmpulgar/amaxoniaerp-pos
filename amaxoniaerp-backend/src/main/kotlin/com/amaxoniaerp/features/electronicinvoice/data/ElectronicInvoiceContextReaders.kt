@@ -2,7 +2,6 @@ package com.amaxoniaerp.features.electronicinvoice.data
 
 import com.amaxoniaerp.features.electronicinvoice.domain.FEDetalleData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
-import com.amaxoniaerp.features.facturas.data.FacturasTablePA
 import org.jetbrains.exposed.sql.Alias
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
@@ -181,8 +180,7 @@ internal fun resolveMaxExistingNumeroDocumentoFiscal(): Long =
             .where { FEFacturaReadTable.numeroDocumentoFiscal.isNotNull() }
             .mapNotNull { row ->
                 row[FEFacturaReadTable.numeroDocumentoFiscal]?.trim()?.toLongOrNull()
-            }
-            .maxOrNull() ?: 0L
+            }.maxOrNull() ?: 0L
     }.getOrDefault(0L)
 
 internal data class FECorrelativoState(
