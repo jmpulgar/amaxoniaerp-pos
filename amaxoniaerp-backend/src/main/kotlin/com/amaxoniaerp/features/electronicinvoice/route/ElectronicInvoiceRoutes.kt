@@ -133,6 +133,7 @@ internal class ElectronicInvoiceHandlers(
                 qr = result.qr.orEmpty(),
                 fechaRecepcionDGI = result.fechaRecepcionDGI.orEmpty(),
                 nroProtocoloAutorizacion = result.nroProtocoloAutorizacion.orEmpty(),
+                numeroDocumentoFiscal = result.numeroDocumentoFiscal,
             ),
         )
 

@@ -2,11 +2,15 @@ package com.amaxoniaerp.features.electronicinvoice.data
 
 import com.amaxoniaerp.features.electronicinvoice.domain.FEDetalleData
 import com.amaxoniaerp.features.electronicinvoice.domain.FEInvoiceNotFoundException
+import com.amaxoniaerp.features.facturas.data.FacturasTablePA
 import org.jetbrains.exposed.sql.Alias
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.alias
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.slf4j.LoggerFactory
 
@@ -170,20 +174,71 @@ internal fun resolveCodigoSucursalYPuntoFacturacion(
     return codigoFinal to puntoFinal
 }
 
-internal fun resolveNumeroDocumentoFiscal(): String {
-    val row =
+internal fun resolveMaxExistingNumeroDocumentoFiscal(): Long =
+    runCatching {
+        FEFacturaReadTable
+            .select(FEFacturaReadTable.numeroDocumentoFiscal)
+            .where { FEFacturaReadTable.numeroDocumentoFiscal.isNotNull() }
+            .mapNotNull { row ->
+                row[FEFacturaReadTable.numeroDocumentoFiscal]?.trim()?.toLongOrNull()
+            }
+            .maxOrNull() ?: 0L
+    }.getOrDefault(0L)
+
+internal data class FECorrelativoState(
+    val id: Int,
+    val contador: Long,
+)
+
+internal fun ensureFECorrelativoExists(): FECorrelativoState {
+    val existing =
         FECorrelativosTable
             .selectAll()
             .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
             .limit(1)
             .firstOrNull()
 
-    if (row == null) {
-        readersLog.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal', usando 1")
-        return "1"
+    if (existing != null) {
+        return FECorrelativoState(
+            id = existing[FECorrelativosTable.id],
+            contador = existing[FECorrelativosTable.contador].toLong(),
+        )
     }
 
-    return (row[FECorrelativosTable.contador] + 1).toString()
+    readersLog.info("[FE] Registro 'numeroDocumentoFiscal' no encontrado en correlativos. Creando registro inicial...")
+    val maxFactura = resolveMaxExistingNumeroDocumentoFiscal()
+    val initialContador = if (maxFactura > 0) maxFactura + 1L else 1L
+    val nextId =
+        runCatching {
+            (FECorrelativosTable.selectAll().map { it[FECorrelativosTable.id] }.maxOrNull() ?: 0) + 1
+        }.getOrDefault(1)
+
+    runCatching {
+        FECorrelativosTable.insert {
+            it[id] = nextId
+            it[campo] = "numeroDocumentoFiscal"
+            it[contador] = initialContador.toInt()
+        }
+    }
+
+    val createdRow =
+        FECorrelativosTable
+            .selectAll()
+            .where { FECorrelativosTable.campo eq "numeroDocumentoFiscal" }
+            .limit(1)
+            .firstOrNull()
+
+    return FECorrelativoState(
+        id = createdRow?.get(FECorrelativosTable.id) ?: nextId,
+        contador = createdRow?.get(FECorrelativosTable.contador)?.toLong() ?: initialContador,
+    )
+}
+
+internal fun resolveNumeroDocumentoFiscal(): String {
+    val state = ensureFECorrelativoExists()
+    val maxFactura = resolveMaxExistingNumeroDocumentoFiscal()
+    val nextToUse = maxOf(state.contador, if (maxFactura > 0) maxFactura + 1L else 1L)
+    return nextToUse.toString()
 }
 
 /**

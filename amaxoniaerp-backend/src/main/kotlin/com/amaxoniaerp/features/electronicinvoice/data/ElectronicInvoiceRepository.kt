@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.get
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -88,6 +89,12 @@ open class ElectronicInvoiceRepository {
                     siguienteCorrelativo = ::resolveNumeroDocumentoFiscal,
                 )
             logger.info("[FE] numeroDocumentoFiscal=$numeroDocFiscal")
+
+            if (facturaRow[FEFacturaReadTable.numeroDocumentoFiscal].isNullOrBlank()) {
+                FacturasTablePA.update({ FacturasTablePA.idFactura eq invoiceId }) {
+                    it[numeroDocumentoFiscal] = numeroDocFiscal
+                }
+            }
 
             // 5. Mapear factura y cliente (JOIN con paises)
             val factura = mapFactura(facturaRow, numeroDocFiscal)
@@ -202,17 +209,25 @@ open class ElectronicInvoiceRepository {
      */
     open suspend fun incrementNumeroDocumentoFiscal(database: Database) =
         dbQuery(database) {
+            val state = ensureFECorrelativoExists()
+            val maxFactura = resolveMaxExistingNumeroDocumentoFiscal()
+            val targetNext = maxOf(state.contador, maxFactura) + 1L
+
             val updated =
                 FECorrelativosTable.update({
                     FECorrelativosTable.campo eq "numeroDocumentoFiscal"
                 }) {
-                    with(SqlExpressionBuilder) {
-                        it.update(FECorrelativosTable.contador, FECorrelativosTable.contador + 1)
-                    }
+                    it[contador] = targetNext.toInt()
                 }
 
             if (updated == 0) {
-                logger.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal'")
+                logger.warn("No se encontró registro de correlativos para 'numeroDocumentoFiscal', insertando...")
+                val nextId = (FECorrelativosTable.selectAll().map { it[FECorrelativosTable.id] }.maxOrNull() ?: 0) + 1
+                FECorrelativosTable.insert {
+                    it[id] = nextId
+                    it[campo] = "numeroDocumentoFiscal"
+                    it[contador] = targetNext.toInt()
+                }
             }
         }
 

@@ -145,6 +145,7 @@ class PanamaInvoiceProcessor(
                 fechaRecepcionDGI = pacAccepted.response.fechaRecepcionDGI,
                 nroProtocoloAutorizacion = pacAccepted.response.nroProtocoloAutorizacion,
                 fechaLimite = pacAccepted.response.fechaLimite,
+                numeroDocumentoFiscal = context.factura.numeroDocumentoFiscal,
             )
         }
 
