@@ -129,6 +129,18 @@ object SyncScheduler {
         )
     }
 
+    /**
+     * Cancela todas las tareas de descarga y sincronización de catálogos en WorkManager.
+     * Conserva las tareas de subida de facturas pendientes y confirmaciones fiscales.
+     */
+    fun cancelCatalogSync(context: Context) {
+        val wm = runCatching { WorkManager.getInstance(context) }.getOrNull() ?: return
+        wm.cancelUniqueWork(PERIODIC_WORK_NAME)
+        wm.cancelUniqueWork(MANUAL_WORK_NAME)
+        wm.cancelUniqueWork(BOOTSTRAP_WORK_NAME)
+        wm.cancelUniqueWork(RECONCILE_WORK_NAME)
+    }
+
     fun enqueuePendingInvoices(context: Context) {
         val constraints =
             Constraints

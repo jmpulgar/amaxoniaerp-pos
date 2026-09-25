@@ -1,6 +1,7 @@
 package com.amaxonia.pos.ui.reports
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,22 +15,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AttachMoney
 import androidx.compose.material.icons.rounded.Cancel
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Discount
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Receipt
-import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,11 +62,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
+import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
-import com.amaxonia.pos.ui.theme.ReportOrange
-import com.amaxonia.pos.ui.theme.SuccessGreen
+import com.amaxonia.pos.ui.theme.paymentMethodColor
 import java.util.Locale
 
 private const val BEST_SELLER_LIMIT = 10
@@ -97,6 +104,15 @@ fun ReportsScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = viewModel::refresh) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Actualizar",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
@@ -116,14 +132,115 @@ fun ReportsScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    item {
+                        ReportFiltersSection(
+                            selectedPeriod = state.selectedPeriod,
+                            onlyActiveCaja = state.onlyActiveCaja,
+                            activeCajaName = state.activeCajaName,
+                            onSelectPeriod = viewModel::selectPeriod,
+                            onToggleOnlyActiveCaja = viewModel::toggleOnlyActiveCaja,
+                        )
+                    }
                     state.summary?.let { summary ->
-                        item { HeroSummaryCard(summary) }
-                        item { MetricCardsRow(summary) }
-                        item { TransactionBreakdownCard(summary) }
+                        item {
+                            HeroSummaryCard(
+                                summary = summary,
+                                period = state.selectedPeriod,
+                            )
+                        }
+                        item { OperationalMetricsRow(summary) }
+                        item {
+                            PaymentMethodsCard(
+                                items = state.paymentBreakdown,
+                                currency = summary.moneda,
+                            )
+                        }
                     }
                     item { BestSellersCard(state.bestSellers) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReportFiltersSection(
+    selectedPeriod: ReportPeriod,
+    onlyActiveCaja: Boolean,
+    activeCajaName: String?,
+    onSelectPeriod: (ReportPeriod) -> Unit,
+    onToggleOnlyActiveCaja: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Quick period chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ReportPeriod.entries.forEach { period ->
+                val isSelected = selectedPeriod == period
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelectPeriod(period) },
+                    label = {
+                        Text(
+                            text = period.label,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                )
+            }
+        }
+
+        // Active cash drawer vs All cash drawers filter
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(
+                selected = onlyActiveCaja,
+                onClick = onToggleOnlyActiveCaja,
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (onlyActiveCaja) Icons.Rounded.PointOfSale else Icons.Rounded.Storefront,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                label = {
+                    Text(
+                        text = if (onlyActiveCaja) {
+                            "Mi caja (${activeCajaName ?: "Actual"})"
+                        } else {
+                            "Todas las cajas"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = if (onlyActiveCaja) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                },
+                trailingIcon = {
+                    if (onlyActiveCaja) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ),
+            )
         }
     }
 }
@@ -182,7 +299,10 @@ private fun ReportsError(
 }
 
 @Composable
-private fun HeroSummaryCard(summary: SummaryStats) {
+private fun HeroSummaryCard(
+    summary: SummaryStats,
+    period: ReportPeriod,
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -197,16 +317,17 @@ private fun HeroSummaryCard(summary: SummaryStats) {
                 Icon(
                     imageVector = Icons.Rounded.AttachMoney,
                     contentDescription = null,
-                    tint = PosPalette.FixedWhite.copy(alpha = 0.8f),
+                    tint = PosPalette.FixedWhite.copy(alpha = 0.85f),
                     modifier = Modifier.size(20.dp),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Ventas totales",
+                    text = "Ventas netas · ${period.label}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = PosPalette.FixedWhite.copy(alpha = 0.8f),
+                    color = PosPalette.FixedWhite.copy(alpha = 0.85f),
                 )
             }
+
             AdaptiveAmountText(
                 text = money(summary.moneda, summary.netSales),
                 modifier = Modifier.fillMaxWidth(),
@@ -215,14 +336,28 @@ private fun HeroSummaryCard(summary: SummaryStats) {
                         fontWeight = FontWeight.Bold,
                     ),
                 color = PosPalette.FixedWhite,
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 18f,
-                    ),
+                options = AdaptiveAmountOptions(minFontSizeSp = 20f),
             )
+
+            // Multicurrency secondary reference if applicable
+            if (summary.netSalesRef != null && !summary.abrMonedaSecundaria.isNullOrBlank()) {
+                Text(
+                    text = "Ref: ${summary.abrMonedaSecundaria} ${money("", summary.netSalesRef)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = PosPalette.FixedWhite.copy(alpha = 0.85f),
+                )
+            }
+
+            HorizontalDivider(
+                color = PosPalette.FixedWhite.copy(alpha = 0.2f),
+                thickness = 1.dp,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 SummaryValue(
                     label = "Ventas brutas",
@@ -230,8 +365,13 @@ private fun HeroSummaryCard(summary: SummaryStats) {
                     modifier = Modifier.weight(1f),
                 )
                 SummaryValue(
-                    label = "Total facturas",
-                    value = summary.totalTransactions.toString(),
+                    label = "Descuentos",
+                    value = money(summary.moneda, summary.discounts),
+                    modifier = Modifier.weight(1f),
+                )
+                SummaryValue(
+                    label = "Ticket prom.",
+                    value = money(summary.moneda, summary.ticketPromedio),
                     modifier = Modifier.weight(1f),
                     alignEnd = true,
                 )
@@ -254,7 +394,7 @@ private fun SummaryValue(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = PosPalette.FixedWhite.copy(alpha = 0.65f),
+            color = PosPalette.FixedWhite.copy(alpha = 0.7f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -267,68 +407,85 @@ private fun SummaryValue(
                     textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
                 ),
             color = PosPalette.FixedWhite,
-            options =
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 10f,
-                ),
+            options = AdaptiveAmountOptions(minFontSizeSp = 10f),
         )
     }
 }
 
 @Composable
-private fun MetricCardsRow(summary: SummaryStats) {
+private fun OperationalMetricsRow(summary: SummaryStats) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetricMiniCard(
+        // Facturas Pagadas
+        OperationalMiniCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Rounded.ShoppingCart,
+            icon = Icons.Rounded.Receipt,
             iconTint = MaterialTheme.colorScheme.primary,
-            label = "Ticket promedio",
-            value = money(summary.moneda, summary.ticketPromedio),
+            containerColor = MaterialTheme.colorScheme.surface,
+            label = "Facturas emitidas",
+            value = summary.totalPaid.toString(),
+            detail = "${summary.totalTransactions} transacciones",
         )
-        MetricMiniCard(
+
+        // Auditoría de Anulaciones
+        val hasCancellations = summary.totalCancelled > 0
+        OperationalMiniCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Rounded.Discount,
-            iconTint = ReportOrange,
-            label = "Descuentos",
-            value = money(summary.moneda, summary.discounts),
+            icon = Icons.Rounded.Cancel,
+            iconTint = if (hasCancellations) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+            containerColor = if (hasCancellations) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+            label = "Anuladas",
+            value = summary.totalCancelled.toString(),
+            detail = if (hasCancellations && summary.cancellations > 0) {
+                "-${money(summary.moneda, summary.cancellations)}"
+            } else {
+                "Sin anulaciones"
+            },
+            detailColor = if (hasCancellations) MaterialTheme.colorScheme.error else null,
         )
     }
 }
 
 @Composable
-private fun MetricMiniCard(
+private fun OperationalMiniCard(
     icon: ImageVector,
     iconTint: Color,
+    containerColor: Color,
     label: String,
     value: String,
+    detail: String,
     modifier: Modifier = Modifier,
+    detailColor: Color? = null,
 ) {
     ElevatedCard(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = containerColor),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(iconTint.copy(alpha = 0.1f)),
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(iconTint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
             Text(
@@ -338,22 +495,28 @@ private fun MetricMiniCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            AdaptiveAmountText(
+            Text(
                 text = value,
-                modifier = Modifier.fillMaxWidth(),
-                baseStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 10f,
-                    ),
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = detailColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
 @Composable
-private fun TransactionBreakdownCard(summary: SummaryStats) {
+private fun PaymentMethodsCard(
+    items: List<PaymentBreakdownItem>,
+    currency: String,
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -365,95 +528,98 @@ private fun TransactionBreakdownCard(summary: SummaryStats) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             SectionTitle(
-                icon = Icons.Rounded.Receipt,
-                text = "Desglose de facturas",
+                icon = Icons.Rounded.AccountBalanceWallet,
+                text = "Ventas por método de pago",
             )
-            TransactionStatusRow(
-                icon = Icons.Rounded.CheckCircle,
-                label = "Pagadas",
-                count = summary.totalPaid,
-                color = SuccessGreen,
-            )
-            ProgressBar(
-                progress = ratio(summary.totalPaid, summary.totalTransactions),
-                color = SuccessGreen,
-                trackColor = MaterialTheme.colorScheme.tertiaryContainer,
-            )
-            TransactionStatusRow(
-                icon = Icons.Rounded.Cancel,
-                label = "Anuladas",
-                count = summary.totalCancelled,
-                color = MaterialTheme.colorScheme.error,
-                amount = if (summary.cancellations > 0) money(summary.moneda, summary.cancellations) else null,
-            )
-            ProgressBar(
-                progress = ratio(summary.totalCancelled, summary.totalTransactions),
-                color = MaterialTheme.colorScheme.error,
-                trackColor = MaterialTheme.colorScheme.errorContainer,
-            )
+
+            if (items.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Sin cobros registrados en este período",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items.forEachIndexed { index, item ->
+                    PaymentMethodRow(item = item, currency = currency)
+                    if (index < items.lastIndex) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 0.5.dp,
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun TransactionStatusRow(
-    icon: ImageVector,
-    label: String,
-    count: Int,
-    color: Color,
-    amount: String? = null,
+private fun PaymentMethodRow(
+    item: PaymentBreakdownItem,
+    currency: String,
 ) {
-    Row(
+    val methodColor = paymentMethodColor(item.name)
+    val percentageFormatted = "${(item.percentage * 100).toInt()}%"
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        amount?.let {
-            AdaptiveAmountText(
-                text = it,
-                modifier = Modifier.weight(1f),
-                baseStyle = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.End),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                options =
-                    com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                        minFontSizeSp = 9f,
-                    ),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(methodColor),
             )
             Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "${item.count} ${if (item.count == 1) "pago" else "pagos"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = money(currency, item.amount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = percentageFormatted,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = methodColor,
+                )
+            }
         }
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = color,
+        LinearProgressIndicator(
+            progress = { item.percentage },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = methodColor,
+            trackColor = methodColor.copy(alpha = 0.12f),
         )
     }
-}
-
-@Composable
-private fun ProgressBar(
-    progress: Float,
-    color: Color,
-    trackColor: Color,
-) {
-    LinearProgressIndicator(
-        progress = { progress },
-        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-        color = color,
-        trackColor = trackColor,
-    )
 }
 
 @Composable
@@ -539,6 +705,8 @@ private fun BestSellerItem(
     position: Int,
 ) {
     val productColor = Color(product.colorHex)
+    val totalRevenue = product.salesCount * product.price
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -561,6 +729,7 @@ private fun BestSellerItem(
         BestSellerDetails(
             product = product,
             productColor = productColor,
+            totalRevenue = totalRevenue,
             modifier = Modifier.weight(1f),
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -573,10 +742,7 @@ private fun BestSellerItem(
                     textAlign = TextAlign.End,
                 ),
             color = MaterialTheme.colorScheme.primary,
-            options =
-                com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions(
-                    minFontSizeSp = 10f,
-                ),
+            options = AdaptiveAmountOptions(minFontSizeSp = 10f),
         )
     }
 }
@@ -585,6 +751,7 @@ private fun BestSellerItem(
 private fun BestSellerDetails(
     product: BestSellerProduct,
     productColor: Color,
+    totalRevenue: Double,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -596,22 +763,21 @@ private fun BestSellerDetails(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "${product.salesCount} ventas · Total ${money("$", totalRevenue)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(modifier = Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${product.salesCount} ventas",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            LinearProgressIndicator(
-                progress = { product.progress },
-                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = productColor,
-                trackColor = productColor.copy(alpha = 0.1f),
-            )
-        }
+        LinearProgressIndicator(
+            progress = { product.progress },
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+            color = productColor,
+            trackColor = productColor.copy(alpha = 0.12f),
+        )
     }
 }
 
@@ -620,8 +786,3 @@ private fun money(
     amount: Double,
     separator: String = " ",
 ): String = "$currency$separator${String.format(Locale.getDefault(), "%.2f", amount)}"
-
-private fun ratio(
-    value: Int,
-    total: Int,
-): Float = if (total > 0) value.toFloat() / total else 0f

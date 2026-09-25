@@ -20,9 +20,9 @@ internal fun mapRowToFacturaSummary(
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
     val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
 
-    val codEstatus = row[tabla.codEstatus] ?: 0
-    val formaPago = row[tabla.formaPago]
-    val descripcionEstatus = row[EstatusTable.descripcion]
+    val codEstatus = row.getOrNull(tabla.codEstatus) ?: 0
+    val formaPago = row.getOrNull(tabla.formaPago).orEmpty()
+    val descripcionEstatus = row.getOrNull(EstatusTable.descripcion).orEmpty()
 
     val estatusFinal =
         if (codEstatus == 1 && formaPago.equals("contado", ignoreCase = true)) {
@@ -33,9 +33,25 @@ internal fun mapRowToFacturaSummary(
 
     val codigoFiscalFinal = resolveCodigoFiscal(row, tabla)
 
-    val nombre = row[FacturasClientesTable.nombre]
-    val apellido = row[FacturasClientesTable.apellido] ?: ""
-    val nombreCompleto = "$nombre $apellido".trim().uppercase()
+    val nombreFromCliente =
+        listOfNotNull(
+            row.getOrNull(FacturasClientesTable.nombre)?.trim(),
+            row.getOrNull(FacturasClientesTable.apellido)?.trim(),
+        ).filter { it.isNotBlank() }.joinToString(" ").trim()
+
+    val nombreCompleto =
+        when {
+            nombreFromCliente.isNotBlank() -> nombreFromCliente
+            !row.getOrNull(tabla.facturarA).isNullOrBlank() -> row[tabla.facturarA]!!.trim()
+            else -> "CONSUMIDOR FINAL"
+        }.uppercase()
+
+    val identificacion =
+        when {
+            !row.getOrNull(FacturasClientesTable.rif).isNullOrBlank() -> row[FacturasClientesTable.rif]!!.trim()
+            !row.getOrNull(tabla.facturarARuc).isNullOrBlank() -> row[tabla.facturarARuc]!!.trim()
+            else -> ""
+        }.uppercase()
 
     val monetary = resolveSummaryMonetaryFields(row, tabla, dateTimeFormatter)
 
@@ -48,7 +64,7 @@ internal fun mapRowToFacturaSummary(
         fechaCreacion = formatDateTime(row[tabla.fechaCreacion], dateTimeFormatter),
         fechaDgi = monetary.fechaDgi,
         clienteNombre = nombreCompleto,
-        clienteIdentificacion = row[FacturasClientesTable.rif].uppercase(),
+        clienteIdentificacion = identificacion,
         total = row[tabla.totalTotalFactura].toDouble(),
         estatus = estatusFinal,
         formaPago = formaPago,

@@ -38,4 +38,6 @@ data class FacturasResumenDto(
     val totalFacturasAnuladas: Int = 0,
     val ticketPromedio: Double = 0.0,
     val moneda: String = "USD",
+    val ventasNetasRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
 )

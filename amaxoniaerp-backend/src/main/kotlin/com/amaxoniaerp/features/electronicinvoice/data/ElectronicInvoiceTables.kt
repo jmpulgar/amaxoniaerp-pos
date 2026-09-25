@@ -38,6 +38,10 @@ object FEFacturaReadTable : Table("factura") {
     val envioContenedor = varchar("envioContenedor", S.VARCHAR_LENGTH_5).nullable()
     val tipoVenta = varchar("tipoVenta", S.VARCHAR_LENGTH_5).nullable()
     val tipoFactura = varchar("tipo_factura", S.VARCHAR_LENGTH_50)
+    val facturarA = varchar("facturar_a", S.VARCHAR_LENGTH_80).nullable()
+    val facturarARuc = varchar("facturar_a_ruc", S.VARCHAR_LENGTH_50).nullable()
+    val facturarADireccion = varchar("facturar_a_direccion", S.VARCHAR_LENGTH_250).nullable()
+    val facturarATelefono = varchar("facturar_a_telefono", S.VARCHAR_LENGTH_50).nullable()
 
     override val primaryKey = PrimaryKey(idFactura)
 }

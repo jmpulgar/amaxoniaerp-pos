@@ -17,6 +17,9 @@ interface SyncStateDao {
 
     @Query("DELETE FROM sync_state WHERE tenantId = :tenantId")
     suspend fun clearForTenant(tenantId: String)
+
+    @Query("DELETE FROM sync_state")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -70,4 +73,7 @@ interface CajaSesionDao {
 
     @Query("SELECT * FROM caja_sesion WHERE localId = :localId LIMIT 1")
     suspend fun getByLocalId(localId: String): CajaSesionEntity?
+
+    @Query("DELETE FROM caja_sesion")
+    suspend fun clearAll()
 }

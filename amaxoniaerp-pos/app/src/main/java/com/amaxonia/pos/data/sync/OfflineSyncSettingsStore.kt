@@ -57,6 +57,14 @@ class OfflineSyncSettingsStore(
         }
     }
 
+    suspend fun reset() {
+        dataStore.edit { prefs ->
+            prefs.remove(KEY_ENABLED)
+            prefs.remove(KEY_DEPT_IDS)
+            prefs.remove(KEY_BRANCH_IDS)
+        }
+    }
+
     private fun parseIds(csv: String?): Set<Int> =
         csv
             ?.split(',')

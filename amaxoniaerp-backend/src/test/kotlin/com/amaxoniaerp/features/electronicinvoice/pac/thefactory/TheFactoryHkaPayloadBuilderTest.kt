@@ -200,6 +200,52 @@ class TheFactoryHkaPayloadBuilderTest {
         assertEquals("und", item.unidadMedidaCPBS)
     }
 
+    @Test
+    fun `long address exceeding 100 characters is safely truncated to 100`() {
+        val longAddress = "A".repeat(150)
+        val ctx =
+            context().let {
+                it.copy(cliente = it.cliente.copy(direccion = longAddress))
+            }
+        val payload = builderFijo().build(ctx)
+        val direccion = payload.documento.datosTransaccion.cliente.direccion
+        assertEquals(100, direccion?.length)
+        assertEquals("A".repeat(100), direccion)
+    }
+
+    @Test
+    fun `short address below 4 characters is padded to minimum 4 characters`() {
+        val ctx =
+            context().let {
+                it.copy(cliente = it.cliente.copy(direccion = "Av"))
+            }
+        val payload = builderFijo().build(ctx)
+        val direccion = payload.documento.datosTransaccion.cliente.direccion
+        assertEquals("Av..", direccion)
+    }
+
+    @Test
+    fun `consumidor final with blank address produces null direccion`() {
+        val ctx =
+            context(tipoClienteFE = "02").let {
+                it.copy(cliente = it.cliente.copy(direccion = "   "))
+            }
+        val payload = builderFijo().build(ctx)
+        val direccion = payload.documento.datosTransaccion.cliente.direccion
+        assertEquals(null, direccion)
+    }
+
+    @Test
+    fun `contribuyente with blank address falls back to valid default PANAMA`() {
+        val ctx =
+            context(tipoClienteFE = "01").let {
+                it.copy(cliente = it.cliente.copy(direccion = null))
+            }
+        val payload = builderFijo().build(ctx)
+        val direccion = payload.documento.datosTransaccion.cliente.direccion
+        assertEquals("PANAMA", direccion)
+    }
+
     private fun builderFijo(): TheFactoryHkaPayloadBuilder =
         TheFactoryHkaPayloadBuilder(
             Clock.fixed(Instant.parse("2026-09-03T19:00:00Z"), ZoneId.of("America/Panama")),

@@ -62,26 +62,47 @@ internal fun mapCliente(
     paisLocal: Alias<FEPaisesReadTable>,
     paisExtranjero: Alias<FEPaisesReadTable>,
 ): FEClienteData {
-    val nombreCompleto =
+    val nombreFromCliente =
         buildString {
             append(row.getOrNull(FECientesReadTable.nombre)?.trim().orEmpty())
             val apellido = row.getOrNull(FECientesReadTable.apellido)?.trim().orEmpty()
             if (apellido.isNotBlank()) append(" ").append(apellido)
-        }.ifBlank { "CONSUMIDOR FINAL" }
+        }.trim()
+
+    val facturarA = row.getOrNull(FEFacturaReadTable.facturarA)?.trim().orEmpty()
+    val nombreCompleto =
+        when {
+            nombreFromCliente.isNotBlank() -> nombreFromCliente
+            facturarA.isNotBlank() -> facturarA
+            else -> "CONSUMIDOR FINAL"
+        }
 
     val paisIso = row.getOrNull(paisLocal[FEPaisesReadTable.iso]) ?: "PA"
     val paisExtIso = row.getOrNull(paisExtranjero[FEPaisesReadTable.iso])
 
+    val rawRif =
+        row.getOrNull(FECientesReadTable.rif)?.takeIf { it.isNotBlank() }
+            ?: row.getOrNull(FEFacturaReadTable.facturarARuc)?.takeIf { it.isNotBlank() }
+            ?: ""
+
+    val rawDireccion =
+        row.getOrNull(FECientesReadTable.direccion)?.takeIf { it.isNotBlank() }
+            ?: row.getOrNull(FEFacturaReadTable.facturarADireccion)?.takeIf { it.isNotBlank() }
+
+    val rawTelefono =
+        row.getOrNull(FECientesReadTable.telefonos)?.takeIf { it.isNotBlank() }
+            ?: row.getOrNull(FEFacturaReadTable.facturarATelefono)?.takeIf { it.isNotBlank() }
+
     return FEClienteData(
         tipoClienteFE = row.getOrNull(FETipoClienteReadTable.tipoClienteFE) ?: "02",
         tipoContribuyente = row.getOrNull(FECientesReadTable.tipoContribuyente)?.toString() ?: "1",
-        identificacion = row.getOrNull(FECientesReadTable.rif) ?: "",
+        identificacion = rawRif,
         dv = row.getOrNull(FECientesReadTable.dv) ?: "",
         nombre = nombreCompleto,
         codigoUbicacion = row.getOrNull(FECientesReadTable.direccionNivel3),
-        telefono = row.getOrNull(FECientesReadTable.telefonos),
+        telefono = rawTelefono,
         correo = row.getOrNull(FECientesReadTable.email),
-        direccion = row.getOrNull(FECientesReadTable.direccion),
+        direccion = rawDireccion,
         paisIso = paisIso,
         paisExtranjeroIso = paisExtIso,
     )

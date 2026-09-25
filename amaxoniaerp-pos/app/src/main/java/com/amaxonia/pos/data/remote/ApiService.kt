@@ -1,6 +1,7 @@
 package com.amaxonia.pos.data.remote
 
 import com.amaxonia.pos.data.local.AppJson
+import com.amaxonia.pos.data.remote.api.applyInvoiceHistoryFilter
 import com.amaxonia.pos.data.remote.dto.ErrorResponse
 import com.amaxonia.pos.data.remote.dto.FacturasResumenDto
 import com.amaxonia.pos.data.remote.dto.LoginRequest
@@ -8,6 +9,7 @@ import com.amaxonia.pos.data.remote.dto.LoginResponse
 import com.amaxonia.pos.data.remote.dto.SelectCompanyRequest
 import com.amaxonia.pos.data.remote.dto.SelectCompanyResponse
 import com.amaxonia.pos.domain.error.UnauthorizedException
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -67,10 +69,14 @@ class ApiService(
                 setBody(request)
             }.body()
 
-    suspend fun getFacturasResumen(token: String): FacturasResumenDto =
+    suspend fun getFacturasResumen(
+        token: String,
+        filter: InvoiceHistoryFilter = InvoiceHistoryFilter(),
+    ): FacturasResumenDto =
         client
             .get("facturas/resumen") {
                 authHeaders(token)
+                applyInvoiceHistoryFilter(filter)
             }.body()
 }
 

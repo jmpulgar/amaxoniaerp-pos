@@ -102,6 +102,37 @@ class FacturasRepositoryFilterTest {
         }
 
     @Test
+    fun `orphan invoice without client in clientes table maps successfully with facturar_a fallback and search matches`() =
+        withSeededDatabase {
+            transaction(database) {
+                insertFactura(
+                    facturaSeed {
+                        id = "factura-orphan"
+                        code = "INV-099"
+                        clientId = "cliente-inexistente"
+                        user = "cajero"
+                        cajaId = "caja-1"
+                        createdAt = "2026-01-04 10:00:00"
+                        total = 150.0
+                        facturarA = "Juan Perez Offline"
+                        facturarARuc = "8-123-456"
+                    },
+                )
+            }
+
+            val (facturas, total) = list(FacturasFilter(search = "Juan Perez"))
+            assertEquals(1L, total)
+            val orphanSummary = facturas.first()
+            assertEquals("factura-orphan", orphanSummary.id)
+            assertEquals("JUAN PEREZ OFFLINE", orphanSummary.clienteNombre)
+            assertEquals("8-123-456", orphanSummary.clienteIdentificacion)
+
+            val (byRuc, totalRuc) = list(FacturasFilter(search = "8-123-456"))
+            assertEquals(1L, totalRuc)
+            assertEquals("factura-orphan", byRuc.first().id)
+        }
+
+    @Test
     fun `panama schema does not require or query numero_control_thka`() {
         val databaseName = UUID.randomUUID().toString().replace("-", "")
         val panamaDb =
@@ -263,6 +294,8 @@ class FacturasRepositoryFilterTest {
         var cajaId: String = "caja-1"
         var createdAt: String = ""
         var total: Double = 0.0
+        var facturarA: String? = null
+        var facturarARuc: String? = null
     }
 
     private fun facturaSeed(configure: FacturaSeed.() -> Unit): FacturaSeed = FacturaSeed().apply(configure)
@@ -290,6 +323,8 @@ class FacturasRepositoryFilterTest {
             it[tasa] = 1.0f
             it[totalRef] = seed.total.toFloat()
             it[impresoraSerial] = null
+            it[facturarA] = seed.facturarA
+            it[facturarARuc] = seed.facturarARuc
         }
     }
 }

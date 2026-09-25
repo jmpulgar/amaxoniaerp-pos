@@ -52,3 +52,16 @@ suspend fun LocalStore.setInitialSyncCompleted(
         prefs[key] = completed
     }
 }
+
+/**
+ * Limpia los cachés de productos y clientes en DataStore, así como los indicadores
+ * de sincronización inicial de todas las empresas.
+ */
+suspend fun LocalStore.clearCatalogCache() {
+    dataStore.edit { prefs ->
+        prefs.remove(productsKey)
+        prefs.remove(clientsKey)
+        val initialSyncKeys = prefs.asMap().keys.filter { it.name.startsWith("initial_sync_completed_") }
+        initialSyncKeys.forEach { prefs.remove(it) }
+    }
+}

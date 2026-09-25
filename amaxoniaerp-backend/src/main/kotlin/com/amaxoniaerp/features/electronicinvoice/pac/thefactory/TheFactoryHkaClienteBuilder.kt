@@ -10,6 +10,8 @@ private const val DEFAULT_RUC = "00000"
 private const val MIN_IDENTIFICATION_LENGTH = 5
 private const val EMAIL_MIN_LENGTH = 7
 private const val ADDRESS_MIN_LENGTH = 4
+private const val ADDRESS_MAX_LENGTH = 100
+private const val DEFAULT_ADDRESS_CONTRIBUYENTE = "PANAMA"
 
 /**
  * Construye el bloque cliente del payload The Factory HKA:
@@ -30,7 +32,7 @@ internal fun buildCliente(ctx: InvoiceFEContext): TheFactoryHkaCliente {
         numeroRUC = rucFor(esExtranjero, cliente.identificacion),
         digitoVerificadorRUC = if (esExtranjero) null else cliente.dv,
         razonSocial = cliente.nombre,
-        direccion = (cliente.direccion?.takeIf { it.isNotBlank() } ?: " ").padStart(ADDRESS_MIN_LENGTH, '-'),
+        direccion = direccionFor(tipoClienteFE, cliente.direccion),
         codigoUbicacion = cliente.codigoUbicacion,
         telefono1 = telefonoFor(cliente.telefono),
         correoElectronico1 = correoFor(ctx.factura.tipoFactura, correoBase),
@@ -39,6 +41,25 @@ internal fun buildCliente(ctx: InvoiceFEContext): TheFactoryHkaCliente {
         pais = if (esExtranjero) null else cliente.paisIso,
         paisExtranjero = if (esExtranjero) cliente.paisExtranjeroIso else null,
     )
+}
+
+private fun direccionFor(
+    tipoClienteFE: String,
+    rawDireccion: String?,
+): String? {
+    val trimmed = rawDireccion?.trim().orEmpty()
+    return when {
+        trimmed.isNotEmpty() -> {
+            val truncated = trimmed.take(ADDRESS_MAX_LENGTH)
+            if (truncated.length < ADDRESS_MIN_LENGTH) {
+                truncated.padEnd(ADDRESS_MIN_LENGTH, '.')
+            } else {
+                truncated
+            }
+        }
+        tipoClienteFE in setOf("01", "03") -> DEFAULT_ADDRESS_CONTRIBUYENTE
+        else -> null
+    }
 }
 
 private fun tipoContribuyenteFor(

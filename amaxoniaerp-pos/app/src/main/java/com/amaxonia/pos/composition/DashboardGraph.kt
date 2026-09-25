@@ -54,6 +54,9 @@ object DashboardGraph {
     suspend fun logout() {
         DependencyContainer.cartRepository.clearCart()
         DependencyContainer.cajaRepository.clearActiveCaja()
+        DependencyContainer.selectedTableHolder.clear()
+        DependencyContainer.tableAccountPaymentHolder.clear()
+        DependencyContainer.purgeOfflineCatalogDataUseCase()
         DependencyContainer.authRepository.logout()
     }
 

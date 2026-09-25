@@ -190,6 +190,8 @@ class FacturasRepository {
             val term = "%$search%"
             andWhere {
                 (tabla.codFactura like term) or
+                    (tabla.facturarA like term) or
+                    (tabla.facturarARuc like term) or
                     (FacturasClientesTable.nombre like term) or
                     (FacturasClientesTable.rif like term) or
                     (EstatusTable.descripcion like term)

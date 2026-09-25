@@ -98,8 +98,18 @@ fun ProductListScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ProductsTopBar(onBack = onBack) },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+        ) {
             ProductListErrorCard(error = state.error, onRetry = viewModel::retry)
+            ProductSearchField(
+                value = state.searchQuery,
+                onValueChange = viewModel::onSearchQueryChange,
+            )
             if (state.isLoading && state.products.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -108,10 +118,6 @@ fun ProductListScreen(
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
-                ProductSearchField(
-                    value = state.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange,
-                )
                 ProductListItems(
                     state = state,
                     viewModel = viewModel,

@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.ImageUrlResolver
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.ServerEnvironment
@@ -85,7 +86,7 @@ class DashboardCatalogCoordinatorTest {
     }
 
     private class FakeReportRepository : ReportRepository {
-        override suspend fun getSummaryStats(): Result<SummaryStats> =
+        override suspend fun getSummaryStats(filter: InvoiceHistoryFilter): Result<SummaryStats> =
             Result.failure(UnsupportedOperationException())
 
         override suspend fun getBestSellers(): Result<List<BestSellerProduct>> = Result.success(emptyList())

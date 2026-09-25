@@ -10,6 +10,8 @@ data class SummaryStats(
     val totalCancelled: Int = 0,
     val ticketPromedio: Double = 0.0,
     val moneda: String = "USD",
+    val netSalesRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
 )
 
 data class BestSellerProduct(

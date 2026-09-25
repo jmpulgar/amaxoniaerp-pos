@@ -57,6 +57,7 @@ import com.amaxonia.pos.data.repository.RoomOfflineInvoiceWriter
 import com.amaxonia.pos.data.repository.RoomPendingSalesReader
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.SesionMesaRepositoryImpl
+import com.amaxonia.pos.domain.usecase.sync.PurgeOfflineCatalogDataUseCase
 import com.amaxonia.pos.data.sync.CatalogDaos
 import com.amaxonia.pos.data.sync.CatalogSyncer
 import com.amaxonia.pos.data.sync.OfflineSyncSettingsRepositoryImpl
@@ -231,6 +232,10 @@ object DependencyContainer {
     lateinit var syncApi: SyncApi
     lateinit var syncEngine: SyncEngine
     lateinit var offlineSyncSettingsRepository: OfflineSyncSettingsRepository
+        private set
+    lateinit var database: AppDatabase
+        private set
+    lateinit var purgeOfflineCatalogDataUseCase: PurgeOfflineCatalogDataUseCase
         private set
     lateinit var areaRepository: AreaRepository
         private set
@@ -427,6 +432,7 @@ object DependencyContainer {
         val localStore = LocalStore(applicationContext)
         val networkMonitor = NetworkMonitor(applicationContext)
         val database = AppDatabase.getInstance(context.applicationContext)
+        this.database = database
         this.appContext = applicationContext
         this.apiService = apiService
         this.apiClient = apiClient
@@ -518,6 +524,13 @@ object DependencyContainer {
                 productRepository = productRepository,
                 scopeStore = offlineSyncSettingsStore,
                 bootstrapEnqueuer = { SyncScheduler.enqueueBootstrap(syncAppContext(), requiresCharging = false) },
+            )
+        purgeOfflineCatalogDataUseCase =
+            PurgeOfflineCatalogDataUseCase(
+                database = database,
+                localStore = localStore,
+                offlineSyncSettingsStore = offlineSyncSettingsStore,
+                appContext = syncAppContext(),
             )
     }
 

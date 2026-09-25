@@ -24,6 +24,9 @@ interface ClientDao {
     @Query("DELETE FROM clients WHERE idSucursal IS NULL OR idSucursal NOT IN (:sucursalIds)")
     suspend fun deleteBySucursalesNotIn(sucursalIds: List<Int>)
 
+    @Query("DELETE FROM clients")
+    suspend fun clearAll()
+
     @Query("SELECT COUNT(*) FROM clients WHERE status = 1")
     suspend fun count(): Int
 
@@ -89,6 +92,9 @@ interface ClientSucursalDao {
 
     @Query("DELETE FROM client_sucursales WHERE clienteCodigo = :clienteCodigo")
     suspend fun deleteByClientCode(clienteCodigo: String)
+
+    @Query("DELETE FROM client_sucursales")
+    suspend fun clearAll()
 
     @Query("SELECT * FROM client_sucursales WHERE clienteCodigo = :clienteCodigo ORDER BY nombreSucursal")
     suspend fun getByClientCode(clienteCodigo: String): List<ClientSucursalEntity>
@@ -230,6 +236,9 @@ interface CountryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<CountryEntity>)
 
+    @Query("DELETE FROM countries")
+    suspend fun clearAll()
+
     @Query("SELECT * FROM countries ORDER BY name")
     suspend fun getAll(): List<CountryEntity>
 }
@@ -239,6 +248,9 @@ interface AddressLevel1Dao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<AddressLevel1Entity>)
 
+    @Query("DELETE FROM address_level1")
+    suspend fun clearAll()
+
     @Query("SELECT * FROM address_level1 WHERE countryCode = :countryCode ORDER BY code")
     suspend fun getByCountry(countryCode: String): List<AddressLevel1Entity>
 }
@@ -247,6 +259,9 @@ interface AddressLevel1Dao {
 interface AddressLevel2Dao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<AddressLevel2Entity>)
+
+    @Query("DELETE FROM address_level2")
+    suspend fun clearAll()
 
     @Query(
         "SELECT * FROM address_level2 " +
@@ -263,6 +278,9 @@ interface AddressLevel2Dao {
 interface AddressLevel3Dao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<AddressLevel3Entity>)
+
+    @Query("DELETE FROM address_level3")
+    suspend fun clearAll()
 
     @Query(
         "SELECT * FROM address_level3 " +
@@ -285,6 +303,9 @@ interface ClientTypeDao {
 
     @Query("DELETE FROM client_types WHERE id = :id")
     suspend fun deleteById(id: Int)
+
+    @Query("DELETE FROM client_types")
+    suspend fun clearAll()
 
     @Query("SELECT * FROM client_types ORDER BY name")
     suspend fun getAll(): List<ClientTypeEntity>

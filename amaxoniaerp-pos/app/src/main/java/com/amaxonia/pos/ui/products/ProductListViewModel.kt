@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class ProductListViewModel(
@@ -23,6 +24,7 @@ class ProductListViewModel(
 
     @Volatile
     private var adminDb: String = ""
+    private var loadJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -80,7 +82,8 @@ class ProductListViewModel(
     fun getStock(productId: String): ProductStock? = _state.value.stockByProductId[productId]
 
     private fun loadProducts(reset: Boolean) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     isLoading = true,

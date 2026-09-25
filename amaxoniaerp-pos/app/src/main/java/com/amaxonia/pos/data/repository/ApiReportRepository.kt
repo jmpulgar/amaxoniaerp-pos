@@ -6,6 +6,7 @@ import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.getBestSellers
 import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
+import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.repository.ReportRepository
 
 /**
@@ -34,13 +35,13 @@ class ApiReportRepository(
             0xFFEF6C00,
         )
 
-    override suspend fun getSummaryStats(): Result<SummaryStats> {
+    override suspend fun getSummaryStats(filter: InvoiceHistoryFilter): Result<SummaryStats> {
         val token = localStore.readCompanySession()?.token
         if (token.isNullOrBlank()) {
             return Result.failure(IllegalStateException("No hay empresa seleccionada"))
         }
         return runCatching {
-            val dto = apiService.getFacturasResumen(token)
+            val dto = apiService.getFacturasResumen(token, filter)
             SummaryStats(
                 grossSales = dto.ventasBrutas,
                 netSales = dto.ventasNetas,
@@ -51,6 +52,8 @@ class ApiReportRepository(
                 totalCancelled = dto.totalFacturasAnuladas,
                 ticketPromedio = dto.ticketPromedio,
                 moneda = dto.moneda,
+                netSalesRef = dto.ventasNetasRef,
+                abrMonedaSecundaria = dto.abrMonedaSecundaria,
             )
         }.fold(
             onSuccess = { Result.success(it) },
