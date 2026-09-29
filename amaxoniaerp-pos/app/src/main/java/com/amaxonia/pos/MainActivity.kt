@@ -88,6 +88,16 @@ class MainActivity : ComponentActivity() {
         applyOrientationLock()
     }
 
+    override fun onStart() {
+        super.onStart()
+        DependencyContainer.customerDisplayManager.start(this)
+    }
+
+    override fun onStop() {
+        DependencyContainer.customerDisplayManager.stop()
+        super.onStop()
+    }
+
     /**
      * Phones (and physical SUNMI terminals, which are small-screened) lock to portrait.
      * Tablets rotate freely. Re-applied on config changes to handle foldables/DeX resizing

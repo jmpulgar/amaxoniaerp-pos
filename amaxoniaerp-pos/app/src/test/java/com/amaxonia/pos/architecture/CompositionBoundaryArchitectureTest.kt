@@ -184,6 +184,7 @@ class CompositionBoundaryArchitectureTest {
                 "com/amaxonia/pos/domain/usecase/payment/QueueFiscalConfirmationUseCase.kt",
                 "com/amaxonia/pos/domain/usecase/payment/QueueGatewayCallbackUseCase.kt",
                 "com/amaxonia/pos/domain/usecase/payment/StartTransactionUseCase.kt",
+                "com/amaxonia/pos/domain/usecase/sync/PurgeOfflineCatalogDataUseCase.kt",
             )
     }
 }

@@ -1,5 +1,5 @@
 # PLAN MAESTRO — Arquitectura, Consistencia y Calidad 10/10
-## Amaxonia ERP POS — Android + Backend Ktor
+## Flow Erp POS — Android + Backend Ktor
 
 > **Repositorio:** `jmpulgar/amaxoniaerp-pos`
 > **Baseline auditado:** `main` @ `e568f77df275ff54d9a610123fa12c61ed8bf2da`

@@ -44,6 +44,7 @@ interface PosSettingsRepository {
     val factorySettings: Flow<TheFactorySettings>
     val allowEditPrices: Flow<Boolean>
     val allowDiscounts: Flow<Boolean>
+    val customerDisplayEnabled: Flow<Boolean>
 
     suspend fun currentCountry(): ServerCountry?
 
@@ -54,4 +55,6 @@ interface PosSettingsRepository {
     suspend fun saveAllowEditPrices(enabled: Boolean)
 
     suspend fun saveAllowDiscounts(enabled: Boolean)
+
+    suspend fun saveCustomerDisplayEnabled(enabled: Boolean)
 }

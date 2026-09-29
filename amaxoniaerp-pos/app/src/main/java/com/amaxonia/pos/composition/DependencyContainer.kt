@@ -402,6 +402,17 @@ object DependencyContainer {
         HkaFiscalDeviceDiagnostics(hkaConnectionHelper, theFactoryRapidPayClient)
     }
 
+    val customerDisplayManager: com.amaxonia.pos.ui.customerdisplay.CustomerDisplayManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        check(::appContext.isInitialized) { "DependencyContainer no inicializado" }
+        com.amaxonia.pos.ui.customerdisplay.CustomerDisplayManager(
+            appContext = appContext,
+            cartRepository = cartRepository,
+            settingsRepository = posConfigurationRepository,
+            cashCloseReader = posConfigurationRepository,
+            activeCajaReader = cajaRepository,
+        )
+    }
+
     fun initialize(context: Context) {
         if (initialized) return
         val database = initializeNetworkAndSession(context)

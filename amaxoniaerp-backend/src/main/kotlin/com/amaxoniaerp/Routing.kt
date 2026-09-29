@@ -111,7 +111,7 @@ fun Application.configureRouting(deps: AppDependencies) {
 
 private fun Route.installCoreRoutes() {
     get("/") {
-        call.respondText("Amaxonia ERP API - Multi-Tenant Ready")
+        call.respondText("Flow Erp API - Multi-Tenant Ready")
     }
 
     get("/health") {

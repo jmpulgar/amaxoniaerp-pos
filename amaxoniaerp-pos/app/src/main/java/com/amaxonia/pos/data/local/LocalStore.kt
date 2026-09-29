@@ -61,6 +61,7 @@ class LocalStore(
     internal val theFactoryPrinterSerialKey = stringPreferencesKey("the_factory_printer_serial")
     internal val allowEditPricesKey = booleanPreferencesKey("allow_edit_prices")
     internal val allowDiscountsKey = booleanPreferencesKey("allow_discounts")
+    internal val customerDisplayEnabledKey = booleanPreferencesKey("customer_display_enabled")
     internal val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
     internal val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
     internal val areasKey = stringPreferencesKey("areas_snapshot")

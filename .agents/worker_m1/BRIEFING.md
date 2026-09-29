@@ -1,7 +1,7 @@
 ﻿# BRIEFING — 2026-08-31T17:41:11Z
 
 ## Mission
-Implement backend technical fixes and features for Amaxonia ERP-POS (R1 to R7) in amaxoniaerp-backend: unblock cash close on en espera/drafts (R1), date filters with 1-month max & field removal in invoice queries (R2), active cash register isolation filter (R3), Panama credit note SQL error fix regarding caja.cod_almacen (R4), PDF download & idempotent electronic invoice resend (R5 & R6), and pass all quality gates (R7).
+Implement backend technical fixes and features for Flow Erp-POS (R1 to R7) in amaxoniaerp-backend: unblock cash close on en espera/drafts (R1), date filters with 1-month max & field removal in invoice queries (R2), active cash register isolation filter (R3), Panama credit note SQL error fix regarding caja.cod_almacen (R4), PDF download & idempotent electronic invoice resend (R5 & R6), and pass all quality gates (R7).
 
 ## 🔒 My Identity
 - Archetype: worker

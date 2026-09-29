@@ -1,4 +1,4 @@
-# Arquitectura de Amaxonia ERP POS
+# Arquitectura de Flow Erp POS
 
 ## Propósito
 

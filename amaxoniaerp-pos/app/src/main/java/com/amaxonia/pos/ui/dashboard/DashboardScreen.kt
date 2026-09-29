@@ -120,6 +120,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -148,6 +149,7 @@ import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.common.shortName
 import com.amaxonia.pos.ui.theme.ConfirmedContainer
 import com.amaxonia.pos.ui.theme.ConfirmedContent
+import com.amaxonia.pos.ui.theme.cartBrandGradient
 import com.amaxonia.pos.ui.theme.InfoBlue
 import com.amaxonia.pos.ui.theme.NeutralGray
 import com.amaxonia.pos.ui.theme.OfflineRed
@@ -520,7 +522,7 @@ fun DashboardScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.primary,
+                drawerContainerColor = MaterialTheme.colorScheme.secondary,
                 drawerContentColor = PosPalette.FixedWhite,
                 modifier = Modifier.width(300.dp).fillMaxHeight(),
             ) {
@@ -538,11 +540,11 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(stringResource(R.string.brand_name), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.weight(1f))
-                        Surface(shape = PosExtraShapes.Pill, color = PosPalette.FixedWhite) {
+                        Surface(shape = PosExtraShapes.Pill, color = MaterialTheme.colorScheme.tertiary) {
                             Text(
                                 "Pro+",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.primary,
+                                color = PosPalette.FixedWhite,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
                             )
@@ -1135,17 +1137,26 @@ fun DashboardScreen(
 
                     // Botón flotante del carrito
                     if (state.cartItemCount > 0) {
+                        val cartGradient = cartBrandGradient()
                         Button(
                             onClick = { viewModel.onAction(DashboardSaleUiAction.Checkout) },
-                            shape = MaterialTheme.shapes.medium,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 6.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = PosPalette.Transparent,
+                                    contentColor = PosPalette.FixedWhite,
+                                ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 2.dp),
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomCenter)
                                     .padding(16.dp)
                                     .fillMaxWidth()
-                                    .height(56.dp),
+                                    .height(56.dp)
+                                    .background(
+                                        brush = Brush.horizontalGradient(cartGradient),
+                                        shape = RoundedCornerShape(16.dp),
+                                    ),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1261,23 +1272,23 @@ private fun BottomPillItem(
     icon: ImageVector,
     label: String,
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else PosPalette.Transparent
-    val tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else PosPalette.Transparent
+    val tint = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
 
     Surface(
         color = bg,
-        shape = MaterialTheme.shapes.medium,
+        shape = PosExtraShapes.Pill,
     ) {
         Column(
-            modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 5.dp),
+            modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
             Text(
                 text = label,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                color = tint,
                 maxLines = 1,
             )
         }
@@ -1298,12 +1309,23 @@ fun DrawerMenuItem(
     isSelected: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val backgroundModifier =
+        if (isSelected) {
+            Modifier.background(
+                color = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(12.dp),
+            )
+        } else {
+            Modifier
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 2.dp)
+                .then(backgroundModifier)
                 .clickable { onClick() }
-                .padding(vertical = 16.dp, horizontal = 24.dp),
+                .padding(vertical = 12.dp, horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = label, tint = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
@@ -1812,14 +1834,14 @@ private fun CatalogFilterButton(
                 Box(
                     modifier = Modifier
                         .size(18.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        .background(MaterialTheme.colorScheme.tertiary, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = activeFilterCount.toString(),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = MaterialTheme.colorScheme.onTertiary,
                     )
                 }
             }

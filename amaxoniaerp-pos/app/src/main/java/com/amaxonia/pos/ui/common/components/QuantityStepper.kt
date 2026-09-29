@@ -52,9 +52,9 @@ fun QuantityStepper(
             modifier =
                 Modifier
                     .size(44.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), MaterialTheme.shapes.small),
+                    .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small),
         ) {
-            Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.Remove, contentDescription = "Disminuir cantidad", tint = MaterialTheme.colorScheme.secondary)
         }
         OutlinedTextField(
             value = quantityText,

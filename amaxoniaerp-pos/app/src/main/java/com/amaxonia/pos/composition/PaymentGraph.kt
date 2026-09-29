@@ -35,6 +35,9 @@ object PaymentGraph {
             selectedClient = DependencyContainer.cartRepository.selectedClient,
             tableAccountPaymentReader = DependencyContainer.tableAccountPaymentHolder,
             cartFinancialSnapshot = DependencyContainer.cartRepository.financialSnapshot,
+            onPaymentProcessingChanged = { isProcessing, message ->
+                DependencyContainer.customerDisplayManager.setPaymentProcessing(isProcessing, message)
+            },
         )
 
     fun paymentSuccessViewModel(transactionId: String): PaymentSuccessViewModel =
@@ -49,9 +52,10 @@ object PaymentGraph {
         DependencyContainer.tableAccountPaymentHolder.clear()
         if (payload.tableSessionClosed) {
             DependencyContainer.selectedTableHolder.clear()
-            DependencyContainer.cartRepository.clearCart()
         }
+        DependencyContainer.cartRepository.clearCart()
         DependencyContainer.localStore.saveLastPaymentSuccess(payload)
+        DependencyContainer.customerDisplayManager.showSaleSuccess()
     }
 
     /**

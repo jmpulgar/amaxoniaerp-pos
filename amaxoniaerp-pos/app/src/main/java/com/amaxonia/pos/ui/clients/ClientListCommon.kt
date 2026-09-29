@@ -97,10 +97,10 @@ internal fun ClientSearchField(
         shape = RoundedCornerShape(12.dp),
         colors =
             OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = PosPalette.Transparent,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
             ),
     )
 }
@@ -113,7 +113,7 @@ internal fun ClientAvatarBox(photoUrl: String) {
             Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                .background(MaterialTheme.colorScheme.secondaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         if (photoUrl.isNotBlank()) {
@@ -123,7 +123,7 @@ internal fun ClientAvatarBox(photoUrl: String) {
                 modifier = Modifier.fillMaxSize().clip(CircleShape),
             )
         } else {
-            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.secondary)
         }
     }
 }

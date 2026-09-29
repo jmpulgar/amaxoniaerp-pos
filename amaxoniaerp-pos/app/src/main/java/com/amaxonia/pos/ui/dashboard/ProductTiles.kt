@@ -255,12 +255,12 @@ private fun ProductTileActions(
         modifier =
             Modifier
                 .size(40.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
+                .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.small),
     ) {
         Icon(
             Icons.Default.Edit,
             contentDescription = "Elegir cantidad",
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(18.dp),
         )
     }

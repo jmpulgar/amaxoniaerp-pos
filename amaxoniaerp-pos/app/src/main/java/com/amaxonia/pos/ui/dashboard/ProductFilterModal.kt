@@ -435,7 +435,7 @@ private fun DepartmentRowItem(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            MaterialTheme.colorScheme.secondaryContainer
         } else {
             PosPalette.Transparent
         },
@@ -451,7 +451,7 @@ private fun DepartmentRowItem(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -460,7 +460,7 @@ private fun DepartmentRowItem(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Seleccionado",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(18.dp),
                 )
             }

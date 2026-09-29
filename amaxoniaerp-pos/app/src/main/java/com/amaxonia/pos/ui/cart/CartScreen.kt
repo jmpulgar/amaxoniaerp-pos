@@ -312,23 +312,35 @@ private fun CartBottomActions(
     onCheckout: () -> Unit,
 ) {
     if (isMesaSession) {
+        val gradient = cartBrandGradient()
         Button(
             onClick = onCheckout,
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(gradient),
+                        shape = RoundedCornerShape(16.dp),
+                    ),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = PosPalette.Transparent,
+                    contentColor = PosPalette.FixedWhite,
+                ),
             contentPadding = PaddingValues(horizontal = 14.dp),
             shape = RoundedCornerShape(16.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 2.dp),
         ) {
-            Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp), tint = PosPalette.FixedWhite)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 "Confirmar para Comanda",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = PosPalette.FixedWhite,
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp), tint = PosPalette.FixedWhite)
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -370,13 +382,25 @@ private fun SaveDraftButton(onClick: () -> Unit) {
 
 @Composable
 private fun CheckoutButton(onClick: () -> Unit) {
+    val gradient = cartBrandGradient()
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(54.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .background(
+                    brush = Brush.horizontalGradient(gradient),
+                    shape = RoundedCornerShape(16.dp),
+                ),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = PosPalette.Transparent,
+                contentColor = PosPalette.FixedWhite,
+            ),
         contentPadding = PaddingValues(horizontal = 14.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 2.dp),
     ) {
         Text(
             "Cobrar",
@@ -385,13 +409,13 @@ private fun CheckoutButton(onClick: () -> Unit) {
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.5.sp,
                 ),
-            color = MaterialTheme.colorScheme.onPrimary,
+            color = PosPalette.FixedWhite,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Icon(
             Icons.AutoMirrored.Filled.ArrowForward,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = PosPalette.FixedWhite,
             modifier = Modifier.size(20.dp),
         )
     }

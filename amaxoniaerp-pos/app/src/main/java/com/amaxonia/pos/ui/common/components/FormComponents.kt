@@ -66,8 +66,12 @@ fun PosTextInput(
             shape = RoundedCornerShape(10.dp),
             colors =
                 OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 ),
             singleLine = true,
         )
@@ -105,10 +109,14 @@ fun PosDropdown(
                 shape = RoundedCornerShape(10.dp),
                 colors =
                     OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                         disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     ),
             )
             ExposedDropdownMenu(
@@ -151,8 +159,8 @@ fun PosMoneyInput(
                 ),
             colors =
                 OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = PosPalette.Transparent,
-                    unfocusedContainerColor = PosPalette.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,

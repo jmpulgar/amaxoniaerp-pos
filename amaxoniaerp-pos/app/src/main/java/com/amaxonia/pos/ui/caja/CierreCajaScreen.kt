@@ -269,7 +269,7 @@ private fun CajaHeaderCard(summary: CierreCajaSummary) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.secondary),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
     ) {
         Column(modifier = Modifier.padding(24.dp)) {

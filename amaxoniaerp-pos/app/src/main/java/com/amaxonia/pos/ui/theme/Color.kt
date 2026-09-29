@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
 import com.amaxonia.pos.R
 
-val SuccessGreen = Color(0xFF2E7D32)
+val SuccessGreen = Color(0xFF15803D)
 val NeutralGray = Color(0xFF9E9E9E)
 val InfoBlue = Color(0xFF1565C0)
 val InfoCyan = Color(0xFF0277BD)
@@ -15,8 +15,8 @@ val WarningOrange = Color(0xFFEF6C00)
 val StrongErrorRed = Color(0xFFC62828)
 val OnlineGreen = Color(0xFF16A34A)
 val OfflineRed = Color(0xFFDC2626)
-val ConfirmedContainer = Color(0xFFE8F5E9)
-val ConfirmedContent = Color(0xFF1B5E20)
+val ConfirmedContainer = Color(0xFFF0FDF4)
+val ConfirmedContent = Color(0xFF15803D)
 val PendingContainer = Color(0xFFFFF3E0)
 val PendingContent = Color(0xFFE65100)
 val ReportOrange = Color(0xFFFF9800)

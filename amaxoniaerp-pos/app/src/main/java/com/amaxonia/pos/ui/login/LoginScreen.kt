@@ -1,7 +1,9 @@
 package com.amaxonia.pos.ui.login
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -59,6 +62,7 @@ import com.amaxonia.pos.R
 import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
+import com.amaxonia.pos.ui.theme.cartBrandGradient
 
 @Composable
 fun LoginScreen(
@@ -165,7 +169,8 @@ private fun LoginCredentialsCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
             UsernameField(state.username) { onAction(LoginUiAction.UsernameChanged(it)) }
@@ -190,7 +195,7 @@ private fun LoginCredentialsCard(
             ) {
                 Text(
                     text = stringResource(R.string.login_forgot_password),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
@@ -275,16 +280,31 @@ private fun LoginSubmitButton(
     loading: Boolean,
     onClick: () -> Unit,
 ) {
+    val gradient = cartBrandGradient()
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(
+                    brush = Brush.horizontalGradient(gradient),
+                    shape = RoundedCornerShape(18.dp),
+                ),
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = PosPalette.Transparent,
+                contentColor = PosPalette.FixedWhite,
+                disabledContainerColor = PosPalette.Transparent,
+                disabledContentColor = PosPalette.FixedWhite.copy(alpha = 0.6f),
+            ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 1.dp),
         enabled = !loading,
     ) {
         if (loading) {
             CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = PosPalette.FixedWhite,
                 modifier = Modifier.size(22.dp),
                 strokeWidth = 2.5.dp,
             )
@@ -292,6 +312,7 @@ private fun LoginSubmitButton(
             Text(
                 text = stringResource(R.string.login_submit),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = PosPalette.FixedWhite,
             )
         }
     }
@@ -301,9 +322,15 @@ private fun LoginSubmitButton(
 @Composable
 private fun loginFieldColors() =
     OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = PosPalette.Transparent,
-        unfocusedBorderColor = PosPalette.Transparent,
-        focusedContainerColor = MaterialTheme.colorScheme.surface,
-        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        focusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+        unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
         cursorColor = MaterialTheme.colorScheme.primary,
     )

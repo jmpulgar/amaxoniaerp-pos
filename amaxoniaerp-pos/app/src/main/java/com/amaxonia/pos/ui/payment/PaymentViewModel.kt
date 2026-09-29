@@ -41,6 +41,7 @@ class PaymentViewModel(
     private val selectedClient: StateFlow<Client?> = MutableStateFlow(null),
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
     private val cartFinancialSnapshot: StateFlow<SaleFinancialSnapshot?> = MutableStateFlow(null),
+    private val onPaymentProcessingChanged: ((Boolean, String?) -> Unit)? = null,
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
 
@@ -215,9 +216,11 @@ class PaymentViewModel(
                 gatewayStatusMessage = "Validando cobro...",
             )
         }
+        onPaymentProcessingChanged?.invoke(true, "Validando cobro...")
     }
 
     private fun applyPaymentResult(result: PaymentFlowResult) {
+        onPaymentProcessingChanged?.invoke(false, null)
         when (result) {
             is PaymentFlowResult.DuplicateInvoice ->
                 _state.update {
@@ -299,10 +302,18 @@ class PaymentViewModel(
 
     private suspend fun handlePaymentFlowEvent(event: PaymentFlowEvent) {
         when (event) {
-            is PaymentFlowEvent.Progress -> _state.update { it.copy(gatewayStatusMessage = event.message) }
+            is PaymentFlowEvent.Progress -> {
+                _state.update { it.copy(gatewayStatusMessage = event.message) }
+                onPaymentProcessingChanged?.invoke(true, event.message)
+            }
             is PaymentFlowEvent.LaunchGateway -> _effects.emit(PaymentUiEffect.LaunchGateway(event.payload))
             PaymentFlowEvent.FiscalConfirmationFailed -> SafeLog.w(TAG, "Fiscal receipt confirmation failed")
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        onPaymentProcessingChanged?.invoke(false, null)
     }
 
     private fun PaymentState.toPaymentOperationRequest(

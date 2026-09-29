@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -63,12 +64,12 @@ import com.amaxonia.pos.ui.common.components.PosFeedbackCard
 import com.amaxonia.pos.ui.common.components.PosStatusBadge
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.theme.cartBrandGradient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-private val SCREEN_ROYAL_BLUE = Color(0xFF1664EA)
 private val WIDE_CONTENT_MAX_WIDTH = 480.dp
 
 /** Fracciones genéricas de progreso usadas por las animaciones de esta pantalla. */
@@ -125,15 +126,16 @@ fun SuccessScreen(
     SuccessSnackbarEffects(uiState = uiState, snackbarHostState = snackbarHostState)
     SuccessBackHandler(scope = scope, snackbarHostState = snackbarHostState)
 
+    val brandGradient = cartBrandGradient()
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = SCREEN_ROYAL_BLUE,
+        containerColor = MaterialTheme.colorScheme.secondary,
     ) { paddingValues ->
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(SCREEN_ROYAL_BLUE)
+                    .background(Brush.verticalGradient(brandGradient))
                     .padding(paddingValues)
                     .statusBarsPadding()
                     .navigationBarsPadding(),
@@ -227,7 +229,6 @@ internal fun SuccessContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(SCREEN_ROYAL_BLUE)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -370,7 +371,7 @@ private fun SuccessHeadline(
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 23.sp,
                 ),
-            color = SCREEN_ROYAL_BLUE,
+            color = MaterialTheme.colorScheme.secondary,
             textAlign = TextAlign.Center,
         )
 
@@ -383,7 +384,7 @@ private fun SuccessHeadline(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 12.5.sp,
                 ),
-            color = Color(0xFF64748B),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
 
@@ -391,8 +392,8 @@ private fun SuccessHeadline(
             Spacer(modifier = Modifier.height(6.dp))
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFFEFF6FF),
-                border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Text(
                     text = "Factura #${payload.codFactura}",
@@ -401,7 +402,7 @@ private fun SuccessHeadline(
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.5.sp,
                         ),
-                    color = SCREEN_ROYAL_BLUE,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                 )
             }
@@ -418,7 +419,7 @@ private fun BluePaymentSummaryCard(
     val countFraction = rememberChangeCountFraction(changeDue = payload.changeDue)
 
     Surface(
-        color = SCREEN_ROYAL_BLUE,
+        color = MaterialTheme.colorScheme.secondary,
         shape = RoundedCornerShape(14.dp),
         shadowElevation = 3.dp,
         modifier =
@@ -533,7 +534,7 @@ private fun LoadingConfirmationCard() {
             verticalArrangement = Arrangement.Center,
         ) {
             CircularProgressIndicator(
-                color = SCREEN_ROYAL_BLUE,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(36.dp),
                 strokeWidth = 3.dp,
             )
@@ -624,13 +625,13 @@ private fun NextOrderButton(
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = Color.White,
-                contentColor = SCREEN_ROYAL_BLUE,
+                contentColor = MaterialTheme.colorScheme.secondary,
             ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 8.dp),
     ) {
         Text(
             text = "SIGUIENTE VENTA",
-            color = SCREEN_ROYAL_BLUE,
+            color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.ExtraBold,
             style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 0.8.sp),
             maxLines = 1,
@@ -639,7 +640,7 @@ private fun NextOrderButton(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
             contentDescription = null,
-            tint = SCREEN_ROYAL_BLUE,
+            tint = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(19.dp),
         )
     }

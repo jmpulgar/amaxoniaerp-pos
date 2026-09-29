@@ -1,5 +1,6 @@
 package com.amaxonia.pos.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -69,6 +72,8 @@ fun SettingsScreen(
     val availablePrinterTypes by viewModel.availablePrinterTypes.collectAsStateWithLifecycle()
     val allowEditPrices by viewModel.allowEditPrices.collectAsStateWithLifecycle()
     val allowDiscounts by viewModel.allowDiscounts.collectAsStateWithLifecycle()
+    val customerDisplayEnabled by viewModel.customerDisplayEnabled.collectAsStateWithLifecycle()
+    val isSecondaryDisplayAvailable by viewModel.isSecondaryDisplayAvailable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val isVE = PrinterType.THE_FACTORY_HKA in availablePrinterTypes
@@ -106,6 +111,14 @@ fun SettingsScreen(
                 allowDiscounts = allowDiscounts,
                 onAllowEditPricesChange = viewModel::onAllowEditPricesChanged,
                 onAllowDiscountsChange = viewModel::onAllowDiscountsChanged,
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            CustomerDisplaySettingsCard(
+                enabled = customerDisplayEnabled,
+                isSecondaryDisplayAvailable = isSecondaryDisplayAvailable,
+                onToggle = viewModel::onToggleCustomerDisplay,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -391,6 +404,65 @@ private fun PrintTestSection(
                         }
                     }
                 },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomerDisplaySettingsCard(
+    enabled: Boolean,
+    isSecondaryDisplayAvailable: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PhoneAndroid,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Pantalla de Cliente",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        )
+                        Text(
+                            text = if (isSecondaryDisplayAvailable) "Hardware detectado (Conectado)" else "No se detecta segunda pantalla",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = if (isSecondaryDisplayAvailable) SuccessGreen else NeutralGray,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                        )
+                    }
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onToggle,
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Muestra en tiempo real los artículos del carrito y totales en la pantalla secundaria orientada al cliente (SUNMI D3 PRO o monitor externo).",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             )
         }
     }

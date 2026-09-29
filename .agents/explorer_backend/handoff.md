@@ -1,7 +1,7 @@
 # Backend Codebase Investigation Report (R1 - R7)
 
 ## Executive Summary
-This report provides a comprehensive technical investigation of the Ktor backend (`amaxoniaerp-backend`) for requirements R1 through R7 of the Amaxonia ERP-POS system. It covers invoice lifecycle ("En Espera" vs Cash Close), date and cash register query filtering, root cause analysis of the Panama electronic credit note SQL error (`caja.cod_almacen`), PDF generation/download mechanisms, idempotent electronic invoice resending, and quality gate configurations (Java 21, JaCoCo, Detekt, Ktlint).
+This report provides a comprehensive technical investigation of the Ktor backend (`amaxoniaerp-backend`) for requirements R1 through R7 of the Flow Erp-POS system. It covers invoice lifecycle ("En Espera" vs Cash Close), date and cash register query filtering, root cause analysis of the Panama electronic credit note SQL error (`caja.cod_almacen`), PDF generation/download mechanisms, idempotent electronic invoice resending, and quality gate configurations (Java 21, JaCoCo, Detekt, Ktlint).
 
 ---
 

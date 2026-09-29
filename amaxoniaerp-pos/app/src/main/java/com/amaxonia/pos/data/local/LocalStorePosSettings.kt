@@ -99,6 +99,19 @@ suspend fun LocalStore.readAllowEditPrices(): Boolean = allowEditPricesFlow().fi
 
 suspend fun LocalStore.readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
 
+suspend fun LocalStore.saveCustomerDisplayEnabled(enabled: Boolean) {
+    dataStore.edit { prefs ->
+        prefs[customerDisplayEnabledKey] = enabled
+    }
+}
+
+fun LocalStore.customerDisplayEnabledFlow(): Flow<Boolean> =
+    dataStore.data.map { prefs ->
+        prefs[customerDisplayEnabledKey] ?: false
+    }
+
+suspend fun LocalStore.readCustomerDisplayEnabled(): Boolean = customerDisplayEnabledFlow().first()
+
 /**
  * Flow observable del país seleccionado
  */

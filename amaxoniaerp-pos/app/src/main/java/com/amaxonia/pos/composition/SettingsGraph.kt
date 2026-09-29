@@ -13,6 +13,7 @@ object SettingsGraph {
         SettingsViewModel(
             settingsRepository = DependencyContainer.posConfigurationRepository,
             fiscalDiagnostics = DependencyContainer.fiscalDeviceDiagnostics,
+            customerDisplayManager = DependencyContainer.customerDisplayManager,
         )
 
     fun activeTicketPrinter(): TicketPrinter? = DependencyContainer.printerFactory.getActiveTicketPrinter()

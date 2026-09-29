@@ -4,11 +4,13 @@ import com.amaxonia.pos.BuildConfig
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.allowDiscountsFlow
 import com.amaxonia.pos.data.local.allowEditPricesFlow
+import com.amaxonia.pos.data.local.customerDisplayEnabledFlow
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readLastPaymentSuccess
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.saveAllowDiscounts
 import com.amaxonia.pos.data.local.saveAllowEditPrices
+import com.amaxonia.pos.data.local.saveCustomerDisplayEnabled
 import com.amaxonia.pos.data.local.saveSelectedPrinterType
 import com.amaxonia.pos.data.local.saveTheFactorySettings
 import com.amaxonia.pos.data.local.selectedCountryFlow
@@ -39,6 +41,7 @@ class LocalPosConfigurationRepository(
     override val factorySettings: Flow<TheFactorySettings> = localStore.theFactorySettingsFlow()
     override val allowEditPrices: Flow<Boolean> = localStore.allowEditPricesFlow()
     override val allowDiscounts: Flow<Boolean> = localStore.allowDiscountsFlow()
+    override val customerDisplayEnabled: Flow<Boolean> = localStore.customerDisplayEnabledFlow()
 
     override suspend fun currentAdminDatabase(): String =
         localStore
@@ -83,5 +86,9 @@ class LocalPosConfigurationRepository(
 
     override suspend fun saveAllowDiscounts(enabled: Boolean) {
         localStore.saveAllowDiscounts(enabled)
+    }
+
+    override suspend fun saveCustomerDisplayEnabled(enabled: Boolean) {
+        localStore.saveCustomerDisplayEnabled(enabled)
     }
 }

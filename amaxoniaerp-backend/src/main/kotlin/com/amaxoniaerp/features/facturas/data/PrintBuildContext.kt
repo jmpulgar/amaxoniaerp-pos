@@ -171,7 +171,7 @@ internal fun buildPrintResponse(ctx: PrintBuildContext): FacturaPrintPayloadResp
         fecha = ctx.factura.stringOrNull("fechaFactura").orEmpty(),
         empresa =
             com.amaxoniaerp.features.facturas.domain.EmpresaPrintResponse(
-                nombre = ctx.companyNameFallback.ifBlank { "Amaxonia ERP" },
+                nombre = ctx.companyNameFallback.ifBlank { "Flow Erp" },
                 ruc = ctx.factura.stringOrNull("empresa_ruc"),
                 direccion = null,
                 telefono = null,

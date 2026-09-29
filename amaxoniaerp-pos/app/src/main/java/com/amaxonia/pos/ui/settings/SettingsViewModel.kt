@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.pos.domain.model.printer.TheFactorySettings
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
@@ -20,6 +21,7 @@ private const val THE_FACTORY_SERIAL_MAX_LENGTH = 10
 class SettingsViewModel(
     private val settingsRepository: PosSettingsRepository,
     private val fiscalDiagnostics: FiscalDeviceDiagnostics? = null,
+    private val customerDisplayManager: com.amaxonia.pos.ui.customerdisplay.CustomerDisplayManager? = null,
 ) : ViewModel() {
     private val _selectedPrinterType = MutableStateFlow(PrinterType.NONE)
     val selectedPrinterType = _selectedPrinterType.asStateFlow()
@@ -39,6 +41,12 @@ class SettingsViewModel(
     val allowEditPrices = _allowEditPrices.asStateFlow()
     private val _allowDiscounts = MutableStateFlow(false)
     val allowDiscounts = _allowDiscounts.asStateFlow()
+    private val _customerDisplayEnabled = MutableStateFlow(false)
+    val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
+
+    val isSecondaryDisplayAvailable: StateFlow<Boolean> =
+        customerDisplayManager?.isSecondaryDisplayAvailable ?: MutableStateFlow(false)
+
     private val _gatewayOptions = MutableStateFlow<List<GatewayOption>>(emptyList())
     val gatewayOptions = _gatewayOptions.asStateFlow()
     private val _isLoadingGateways = MutableStateFlow(false)
@@ -79,6 +87,23 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.allowDiscounts.collect { enabled ->
                 _allowDiscounts.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.customerDisplayEnabled.collect { enabled ->
+                _customerDisplayEnabled.value = enabled
+            }
+        }
+    }
+
+    fun onToggleCustomerDisplay(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveCustomerDisplayEnabled(enabled)
+            }.onFailure { throwable ->
+                _errorMessage.update {
+                    throwable.message ?: "No se pudo actualizar la configuración de pantalla de cliente"
+                }
             }
         }
     }
