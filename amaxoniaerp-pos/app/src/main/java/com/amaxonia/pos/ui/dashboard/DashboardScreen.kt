@@ -536,7 +536,8 @@ fun DashboardScreen(
                                 Modifier
                                     .size(40.dp)
                                     .background(PosPalette.FixedWhite, MaterialTheme.shapes.small)
-                                    .padding(4.dp),
+                                    .padding(1.dp)
+                                    .padding(end = 3.dp),
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(stringResource(R.string.brand_name), fontSize = 18.sp, fontWeight = FontWeight.Bold)
