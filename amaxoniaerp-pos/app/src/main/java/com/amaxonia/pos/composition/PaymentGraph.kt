@@ -1,11 +1,16 @@
 package com.amaxonia.pos.composition
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.saveLastPaymentSuccess
 import com.amaxonia.pos.data.printer.LocalInvoicePrintPayloadMapper
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
+import com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
 import com.amaxonia.pos.domain.model.printer.PrintResult
@@ -14,6 +19,7 @@ import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentCountryUseCase
 import com.amaxonia.pos.ui.payment.PaymentSuccessViewModel
 import com.amaxonia.pos.ui.payment.PaymentViewModel
+import java.io.File
 
 /**
  * Grafo del feature pago (TASK-051/052). La arquitectura de Payment está
@@ -60,15 +66,85 @@ object PaymentGraph {
 
     /**
      * Reimpresión del recibo de una venta. Selector por país para SUNMI_V2
-     * (VE → formatter Venezuela; PA/otros → formatter Panamá) e impresora
-     * genérica para el resto. Suspend: los gateways de impresión son async.
+     * (VE → formatter Venezuela; PA/otros → formatter Panamá), impresora
+     * fiscal The Factory HKA, y descarga en PDF cuando no hay impresora configurada.
      */
+    suspend fun printSuccessReceipt(context: Context, transactionId: String): Result<String> {
+        val selectedPrinter = DependencyContainer.localStore.readSelectedPrinterType()
+        val isSunmi = selectedPrinter == PrinterType.SUNMI_V2 || SunmiDeviceDetector.isSunmiDevice()
+
+        return when {
+            isSunmi -> printSunmiTicket(transactionId)
+            selectedPrinter == PrinterType.THE_FACTORY_HKA -> {
+                val printer = DependencyContainer.printerFactory.getActivePrinter()
+                if (printer != null) {
+                    printGenericReceipt(transactionId)
+                } else {
+                    downloadAndOpenReceiptPdf(context, transactionId)
+                }
+            }
+            else -> downloadAndOpenReceiptPdf(context, transactionId)
+        }
+    }
+
     suspend fun printSuccessReceipt(transactionId: String): Result<String> =
-        if (DependencyContainer.localStore.readSelectedPrinterType() == PrinterType.SUNMI_V2) {
+        if (DependencyContainer.localStore.readSelectedPrinterType() == PrinterType.SUNMI_V2 ||
+            SunmiDeviceDetector.isSunmiDevice()
+        ) {
             printSunmiTicket(transactionId)
         } else {
             printGenericReceipt(transactionId)
         }
+
+    private suspend fun downloadAndOpenReceiptPdf(
+        context: Context,
+        transactionId: String,
+    ): Result<String> {
+        if (transactionId.isBlank() || transactionId.startsWith("OFF-")) {
+            return Result.failure(
+                IllegalStateException("No hay impresora configurada. El PDF no está disponible para facturas no sincronizadas.")
+            )
+        }
+
+        val pdfResult = DependencyContainer.salesRepository.getInvoicePdf(transactionId)
+        return pdfResult.fold(
+            onSuccess = { bytes ->
+                runCatching {
+                    val invoiceNumber = DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrNull()?.invoiceNumber
+                    val cleanName = (invoiceNumber?.takeIf { it.isNotBlank() } ?: transactionId)
+                        .replace('/', '_')
+                        .replace('\\', '_')
+                    val pdfFile = File(context.cacheDir, "factura_$cleanName.pdf").apply {
+                        writeBytes(bytes)
+                    }
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        pdfFile,
+                    )
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/pdf")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    Result.success("Sin impresora configurada. Abriendo PDF de la factura...")
+                }.getOrElse { ex ->
+                    if (ex is ActivityNotFoundException) {
+                        Result.success("Sin impresora configurada. Factura guardada en PDF (no se encontró visor de PDF).")
+                    } else {
+                        Result.failure(ex)
+                    }
+                }
+            },
+            onFailure = { error ->
+                Result.failure(
+                    IllegalStateException(
+                        "Sin impresora configurada. No se pudo descargar el PDF: ${error.message ?: "error desconocido"}"
+                    )
+                )
+            },
+        )
+    }
 
     private suspend fun printSunmiTicket(transactionId: String): Result<String> {
         val ticketPrinter = DependencyContainer.printerFactory.getActiveTicketPrinter()
@@ -111,18 +187,15 @@ object PaymentGraph {
     }
 
     private suspend fun printGenericReceipt(transactionId: String): Result<String> {
+        val printer = DependencyContainer.printerFactory.getActivePrinter()
+            ?: return Result.failure(IllegalStateException("No hay impresora configurada"))
         val transaction =
             DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrElse { error ->
                 return Result.failure(error)
             }
-        val printer = DependencyContainer.printerFactory.getActivePrinter()
-        return when {
-            printer == null -> Result.failure(IllegalStateException("No hay impresora configurada"))
-            else ->
-                printer.printReceipt(transaction).fold(
-                    onSuccess = { Result.success("Imprimiendo recibo...") },
-                    onFailure = { Result.failure(it) },
-                )
-        }
+        return printer.printReceipt(transaction).fold(
+            onSuccess = { Result.success("Imprimiendo recibo...") },
+            onFailure = { Result.failure(it) },
+        )
     }
 }

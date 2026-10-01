@@ -10,6 +10,7 @@ import com.amaxonia.pos.data.local.db.PendingInvoiceDao
 import com.amaxonia.pos.data.local.db.PendingInvoiceEntity
 import com.amaxonia.pos.data.local.saveCompanySession
 import com.amaxonia.pos.data.remote.api.SalesApi
+import com.amaxonia.pos.domain.model.Transaction
 import com.amaxonia.pos.domain.model.TransactionStatus
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalResponseDto
@@ -392,4 +393,30 @@ class ApiTransactionRepositoryTest {
             assertEquals(5.00, detail.items.first().precioUnitario, 0.001)
             assertEquals(10.00, detail.items.first().totalConIva, 0.001)
         }
+
+    @Test
+    fun saveTransactionCachesTransactionAndCanBeRetrievedByIdOrNumber() =
+        runTest {
+            val repository = ApiTransactionRepository(fakeSalesApi, localStore, fakePendingDao)
+            val tx =
+                Transaction(
+                    id = "REC-999",
+                    invoiceNumber = "FAC-999",
+                    time = "12:00",
+                    amount = 15.0,
+                    dateHeader = "Hoy",
+                    clienteNombre = "Juan Perez",
+                )
+
+            repository.saveTransaction(tx)
+
+            val byId = repository.getTransactionById("REC-999").getOrThrow()
+            assertEquals("REC-999", byId.id)
+            assertEquals("FAC-999", byId.invoiceNumber)
+
+            val byNumber = repository.getTransactionById("FAC-999").getOrThrow()
+            assertEquals("REC-999", byNumber.id)
+            assertEquals("FAC-999", byNumber.invoiceNumber)
+        }
 }
+

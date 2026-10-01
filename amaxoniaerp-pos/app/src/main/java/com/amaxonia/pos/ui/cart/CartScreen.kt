@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,6 +81,7 @@ import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.domain.model.ItemCarrito
 import com.amaxonia.pos.domain.usecase.BigDecimalMoneyFormatter
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
+import com.amaxonia.pos.ui.common.components.PosGradientButton
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.payment.FinancialBreakdown
@@ -133,17 +135,28 @@ fun CartScreen(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = { CartBottomBarArea(state = state, viewModel = viewModel) },
     ) { padding ->
-        CartScreenContent(
-            state = state,
-            viewModel = viewModel,
-            actions =
-                CartScreenActions(
-                    onSelectClient = onSelectClient,
-                    onChangeSeller = { showSellerSheet = true },
-                    onStartEdit = editState::start,
-                ),
-            modifier = Modifier.padding(padding),
-        )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            CartScreenContent(
+                state = state,
+                viewModel = viewModel,
+                actions =
+                    CartScreenActions(
+                        onSelectClient = onSelectClient,
+                        onChangeSeller = { showSellerSheet = true },
+                        onStartEdit = editState::start,
+                    ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 720.dp),
+            )
+        }
     }
 }
 
@@ -170,12 +183,18 @@ internal fun CartBottomBar(
     ) {
         BoxWithConstraints {
             val compact = maxHeight < 480.dp
-            Column(
-                modifier =
-                    Modifier
-                        .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
-                        .navigationBarsPadding(),
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .widthIn(max = 720.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 12.dp)
+                            .navigationBarsPadding(),
+                ) {
                 CartBottomTotalRow(
                     total = total,
                     secondaryTotal =
@@ -216,6 +235,7 @@ internal fun CartBottomBar(
             }
         }
     }
+}
 }
 
 /** Fila del total con monto adaptivo, moneda secundaria y flecha que despliega el desglose. */
@@ -312,25 +332,12 @@ private fun CartBottomActions(
     onCheckout: () -> Unit,
 ) {
     if (isMesaSession) {
-        val gradient = cartBrandGradient()
-        Button(
+        PosGradientButton(
             onClick = onCheckout,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(gradient),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = PosPalette.Transparent,
-                    contentColor = PosPalette.FixedWhite,
-                ),
-            contentPadding = PaddingValues(horizontal = 14.dp),
-            shape = RoundedCornerShape(16.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 2.dp),
+                    .height(54.dp),
         ) {
             Icon(Icons.Default.RestaurantMenu, null, modifier = Modifier.size(20.dp), tint = PosPalette.FixedWhite)
             Spacer(modifier = Modifier.width(8.dp))
@@ -382,25 +389,12 @@ private fun SaveDraftButton(onClick: () -> Unit) {
 
 @Composable
 private fun CheckoutButton(onClick: () -> Unit) {
-    val gradient = cartBrandGradient()
-    Button(
+    PosGradientButton(
         onClick = onClick,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(54.dp)
-                .background(
-                    brush = Brush.horizontalGradient(gradient),
-                    shape = RoundedCornerShape(16.dp),
-                ),
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = PosPalette.Transparent,
-                contentColor = PosPalette.FixedWhite,
-            ),
-        contentPadding = PaddingValues(horizontal = 14.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 2.dp),
+                .height(54.dp),
     ) {
         Text(
             "Cobrar",

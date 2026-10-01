@@ -152,16 +152,17 @@ fun SuccessScreen(
                                 isPrinting = isPrinting,
                             ),
                         onPrintReceipt = {
-                            if (transactionId.isBlank()) {
+                            val targetId = payload?.transactionId?.takeIf { it.isNotBlank() } ?: transactionId
+                            if (targetId.isBlank()) {
                                 scope.launch { snackbarHostState.showSnackbar("No hay transacción para imprimir") }
                                 return@SuccessActions
                             }
                             scope.launch {
                                 isPrinting = true
-                                val result = onPrintReceipt(transactionId)
+                                val result = onPrintReceipt(targetId)
                                 val feedback =
                                     result.getOrElse { error ->
-                                        error.message ?: "No se pudo imprimir el recibo"
+                                        error.message ?: "No se pudo procesar el recibo"
                                     }
                                 snackbarHostState.showSnackbar(feedback)
                                 isPrinting = false

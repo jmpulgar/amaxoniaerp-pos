@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.pos.domain.model.money.Money
@@ -194,6 +196,9 @@ internal fun NonCashListPanel(
     fillRemaining: Boolean,
     modifier: Modifier = Modifier,
     narrow: Boolean = false,
+    topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
+    showCtaButton: Boolean = true,
 ) {
     Column(modifier = modifier) {
         if (state.formasPagoTarjetaOtro.isEmpty()) {
@@ -201,17 +206,20 @@ internal fun NonCashListPanel(
                 icon = Icons.Default.CreditCard,
                 title = "Otros medios no disponibles",
                 message = "No hay tarjetas u otras formas de pago configuradas para esta caja.",
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = topPadding),
             )
             return
         }
 
-        NonCashFormasHeader(count = state.formasPagoTarjetaOtro.size)
         val listModifier = if (fillRemaining) Modifier.weight(1f) else Modifier
         LazyColumn(
             modifier = listModifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
         ) {
+            item(key = "formas_header") {
+                NonCashFormasHeader(count = state.formasPagoTarjetaOtro.size)
+            }
             items(state.formasPagoTarjetaOtro, key = { it.idFormaPago }) { forma ->
                 NonCashRow(
                     forma = forma,
@@ -229,14 +237,16 @@ internal fun NonCashListPanel(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        PrimaryCtaButton(
-            state = state,
-            warningScale = 1f,
-            isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
-            onClick = { onAction(PaymentUiAction.ProcessPayment) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (showCtaButton) {
+            Spacer(modifier = Modifier.height(12.dp))
+            PrimaryCtaButton(
+                state = state,
+                warningScale = 1f,
+                isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
+                onClick = { onAction(PaymentUiAction.ProcessPayment) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

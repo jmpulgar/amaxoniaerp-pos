@@ -58,7 +58,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    flavorDimensions += "brand"
+    flavorDimensions += "brand" 
 
     productFlavors {
         create("amaxonia") {

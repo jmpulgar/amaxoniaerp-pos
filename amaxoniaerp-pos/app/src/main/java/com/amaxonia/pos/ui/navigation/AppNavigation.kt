@@ -586,10 +586,11 @@ private fun NavGraphBuilder.paymentDestinations(
                 },
             ),
     ) { backStackEntry ->
+        val context = LocalContext.current
         SuccessScreen(
             transactionId = backStackEntry.arguments?.getString("transactionId").orEmpty(),
             onPrintReceipt = { trxId ->
-                AppGraph.payment.printSuccessReceipt(trxId)
+                AppGraph.payment.printSuccessReceipt(context, trxId)
             },
             onNextOrder = {
                 cartRepository.clearCart()

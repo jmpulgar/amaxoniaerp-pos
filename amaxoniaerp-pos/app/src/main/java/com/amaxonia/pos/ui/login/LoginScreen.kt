@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -60,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.pos.R
 import com.amaxonia.pos.composition.AppGraph
+import com.amaxonia.pos.ui.common.components.PosGradientButton
 import com.amaxonia.pos.ui.common.injectedViewModel
 import com.amaxonia.pos.ui.theme.PosPalette
 import com.amaxonia.pos.ui.theme.cartBrandGradient
@@ -141,21 +145,27 @@ private fun LoginForm(
     onAction: (LoginUiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
         Spacer(modifier = Modifier.height(8.dp))
         Image(
             painter = painterResource(R.drawable.brand_logo),
             contentDescription = stringResource(R.string.brand_logo_description),
-            modifier = Modifier.fillMaxWidth().height(128.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 96.dp).height(96.dp),
             contentScale = ContentScale.Fit,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.login_title),
-            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 34.sp, fontWeight = FontWeight.ExtraBold),
+            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold),
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         LoginCredentialsCard(state, onAction)
     }
 }
@@ -280,27 +290,14 @@ private fun LoginSubmitButton(
     loading: Boolean,
     onClick: () -> Unit,
 ) {
-    val gradient = cartBrandGradient()
-    Button(
+    PosGradientButton(
         onClick = onClick,
+        enabled = !loading,
+        shape = RoundedCornerShape(18.dp),
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .background(
-                    brush = Brush.horizontalGradient(gradient),
-                    shape = RoundedCornerShape(18.dp),
-                ),
-        shape = RoundedCornerShape(18.dp),
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = PosPalette.Transparent,
-                contentColor = PosPalette.FixedWhite,
-                disabledContainerColor = PosPalette.Transparent,
-                disabledContentColor = PosPalette.FixedWhite.copy(alpha = 0.6f),
-            ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 1.dp),
-        enabled = !loading,
+                .height(56.dp),
     ) {
         if (loading) {
             CircularProgressIndicator(

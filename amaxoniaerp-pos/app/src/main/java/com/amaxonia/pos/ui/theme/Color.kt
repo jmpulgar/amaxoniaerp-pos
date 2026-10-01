@@ -46,15 +46,16 @@ object PosStatusColors {
 }
 
 /**
- * Brand-aware replacement for the old hardcoded CartGradientStart/End (which never varied
- * by white-label flavor). Reads the same brand_gradient_* resources every flavor already defines.
+ * Brand-aware gradient for primary CTA buttons, badges, and headers.
+ * Uses a harmonious 2-stop ramp (start -> mid) from deep brand primary to vibrant brand secondary,
+ * eliminating the harsh 3-block horizontal banding ("cuadrados") that occurs when accent colors
+ * are forced into compact button widths.
  */
 @Composable
 fun cartBrandGradient(): List<Color> =
     listOf(
         colorResource(R.color.brand_gradient_start),
         colorResource(R.color.brand_gradient_mid),
-        colorResource(R.color.brand_gradient_end),
     )
 
 /** Stable per-payment-method color, centralized so tiles/rows/reports agree on the same mapping. */

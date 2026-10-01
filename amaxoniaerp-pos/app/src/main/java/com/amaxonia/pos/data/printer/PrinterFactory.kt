@@ -134,7 +134,7 @@ class PrinterFactory(
             PrinterType.NONE,
             PrinterType.THE_FACTORY_HKA,
             PrinterType.GENERIC_BLUETOOTH,
-            -> null
+            -> if (com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector.isSunmiDevice()) getSunmiPrinterOrNull() else null
         }
     }
 

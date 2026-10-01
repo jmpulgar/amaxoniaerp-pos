@@ -14,7 +14,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,11 +24,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
@@ -126,29 +132,40 @@ fun WelcomeScreen(
             gradientEnd = gradientEnd,
         )
 
-        Column(
+        BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .alpha(contentAlpha),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                    .navigationBarsPadding(),
         ) {
-            WelcomeBrandHeader(taglineColor = taglineColor)
+            val minContentHeight = maxHeight
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(min = minContentHeight)
+                        .alpha(contentAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                WelcomeBrandHeader(taglineColor = taglineColor)
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            WelcomeHero()
-            WelcomeActions(
-                onLoginClick = onLoginClick,
-                onRequestAccountClick = {
-                    onRequestAccountClick()
-                    showContactSheet = true
-                },
-            )
-
-            Spacer(modifier = Modifier.height(36.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(bottom = 24.dp),
+                ) {
+                    WelcomeHero()
+                    WelcomeActions(
+                        onLoginClick = onLoginClick,
+                        onRequestAccountClick = {
+                            onRequestAccountClick()
+                            showContactSheet = true
+                        },
+                    )
+                }
+            }
         }
 
         if (showContactSheet) {
@@ -332,7 +349,7 @@ private fun DrawScope.drawFrontWave(
 /** Logo grande sobre fondo blanco + tagline de marca. */
 @Composable
 private fun WelcomeBrandHeader(taglineColor: Color) {
-    Spacer(modifier = Modifier.height(48.dp))
+    Spacer(modifier = Modifier.height(28.dp))
 
     Image(
         painter = painterResource(id = R.drawable.brand_logo),
@@ -340,12 +357,13 @@ private fun WelcomeBrandHeader(taglineColor: Color) {
         modifier =
             Modifier
                 .fillMaxWidth(LOGO_WIDTH_FRACTION)
+                .heightIn(max = 120.dp)
                 .aspectRatio(2f),
         // mantiene proporción sin estirarse
         contentScale = ContentScale.Fit,
     )
 
-    Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.height(14.dp))
 
     Text(
         text = stringResource(R.string.brand_welcome_tagline),
@@ -385,7 +403,7 @@ private fun WelcomeHero() {
         modifier = Modifier.padding(horizontal = 36.dp),
     )
 
-    Spacer(modifier = Modifier.height(32.dp))
+    Spacer(modifier = Modifier.height(20.dp))
 }
 
 /** Botones de inicio de sesión y solicitud de cuenta. */
@@ -394,7 +412,14 @@ private fun WelcomeActions(
     onLoginClick: () -> Unit,
     onRequestAccountClick: () -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 32.dp)) {
+    Column(
+        modifier =
+            Modifier
+                .padding(horizontal = 32.dp)
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         LoginButton(onClick = onLoginClick)
 
         Spacer(modifier = Modifier.height(14.dp))

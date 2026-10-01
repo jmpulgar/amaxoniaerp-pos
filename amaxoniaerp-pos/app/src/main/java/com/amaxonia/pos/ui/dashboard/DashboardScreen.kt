@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -142,7 +143,7 @@ import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
-import com.amaxonia.pos.ui.common.components.CategoryChipRow
+import com.amaxonia.pos.ui.common.components.PosGradientButton
 import com.amaxonia.pos.ui.common.components.PosMoneyInput
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -813,6 +814,7 @@ fun DashboardScreen(
                             Modifier
                                 .padding(horizontal = 18.dp)
                                 .height(58.dp)
+                                .widthIn(max = 500.dp)
                                 .fillMaxWidth(),
                     ) {
                         Row(
@@ -1137,26 +1139,15 @@ fun DashboardScreen(
 
                     // Botón flotante del carrito
                     if (state.cartItemCount > 0) {
-                        val cartGradient = cartBrandGradient()
-                        Button(
+                        PosGradientButton(
                             onClick = { viewModel.onAction(DashboardSaleUiAction.Checkout) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = PosPalette.Transparent,
-                                    contentColor = PosPalette.FixedWhite,
-                                ),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 2.dp),
                             modifier =
                                 Modifier
                                     .align(Alignment.BottomCenter)
                                     .padding(16.dp)
+                                    .widthIn(max = 560.dp)
                                     .fillMaxWidth()
-                                    .height(56.dp)
-                                    .background(
-                                        brush = Brush.horizontalGradient(cartGradient),
-                                        shape = RoundedCornerShape(16.dp),
-                                    ),
+                                    .height(56.dp),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

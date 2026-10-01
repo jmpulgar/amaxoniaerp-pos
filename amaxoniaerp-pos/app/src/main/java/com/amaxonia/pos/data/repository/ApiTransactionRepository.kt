@@ -31,6 +31,8 @@ class ApiTransactionRepository(
     private val localStore: LocalStore,
     private val pendingInvoiceDao: PendingInvoiceDao? = null,
 ) : InvoiceHistoryRepository {
+    private val recentTransactions = java.util.concurrent.ConcurrentHashMap<String, Transaction>()
+
     override suspend fun getAllTransactions(): Result<List<Transaction>> = getTransactions().map { it.transactions }
 
     override suspend fun getTransactionById(id: String): Result<Transaction> =
@@ -39,18 +41,59 @@ class ApiTransactionRepository(
             val localMatch = localPending.firstOrNull { it.id == id || it.invoiceNumber == id }
             if (localMatch != null) return@catchingResult Result.success(localMatch)
 
+            val recentMatch = recentTransactions[id] ?: recentTransactions.values.firstOrNull { it.id == id || it.invoiceNumber == id }
+            if (recentMatch != null) return@catchingResult Result.success(recentMatch)
+
             val authHeader = getAuthHeader()
-            salesApi
-                .getFacturas(
+            val facturasResult =
+                salesApi.getFacturas(
                     authHeader = authHeader,
-                    limit = 10,
+                    limit = 20,
                     filter = InvoiceHistoryFilter(search = id),
-                ).map { response ->
-                    response.data
-                        .firstOrNull { it.id == id || it.codigo == id }
-                        ?.toTransaction()
-                        ?: error("Transaccion no encontrada: $id")
+                )
+            val remoteMatch =
+                facturasResult.getOrNull()?.data?.firstOrNull { it.id == id || it.codigo == id }?.toTransaction()
+            if (remoteMatch != null) return@catchingResult Result.success(remoteMatch)
+
+            if (!id.startsWith("OFF-")) {
+                val printPayloadResult = salesApi.getPrintPayload(authHeader = authHeader, facturaId = id)
+                val payload = printPayloadResult.getOrNull()
+                if (payload != null) {
+                    val fallbackTransaction =
+                        Transaction(
+                            id = payload.facturaId.ifBlank { id },
+                            invoiceNumber = payload.numeroFactura,
+                            time = "--:--",
+                            amount = payload.total.toDoubleOrNull() ?: 0.0,
+                            dateHeader = payload.fecha,
+                            clienteNombre = payload.cliente?.nombre.orEmpty(),
+                            clienteIdentificacion = payload.cliente?.documento.orEmpty(),
+                            formaPago = payload.pagos.firstOrNull()?.metodo.orEmpty(),
+                            paymentMethods =
+                                payload.pagos.map { p ->
+                                    com.amaxonia.pos.domain.model.TransactionPaymentMethod(
+                                        description = p.metodo,
+                                        amount = p.monto.toDoubleOrNull() ?: 0.0,
+                                    )
+                                },
+                            fiscalItems =
+                                payload.productos.map { prod ->
+                                    com.amaxonia.pos.domain.model.TransactionFiscalItem(
+                                        description = prod.nombre,
+                                        quantity = prod.cantidad.toDoubleOrNull() ?: 1.0,
+                                        unitPriceWithoutTax = prod.precioUnitario.toDoubleOrNull() ?: 0.0,
+                                        iva = prod.tasaImpuesto?.toDoubleOrNull() ?: 0.0,
+                                    )
+                                },
+                            totalRef = payload.totalDivisa?.toDoubleOrNull(),
+                            abrMonedaSecundaria = payload.abrMonedaSecundaria,
+                        )
+                    saveTransaction(fallbackTransaction)
+                    return@catchingResult Result.success(fallbackTransaction)
                 }
+            }
+
+            error("Transaccion no encontrada: $id")
         }
 
     override suspend fun getTransactions(
@@ -150,7 +193,12 @@ class ApiTransactionRepository(
         }
 
     override suspend fun saveTransaction(transaction: Transaction): Result<Unit> {
-        // Sales are created via processSale() in SalesRepository, not here.
+        if (transaction.id.isNotBlank()) {
+            recentTransactions[transaction.id] = transaction
+        }
+        if (transaction.invoiceNumber.isNotBlank()) {
+            recentTransactions[transaction.invoiceNumber] = transaction
+        }
         return Result.success(Unit)
     }
 

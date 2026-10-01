@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -75,6 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -91,11 +93,13 @@ import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.model.payment.FormaPago
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import androidx.compose.foundation.layout.RowScope
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.Keypad
 import com.amaxonia.pos.ui.common.components.KeypadDisplay
 import com.amaxonia.pos.ui.common.components.PosFeedbackCard
+import com.amaxonia.pos.ui.common.components.PosGradientButton
 import com.amaxonia.pos.ui.common.components.PosLoadingState
 import com.amaxonia.pos.ui.common.components.PosVisualTone
 import com.amaxonia.pos.ui.common.injectedViewModel
@@ -322,7 +326,7 @@ internal fun PaymentHeader(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    var breakdownExpanded by remember { mutableStateOf(true) }
+    var breakdownExpanded by remember { mutableStateOf(false) }
     val arrowRotation by animateFloatAsState(
         targetValue = if (breakdownExpanded) 180f else 0f,
         label = "breakdownArrow",
@@ -419,6 +423,19 @@ internal fun PaymentHeader(
                 }
             }
 
+            // Badges de estado de pago (Asignado y Restante / Total cubierto)
+            PaymentStatusBadgesRow(state = state, compact = compact)
+
+            // Recordatorio de pago insuficiente en modo no efectivo
+            if (state.selectedMethod == PaymentMethod.NON_CASH) {
+                AnimatedInsufficientRow(
+                    isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
+                    missingCashAmountText = state.nonCashPendingText,
+                    missingCashBsText = state.nonCashPendingBsText,
+                    isMultiCurrency = state.isMultiCurrency,
+                )
+            }
+
             // Desglose financiero colapsable
             AnimatedVisibility(
                 visible = breakdownExpanded,
@@ -435,7 +452,188 @@ internal fun PaymentHeader(
                         tasa = state.tasa,
                         compact = compact,
                     )
+                    if (state.assignedAmountMoney > Money.ZERO) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        PaymentAssignmentBreakdown(state = state, compact = compact)
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentStatusBadgesRow(
+    state: PaymentState,
+    compact: Boolean = false,
+) {
+    val showBadges = state.selectedMethod == PaymentMethod.NON_CASH || state.assignedAmountMoney > Money.ZERO
+    if (!showBadges) return
+
+    Spacer(modifier = Modifier.height(if (compact) 8.dp else 10.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Badge Asignado
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.weight(1f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = if (compact) 6.dp else 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "Asignado",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "$ ${state.assignedText}",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    if (state.isMultiCurrency && state.assignedBsText.isNotBlank()) {
+                        Text(
+                            text = "$SECONDARY_CURRENCY_LABEL ${state.assignedBsText}",
+                            style = PosTextStyles.amountSecondary.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.80f),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Badge Restante / Total cubierto
+        if (state.isPaymentEnough) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = com.amaxonia.pos.ui.theme.ConfirmedContainer,
+                contentColor = com.amaxonia.pos.ui.theme.ConfirmedContent,
+                modifier = Modifier.weight(1f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = if (compact) 6.dp else 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = com.amaxonia.pos.ui.theme.SuccessGreen,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (state.changeDueMoney > Money.ZERO) "Cambio: $ ${state.changeDueText}" else "¡Total cubierto!",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = com.amaxonia.pos.ui.theme.SuccessGreen,
+                    )
+                }
+            }
+        } else {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.50f),
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = if (compact) 6.dp else 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Restante",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "$ ${state.nonCashPendingText}",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        if (state.isMultiCurrency && state.nonCashPendingBsText.isNotBlank()) {
+                            Text(
+                                text = "$SECONDARY_CURRENCY_LABEL ${state.nonCashPendingBsText}",
+                                style = PosTextStyles.amountSecondary.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentAssignmentBreakdown(
+    state: PaymentState,
+    compact: Boolean = false,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = if (compact) 12.dp else 14.dp, vertical = if (compact) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "Distribución del pago",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (state.tenderedAmountMoney > Money.ZERO) {
+                PaymentSummaryLine(
+                    label = "Efectivo",
+                    value = "$ ${state.tenderedAmountText}",
+                    secondary =
+                        state.tenderedAmountBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                    emphasized = false,
+                )
+            }
+            if (state.nonCashAssignedMoney > Money.ZERO) {
+                PaymentSummaryLine(
+                    label = "Tarjeta / Otro",
+                    value = "$ ${state.nonCashAssignedText}",
+                    secondary =
+                        state.nonCashAssignedBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                    emphasized = false,
+                )
+            }
+            PaymentSummaryLine(
+                label = "Total asignado",
+                value = "$ ${state.assignedText}",
+                secondary =
+                    state.assignedBsText
+                        .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                        ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                emphasized = state.isPaymentEnough,
+            )
+            if (!state.isPaymentEnough) {
+                PaymentSummaryLine(
+                    label = "Saldo restante",
+                    value = "$ ${state.nonCashPendingText}",
+                    secondary =
+                        state.nonCashPendingBsText
+                            .takeIf { state.isMultiCurrency && it.isNotBlank() }
+                            ?.let { "$SECONDARY_CURRENCY_LABEL $it" },
+                    emphasized = true,
+                )
             }
         }
     }
@@ -685,7 +883,9 @@ internal fun PaymentWide(
             )
             when (state.selectedMethod) {
                 PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction)
-                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state)
+                PaymentMethod.NON_CASH -> {
+                    // El resumen de cobro y saldo restante ya está unificado en PaymentHeader
+                }
             }
         }
 
@@ -745,7 +945,9 @@ internal fun PaymentLandscape(
             )
             when (state.selectedMethod) {
                 PaymentMethod.CASH -> CashAmountPanel(state = state, onAction = onAction)
-                PaymentMethod.NON_CASH -> NonCashSummaryPanel(state = state)
+                PaymentMethod.NON_CASH -> {
+                    // El resumen de cobro y saldo restante ya está unificado en PaymentHeader
+                }
             }
         }
 
@@ -850,23 +1052,79 @@ private fun PaymentPortraitNonCash(
     state: PaymentState,
     onAction: (PaymentUiAction) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        PaymentHeader(
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. Fondo completo: Lista de formas de pago con scroll de pantalla completa
+        NonCashListPanel(
             state = state,
-            compact = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            onAction = onAction,
+            fillRemaining = false,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            topPadding = 164.dp,
+            bottomPadding = 92.dp,
+            showCtaButton = false,
         )
-        PaymentMethodSelectorRow(
-            selectedMethod = state.selectedMethod,
-            cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
-            nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
-            onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-        )
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            NonCashSummaryPanel(state = state, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(10.dp))
-            NonCashListPanel(state = state, onAction = onAction, fillRemaining = true, modifier = Modifier.weight(1f).fillMaxWidth())
+
+        // 2. Capa superior flotante: Cabecera del total + Selector de pestañas
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    MaterialTheme.colorScheme.background,
+                                    MaterialTheme.colorScheme.background,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                                    Color.Transparent,
+                                ),
+                        ),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+        ) {
+            PaymentHeader(
+                state = state,
+                compact = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            PaymentMethodSelectorRow(
+                selectedMethod = state.selectedMethod,
+                cashEnabled = state.formasPagoEfectivo.isNotEmpty(),
+                nonCashEnabled = state.formasPagoTarjetaOtro.isNotEmpty() || state.isLoadingFormasPago,
+                onSelect = { onAction(PaymentUiAction.SelectMethod(it)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Botón de cobrar flotante sobre la parte inferior
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.85f),
+                                    MaterialTheme.colorScheme.background,
+                                ),
+                        ),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .imePadding(),
+        ) {
+            PrimaryCtaButton(
+                state = state,
+                warningScale = 1f,
+                isInsufficient = state.showInsufficientReminder && !state.isPaymentEnough,
+                onClick = { onAction(PaymentUiAction.ProcessPayment) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -1086,28 +1344,8 @@ internal fun PrimaryCtaButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val heroColor =
-        if (isInsufficient) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.primary
-        }
-    val onHeroColor = MaterialTheme.colorScheme.onPrimary
-    Button(
-        onClick = onClick,
-        enabled = !state.isProcessingPayment,
-        modifier =
-            modifier
-                .height(58.dp)
-                .defaultMinSize(minHeight = 54.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = heroColor,
-                contentColor = onHeroColor,
-            ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.5.dp, pressedElevation = 5.dp),
-    ) {
+    val onHeroColor = if (isInsufficient) MaterialTheme.colorScheme.onError else PosPalette.FixedWhite
+    val buttonContent: @Composable RowScope.() -> Unit = {
         if (state.isProcessingPayment) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
@@ -1144,6 +1382,36 @@ internal fun PrimaryCtaButton(
                     ),
             )
         }
+    }
+
+    if (isInsufficient) {
+        Button(
+            onClick = onClick,
+            enabled = !state.isProcessingPayment,
+            modifier =
+                modifier
+                    .height(58.dp)
+                    .defaultMinSize(minHeight = 54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.5.dp, pressedElevation = 5.dp),
+            content = buttonContent,
+        )
+    } else {
+        PosGradientButton(
+            onClick = onClick,
+            enabled = !state.isProcessingPayment,
+            modifier =
+                modifier
+                    .height(58.dp)
+                    .defaultMinSize(minHeight = 54.dp),
+            shape = RoundedCornerShape(16.dp),
+            content = buttonContent,
+        )
     }
 }
 

@@ -396,7 +396,7 @@ internal class CompletePaymentSaleUseCase(
     ): PaymentFlowResult {
         val transaction =
             createTransaction(
-                id = idGenerator.nextId(),
+                id = response.idFactura.ifBlank { idGenerator.nextId() },
                 invoiceNumber = response.codFactura,
                 status = TransactionStatus.PAID,
                 input = input,
