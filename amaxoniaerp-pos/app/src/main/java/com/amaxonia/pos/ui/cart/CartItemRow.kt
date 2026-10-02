@@ -1,5 +1,7 @@
 package com.amaxonia.pos.ui.cart
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,13 +13,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Percent
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,13 +44,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import com.amaxonia.pos.domain.model.CartItem
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountOptions
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
-import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.theme.PosTextStyles
 import java.util.Locale
 
@@ -75,49 +93,117 @@ class CartItemActions(
 
 @Composable
 fun CartItemRow(
-    item: com.amaxonia.pos.domain.model.CartItem,
+    item: CartItem,
+    imageUrl: String = "",
     actions: CartItemActions,
     allowEditPrice: Boolean,
     allowDiscount: Boolean,
 ) {
-    androidx.compose.material3.ElevatedCard(
+    ElevatedCard(
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp),
-        shape =
-            androidx.compose.foundation.shape
-                .RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
-            CartItemHeaderRow(item = item, onRemove = actions.onRemove)
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp).fillMaxWidth()) {
+            // Sección Superior: Miniatura 44x44dp + (Título, Total, Metadata y Eliminar)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+            ) {
+                ProductThumbnail(
+                    imageUrl = imageUrl,
+                    description = item.product.description,
+                    modifier = Modifier.size(44.dp),
+                )
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-            CartItemPriceRow(item = item)
+                Column(modifier = Modifier.weight(1f)) {
+                    // Nivel 1: Título + Total de línea
+                    CartItemTopRow(item = item)
 
-            Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
-            CartItemQuantityRow(
+                    // Nivel 2: Metadata (Precio unitario, Lista, Unidad) + Eliminar
+                    CartItemMetadataRow(
+                        item = item,
+                        onRemove = actions.onRemove,
+                        onPriceLevelChange = actions.onPriceLevelChange,
+                        onUnitChange = actions.onUnitChange,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Nivel 3: Stepper compacto + Acciones de edición / Descuento
+            CartItemBottomRow(
                 item = item,
                 actions = actions,
                 allowEditPrice = allowEditPrice,
                 allowDiscount = allowDiscount,
             )
 
-            if (!item.isPromotionLine) {
-                Spacer(modifier = Modifier.height(8.dp))
-                CartItemPriceLevelSelector(
-                    item = item,
-                    onPriceLevelChange = actions.onPriceLevelChange,
+            // Lotes asignados (condicional)
+            CartItemLotFootnotes(item = item)
+        }
+    }
+}
+
+/** Miniatura del producto con carga asíncrona y placeholder simétrico. */
+@Composable
+private fun ProductThumbnail(
+    imageUrl: String,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        modifier = modifier.clip(RoundedCornerShape(8.dp)),
+    ) {
+        if (imageUrl.isNotBlank()) {
+            SubcomposeAsyncImage(
+                model = imageUrl,
+                contentDescription = description,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Inventory2,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
+                error = {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Inventory2,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
+                success = {
+                    SubcomposeAsyncImageContent(
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                },
+            )
+        } else {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Inventory2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
+                    modifier = Modifier.size(20.dp),
                 )
             }
-
-            if (item.product.canSwitchUnit) {
-                Spacer(modifier = Modifier.height(6.dp))
-                CartItemUnitSelector(item = item, onUnitChange = actions.onUnitChange)
-            }
-
-            CartItemFootnotes(item = item)
         }
     }
 }
@@ -162,80 +248,245 @@ private class CartQuantityController(
     }
 }
 
-/** Fila 1: descripción (flexible) + eliminar (target ≥48dp vía minimum interactive). */
+/** Nivel 1: Descripción del producto + Total destacado de línea. */
 @Composable
-private fun CartItemHeaderRow(
-    item: com.amaxonia.pos.domain.model.CartItem,
-    onRemove: () -> Unit,
+private fun CartItemTopRow(
+    item: CartItem,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
         Text(
-            item.product.description,
+            text = item.product.description,
             fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
+            fontSize = 13.5.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
+            lineHeight = 17.sp,
+            modifier = Modifier.weight(1f).padding(end = 6.dp),
         )
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier.size(36.dp),
-        ) {
-            Icon(
-                Icons.Default.Delete,
-                contentDescription = "Quitar del carrito",
-                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.80f),
-                modifier = Modifier.size(19.dp),
-            )
-        }
+        AdaptiveAmountText(
+            text = "$ ${String.format(Locale.getDefault(), "%.2f", item.total)}",
+            baseStyle = PosTextStyles.priceTileLarge.copy(fontSize = 15.5.sp, fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.primary,
+            options = AdaptiveAmountOptions(minFontSizeSp = 11f),
+        )
     }
 }
 
-/** Fila 2: precio unitario (flexible) + total de línea en badge destacado. */
+/** Nivel 2: Precio unitario con IVA + Chips compactos (Lista / Unidad) + Eliminar. */
 @Composable
-private fun CartItemPriceRow(item: com.amaxonia.pos.domain.model.CartItem) {
+private fun CartItemMetadataRow(
+    item: CartItem,
+    onRemove: () -> Unit,
+    onPriceLevelChange: (String) -> Unit,
+    onUnitChange: (String) -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "$ ${String.format(
-                Locale.getDefault(),
-                "%.2f",
-                item.unitPriceWithTax,
-            )} / ${item.displayUnitLabel.lowercase()}",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        Surface(
-            shape =
-                androidx.compose.foundation.shape
-                    .RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            AdaptiveAmountText(
-                text = "$ ${String.format(Locale.getDefault(), "%.2f", item.total)}",
-                baseStyle = PosTextStyles.priceTileLarge.copy(fontSize = 16.sp),
-                color = MaterialTheme.colorScheme.primary,
-                options = AdaptiveAmountOptions(minFontSizeSp = 12f),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            Text(
+                text = "$ ${String.format(
+                    Locale.getDefault(),
+                    "%.2f",
+                    item.unitPriceWithTax,
+                )}/${item.displayUnitLabel.lowercase()}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            if (!item.isPromotionLine) {
+                CompactPriceLevelChip(item = item, onPriceLevelChange = onPriceLevelChange)
+            }
+
+            if (item.product.canSwitchUnit) {
+                CompactUnitChip(item = item, onUnitChange = onUnitChange)
+            }
+        }
+
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+            modifier = Modifier.size(24.dp),
+        ) {
+            IconButton(onClick = onRemove, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Quitar del carrito",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Selector compacto en cápsula para la lista de precios. */
+@Composable
+private fun CompactPriceLevelChip(
+    item: CartItem,
+    onPriceLevelChange: (String) -> Unit,
+) {
+    var priceMenuExpanded by remember { mutableStateOf(false) }
+    val availableLevels =
+        remember(item.product.prices) {
+            val positive = item.product.prices.filter { it.pricePlusTax > 0.0 || it.price > 0.0 }
+            if (positive.isNotEmpty()) positive else item.product.prices
+        }
+    val currentLabelText =
+        if (item.isManualPrice) "Manual" else item.selectedPriceLabel
+
+    Box {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f),
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { priceMenuExpanded = true },
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            ) {
+                Icon(
+                    Icons.Default.LocalOffer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(11.dp),
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = currentLabelText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = priceMenuExpanded,
+            onDismissRequest = { priceMenuExpanded = false },
+        ) {
+            availableLevels.forEach { level ->
+                val isSelected =
+                    !item.isManualPrice && item.selectedPriceLabel.equals(level.label, ignoreCase = true)
+                val levelPrice =
+                    if (item.itemUnitPackage == "EMPAQUE" || item.product.bulkQuantity <= 1.0) {
+                        level.pricePlusTax.takeIf { it > 0.0 } ?: level.price
+                    } else {
+                        level.unitPricePlusTax.takeIf { it > 0.0 } ?: level.unitPrice.takeIf { it > 0.0 } ?: level.pricePlusTax
+                    }
+                val formattedPrice = String.format(Locale.getDefault(), "%.2f", levelPrice)
+
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Lista ${level.label}",
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                "$ $formattedPrice",
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 13.sp,
+                            )
+                        }
+                    },
+                    onClick = {
+                        priceMenuExpanded = false
+                        onPriceLevelChange(level.label)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Selector compacto en cápsula para el cambio de unidad. */
+@Composable
+private fun CompactUnitChip(
+    item: CartItem,
+    onUnitChange: (String) -> Unit,
+) {
+    var unitMenuExpanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.50f),
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { unitMenuExpanded = true },
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            ) {
+                Icon(
+                    Icons.Default.Autorenew,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(11.dp),
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = item.displayUnitLabel,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = unitMenuExpanded,
+            onDismissRequest = { unitMenuExpanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("UNIDAD") },
+                onClick = {
+                    unitMenuExpanded = false
+                    onUnitChange("UNIDAD")
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(item.product.packageLabel) },
+                onClick = {
+                    unitMenuExpanded = false
+                    onUnitChange("EMPAQUE")
+                },
             )
         }
     }
 }
 
-/**
- * Fila 3: stepper (flexible) + acciones de precio/descuento con targets ≥48dp
- * y botones tonales redondeados.
- */
+/** Nivel 3: Stepper de cantidad compacto (32dp) + Descuento + Botones de precio/descuento. */
 @Composable
-private fun CartItemQuantityRow(
-    item: com.amaxonia.pos.domain.model.CartItem,
+private fun CartItemBottomRow(
+    item: CartItem,
     actions: CartItemActions,
     allowEditPrice: Boolean,
     allowDiscount: Boolean,
@@ -251,271 +502,173 @@ private fun CartItemQuantityRow(
             )
         }
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        QuantityStepper(
+        CompactQuantityStepper(
             quantityText = controller.text,
             onQuantityTextChange = controller::onTextChange,
             onDecrease = { controller.decrease(item.quantity) },
             onIncrease = { controller.increase(item.quantity) },
             onDone = controller::done,
             isError = controller.isError,
-            label = "Cantidad",
-            modifier = Modifier.weight(1f),
         )
-        CartItemEditButtons(
-            allowEditPrice = allowEditPrice,
-            allowDiscount = allowDiscount,
-            onEditPrice = actions.edit.onEditPrice,
-            onEditDiscount = actions.edit.onEditDiscount,
-        )
-    }
-}
 
-@Composable
-private fun CartItemEditButtons(
-    allowEditPrice: Boolean,
-    allowDiscount: Boolean,
-    onEditPrice: () -> Unit,
-    onEditDiscount: () -> Unit,
-) {
-    if (allowEditPrice) {
-        Surface(
-            shape =
-                androidx.compose.foundation.shape
-                    .RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-            modifier = Modifier.size(40.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            IconButton(onClick = onEditPrice, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Editar precio",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-    if (allowDiscount) {
-        Surface(
-            shape =
-                androidx.compose.foundation.shape
-                    .RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
-            modifier = Modifier.size(40.dp),
-        ) {
-            IconButton(onClick = onEditDiscount, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    Icons.Default.Percent,
-                    contentDescription = "Aplicar descuento",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CartItemPriceLevelSelector(
-    item: com.amaxonia.pos.domain.model.CartItem,
-    onPriceLevelChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var priceMenuExpanded by remember { mutableStateOf(false) }
-    val availableLevels =
-        remember(item.product.prices) {
-            val positive = item.product.prices.filter { it.pricePlusTax > 0.0 || it.price > 0.0 }
-            if (positive.isNotEmpty()) positive else item.product.prices
-        }
-
-    val currentLabelText =
-        if (item.isManualPrice) {
-            "Precio Manual"
-        } else {
-            "Lista ${item.selectedPriceLabel}"
-        }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier,
-    ) {
-        Text(
-            "Precio:",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Box {
-            AssistChip(
-                onClick = { priceMenuExpanded = true },
-                label = {
+            if (item.discountPercent > 0.0) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.50f),
+                ) {
                     Text(
-                        currentLabelText,
+                        "-${String.format(Locale.getDefault(), "%.0f", item.discountPercent)}%",
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                     )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.LocalOffer,
-                        contentDescription = "Cambiar lista de precios",
-                        modifier = Modifier.size(14.dp),
-                    )
-                },
-                shape =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(8.dp),
-            )
-            DropdownMenu(
-                expanded = priceMenuExpanded,
-                onDismissRequest = { priceMenuExpanded = false },
-            ) {
-                availableLevels.forEach { level ->
-                    val isSelected =
-                        !item.isManualPrice && item.selectedPriceLabel.equals(level.label, ignoreCase = true)
-                    val levelPrice =
-                        if (item.itemUnitPackage == "EMPAQUE" || item.product.bulkQuantity <= 1.0) {
-                            level.pricePlusTax.takeIf { it > 0.0 } ?: level.price
-                        } else {
-                            level.unitPricePlusTax.takeIf { it > 0.0 } ?: level.unitPrice.takeIf { it > 0.0 } ?: level.pricePlusTax
-                        }
-                    val formattedPrice = String.format(Locale.getDefault(), "%.2f", levelPrice)
+                }
+            }
 
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "Lista ${level.label}",
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color =
-                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Text(
-                                    "$ $formattedPrice",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 13.sp,
-                                )
-                            }
-                        },
-                        onClick = {
-                            priceMenuExpanded = false
-                            onPriceLevelChange(level.label)
-                        },
-                    )
+            if (allowEditPrice) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    IconButton(onClick = actions.edit.onEditPrice, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar precio",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
+            }
+
+            if (allowDiscount) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    IconButton(onClick = actions.edit.onEditDiscount, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.Percent,
+                            contentDescription = "Aplicar descuento",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** Stepper compacto de 32dp de altura sin etiquetas flotantes pesadas. */
 @Composable
-private fun CartItemUnitSelector(
-    item: com.amaxonia.pos.domain.model.CartItem,
-    onUnitChange: (String) -> Unit,
+private fun CompactQuantityStepper(
+    quantityText: String,
+    onQuantityTextChange: (String) -> Unit,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    onDone: () -> Unit,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    var unitMenuExpanded by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            "Unidad:",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Box {
-            AssistChip(
-                onClick = { unitMenuExpanded = true },
-                label = { Text(item.displayUnitLabel, fontWeight = FontWeight.Bold) },
-                leadingIcon = {
-                    Icon(Icons.Default.Autorenew, contentDescription = null, modifier = Modifier.size(15.dp))
-                },
-                shape =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(8.dp),
-            )
-            DropdownMenu(
-                expanded = unitMenuExpanded,
-                onDismissRequest = { unitMenuExpanded = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text("UNIDAD") },
-                    onClick = {
-                        unitMenuExpanded = false
-                        onUnitChange("UNIDAD")
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(item.product.packageLabel) },
-                    onClick = {
-                        unitMenuExpanded = false
-                        onUnitChange("EMPAQUE")
-                    },
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f),
+            modifier = Modifier.size(32.dp),
+        ) {
+            IconButton(onClick = onDecrease, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = "Disminuir cantidad",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            "Total unidades: ${String.format(Locale.getDefault(), "%.2f", item.quantityTotal)}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
+
+        BasicTextField(
+            value = quantityText,
+            onValueChange = onQuantityTextChange,
+            singleLine = true,
+            textStyle =
+                TextStyle(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                ),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
+            modifier =
+                Modifier
+                    .width(42.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (isError) {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.50f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+                        },
+                    ),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    innerTextField()
+                }
+            },
         )
+
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(32.dp),
+        ) {
+            IconButton(onClick = onIncrease, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Aumentar cantidad",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }
 
-/** Descuento y lotes asignados, secciones condicionales al pie de la tarjeta. */
+/** Lotes asignados condicionales al pie de la tarjeta. */
 @Composable
-private fun CartItemFootnotes(item: com.amaxonia.pos.domain.model.CartItem) {
-    // Descuento (condicional)
-    if (item.discountPercent > 0.0) {
-        Surface(
-            shape =
-                androidx.compose.foundation.shape
-                    .RoundedCornerShape(6.dp),
-            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.40f),
-            modifier = Modifier.padding(top = 6.dp),
-        ) {
-            Text(
-                "Desc: ${String.format(
-                    Locale.getDefault(),
-                    "%.2f",
-                    item.discountPercent,
-                )}% (-$ ${String.format(Locale.getDefault(), "%.2f", item.discountAmountWithoutTax)})",
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            )
-        }
-    }
-
-    // Lotes asignados (condicional)
+private fun CartItemLotFootnotes(item: CartItem) {
     if (item.lotAssignments.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         item.lotAssignments.forEach { lot ->
             val expiry = if (!lot.vencimiento.isNullOrBlank()) " · Vence: ${lot.vencimiento}" else ""
             Surface(
-                shape =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(6.dp),
+                shape = RoundedCornerShape(4.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 modifier = Modifier.padding(top = 2.dp),
             ) {
                 Text(
                     "Lote: ${lot.codigoLote} (${lot.cantidad} uds$expiry)",
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
         }

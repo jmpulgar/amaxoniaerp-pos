@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class CartState(
     val items: List<CartItem> = emptyList(),
@@ -146,6 +147,7 @@ class CartViewModel(
     private val stateCoordinator: CartStateCoordinator,
     private val configurationCoordinator: CartConfigurationCoordinator,
     private val actionHandler: CartActionHandler,
+    private val resolveProductImageUrlUseCase: com.amaxonia.pos.domain.usecase.cart.ResolveProductImageUrlUseCase? = null,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(CartState())
     val state: StateFlow<CartState> = mutableState.asStateFlow()
@@ -156,7 +158,13 @@ class CartViewModel(
     init {
         stateCoordinator.start(viewModelScope, mutableState)
         configurationCoordinator.start(viewModelScope, mutableState)
+        viewModelScope.launch {
+            resolveProductImageUrlUseCase?.warmUp()
+        }
     }
+
+    fun getProductImageUrl(photoPath: String): String =
+        resolveProductImageUrlUseCase?.invoke(photoPath).orEmpty()
 
     fun onAction(action: CartUiAction) {
         actionHandler.onAction(action, viewModelScope, mutableState, mutableEffects)

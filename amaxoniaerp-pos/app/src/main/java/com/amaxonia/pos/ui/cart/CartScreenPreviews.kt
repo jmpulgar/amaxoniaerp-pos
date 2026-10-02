@@ -67,6 +67,31 @@ internal fun CartItemRowSimple() =
         }
     }
 
+@Preview(name = "Item · con foto de producto", showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+internal fun CartItemRowWithPhoto() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                CartItemRow(
+                    item = previewItem(description = "Hamburguesa Doble con Queso", unitPrice = 8.50),
+                    imageUrl = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
+                    actions =
+                        CartItemActions(
+                            onIncrease = {},
+                            onDecrease = {},
+                            onRemove = {},
+                            onUnitChange = {},
+                            onQuantityChange = {},
+                            edit = CartItemEditActions(onEditPrice = {}, onEditDiscount = {}),
+                        ),
+                    allowEditPrice = true,
+                    allowDiscount = true,
+                )
+            }
+        }
+    }
+
 @Preview(name = "Bottom bar · 320×568 · monto normal", showBackground = true, widthDp = 320, heightDp = 568)
 @Composable
 internal fun CartBottomBar320() =
@@ -167,6 +192,26 @@ internal fun CartPanelEmpty() =
                 onRemoveClient = {},
                 onChangeSeller = {},
                 modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+
+@Preview(name = "Panel cliente+vendedor · 320dp estrecho", showBackground = true, widthDp = 320, heightDp = 568)
+@Composable
+internal fun CartPanelCompact320() =
+    PosTheme {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CartClientVendorPanel(
+                state =
+                    CartState(
+                        selectedClient = Client(firstName = "María Alejandra", lastName = "Fernández"),
+                        currentSeller = Seller(id = 3, nombre = "Carlos Pérez"),
+                        availableSellers = listOf(Seller(id = 3, nombre = "Carlos Pérez")),
+                    ),
+                onSelectClient = {},
+                onRemoveClient = {},
+                onChangeSeller = {},
+                modifier = Modifier.padding(8.dp),
             )
         }
     }

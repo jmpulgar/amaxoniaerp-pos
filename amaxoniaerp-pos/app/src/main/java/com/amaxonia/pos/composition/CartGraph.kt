@@ -1,6 +1,7 @@
 package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
+import com.amaxonia.pos.domain.usecase.cart.ResolveProductImageUrlUseCase
 import com.amaxonia.pos.ui.cart.CartActionHandler
 import com.amaxonia.pos.ui.cart.CartConfigurationCoordinator
 import com.amaxonia.pos.ui.cart.CartStateCoordinator
@@ -35,6 +36,11 @@ object CartGraph {
                     DependencyContainer.cartRepository,
                     DependencyContainer.refreshCartProductLotsUseCase,
                     DependencyContainer.saveDraftInvoiceUseCase,
+                ),
+            resolveProductImageUrlUseCase =
+                ResolveProductImageUrlUseCase(
+                    DependencyContainer.posConfigurationRepository,
+                    DependencyContainer.imageUrlResolver,
                 ),
         )
 }

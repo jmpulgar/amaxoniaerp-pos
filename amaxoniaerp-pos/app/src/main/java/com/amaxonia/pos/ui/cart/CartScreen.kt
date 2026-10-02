@@ -430,60 +430,75 @@ internal fun CartClientVendorPanel(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        CartClientRow(state = state, onSelectClient = onSelectClient, onRemoveClient = onRemoveClient)
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f),
-            modifier = Modifier.padding(horizontal = 14.dp),
-        )
-        CartSellerRow(state = state, onChangeSeller = onChangeSeller)
-    }
-}
-
-@Composable
-private fun CartClientRow(
-    state: CartState,
-    onSelectClient: () -> Unit,
-    onRemoveClient: () -> Unit,
-) {
-    val selectedClient = state.selectedClient
-    if (selectedClient != null) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clickable { onSelectClient() }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            CompactClientSection(
+                state = state,
+                onSelectClient = onSelectClient,
+                onRemoveClient = onRemoveClient,
+                modifier = Modifier.weight(1f),
+            )
+
+            Box(
+                modifier =
+                    Modifier
+                        .width(1.dp)
+                        .height(26.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
+            )
+
+            CompactSellerSection(
+                state = state,
+                onChangeSeller = onChangeSeller,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactClientSection(
+    state: CartState,
+    onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedClient = state.selectedClient
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onSelectClient() }
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (selectedClient != null) {
             ClientAvatar(
                 clientPhotoUrl = state.selectedClientPhotoUrl,
                 clientName = "${selectedClient.firstName} ${selectedClient.lastName}",
+                size = 28.dp,
+                fontSize = 10.sp,
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(com.amaxonia.pos.ui.theme.SuccessGreen),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "Cliente asignado",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Text(
-                    "${selectedClient.firstName} ${selectedClient.lastName}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    text = "Cliente",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                Text(
+                    text = "${selectedClient.firstName} ${selectedClient.lastName}",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -492,121 +507,123 @@ private fun CartClientRow(
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f),
+                modifier = Modifier.size(24.dp),
             ) {
-                IconButton(onClick = onRemoveClient, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = onRemoveClient, modifier = Modifier.fillMaxSize()) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Quitar cliente",
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(17.dp),
+                        modifier = Modifier.size(13.dp),
                     )
                 }
             }
-        }
-    } else {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelectClient() }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        } else {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.60f),
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(28.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Asignar cliente a la venta",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    text = "Asignar cliente",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "Opcional para cliente genérico",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Genérico",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+                modifier = Modifier.size(22.dp),
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(6.dp).size(18.dp),
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CartSellerRow(
+private fun CompactSellerSection(
     state: CartState,
     onChangeSeller: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val canChange = state.availableSellers.isNotEmpty()
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(enabled = state.availableSellers.isNotEmpty()) { onChangeSeller() }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(enabled = canChange) { onChangeSeller() }
+                .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.60f),
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(28.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Default.Storefront,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp),
+                )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Vendedor asignado",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                text = "Vendedor",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
             )
             Text(
                 text = state.currentSeller?.nombre ?: "Sin vendedor",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (state.availableSellers.isNotEmpty()) {
+        if (canChange) {
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                modifier = Modifier.size(22.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.Autorenew,
                         contentDescription = "Cambiar vendedor",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        "Cambiar",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(13.dp),
                     )
                 }
             }
@@ -653,7 +670,7 @@ internal fun ClientSucursalSelectorCard(
     val hasMultiple = sucursales.size > 1
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor =
@@ -666,14 +683,14 @@ internal fun ClientSucursalSelectorCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Text(
                 text = if (hasMultiple) "Sucursal del cliente" else "Sucursal del cliente asignada",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             if (hasMultiple) {
                 SucursalSelectorDropdown(
@@ -765,6 +782,8 @@ private fun ClientAvatar(
     clientPhotoUrl: String,
     clientName: String,
     modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 28.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
 ) {
     val initials = buildInitials(clientName)
     val gradient = cartBrandGradient()
@@ -772,20 +791,20 @@ private fun ClientAvatar(
     Box(
         modifier =
             modifier
-                .size(42.dp)
+                .size(size)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(gradient)),
         contentAlignment = Alignment.Center,
     ) {
         if (clientPhotoUrl.isBlank()) {
-            Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+            Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = fontSize)
         } else {
             SubcomposeAsyncImage(
                 model = clientPhotoUrl,
                 contentDescription = "Foto cliente",
                 modifier = Modifier.fillMaxSize(),
-                loading = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp) },
-                error = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = 13.5.sp) },
+                loading = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = fontSize) },
+                error = { Text(initials, color = PosPalette.FixedWhite, fontWeight = FontWeight.Bold, fontSize = fontSize) },
                 success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
             )
         }

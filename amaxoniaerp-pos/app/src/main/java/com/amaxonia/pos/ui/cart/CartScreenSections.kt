@@ -372,7 +372,7 @@ internal fun CartScreenContent(
             onChangeSeller = actions.onChangeSeller,
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (state.selectedClient != null && state.clientSucursales.isNotEmpty()) {
             ClientSucursalSelectorCard(
@@ -382,13 +382,13 @@ internal fun CartScreenContent(
                 onSelect = { branchId -> viewModel.onAction(CartUiAction.SelectClientBranch(branchId)) },
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         state.cartActionError?.let { message ->
             CartErrorBanner(message)
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         if (state.items.isEmpty()) {
@@ -396,7 +396,12 @@ internal fun CartScreenContent(
                 CartEmptyState()
             }
         } else {
-            CartItemsList(state = state, viewModel = viewModel, onStartEdit = actions.onStartEdit)
+            CartItemsList(
+                state = state,
+                viewModel = viewModel,
+                onStartEdit = actions.onStartEdit,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -407,14 +412,19 @@ private fun CartItemsList(
     state: CartState,
     viewModel: CartViewModel,
     onStartEdit: (CartEditTarget, CartItem) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         items(state.displayItems, key = { it.id }) { displayItem ->
             when (displayItem) {
                 is ItemCarrito.ProductoIndividual -> {
                     val item = displayItem.item
                     CartItemRow(
                         item = item,
+                        imageUrl = viewModel.getProductImageUrl(item.product.photoUrl),
                         actions = buildCartItemActions(item, viewModel, onStartEdit),
                         allowEditPrice = state.allowEditPrices,
                         allowDiscount = state.allowDiscounts,
