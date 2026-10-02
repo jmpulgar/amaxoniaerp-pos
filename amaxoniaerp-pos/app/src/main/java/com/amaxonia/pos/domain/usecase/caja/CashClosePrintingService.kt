@@ -42,8 +42,8 @@ class CashClosePrintingService(
     }
 
     suspend fun shouldOfferCloseTicket(): Boolean =
-        contextReader.currentCountryCode().uppercase() in SUNMI_TICKET_COUNTRIES &&
-            contextReader.selectedPrinterType() == PrinterType.SUNMI_V2 &&
+        contextReader.currentCountryCode().uppercase() in TICKET_COUNTRIES &&
+            contextReader.selectedPrinterType() in TICKET_PRINTER_TYPES &&
             printerProvider.getActiveTicketPrinter() != null
 
     suspend fun printCloseTicket(payload: CashCloseTicketPayload): CashClosePrintOutcome {
@@ -59,6 +59,7 @@ class CashClosePrintingService(
     }
 
     private companion object {
-        val SUNMI_TICKET_COUNTRIES = setOf("PA", "VE")
+        val TICKET_COUNTRIES = setOf("PA", "VE")
+        val TICKET_PRINTER_TYPES = setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
     }
 }

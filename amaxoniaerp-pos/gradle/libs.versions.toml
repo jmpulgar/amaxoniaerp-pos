@@ -19,6 +19,7 @@ room = "2.6.1"
 work = "2.9.1"
 ksp = "2.0.21-1.0.28"
 sunmiPrinter = "1.0.24"
+iminPrinter = "V2.0.0.18"
 coroutines = "1.9.0"
 turbine = "1.2.0"
 archCore = "2.2.0"
@@ -66,6 +67,7 @@ androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testin
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 sunmi-printer = { group = "com.sunmi", name = "printerlibrary", version.ref = "sunmiPrinter" }
+imin-printer = { group = "com.github.iminsoftware", name = "IminPrinterLibrary", version.ref = "iminPrinter" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 [plugins]

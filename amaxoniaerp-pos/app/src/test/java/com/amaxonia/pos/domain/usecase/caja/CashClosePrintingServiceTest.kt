@@ -42,6 +42,22 @@ class CashClosePrintingServiceTest {
         }
 
     @Test
+    fun `close ticket offer supports Panama and Venezuela with iMin Swift`() =
+        runTest {
+            val ticketPrinter = RecordingTicketPrinter()
+
+            val iminService = service(printerType = PrinterType.IMIN_SWIFT, ticketPrinter = ticketPrinter)
+            assertTrue(iminService.shouldOfferCloseTicket())
+
+            val iminVeService =
+                service(country = "VE", printerType = PrinterType.IMIN_SWIFT, ticketPrinter = ticketPrinter)
+            assertTrue(iminVeService.shouldOfferCloseTicket())
+
+            val iminNullService = service(printerType = PrinterType.IMIN_SWIFT, ticketPrinter = null)
+            assertFalse(iminNullService.shouldOfferCloseTicket())
+        }
+
+    @Test
     fun `successful close ticket keeps exact user message`() =
         runTest {
             val ticketPrinter = RecordingTicketPrinter()
@@ -55,6 +71,7 @@ class CashClosePrintingServiceTest {
     private fun service(
         printer: PrinterRepository? = FixedPrinterRepository(Result.success(Unit), Result.success(Unit)),
         country: String = "PA",
+        printerType: PrinterType = PrinterType.SUNMI_V2,
         ticketPrinter: TicketPrinter? = RecordingTicketPrinter(),
     ) = CashClosePrintingService(
         object : PrinterProvider {
@@ -65,7 +82,7 @@ class CashClosePrintingServiceTest {
         object : CashCloseContextReader {
             override suspend fun currentCountryCode(): String = country
 
-            override suspend fun selectedPrinterType(): PrinterType = PrinterType.SUNMI_V2
+            override suspend fun selectedPrinterType(): PrinterType = printerType
 
             override suspend fun currentCompany(): CompanyIdentity? = null
         },

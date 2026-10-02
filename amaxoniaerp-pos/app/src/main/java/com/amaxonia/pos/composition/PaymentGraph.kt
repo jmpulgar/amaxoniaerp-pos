@@ -69,12 +69,19 @@ object PaymentGraph {
      * (VE → formatter Venezuela; PA/otros → formatter Panamá), impresora
      * fiscal The Factory HKA, y descarga en PDF cuando no hay impresora configurada.
      */
-    suspend fun printSuccessReceipt(context: Context, transactionId: String): Result<String> {
+    suspend fun printSuccessReceipt(
+        context: Context,
+        transactionId: String,
+    ): Result<String> {
         val selectedPrinter = DependencyContainer.localStore.readSelectedPrinterType()
-        val isSunmi = selectedPrinter == PrinterType.SUNMI_V2 || SunmiDeviceDetector.isSunmiDevice()
+        val isTicketDevice =
+            selectedPrinter in setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT) ||
+                SunmiDeviceDetector.isSunmiDevice() ||
+                com.amaxonia.pos.data.printer.imin.IminDeviceDetector
+                    .isIminDevice()
 
         return when {
-            isSunmi -> printSunmiTicket(transactionId)
+            isTicketDevice -> printSunmiTicket(transactionId)
             selectedPrinter == PrinterType.THE_FACTORY_HKA -> {
                 val printer = DependencyContainer.printerFactory.getActivePrinter()
                 if (printer != null) {
@@ -88,8 +95,10 @@ object PaymentGraph {
     }
 
     suspend fun printSuccessReceipt(transactionId: String): Result<String> =
-        if (DependencyContainer.localStore.readSelectedPrinterType() == PrinterType.SUNMI_V2 ||
-            SunmiDeviceDetector.isSunmiDevice()
+        if (DependencyContainer.localStore.readSelectedPrinterType() in setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT) ||
+            SunmiDeviceDetector.isSunmiDevice() ||
+            com.amaxonia.pos.data.printer.imin.IminDeviceDetector
+                .isIminDevice()
         ) {
             printSunmiTicket(transactionId)
         } else {
@@ -102,7 +111,7 @@ object PaymentGraph {
     ): Result<String> {
         if (transactionId.isBlank() || transactionId.startsWith("OFF-")) {
             return Result.failure(
-                IllegalStateException("No hay impresora configurada. El PDF no está disponible para facturas no sincronizadas.")
+                IllegalStateException("No hay impresora configurada. El PDF no está disponible para facturas no sincronizadas."),
             )
         }
 
@@ -110,22 +119,31 @@ object PaymentGraph {
         return pdfResult.fold(
             onSuccess = { bytes ->
                 runCatching {
-                    val invoiceNumber = DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrNull()?.invoiceNumber
-                    val cleanName = (invoiceNumber?.takeIf { it.isNotBlank() } ?: transactionId)
-                        .replace('/', '_')
-                        .replace('\\', '_')
-                    val pdfFile = File(context.cacheDir, "factura_$cleanName.pdf").apply {
-                        writeBytes(bytes)
-                    }
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        pdfFile,
-                    )
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri, "application/pdf")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+                    val invoiceNumber =
+                        DependencyContainer.transactionRepository
+                            .getTransactionById(
+                                transactionId,
+                            ).getOrNull()
+                            ?.invoiceNumber
+                    val cleanName =
+                        (invoiceNumber?.takeIf { it.isNotBlank() } ?: transactionId)
+                            .replace('/', '_')
+                            .replace('\\', '_')
+                    val pdfFile =
+                        File(context.cacheDir, "factura_$cleanName.pdf").apply {
+                            writeBytes(bytes)
+                        }
+                    val uri =
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            pdfFile,
+                        )
+                    val intent =
+                        Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/pdf")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
                     context.startActivity(intent)
                     Result.success("Sin impresora configurada. Abriendo PDF de la factura...")
                 }.getOrElse { ex ->
@@ -139,8 +157,8 @@ object PaymentGraph {
             onFailure = { error ->
                 Result.failure(
                     IllegalStateException(
-                        "Sin impresora configurada. No se pudo descargar el PDF: ${error.message ?: "error desconocido"}"
-                    )
+                        "Sin impresora configurada. No se pudo descargar el PDF: ${error.message ?: "error desconocido"}",
+                    ),
                 )
             },
         )
@@ -187,8 +205,9 @@ object PaymentGraph {
     }
 
     private suspend fun printGenericReceipt(transactionId: String): Result<String> {
-        val printer = DependencyContainer.printerFactory.getActivePrinter()
-            ?: return Result.failure(IllegalStateException("No hay impresora configurada"))
+        val printer =
+            DependencyContainer.printerFactory.getActivePrinter()
+                ?: return Result.failure(IllegalStateException("No hay impresora configurada"))
         val transaction =
             DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrElse { error ->
                 return Result.failure(error)

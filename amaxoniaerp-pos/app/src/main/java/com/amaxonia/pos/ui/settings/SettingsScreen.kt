@@ -258,13 +258,25 @@ private fun PrinterTypeSection(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    if (isPA) {
+    if (isPA || com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector.isSunmiDevice()) {
         PrinterOptionCard(
             visual = PrinterOptionVisual(icon = Icons.Rounded.PhoneAndroid, iconTint = SuccessGreen),
             title = "SUNMI",
             description = "Impresora integrada en terminales Sunmi V2 y V2 Pro. Conexion directa sin Bluetooth.",
             isSelected = selectedPrinterType == PrinterType.SUNMI_V2,
             onSelect = { onSelectPrinterType(PrinterType.SUNMI_V2) },
+        )
+    }
+
+    if (isPA || isVE || com.amaxonia.pos.data.printer.imin.IminDeviceDetector.isIminDevice()) {
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PrinterOptionCard(
+            visual = PrinterOptionVisual(icon = Icons.Rounded.PhoneAndroid, iconTint = SuccessGreen),
+            title = "iMin Swift 2",
+            description = "Impresora integrada en terminales iMin Swift 2 (I23M01). Conexion directa sin Bluetooth.",
+            isSelected = selectedPrinterType == PrinterType.IMIN_SWIFT,
+            onSelect = { onSelectPrinterType(PrinterType.IMIN_SWIFT) },
         )
     }
 }

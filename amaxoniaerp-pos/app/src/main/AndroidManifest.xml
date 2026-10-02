@@ -12,6 +12,7 @@
         <package android:name="com.thefactory.hkapos.fiscal.demo.demo" />
         <package android:name="woyou.aidlservice.jiuiv5" />
         <package android:name="com.sunmi.peripheral.printer" />
+        <package android:name="com.imin.printer" />
     </queries>
     <application
         android:allowBackup="true"

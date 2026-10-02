@@ -197,4 +197,28 @@ class DefaultInvoicePrintGatewayTest {
             assertTrue(texts.contains("FACTURA"))
             assertTrue(texts.contains("TEST RESTAURANT CORP"))
         }
+
+    @Test
+    fun printsOfflineIminSwiftTicketUsingLocalFallbackForPanama() =
+        runTest {
+            localStore.saveSelectedCountry(ServerCountries.PANAMA)
+            localStore.saveSelectedPrinterType(PrinterType.IMIN_SWIFT)
+            val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
+
+            val feedback =
+                gateway.print(
+                    countryCode = "PA",
+                    transaction = testTransaction,
+                    remoteInvoiceId = "OFF-100",
+                )
+
+            assertNotNull(feedback)
+            assertEquals("Ticket iMin Swift enviado correctamente", feedback?.displayMessage)
+            assertEquals(1, printedTickets.size)
+
+            val ticket = printedTickets.first()
+            val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+            assertTrue(texts.contains("TEST RESTAURANT CORP"))
+            assertTrue(texts.any { it.contains("Menu Ejecutivo") })
+        }
 }

@@ -53,12 +53,12 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 8
-        versionName = "1.1.3"
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    flavorDimensions += "brand" 
+    flavorDimensions += "brand"
 
     productFlavors {
         create("amaxonia") {
@@ -87,7 +87,7 @@ android {
                 "String",
                 "BASE_URL",
                 "\"https://api.listoerp.app/\"",
-                //"\"http://192.168.2.12:8080/\"",
+                // "\"http://192.168.2.12:8080/\"",
                 //  "\"http://10.0.2.2:8080/\"",
                 //  "\"http://127.0.0.1:8080/\""
             )
@@ -101,12 +101,12 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
-            )  
+            )
 
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"https://api.listoerp.app/\"",                                     
+                "\"https://api.listoerp.app/\"",
             )
         }
     }
@@ -244,6 +244,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.sunmi.printer)
+    implementation(libs.imin.printer)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)

@@ -17,12 +17,30 @@ class PrinterTypePolicyTest {
     }
 
     @Test
+    fun iminSwiftAppearsForPanamaAndVenezuela() {
+        assertTrue(PrinterType.IMIN_SWIFT in PrinterTypePolicy.availablePrinterTypes(panama))
+        assertTrue(PrinterType.IMIN_SWIFT in PrinterTypePolicy.availablePrinterTypes(venezuela))
+    }
+
+    @Test
     fun sunmiCanBeSavedForVenezuela() {
         PrinterTypePolicy.validate(venezuela, PrinterType.SUNMI_V2)
     }
 
     @Test
+    fun iminSwiftCanBeSavedForVenezuelaAndPanama() {
+        PrinterTypePolicy.validate(venezuela, PrinterType.IMIN_SWIFT)
+        PrinterTypePolicy.validate(panama, PrinterType.IMIN_SWIFT)
+    }
+
+    @Test
     fun sunmiIsPreservedForVenezuela() {
         assertEquals(PrinterType.SUNMI_V2, PrinterTypePolicy.coerce(venezuela, PrinterType.SUNMI_V2))
+    }
+
+    @Test
+    fun iminSwiftIsPreservedForVenezuelaAndPanama() {
+        assertEquals(PrinterType.IMIN_SWIFT, PrinterTypePolicy.coerce(venezuela, PrinterType.IMIN_SWIFT))
+        assertEquals(PrinterType.IMIN_SWIFT, PrinterTypePolicy.coerce(panama, PrinterType.IMIN_SWIFT))
     }
 }

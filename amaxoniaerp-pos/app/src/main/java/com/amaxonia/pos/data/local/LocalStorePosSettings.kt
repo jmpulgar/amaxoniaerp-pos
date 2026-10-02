@@ -31,10 +31,12 @@ fun LocalStore.selectedPrinterTypeFlow(): Flow<PrinterType> =
         val code = prefs[selectedCountryKey] ?: com.amaxonia.pos.BuildConfig.DEFAULT_COUNTRY_CODE
         val country = ServerCountries.fromCode(code)
         val defaultPrinter =
-            if (com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector.isSunmiDevice()) {
-                PrinterType.SUNMI_V2
-            } else {
-                PrinterType.NONE
+            when {
+                com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
+                    .isSunmiDevice() -> PrinterType.SUNMI_V2
+                com.amaxonia.pos.data.printer.imin.IminDeviceDetector
+                    .isIminDevice() -> PrinterType.IMIN_SWIFT
+                else -> PrinterType.NONE
             }
         val storedPrinter =
             prefs[selectedPrinterTypeKey]

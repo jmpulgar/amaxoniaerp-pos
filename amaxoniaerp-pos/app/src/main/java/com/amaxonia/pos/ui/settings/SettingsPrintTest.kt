@@ -170,19 +170,21 @@ internal suspend fun runPrintTest(
         val saveResult = viewModel.persistTheFactorySettings(requireGatewaySelection = false)
         if (saveResult.isFailure) return
     }
-    if (printerType == PrinterType.SUNMI_V2) {
-        printSunmiTestTicket(brandPrintTestMessage, snackbarHostState)
+    if (printerType == PrinterType.SUNMI_V2 || printerType == PrinterType.IMIN_SWIFT) {
+        printTicketTestReceipt(printerType, brandPrintTestMessage, snackbarHostState)
     } else {
         printGenericTestReceipt(snackbarHostState)
     }
 }
 
-/** Imprime el mensaje de prueba por la impresora de ticket SUNMI activa. */
-private suspend fun printSunmiTestTicket(
+/** Imprime el mensaje de prueba por la impresora de ticket integrada activa (SUNMI o iMin Swift). */
+private suspend fun printTicketTestReceipt(
+    printerType: PrinterType,
     brandPrintTestMessage: String,
     snackbarHostState: SnackbarHostState,
 ) {
     val ticketPrinter = AppGraph.settings.activeTicketPrinter()
+    val brand = if (printerType == PrinterType.IMIN_SWIFT) "iMin Swift" else "SUNMI"
     val result = ticketPrinter?.printText(brandPrintTestMessage)
     if (result is PrintResult.Success) {
         snackbarHostState.showSnackbar(
@@ -192,7 +194,7 @@ private suspend fun printSunmiTestTicket(
     } else {
         snackbarHostState.showSnackbar(
             (result as? PrintResult.Error)?.message
-                ?: "Impresora SUNMI no disponible",
+                ?: "Impresora $brand no disponible",
             duration = SnackbarDuration.Long,
         )
     }

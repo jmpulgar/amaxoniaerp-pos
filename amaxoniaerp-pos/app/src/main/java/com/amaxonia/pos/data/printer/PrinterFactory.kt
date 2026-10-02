@@ -5,6 +5,9 @@ import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
+import com.amaxonia.pos.data.printer.imin.IminDeviceDetector
+import com.amaxonia.pos.data.printer.imin.IminSwiftPrinter
+import com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
 import com.amaxonia.pos.data.printer.sunmi.SunmiV2Printer
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.model.printer.TicketPrinter
@@ -31,10 +34,11 @@ class PrinterFactory(
     @Volatile
     private var isHydrated = false
 
-    /** Carga bajo demanda; si la librerÃ­a fiscal falla (p. ej. en Android 10), no se cierra la app. */
+    /** Carga bajo demanda; si la librería fiscal falla (p. ej. en Android 10), no se cierra la app. */
     @Volatile
     private var theFactoryPrinterInstance: PrinterRepository? = null
     private var sunmiPrinterInstance: TicketPrinter? = null
+    private var iminPrinterInstance: TicketPrinter? = null
 
     private fun getTheFactoryPrinterOrNull(): PrinterRepository? {
         theFactoryPrinterInstance?.let { return it }
@@ -85,6 +89,28 @@ class PrinterFactory(
         }
     }
 
+    private fun getIminPrinterOrNull(): TicketPrinter? {
+        iminPrinterInstance?.let { return it }
+        synchronized(this) {
+            return when {
+                iminPrinterInstance != null -> iminPrinterInstance
+                else -> {
+                    iminPrinterInstance =
+                        runCatching {
+                            IminSwiftPrinter(appContext)
+                        }.fold(
+                            onSuccess = { it },
+                            onFailure = { t ->
+                                SafeLog.e(TAG, "iMin printer implementation is unavailable", t)
+                                null
+                            },
+                        )
+                    iminPrinterInstance
+                }
+            }
+        }
+    }
+
     init {
         scope.launch {
             localStore.selectedPrinterTypeFlow().collectLatest { printerType ->
@@ -112,6 +138,7 @@ class PrinterFactory(
             PrinterType.NONE,
             PrinterType.GENERIC_BLUETOOTH,
             PrinterType.SUNMI_V2,
+            PrinterType.IMIN_SWIFT,
             -> null
         }
     }
@@ -131,10 +158,16 @@ class PrinterFactory(
 
         return when (printerType) {
             PrinterType.SUNMI_V2 -> getSunmiPrinterOrNull()
+            PrinterType.IMIN_SWIFT -> getIminPrinterOrNull()
             PrinterType.NONE,
             PrinterType.THE_FACTORY_HKA,
             PrinterType.GENERIC_BLUETOOTH,
-            -> if (com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector.isSunmiDevice()) getSunmiPrinterOrNull() else null
+            ->
+                when {
+                    SunmiDeviceDetector.isSunmiDevice() -> getSunmiPrinterOrNull()
+                    IminDeviceDetector.isIminDevice() -> getIminPrinterOrNull()
+                    else -> null
+                }
         }
     }
 

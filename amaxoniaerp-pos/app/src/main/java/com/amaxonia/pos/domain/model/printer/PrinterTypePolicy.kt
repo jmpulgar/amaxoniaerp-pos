@@ -13,8 +13,8 @@ object PrinterTypePolicy {
             )
         val countryCode = country?.code?.uppercase()
         return when (countryCode) {
-            "VE" -> base + listOf(PrinterType.THE_FACTORY_HKA, PrinterType.SUNMI_V2)
-            PANAMA_CODE -> base + PrinterType.SUNMI_V2
+            "VE" -> base + listOf(PrinterType.THE_FACTORY_HKA, PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
+            PANAMA_CODE -> base + listOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
             else -> base
         }
     }
@@ -31,7 +31,9 @@ object PrinterTypePolicy {
         if (!isAllowed(country, printerType)) {
             throw InvalidPosConfigurationException(
                 when (printerType) {
-                    PrinterType.SUNMI_V2 -> "La impresora SUNMI solo está disponible para Panamá y Venezuela."
+                    PrinterType.SUNMI_V2,
+                    PrinterType.IMIN_SWIFT,
+                    -> "Esta impresora de tickets solo está disponible para Panamá y Venezuela."
                     PrinterType.THE_FACTORY_HKA -> "The Factory HKA solo está disponible para Venezuela."
                     else -> "La impresora seleccionada no está disponible para el país configurado."
                 },
