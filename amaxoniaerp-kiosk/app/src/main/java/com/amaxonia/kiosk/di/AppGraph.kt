@@ -11,6 +11,8 @@ import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.CheckoutOrderUseCase
 import com.amaxonia.kiosk.domain.payment.DevMockPaymentTerminal
 import com.amaxonia.kiosk.domain.payment.PaymentTerminal
+import com.amaxonia.kiosk.hardware.printer.KioskPrinter
+import com.amaxonia.kiosk.hardware.printer.SunmiPrinterManager
 import com.amaxonia.kiosk.ui.payment.CompletedOrderInfo
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ class AppGraph(
     val database: KioskDatabase = KioskDatabase.build(context)
     val pendingPaymentDao: PendingPaymentDao = database.pendingPaymentDao()
     val paymentTerminal: PaymentTerminal = DevMockPaymentTerminal()
+    val printer: KioskPrinter = SunmiPrinterManager(context)
     val checkoutUseCase: CheckoutOrderUseCase =
         CheckoutOrderUseCase(
             apiClient = apiClient,

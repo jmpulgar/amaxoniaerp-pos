@@ -293,6 +293,9 @@ fun KioskRoot(appGraph: AppGraph) {
             val completedOrder by appGraph.completedOrderState.collectAsStateWithLifecycle()
             val order = completedOrder
             if (order != null) {
+                LaunchedEffect(order.orderNumber) {
+                    appGraph.printer.printReceipt(order.paymentResponse)
+                }
                 OrderNumberScreen(
                     orderInfo = order,
                     onFinish = {
