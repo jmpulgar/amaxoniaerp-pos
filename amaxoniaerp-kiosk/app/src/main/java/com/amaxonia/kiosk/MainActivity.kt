@@ -25,6 +25,8 @@ import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
+import com.amaxonia.kiosk.ui.customer.CustomerIdScreen
+import com.amaxonia.kiosk.ui.customer.CustomerIdViewModel
 import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
 import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
 import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
@@ -35,6 +37,8 @@ import com.amaxonia.kiosk.ui.pairing.PairingScreen
 import com.amaxonia.kiosk.ui.pairing.PairingViewModel
 import com.amaxonia.kiosk.ui.review.ReviewScreen
 import com.amaxonia.kiosk.ui.review.ReviewViewModel
+import com.amaxonia.kiosk.ui.tabletent.TableTentScreen
+import com.amaxonia.kiosk.ui.tabletent.TableTentViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
 
 class MainActivity : ComponentActivity() {
@@ -222,12 +226,53 @@ fun KioskRoot(appGraph: AppGraph) {
         }
 
         composable(KioskDestinations.CUSTOMER_ID) {
+            val customerViewModel =
+                remember(appGraph) {
+                    CustomerIdViewModel(
+                        orderGraph = appGraph.orderGraph,
+                    )
+                }
+            CustomerIdScreen(
+                viewModel = customerViewModel,
+                onCustomerConfirmed = {
+                    if (appGraph.orderGraph.diningMode.value == "COMER_AQUI") {
+                        navController.navigate(KioskDestinations.TABLE_TENT)
+                    } else {
+                        appGraph.orderGraph.setTableTent(null)
+                        navController.navigate(KioskDestinations.PAYMENT)
+                    }
+                },
+                onBack = {
+                    navController.popBackStack()
+                },
+            )
+        }
+
+        composable(KioskDestinations.TABLE_TENT) {
+            val tableTentViewModel =
+                remember(appGraph) {
+                    TableTentViewModel(
+                        orderGraph = appGraph.orderGraph,
+                    )
+                }
+            TableTentScreen(
+                viewModel = tableTentViewModel,
+                onConfirmed = {
+                    navController.navigate(KioskDestinations.PAYMENT)
+                },
+                onBack = {
+                    navController.popBackStack()
+                },
+            )
+        }
+
+        composable(KioskDestinations.PAYMENT) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Identificación de Cliente (A8)",
+                    text = "Terminal de Pago (A9)",
                     style = MaterialTheme.typography.headlineLarge,
                 )
             }
