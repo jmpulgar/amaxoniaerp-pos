@@ -11,12 +11,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -25,11 +27,14 @@ import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
 import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
 import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
+import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
 import com.amaxonia.kiosk.ui.menu.MenuScreen
 import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
 import com.amaxonia.kiosk.ui.pairing.PairingScreen
 import com.amaxonia.kiosk.ui.pairing.PairingViewModel
+import com.amaxonia.kiosk.ui.review.ReviewScreen
+import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
 
 class MainActivity : ComponentActivity() {
@@ -116,10 +121,27 @@ fun KioskRoot(appGraph: AppGraph) {
             AttractScreen(
                 viewModel = attractViewModel,
                 onStartOrder = {
-                    navController.navigate(KioskDestinations.MENU)
+                    navController.navigate(KioskDestinations.DINING_MODE)
                 },
                 onAdminUnlocked = {
                     navController.navigate(KioskDestinations.PAIRING)
+                },
+            )
+        }
+
+        composable(KioskDestinations.DINING_MODE) {
+            val diningMode by appGraph.orderGraph.diningMode.collectAsStateWithLifecycle()
+            DiningModeScreen(
+                currentMode = diningMode,
+                onModeSelected = { mode ->
+                    appGraph.orderGraph.setDiningMode(mode)
+                    navController.navigate(KioskDestinations.MENU)
+                },
+                onBack = {
+                    appGraph.orderGraph.reset()
+                    navController.navigate(KioskDestinations.ATTRACT) {
+                        popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                    }
                 },
             )
         }
@@ -174,12 +196,38 @@ fun KioskRoot(appGraph: AppGraph) {
         }
 
         composable(KioskDestinations.REVIEW) {
+            val reviewViewModel =
+                remember(appGraph) {
+                    ReviewViewModel(
+                        orderGraph = appGraph.orderGraph,
+                    )
+                }
+            ReviewScreen(
+                viewModel = reviewViewModel,
+                onContinueShopping = {
+                    navController.navigate(KioskDestinations.MENU) {
+                        popUpTo(KioskDestinations.MENU) { inclusive = true }
+                    }
+                },
+                onProceedToCheckout = {
+                    navController.navigate(KioskDestinations.CUSTOMER_ID)
+                },
+                onCancelOrder = {
+                    appGraph.orderGraph.reset()
+                    navController.navigate(KioskDestinations.ATTRACT) {
+                        popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(KioskDestinations.CUSTOMER_ID) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Revisión de Pedido (A7)",
+                    text = "Identificación de Cliente (A8)",
                     style = MaterialTheme.typography.headlineLarge,
                 )
             }
