@@ -372,7 +372,7 @@ private fun WelcomeBrandHeader(taglineColor: Color) {
                 fontWeight = FontWeight.Normal,
                 letterSpacing = 0.2.sp,
             ),
-        color = taglineColor,
+        color = Color.White,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(horizontal = 40.dp),
     )

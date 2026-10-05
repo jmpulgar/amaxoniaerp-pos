@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Amaxonia ERP POS</string>
+    <string name="brand_name">Amaxonia ERP</string>
+    <string name="brand_logo_description">Amaxonia ERP Logo</string>
+    <string name="brand_welcome_tagline">Terminal Punto de Venta Inteligente</string>
+    <string name="brand_welcome_message">Facturación rápida, control de inventario y caja en tu pantalla de mostrador.</string>
+    <string name="login_title">Iniciar sesión</string>
+    <string name="login_subtitle">Ingresa tus credenciales para acceder a la terminal POS</string>
+    <string name="login_country_region">País / Región</string>
+    <string name="login_username_label">Nombre de usuario</string>
+    <string name="login_username_placeholder">Ingresa tu usuario</string>
+    <string name="login_password_label">Contraseña</string>
+    <string name="login_password_placeholder">Ingresa tu contraseña</string>
+    <string name="login_submit">Ingresar a Terminal</string>
+    <string name="login_forgot_password">¿Olvidaste tu contraseña?</string>
+    <string name="show_password">Mostrar contraseña</string>
+    <string name="hide_password">Ocultar contraseña</string>
+    <string name="logout">Cerrar sesión</string>
+    <string name="terminal_active">Terminal POS Activa</string>
+    <string name="welcome_user">Bienvenido, %1$s</string>
+</resources>

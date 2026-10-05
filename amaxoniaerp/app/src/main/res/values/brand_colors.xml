@@ -1,0 +1,77 @@
+<resources>
+    <!-- Brand Primary = Azul Índigo Profundo #201B82 (Contraste AAA 14.5:1 con blanco) -->
+    <color name="brand_primary">#201B82</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_primary_dark">#A5B4FC</color>
+    <color name="brand_primary_container">#E0E3FE</color>
+    <color name="brand_on_primary_container">#0D0860</color>
+
+    <!-- Brand Secondary = Azul Moderno #2488FA -->
+    <color name="brand_secondary">#2488FA</color>
+    <color name="brand_on_secondary">#FFFFFF</color>
+    <color name="brand_secondary_container">#D7E8FE</color>
+    <color name="brand_on_secondary_container">#003B75</color>
+
+    <!-- Brand Accent / Tertiary = Púrpura #A37EE3 / Lavanda Suave #EDE4FD -->
+    <color name="brand_accent">#A37EE3</color>
+    <color name="brand_on_accent">#FFFFFF</color>
+    <color name="brand_accent_container">#EDE4FD</color>
+    <color name="brand_on_accent_container">#320B66</color>
+
+    <!-- Error / Peligro (#B91C1C / #FEF2F2) -->
+    <color name="brand_error">#B91C1C</color>
+    <color name="brand_on_error">#FFFFFF</color>
+    <color name="brand_error_container">#FEF2F2</color>
+    <color name="brand_on_error_container">#B91C1C</color>
+
+    <!-- Superficies y Fondos Light Mode -->
+    <color name="brand_background">#F4F5F8</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_on_background">#121212</color>
+    <color name="brand_on_surface">#121212</color>
+    <color name="brand_surface_variant">#EDF1F7</color>
+    <color name="brand_on_surface_variant">#475569</color>
+    <color name="brand_outline">#94A3B8</color>
+    <color name="brand_outline_variant">#E2E8F0</color>
+
+    <!-- Dark Theme (Armonizado con Índigo + Azul + Lavanda) -->
+    <color name="brand_on_primary_dark">#120D54</color>
+    <color name="brand_primary_container_dark">#1E186D</color>
+    <color name="brand_on_primary_container_dark">#E0E3FE</color>
+    <color name="brand_secondary_dark">#78B7FF</color>
+    <color name="brand_on_secondary_dark">#002C5E</color>
+    <color name="brand_secondary_container_dark">#00478D</color>
+    <color name="brand_on_secondary_container_dark">#D7E8FE</color>
+    <color name="brand_accent_dark">#C9B0F5</color>
+    <color name="brand_on_accent_dark">#340C68</color>
+    <color name="brand_accent_container_dark">#4A237E</color>
+    <color name="brand_on_accent_container_dark">#EDE4FD</color>
+    <color name="brand_error_dark">#F87171</color>
+    <color name="brand_on_error_dark">#450A0A</color>
+    <color name="brand_error_container_dark">#7F1D1D</color>
+    <color name="brand_on_error_container_dark">#FEE2E2</color>
+    <color name="brand_background_dark">#0F172A</color>
+    <color name="brand_on_background_dark">#F8FAFC</color>
+    <color name="brand_surface_dark">#1E293B</color>
+    <color name="brand_on_surface_dark">#F8FAFC</color>
+    <color name="brand_surface_variant_dark">#334155</color>
+    <color name="brand_on_surface_variant_dark">#94A3B8</color>
+    <color name="brand_outline_dark">#64748B</color>
+    <color name="brand_outline_variant_dark">#475569</color>
+
+    <!-- Gradientes y Olas tricolor (Índigo #201B82 -> Azul #2488FA -> Púrpura #A37EE3) -->
+    <color name="brand_gradient_start">#201B82</color>
+    <color name="brand_gradient_mid">#2488FA</color>
+    <color name="brand_gradient_end">#A37EE3</color>
+
+    <!-- Wave layers (WelcomeScreen) -->
+    <color name="brand_wave_back_top">#4D201B82</color>
+    <color name="brand_wave_back_bottom">#66A37EE3</color>
+    <color name="brand_wave_front_start">#FF201B82</color>
+    <color name="brand_wave_front_mid">#FF2488FA</color>
+    <color name="brand_wave_front_end">#FFA37EE3</color>
+    <color name="brand_wave_scrim">#59100C4A</color>
+
+    <color name="brand_welcome_tagline">#475569</color>
+    <color name="brand_splash_background">#FFFFFF</color>
+</resources>

@@ -35,7 +35,7 @@ object CajaTableFactory {
 }
 
 object SucursalTable : Table("sucursal") {
-    val idSucursal = integer("id")
+    val idSucursal = integer("id").autoIncrement()
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_10).nullable()
     val serie = varchar("serie", S.VARCHAR_LENGTH_10).nullable()
     val codigoSucursalEmisor = varchar("codigo_sucursal_emisor", S.VARCHAR_LENGTH_20).nullable()

@@ -21,6 +21,7 @@ import com.amaxoniaerp.features.mesas.sesionMesaRouting
 import com.amaxoniaerp.features.pos.posRouting
 import com.amaxoniaerp.features.promotions.route.promotionsRoutes
 import com.amaxoniaerp.features.sales.route.salesRoutes
+import com.amaxoniaerp.features.sucursales.route.sucursalesRoutes
 import com.amaxoniaerp.features.sync.route.syncRoutes
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -148,4 +149,5 @@ private fun Route.installPosRoutes(deps: AppDependencies) {
     clientTypesRoutes(deps.repositories.clientTypesRepository)
     facturasRoutes(deps.repositories.facturasRepository, deps.fiscal.feDependencies.panamaProcessor)
     geographyRoutes(deps.repositories.geographyRepository)
+    sucursalesRoutes(deps.repositories.sucursalRepository)
 }
