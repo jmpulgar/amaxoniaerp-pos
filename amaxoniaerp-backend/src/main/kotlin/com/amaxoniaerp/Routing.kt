@@ -13,6 +13,7 @@ import com.amaxoniaerp.features.electronicinvoice.route.electronicInvoiceRoutes
 import com.amaxoniaerp.features.facturas.route.facturasRoutes
 import com.amaxoniaerp.features.geography.route.geographyRoutes
 import com.amaxoniaerp.features.items.route.itemsRoutes
+import com.amaxoniaerp.features.kiosk.route.kioskRoutes
 import com.amaxoniaerp.features.mesas.cuentaMesaRouting
 import com.amaxoniaerp.features.mesas.mesasRouting
 import com.amaxoniaerp.features.mesas.pedidoMesaRouting
@@ -140,6 +141,8 @@ private fun Route.installPosRoutes(deps: AppDependencies) {
     electronicInvoiceRoutes(deps.fiscal.feDependencies.feFactory)
 
     assetsRoutes(assetsBaseUrls = deps.routingConfig.assetsBaseUrls, dataBasePath = deps.routingConfig.dataBasePath)
+    kioskRoutes(deps.kiosk.kioskService)
+
     // Rutas auxiliares que aún podrían necesitar refactoring
     clientsRoutes(deps.repositories.clientsRepository)
     clientTypesRoutes(deps.repositories.clientTypesRepository)

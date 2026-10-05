@@ -1,6 +1,5 @@
 package com.amaxoniaerp.features.kiosk.domain
 
-import io.ktor.server.auth.jwt.JWTPrincipal
 import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -241,7 +240,31 @@ data class KioskRequestContext(
     val idAlmacen: Int,
     val codVendedor: Int,
     val idClienteGenerico: String,
-    val principal: JWTPrincipal,
+)
+
+data class KioskSalePrerequisites(
+    val branchSerie: String,
+    val branchName: String,
+    val branchAddress: String,
+    val companyRif: String?,
+    val defaultTaxRate: BigDecimal,
+    val cajaCode: String,
+    val customerName: String,
+    val customerRif: String,
+    val customerAddress: String,
+    val customerPhone: String,
+    val customerDv: String?,
+    val customerCod: String,
+    val paymentMethodId: Int,
+    val itemDetails: Map<Int, KioskItemTaxInfo>,
+    val dispatchDestination: String,
+    val kitchenPrinterIp: String?,
+)
+
+data class KioskItemTaxInfo(
+    val description: String,
+    val isExempt: Boolean,
+    val ivaRate: BigDecimal,
 )
 
 data class KioskOrderRecord(

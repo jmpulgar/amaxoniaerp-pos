@@ -1,4 +1,4 @@
-﻿package com.amaxoniaerp.composition
+package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
@@ -9,6 +9,7 @@ import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.geography.data.GeographyRepository
 import com.amaxoniaerp.features.items.data.ItemsRepository
+import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
@@ -28,6 +29,7 @@ class AppDependencies(
     val caja: CajaDependencies,
     val mesas: MesasDependencies,
     val fiscal: FiscalDependencies,
+    val kiosk: KioskDependencies,
     val routingConfig: RoutingConfig,
 )
 
@@ -59,6 +61,11 @@ class CajaDependencies(
 class FiscalDependencies(
     val feDependencies: FeDependencies,
     val creditNoteDependencies: CreditNoteDependencies,
+)
+
+/** Dependencias del módulo Kiosco (emparejamiento, catálogo, cotización, pago y despacho). */
+class KioskDependencies(
+    val kioskService: KioskService,
 )
 
 /**

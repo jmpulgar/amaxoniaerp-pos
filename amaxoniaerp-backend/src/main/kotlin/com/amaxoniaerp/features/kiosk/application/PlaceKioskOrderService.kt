@@ -1,20 +1,12 @@
 package com.amaxoniaerp.features.kiosk.application
 
-import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
-import com.amaxoniaerp.features.caja.data.CajaTableFactory
-import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
-import com.amaxoniaerp.features.clients.data.ClientsTable
-import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
-import com.amaxoniaerp.features.items.data.ItemsTableFactory
-import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.amaxoniaerp.features.kiosk.application.dispatch.KioskDispatchConfig
 import com.amaxoniaerp.features.kiosk.application.dispatch.OrderDispatchPolicyFactory
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
-import com.amaxoniaerp.features.kiosk.data.KioskParametrosTable
 import com.amaxoniaerp.features.kiosk.domain.KioskInvoiceInfo
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskPayResponse
@@ -22,8 +14,8 @@ import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskReceipt
 import com.amaxoniaerp.features.kiosk.domain.KioskReceiptLine
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
+import com.amaxoniaerp.features.kiosk.domain.KioskSalePrerequisites
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
-import com.amaxoniaerp.features.sales.data.SalesFacturaTableFactory
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
 import com.amaxoniaerp.features.sales.domain.SaleCurrencyInput
@@ -32,9 +24,6 @@ import com.amaxoniaerp.features.sales.domain.SaleItemInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentInput
 import com.amaxoniaerp.features.sales.domain.SalePaymentSummaryInput
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.or
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
 import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -84,11 +73,13 @@ class PlaceKioskOrderService(
             throw IllegalArgumentException("El monto enviado ($reqAmount) no coincide con el total del pedido ($orderTotal)")
         }
 
+        val prereqs = kioskOrderRepository.loadSalePrerequisites(database, kioskContext, order)
+
         // 1. Asegurar secuencia de caja abierta para hoy (auto-close si había una de un día anterior)
-        val activeSecuencia = ensureOpenSessionForToday(database, kioskContext)
+        val activeSecuencia = ensureOpenSessionForToday(database, kioskContext, prereqs.branchSerie)
 
         // 2. Procesar venta y facturación fiscal vía ProcessSaleUseCase
-        val saleResult = executeSale(database, kioskContext, order, activeSecuencia, request)
+        val saleResult = executeSale(database, kioskContext, order, activeSecuencia, request, prereqs)
 
         // 3. Determinar estado final y actualizar pedido
         val isPendingInvoice = saleResult.feError != null
@@ -109,26 +100,9 @@ class PlaceKioskOrderService(
 
         // 4. Ejecutar política de despacho configurada (Retiro en mostrador, Impresora cocina o Mesas)
         runCatching {
-            val (destino, cocinaIp) = dbQuery(database) {
-                val row = KioskParametrosTable
-                    .select(KioskParametrosTable.kioscoDestinoPedido, KioskParametrosTable.kioscoImpresoraCocinaIp)
-                    .limit(1)
-                    .singleOrNull()
-                val dest = row?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-                val ip = row?.get(KioskParametrosTable.kioscoImpresoraCocinaIp)
-                Pair(dest, ip)
-            }
-            val policy = dispatchPolicyFactory.getPolicy(destino)
-            val dispatchConfig = KioskDispatchConfig(kitchenPrinterIp = cocinaIp)
-            val itemNames = dbQuery(database) {
-                val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
-                val itemIds = order.items.map { it.idItem }.distinct()
-                if (itemIds.isNotEmpty()) {
-                    itemsTable.select(itemsTable.idItem, itemsTable.descripcion1)
-                        .where { itemsTable.idItem inList itemIds }
-                        .associate { it[itemsTable.idItem] to (it[itemsTable.descripcion1] ?: "") }
-                } else emptyMap()
-            }
+            val policy = dispatchPolicyFactory.getPolicy(prereqs.dispatchDestination)
+            val dispatchConfig = KioskDispatchConfig(kitchenPrinterIp = prereqs.kitchenPrinterIp)
+            val itemNames = prereqs.itemDetails.mapValues { it.value.description }
             policy.dispatch(order, dispatchConfig, itemNames)
         }.onFailure { err ->
             logger.warn("Dispatch execution failed for order {}: {}", order.codigoPedido, err.message)
@@ -136,11 +110,10 @@ class PlaceKioskOrderService(
 
         // 5. Construir comprobante (recibo 80mm) y respuesta
         return buildPayResponse(
-            database = database,
-            kioskContext = kioskContext,
             order = order,
             saleResult = saleResult,
             request = request,
+            prereqs = prereqs,
             status = statusResponse,
         )
     }
@@ -148,9 +121,10 @@ class PlaceKioskOrderService(
     private suspend fun ensureOpenSessionForToday(
         database: Database,
         kioskContext: KioskRequestContext,
+        branchSerie: String,
     ): CajaSecuencia {
         if (cajaSessionWorkflow == null) {
-            return dummyCajaSecuencia(kioskContext)
+            return dummyCajaSecuencia(kioskContext, branchSerie)
         }
 
         val openSecuencia = cajaSessionWorkflow.status(database, kioskContext.companyDb, kioskContext.idCaja)
@@ -160,17 +134,11 @@ class PlaceKioskOrderService(
         return if (openSecuencia != null && isOpenToday(openSecuencia.fechaApertura, today)) {
             openSecuencia
         } else {
-            val sucursalSerie = dbQuery(database) {
-                SucursalTable
-                    .select(SucursalTable.serie)
-                    .where { SucursalTable.idSucursal eq kioskContext.idSucursal }
-                    .firstOrNull()?.get(SucursalTable.serie)?.trim()?.ifBlank { "01" } ?: "01"
-            }
             val aperturaReq = AperturaRequest(
                 idCaja = kioskContext.idCaja,
                 montoApertura = 0.0,
                 idVendedor = kioskContext.codVendedor,
-                serieSucursal = sucursalSerie,
+                serieSucursal = branchSerie,
                 idSucursal = kioskContext.idSucursal,
             )
             cajaSessionWorkflow.open(
@@ -199,7 +167,7 @@ class PlaceKioskOrderService(
         } else false
     }
 
-    private fun dummyCajaSecuencia(kioskContext: KioskRequestContext): CajaSecuencia =
+    private fun dummyCajaSecuencia(kioskContext: KioskRequestContext, branchSerie: String): CajaSecuencia =
         CajaSecuencia(
             idCajaSecuencia = "SEC-${kioskContext.idCaja}",
             idCaja = kioskContext.idCaja,
@@ -207,7 +175,7 @@ class PlaceKioskOrderService(
             montoApertura = 0.0,
             estatus = 1,
             usuarioApertura = "KIOSK",
-            serieSucursal = "01",
+            serieSucursal = branchSerie,
             idSucursal = kioskContext.idSucursal,
         )
 
@@ -217,6 +185,7 @@ class PlaceKioskOrderService(
         order: KioskOrderRecord,
         activeSecuencia: CajaSecuencia,
         paymentRequest: KioskPaymentRequest,
+        prereqs: KioskSalePrerequisites,
     ): ProcessSaleResponse {
         if (processSaleUseCase == null) {
             val fakeInvoiceId = UUID.randomUUID().toString()
@@ -228,66 +197,23 @@ class PlaceKioskOrderService(
             )
         }
 
-        val saleRequest = dbQuery(database) {
-            buildProcessSaleRequest(database, kioskContext, order, activeSecuencia, paymentRequest)
-        }
-
+        val saleRequest = buildProcessSaleRequest(kioskContext, order, activeSecuencia, paymentRequest, prereqs)
         return processSaleUseCase.execute(database, kioskContext.countryCode, saleRequest)
     }
 
     private fun buildProcessSaleRequest(
-        database: Database,
         kioskContext: KioskRequestContext,
         order: KioskOrderRecord,
         activeSecuencia: CajaSecuencia,
         paymentRequest: KioskPaymentRequest,
+        prereqs: KioskSalePrerequisites,
     ): ProcessSaleRequest {
-        val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
-        val itemIds = order.items.map { it.idItem }.distinct()
-        val itemsMap = if (itemIds.isNotEmpty()) {
-            itemsTable
-                .selectAll()
-                .where { itemsTable.idItem inList itemIds }
-                .associateBy { it[itemsTable.idItem] }
-        } else {
-            emptyMap()
-        }
-
-        val paramsTable = ParametrosGeneralesTableFactory.forCountry(kioskContext.countryCode)
-        val paramsRow = paramsTable.select(paramsTable.porcentajeImpuestoPrincipal).limit(1).singleOrNull()
-        val defaultTaxRate = paramsRow?.get(paramsTable.porcentajeImpuestoPrincipal) ?: BigDecimal("7.00")
-
-        val cajaTable = CajaTableFactory.forCountry(kioskContext.countryCode)
-        val codigoCaja = cajaTable
-            .select(cajaTable.codCaja, cajaTable.serieCaja)
-            .where { cajaTable.idCaja eq kioskContext.idCaja }
-            .firstOrNull()?.let { it[cajaTable.codCaja] ?: it[cajaTable.serieCaja] } ?: "CAJA1"
-
-        val clientRow = ClientsTable
-            .selectAll()
-            .where { (ClientsTable.idCliente eq order.idCliente) or (ClientsTable.codCliente eq order.idCliente) }
-            .limit(1)
-            .singleOrNull()
-
-        val customerName = clientRow?.get(ClientsTable.nombre)?.trim()?.takeIf { it.isNotBlank() } ?: "CONSUMIDOR FINAL"
-        val customerRif = clientRow?.get(ClientsTable.rif)?.trim()?.takeIf { it.isNotBlank() } ?: "CF"
-        val customerAddress = clientRow?.get(ClientsTable.direccion)?.trim() ?: ""
-        val customerPhone = clientRow?.get(ClientsTable.telefonos)?.trim() ?: ""
-
-        val formaPagoId = runCatching {
-            CajaFormaPagoTable
-                .select(CajaFormaPagoTable.idFormaPago)
-                .where { (CajaFormaPagoTable.siglas eq "TDC") or (CajaFormaPagoTable.siglas eq "TARJETA") }
-                .map { it[CajaFormaPagoTable.idFormaPago] }
-                .firstOrNull()
-        }.getOrNull() ?: 2
-
         var totalSubtotal = BigDecimal.ZERO
         var totalTax = BigDecimal.ZERO
 
         val saleItems = order.items.map { itemRecord ->
-            val itemRow = itemsMap[itemRecord.idItem]
-            val itemDesc = itemRow?.get(itemsTable.descripcion1)?.trim() ?: "Item ${itemRecord.idItem}"
+            val itemTaxInfo = prereqs.itemDetails[itemRecord.idItem]
+            val itemDesc = itemTaxInfo?.description ?: "Item ${itemRecord.idItem}"
             val modNames = itemRecord.modifiers.map { it.nombre }
             val fullDesc = if (modNames.isNotEmpty()) {
                 "$itemDesc (${modNames.joinToString(", ")})"
@@ -296,10 +222,10 @@ class PlaceKioskOrderService(
             }
 
             val taxRate = when {
-                itemRow == null -> defaultTaxRate
-                itemRow[itemsTable.montoExento] -> BigDecimal.ZERO
-                itemRow[itemsTable.iva] > BigDecimal.ZERO -> itemRow[itemsTable.iva]
-                else -> defaultTaxRate
+                itemTaxInfo == null -> prereqs.defaultTaxRate
+                itemTaxInfo.isExempt -> BigDecimal.ZERO
+                itemTaxInfo.ivaRate > BigDecimal.ZERO -> itemTaxInfo.ivaRate
+                else -> prereqs.defaultTaxRate
             }
 
             val lineSubtotal = (itemRecord.precioUnitario * itemRecord.cantidad).setScale(2, RoundingMode.HALF_UP)
@@ -328,12 +254,12 @@ class PlaceKioskOrderService(
 
         val invoiceInput = SaleInvoiceInput(
             idCliente = order.idCliente,
-            codCliente = clientRow?.get(ClientsTable.codCliente) ?: "CF",
+            codCliente = prereqs.customerCod,
             codVendedor = kioskContext.codVendedor,
             idShop = kioskContext.idSucursal,
             idSucursal = kioskContext.idSucursal,
             idCaja = kioskContext.idCaja,
-            codigoCaja = codigoCaja,
+            codigoCaja = prereqs.cajaCode,
             idCajaSecuencia = activeSecuencia.idCajaSecuencia,
             serieSucursal = activeSecuencia.serieSucursal,
             formaPago = "TDC",
@@ -352,10 +278,10 @@ class PlaceKioskOrderService(
             totalizarMontoIva = overallTaxDouble,
             totalizarTotalGeneral = overallTotalDouble,
             usuarioCreacion = "KIOSK",
-            facturarA = customerName,
-            facturarARuc = customerRif,
-            facturarADireccion = customerAddress,
-            facturarATelefono = customerPhone,
+            facturarA = prereqs.customerName,
+            facturarARuc = prereqs.customerRif,
+            facturarADireccion = prereqs.customerAddress,
+            facturarATelefono = prereqs.customerPhone,
         )
 
         return ProcessSaleRequest(
@@ -371,7 +297,7 @@ class PlaceKioskOrderService(
             ),
             pagos = listOf(
                 SalePaymentInput(
-                    idFormaPago = formaPagoId,
+                    idFormaPago = prereqs.paymentMethodId,
                     tipoMovimiento = "ING",
                     monto = overallTotalDouble,
                     montoRecibido = overallTotalDouble,
@@ -390,50 +316,16 @@ class PlaceKioskOrderService(
         )
     }
 
-    private suspend fun buildPayResponse(
-        database: Database,
-        kioskContext: KioskRequestContext,
+    private fun buildPayResponse(
         order: KioskOrderRecord,
         saleResult: ProcessSaleResponse,
         request: KioskPaymentRequest,
+        prereqs: KioskSalePrerequisites,
         status: String,
-    ): KioskPayResponse = dbQuery(database) {
-        val sucursalRow = SucursalTable
-            .selectAll()
-            .where { SucursalTable.idSucursal eq kioskContext.idSucursal }
-            .limit(1)
-            .singleOrNull()
-
-        val companyName = sucursalRow?.get(SucursalTable.sucursal)?.trim()?.takeIf { it.isNotBlank() } ?: "Amaxonia"
-        val companyAddress = sucursalRow?.get(SucursalTable.descripcion)?.trim() ?: ""
-
-        val paramsTable = ParametrosGeneralesTableFactory.forCountry(kioskContext.countryCode)
-        val paramsRow = paramsTable.select(paramsTable.rif).limit(1).singleOrNull()
-        val companyRif = paramsRow?.get(paramsTable.rif)
-
-        val clientRow = ClientsTable
-            .selectAll()
-            .where { (ClientsTable.idCliente eq order.idCliente) or (ClientsTable.codCliente eq order.idCliente) }
-            .limit(1)
-            .singleOrNull()
-
-        val customerName = clientRow?.get(ClientsTable.nombre)?.trim()?.takeIf { it.isNotBlank() } ?: "CONSUMIDOR FINAL"
-        val customerRif = clientRow?.get(ClientsTable.rif)?.trim()?.takeIf { it.isNotBlank() } ?: "CF"
-
-        val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
-        val itemIds = order.items.map { it.idItem }.distinct()
-        val itemsMap = if (itemIds.isNotEmpty()) {
-            itemsTable
-                .selectAll()
-                .where { itemsTable.idItem inList itemIds }
-                .associateBy { it[itemsTable.idItem] }
-        } else {
-            emptyMap()
-        }
-
+    ): KioskPayResponse {
         var totalSubtotal = BigDecimal.ZERO
         val receiptLines = order.items.map { item ->
-            val itemDesc = itemsMap[item.idItem]?.get(itemsTable.descripcion1)?.trim() ?: "Item ${item.idItem}"
+            val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
             val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
             totalSubtotal += lineTotal
             KioskReceiptLine(
@@ -448,12 +340,6 @@ class PlaceKioskOrderService(
         val total = order.total.setScale(2, RoundingMode.HALF_UP)
         val tax = (total - totalSubtotal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
 
-        val destinoPedido = KioskParametrosTable
-            .select(KioskParametrosTable.kioscoDestinoPedido)
-            .limit(1)
-            .singleOrNull()
-            ?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-
         val invoiceInfo = KioskInvoiceInfo(
             codFactura = saleResult.codFactura,
             cufe = saleResult.cufe,
@@ -464,15 +350,15 @@ class PlaceKioskOrderService(
         )
 
         val receipt = KioskReceipt(
-            companyName = companyName,
-            ruc = companyRif,
-            dv = clientRow?.get(ClientsTable.dv),
-            address = companyAddress,
+            companyName = prereqs.branchName,
+            ruc = prereqs.companyRif,
+            dv = prereqs.customerDv,
+            address = prereqs.branchAddress,
             orderNumber = order.codigoPedido,
             diningMode = order.modalidad,
             tableTent = order.portamesa,
-            customerName = customerName,
-            customerId = customerRif,
+            customerName = prereqs.customerName,
+            customerId = prereqs.customerRif,
             date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
             lines = receiptLines,
             subtotal = totalSubtotal.toPlainString(),
@@ -487,10 +373,10 @@ class PlaceKioskOrderService(
             qr = saleResult.qr,
         )
 
-        KioskPayResponse(
+        return KioskPayResponse(
             orderNumber = order.codigoPedido,
             invoice = invoiceInfo,
-            dispatch = destinoPedido,
+            dispatch = prereqs.dispatchDestination,
             receipt = receipt,
             status = status,
         )
@@ -500,43 +386,13 @@ class PlaceKioskOrderService(
         database: Database,
         kioskContext: KioskRequestContext,
         order: KioskOrderRecord,
-    ): KioskPayResponse = dbQuery(database) {
-        val sucursalRow = SucursalTable
-            .selectAll()
-            .where { SucursalTable.idSucursal eq kioskContext.idSucursal }
-            .limit(1)
-            .singleOrNull()
-
-        val companyName = sucursalRow?.get(SucursalTable.sucursal)?.trim()?.takeIf { it.isNotBlank() } ?: "Amaxonia"
-        val companyAddress = sucursalRow?.get(SucursalTable.descripcion)?.trim() ?: ""
-
-        val paramsTable = ParametrosGeneralesTableFactory.forCountry(kioskContext.countryCode)
-        val paramsRow = paramsTable.select(paramsTable.rif).limit(1).singleOrNull()
-        val companyRif = paramsRow?.get(paramsTable.rif)
-
-        val clientRow = ClientsTable
-            .selectAll()
-            .where { (ClientsTable.idCliente eq order.idCliente) or (ClientsTable.codCliente eq order.idCliente) }
-            .limit(1)
-            .singleOrNull()
-
-        val customerName = clientRow?.get(ClientsTable.nombre)?.trim()?.takeIf { it.isNotBlank() } ?: "CONSUMIDOR FINAL"
-        val customerRif = clientRow?.get(ClientsTable.rif)?.trim()?.takeIf { it.isNotBlank() } ?: "CF"
-
-        val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
-        val itemIds = order.items.map { it.idItem }.distinct()
-        val itemsMap = if (itemIds.isNotEmpty()) {
-            itemsTable
-                .selectAll()
-                .where { itemsTable.idItem inList itemIds }
-                .associateBy { it[itemsTable.idItem] }
-        } else {
-            emptyMap()
-        }
+    ): KioskPayResponse {
+        val prereqs = kioskOrderRepository.loadSalePrerequisites(database, kioskContext, order)
+        val codFactura = kioskOrderRepository.getInvoiceCode(database, kioskContext.countryCode, order.idFactura) ?: order.idFactura ?: ""
 
         var totalSubtotal = BigDecimal.ZERO
         val receiptLines = order.items.map { item ->
-            val itemDesc = itemsMap[item.idItem]?.get(itemsTable.descripcion1)?.trim() ?: "Item ${item.idItem}"
+            val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
             val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
             totalSubtotal += lineTotal
             KioskReceiptLine(
@@ -550,22 +406,6 @@ class PlaceKioskOrderService(
 
         val total = order.total.setScale(2, RoundingMode.HALF_UP)
         val tax = (total - totalSubtotal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
-
-        val destinoPedido = KioskParametrosTable
-            .select(KioskParametrosTable.kioscoDestinoPedido)
-            .limit(1)
-            .singleOrNull()
-            ?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-
-        val facturaTable = SalesFacturaTableFactory.forCountry(kioskContext.countryCode)
-        val facturaRow = if (order.idFactura != null) {
-            facturaTable
-                .selectAll()
-                .where { facturaTable.idFactura eq order.idFactura }
-                .singleOrNull()
-        } else null
-
-        val codFactura = facturaRow?.get(facturaTable.codFactura) ?: order.idFactura ?: ""
         val statusResponse = if (order.estado == "PAGADO_SIN_FACTURA") "PAID_PENDING_INVOICE" else "FACTURADO"
 
         val invoiceInfo = KioskInvoiceInfo(
@@ -575,15 +415,15 @@ class PlaceKioskOrderService(
         )
 
         val receipt = KioskReceipt(
-            companyName = companyName,
-            ruc = companyRif,
-            dv = clientRow?.get(ClientsTable.dv),
-            address = companyAddress,
+            companyName = prereqs.branchName,
+            ruc = prereqs.companyRif,
+            dv = prereqs.customerDv,
+            address = prereqs.branchAddress,
             orderNumber = order.codigoPedido,
             diningMode = order.modalidad,
             tableTent = order.portamesa,
-            customerName = customerName,
-            customerId = customerRif,
+            customerName = prereqs.customerName,
+            customerId = prereqs.customerRif,
             date = order.actualizadoEn.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
             lines = receiptLines,
             subtotal = totalSubtotal.toPlainString(),
@@ -598,10 +438,10 @@ class PlaceKioskOrderService(
             qr = null,
         )
 
-        KioskPayResponse(
+        return KioskPayResponse(
             orderNumber = order.codigoPedido,
             invoice = invoiceInfo,
-            dispatch = destinoPedido,
+            dispatch = prereqs.dispatchDestination,
             receipt = receipt,
             status = statusResponse,
         )

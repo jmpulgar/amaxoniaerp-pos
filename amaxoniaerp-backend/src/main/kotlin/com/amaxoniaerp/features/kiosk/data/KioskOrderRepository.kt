@@ -1,8 +1,14 @@
 package com.amaxoniaerp.features.kiosk.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.caja.data.CajaTableFactory
+import com.amaxoniaerp.features.caja.data.SucursalTable
+import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.items.data.ItemsTableFactory
+import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
+import com.amaxoniaerp.features.sales.data.SalesFacturaTableFactory
+import com.amaxoniaerp.features.kiosk.domain.KioskItemTaxInfo
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderItemRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderModifierRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderRecord
@@ -12,12 +18,15 @@ import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
+import com.amaxoniaerp.features.kiosk.domain.KioskSalePrerequisites
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.max
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
@@ -506,5 +515,111 @@ class KioskOrderRepository {
             it[KioskOrderTable.motivoRechazo] = motivoRechazo
             it[KioskOrderTable.actualizadoEn] = now
         }
+    }
+
+    suspend fun loadSalePrerequisites(
+        database: Database,
+        kioskContext: KioskRequestContext,
+        order: KioskOrderRecord,
+    ): KioskSalePrerequisites = dbQuery(database) {
+        val sucursalRow = SucursalTable
+            .selectAll()
+            .where { SucursalTable.idSucursal eq kioskContext.idSucursal }
+            .limit(1)
+            .singleOrNull()
+
+        val sucursalSerie = sucursalRow?.get(SucursalTable.serie)?.trim()?.ifBlank { "01" } ?: "01"
+        val companyName = sucursalRow?.get(SucursalTable.sucursal)?.trim()?.takeIf { it.isNotBlank() } ?: "Amaxonia"
+        val companyAddress = sucursalRow?.get(SucursalTable.descripcion)?.trim() ?: ""
+
+        val paramsTable = ParametrosGeneralesTableFactory.forCountry(kioskContext.countryCode)
+        val paramsRow = paramsTable.select(paramsTable.rif, paramsTable.porcentajeImpuestoPrincipal).limit(1).singleOrNull()
+        val companyRif = paramsRow?.get(paramsTable.rif)
+        val defaultTaxRate = paramsRow?.get(paramsTable.porcentajeImpuestoPrincipal) ?: BigDecimal("7.00")
+
+        val cajaTable = CajaTableFactory.forCountry(kioskContext.countryCode)
+        val codigoCaja = cajaTable
+            .select(cajaTable.codCaja, cajaTable.serieCaja)
+            .where { cajaTable.idCaja eq kioskContext.idCaja }
+            .firstOrNull()?.let { it[cajaTable.codCaja] ?: it[cajaTable.serieCaja] } ?: "CAJA1"
+
+        val clientRow = ClientsTable
+            .selectAll()
+            .where { (ClientsTable.idCliente eq order.idCliente) or (ClientsTable.codCliente eq order.idCliente) }
+            .limit(1)
+            .singleOrNull()
+
+        val customerName = clientRow?.get(ClientsTable.nombre)?.trim()?.takeIf { it.isNotBlank() } ?: "CONSUMIDOR FINAL"
+        val customerRif = clientRow?.get(ClientsTable.rif)?.trim()?.takeIf { it.isNotBlank() } ?: "CF"
+        val customerAddress = clientRow?.get(ClientsTable.direccion)?.trim() ?: ""
+        val customerPhone = clientRow?.get(ClientsTable.telefonos)?.trim() ?: ""
+        val customerDv = clientRow?.get(ClientsTable.dv)
+        val customerCod = clientRow?.get(ClientsTable.codCliente) ?: "CF"
+
+        val formaPagoId = runCatching {
+            CajaFormaPagoTable
+                .select(CajaFormaPagoTable.idFormaPago)
+                .where { (CajaFormaPagoTable.siglas eq "TDC") or (CajaFormaPagoTable.siglas eq "TARJETA") }
+                .map { it[CajaFormaPagoTable.idFormaPago] }
+                .firstOrNull()
+        }.getOrNull() ?: 2
+
+        val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
+        val itemIds = order.items.map { it.idItem }.distinct()
+        val itemDetails = if (itemIds.isNotEmpty()) {
+            itemsTable
+                .selectAll()
+                .where { itemsTable.idItem inList itemIds }
+                .associate { row ->
+                    row[itemsTable.idItem] to KioskItemTaxInfo(
+                        description = row[itemsTable.descripcion1]?.trim() ?: "Item ${row[itemsTable.idItem]}",
+                        isExempt = row[itemsTable.montoExento],
+                        ivaRate = row[itemsTable.iva],
+                    )
+                }
+        } else {
+            emptyMap()
+        }
+
+        val (destino, cocinaIp) = run {
+            val paramRow = KioskParametrosTable
+                .select(KioskParametrosTable.kioscoDestinoPedido, KioskParametrosTable.kioscoImpresoraCocinaIp)
+                .limit(1)
+                .singleOrNull()
+            val dest = paramRow?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
+            val ip = paramRow?.get(KioskParametrosTable.kioscoImpresoraCocinaIp)
+            Pair(dest, ip)
+        }
+
+        KioskSalePrerequisites(
+            branchSerie = sucursalSerie,
+            branchName = companyName,
+            branchAddress = companyAddress,
+            companyRif = companyRif,
+            defaultTaxRate = defaultTaxRate,
+            cajaCode = codigoCaja,
+            customerName = customerName,
+            customerRif = customerRif,
+            customerAddress = customerAddress,
+            customerPhone = customerPhone,
+            customerDv = customerDv,
+            customerCod = customerCod,
+            paymentMethodId = formaPagoId,
+            itemDetails = itemDetails,
+            dispatchDestination = destino,
+            kitchenPrinterIp = cocinaIp,
+        )
+    }
+
+    suspend fun getInvoiceCode(
+        database: Database,
+        countryCode: String,
+        idFactura: String?,
+    ): String? = if (idFactura == null) null else dbQuery(database) {
+        val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
+        facturaTable
+            .select(facturaTable.codFactura)
+            .where { facturaTable.idFactura eq idFactura }
+            .singleOrNull()?.get(facturaTable.codFactura)
     }
 }

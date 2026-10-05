@@ -1,11 +1,18 @@
 package com.amaxoniaerp.composition
 
+import com.amaxoniaerp.JwtConfig
+import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.caja.data.ExposedCajaSessionStore
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
+import com.amaxoniaerp.features.kiosk.application.KioskService
+import com.amaxoniaerp.features.kiosk.application.PlaceKioskOrderService
+import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
+import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
 import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
@@ -36,6 +43,7 @@ fun buildAppDependencies(application: Application): AppDependencies {
     val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
     val creditNoteDependencies = buildCreditNoteDependencies(feDependencies, dataBasePath)
     val mesas = buildMesasDependencies(feDependencies.feFactory)
+    val kiosk = buildKioskDependencies(jwtConfig, caja.cajaSession, mesas.processSaleUseCase)
     val routingConfig =
         RoutingConfig(
             dataBasePath = dataBasePath,
@@ -48,6 +56,7 @@ fun buildAppDependencies(application: Application): AppDependencies {
         caja = caja,
         mesas = mesas,
         fiscal = FiscalDependencies(feDependencies, creditNoteDependencies),
+        kiosk = kiosk,
         routingConfig = routingConfig,
     )
 }
@@ -69,6 +78,32 @@ private fun buildMesasDependencies(feFactory: ElectronicInvoiceProcessorFactory)
     val processSaleUseCase =
         ProcessSaleUseCase(ProcessSaleTransactionalRepository(cuentaMesaRepository), feFactory)
     return MesasDependencies(pedidoMesaRepository, sesionMesaRepository, cuentaMesaRepository, processSaleUseCase)
+}
+
+private fun buildKioskDependencies(
+    jwtConfig: JwtConfig,
+    cajaSession: CajaSessionWorkflow,
+    processSaleUseCase: ProcessSaleUseCase,
+): KioskDependencies {
+    val kioskDeviceRepository = KioskDeviceRepository()
+    val unlockRateLimiter = UnlockRateLimiter()
+    val kioskOrderRepository = KioskOrderRepository()
+    val placeKioskOrderService = PlaceKioskOrderService(
+        kioskOrderRepository = kioskOrderRepository,
+        cajaSessionWorkflow = cajaSession,
+        processSaleUseCase = processSaleUseCase,
+    )
+    val kioskService = KioskService(
+        kioskDeviceRepository = kioskDeviceRepository,
+        unlockRateLimiter = unlockRateLimiter,
+        jwtConfig = jwtConfig,
+        databaseResolver = { countryCode, companyDb ->
+            DatabaseManager.connectToCompanyDb(countryCode, companyDb)
+        },
+        kioskOrderRepository = kioskOrderRepository,
+        placeKioskOrderService = placeKioskOrderService,
+    )
+    return KioskDependencies(kioskService)
 }
 
 private fun resolveAssetsBaseUrls(
