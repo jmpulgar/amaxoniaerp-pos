@@ -10,14 +10,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.amaxonia.kiosk.di.AppGraph
+import com.amaxonia.kiosk.ui.navigation.KioskDestinations
+import com.amaxonia.kiosk.ui.pairing.PairingScreen
+import com.amaxonia.kiosk.ui.pairing.PairingViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
 
 class MainActivity : ComponentActivity() {
+    private val appGraph: AppGraph
+        get() = (application as KioskApplication).appGraph
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -33,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    KioskRoot()
+                    KioskRoot(appGraph = appGraph)
                 }
             }
         }
@@ -56,14 +67,47 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KioskRoot() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
+fun KioskRoot(appGraph: AppGraph) {
+    val navController = rememberNavController()
+    val startDestination =
+        if (appGraph.tokenStorage.isPaired()) {
+            KioskDestinations.ATTRACT
+        } else {
+            KioskDestinations.PAIRING
+        }
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
     ) {
-        Text(
-            text = "Amaxonia Kiosko",
-            style = MaterialTheme.typography.headlineLarge,
-        )
+        composable(KioskDestinations.PAIRING) {
+            val viewModel =
+                remember(appGraph) {
+                    PairingViewModel(
+                        apiClient = appGraph.apiClient,
+                        initialServerUrl = appGraph.tokenStorage.serverUrl,
+                    )
+                }
+            PairingScreen(
+                viewModel = viewModel,
+                onPairingSuccess = {
+                    navController.navigate(KioskDestinations.ATTRACT) {
+                        popUpTo(KioskDestinations.PAIRING) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(KioskDestinations.ATTRACT) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Amaxonia Kiosko · Modo Atracción",
+                    style = MaterialTheme.typography.headlineLarge,
+                )
+            }
+        }
     }
 }
