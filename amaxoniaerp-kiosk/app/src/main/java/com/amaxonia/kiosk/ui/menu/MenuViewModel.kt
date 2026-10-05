@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskApiClient
+import com.amaxonia.kiosk.core.network.KioskCatalogResponse
 import com.amaxonia.kiosk.core.network.KioskCategoryDto
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.core.network.KioskItemDto
@@ -45,6 +46,7 @@ class MenuViewModel(
     private val apiClient: KioskApiClient,
     private val tokenStorage: KioskTokenStorage,
     val orderGraph: OrderGraph,
+    private val catalogState: MutableStateFlow<KioskCatalogResponse?>? = null,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(
@@ -108,6 +110,7 @@ class MenuViewModel(
                 when (result) {
                     is NetworkResult.Success -> {
                         val catalog = result.data
+                        catalogState?.value = catalog
                         val sortedCategories = catalog.categories.sortedBy { it.order }
                         val firstCatId = sortedCategories.firstOrNull()?.id
                         _uiState.update {

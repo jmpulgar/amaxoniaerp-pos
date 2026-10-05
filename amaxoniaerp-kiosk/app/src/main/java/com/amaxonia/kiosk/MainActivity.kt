@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,8 @@ import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
+import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
+import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
 import com.amaxonia.kiosk.ui.menu.MenuScreen
 import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
@@ -128,6 +131,7 @@ fun KioskRoot(appGraph: AppGraph) {
                         apiClient = appGraph.apiClient,
                         tokenStorage = appGraph.tokenStorage,
                         orderGraph = appGraph.orderGraph,
+                        catalogState = appGraph.catalogState,
                     )
                 }
             MenuScreen(
@@ -147,15 +151,25 @@ fun KioskRoot(appGraph: AppGraph) {
             )
         }
 
-        composable("${KioskDestinations.CUSTOMIZER}/{itemId}") {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Personalizador (A6)",
-                    style = MaterialTheme.typography.headlineLarge,
+        composable("${KioskDestinations.CUSTOMIZER}/{itemId}") { backStackEntry ->
+            val itemId = backStackEntry.arguments?.getString("itemId")?.toIntOrNull()
+            val item = appGraph.catalogState.value?.items?.find { it.id == itemId }
+            if (item != null) {
+                val customizerViewModel =
+                    remember(item, appGraph) {
+                        ProductCustomizerViewModel(
+                            item = item,
+                            orderGraph = appGraph.orderGraph,
+                        )
+                    }
+                CustomizerScreen(
+                    viewModel = customizerViewModel,
+                    onDismiss = { navController.popBackStack() },
                 )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
             }
         }
 
