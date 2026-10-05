@@ -11,6 +11,7 @@ import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.CheckoutOrderUseCase
 import com.amaxonia.kiosk.domain.payment.DevMockPaymentTerminal
 import com.amaxonia.kiosk.domain.payment.PaymentTerminal
+import com.amaxonia.kiosk.ui.payment.CompletedOrderInfo
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -22,6 +23,7 @@ class AppGraph(
     val apiClient: KioskApiClient = KioskApiClient(httpClient, tokenStorage)
     val orderGraph: OrderGraph = OrderGraph()
     val catalogState: MutableStateFlow<KioskCatalogResponse?> = MutableStateFlow(null)
+    val completedOrderState: MutableStateFlow<CompletedOrderInfo?> = MutableStateFlow(null)
     val database: KioskDatabase = KioskDatabase.build(context)
     val pendingPaymentDao: PendingPaymentDao = database.pendingPaymentDao()
     val paymentTerminal: PaymentTerminal = DevMockPaymentTerminal()

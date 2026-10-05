@@ -4,16 +4,13 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -35,6 +32,9 @@ import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
 import com.amaxonia.kiosk.ui.pairing.PairingScreen
 import com.amaxonia.kiosk.ui.pairing.PairingViewModel
+import com.amaxonia.kiosk.ui.payment.OrderNumberScreen
+import com.amaxonia.kiosk.ui.payment.PaymentScreen
+import com.amaxonia.kiosk.ui.payment.PaymentViewModel
 import com.amaxonia.kiosk.ui.review.ReviewScreen
 import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import com.amaxonia.kiosk.ui.tabletent.TableTentScreen
@@ -267,14 +267,48 @@ fun KioskRoot(appGraph: AppGraph) {
         }
 
         composable(KioskDestinations.PAYMENT) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Terminal de Pago (A9)",
-                    style = MaterialTheme.typography.headlineLarge,
+            val paymentViewModel =
+                remember(appGraph) {
+                    PaymentViewModel(
+                        checkoutUseCase = appGraph.checkoutUseCase,
+                        paymentTerminal = appGraph.paymentTerminal,
+                        orderGraph = appGraph.orderGraph,
+                        onOrderSuccess = { info ->
+                            appGraph.completedOrderState.value = info
+                            navController.navigate(KioskDestinations.ORDER_NUMBER) {
+                                popUpTo(KioskDestinations.PAYMENT) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+            PaymentScreen(
+                viewModel = paymentViewModel,
+                onBack = {
+                    navController.popBackStack()
+                },
+            )
+        }
+
+        composable(KioskDestinations.ORDER_NUMBER) {
+            val completedOrder by appGraph.completedOrderState.collectAsStateWithLifecycle()
+            val order = completedOrder
+            if (order != null) {
+                OrderNumberScreen(
+                    orderInfo = order,
+                    onFinish = {
+                        appGraph.orderGraph.reset()
+                        appGraph.completedOrderState.value = null
+                        navController.navigate(KioskDestinations.ATTRACT) {
+                            popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                        }
+                    },
                 )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.navigate(KioskDestinations.ATTRACT) {
+                        popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                    }
+                }
             }
         }
     }
