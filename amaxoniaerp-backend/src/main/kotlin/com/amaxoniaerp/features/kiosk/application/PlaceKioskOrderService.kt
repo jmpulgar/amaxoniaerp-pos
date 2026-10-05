@@ -11,6 +11,8 @@ import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.items.data.ItemsTableFactory
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
+import com.amaxoniaerp.features.kiosk.application.dispatch.KioskDispatchConfig
+import com.amaxoniaerp.features.kiosk.application.dispatch.OrderDispatchPolicyFactory
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
 import com.amaxoniaerp.features.kiosk.data.KioskParametrosTable
 import com.amaxoniaerp.features.kiosk.domain.KioskInvoiceInfo
@@ -45,6 +47,7 @@ class PlaceKioskOrderService(
     private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(),
     private val cajaSessionWorkflow: CajaSessionWorkflow? = null,
     private val processSaleUseCase: ProcessSaleUseCase? = null,
+    private val dispatchPolicyFactory: OrderDispatchPolicyFactory = OrderDispatchPolicyFactory(),
 ) {
     private val logger = LoggerFactory.getLogger(PlaceKioskOrderService::class.java)
 
@@ -104,7 +107,34 @@ class PlaceKioskOrderService(
             motivoRechazo = saleResult.feError,
         )
 
-        // 4. Construir comprobante (recibo 80mm) y respuesta
+        // 4. Ejecutar política de despacho configurada (Retiro en mostrador, Impresora cocina o Mesas)
+        runCatching {
+            val (destino, cocinaIp) = dbQuery(database) {
+                val row = KioskParametrosTable
+                    .select(KioskParametrosTable.kioscoDestinoPedido, KioskParametrosTable.kioscoImpresoraCocinaIp)
+                    .limit(1)
+                    .singleOrNull()
+                val dest = row?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
+                val ip = row?.get(KioskParametrosTable.kioscoImpresoraCocinaIp)
+                Pair(dest, ip)
+            }
+            val policy = dispatchPolicyFactory.getPolicy(destino)
+            val dispatchConfig = KioskDispatchConfig(kitchenPrinterIp = cocinaIp)
+            val itemNames = dbQuery(database) {
+                val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
+                val itemIds = order.items.map { it.idItem }.distinct()
+                if (itemIds.isNotEmpty()) {
+                    itemsTable.select(itemsTable.idItem, itemsTable.descripcion1)
+                        .where { itemsTable.idItem inList itemIds }
+                        .associate { it[itemsTable.idItem] to (it[itemsTable.descripcion1] ?: "") }
+                } else emptyMap()
+            }
+            policy.dispatch(order, dispatchConfig, itemNames)
+        }.onFailure { err ->
+            logger.warn("Dispatch execution failed for order {}: {}", order.codigoPedido, err.message)
+        }
+
+        // 5. Construir comprobante (recibo 80mm) y respuesta
         return buildPayResponse(
             database = database,
             kioskContext = kioskContext,
