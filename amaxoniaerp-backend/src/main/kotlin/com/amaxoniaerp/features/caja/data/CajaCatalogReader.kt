@@ -227,6 +227,7 @@ internal fun mapCajaRows(
     defaultBySucursal: Map<Int, Int?>,
     activeSellers: List<SellerRecord>,
     warehouseNames: Map<Int, String> = emptyMap(),
+    all: Boolean = false,
 ): List<Caja> {
     val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
     val userIdToken = userId.toString()
@@ -245,52 +246,107 @@ internal fun mapCajaRows(
         .join(SucursalTable, org.jetbrains.exposed.sql.JoinType.LEFT, CajaTable.idSucursal, SucursalTable.idSucursal)
         .select(cajaColumns + SucursalTable.columns)
         .map { row ->
-            val nombreSucursal =
-                row[SucursalTable.sucursal]?.takeIf { it.isNotBlank() }
-                    ?: row[SucursalTable.descripcion]?.takeIf { it.isNotBlank() }
-
-            val idCaja = row[CajaTable.idCaja]
-            val idSucursal = row[CajaTable.idSucursal]
-            val cajaWarehouse =
-                if (isVE) {
-                    row.getOrNull(CajaTable.codAlmacen)?.takeIf { it > 0 }
-                } else {
-                    null
-                }
-            val resolvedDefaultWarehouse =
-                cajaWarehouse
-                    ?: idSucursal?.let { defaultBySucursal[it] }
-                    ?: params.globalDefaultWarehouse
-
-            val sucursalToken = idSucursal?.toString()
-            val defaultSeller =
-                activeSellers.firstOrNull { csvContains(it.codUsuarios, userIdToken) }
-                    ?: activeSellers.firstOrNull { csvContains(it.idCajas, idCaja) }
-                    ?: sucursalToken?.let { token ->
-                        activeSellers.firstOrNull { csvContains(it.idTiendas, token) }
-                    }
-
-            Caja(
-                idCaja = idCaja,
-                codCaja = row[CajaTable.codCaja],
-                caja = row[CajaTable.caja],
-                descripcion = row[CajaTable.descripcion],
-                estatus = row[CajaTable.codEstatus],
-                idSucursal = idSucursal,
-                codAlmacen = if (isVE) row.getOrNull(CajaTable.codAlmacen) else null,
-                defaultWarehouseId = resolvedDefaultWarehouse,
-                defaultSellerId = defaultSeller?.id,
-                defaultSellerName = defaultSeller?.nombre,
+            buildCajaFromRow(
+                row = row,
+                isVE = isVE,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
                 availableSellers = availableSellers,
-                serieSucursal = row[SucursalTable.serie],
-                defaultTaxRate = params.defaultTaxRate,
-                defaultFormaPagoId = params.defaultFormaPagoId,
-                currency = params.currency,
-                serieCaja = row[CajaTable.serieCaja],
-                sucursalNombre = nombreSucursal,
-                sucursalCodigo = row[SucursalTable.codigo],
-                codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
-                almacenNombre = resolvedDefaultWarehouse?.let { warehouseNames[it] }?.takeIf { it.isNotBlank() },
+                warehouseNames = warehouseNames,
+                userIdToken = userIdToken,
             )
-        }.filter { caja -> assignedCajaIds.isEmpty() || caja.idCaja in assignedCajaIds }
+        }.filter { caja -> all || assignedCajaIds.isEmpty() || caja.idCaja in assignedCajaIds }
+}
+
+internal fun findCajaRowById(
+    countryCode: String,
+    id: String,
+    params: CajaCatalogParams,
+    defaultBySucursal: Map<Int, Int?>,
+    activeSellers: List<SellerRecord>,
+    warehouseNames: Map<Int, String> = emptyMap(),
+): Caja? {
+    val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
+    val isVE = countryCode.equals("VE", ignoreCase = true)
+    val cajaColumns =
+        CajaTable.columns
+            .filter { isVE || it != CajaTable.codAlmacen }
+
+    return CajaTable
+        .join(SucursalTable, org.jetbrains.exposed.sql.JoinType.LEFT, CajaTable.idSucursal, SucursalTable.idSucursal)
+        .select(cajaColumns + SucursalTable.columns)
+        .where { CajaTable.idCaja eq id }
+        .singleOrNull()
+        ?.let { row ->
+            buildCajaFromRow(
+                row = row,
+                isVE = isVE,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
+                availableSellers = availableSellers,
+                warehouseNames = warehouseNames,
+                userIdToken = null,
+            )
+        }
+}
+
+private fun buildCajaFromRow(
+    row: ResultRow,
+    isVE: Boolean,
+    params: CajaCatalogParams,
+    defaultBySucursal: Map<Int, Int?>,
+    activeSellers: List<SellerRecord>,
+    availableSellers: List<SellerSummary>,
+    warehouseNames: Map<Int, String>,
+    userIdToken: String?,
+): Caja {
+    val nombreSucursal =
+        row[SucursalTable.sucursal]?.takeIf { it.isNotBlank() }
+            ?: row[SucursalTable.descripcion]?.takeIf { it.isNotBlank() }
+
+    val idCaja = row[CajaTable.idCaja]
+    val idSucursal = row[CajaTable.idSucursal]
+    val cajaWarehouse =
+        if (isVE) {
+            row.getOrNull(CajaTable.codAlmacen)?.takeIf { it > 0 }
+        } else {
+            null
+        }
+    val resolvedDefaultWarehouse =
+        cajaWarehouse
+            ?: idSucursal?.let { defaultBySucursal[it] }
+            ?: params.globalDefaultWarehouse
+
+    val sucursalToken = idSucursal?.toString()
+    val defaultSeller =
+        (userIdToken?.let { token -> activeSellers.firstOrNull { csvContains(it.codUsuarios, token) } })
+            ?: activeSellers.firstOrNull { csvContains(it.idCajas, idCaja) }
+            ?: sucursalToken?.let { token ->
+                activeSellers.firstOrNull { csvContains(it.idTiendas, token) }
+            }
+
+    return Caja(
+        idCaja = idCaja,
+        codCaja = row[CajaTable.codCaja],
+        caja = row[CajaTable.caja],
+        descripcion = row[CajaTable.descripcion],
+        estatus = row[CajaTable.codEstatus],
+        idSucursal = idSucursal,
+        codAlmacen = if (isVE) row.getOrNull(CajaTable.codAlmacen) else null,
+        defaultWarehouseId = resolvedDefaultWarehouse,
+        defaultSellerId = defaultSeller?.id,
+        defaultSellerName = defaultSeller?.nombre,
+        availableSellers = availableSellers,
+        serieSucursal = row[SucursalTable.serie],
+        defaultTaxRate = params.defaultTaxRate,
+        defaultFormaPagoId = params.defaultFormaPagoId,
+        currency = params.currency,
+        serieCaja = row[CajaTable.serieCaja],
+        sucursalNombre = nombreSucursal,
+        sucursalCodigo = row[SucursalTable.codigo],
+        codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
+        almacenNombre = resolvedDefaultWarehouse?.let { warehouseNames[it] }?.takeIf { it.isNotBlank() },
+    )
 }

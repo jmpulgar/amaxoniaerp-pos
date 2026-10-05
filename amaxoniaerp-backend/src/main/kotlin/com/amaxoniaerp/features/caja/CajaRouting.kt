@@ -13,6 +13,8 @@ import com.amaxoniaerp.features.caja.domain.CajaSecuenciaCodigoResponse
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaGetResponse
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaResumenResponse
 import com.amaxoniaerp.features.caja.domain.CajaStatusResponse
+import com.amaxoniaerp.features.caja.domain.SaveCajaRequest
+import com.amaxoniaerp.features.caja.domain.SaveCajaResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
@@ -21,6 +23,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import org.slf4j.LoggerFactory
 
@@ -48,6 +51,9 @@ fun Route.cajaRouting(
     route("/api/cajas") {
         authenticate {
             get { handlers.listar(call) }
+            post { handlers.crear(call) }
+            get("/{id}") { handlers.detalle(call) }
+            put("/{id}") { handlers.actualizar(call) }
             post("/open") { handlers.abrir(call) }
             get("/{id}/status") { handlers.status(call) }
             get("/{id}/secuencia") { handlers.resumenSecuencia(call) }
@@ -73,11 +79,93 @@ internal class CajaHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
             val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
             val userId = ctx.requireUserId(call) ?: return@run
+            val all = call.request.queryParameters["all"]?.toBooleanStrictOrNull() == true
 
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
-            val cajas = cajaRepository.getCajas(database, ctx.countryCode, userId)
-            log.debug("Cajas listadas. companyDb={} userId={}", companyDb, userId)
+            val cajas = cajaRepository.getCajas(database, ctx.countryCode, userId, all)
+            log.debug("Cajas listadas. companyDb={} userId={} all={}", companyDb, userId, all)
             call.respond(HttpStatusCode.OK, cajas)
+        }
+
+    suspend fun detalle(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
+            val id = call.parameters["id"]
+            if (id.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "ID de caja requerido"))
+                return@run
+            }
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val caja = cajaRepository.getCajaById(database, ctx.countryCode, id)
+            if (caja == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Caja no encontrada"))
+                return@run
+            }
+            call.respond(HttpStatusCode.OK, caja)
+        }
+
+    suspend fun crear(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
+            val request =
+                runCatching { call.receive<SaveCajaRequest>() }.getOrElse {
+                    log.warn("Payload de caja inválido", it)
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_INVALID_PAYLOAD))
+                    return@run
+                }
+
+            if (request.caja.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "El nombre de la caja es requerido"))
+                return@run
+            }
+            if (request.serieCaja.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "La serie de la caja es requerida"))
+                return@run
+            }
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val created = cajaRepository.createCaja(database, ctx.countryCode, request)
+            log.info("Caja creada con éxito. companyDb={} idCaja={}", companyDb, created.idCaja)
+            call.respond(HttpStatusCode.Created, SaveCajaResponse(success = true, data = created))
+        }
+
+    suspend fun actualizar(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val companyDb = ctx.requireCompanyDbHeader(call) ?: return@run
+            val id = call.parameters["id"]
+            if (id.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "ID de caja requerido"))
+                return@run
+            }
+
+            val request =
+                runCatching { call.receive<SaveCajaRequest>() }.getOrElse {
+                    log.warn("Payload de caja inválido", it)
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_INVALID_PAYLOAD))
+                    return@run
+                }
+
+            if (request.caja.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "El nombre de la caja es requerido"))
+                return@run
+            }
+            if (request.serieCaja.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "La serie de la caja es requerida"))
+                return@run
+            }
+
+            val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
+            val updated = cajaRepository.updateCaja(database, ctx.countryCode, id, request)
+            if (updated == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "Caja no encontrada"))
+                return@run
+            }
+            log.info("Caja actualizada con éxito. companyDb={} idCaja={}", companyDb, id)
+            call.respond(HttpStatusCode.OK, SaveCajaResponse(success = true, data = updated))
         }
 
     suspend fun abrir(call: ApplicationCall) =

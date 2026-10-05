@@ -1,4 +1,4 @@
-﻿package com.amaxoniaerp.composition
+package com.amaxoniaerp.composition
 
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
@@ -16,6 +16,7 @@ import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
+import com.amaxoniaerp.features.sucursales.data.SucursalRepository
 import com.amaxoniaerp.features.sync.data.SyncRepository
 
 /**
@@ -47,6 +48,7 @@ class Repositories {
     val promotionsRepository = PromotionsRepository()
     val mesasRepository = MesasRepository()
     val syncRepository = SyncRepository()
+    val sucursalRepository = SucursalRepository()
 }
 
 /** Caja: módulo profundo de sesión (apertura atómica/cierre/estado) sobre el repositorio de queries. */

@@ -5,7 +5,14 @@ import com.amaxoniaerp.features.caja.domain.Caja
 import com.amaxoniaerp.features.caja.domain.CajaCierreSummary
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
+import com.amaxoniaerp.features.caja.domain.SaveCajaRequest
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.UUID
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
 
 /**
@@ -82,12 +89,99 @@ class CajaRepository {
         database: Database,
         countryCode: String,
         userId: Int,
+        all: Boolean = false,
     ): List<Caja> =
         dbQuery(database) {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames)
+            mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames, all)
+        }
+
+    suspend fun getCajaById(
+        database: Database,
+        countryCode: String,
+        id: String,
+    ): Caja? =
+        dbQuery(database) {
+            val params = loadCajaCatalogParams(countryCode)
+            val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val activeSellers = loadActiveSellers()
+            val warehouseNames = loadWarehouseNames()
+            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames)
+        }
+
+    suspend fun createCaja(
+        database: Database,
+        countryCode: String,
+        request: SaveCajaRequest,
+    ): Caja =
+        dbQuery(database) {
+            val isVE = countryCode.equals("VE", ignoreCase = true)
+            val generatedId = request.id?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+            val fondo = request.fondoApertura?.let { BigDecimal.valueOf(it).setScale(2, RoundingMode.HALF_UP) }
+
+            CajaTable.insert {
+                it[idCaja] = generatedId
+                it[codCaja] = request.codigo
+                it[caja] = request.caja
+                it[descripcion] = request.descripcion
+                it[codEstatus] = request.activo
+                it[idSucursal] = request.idSucursal
+                it[serieCaja] = request.serieCaja
+                it[fondoApertura] = fondo
+                it[impresoraModelo] = request.impresoraModelo
+                it[codigoSucursalEmisor] = request.codigoSucursalEmisor
+                it[puntoFacturacionFiscal] = request.puntoFacturacionFiscal
+                if (isVE) {
+                    it[codAlmacen] = request.codAlmacen
+                }
+            }
+
+            val params = loadCajaCatalogParams(countryCode)
+            val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val activeSellers = loadActiveSellers()
+            val warehouseNames = loadWarehouseNames()
+            findCajaRowById(countryCode, generatedId, params, defaultBySucursal, activeSellers, warehouseNames)
+                ?: error("No se pudo recuperar la caja recién creada: $generatedId")
+        }
+
+    suspend fun updateCaja(
+        database: Database,
+        countryCode: String,
+        id: String,
+        request: SaveCajaRequest,
+    ): Caja? =
+        dbQuery(database) {
+            val isVE = countryCode.equals("VE", ignoreCase = true)
+            val fondo = request.fondoApertura?.let { BigDecimal.valueOf(it).setScale(2, RoundingMode.HALF_UP) }
+
+            val updatedRows =
+                CajaTable.update({ CajaTable.idCaja eq id }) {
+                    if (request.codigo != null) it[codCaja] = request.codigo
+                    it[caja] = request.caja
+                    it[descripcion] = request.descripcion
+                    it[codEstatus] = request.activo
+                    it[idSucursal] = request.idSucursal
+                    it[serieCaja] = request.serieCaja
+                    it[fondoApertura] = fondo
+                    it[impresoraModelo] = request.impresoraModelo
+                    it[codigoSucursalEmisor] = request.codigoSucursalEmisor
+                    it[puntoFacturacionFiscal] = request.puntoFacturacionFiscal
+                    if (isVE && request.codAlmacen != null) {
+                        it[codAlmacen] = request.codAlmacen
+                    }
+                }
+
+            if (updatedRows == 0) {
+                return@dbQuery null
+            }
+
+            val params = loadCajaCatalogParams(countryCode)
+            val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val activeSellers = loadActiveSellers()
+            val warehouseNames = loadWarehouseNames()
+            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames)
         }
 }
