@@ -5,12 +5,15 @@ import com.amaxoniaerp.features.kiosk.application.KioskRateLimitException
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
@@ -40,10 +43,34 @@ fun Route.kioskRoutes(kioskService: KioskService) {
                 }
         }
 
-        /**
-         * Desbloqueo de modo kiosco con clave de administración (verificada en servidor con BCrypt).
-         */
         authenticate {
+            /**
+             * Configuración del kiosco con soporte de ETag (304 Not Modified).
+             */
+            get("/config") {
+                val kioskContext = call.resolveKioskRequestContext(kioskService) ?: return@get
+                val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
+
+                kioskService.getConfig(kioskContext)
+                    .onSuccess { (config, etag) ->
+                        call.response.headers.append(HttpHeaders.ETag, etag)
+                        if (ifNoneMatch != null && (ifNoneMatch == etag || ifNoneMatch == etag.trim('"') || ifNoneMatch == "W/$etag")) {
+                            call.respond(HttpStatusCode.NotModified)
+                        } else {
+                            call.respond(HttpStatusCode.OK, config)
+                        }
+                    }
+                    .onFailure { error ->
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to (error.message ?: "Error al obtener configuración"))
+                        )
+                    }
+            }
+
+            /**
+             * Desbloqueo de modo kiosco con clave de administración (verificada en servidor con BCrypt).
+             */
             post("/unlock") {
                 val kioskContext = call.resolveKioskRequestContext(kioskService) ?: return@post
 

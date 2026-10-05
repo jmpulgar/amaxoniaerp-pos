@@ -24,6 +24,33 @@ data class KioskUnlockRequest(
     val password: String,
 )
 
+@Serializable
+data class KioskMediaItem(
+    val type: String, // "IMAGE" or "VIDEO"
+    val url: String,
+    val durationSec: Int,
+)
+
+@Serializable
+data class KioskCurrencyConfig(
+    val base: String,
+    val secondary: String?,
+    val rate: String,
+)
+
+@Serializable
+data class KioskConfigResponse(
+    val version: Int,
+    val brandColor: String?,
+    val logoUrl: String?,
+    val media: List<KioskMediaItem>,
+    val diningModes: List<String>,
+    val dispatch: String,
+    val defaultCustomerId: String,
+    val currency: KioskCurrencyConfig,
+    val country: String,
+)
+
 data class KioskDevice(
     val id: String,
     val nombre: String,

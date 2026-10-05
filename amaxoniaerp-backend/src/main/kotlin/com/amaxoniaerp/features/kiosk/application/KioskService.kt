@@ -1,7 +1,9 @@
 package com.amaxoniaerp.features.kiosk.application
 
 import com.amaxoniaerp.JwtConfig
+import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
 import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskDevice
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
@@ -9,6 +11,7 @@ import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
 import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
@@ -23,7 +26,14 @@ class KioskService(
     private val unlockRateLimiter: UnlockRateLimiter,
     private val jwtConfig: JwtConfig,
     private val databaseResolver: (countryCode: String, companyDb: String) -> Database,
+    private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(),
 ) {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = false
+        explicitNulls = false
+    }
+
     suspend fun pairDevice(request: KioskPairingRequest): Result<KioskPairingResponse> = runCatching {
         val countryCode = request.countryCode.trim().uppercase()
         val companyDb = request.companyDb.trim()
@@ -141,6 +151,18 @@ class KioskService(
         }
 
         unlockRateLimiter.recordSuccess(deviceId)
+    }
+
+    suspend fun getConfig(kioskContext: KioskRequestContext): Result<Pair<KioskConfigResponse, String>> = runCatching {
+        val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+        val config = kioskConfigRepository.getKioskConfig(
+            database = database,
+            countryCode = kioskContext.countryCode,
+            companyDb = kioskContext.companyDb,
+        )
+        val jsonString = json.encodeToString(KioskConfigResponse.serializer(), config)
+        val etag = "\"" + sha256(jsonString) + "\""
+        Pair(config, etag)
     }
 
     private fun sha256(input: String): String {

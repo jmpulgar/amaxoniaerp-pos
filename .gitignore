@@ -3,3 +3,4 @@
 
 # Kotlin daemon error logs
 .kotlin/
+.atl/
