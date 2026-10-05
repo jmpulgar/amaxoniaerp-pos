@@ -2,6 +2,8 @@ package com.amaxoniaerp.features.kiosk.domain
 
 import io.ktor.server.auth.jwt.JWTPrincipal
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Serializable
@@ -148,6 +150,69 @@ data class KioskQuoteResponse(
     val lines: List<KioskQuoteLineResponse>,
 )
 
+@Serializable
+data class KioskPaymentRequest(
+    val transactionId: String,
+    val authCode: String,
+    val reference: String,
+    val last4: String,
+    val brand: String,
+    val amount: String,
+)
+
+@Serializable
+data class KioskInvoiceInfo(
+    val codFactura: String,
+    val cufe: String? = null,
+    val qr: String? = null,
+    val fechaRecepcionDGI: String? = null,
+    val numeroDocumentoFiscal: String? = null,
+    val numeroControl: String? = null,
+)
+
+@Serializable
+data class KioskReceiptLine(
+    val qty: Int,
+    val description: String,
+    val price: String,
+    val total: String,
+    val modifiers: List<String> = emptyList(),
+)
+
+@Serializable
+data class KioskReceipt(
+    val companyName: String,
+    val ruc: String? = null,
+    val dv: String? = null,
+    val address: String? = null,
+    val orderNumber: String,
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerName: String,
+    val customerId: String,
+    val date: String,
+    val lines: List<KioskReceiptLine>,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val paymentBrand: String,
+    val paymentLast4: String,
+    val paymentAuthCode: String,
+    val paymentReference: String,
+    val invoiceNumber: String? = null,
+    val cufe: String? = null,
+    val qr: String? = null,
+)
+
+@Serializable
+data class KioskPayResponse(
+    val orderNumber: String,
+    val invoice: KioskInvoiceInfo? = null,
+    val dispatch: String,
+    val receipt: KioskReceipt,
+    val status: String,
+)
+
 data class KioskDevice(
     val id: String,
     val nombre: String,
@@ -177,4 +242,45 @@ data class KioskRequestContext(
     val codVendedor: Int,
     val idClienteGenerico: String,
     val principal: JWTPrincipal,
+)
+
+data class KioskOrderRecord(
+    val id: String,
+    val idDispositivo: String,
+    val numeroPedidoDiario: Int,
+    val codigoPedido: String,
+    val fecha: LocalDate,
+    val estado: String,
+    val modalidad: String,
+    val portamesa: String?,
+    val idCliente: String,
+    val total: BigDecimal,
+    val quoteExpiraEn: LocalDateTime,
+    val pagoReferencia: String?,
+    val pagoAutorizacion: String?,
+    val pagoUltimos4: String?,
+    val pagoMarca: String?,
+    val idFactura: String?,
+    val motivoRechazo: String?,
+    val creadoEn: LocalDateTime,
+    val actualizadoEn: LocalDateTime,
+    val items: List<KioskOrderItemRecord>,
+)
+
+data class KioskOrderItemRecord(
+    val idPedido: String,
+    val linea: Int,
+    val idItem: Int,
+    val cantidad: BigDecimal,
+    val precioUnitario: BigDecimal,
+    val nota: String?,
+    val modifiers: List<KioskOrderModifierRecord>,
+)
+
+data class KioskOrderModifierRecord(
+    val idPedido: String,
+    val linea: Int,
+    val idModificador: Int,
+    val nombre: String,
+    val precioAdicional: BigDecimal,
 )

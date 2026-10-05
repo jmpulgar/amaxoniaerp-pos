@@ -10,6 +10,8 @@ import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskDevice
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
+import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
+import com.amaxoniaerp.features.kiosk.domain.KioskPayResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
@@ -34,6 +36,7 @@ class KioskService(
     private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(),
     private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(),
     private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(),
+    private val placeKioskOrderService: PlaceKioskOrderService = PlaceKioskOrderService(kioskOrderRepository = kioskOrderRepository),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -197,6 +200,23 @@ class KioskService(
             database = database,
             kioskContext = kioskContext,
             idempotencyKey = idempotencyKey,
+            request = request,
+        )
+    }
+
+    suspend fun payOrder(
+        kioskContext: KioskRequestContext,
+        orderId: String,
+        request: KioskPaymentRequest,
+    ): Result<KioskPayResponse> = runCatching {
+        if (orderId.isBlank()) {
+            throw IllegalArgumentException("orderId no puede estar vacío")
+        }
+        val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+        placeKioskOrderService.payOrder(
+            database = database,
+            kioskContext = kioskContext,
+            orderId = orderId,
             request = request,
         )
     }

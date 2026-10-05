@@ -4,6 +4,7 @@ import com.amaxoniaerp.features.kiosk.application.KioskAuthenticationException
 import com.amaxoniaerp.features.kiosk.application.KioskRateLimitException
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
+import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import io.ktor.http.HttpHeaders
@@ -114,6 +115,50 @@ fun Route.kioskRoutes(kioskService: KioskService) {
                 kioskService.createQuote(kioskContext, idempotencyKey, request)
                     .onSuccess { response ->
                         call.respond(HttpStatusCode.OK, response)
+                    }
+                    .onFailure { error ->
+                        when (error) {
+                            is IllegalArgumentException -> call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to (error.message ?: "Solicitud inválida")),
+                            )
+                            is IllegalStateException -> call.respond(
+                                HttpStatusCode.Conflict,
+                                mapOf("error" to (error.message ?: "Conflicto en estado del pedido")),
+                            )
+                            else -> call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to (error.message ?: "Error interno")),
+                            )
+                        }
+                    }
+            }
+
+            /**
+             * Procesamiento de pago de pedido con apertura/cierre automático de caja y facturación fiscal.
+             */
+            post("/orders/{id}/pay") {
+                val kioskContext = call.resolveKioskRequestContext(kioskService) ?: return@post
+                val orderId = call.parameters["id"]?.trim()
+                if (orderId.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "id de pedido requerido"))
+                    return@post
+                }
+
+                val request = try {
+                    call.receive<KioskPaymentRequest>()
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cuerpo de solicitud inválido"))
+                    return@post
+                }
+
+                kioskService.payOrder(kioskContext, orderId, request)
+                    .onSuccess { response ->
+                        if (response.status == "PAID_PENDING_INVOICE") {
+                            call.respond(HttpStatusCode.Accepted, response)
+                        } else {
+                            call.respond(HttpStatusCode.OK, response)
+                        }
                     }
                     .onFailure { error ->
                         when (error) {

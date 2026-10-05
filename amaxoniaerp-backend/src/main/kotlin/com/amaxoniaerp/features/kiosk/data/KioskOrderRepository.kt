@@ -3,6 +3,9 @@ package com.amaxoniaerp.features.kiosk.data
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.items.data.ItemsTableFactory
+import com.amaxoniaerp.features.kiosk.domain.KioskOrderItemRecord
+import com.amaxoniaerp.features.kiosk.domain.KioskOrderModifierRecord
+import com.amaxoniaerp.features.kiosk.domain.KioskOrderRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineModifierResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineResponse
@@ -10,11 +13,13 @@ import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -405,5 +410,101 @@ class KioskOrderRepository {
                 )
             },
         )
+    }
+
+    suspend fun findOrderRecordById(
+        database: Database,
+        orderId: String,
+    ): KioskOrderRecord? = dbQuery(database) {
+        val orderRow = KioskOrderTable
+            .selectAll()
+            .where { KioskOrderTable.id eq orderId }
+            .singleOrNull() ?: return@dbQuery null
+
+        val itemRows = KioskOrderItemTable
+            .selectAll()
+            .where { KioskOrderItemTable.idPedido eq orderId }
+            .orderBy(KioskOrderItemTable.linea to SortOrder.ASC)
+            .toList()
+
+        val modRows = KioskOrderItemModifierTable
+            .selectAll()
+            .where { KioskOrderItemModifierTable.idPedido eq orderId }
+            .orderBy(
+                KioskOrderItemModifierTable.linea to SortOrder.ASC,
+                KioskOrderItemModifierTable.idModificador to SortOrder.ASC,
+            )
+            .toList()
+            .groupBy { it[KioskOrderItemModifierTable.linea] }
+
+        val items = itemRows.map { iRow ->
+            val linea = iRow[KioskOrderItemTable.linea]
+            val mods = modRows[linea]?.map { mRow ->
+                KioskOrderModifierRecord(
+                    idPedido = orderId,
+                    linea = linea,
+                    idModificador = mRow[KioskOrderItemModifierTable.idModificador],
+                    nombre = mRow[KioskOrderItemModifierTable.nombre],
+                    precioAdicional = mRow[KioskOrderItemModifierTable.precioAdicional],
+                )
+            } ?: emptyList()
+
+            KioskOrderItemRecord(
+                idPedido = orderId,
+                linea = linea,
+                idItem = iRow[KioskOrderItemTable.idItem],
+                cantidad = iRow[KioskOrderItemTable.cantidad],
+                precioUnitario = iRow[KioskOrderItemTable.precioUnitario],
+                nota = iRow[KioskOrderItemTable.nota],
+                modifiers = mods,
+            )
+        }
+
+        KioskOrderRecord(
+            id = orderRow[KioskOrderTable.id].trim(),
+            idDispositivo = orderRow[KioskOrderTable.idDispositivo].trim(),
+            numeroPedidoDiario = orderRow[KioskOrderTable.numeroPedidoDiario],
+            codigoPedido = orderRow[KioskOrderTable.codigoPedido],
+            fecha = orderRow[KioskOrderTable.fecha],
+            estado = orderRow[KioskOrderTable.estado],
+            modalidad = orderRow[KioskOrderTable.modalidad],
+            portamesa = orderRow[KioskOrderTable.portamesa],
+            idCliente = orderRow[KioskOrderTable.idCliente].trim(),
+            total = orderRow[KioskOrderTable.total],
+            quoteExpiraEn = orderRow[KioskOrderTable.quoteExpiraEn],
+            pagoReferencia = orderRow[KioskOrderTable.pagoReferencia],
+            pagoAutorizacion = orderRow[KioskOrderTable.pagoAutorizacion],
+            pagoUltimos4 = orderRow[KioskOrderTable.pagoUltimos4],
+            pagoMarca = orderRow[KioskOrderTable.pagoMarca],
+            idFactura = orderRow[KioskOrderTable.idFactura],
+            motivoRechazo = orderRow[KioskOrderTable.motivoRechazo],
+            creadoEn = orderRow[KioskOrderTable.creadoEn],
+            actualizadoEn = orderRow[KioskOrderTable.actualizadoEn],
+            items = items,
+        )
+    }
+
+    suspend fun updateOrderPaymentStatus(
+        database: Database,
+        orderId: String,
+        estado: String,
+        idFactura: String?,
+        pagoReferencia: String?,
+        pagoAutorizacion: String?,
+        pagoUltimos4: String?,
+        pagoMarca: String?,
+        motivoRechazo: String?,
+    ): Unit = dbQuery(database) {
+        val now = LocalDateTime.now()
+        KioskOrderTable.update({ KioskOrderTable.id eq orderId }) {
+            it[KioskOrderTable.estado] = estado
+            if (idFactura != null) it[KioskOrderTable.idFactura] = idFactura
+            if (pagoReferencia != null) it[KioskOrderTable.pagoReferencia] = pagoReferencia
+            if (pagoAutorizacion != null) it[KioskOrderTable.pagoAutorizacion] = pagoAutorizacion
+            if (pagoUltimos4 != null) it[KioskOrderTable.pagoUltimos4] = pagoUltimos4
+            if (pagoMarca != null) it[KioskOrderTable.pagoMarca] = pagoMarca
+            it[KioskOrderTable.motivoRechazo] = motivoRechazo
+            it[KioskOrderTable.actualizadoEn] = now
+        }
     }
 }
