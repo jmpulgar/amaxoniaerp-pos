@@ -97,6 +97,57 @@ data class KioskCatalogResponse(
     val items: List<KioskItemDto>,
 )
 
+@Serializable
+data class KioskQuoteLineRequest(
+    val itemId: Int,
+    val qty: Int,
+    val note: String? = null,
+    val modifiers: List<Int> = emptyList(),
+)
+
+@Serializable
+data class KioskQuoteRequest(
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerId: String? = null,
+    val lines: List<KioskQuoteLineRequest>,
+)
+
+@Serializable
+data class KioskQuoteLineModifierResponse(
+    val id: Int,
+    val name: String,
+    val extraPrice: String,
+)
+
+@Serializable
+data class KioskQuoteLineResponse(
+    val line: Int,
+    val itemId: Int,
+    val name: String,
+    val qty: Int,
+    val unitPrice: String,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val note: String? = null,
+    val modifiers: List<KioskQuoteLineModifierResponse> = emptyList(),
+)
+
+@Serializable
+data class KioskQuoteResponse(
+    val orderId: String,
+    val formattedOrderNumber: String,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val expiresAt: String,
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerId: String,
+    val lines: List<KioskQuoteLineResponse>,
+)
+
 data class KioskDevice(
     val id: String,
     val nombre: String,

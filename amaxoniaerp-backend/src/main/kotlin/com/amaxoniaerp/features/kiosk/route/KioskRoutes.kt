@@ -4,6 +4,7 @@ import com.amaxoniaerp.features.kiosk.application.KioskAuthenticationException
 import com.amaxoniaerp.features.kiosk.application.KioskRateLimitException
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
+import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -89,6 +90,46 @@ fun Route.kioskRoutes(kioskService: KioskService) {
                             HttpStatusCode.InternalServerError,
                             mapOf("error" to (error.message ?: "Error al obtener catálogo"))
                         )
+                    }
+            }
+
+            /**
+             * Cotización de pedido del kiosco con validación de modificadores, cálculo en Money y numeración diaria.
+             */
+            post("/orders/quote") {
+                val kioskContext = call.resolveKioskRequestContext(kioskService) ?: return@post
+                val idempotencyKey = call.request.header("Idempotency-Key")?.trim()
+                if (idempotencyKey.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Header Idempotency-Key es requerido"))
+                    return@post
+                }
+
+                val request = try {
+                    call.receive<KioskQuoteRequest>()
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cuerpo de solicitud inválido"))
+                    return@post
+                }
+
+                kioskService.createQuote(kioskContext, idempotencyKey, request)
+                    .onSuccess { response ->
+                        call.respond(HttpStatusCode.OK, response)
+                    }
+                    .onFailure { error ->
+                        when (error) {
+                            is IllegalArgumentException -> call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to (error.message ?: "Solicitud inválida")),
+                            )
+                            is IllegalStateException -> call.respond(
+                                HttpStatusCode.Conflict,
+                                mapOf("error" to (error.message ?: "Conflicto en estado del pedido")),
+                            )
+                            else -> call.respond(
+                                HttpStatusCode.InternalServerError,
+                                mapOf("error" to (error.message ?: "Error interno")),
+                            )
+                        }
                     }
             }
 

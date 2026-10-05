@@ -4,11 +4,14 @@ import com.amaxoniaerp.JwtConfig
 import com.amaxoniaerp.features.kiosk.data.KioskCatalogRepository
 import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
 import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
 import com.amaxoniaerp.features.kiosk.domain.KioskCatalogResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskDevice
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
+import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
+import com.amaxoniaerp.features.kiosk.domain.KioskQuoteResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import com.auth0.jwt.JWT
@@ -30,6 +33,7 @@ class KioskService(
     private val databaseResolver: (countryCode: String, companyDb: String) -> Database,
     private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(),
     private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(),
+    private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -178,6 +182,23 @@ class KioskService(
         val jsonString = json.encodeToString(KioskCatalogResponse.serializer(), catalog)
         val etag = "\"" + sha256(jsonString) + "\""
         Pair(catalog, etag)
+    }
+
+    suspend fun createQuote(
+        kioskContext: KioskRequestContext,
+        idempotencyKey: String,
+        request: KioskQuoteRequest,
+    ): Result<KioskQuoteResponse> = runCatching {
+        if (idempotencyKey.isBlank()) {
+            throw IllegalArgumentException("Header Idempotency-Key es requerido")
+        }
+        val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+        kioskOrderRepository.createQuote(
+            database = database,
+            kioskContext = kioskContext,
+            idempotencyKey = idempotencyKey,
+            request = request,
+        )
     }
 
     private fun sha256(input: String): String {
