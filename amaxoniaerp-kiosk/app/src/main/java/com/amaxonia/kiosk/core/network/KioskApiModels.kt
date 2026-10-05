@@ -31,22 +31,22 @@ data class KioskMediaItem(
 
 @Serializable
 data class KioskCurrencyConfig(
-    val base: String,
-    val secondary: String?,
-    val rate: String,
+    val base: String = "USD",
+    val secondary: String? = null,
+    val rate: String = "1.0000",
 )
 
 @Serializable
 data class KioskConfigResponse(
-    val version: Int,
-    val brandColor: String?,
-    val logoUrl: String?,
-    val media: List<KioskMediaItem>,
-    val diningModes: List<String>,
-    val dispatch: String,
-    val defaultCustomerId: String,
-    val currency: KioskCurrencyConfig,
-    val country: String,
+    val version: Int = 1,
+    val brandColor: String? = null,
+    val logoUrl: String? = null,
+    val media: List<KioskMediaItem> = emptyList(),
+    val diningModes: List<String> = emptyList(),
+    val dispatch: String = "RETIRO_MOSTRADOR",
+    val defaultCustomerId: String = "CF",
+    val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
+    val country: String = "PA",
 )
 
 @Serializable

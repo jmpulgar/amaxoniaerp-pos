@@ -20,6 +20,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
+import com.amaxonia.kiosk.ui.attract.AttractScreen
+import com.amaxonia.kiosk.ui.attract.AttractViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
 import com.amaxonia.kiosk.ui.pairing.PairingScreen
 import com.amaxonia.kiosk.ui.pairing.PairingViewModel
@@ -99,12 +101,31 @@ fun KioskRoot(appGraph: AppGraph) {
         }
 
         composable(KioskDestinations.ATTRACT) {
+            val attractViewModel =
+                remember(appGraph) {
+                    AttractViewModel(
+                        apiClient = appGraph.apiClient,
+                        tokenStorage = appGraph.tokenStorage,
+                    )
+                }
+            AttractScreen(
+                viewModel = attractViewModel,
+                onStartOrder = {
+                    navController.navigate(KioskDestinations.MENU)
+                },
+                onAdminUnlocked = {
+                    navController.navigate(KioskDestinations.PAIRING)
+                },
+            )
+        }
+
+        composable(KioskDestinations.MENU) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Amaxonia Kiosko · Modo Atracción",
+                    text = "Menú Principal (A5)",
                     style = MaterialTheme.typography.headlineLarge,
                 )
             }
