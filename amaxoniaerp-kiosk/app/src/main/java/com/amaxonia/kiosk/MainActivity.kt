@@ -22,6 +22,8 @@ import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
+import com.amaxonia.kiosk.ui.menu.MenuScreen
+import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
 import com.amaxonia.kiosk.ui.pairing.PairingScreen
 import com.amaxonia.kiosk.ui.pairing.PairingViewModel
@@ -120,12 +122,50 @@ fun KioskRoot(appGraph: AppGraph) {
         }
 
         composable(KioskDestinations.MENU) {
+            val menuViewModel =
+                remember(appGraph) {
+                    MenuViewModel(
+                        apiClient = appGraph.apiClient,
+                        tokenStorage = appGraph.tokenStorage,
+                        orderGraph = appGraph.orderGraph,
+                    )
+                }
+            MenuScreen(
+                viewModel = menuViewModel,
+                onOpenCustomizer = { itemId ->
+                    navController.navigate("${KioskDestinations.CUSTOMIZER}/$itemId")
+                },
+                onViewCart = {
+                    navController.navigate(KioskDestinations.REVIEW)
+                },
+                onBackToAttract = {
+                    appGraph.orderGraph.reset()
+                    navController.navigate(KioskDestinations.ATTRACT) {
+                        popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable("${KioskDestinations.CUSTOMIZER}/{itemId}") {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Menú Principal (A5)",
+                    text = "Personalizador (A6)",
+                    style = MaterialTheme.typography.headlineLarge,
+                )
+            }
+        }
+
+        composable(KioskDestinations.REVIEW) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Revisión de Pedido (A7)",
                     style = MaterialTheme.typography.headlineLarge,
                 )
             }
