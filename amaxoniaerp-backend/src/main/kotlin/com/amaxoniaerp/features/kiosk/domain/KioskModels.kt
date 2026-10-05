@@ -51,6 +51,52 @@ data class KioskConfigResponse(
     val country: String,
 )
 
+@Serializable
+data class KioskCategoryDto(
+    val id: Int,
+    val name: String,
+    val iconUrl: String? = null,
+    val order: Int = 0,
+)
+
+@Serializable
+data class KioskModifierOptionDto(
+    val id: Int,
+    val name: String,
+    val extraPrice: String,
+    val soldOut: Boolean = false,
+)
+
+@Serializable
+data class KioskModifierGroupDto(
+    val id: Int,
+    val name: String,
+    val min: Int,
+    val max: Int,
+    val isMandatory: Boolean,
+    val isCombo: Boolean,
+    val options: List<KioskModifierOptionDto>,
+)
+
+@Serializable
+data class KioskItemDto(
+    val id: Int,
+    val categoryId: Int,
+    val name: String,
+    val description: String?,
+    val price: String,
+    val taxRate: String,
+    val imageUrl: String?,
+    val soldOut: Boolean,
+    val modifierGroups: List<KioskModifierGroupDto>,
+)
+
+@Serializable
+data class KioskCatalogResponse(
+    val categories: List<KioskCategoryDto>,
+    val items: List<KioskItemDto>,
+)
+
 data class KioskDevice(
     val id: String,
     val nombre: String,

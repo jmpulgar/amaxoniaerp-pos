@@ -69,6 +69,30 @@ fun Route.kioskRoutes(kioskService: KioskService) {
             }
 
             /**
+             * Catálogo del kiosco filtrando departamentos con visible_pos = 1, precios nivel A y modificadores.
+             */
+            get("/catalog") {
+                val kioskContext = call.resolveKioskRequestContext(kioskService) ?: return@get
+                val ifNoneMatch = call.request.header(HttpHeaders.IfNoneMatch)
+
+                kioskService.getCatalog(kioskContext)
+                    .onSuccess { (catalog, etag) ->
+                        call.response.headers.append(HttpHeaders.ETag, etag)
+                        if (ifNoneMatch != null && (ifNoneMatch == etag || ifNoneMatch == etag.trim('"') || ifNoneMatch == "W/$etag")) {
+                            call.respond(HttpStatusCode.NotModified)
+                        } else {
+                            call.respond(HttpStatusCode.OK, catalog)
+                        }
+                    }
+                    .onFailure { error ->
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to (error.message ?: "Error al obtener catálogo"))
+                        )
+                    }
+            }
+
+            /**
              * Desbloqueo de modo kiosco con clave de administración (verificada en servidor con BCrypt).
              */
             post("/unlock") {

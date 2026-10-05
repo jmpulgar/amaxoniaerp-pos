@@ -11,6 +11,7 @@ object DepartamentoTable : Table("departamento") {
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_10).nullable()
     val descripcion = varchar("descripcion", S.VARCHAR_LENGTH_100).nullable()
     val visible = bool("visible").default(true)
+    val visiblePos = flexibleInt("visible_pos").default(1)
 
     override val primaryKey = PrimaryKey(id)
 }

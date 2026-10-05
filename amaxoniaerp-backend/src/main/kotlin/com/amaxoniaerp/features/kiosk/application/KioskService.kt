@@ -1,8 +1,10 @@
 package com.amaxoniaerp.features.kiosk.application
 
 import com.amaxoniaerp.JwtConfig
+import com.amaxoniaerp.features.kiosk.data.KioskCatalogRepository
 import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
 import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.domain.KioskCatalogResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskDevice
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
@@ -27,6 +29,7 @@ class KioskService(
     private val jwtConfig: JwtConfig,
     private val databaseResolver: (countryCode: String, companyDb: String) -> Database,
     private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(),
+    private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -163,6 +166,18 @@ class KioskService(
         val jsonString = json.encodeToString(KioskConfigResponse.serializer(), config)
         val etag = "\"" + sha256(jsonString) + "\""
         Pair(config, etag)
+    }
+
+    suspend fun getCatalog(kioskContext: KioskRequestContext): Result<Pair<KioskCatalogResponse, String>> = runCatching {
+        val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+        val catalog = kioskCatalogRepository.getCatalog(
+            database = database,
+            countryCode = kioskContext.countryCode,
+            companyDb = kioskContext.companyDb,
+        )
+        val jsonString = json.encodeToString(KioskCatalogResponse.serializer(), catalog)
+        val etag = "\"" + sha256(jsonString) + "\""
+        Pair(catalog, etag)
     }
 
     private fun sha256(input: String): String {
