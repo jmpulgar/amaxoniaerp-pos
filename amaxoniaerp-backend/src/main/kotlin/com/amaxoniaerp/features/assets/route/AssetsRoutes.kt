@@ -1,10 +1,13 @@
 package com.amaxoniaerp.features.assets.route
 
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondFile
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -13,10 +16,11 @@ import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
- * Rutas para servir imágenes de productos (item) y clientes.
+ * Rutas para servir imágenes de productos (item), clientes y banners/videos de kiosco.
  *
  * En BD: item.foto = "fotos/1_foto.jpeg"; cliente = "{id_cliente}_foto.jpeg".
  * Físicamente: item en {data}/item/1_foto.jpeg; cliente en {data}/cliente_foto/{id}/{filename}.
+ * Banners: {data}/banners/{filename}.
  *
  * Si ASSETS_BASE_URL está configurado, se redirige allí (ej. listoerp.app).
  * Si DATA_BASE_PATH está configurado y el archivo existe, se sirve desde disco.
@@ -38,6 +42,12 @@ fun Route.assetsRoutes(
          * URL: .../cliente_foto/{idCliente}/{filename} (ej. .../46726248-.../46726248-..._foto.jpeg)
          */
         get("/cliente_foto/{idCliente}/{filename}") { handlers.servirClienteFoto(call) }
+
+        /**
+         * Banners / videos del attract loop para Kiosco.
+         * URL: .../banners/{filename} (ej. .../banners/video_promo.mp4)
+         */
+        get("/banners/{filename}") { handlers.servirBanner(call) }
     }
 }
 
@@ -105,6 +115,27 @@ internal class AssetsHandlers(
             redirectToAssetsBase(call, scope, "cliente_foto/$idCliente/$filename")
         }
 
+    suspend fun servirBanner(call: ApplicationCall) =
+        run {
+            val scope = call.resolveAssetScope() ?: return@run
+            val filename =
+                call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+            if (filename == null) {
+                call.respond(HttpStatusCode.BadRequest, "filename inválido")
+                return@run
+            }
+
+            val localFile =
+                localFile(File(dataBasePath ?: "", "${scope.companyDb}/banners/$filename"))
+            if (localFile != null) {
+                call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
+                call.respondFile(localFile)
+                return@run
+            }
+
+            redirectToAssetsBase(call, scope, "banners/$filename")
+        }
+
     private fun localFile(file: File): File? {
         if (dataBasePath.isNullOrBlank()) return null
         log.info(
@@ -157,6 +188,8 @@ private fun contentTypeForFilename(filename: String): ContentType {
         "png" -> ContentType.Image.PNG
         "gif" -> ContentType.Image.GIF
         "webp" -> ContentType.parse("image/webp")
+        "mp4" -> ContentType.parse("video/mp4")
+        "webm" -> ContentType.parse("video/webm")
         else -> ContentType.Image.Any
     }
 }
