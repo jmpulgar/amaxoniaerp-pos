@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.QrCode2
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +66,7 @@ private const val SUCCESS_HOLD_MS = 1_800L
 private val QrChromeReserve = 760.dp
 private val MinQrSize = 400.dp
 private val MaxQrSize = 600.dp
+private val LandscapeQrReserve = 120.dp
 
 /**
  * Yappy payment: giant QR, 3-step instructions, amount, countdown ring and a pulsing waiting
@@ -170,6 +174,27 @@ private fun AwaitingScanView(
 ) {
     val pulse = rememberPulse(from = 0.98f, to = 1.02f)
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (maxWidth > maxHeight) {
+            // Landscape: the QR fills the height on the left; amount, steps and actions on the right.
+            val qrSize = (maxHeight - LandscapeQrReserve).coerceIn(MinQrSize, MaxQrSize)
+            Row(
+                modifier = Modifier.fillMaxSize().padding(start = 48.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                QrCard(qrHash = awaiting.qrHash, qrSize = qrSize, pulse = pulse)
+                Column(
+                    // Inner padding keeps the banner shadow inside the scroll container's clip.
+                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(28.dp),
+                ) {
+                    YappyAmountBanner(uiState)
+                    InstructionSteps()
+                    WaitingAndActions(uiState = uiState, awaiting = awaiting, onCancel = onCancel)
+                }
+            }
+            return@BoxWithConstraints
+        }
         // The QR is as large as the room allows (it shrinks in "pantalla baja"), never below a scannable size.
         val qrSize = (maxHeight - QrChromeReserve).coerceIn(MinQrSize, MaxQrSize)
         ScrollableFillColumn(
@@ -177,64 +202,93 @@ private fun AwaitingScanView(
             contentPadding = PaddingValues(start = 48.dp, end = 48.dp, top = 16.dp, bottom = 32.dp),
         ) {
             YappyAmountBanner(uiState)
-            KioskCard(
-                modifier =
-                    Modifier
-                        .padding(vertical = 28.dp)
-                        .graphicsLayer {
-                            scaleX = pulse
-                            scaleY = pulse
-                        },
-            ) {
-                Box(modifier = Modifier.padding(24.dp).size(qrSize), contentAlignment = Alignment.Center) {
-                    QrImage(content = awaiting.qrHash)
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                InstructionStep(1, stringResource(R.string.payflow_yappy_step_open))
-                InstructionStep(2, stringResource(R.string.payflow_yappy_step_scan))
-                InstructionStep(3, stringResource(R.string.payflow_yappy_step_confirm))
-            }
-            Column(modifier = Modifier.padding(top = 28.dp)) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.large)
-                            .padding(horizontal = 32.dp, vertical = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CountdownRing(
-                        secondsRemaining = awaiting.secondsRemaining,
-                        totalSeconds = awaiting.totalSeconds,
-                        size = 128.dp,
-                        color = YappyBlue,
-                    )
-                    Spacer(Modifier.width(32.dp))
-                    Text(
-                        text = stringResource(R.string.payflow_yappy_waiting),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = YappyBlue,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(24.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    KioskButton(
-                        text = stringResource(R.string.payflow_cancel),
-                        onClick = onCancel,
-                        style = KioskButtonStyle.Secondary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (uiState.canChangeMethod) {
-                        KioskButton(
-                            text = stringResource(R.string.payflow_change_method),
-                            onClick = onCancel,
-                            style = KioskButtonStyle.Secondary,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
+            QrCard(qrHash = awaiting.qrHash, qrSize = qrSize, pulse = pulse, modifier = Modifier.padding(vertical = 28.dp))
+            InstructionSteps()
+            WaitingAndActions(
+                uiState = uiState,
+                awaiting = awaiting,
+                onCancel = onCancel,
+                modifier = Modifier.padding(top = 28.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QrCard(
+    qrHash: String,
+    qrSize: Dp,
+    pulse: Float,
+    modifier: Modifier = Modifier,
+) {
+    KioskCard(
+        modifier =
+            modifier.graphicsLayer {
+                scaleX = pulse
+                scaleY = pulse
+            },
+    ) {
+        Box(modifier = Modifier.padding(24.dp).size(qrSize), contentAlignment = Alignment.Center) {
+            QrImage(content = qrHash)
+        }
+    }
+}
+
+@Composable
+private fun InstructionSteps() {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        InstructionStep(1, stringResource(R.string.payflow_yappy_step_open))
+        InstructionStep(2, stringResource(R.string.payflow_yappy_step_scan))
+        InstructionStep(3, stringResource(R.string.payflow_yappy_step_confirm))
+    }
+}
+
+/** "Waiting for your payment" with the countdown, then cancel / change method. */
+@Composable
+private fun WaitingAndActions(
+    uiState: YappyUiState,
+    awaiting: YappyStep.AwaitingScan,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.large)
+                    .padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CountdownRing(
+                secondsRemaining = awaiting.secondsRemaining,
+                totalSeconds = awaiting.totalSeconds,
+                size = 128.dp,
+                color = YappyBlue,
+            )
+            Spacer(Modifier.width(32.dp))
+            Text(
+                text = stringResource(R.string.payflow_yappy_waiting),
+                style = MaterialTheme.typography.headlineMedium,
+                color = YappyBlue,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            KioskButton(
+                text = stringResource(R.string.payflow_cancel),
+                onClick = onCancel,
+                style = KioskButtonStyle.Secondary,
+                modifier = Modifier.weight(1f),
+            )
+            if (uiState.canChangeMethod) {
+                KioskButton(
+                    text = stringResource(R.string.payflow_change_method),
+                    onClick = onCancel,
+                    style = KioskButtonStyle.Secondary,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }

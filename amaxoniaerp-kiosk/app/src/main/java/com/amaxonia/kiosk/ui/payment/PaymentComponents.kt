@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,6 +59,8 @@ import com.amaxonia.kiosk.ui.components.CheckoutStep
 import com.amaxonia.kiosk.ui.components.CheckoutStepper
 import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskHeader
+import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.theme.FlowBlueDeep
 import com.amaxonia.kiosk.ui.theme.FlowSuccess
@@ -71,6 +74,7 @@ private const val PULSE_MS = 900
 private const val SECONDARY_DEFAULT_SYMBOL = "Bs"
 private const val MUTED_ALPHA = 0.8f
 private val LARGE_RING = 160.dp
+private val ActionsMaxWidth = 960.dp
 
 /** Title bar shared by the payment screens: the app header (optional back) plus the checkout stepper on "Pago". */
 @Composable
@@ -246,10 +250,11 @@ fun PaymentStatusView(
     LaunchedEffect(Unit) {
         entrance.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
     }
-    Column(
-        modifier = modifier.fillMaxSize().padding(horizontal = 64.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    // Scrolls when the room is short (landscape, "pantalla baja"); actions never stretch edge to edge.
+    ScrollableFillColumn(
+        modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
+        contentPadding = PaddingValues(horizontal = 64.dp, vertical = 48.dp),
     ) {
         Box(
             modifier =
@@ -281,7 +286,7 @@ fun PaymentStatusView(
         }
         Spacer(Modifier.height(56.dp))
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.centeredMaxWidth(ActionsMaxWidth),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             content = actions,
         )

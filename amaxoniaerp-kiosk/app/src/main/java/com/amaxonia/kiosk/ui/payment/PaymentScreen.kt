@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,7 +24,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Contactless
 import androidx.compose.material.icons.rounded.CreditCard
@@ -52,6 +55,7 @@ import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
 import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.theme.FlowSuccess
 import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
 private const val ARROW_BOUNCE_MS = 700
 private const val ARROW_TRAVEL_PX = 36f
@@ -161,7 +165,31 @@ private fun AwaitingCardView(
         animationSpec = infiniteRepeatable(tween(ARROW_BOUNCE_MS, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "arrow_offset",
     )
-    val colors = MaterialTheme.colorScheme
+    if (LocalKioskCanvas.current.isLandscape) {
+        // Landscape: amount, countdown and cancel on the left; the reader prompt on the right.
+        // Scroll containers get inner padding so the soft shadows are not clipped at their edges.
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AmountHero(total = uiState.totalAmount, currency = uiState.currency)
+                Spacer(Modifier.height(48.dp))
+                CancelWithCountdown(secondsRemaining, totalSeconds, arrowOffset, onCancel)
+            }
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CardReaderPrompt(pulse = pulse)
+            }
+        }
+        return
+    }
 
     ScrollableFillColumn(
         modifier = Modifier.fillMaxSize(),
@@ -170,77 +198,96 @@ private fun AwaitingCardView(
         AmountHero(total = uiState.totalAmount, currency = uiState.currency)
 
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 40.dp)) {
-            // Contactless "radar": a breathing halo behind a brand-gradient disc.
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(340.dp)
-                            .graphicsLayer {
-                                scaleX = pulse
-                                scaleY = pulse
-                            }.background(colors.primaryContainer, CircleShape),
-                )
-                Box(
-                    modifier =
-                        Modifier
-                            .size(250.dp)
-                            .background(colors.secondaryContainer, CircleShape),
-                )
-                Box(
-                    modifier =
-                        Modifier
-                            .size(184.dp)
-                            .softShadow(92.dp, Depth.Medium)
-                            .background(KioskColors.ctaBrush, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Contactless,
-                        contentDescription = null,
-                        tint = colors.onPrimary,
-                        modifier = Modifier.size(112.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(48.dp))
-            Text(
-                text = stringResource(R.string.payflow_card_instruction),
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.payflow_card_hint),
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+            CardReaderPrompt(pulse = pulse)
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CountdownRing(secondsRemaining = secondsRemaining, totalSeconds = totalSeconds, size = 152.dp)
-                Spacer(Modifier.width(32.dp))
-                KioskButton(
-                    text = stringResource(R.string.payflow_card_cancel_operation),
-                    onClick = onCancel,
-                    style = KioskButtonStyle.Secondary,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            // Arrow pointing at the payment terminal mounted below the screen.
-            Icon(
-                imageVector = Icons.Rounded.KeyboardDoubleArrowDown,
-                contentDescription = null,
-                tint = colors.secondary,
+        CancelWithCountdown(secondsRemaining, totalSeconds, arrowOffset, onCancel)
+    }
+}
+
+/** Contactless "radar" (a breathing halo behind a brand-gradient disc) with the instructions. */
+@Composable
+private fun CardReaderPrompt(pulse: Float) {
+    val colors = MaterialTheme.colorScheme
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.Center) {
+            Box(
                 modifier =
                     Modifier
-                        .size(112.dp)
-                        .graphicsLayer { translationY = arrowOffset },
+                        .size(340.dp)
+                        .graphicsLayer {
+                            scaleX = pulse
+                            scaleY = pulse
+                        }.background(colors.primaryContainer, CircleShape),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(250.dp)
+                        .background(colors.secondaryContainer, CircleShape),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(184.dp)
+                        .softShadow(92.dp, Depth.Medium)
+                        .background(KioskColors.ctaBrush, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Contactless,
+                    contentDescription = null,
+                    tint = colors.onPrimary,
+                    modifier = Modifier.size(112.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(48.dp))
+        Text(
+            text = stringResource(R.string.payflow_card_instruction),
+            style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.payflow_card_hint),
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** Countdown ring + cancel button, and the bouncing arrow pointing at the terminal below the screen. */
+@Composable
+private fun CancelWithCountdown(
+    secondsRemaining: Int,
+    totalSeconds: Int,
+    arrowOffset: Float,
+    onCancel: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CountdownRing(secondsRemaining = secondsRemaining, totalSeconds = totalSeconds, size = 152.dp)
+            Spacer(Modifier.width(32.dp))
+            KioskButton(
+                text = stringResource(R.string.payflow_card_cancel_operation),
+                onClick = onCancel,
+                style = KioskButtonStyle.Secondary,
+                modifier = Modifier.weight(1f),
             )
         }
+        Spacer(Modifier.height(8.dp))
+        // Arrow pointing at the payment terminal mounted below the screen.
+        Icon(
+            imageVector = Icons.Rounded.KeyboardDoubleArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier =
+                Modifier
+                    .size(112.dp)
+                    .graphicsLayer { translationY = arrowOffset },
+        )
     }
 }
 

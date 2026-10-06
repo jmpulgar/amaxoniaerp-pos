@@ -35,13 +35,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskTouchTarget
 import com.amaxonia.kiosk.ui.components.kioskPressable
+import com.amaxonia.kiosk.ui.theme.KioskDialog
 
 private const val DISABLED_ALPHA = 0.4f
 
@@ -59,15 +58,7 @@ fun AdminMenuDialog(
     sessionLabel: String? = null,
 ) {
     val colors = MaterialTheme.colorScheme
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties =
-            DialogProperties(
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true,
-                usePlatformDefaultWidth = false,
-            ),
-    ) {
+    KioskDialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = modifier.widthIn(max = 820.dp).padding(horizontal = 48.dp),
             shape = MaterialTheme.shapes.extraLarge,

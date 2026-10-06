@@ -39,8 +39,8 @@ android {
         minSdk = 28
         targetSdk = 36
         // Bump both on every build handed to a kiosk and log it in CHANGELOG.md (versionCode must always increase).
-        versionCode = 4
-        versionName = "0.0.4"
+        versionCode = 5
+        versionName = "0.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +19,7 @@ import com.amaxonia.kiosk.ui.accessibility.AccessibilityActions
 import com.amaxonia.kiosk.ui.accessibility.AccessibilityState
 import com.amaxonia.kiosk.ui.accessibility.KioskChrome
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
+import com.amaxonia.kiosk.ui.theme.KioskScaledCanvas
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -21,6 +27,18 @@ import org.junit.Assume
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
+
+/** One screen of a [KioskScreenshotRule.snapSequence]. */
+@Suppress("LongParameterList")
+class Shot(
+    val name: String,
+    val variant: Variant = Variant.NORMAL,
+    val orderingScreen: Boolean = true,
+    val settleMs: Long = SETTLE_MS,
+    val waitForAsync: Boolean = false,
+    val allWindows: Boolean = false,
+    val content: @Composable () -> Unit,
+)
 
 /** Visual variants rendered for each screen. */
 enum class Variant(
@@ -33,7 +51,7 @@ enum class Variant(
     LOW_REACH("_baja", false, true),
 }
 
-private const val SETTLE_MS = 2_500L
+internal const val SETTLE_MS = 2_500L
 private const val ASYNC_WAIT_MS = 50L
 private const val ASYNC_POLLS = 40
 
@@ -92,13 +110,51 @@ class KioskScreenshotRule : TestRule {
         captureScreenRoboImage("screenshots/$name${variant.suffix}.png")
     }
 
+    /**
+     * Renders every [shots] entry in turn inside one activity (one test per device configuration)
+     * and writes them to `app/screenshots/[dir]/`. Dialog shots capture every window.
+     */
+    @OptIn(ExperimentalRoborazziApi::class)
+    fun snapSequence(
+        dir: String,
+        shots: List<Shot>,
+    ) {
+        var current by mutableStateOf(shots.first())
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            key(current.name) {
+                KioskFrame(current.variant, current.orderingScreen, current.content)
+            }
+        }
+        shots.forEach { shot ->
+            compose.runOnUiThread {
+                current = shot
+                Snapshot.sendApplyNotifications()
+            }
+            compose.mainClock.advanceTimeByFrame()
+            settle(shot.settleMs, shot.waitForAsync)
+            val path = "screenshots/$dir/${shot.name}${shot.variant.suffix}.png"
+            if (shot.allWindows) captureScreenRoboImage(path) else compose.onRoot().captureRoboImage(path)
+        }
+    }
+
     private fun render(
         variant: Variant,
         orderingScreen: Boolean,
         content: @Composable () -> Unit,
     ) {
         compose.mainClock.autoAdvance = false
-        compose.setContent {
+        compose.setContent { KioskFrame(variant, orderingScreen, content) }
+    }
+
+    @Composable
+    private fun KioskFrame(
+        variant: Variant,
+        orderingScreen: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        // Same root canvas as MainActivity: the design canvas is scaled onto the window.
+        KioskScaledCanvas {
             AmaxoniaKioskTheme(highContrast = variant.highContrast) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     KioskChrome(

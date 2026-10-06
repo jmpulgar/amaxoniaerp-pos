@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -44,7 +45,6 @@ import androidx.compose.material.icons.rounded.LunchDining
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.WifiOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -103,7 +103,9 @@ import com.amaxonia.kiosk.ui.theme.FlowIndigoDeep
 import com.amaxonia.kiosk.ui.theme.FlowIndigoSoft
 import com.amaxonia.kiosk.ui.theme.FlowLavender
 import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.KioskDialog
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
@@ -120,6 +122,10 @@ private const val BUBBLE_ICON_ALPHA = 0.85f
 private const val HERO_TOP_FRACTION = 0.23f
 private val BUBBLE_FLOAT = 14.dp
 private val HeroPlateSize = 420.dp
+private val LandscapePlateSize = 340.dp
+private val CtaMaxWidth = 1040.dp
+private const val LANDSCAPE_HERO_TOP_FRACTION = 0.24f
+private const val PLATE_GLYPH_FRACTION = 232f / 420f
 private val WaveFrontBrush = Brush.verticalGradient(listOf(FlowIndigo, FlowIndigoDeep))
 
 /**
@@ -172,6 +178,7 @@ fun AttractContent(
     language: KioskLanguage? = null,
     onLanguageSelected: ((KioskLanguage) -> Unit)? = null,
 ) {
+    val landscape = LocalKioskCanvas.current.isLandscape
     Box(
         modifier =
             modifier
@@ -213,7 +220,7 @@ fun AttractContent(
             modifier =
                 Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 56.dp)
+                    .padding(top = if (landscape) 32.dp else 56.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -224,10 +231,10 @@ fun AttractContent(
                 AsyncImage(
                     model = uiState.logoUrl,
                     contentDescription = stringResource(R.string.brand_name),
-                    modifier = Modifier.height(112.dp),
+                    modifier = Modifier.height(if (landscape) 96.dp else 112.dp),
                 )
             } else {
-                BrandWordmark(onDark = true, height = 132.dp)
+                BrandWordmark(onDark = true, height = if (landscape) 108.dp else 132.dp)
             }
         }
 
@@ -238,11 +245,17 @@ fun AttractContent(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, FlowIndigoDeep.copy(alpha = SCRIM_ALPHA))))
-                    .padding(start = 56.dp, end = 56.dp, top = 220.dp, bottom = 72.dp),
+                    .padding(
+                        start = 56.dp,
+                        end = 56.dp,
+                        top = if (landscape) 120.dp else 220.dp,
+                        bottom = if (landscape) 56.dp else 72.dp,
+                    ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AnimatedVisibility(visible = !uiState.isOffline, enter = fadeIn(), exit = fadeOut()) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Never stretched edge to edge on wide (landscape) screens.
+                Column(modifier = Modifier.widthIn(max = CtaMaxWidth), horizontalAlignment = Alignment.CenterHorizontally) {
                     TouchToOrderCta(onClick = onStartOrder)
                     if (onLanguageSelected != null) {
                         Spacer(Modifier.height(40.dp))
@@ -515,6 +528,15 @@ private val FoodBubbles =
         FoodBubble(Icons.Rounded.Coffee, x = 0.03f, y = 0.44f, size = 152.dp, phase = 4.4f),
     )
 
+/** Landscape: bubbles stay in the side margins, clear of the hero row and the logo. */
+private val LandscapeFoodBubbles =
+    listOf(
+        FoodBubble(Icons.Rounded.LocalDrink, x = 0.04f, y = 0.12f, size = 180.dp, phase = 0f),
+        FoodBubble(Icons.Rounded.Icecream, x = 0.86f, y = 0.10f, size = 196.dp, phase = 1.7f),
+        FoodBubble(Icons.Rounded.LocalPizza, x = 0.89f, y = 0.44f, size = 150.dp, phase = 3.1f),
+        FoodBubble(Icons.Rounded.Coffee, x = 0.03f, y = 0.47f, size = 140.dp, phase = 4.4f),
+    )
+
 /**
  * Branded artwork used when no attract media is configured: the Flow gradient, a hero "plate" with
  * a burger, floating food bubbles and animated waves anchoring the call to action. One infinite
@@ -538,7 +560,8 @@ private fun FallbackAttractDisplay(
     val floatPx = with(density) { BUBBLE_FLOAT.toPx() }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(background)) {
-        FoodBubbles.forEach { bubble ->
+        val landscape = maxWidth > maxHeight
+        (if (landscape) LandscapeFoodBubbles else FoodBubbles).forEach { bubble ->
             Box(
                 modifier =
                     Modifier
@@ -557,55 +580,87 @@ private fun FallbackAttractDisplay(
             }
         }
 
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = maxHeight * HERO_TOP_FRACTION, start = 64.dp, end = 64.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
+        val plateFloat = { sin(time * TWO_PI) * floatPx * 0.6f }
+        if (landscape) {
+            // Side by side: plate on the left, welcome text on the right, above the CTA band.
+            Row(
                 modifier =
                     Modifier
-                        .size(HeroPlateSize)
-                        .graphicsLayer { translationY = sin(time * TWO_PI) * floatPx * 0.6f }
-                        .softShadow(HeroPlateSize, Depth.High, tint = FlowIndigoDeep)
-                        .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center,
+                        .align(Alignment.TopCenter)
+                        .padding(top = maxHeight * LANDSCAPE_HERO_TOP_FRACTION, start = 64.dp, end = 64.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier.size(HeroPlateSize - 56.dp).background(KioskColors.softBrush, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.LunchDining,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(232.dp).brushTint(KioskColors.heroBrush),
-                    )
+                HeroPlate(size = LandscapePlateSize, floatY = plateFloat)
+                Spacer(modifier = Modifier.width(72.dp))
+                Column {
+                    WelcomeTexts(textAlign = TextAlign.Start)
                 }
             }
-            Spacer(modifier = Modifier.height(56.dp))
-            Text(
-                text = stringResource(R.string.attract_welcome),
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 128.sp, lineHeight = 132.sp),
-                color = Color.White,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.attract_tagline),
-                style = MaterialTheme.typography.headlineMedium,
-                color = FlowIndigoSoft,
-                textAlign = TextAlign.Center,
-            )
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = maxHeight * HERO_TOP_FRACTION, start = 64.dp, end = 64.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                HeroPlate(size = HeroPlateSize, floatY = plateFloat)
+                Spacer(modifier = Modifier.height(56.dp))
+                WelcomeTexts(textAlign = TextAlign.Center)
+            }
         }
 
         FlowWaves(
-            modifier = Modifier.fillMaxWidth().height(520.dp).align(Alignment.BottomCenter),
+            modifier = Modifier.fillMaxWidth().height(if (landscape) 380.dp else 520.dp).align(Alignment.BottomCenter),
             drift = { time },
             frontBrush = WaveFrontBrush,
             backColor = FlowLavender.copy(alpha = 0.45f),
             amplitude = 30.dp,
         )
     }
+}
+
+/** White hero "plate" with the burger artwork, gently floating by [floatY] pixels. */
+@Composable
+private fun HeroPlate(
+    size: Dp,
+    floatY: () -> Float,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(size)
+                .graphicsLayer { translationY = floatY() }
+                .softShadow(size, Depth.High, tint = FlowIndigoDeep)
+                .background(Color.White, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier.size(size - 56.dp).background(KioskColors.softBrush, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.LunchDining,
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(size * PLATE_GLYPH_FRACTION).brushTint(KioskColors.heroBrush),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WelcomeTexts(textAlign: TextAlign) {
+    Text(
+        text = stringResource(R.string.attract_welcome),
+        style = MaterialTheme.typography.displayLarge.copy(fontSize = 128.sp, lineHeight = 132.sp),
+        color = Color.White,
+        textAlign = textAlign,
+    )
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = stringResource(R.string.attract_tagline),
+        style = MaterialTheme.typography.headlineMedium,
+        color = FlowIndigoSoft,
+        textAlign = textAlign,
+    )
 }
 
 @Composable
@@ -617,16 +672,25 @@ private fun AdminUnlockDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = MaterialTheme.shapes.large,
-        icon = { Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(48.dp)) },
-        title = { Text(stringResource(R.string.admin_unlock_title), style = MaterialTheme.typography.headlineSmall) },
-        text = {
-            Column {
+    val colors = MaterialTheme.colorScheme
+    KioskDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.widthIn(max = 760.dp).padding(horizontal = 48.dp),
+            shape = MaterialTheme.shapes.large,
+            color = colors.surface,
+            border = if (LocalHighContrast.current) BorderStroke(4.dp, colors.onSurface) else null,
+            shadowElevation = 16.dp,
+        ) {
+            Column(modifier = Modifier.padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Rounded.Lock, contentDescription = null, tint = colors.secondary, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(stringResource(R.string.admin_unlock_title), style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.admin_unlock_message),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
@@ -644,29 +708,33 @@ private fun AdminUnlockDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
+                        color = colors.error,
                         style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isLoading) {
+                        Text(stringResource(R.string.btn_cancel), style = MaterialTheme.typography.titleMedium)
+                    }
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+                    } else {
+                        KioskButton(
+                            text = stringResource(R.string.admin_unlock_confirm),
+                            onClick = onConfirm,
+                            height = 88.dp,
+                        )
+                    }
+                }
             }
-        },
-        confirmButton = {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-            } else {
-                KioskButton(
-                    text = stringResource(R.string.admin_unlock_confirm),
-                    onClick = onConfirm,
-                    height = 88.dp,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) {
-                Text(stringResource(R.string.btn_cancel), style = MaterialTheme.typography.titleMedium)
-            }
-        },
-    )
+        }
+    }
 }
 
 private const val HEX_COLOR_LENGTH = 7

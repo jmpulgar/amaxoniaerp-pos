@@ -19,13 +19,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.ui.components.CountdownRing
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskTouchTarget
+import com.amaxonia.kiosk.ui.theme.KioskDialog
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 
 private const val URGENT_SECONDS = 5
@@ -39,14 +38,10 @@ fun IdleWarningDialog(
     totalSeconds: Int = DEFAULT_WARNING_TIMEOUT_SECONDS,
 ) {
     val colors = MaterialTheme.colorScheme
-    Dialog(
+    KioskDialog(
         onDismissRequest = onContinue,
-        properties =
-            DialogProperties(
-                dismissOnBackPress = false,
-                dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false,
-            ),
+        dismissOnBackPress = false,
+        dismissOnClickOutside = false,
     ) {
         Surface(
             modifier = modifier.widthIn(max = 860.dp).padding(horizontal = 48.dp),

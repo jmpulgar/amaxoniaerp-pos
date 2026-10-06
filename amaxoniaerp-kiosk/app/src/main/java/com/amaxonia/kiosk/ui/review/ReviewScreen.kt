@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,6 +53,7 @@ import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.CartLine
 import com.amaxonia.kiosk.ui.components.CheckoutStep
 import com.amaxonia.kiosk.ui.components.CheckoutStepper
+import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
@@ -65,13 +67,16 @@ import com.amaxonia.kiosk.ui.components.QuantityStepper
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
 import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
 import com.amaxonia.kiosk.ui.components.secondaryText
+import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.diningmode.MODE_DINE_IN
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import java.math.BigDecimal
 
 private val LineImageSize = 152.dp
 private val RemoveButtonSize = KioskTouchTarget
+private val SidePanelWidth = 680.dp
 private val StepperButtonSize = KioskTouchTarget
 
 @Composable
@@ -126,42 +131,67 @@ fun ReviewScreen(
 
             if (uiState.isEmpty) {
                 EmptyCartView(onExploreMenu = onContinueShopping, modifier = Modifier.weight(1f))
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    item(key = "dining_mode") {
-                        KioskSegmentedControl(
-                            options =
-                                listOf(
-                                    stringResource(R.string.dining_mode_dine_in_title) to Icons.Rounded.Restaurant,
-                                    stringResource(R.string.dining_mode_takeaway_title) to Icons.Rounded.ShoppingBag,
-                                ),
-                            selectedIndex = if (uiState.diningMode == MODE_TAKEAWAY) 1 else 0,
-                            onSelect = { index -> viewModel.setDiningMode(if (index == 1) MODE_TAKEAWAY else MODE_DINE_IN) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    items(items = uiState.lines, key = { it.id }) { line ->
-                        CartLineCard(
-                            line = line,
-                            currency = uiState.currency,
-                            onIncrement = { viewModel.incrementQuantity(line.id) },
-                            onDecrement = { viewModel.decrementQuantity(line.id) },
-                            onRemove = { viewModel.removeLine(line.id) },
-                            modifier = Modifier.animateItem(),
+            } else if (LocalKioskCanvas.current.isLandscape) {
+                // Landscape: lines on the left, totals and actions in a side panel on the right.
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    CartLinesList(uiState = uiState, viewModel = viewModel, modifier = Modifier.weight(1f).fillMaxHeight())
+                    // A summary card anchored low on the right, where the hand already is.
+                    Box(
+                        modifier = Modifier.width(SidePanelWidth).fillMaxHeight().padding(top = 16.dp, end = 32.dp, bottom = 32.dp),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        ReviewBottomBar(
+                            uiState = uiState,
+                            onContinueShopping = onContinueShopping,
+                            onCheckout = onProceedToCheckout,
+                            sidePanel = true,
                         )
                     }
                 }
-
+            } else {
+                CartLinesList(uiState = uiState, viewModel = viewModel, modifier = Modifier.weight(1f).fillMaxWidth())
                 ReviewBottomBar(
                     uiState = uiState,
                     onContinueShopping = onContinueShopping,
                     onCheckout = onProceedToCheckout,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CartLinesList(
+    uiState: ReviewUiState,
+    viewModel: ReviewViewModel,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        item(key = "dining_mode") {
+            KioskSegmentedControl(
+                options =
+                    listOf(
+                        stringResource(R.string.dining_mode_dine_in_title) to Icons.Rounded.Restaurant,
+                        stringResource(R.string.dining_mode_takeaway_title) to Icons.Rounded.ShoppingBag,
+                    ),
+                selectedIndex = if (uiState.diningMode == MODE_TAKEAWAY) 1 else 0,
+                onSelect = { index -> viewModel.setDiningMode(if (index == 1) MODE_TAKEAWAY else MODE_DINE_IN) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        items(items = uiState.lines, key = { it.id }) { line ->
+            CartLineCard(
+                line = line,
+                currency = uiState.currency,
+                onIncrement = { viewModel.incrementQuantity(line.id) },
+                onDecrement = { viewModel.decrementQuantity(line.id) },
+                onRemove = { viewModel.removeLine(line.id) },
+                modifier = Modifier.animateItem(),
+            )
         }
     }
 }
@@ -320,16 +350,23 @@ private fun ReviewBottomBar(
     uiState: ReviewUiState,
     onContinueShopping: () -> Unit,
     onCheckout: () -> Unit,
+    sidePanel: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val total = uiState.estimatedTotal
     val secondaryTotal = remember(total, uiState.currency) { total.secondaryText(uiState.currency) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = if (sidePanel) modifier.fillMaxWidth().softShadow(40.dp, Depth.Medium) else modifier.fillMaxWidth(),
         color = colors.surface,
-        shadowElevation = 20.dp,
-        shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
+        shadowElevation = if (sidePanel) 0.dp else 20.dp,
+        shape =
+            if (sidePanel) {
+                RoundedCornerShape(40.dp)
+            } else {
+                RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
+            },
         border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
     ) {
         Column(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {
@@ -360,21 +397,33 @@ private fun ReviewBottomBar(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                KioskButton(
-                    text = stringResource(R.string.review_continue_shopping),
-                    onClick = onContinueShopping,
-                    style = KioskButtonStyle.Secondary,
-                    modifier = Modifier.weight(0.85f),
-                )
+            val pay: @Composable (Modifier) -> Unit = { buttonModifier ->
                 KioskButton(
                     text = stringResource(R.string.review_pay, total.toDisplayString()),
                     onClick = onCheckout,
-                    modifier = Modifier.weight(1.15f),
+                    modifier = buttonModifier,
                     trailing = {
                         Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp))
                     },
                 )
+            }
+            val keepShopping: @Composable (Modifier) -> Unit = { buttonModifier ->
+                KioskButton(
+                    text = stringResource(R.string.review_continue_shopping),
+                    onClick = onContinueShopping,
+                    style = KioskButtonStyle.Secondary,
+                    modifier = buttonModifier,
+                )
+            }
+            if (sidePanel) {
+                pay(Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(20.dp))
+                keepShopping(Modifier.fillMaxWidth())
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    keepShopping(Modifier.weight(0.85f))
+                    pay(Modifier.weight(1.15f))
+                }
             }
         }
     }

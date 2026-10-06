@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,6 +77,7 @@ import com.amaxonia.kiosk.ui.theme.FlowLavender
 import com.amaxonia.kiosk.ui.theme.FlowSuccess
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -87,6 +89,7 @@ private const val CONFETTI_COUNT = 36
 private const val CONFETTI_FALL_MS = 3200
 private const val CONFETTI_SEED = 42
 private val HeroHeight = 700.dp
+private const val LANDSCAPE_HERO_WEIGHT = 0.42f
 private val ConfettiColors = listOf(FlowBlue, FlowLavender, FlowSuccess, Color(0xFFFFFFFF), Color(0xFF8EC5FF))
 
 /**
@@ -118,6 +121,11 @@ fun OrderNumberScreen(
 
     val colors = MaterialTheme.colorScheme
     val highContrast = LocalHighContrast.current
+
+    if (LocalKioskCanvas.current.isLandscape) {
+        LandscapeOrderNumber(orderInfo, onFinish, secondsRemaining, receiptPrintFailed, modifier)
+        return
+    }
 
     Surface(modifier = modifier.fillMaxSize(), color = colors.background) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -171,32 +179,103 @@ fun OrderNumberScreen(
                     Spacer(Modifier.height(0.dp))
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 8.dp, bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CountdownRing(
-                        progress = secondsRemaining / AUTO_FINISH_SECONDS.toFloat(),
-                        size = 120.dp,
-                        strokeWidth = 12.dp,
-                    ) {
-                        Text(text = secondsRemaining.toString(), style = MaterialTheme.typography.headlineMedium)
-                    }
-                    Spacer(Modifier.width(32.dp))
-                    KioskButton(
-                        text = stringResource(R.string.order_number_finish),
-                        onClick = onFinish,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.order_number_auto_close, secondsRemaining),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 32.dp),
+                FinishBar(
+                    secondsRemaining = secondsRemaining,
+                    onFinish = onFinish,
+                    modifier = Modifier.padding(start = 48.dp, end = 48.dp, top = 8.dp, bottom = 32.dp),
                 )
             }
         }
+    }
+}
+
+/** Landscape: the celebration on a full-height hero panel, the ticket and next steps beside it. */
+@Composable
+private fun LandscapeOrderNumber(
+    orderInfo: CompletedOrderInfo,
+    onFinish: () -> Unit,
+    secondsRemaining: Int,
+    receiptPrintFailed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(modifier = modifier.fillMaxSize(), color = colors.background) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(LANDSCAPE_HERO_WEIGHT)
+                        .fillMaxHeight()
+                        .background(KioskColors.heroBrush),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!LocalHighContrast.current) {
+                    Confetti(modifier = Modifier.fillMaxSize())
+                }
+                Column(
+                    modifier = Modifier.padding(horizontal = 56.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    SuccessCheck()
+                    Spacer(Modifier.height(32.dp))
+                    Text(
+                        text = stringResource(R.string.order_number_title),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = stringResource(R.string.order_number_subtitle),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            ScrollableFillColumn(
+                modifier = Modifier.weight(1f - LANDSCAPE_HERO_WEIGHT).fillMaxHeight(),
+                verticalArrangement = Arrangement.Center,
+                contentPadding = PaddingValues(horizontal = 72.dp, vertical = 40.dp),
+            ) {
+                OrderTicket(orderInfo = orderInfo)
+                Spacer(Modifier.height(32.dp))
+                NextStepsCard(orderInfo = orderInfo, printFailed = receiptPrintFailed)
+                Spacer(Modifier.height(32.dp))
+                FinishBar(secondsRemaining = secondsRemaining, onFinish = onFinish)
+            }
+        }
+    }
+}
+
+/** Auto-finish countdown, the "Finalizar" CTA and the auto-close hint. */
+@Composable
+private fun FinishBar(
+    secondsRemaining: Int,
+    onFinish: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CountdownRing(
+                progress = secondsRemaining / AUTO_FINISH_SECONDS.toFloat(),
+                size = 120.dp,
+                strokeWidth = 12.dp,
+            ) {
+                Text(text = secondsRemaining.toString(), style = MaterialTheme.typography.headlineMedium)
+            }
+            Spacer(Modifier.width(32.dp))
+            KioskButton(
+                text = stringResource(R.string.order_number_finish),
+                onClick = onFinish,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.order_number_auto_close, secondsRemaining),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

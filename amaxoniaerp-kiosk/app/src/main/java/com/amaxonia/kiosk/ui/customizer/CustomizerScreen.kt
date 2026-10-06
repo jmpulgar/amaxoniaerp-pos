@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,10 +28,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddShoppingCart
 import androidx.compose.material.icons.rounded.Check
@@ -70,6 +74,7 @@ import com.amaxonia.kiosk.ui.components.KioskIconButton
 import com.amaxonia.kiosk.ui.components.KioskImage
 import com.amaxonia.kiosk.ui.components.PricePill
 import com.amaxonia.kiosk.ui.components.QuantityStepper
+import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
 import com.amaxonia.kiosk.ui.components.secondaryText
 import com.amaxonia.kiosk.ui.theme.KioskColors
@@ -82,6 +87,8 @@ private const val ADDED_FEEDBACK_MS = 650L
 private const val OPTIONS_PER_ROW = 2
 private const val SOLD_OUT_ALPHA = 0.45f
 private const val HERO_FRACTION = 0.36f
+private const val LANDSCAPE_HERO_FRACTION = 0.5f
+private const val LANDSCAPE_HERO_WEIGHT = 0.4f
 private const val HERO_GLYPH_RATIO = 0.4f
 private val MinHeroHeight = 320.dp
 private val MaxHeroHeight = 560.dp
@@ -134,14 +141,14 @@ fun CustomizerScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 // The photo gives way to the options when the screen is short ("pantalla baja").
-                val heroHeight = (maxHeight * HERO_FRACTION).coerceIn(MinHeroHeight, MaxHeroHeight)
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item(key = "hero") { ProductHero(item = item, imageHeight = heroHeight) }
+                val landscape = maxWidth > maxHeight
+                val heroHeight =
+                    if (landscape) {
+                        (maxHeight * LANDSCAPE_HERO_FRACTION).coerceIn(MinHeroHeight, MaxHeroHeight)
+                    } else {
+                        (maxHeight * HERO_FRACTION).coerceIn(MinHeroHeight, MaxHeroHeight)
+                    }
+                val options: LazyListScope.() -> Unit = {
                     itemsIndexed(item.modifierGroups, key = { _, group -> group.id }) { _, group ->
                         ModifierGroupSection(
                             group = group,
@@ -152,6 +159,40 @@ fun CustomizerScreen(
                     }
                     item(key = "note") {
                         NoteSection(note = uiState.note, onNoteChanged = viewModel::onNoteChanged)
+                    }
+                }
+                if (landscape) {
+                    // Landscape: the product stays visible on the left while the options scroll on the right.
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(LANDSCAPE_HERO_WEIGHT)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
+                        ) {
+                            ProductHero(item = item, imageHeight = heroHeight)
+                        }
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.weight(1f - LANDSCAPE_HERO_WEIGHT).fillMaxHeight(),
+                            contentPadding = PaddingValues(bottom = 40.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // Keeps the groups at GROUPS_LIST_OFFSET, like the portrait list with its hero.
+                            item(key = "top") { Spacer(Modifier.height(16.dp)) }
+                            options()
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 40.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item(key = "hero") { ProductHero(item = item, imageHeight = heroHeight) }
+                        options()
                     }
                 }
 
@@ -455,7 +496,7 @@ private fun CustomizerBottomBar(
         shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
         border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
     ) {
-        Column(modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp)) {
+        Column(modifier = Modifier.centeredMaxWidth().padding(horizontal = 28.dp, vertical = 24.dp)) {
             AnimatedVisibility(visible = !isValid) {
                 Text(
                     text = stringResource(R.string.customizer_missing_required),

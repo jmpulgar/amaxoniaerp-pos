@@ -87,12 +87,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.KioskDialog
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 
 private val GrayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
@@ -604,10 +603,7 @@ fun KioskConfirmDialog(
     onDismiss: () -> Unit,
     icon: ImageVector? = null,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    KioskDialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier.widthIn(max = 860.dp).padding(horizontal = 48.dp),
             shape = MaterialTheme.shapes.extraLarge,

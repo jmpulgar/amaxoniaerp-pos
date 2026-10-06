@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -72,12 +75,15 @@ import com.amaxonia.kiosk.ui.theme.FlowIndigoSoft
 import com.amaxonia.kiosk.ui.theme.FlowLavender
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
 private val HeroHeight = 820.dp
 private val HeroOverlap = 260.dp
 private val FieldHeight = 108.dp
 private val WaveHeight = 240.dp
 private val CardRadius = 48.dp
+private val LandscapeCardMaxWidth = 960.dp
+private const val LANDSCAPE_HERO_WEIGHT = 0.42f
 private const val ORB_ALPHA = 0.10f
 private const val WAVE_BACK_ALPHA = 0.35f
 private const val DISABLED_TEXT_ALPHA = 0.6f
@@ -96,6 +102,10 @@ fun SetupScaffold(
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (LocalKioskCanvas.current.isLandscape) {
+        LandscapeSetupScaffold(title, subtitle, modifier, heroExtra, footer, content)
+        return
+    }
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current
     var rootTop by remember { mutableFloatStateOf(0f) }
@@ -166,6 +176,94 @@ fun SetupScaffold(
                 if (footer != null) {
                     Spacer(Modifier.height(40.dp))
                     footer()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Landscape setup frame: the deep-gradient hero becomes a full-height side panel with the wordmark
+ * and titles, and the form card is centered (max width) in the remaining space, scrolling above the
+ * on-screen keyboard.
+ */
+@Suppress("LongParameterList")
+@Composable
+private fun LandscapeSetupScaffold(
+    title: String,
+    subtitle: String,
+    modifier: Modifier,
+    heroExtra: (@Composable ColumnScope.() -> Unit)?,
+    footer: (@Composable ColumnScope.() -> Unit)?,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(modifier = modifier.fillMaxSize().background(colors.background)) {
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .weight(LANDSCAPE_HERO_WEIGHT)
+                    .fillMaxHeight()
+                    .clipToBounds()
+                    .background(KioskColors.deepBrush),
+        ) {
+            if (!LocalHighContrast.current) {
+                HeroOrb(size = 520.dp, x = maxWidth - 300.dp, y = (-180).dp)
+                HeroOrb(size = 260.dp, x = (-90).dp, y = maxHeight - 200.dp)
+            }
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 72.dp, vertical = 72.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                BrandWordmark(onDark = true, height = 120.dp)
+                Spacer(Modifier.height(56.dp))
+                Text(text = title, style = MaterialTheme.typography.displaySmall, color = Color.White)
+                Spacer(Modifier.height(16.dp))
+                Text(text = subtitle, style = MaterialTheme.typography.bodyLarge, color = FlowIndigoSoft)
+                if (heroExtra != null) {
+                    Spacer(Modifier.height(28.dp))
+                    heroExtra()
+                }
+            }
+        }
+        BoxWithConstraints(modifier = Modifier.weight(1f - LANDSCAPE_HERO_WEIGHT).fillMaxHeight()) {
+            val viewport = maxHeight
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .imePadding()
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = viewport)
+                            .padding(horizontal = 64.dp, vertical = 56.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Surface(
+                        modifier =
+                            Modifier
+                                .widthIn(max = LandscapeCardMaxWidth)
+                                .fillMaxWidth()
+                                .softShadow(CardRadius, Depth.High),
+                        shape = RoundedCornerShape(CardRadius),
+                        color = colors.surface,
+                        border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
+                    ) {
+                        Column(modifier = Modifier.padding(56.dp), content = content)
+                    }
+                    if (footer != null) {
+                        Spacer(Modifier.height(32.dp))
+                        Column(modifier = Modifier.widthIn(max = LandscapeCardMaxWidth).fillMaxWidth(), content = footer)
+                    }
                 }
             }
         }

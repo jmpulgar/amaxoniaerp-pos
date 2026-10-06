@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -59,6 +61,20 @@ val KioskCtaHeight = 120.dp
 
 /** Minimum touch target for secondary actions (spec §3: 88 dp). */
 val KioskTouchTarget = 88.dp
+
+/**
+ * Widest a content column (forms, action bars) grows. The 1080 dp portrait canvas is narrower, so
+ * this only kicks in on wide canvases (landscape kiosks, 16:10 tablets) to avoid edge-to-edge stretch.
+ */
+val KioskContentMaxWidth = 1200.dp
+
+/** Fills the width up to [max] and centers itself in any extra room. */
+fun Modifier.centeredMaxWidth(max: Dp = KioskContentMaxWidth): Modifier =
+    this
+        .fillMaxWidth()
+        .wrapContentWidth(Alignment.CenterHorizontally)
+        .widthIn(max = max)
+        .fillMaxWidth()
 
 private const val BADGE_POP_SCALE = 1.45f
 private val PILL_RADIUS = 999.dp

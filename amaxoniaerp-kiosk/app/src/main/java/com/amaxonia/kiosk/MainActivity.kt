@@ -78,6 +78,7 @@ import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import com.amaxonia.kiosk.ui.tabletent.TableTentScreen
 import com.amaxonia.kiosk.ui.tabletent.TableTentViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
+import com.amaxonia.kiosk.ui.theme.KioskScaledCanvas
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -93,8 +94,9 @@ class MainActivity : ComponentActivity() {
             appGraph.lockTaskController.startLockTask(this)
         }
 
-        // Lock to vertical portrait (1080x1920)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // Follow the rotation configured on the device (portrait K2, or a landscape kiosk), as its
+        // launcher does; the UI adapts to either through KioskScaledCanvas.
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER
 
         // Enable immersive full-screen kiosk mode
         enableImmersiveMode()
@@ -165,49 +167,52 @@ fun KioskRoot(appGraph: AppGraph) {
         LocalConfiguration provides localizedConfig,
         LocalContext provides localizedContext,
     ) {
-        AmaxoniaKioskTheme(highContrast = accessibilityState.isHighContrast) {
-            Surface(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    awaitPointerEvent(PointerEventPass.Initial)
-                                    appGraph.idleTimerManager.onUserActivity()
+        // Maps the 1080x1920 design canvas onto the real window, whatever its density or font scale.
+        KioskScaledCanvas {
+            AmaxoniaKioskTheme(highContrast = accessibilityState.isHighContrast) {
+                Surface(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent(PointerEventPass.Initial)
+                                        appGraph.idleTimerManager.onUserActivity()
+                                    }
                                 }
-                            }
-                        },
-                color = MaterialTheme.colorScheme.background,
-            ) {
-                if (!storageReady) {
-                    // Encrypted storage is opening off the main thread; a blank canvas for a few ms.
-                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                    return@Surface
-                }
-                Box(modifier = Modifier.fillMaxSize()) {
-                    KioskChrome(
-                        state = accessibilityState,
-                        isOrderingScreen = isOrderingScreen,
-                        actions =
-                            AccessibilityActions(
-                                onToggleAccessibleMode = appGraph.accessibilityManager::toggleAccessibleMode,
-                                onToggleHighContrast = appGraph.accessibilityManager::toggleHighContrast,
-                                onToggleLanguage = appGraph.accessibilityManager::toggleLanguage,
-                            ),
-                    ) {
-                        KioskNavHost(
-                            navController = navController,
-                            appGraph = appGraph,
-                        )
+                            },
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    if (!storageReady) {
+                        // Encrypted storage is opening off the main thread; a blank canvas for a few ms.
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                        return@Surface
                     }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        KioskChrome(
+                            state = accessibilityState,
+                            isOrderingScreen = isOrderingScreen,
+                            actions =
+                                AccessibilityActions(
+                                    onToggleAccessibleMode = appGraph.accessibilityManager::toggleAccessibleMode,
+                                    onToggleHighContrast = appGraph.accessibilityManager::toggleHighContrast,
+                                    onToggleLanguage = appGraph.accessibilityManager::toggleLanguage,
+                                ),
+                        ) {
+                            KioskNavHost(
+                                navController = navController,
+                                appGraph = appGraph,
+                            )
+                        }
 
-                    if (idleTimerState.isWarningVisible) {
-                        IdleWarningDialog(
-                            remainingSeconds = idleTimerState.remainingSeconds,
-                            onContinue = { appGraph.idleTimerManager.continueOrdering() },
-                            onCancel = { appGraph.idleTimerManager.cancelOrder() },
-                        )
+                        if (idleTimerState.isWarningVisible) {
+                            IdleWarningDialog(
+                                remainingSeconds = idleTimerState.remainingSeconds,
+                                onContinue = { appGraph.idleTimerManager.continueOrdering() },
+                                onCancel = { appGraph.idleTimerManager.cancelOrder() },
+                            )
+                        }
                     }
                 }
             }

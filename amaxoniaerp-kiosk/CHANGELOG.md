@@ -17,6 +17,28 @@ _Nada todavía._
 
 ---
 
+## [0.0.5] — 2026-10-06
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 5 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.5.apk` |
+| SHA-256 | `1A42937D204F48052CABE5DFC6CA3B174CE8C6A40B4AAE7DD0DA088C1EAA215D` |
+
+### Requisitos
+- Los mismos de 0.0.4 (mismo backend; sin migraciones nuevas).
+
+### Corregido
+- En el equipo real todo se veía demasiado grande: la interfaz estaba diseñada para 1080 × 1920 a densidad mdpi y el kiosco reporta una densidad mayor (y a veces un tamaño de fuente del sistema mayor), así que botones, títulos y logos salían 1,5–2 veces más grandes. Los diálogos (inactividad, panel de administración, confirmaciones, desbloqueo) también se veían ampliados.
+
+### Cambiado
+- La interfaz se adapta a cualquier tamaño y densidad de pantalla de kiosco, vertical u horizontal, e ignora el tamaño de fuente del sistema: el diseño de 1080 × 1920 (o 1920 × 1080 en horizontal) se escala a la pantalla real y ocupa siempre la misma proporción.
+- La app sigue la rotación configurada en el equipo, igual que su launcher (ya no fuerza vertical). En pantallas horizontales: Attract con el plato y el saludo lado a lado, inicio de sesión y caja con panel lateral, menú con 4–5 columnas, personalizador con el producto a la izquierda, pedido con resumen lateral, portamesa / datos de factura / pago con tarjeta / Yappy / número de pedido en columnas, y métodos de pago lado a lado.
+- Formularios, barras de acción y diálogos tienen un ancho máximo y se centran en pantallas anchas; el modo «pantalla baja» baja menos el contenido en horizontal (200 dp en vez de 380 dp).
+
+---
+
 ## [0.0.4] — 2026-10-06
 
 | Dato | Valor |

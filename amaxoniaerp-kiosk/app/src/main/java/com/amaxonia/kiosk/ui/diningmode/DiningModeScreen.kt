@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +62,10 @@ private val MinTitleRoom = 340.dp
 private val HeroOverlap = 220.dp
 private val BottomGap = 56.dp
 private val RoomForGlyphs = 440.dp
+private val LandscapeMinCardHeight = 440.dp
+private val LandscapeTitleRoom = 260.dp
+private val CardsMaxWidth = 1500.dp
+private val CompactCardHeight = 640.dp
 
 @Composable
 fun DiningModeScreen(
@@ -83,13 +88,20 @@ fun DiningModeScreen(
             // the layout fills the screen and still fits (scrolling if needed) in "pantalla baja".
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 val viewport = maxHeight
-                val cardHeight = (viewport - BottomGap - MinTitleRoom).coerceIn(MinCardHeight, MaxCardHeight)
-                val cardsTop = (viewport - BottomGap - cardHeight).coerceAtLeast(MinTitleRoom)
+                // Landscape: a shorter title band and shorter (compact) cards so both fit side by side.
+                val landscape = maxWidth > maxHeight
+                val titleRoom = if (landscape) LandscapeTitleRoom else MinTitleRoom
+                val minCard = if (landscape) LandscapeMinCardHeight else MinCardHeight
+                val cardHeight = (viewport - BottomGap - titleRoom).coerceIn(minCard, MaxCardHeight)
+                val cardsTop = (viewport - BottomGap - cardHeight).coerceAtLeast(titleRoom)
+                val compact = landscape || cardHeight < CompactCardHeight
                 Box(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     DiningHero(height = cardsTop + HeroOverlap, titleRoom = cardsTop)
                     Row(
                         modifier =
                             Modifier
+                                .align(Alignment.TopCenter)
+                                .widthIn(max = CardsMaxWidth)
                                 .fillMaxWidth()
                                 .padding(top = cardsTop, start = 48.dp, end = 48.dp, bottom = BottomGap)
                                 .height(cardHeight),
@@ -102,6 +114,7 @@ fun DiningModeScreen(
                                 icon = Icons.Rounded.Restaurant,
                                 isSelected = currentMode == MODE_DINE_IN,
                                 onClick = { onModeSelected(MODE_DINE_IN) },
+                                compact = compact,
                             )
                         }
                         StaggeredReveal(index = 2, modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -111,6 +124,7 @@ fun DiningModeScreen(
                                 icon = Icons.Rounded.ShoppingBag,
                                 isSelected = currentMode == MODE_TAKEAWAY,
                                 onClick = { onModeSelected(MODE_TAKEAWAY) },
+                                compact = compact,
                             )
                         }
                     }
@@ -194,9 +208,14 @@ private fun DiningModeOptionCard(
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val highContrast = LocalHighContrast.current
+    // Compact: same composition, smaller illustration and gaps (landscape and short viewports).
+    val haloSize = if (compact) 240.dp else 320.dp
+    val discSize = if (compact) 176.dp else 232.dp
+    val glyphSize = if (compact) 100.dp else 136.dp
     val halo by animateColorAsState(
         if (isSelected) colors.secondaryContainer else colors.primaryContainer,
         label = "dining_halo",
@@ -217,28 +236,28 @@ private fun DiningModeOptionCard(
                 )
             }
             Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 40.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = if (compact) 24.dp else 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 // "Illustration": a big glyph on a soft halo around a brand-gradient disc.
                 Box(
-                    modifier = Modifier.size(320.dp).background(halo, CircleShape),
+                    modifier = Modifier.size(haloSize).background(halo, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
-                        modifier = Modifier.size(232.dp).background(KioskColors.ctaBrush, CircleShape),
+                        modifier = Modifier.size(discSize).background(KioskColors.ctaBrush, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
                             tint = colors.onPrimary,
-                            modifier = Modifier.size(136.dp),
+                            modifier = Modifier.size(glyphSize),
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(if (compact) 32.dp else 48.dp))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.displaySmall,
@@ -252,7 +271,7 @@ private fun DiningModeOptionCard(
                     color = colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(if (compact) 28.dp else 40.dp))
                 ChooseChip(highContrast = highContrast)
             }
         }

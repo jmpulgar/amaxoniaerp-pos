@@ -27,8 +27,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
 private val ACCESSIBLE_TOP_OFFSET = 380.dp
+
+/** Landscape screens are already low; a smaller drop keeps room for the content. */
+private val LANDSCAPE_ACCESSIBLE_TOP_OFFSET = 200.dp
 private val ZERO_OFFSET = 0.dp
 
 /**
@@ -42,8 +46,9 @@ fun AccessibleContainer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val accessibleOffset = if (LocalKioskCanvas.current.isLandscape) LANDSCAPE_ACCESSIBLE_TOP_OFFSET else ACCESSIBLE_TOP_OFFSET
     val topOffset by animateDpAsState(
-        targetValue = if (isAccessibleMode) ACCESSIBLE_TOP_OFFSET else ZERO_OFFSET,
+        targetValue = if (isAccessibleMode) accessibleOffset else ZERO_OFFSET,
         label = "accessible_top_offset",
     )
 

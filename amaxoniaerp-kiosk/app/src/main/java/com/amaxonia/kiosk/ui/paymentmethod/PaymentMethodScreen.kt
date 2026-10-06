@@ -52,6 +52,7 @@ import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
+import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.payment.AmountHero
@@ -69,6 +70,8 @@ private val TileGap = 28.dp
 private val HeroReserve = 420.dp
 private val MinTileHeight = 260.dp
 private val MaxTileHeight = 560.dp
+private val LandscapeHeroReserve = 380.dp
+private val LandscapeMaxWidth = 1600.dp
 
 /**
  * "¿Cómo deseas pagar?": quotes the order (spec §3 Quote step) and offers the available methods as
@@ -171,9 +174,27 @@ private fun MethodChoices(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         // Tiles share the room left under the amount (bottom 60 % of the screen), within sane bounds.
         val methodCount = uiState.methods.size.coerceAtLeast(1)
-        val tileHeight = ((maxHeight - HeroReserve) / methodCount - TileGap).coerceIn(MinTileHeight, MaxTileHeight)
+        // Landscape: the tiles sit side by side under the amount and share its full width.
+        val sideBySide = maxWidth > maxHeight && methodCount > 1
+        val tileHeight =
+            if (sideBySide) {
+                (maxHeight - LandscapeHeroReserve).coerceIn(MinTileHeight, MaxTileHeight)
+            } else {
+                ((maxHeight - HeroReserve) / methodCount - TileGap).coerceIn(MinTileHeight, MaxTileHeight)
+            }
+        val tile: @Composable (PaymentMethod, Modifier) -> Unit = { method, tileModifier ->
+            when (method) {
+                PaymentMethod.CARD -> CardMethodTile(height = tileHeight, onClick = { onSelect(method) }, modifier = tileModifier)
+                PaymentMethod.YAPPY -> YappyMethodTile(height = tileHeight, onClick = { onSelect(method) }, modifier = tileModifier)
+            }
+        }
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 24.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 48.dp, vertical = 24.dp)
+                    .centeredMaxWidth(LandscapeMaxWidth),
             verticalArrangement = Arrangement.spacedBy(TileGap),
         ) {
             AmountHero(total = uiState.total, currency = uiState.currency)
@@ -183,17 +204,26 @@ private fun MethodChoices(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 16.dp, start = 8.dp),
             )
-            uiState.methods.forEachIndexed { index, method ->
+            val reveal: @Composable (Int, Modifier, @Composable () -> Unit) -> Unit = { index, revealModifier, content ->
                 AnimatedVisibility(
                     visible = visible,
+                    modifier = revealModifier,
                     enter =
                         fadeIn(tween(durationMillis = 300, delayMillis = index * CARD_STAGGER_MS)) +
                             slideInVertically(tween(durationMillis = 350, delayMillis = index * CARD_STAGGER_MS)) { it / 3 },
                 ) {
-                    when (method) {
-                        PaymentMethod.CARD -> CardMethodTile(height = tileHeight, onClick = { onSelect(method) })
-                        PaymentMethod.YAPPY -> YappyMethodTile(height = tileHeight, onClick = { onSelect(method) })
+                    content()
+                }
+            }
+            if (sideBySide) {
+                Row(horizontalArrangement = Arrangement.spacedBy(TileGap)) {
+                    uiState.methods.forEachIndexed { index, method ->
+                        reveal(index, Modifier.weight(1f)) { tile(method, Modifier) }
                     }
+                }
+            } else {
+                uiState.methods.forEachIndexed { index, method ->
+                    reveal(index, Modifier) { tile(method, Modifier) }
                 }
             }
         }
@@ -204,8 +234,9 @@ private fun MethodChoices(
 private fun CardMethodTile(
     height: Dp,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    KioskCard(modifier = Modifier.fillMaxWidth().height(height), onClick = onClick) {
+    KioskCard(modifier = modifier.fillMaxWidth().height(height), onClick = onClick) {
         MethodTileContent(
             title = stringResource(R.string.payflow_method_card_title),
             subtitle = stringResource(R.string.payflow_method_card_subtitle),
@@ -229,11 +260,12 @@ private fun CardMethodTile(
 private fun YappyMethodTile(
     height: Dp,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = MaterialTheme.shapes.large
     Box(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .height(height)
                 .kioskPressable(onClick = onClick)

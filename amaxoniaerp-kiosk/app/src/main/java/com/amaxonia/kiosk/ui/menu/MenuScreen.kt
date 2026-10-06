@@ -90,6 +90,7 @@ import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
 
 private const val TOAST_DURATION_MS = 1400L
@@ -97,8 +98,10 @@ private const val CATEGORY_SWAP_IN_MS = 260
 private const val CATEGORY_SWAP_OUT_MS = 120
 private const val SOLD_OUT_CONTENT_ALPHA = 0.6f
 private const val PRODUCT_IMAGE_RATIO = 1.12f
+private const val LANDSCAPE_IMAGE_RATIO = 1.4f
 private const val MUTED_ALPHA = 0.8f
 private val CategoryRailWidth = 240.dp
+private val ProductCardMinWidth = 300.dp
 
 /** Bottom padding so the last row scrolls clear of the floating cart bar. */
 private val CartBarClearance = 220.dp
@@ -407,7 +410,8 @@ private fun ProductArea(
         val categoryName = uiState.categories.firstOrNull { it.id == categoryId }?.name ?: stringResource(R.string.menu_title)
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            // Two columns on the 1080 dp portrait canvas, four or five on landscape screens.
+            columns = GridCells.Adaptive(ProductCardMinWidth),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(28.dp),
             contentPadding = PaddingValues(start = 28.dp, end = 32.dp, top = 32.dp, bottom = CartBarClearance),
@@ -474,7 +478,8 @@ private fun ProductCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .aspectRatio(PRODUCT_IMAGE_RATIO)
+                        // Flatter photos on landscape screens, where height is the scarce axis.
+                        .aspectRatio(if (LocalKioskCanvas.current.isLandscape) LANDSCAPE_IMAGE_RATIO else PRODUCT_IMAGE_RATIO)
                         .clip(imageShape),
             ) {
                 KioskImage(

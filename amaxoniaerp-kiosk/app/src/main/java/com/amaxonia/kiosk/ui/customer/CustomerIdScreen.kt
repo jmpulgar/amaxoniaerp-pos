@@ -13,9 +13,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,9 +25,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Badge
@@ -61,14 +65,17 @@ import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
 import com.amaxonia.kiosk.ui.components.NumericKeypad
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
+import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
 private val DocTypes = listOf("CEDULA", "RUC", "PASAPORTE")
 private const val PASSPORT_INDEX = 2
 private const val ICON_RATIO = 0.52f
+private const val LANDSCAPE_SIDE_WEIGHT = 0.8f
 
 @Composable
 fun CustomerIdScreen(
@@ -78,6 +85,7 @@ fun CustomerIdScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val landscape = LocalKioskCanvas.current.isLandscape
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -86,6 +94,16 @@ fun CustomerIdScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             KioskHeader(title = stringResource(R.string.checkout_step_details), onBack = onBack)
             CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.DETAILS)
+
+            if (landscape && uiState.isCustomBilling) {
+                LandscapeInvoiceForm(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onCustomerConfirmed = onCustomerConfirmed,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                return@Column
+            }
 
             ScrollableFillColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -107,37 +125,58 @@ fun CustomerIdScreen(
                 )
                 Spacer(modifier = Modifier.height(40.dp))
 
-                CustomerOptionCard(
-                    title = stringResource(R.string.customer_final_title),
-                    subtitle = stringResource(R.string.customer_final_desc),
-                    icon = Icons.Rounded.Person,
-                    isSelected = !uiState.isCustomBilling,
-                    compact = uiState.isCustomBilling,
-                    onClick = {
-                        viewModel.toggleCustomBilling(false)
-                        viewModel.selectConsumidorFinal(onCustomerConfirmed)
-                    },
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                CustomerOptionCard(
-                    title = stringResource(R.string.customer_custom_title),
-                    subtitle = stringResource(R.string.customer_custom_desc),
-                    icon = Icons.Rounded.ReceiptLong,
-                    isSelected = uiState.isCustomBilling,
-                    compact = uiState.isCustomBilling,
-                    onClick = { viewModel.toggleCustomBilling(true) },
-                )
-
-                AnimatedVisibility(
-                    visible = uiState.isCustomBilling,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
-                ) {
-                    CustomBillingForm(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        modifier = Modifier.padding(top = 36.dp),
+                val finalCard: @Composable (Modifier) -> Unit = { cardModifier ->
+                    CustomerOptionCard(
+                        title = stringResource(R.string.customer_final_title),
+                        subtitle = stringResource(R.string.customer_final_desc),
+                        icon = Icons.Rounded.Person,
+                        isSelected = !uiState.isCustomBilling,
+                        compact = uiState.isCustomBilling || landscape,
+                        onClick = {
+                            viewModel.toggleCustomBilling(false)
+                            viewModel.selectConsumidorFinal(onCustomerConfirmed)
+                        },
+                        modifier = cardModifier,
                     )
+                }
+                val invoiceCard: @Composable (Modifier) -> Unit = { cardModifier ->
+                    CustomerOptionCard(
+                        title = stringResource(R.string.customer_custom_title),
+                        subtitle = stringResource(R.string.customer_custom_desc),
+                        icon = Icons.Rounded.ReceiptLong,
+                        isSelected = uiState.isCustomBilling,
+                        compact = uiState.isCustomBilling || landscape,
+                        onClick = { viewModel.toggleCustomBilling(true) },
+                        modifier = cardModifier,
+                    )
+                }
+                Column(modifier = Modifier.centeredMaxWidth()) {
+                    if (landscape) {
+                        // Landscape: the two choices side by side, so the form fits below them.
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        ) {
+                            finalCard(Modifier.weight(1f).fillMaxHeight())
+                            invoiceCard(Modifier.weight(1f).fillMaxHeight())
+                        }
+                    } else {
+                        finalCard(Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(24.dp))
+                        invoiceCard(Modifier.fillMaxWidth())
+                    }
+
+                    AnimatedVisibility(
+                        visible = uiState.isCustomBilling,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        CustomBillingForm(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            modifier = Modifier.padding(top = 36.dp),
+                        )
+                    }
                 }
             }
 
@@ -165,6 +204,90 @@ fun CustomerIdScreen(
     }
 }
 
+/**
+ * Landscape invoice entry in three columns: the two choices, the fields with the confirm button and
+ * the keypad, so nothing has to scroll under a bottom bar on a 1080 dp tall screen.
+ */
+@Composable
+private fun LandscapeInvoiceForm(
+    uiState: CustomerIdUiState,
+    viewModel: CustomerIdViewModel,
+    onCustomerConfirmed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isPassport = uiState.docType == DocTypes[PASSPORT_INDEX]
+    Column(modifier = modifier.padding(horizontal = 32.dp, vertical = 16.dp)) {
+        Text(
+            text = stringResource(R.string.customer_title),
+            style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Inner padding keeps card shadows inside each scroll container's clip.
+            Column(
+                modifier =
+                    Modifier.weight(
+                        LANDSCAPE_SIDE_WEIGHT,
+                    ).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                CustomerOptionCard(
+                    title = stringResource(R.string.customer_final_title),
+                    subtitle = stringResource(R.string.customer_final_desc),
+                    icon = Icons.Rounded.Person,
+                    isSelected = false,
+                    compact = true,
+                    onClick = {
+                        viewModel.toggleCustomBilling(false)
+                        viewModel.selectConsumidorFinal(onCustomerConfirmed)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                CustomerOptionCard(
+                    title = stringResource(R.string.customer_custom_title),
+                    subtitle = stringResource(R.string.customer_custom_desc),
+                    icon = Icons.Rounded.ReceiptLong,
+                    isSelected = true,
+                    compact = true,
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Column(
+                modifier =
+                    Modifier.weight(
+                        1f,
+                    ).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                BillingFields(uiState = uiState, viewModel = viewModel)
+                KioskButton(
+                    text = stringResource(R.string.customer_confirm),
+                    onClick = { viewModel.submitCustomCustomer(onCustomerConfirmed) },
+                    dimmed = !uiState.isValid,
+                    trailing = {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Box(modifier = Modifier.weight(LANDSCAPE_SIDE_WEIGHT).padding(16.dp)) {
+                if (!isPassport) {
+                    NumericKeypad(
+                        onDigit = viewModel::onKeypadInput,
+                        onBackspace = viewModel::onKeypadBackspace,
+                        extraKey = "-",
+                        onExtraKey = { viewModel.onKeypadInput('-') },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun BottomActionBar(content: @Composable () -> Unit) {
     val colors = MaterialTheme.colorScheme
@@ -175,7 +298,7 @@ private fun BottomActionBar(content: @Composable () -> Unit) {
         shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
         border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
     ) {
-        Box(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {
+        Box(modifier = Modifier.centeredMaxWidth().padding(horizontal = 40.dp, vertical = 28.dp)) {
             content()
         }
     }
@@ -189,11 +312,12 @@ private fun CustomerOptionCard(
     isSelected: Boolean,
     compact: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val disc = if (isSelected) KioskColors.ctaBrush else SolidColor(colors.secondaryContainer)
     val discSize by animateDpAsState(if (compact) 96.dp else 136.dp, label = "option_disc")
-    KioskCard(modifier = Modifier.fillMaxWidth(), selected = isSelected, onClick = onClick) {
+    KioskCard(modifier = modifier, selected = isSelected, onClick = onClick) {
         Row(
             modifier =
                 Modifier
@@ -230,6 +354,28 @@ private fun CustomerOptionCard(
 
 @Composable
 private fun CustomBillingForm(
+    uiState: CustomerIdUiState,
+    viewModel: CustomerIdViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val isPassport = uiState.docType == DocTypes[PASSPORT_INDEX]
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        BillingFields(uiState = uiState, viewModel = viewModel)
+        if (!isPassport) {
+            NumericKeypad(
+                onDigit = viewModel::onKeypadInput,
+                onBackspace = viewModel::onKeypadBackspace,
+                extraKey = "-",
+                onExtraKey = { viewModel.onKeypadInput('-') },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Document type, document number (+ DV), name and the validation message. */
+@Composable
+private fun BillingFields(
     uiState: CustomerIdUiState,
     viewModel: CustomerIdViewModel,
     modifier: Modifier = Modifier,
@@ -303,16 +449,6 @@ private fun CustomBillingForm(
                     ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.error,
-            )
-        }
-
-        if (!isPassport) {
-            NumericKeypad(
-                onDigit = viewModel::onKeypadInput,
-                onBackspace = viewModel::onKeypadBackspace,
-                extraKey = "-",
-                onExtraKey = { viewModel.onKeypadInput('-') },
-                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
