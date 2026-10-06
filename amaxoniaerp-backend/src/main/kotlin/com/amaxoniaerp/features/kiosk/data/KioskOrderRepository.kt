@@ -12,6 +12,7 @@ import com.amaxoniaerp.features.kiosk.domain.KioskItemTaxInfo
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderItemRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderModifierRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderRecord
+import com.amaxoniaerp.features.kiosk.domain.KioskPaymentMethod
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineModifierResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteLineResponse
@@ -493,6 +494,46 @@ class KioskOrderRepository {
         )
     }
 
+    /**
+     * Registra la transacción Yappy vigente del pedido sin columnas nuevas:
+     * `pago_marca = 'YAPPY'` y `pago_referencia = transactionId`. Solo aplica mientras el
+     * pedido sigue COTIZADO; devuelve false si no se actualizó ninguna fila.
+     */
+    suspend fun assignYappyTransaction(
+        database: Database,
+        orderId: String,
+        transactionId: String,
+    ): Boolean =
+        dbQuery(database) {
+            KioskOrderTable.update({ (KioskOrderTable.id eq orderId) and (KioskOrderTable.estado eq ESTADO_COTIZADO) }) {
+                it[KioskOrderTable.pagoMarca] = KioskPaymentMethod.YAPPY
+                it[KioskOrderTable.pagoReferencia] = transactionId
+                it[KioskOrderTable.actualizadoEn] = LocalDateTime.now()
+            } > 0
+        }
+
+    /**
+     * Libera la transacción Yappy [transactionId] del pedido (limpia `pago_marca` y
+     * `pago_referencia`) solo si el pedido sigue COTIZADO y aún la tiene asignada.
+     */
+    suspend fun clearYappyTransaction(
+        database: Database,
+        orderId: String,
+        transactionId: String,
+    ): Boolean =
+        dbQuery(database) {
+            KioskOrderTable.update({
+                (KioskOrderTable.id eq orderId) and
+                    (KioskOrderTable.estado eq ESTADO_COTIZADO) and
+                    (KioskOrderTable.pagoMarca eq KioskPaymentMethod.YAPPY) and
+                    (KioskOrderTable.pagoReferencia eq transactionId)
+            }) {
+                it[KioskOrderTable.pagoMarca] = null
+                it[KioskOrderTable.pagoReferencia] = null
+                it[KioskOrderTable.actualizadoEn] = LocalDateTime.now()
+            } > 0
+        }
+
     suspend fun updateOrderPaymentStatus(
         database: Database,
         orderId: String,
@@ -564,6 +605,16 @@ class KioskOrderRepository {
                 .firstOrNull()
         }.getOrNull() ?: 2
 
+        val yappyFormaPagoId =
+            runCatching {
+                CajaFormaPagoTable
+                    .select(CajaFormaPagoTable.idFormaPago)
+                    .where { CajaFormaPagoTable.siglas eq KioskPaymentMethod.YAPPY }
+                    .orderBy(CajaFormaPagoTable.activo to SortOrder.DESC)
+                    .map { it[CajaFormaPagoTable.idFormaPago] }
+                    .firstOrNull()
+            }.getOrNull()
+
         val itemsTable = ItemsTableFactory.getTableForCountry(kioskContext.countryCode)
         val itemIds = order.items.map { it.idItem }.distinct()
         val itemDetails = if (itemIds.isNotEmpty()) {
@@ -605,6 +656,7 @@ class KioskOrderRepository {
             customerDv = customerDv,
             customerCod = customerCod,
             paymentMethodId = formaPagoId,
+            yappyPaymentMethodId = yappyFormaPagoId,
             itemDetails = itemDetails,
             dispatchDestination = destino,
             kitchenPrinterIp = cocinaIp,
@@ -623,3 +675,5 @@ class KioskOrderRepository {
             .singleOrNull()?.get(facturaTable.codFactura)
     }
 }
+
+private const val ESTADO_COTIZADO = "COTIZADO"

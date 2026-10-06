@@ -28,6 +28,18 @@ class KioskDeviceRepository {
                 .map { it.toKioskDevice() }
         }
 
+    /**
+     * Current time on the company's database server. Pairing codes are written by the PHP admin with
+     * that server's clock, which may sit in a different time zone than the backend host (PA vs VE).
+     */
+    suspend fun currentDatabaseTime(database: Database): LocalDateTime =
+        dbQuery(database) {
+            exec("SELECT NOW()") { rs ->
+                rs.next()
+                rs.getTimestamp(1).toLocalDateTime()
+            } ?: LocalDateTime.now()
+        }
+
     suspend fun updateDevicePairing(
         database: Database,
         deviceId: String,

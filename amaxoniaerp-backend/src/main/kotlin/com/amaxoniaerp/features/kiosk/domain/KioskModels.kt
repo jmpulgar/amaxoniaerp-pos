@@ -50,6 +50,8 @@ data class KioskConfigResponse(
     val defaultCustomerId: String,
     val currency: KioskCurrencyConfig,
     val country: String,
+    /** Métodos de pago habilitados para este kiosco: siempre "CARD"; "YAPPY" si está configurado. */
+    val paymentMethods: List<String>,
 )
 
 @Serializable
@@ -149,14 +151,39 @@ data class KioskQuoteResponse(
     val lines: List<KioskQuoteLineResponse>,
 )
 
+/**
+ * Confirmación de pago del kiosco. `method` es opcional para no romper clientes previos (CARD).
+ * Para YAPPY solo son relevantes `transactionId` (el devuelto al generar el QR) y `amount`;
+ * los campos de tarjeta pueden omitirse.
+ */
 @Serializable
 data class KioskPaymentRequest(
     val transactionId: String,
-    val authCode: String,
-    val reference: String,
-    val last4: String,
-    val brand: String,
+    val authCode: String = "",
+    val reference: String = "",
+    val last4: String = "",
+    val brand: String = "",
     val amount: String,
+    val method: String = KioskPaymentMethod.CARD,
+)
+
+object KioskPaymentMethod {
+    const val CARD = "CARD"
+    const val YAPPY = "YAPPY"
+}
+
+@Serializable
+data class KioskYappyQrResponse(
+    val transactionId: String,
+    val qrHash: String,
+    val amount: String,
+    val expiresInSec: Int,
+)
+
+@Serializable
+data class KioskYappyStatusResponse(
+    val transactionId: String,
+    val status: String,
 )
 
 @Serializable
@@ -256,6 +283,8 @@ data class KioskSalePrerequisites(
     val customerDv: String?,
     val customerCod: String,
     val paymentMethodId: Int,
+    /** `caja_forma_pago.id_forma_pago` con siglas YAPPY; null si la empresa no la tiene. */
+    val yappyPaymentMethodId: Int? = null,
     val itemDetails: Map<Int, KioskItemTaxInfo>,
     val dispatchDestination: String,
     val kitchenPrinterIp: String?,
@@ -288,7 +317,23 @@ data class KioskOrderRecord(
     val creadoEn: LocalDateTime,
     val actualizadoEn: LocalDateTime,
     val items: List<KioskOrderItemRecord>,
-)
+) {
+    /**
+     * Método de pago derivado de las columnas existentes (sin columna propia): un pedido es
+     * Yappy cuando `pago_marca = 'YAPPY'`; cualquier otra marca (o ninguna) es tarjeta.
+     */
+    val pagoMetodo: String
+        get() =
+            if (pagoMarca?.trim().equals(KioskPaymentMethod.YAPPY, ignoreCase = true)) {
+                KioskPaymentMethod.YAPPY
+            } else {
+                KioskPaymentMethod.CARD
+            }
+
+    /** Transacción Yappy vigente/pagada: `pago_referencia` solo cuando el pedido es Yappy. */
+    val yappyTransactionId: String?
+        get() = if (pagoMetodo == KioskPaymentMethod.YAPPY) pagoReferencia?.trim()?.takeIf { it.isNotEmpty() } else null
+}
 
 data class KioskOrderItemRecord(
     val idPedido: String,

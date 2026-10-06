@@ -296,6 +296,8 @@ class KioskConfigRoutesTest {
         assertEquals(null, config.currency.secondary)
         assertEquals("1.0000", config.currency.rate)
         assertEquals("PA", config.country)
+        // Sin KioskYappyService (o sin configuración Yappy) solo se ofrece tarjeta.
+        assertEquals(listOf("CARD"), config.paymentMethods)
     }
 
     @Test

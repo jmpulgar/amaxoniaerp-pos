@@ -67,6 +67,8 @@ object KioskOrderTable : Table("kiosco_pedido") {
     val idCliente = varchar("id_cliente", S.VARCHAR_LENGTH_36)
     val total = decimal("total", S.DECIMAL_PRECISION_18, S.DECIMAL_SCALE_4)
     val quoteExpiraEn = datetime("quote_expira_en")
+    // Yappy reutiliza las columnas de pago (sin cambio de esquema): pago_marca = 'YAPPY' y
+    // pago_referencia = transactionId desde que se genera el QR (ver KioskOrderRecord.pagoMetodo).
     val pagoReferencia = varchar("pago_referencia", S.VARCHAR_LENGTH_64).nullable()
     val pagoAutorizacion = varchar("pago_autorizacion", S.VARCHAR_LENGTH_32).nullable()
     val pagoUltimos4 = char("pago_ultimos4", S.VARCHAR_LENGTH_4).nullable()
@@ -128,4 +130,33 @@ object KioskParametrosTable : Table("parametros_generales") {
     val kioscoColorMarca = varchar("kiosco_color_marca", 7).nullable()
     val kioscoConfigVersion = integer("kiosco_config_version").default(1)
     val claveKiosko = varchar("clave_kiosko", S.VARCHAR_LENGTH_255).nullable()
+}
+
+/**
+ * Proyección de solo lectura de las credenciales Yappy que el administrativo PHP guarda en
+ * parametros_generales (2025-08-27-ALTER-TABLE-YAPPY.sql y 2025-09-13-...-YAPPY.sql).
+ *
+ * Se mapea aparte de `ParametrosGeneralesTablePA` porque esa tabla se lee con `selectAll()`
+ * en la venta y en compañías: sumarle estas columnas rompería esas lecturas en tenants que
+ * aún no tengan las columnas Yappy.
+ */
+object KioskYappyParametrosTable : Table("parametros_generales") {
+    val codEmpresa = integer("cod_empresa")
+    val yappyApiKey = varchar("yappy_api_key", S.VARCHAR_LENGTH_255).nullable()
+    val yappySecretKey = varchar("yappy_secret_key", S.VARCHAR_LENGTH_255).nullable()
+    val yappyModoProduccion = integer("yappy_modo_produccion").default(0)
+    val yappyEndpointProd = varchar("yappy_endpoint_prod", S.VARCHAR_LENGTH_255).nullable()
+    val yappyEndpointSandbox = varchar("yappy_endpoint_sandbox", S.VARCHAR_LENGTH_255).nullable()
+    val yappyIdUnidad = varchar("yappy_id_unidad", S.VARCHAR_LENGTH_100).nullable()
+    val yappyIdGrupo = varchar("yappy_id_grupo", S.VARCHAR_LENGTH_100).nullable()
+}
+
+/**
+ * Proyección opcional de `parametros_generales.yappy_tipo_qr` (DYN|HYB). La columna NO es
+ * obligatoria (doc/runbooks/optional_yappy_tipo_qr.sql): solo se consulta con un `select`
+ * explícito después de comprobar que existe en el tenant, nunca con `selectAll()`.
+ */
+object KioskYappyQrTypeParametrosTable : Table("parametros_generales") {
+    val codEmpresa = integer("cod_empresa")
+    val yappyTipoQr = varchar("yappy_tipo_qr", 3).nullable()
 }

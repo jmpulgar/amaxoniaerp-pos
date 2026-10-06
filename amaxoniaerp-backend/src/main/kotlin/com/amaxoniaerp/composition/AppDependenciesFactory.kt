@@ -9,10 +9,16 @@ import com.amaxoniaerp.features.caja.data.ExposedCajaSessionStore
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceProcessorFactory
 import com.amaxoniaerp.features.kiosk.application.KioskService
+import com.amaxoniaerp.features.kiosk.application.KioskYappyService
 import com.amaxoniaerp.features.kiosk.application.PlaceKioskOrderService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
+import com.amaxoniaerp.features.kiosk.application.YappySessionManager
 import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
+import com.amaxoniaerp.features.kiosk.data.KioskYappyConfigRepository
+import com.amaxoniaerp.features.kiosk.data.yappy.YappyClient
+import com.amaxoniaerp.features.kiosk.domain.yappy.YappyGateway
+import com.amaxoniaerp.features.kiosk.domain.yappy.YappyQrType
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
 import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
@@ -21,6 +27,9 @@ import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
 import com.amaxoniaerp.loadConfigValue
 import com.amaxoniaerp.loadDotEnv
 import com.amaxoniaerp.loadJwtConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 
@@ -43,7 +52,19 @@ fun buildAppDependencies(application: Application): AppDependencies {
     val feDependencies = buildElectronicInvoiceDependencies(feHttpClient)
     val creditNoteDependencies = buildCreditNoteDependencies(feDependencies, dataBasePath)
     val mesas = buildMesasDependencies(feDependencies.feFactory)
-    val kiosk = buildKioskDependencies(jwtConfig, caja.cajaSession, mesas.processSaleUseCase)
+    val yappyHttpClient = buildYappyHttpClient()
+    application.environment.monitor.subscribe(ApplicationStopped) { yappyHttpClient.close() }
+    // Respaldo del tipo de QR Yappy: el valor por empresa sale de parametros_generales.yappy_tipo_qr
+    // (columna opcional); si no existe o está vacío se usa YAPPY_QR_TYPE y, por último, DYN.
+    val yappyQrType = YappyQrType.fromConfig(application.loadConfigValue("YAPPY_QR_TYPE", "yappy.qrType", dotenv))
+    val kiosk =
+        buildKioskDependencies(
+            jwtConfig = jwtConfig,
+            cajaSession = caja.cajaSession,
+            processSaleUseCase = mesas.processSaleUseCase,
+            yappyGateway = YappyClient(yappyHttpClient),
+            yappyQrType = yappyQrType,
+        )
     val routingConfig =
         RoutingConfig(
             dataBasePath = dataBasePath,
@@ -84,14 +105,25 @@ private fun buildKioskDependencies(
     jwtConfig: JwtConfig,
     cajaSession: CajaSessionWorkflow,
     processSaleUseCase: ProcessSaleUseCase,
+    yappyGateway: YappyGateway,
+    yappyQrType: YappyQrType,
 ): KioskDependencies {
     val kioskDeviceRepository = KioskDeviceRepository()
     val unlockRateLimiter = UnlockRateLimiter()
     val kioskOrderRepository = KioskOrderRepository()
+    val kioskYappyService =
+        KioskYappyService(
+            kioskOrderRepository = kioskOrderRepository,
+            yappyConfigRepository = KioskYappyConfigRepository(),
+            yappyGateway = yappyGateway,
+            sessionManager = YappySessionManager(yappyGateway),
+            defaultQrType = yappyQrType,
+        )
     val placeKioskOrderService = PlaceKioskOrderService(
         kioskOrderRepository = kioskOrderRepository,
         cajaSessionWorkflow = cajaSession,
         processSaleUseCase = processSaleUseCase,
+        yappyPaymentVerifier = kioskYappyService,
     )
     val kioskService = KioskService(
         kioskDeviceRepository = kioskDeviceRepository,
@@ -102,9 +134,25 @@ private fun buildKioskDependencies(
         },
         kioskOrderRepository = kioskOrderRepository,
         placeKioskOrderService = placeKioskOrderService,
+        kioskYappyService = kioskYappyService,
     )
     return KioskDependencies(kioskService)
 }
+
+/**
+ * Cliente HTTP dedicado a Yappy: timeouts de 15 s y sin plugin de logging para que api-key,
+ * secret-key y el token de sesión nunca lleguen a los logs.
+ */
+private fun buildYappyHttpClient(): HttpClient =
+    HttpClient(CIO) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = YAPPY_TIMEOUT_MS
+            connectTimeoutMillis = YAPPY_TIMEOUT_MS
+            socketTimeoutMillis = YAPPY_TIMEOUT_MS
+        }
+    }
+
+private const val YAPPY_TIMEOUT_MS = 15_000L
 
 private fun resolveAssetsBaseUrls(
     application: Application,

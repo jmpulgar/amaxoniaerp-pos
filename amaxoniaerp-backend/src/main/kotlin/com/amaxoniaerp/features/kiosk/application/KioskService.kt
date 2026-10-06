@@ -12,10 +12,13 @@ import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPayResponse
+import com.amaxoniaerp.features.kiosk.domain.KioskPaymentMethod
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
+import com.amaxoniaerp.features.kiosk.domain.KioskYappyQrResponse
+import com.amaxoniaerp.features.kiosk.domain.KioskYappyStatusResponse
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import kotlinx.serialization.json.Json
@@ -37,6 +40,7 @@ class KioskService(
     private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(),
     private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(),
     private val placeKioskOrderService: PlaceKioskOrderService = PlaceKioskOrderService(kioskOrderRepository = kioskOrderRepository),
+    private val kioskYappyService: KioskYappyService? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -61,7 +65,8 @@ class KioskService(
 
         val database = databaseResolver(countryCode, companyDb)
         val candidates = kioskDeviceRepository.findCandidateDevices(database)
-        val now = LocalDateTime.now()
+        // Compare against the DB clock: the admin writes codigo_expira_en in the DB server's local time.
+        val now = kioskDeviceRepository.currentDatabaseTime(database)
 
         val hashedInputSha256 = sha256(pairingCode)
 
@@ -165,11 +170,19 @@ class KioskService(
 
     suspend fun getConfig(kioskContext: KioskRequestContext): Result<Pair<KioskConfigResponse, String>> = runCatching {
         val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
-        val config = kioskConfigRepository.getKioskConfig(
+        val baseConfig = kioskConfigRepository.getKioskConfig(
             database = database,
             countryCode = kioskContext.countryCode,
             companyDb = kioskContext.companyDb,
         )
+        val yappyAvailable = kioskYappyService?.isAvailable(database, kioskContext) == true
+        val paymentMethods =
+            if (yappyAvailable) {
+                listOf(KioskPaymentMethod.CARD, KioskPaymentMethod.YAPPY)
+            } else {
+                listOf(KioskPaymentMethod.CARD)
+            }
+        val config = baseConfig.copy(paymentMethods = paymentMethods)
         val jsonString = json.encodeToString(KioskConfigResponse.serializer(), config)
         val etag = "\"" + sha256(jsonString) + "\""
         Pair(config, etag)
@@ -220,6 +233,38 @@ class KioskService(
             request = request,
         )
     }
+
+    suspend fun createYappyQr(
+        kioskContext: KioskRequestContext,
+        orderId: String,
+    ): Result<KioskYappyQrResponse> =
+        runCatching {
+            val yappy = kioskYappyService ?: throw KioskYappyNotConfiguredException()
+            yappy.createQr(databaseResolver(kioskContext.countryCode, kioskContext.companyDb), kioskContext, orderId)
+        }
+
+    suspend fun getYappyStatus(
+        kioskContext: KioskRequestContext,
+        orderId: String,
+        transactionId: String,
+    ): Result<KioskYappyStatusResponse> =
+        runCatching {
+            val yappy = kioskYappyService ?: throw KioskYappyNotConfiguredException()
+            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            yappy.getStatus(database, kioskContext, orderId, transactionId)
+        }
+
+    /** Anulación best-effort: el resultado solo informa errores inesperados para registrarlos. */
+    suspend fun cancelYappy(
+        kioskContext: KioskRequestContext,
+        orderId: String,
+        transactionId: String,
+    ): Result<Unit> =
+        runCatching {
+            val yappy = kioskYappyService ?: return@runCatching
+            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            yappy.cancel(database, kioskContext, orderId, transactionId)
+        }
 
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())

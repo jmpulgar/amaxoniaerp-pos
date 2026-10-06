@@ -8,6 +8,7 @@ import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskCurrencyConfig
 import com.amaxoniaerp.features.kiosk.domain.KioskMediaItem
+import com.amaxoniaerp.features.kiosk.domain.KioskPaymentMethod
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
@@ -62,6 +63,7 @@ class KioskConfigRepository {
             defaultCustomerId = defaultCustomerId,
             currency = currencyConfig,
             country = countryCode.uppercase(),
+            paymentMethods = listOf(KioskPaymentMethod.CARD),
         )
     }
 

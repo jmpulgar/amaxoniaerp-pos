@@ -178,6 +178,8 @@ fun Route.kioskRoutes(kioskService: KioskService) {
                     }
             }
 
+            kioskYappyRoutes(kioskService)
+
             /**
              * Desbloqueo de modo kiosco con clave de administración (verificada en servidor con BCrypt).
              */
