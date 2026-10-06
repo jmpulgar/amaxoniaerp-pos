@@ -17,6 +17,24 @@ _Nada todavía._
 
 ---
 
+## [0.0.4] — 2026-10-06
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 4 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.4.apk` |
+| SHA-256 | `FF3E8FB0547D7397BFC4CBF3249523956D2F0013D413BD220DD9CE8B0F4314DC` |
+
+### Requisitos
+- Los mismos de 0.0.3 (backend desplegado y migración `2026-10-06-KIOSCO-AUTOSERVICIO.sql`, ya aplicada en las 90 bases PA).
+
+### Cambiado
+- Nuevo logotipo **Flow ERP Kiosko**: ícono de la app (adaptativo, todas las densidades) y logo interno en Attract, inicio de sesión, selección de caja, menú y modalidad.
+- El APK ahora se llama `app-flow-kiosko-v<versión>.apk` (las variantes de desarrollo agregan su nombre, p. ej. `-flowerpDevDebug`).
+
+---
+
 ## [0.0.3] — 2026-10-06
 
 | Dato | Valor |

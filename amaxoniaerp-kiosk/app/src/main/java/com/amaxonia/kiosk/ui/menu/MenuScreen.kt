@@ -176,7 +176,7 @@ fun MenuContent(
             Column(modifier = Modifier.fillMaxSize()) {
                 KioskHeader(
                     title = null,
-                    leading = { BrandWordmark(height = 64.dp) },
+                    leading = { BrandWordmark(height = 80.dp) },
                     actions = { DiningModeChip(isTakeaway = diningMode == MODE_TAKEAWAY) },
                 )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

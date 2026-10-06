@@ -140,7 +140,7 @@ fun SetupScaffold(
                         .padding(start = 72.dp, end = 72.dp, top = 96.dp, bottom = 56.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
-                BrandWordmark(onDark = true, height = 104.dp)
+                BrandWordmark(onDark = true, height = 120.dp)
                 Spacer(Modifier.height(56.dp))
                 Text(text = title, style = MaterialTheme.typography.displaySmall, color = Color.White)
                 Spacer(Modifier.height(16.dp))

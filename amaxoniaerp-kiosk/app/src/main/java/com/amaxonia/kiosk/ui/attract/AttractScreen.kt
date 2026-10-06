@@ -227,7 +227,7 @@ fun AttractContent(
                     modifier = Modifier.height(112.dp),
                 )
             } else {
-                BrandWordmark(onDark = true, height = 96.dp)
+                BrandWordmark(onDark = true, height = 132.dp)
             }
         }
 

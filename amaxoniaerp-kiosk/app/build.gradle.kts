@@ -39,8 +39,8 @@ android {
         minSdk = 28
         targetSdk = 36
         // Bump both on every build handed to a kiosk and log it in CHANGELOG.md (versionCode must always increase).
-        versionCode = 3
-        versionName = "0.0.3"
+        versionCode = 4
+        versionName = "0.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -80,6 +80,18 @@ android {
             dimension = "environment"
             buildConfigField("boolean", "IS_DEV", "false")
             buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://api.listoerp.app/\"")
+        }
+    }
+
+    // APK file name carries the app version: app-flow-kiosko-v0.0.4.apk for the prod release,
+    // with the variant appended for every other build (e.g. app-flow-kiosko-v0.0.4-flowerpDevDebug.apk).
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val isProdRelease = variant.buildType.name == "release" && variant.flavorName.endsWith("Prod")
+            val suffix = if (isProdRelease) "" else "-${variant.name}"
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "app-flow-kiosko-v${variant.versionName}$suffix.apk"
         }
     }
 

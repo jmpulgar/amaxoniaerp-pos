@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -86,7 +87,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -260,7 +260,10 @@ fun KioskHeader(
     }
 }
 
-/** Brand mark: the configured logo when available, otherwise a bold wordmark. */
+/**
+ * Brand logo: the configured remote logo when available, otherwise the flavor's `brand_logo`
+ * artwork. The artwork has dark lettering, so on dark backgrounds it sits on a white plate.
+ */
 @Composable
 fun BrandWordmark(
     modifier: Modifier = Modifier,
@@ -276,27 +279,28 @@ fun BrandWordmark(
         )
         return
     }
-    val colors = MaterialTheme.colorScheme
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier =
-                Modifier
-                    .size(height)
-                    .background(Color.White, RoundedCornerShape(height / 4)),
-            contentAlignment = Alignment.Center,
-        ) {
+    val logo =
+        @Composable { imageModifier: Modifier ->
             Image(
-                painter = painterResource(R.drawable.brand_mark),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().padding(height / 8),
+                painter = painterResource(R.drawable.brand_logo),
+                contentDescription = stringResource(R.string.brand_name),
+                contentScale = ContentScale.Fit,
+                modifier = imageModifier.height(height),
             )
         }
-        Spacer(Modifier.width(16.dp))
-        Text(
-            text = stringResource(R.string.brand_name),
-            style = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Black),
-            color = if (onDark) Color.White else colors.onSurface,
-        )
+    if (onDark) {
+        Box(
+            modifier =
+                modifier
+                    .shadow(elevation = 8.dp, shape = RoundedCornerShape(height / 3), clip = false)
+                    .background(Color.White, RoundedCornerShape(height / 3))
+                    .padding(horizontal = height / 3, vertical = height / 6),
+            contentAlignment = Alignment.Center,
+        ) {
+            logo(Modifier)
+        }
+    } else {
+        logo(modifier)
     }
 }
 
