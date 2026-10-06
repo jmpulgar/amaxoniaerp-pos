@@ -17,7 +17,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -36,7 +36,8 @@ android {
         }
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -62,6 +63,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            val apkName = "amaxoniaerp-v$versionName-${buildType.name}.apk"
+            @Suppress("UNCHECKED_CAST")
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = apkName
+        }
     }
 }
 

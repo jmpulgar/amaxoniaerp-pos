@@ -18,9 +18,13 @@ import com.amaxonia.erp.domain.repository.ProductRepository
 import com.amaxonia.erp.domain.repository.SalesRepository
 import com.amaxonia.erp.domain.util.CajaDateParser
 import com.amaxonia.erp.data.printer.DefaultInvoicePrintGateway
+import com.amaxonia.erp.domain.model.ClientBranch
+import com.amaxonia.erp.domain.model.SellerSummary
+import com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,6 +35,7 @@ class PosTerminalViewModel(
     private val salesRepository: SalesRepository,
     private val localStore: LocalStore,
     private val printGateway: DefaultInvoicePrintGateway? = null,
+    private val customerDisplayManager: CustomerDisplayManager? = null,
 ) : ViewModel() {
 
 
@@ -39,6 +44,75 @@ class PosTerminalViewModel(
 
     init {
         loadInitialData()
+        observeCajaChanges()
+        observeCustomerDisplaySync()
+    }
+
+    private fun observeCustomerDisplaySync() {
+        viewModelScope.launch {
+            _uiState.collect { state ->
+                customerDisplayManager?.updateCart(
+                    cart = state.cart,
+                    summary = state.summary,
+                    client = state.selectedClient,
+                    isProcessingSale = state.isProcessingSale,
+                    completedSaleInfo = state.completedSaleInfo,
+                    branchName = state.sucursalNombre.orEmpty(),
+                )
+            }
+        }
+    }
+
+    private var lastPromptedSecuenciaId: String? = null
+
+    private fun observeCajaChanges() {
+        viewModelScope.launch {
+            combine(
+                cajaRepository.activeCaja,
+                cajaRepository.activeCajaSecuencia,
+            ) { caja, secuencia ->
+                Pair(caja, secuencia)
+            }.collect { (caja, secuencia) ->
+                val branchName = caja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
+                val warehouseName =
+                    caja?.almacenNombre?.takeIf(String::isNotBlank)
+                        ?: caja?.defaultWarehouseId?.let { "Almacén $it" }
+                        ?: caja?.codAlmacen?.takeIf { it > 0 }?.let { "Almacén $it" }
+                        ?: "Almacén Principal"
+                val rawFecha = secuencia?.fechaApertura
+                val formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
+                val isDiaAnterior = secuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                val isOpen = secuencia != null && (caja == null || secuencia.idCaja == caja.idCaja)
+                val seqId = secuencia?.idCajaSecuencia
+                val shouldPrompt = isDiaAnterior && isOpen && !seqId.isNullOrBlank() && seqId != lastPromptedSecuenciaId
+                if (shouldPrompt) {
+                    lastPromptedSecuenciaId = seqId
+                } else if (seqId == null || !isDiaAnterior) {
+                    lastPromptedSecuenciaId = null
+                }
+
+                val sellers = caja?.availableSellers.orEmpty()
+                val defaultSeller = caja?.defaultSellerId?.let { id ->
+                    sellers.firstOrNull { it.id == id } ?: SellerSummary(id, caja.defaultSellerName ?: "Vendedor $id")
+                } ?: sellers.firstOrNull()
+
+                _uiState.update { current ->
+                    current.copy(
+                        activeCajaId = caja?.idCaja ?: current.activeCajaId,
+                        activeCajaName = caja?.displayName ?: current.activeCajaName,
+                        sucursalNombre = branchName,
+                        almacenNombre = warehouseName,
+                        isCajaOpen = isOpen,
+                        isCajaDiaAnterior = isDiaAnterior,
+                        cajaFechaApertura = formattedFecha,
+                        usuarioApertura = secuencia?.usuarioApertura,
+                        showAvisoCajaAnterior = if (shouldPrompt) true else (if (isDiaAnterior) current.showAvisoCajaAnterior else false),
+                        availableSellers = sellers,
+                        selectedSeller = current.selectedSeller ?: defaultSeller,
+                    )
+                }
+            }
+        }
     }
 
     fun loadInitialData() {
@@ -46,21 +120,35 @@ class PosTerminalViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             // 1. Load active caja & status
-            val activeCaja = cajaRepository.getActiveCaja()
+            val activeCaja = cajaRepository.activeCaja.value
+            val cajaId = activeCaja?.idCaja ?: cajaRepository.getActiveCaja()?.first
             var isCajaOpen = false
             var isDiaAnterior = false
             var formattedFecha: String? = null
-            if (activeCaja != null) {
-                val statusResult = cajaRepository.checkCajaStatus(activeCaja.first)
+            var usuarioApertura: String? = null
+            if (cajaId != null) {
+                val statusResult = cajaRepository.checkCajaStatus(cajaId)
                 val status = statusResult.getOrNull()
                 isCajaOpen = status?.isOpen == true
                 val rawFecha = status?.cajaSecuencia?.fechaApertura
                 formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
                 isDiaAnterior = status?.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                usuarioApertura = status?.cajaSecuencia?.usuarioApertura
             }
+            val branchName = activeCaja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
+            val warehouseName =
+                activeCaja?.almacenNombre?.takeIf(String::isNotBlank)
+                    ?: activeCaja?.defaultWarehouseId?.let { "Almacén $it" }
+                    ?: activeCaja?.codAlmacen?.takeIf { it > 0 }?.let { "Almacén $it" }
+                    ?: "Almacén Principal"
+
+            val sellers = activeCaja?.availableSellers.orEmpty()
+            val defaultSeller = activeCaja?.defaultSellerId?.let { id ->
+                sellers.firstOrNull { it.id == id } ?: SellerSummary(id, activeCaja.defaultSellerName ?: "Vendedor $id")
+            } ?: sellers.firstOrNull()
 
             // 2. Load payment methods
-            val paymentMethods = salesRepository.getFormasPago(activeCaja?.first).getOrElse {
+            val paymentMethods = salesRepository.getFormasPago(cajaId).getOrElse {
                 listOf(
                     FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
                     FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta"),
@@ -84,8 +172,11 @@ class PosTerminalViewModel(
                     products = products,
                     filteredProducts = products,
                     departments = departments,
-                    activeCajaId = activeCaja?.first,
-                    activeCajaName = activeCaja?.second,
+                    activeCajaId = cajaId,
+                    activeCajaName = activeCaja?.displayName ?: cajaRepository.activeCajaName.value,
+                    sucursalNombre = branchName,
+                    almacenNombre = warehouseName,
+                    usuarioApertura = usuarioApertura,
                     isCajaOpen = isCajaOpen,
                     isCajaDiaAnterior = isDiaAnterior,
                     showAvisoCajaAnterior = isDiaAnterior,
@@ -93,6 +184,8 @@ class PosTerminalViewModel(
                     paymentMethods = paymentMethods,
                     selectedPaymentMethod = paymentMethods.firstOrNull(),
                     selectedClient = defaultClient,
+                    availableSellers = sellers,
+                    selectedSeller = it.selectedSeller ?: defaultSeller,
                 )
             }
         }
@@ -173,7 +266,51 @@ class PosTerminalViewModel(
     }
 
     fun selectClient(client: Client) {
-        _uiState.update { it.copy(selectedClient = client, showClientDialog = false) }
+        _uiState.update {
+            it.copy(
+                selectedClient = client,
+                showClientDialog = false,
+                isLoadingBranches = true,
+                branchSelectionRequiredError = false,
+                selectedClientBranch = null,
+                clientBranches = emptyList(),
+            )
+        }
+        if (client.code == "CF" || client.id == "0" || client.id.isBlank()) {
+            _uiState.update { it.copy(isLoadingBranches = false) }
+            return
+        }
+        viewModelScope.launch {
+            val branches = clientRepository.getClientSucursales(client.id).getOrElse { emptyList() }
+            _uiState.update { current ->
+                current.copy(
+                    clientBranches = branches,
+                    selectedClientBranch = if (branches.size == 1) branches.first() else null,
+                    isLoadingBranches = false,
+                )
+            }
+        }
+    }
+
+    fun selectClientBranch(branch: ClientBranch) {
+        _uiState.update {
+            it.copy(
+                selectedClientBranch = branch,
+                branchSelectionRequiredError = false,
+            )
+        }
+    }
+
+    fun removeSelectedClient() {
+        selectClient(Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF"))
+    }
+
+    suspend fun searchClients(query: String): List<Client> {
+        return if (query.isBlank()) {
+            clientRepository.getAllClients(page = 1, pageSize = 30).getOrElse { emptyList() }
+        } else {
+            clientRepository.searchClients(query = query, page = 1, pageSize = 30).getOrElse { emptyList() }
+        }
     }
 
     fun openClientDialog() {
@@ -182,6 +319,18 @@ class PosTerminalViewModel(
 
     fun dismissClientDialog() {
         _uiState.update { it.copy(showClientDialog = false) }
+    }
+
+    fun selectSeller(seller: SellerSummary) {
+        _uiState.update { it.copy(selectedSeller = seller, showSellerSheet = false) }
+    }
+
+    fun openSellerSheet() {
+        _uiState.update { it.copy(showSellerSheet = true) }
+    }
+
+    fun dismissSellerSheet() {
+        _uiState.update { it.copy(showSellerSheet = false) }
     }
 
     fun openPaymentDialog() {
@@ -195,6 +344,16 @@ class PosTerminalViewModel(
 
         if (state.isCajaDiaAnterior) {
             _uiState.update { it.copy(showAvisoCajaAnterior = true) }
+            return
+        }
+
+        if (state.clientBranches.size > 1 && state.selectedClientBranch == null) {
+            _uiState.update {
+                it.copy(
+                    branchSelectionRequiredError = true,
+                    errorMessage = "Por favor selecciona la sucursal del cliente antes de continuar al cobro",
+                )
+            }
             return
         }
 
@@ -242,6 +401,7 @@ class PosTerminalViewModel(
                             isRenovandoCaja = false,
                             isCajaOpen = res.isOpen,
                             cajaFechaApertura = formatted,
+                            usuarioApertura = res.cajaSecuencia?.usuarioApertura,
                             isCajaDiaAnterior = false,
                             showAvisoCajaAnterior = false,
                         )
@@ -307,6 +467,16 @@ class PosTerminalViewModel(
         val state = _uiState.value
         if (state.cart.isEmpty() || state.isProcessingSale) return
 
+        if (state.clientBranches.size > 1 && state.selectedClientBranch == null) {
+            _uiState.update {
+                it.copy(
+                    branchSelectionRequiredError = true,
+                    errorMessage = "Por favor selecciona la sucursal del cliente antes de cobrar",
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isProcessingSale = true, errorMessage = null) }
 
@@ -320,6 +490,7 @@ class PosTerminalViewModel(
             val invoice = SaleInvoiceDto(
                 idCliente = state.selectedClient?.id ?: "0",
                 codCliente = state.selectedClient?.code ?: "CF",
+                codVendedor = state.selectedSeller?.id ?: 1,
                 idSucursal = sucursalId,
                 idCaja = state.activeCajaId ?: "1",
                 codigoCaja = state.activeCajaName ?: "01",
@@ -333,14 +504,16 @@ class PosTerminalViewModel(
                 usuarioCreacion = session?.user?.username ?: "admin",
                 facturarA = state.selectedClient?.name ?: "CONSUMIDOR FINAL",
                 facturarARuc = state.selectedClient?.identification ?: "CF",
-                facturarADireccion = state.selectedClient?.address ?: "",
-                facturarATelefono = state.selectedClient?.phone ?: "",
+                facturarADireccion = state.selectedClientBranch?.direccion?.takeIf(String::isNotBlank) ?: state.selectedClient?.address ?: "",
+                facturarATelefono = state.selectedClientBranch?.telefonoContacto?.takeIf(String::isNotBlank) ?: state.selectedClient?.phone ?: "",
+                clienteSucursalId = state.selectedClientBranch?.sucursalId,
                 formaPago = state.selectedPaymentMethod?.codigo ?: "EFECTIVO",
             )
 
             val saleItems = state.cart.map { item ->
                 SaleItemDto(
                     idItem = item.product.id.toIntOrNull() ?: 1,
+                    codVendedor = state.selectedSeller?.id ?: 1,
                     itemAlmacen = 1,
                     itemDescripcion = item.product.description,
                     itemCantidad = item.quantity,
@@ -406,6 +579,8 @@ class PosTerminalViewModel(
                         isPrintingReceipt = false,
                     )
                 }
+
+                customerDisplayManager?.showSaleSuccess(completedInfo)
 
                 if (localStore.readAutoPrintReceipt()) {
                     printReceipt(targetFacturaId)

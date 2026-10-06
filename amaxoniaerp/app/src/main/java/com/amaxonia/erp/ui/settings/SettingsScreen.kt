@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +54,8 @@ fun SettingsScreen(
     val allowEditPrices by viewModel.allowEditPrices.collectAsStateWithLifecycle()
     val allowDiscounts by viewModel.allowDiscounts.collectAsStateWithLifecycle()
     val autoPrintReceipt by viewModel.autoPrintReceipt.collectAsStateWithLifecycle()
+    val customerDisplayEnabled by viewModel.customerDisplayEnabled.collectAsStateWithLifecycle()
+    val isSecondaryDisplayAvailable by viewModel.isSecondaryDisplayAvailable.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
@@ -184,6 +187,54 @@ fun SettingsScreen(
                         Switch(
                             checked = autoPrintReceipt,
                             onCheckedChange = viewModel::onAutoPrintReceiptChanged,
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Pantalla de cliente (Sunmi D3 Pro)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSecondaryDisplayAvailable) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    },
+                                ) {
+                                    Text(
+                                        text = if (isSecondaryDisplayAvailable) "Hardware detectado" else "No detectado",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isSecondaryDisplayAvailable) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Muestra en la segunda pantalla el carrito en vivo, totales e información fiscal",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = customerDisplayEnabled,
+                            onCheckedChange = viewModel::onCustomerDisplayToggled,
                         )
                     }
 

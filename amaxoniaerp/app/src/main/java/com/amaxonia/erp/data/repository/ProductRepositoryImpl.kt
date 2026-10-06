@@ -1,7 +1,9 @@
 package com.amaxonia.erp.data.repository
 
+import com.amaxonia.erp.BuildConfig
 import com.amaxonia.erp.data.local.LocalStore
 import com.amaxonia.erp.data.remote.ApiService
+import com.amaxonia.erp.data.remote.ImageUrlHelper
 import com.amaxonia.erp.data.remote.createProduct
 import com.amaxonia.erp.data.remote.dto.CreateProductRequest
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
@@ -23,6 +25,15 @@ class ProductRepositoryImpl(
             ?: error("No hay sesión de empresa activa")
     }
 
+    private suspend fun resolveImageContext(): Triple<String, String, String> {
+        val session = localStore.readCompanySession()
+        val countryCode = session?.company?.countryCode.takeIf { !it.isNullOrBlank() }
+            ?: localStore.readSelectedCountry()?.code
+            ?: BuildConfig.DEFAULT_COUNTRY_CODE
+        val companyDb = session?.company?.adminDb.orEmpty()
+        return Triple(apiService.baseUrl, countryCode, companyDb)
+    }
+
     override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
         runCatching {
             val token = requireToken()
@@ -33,7 +44,8 @@ class ProductRepositoryImpl(
                 offset = offset,
                 departmentId = departmentId,
             )
-            response.data.map { it.toDomain() }
+            val (baseUrl, countryCode, companyDb) = resolveImageContext()
+            response.data.map { it.toDomain(baseUrl, countryCode, companyDb) }
         }
 
     override suspend fun searchProducts(query: String, page: Int, pageSize: Int): Result<List<Product>> =
@@ -46,7 +58,8 @@ class ProductRepositoryImpl(
                 offset = offset,
                 search = query,
             )
-            response.data.map { it.toDomain() }
+            val (baseUrl, countryCode, companyDb) = resolveImageContext()
+            response.data.map { it.toDomain(baseUrl, countryCode, companyDb) }
         }
 
     override suspend fun createProduct(product: Product, departmentId: Int): Result<Product> =
@@ -62,7 +75,8 @@ class ProductRepositoryImpl(
                 isExempt = product.isExempt,
             )
             val response = apiService.createProduct(token, request)
-            response.toDomain()
+            val (baseUrl, countryCode, companyDb) = resolveImageContext()
+            response.toDomain(baseUrl, countryCode, companyDb)
         }
 
     override suspend fun updateProduct(id: String, product: Product, departmentId: Int): Result<Product> =
@@ -78,7 +92,8 @@ class ProductRepositoryImpl(
                 isExempt = product.isExempt,
             )
             val response = apiService.updateProduct(token, id, request)
-            response.toDomain()
+            val (baseUrl, countryCode, companyDb) = resolveImageContext()
+            response.toDomain(baseUrl, countryCode, companyDb)
         }
 
     override suspend fun getDepartments(): Result<List<DepartmentDto>> =
@@ -88,14 +103,24 @@ class ProductRepositoryImpl(
         }
 }
 
-private fun ProductDto.toDomain(): Product =
-    Product(
+private fun ProductDto.toDomain(
+    baseUrl: String,
+    countryCode: String,
+    companyDb: String,
+): Product {
+    val photo = ImageUrlHelper.productImageUrl(
+        baseUrl = baseUrl,
+        countryCode = countryCode,
+        companyDb = companyDb,
+        photoPath = rawPhoto,
+    )
+    return Product(
         id = id ?: code ?: "",
         code = code ?: "",
         description = description ?: "",
         reference = reference ?: "",
         barcode1 = barcode1 ?: "",
-        photoUrl = photoUrl ?: "",
+        photoUrl = photo,
         department = department ?: "",
         isExempt = isExempt ?: false,
         taxRate = taxRate ?: 0.0,
@@ -111,3 +136,4 @@ private fun ProductDto.toDomain(): Product =
             )
         },
     )
+}

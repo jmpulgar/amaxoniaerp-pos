@@ -1,6 +1,7 @@
 package com.amaxonia.erp.data.remote
 
 import com.amaxonia.erp.data.remote.dto.ClientDto
+import com.amaxonia.erp.data.remote.dto.ClientSucursalDto
 import com.amaxonia.erp.data.remote.dto.CreateClientRequest
 import com.amaxonia.erp.data.remote.dto.PagedResponse
 import io.ktor.client.call.body
@@ -50,3 +51,12 @@ suspend fun ApiService.getDefaultClient(token: String): ClientDto =
     client.get("clients/default") {
         header("Authorization", "Bearer $token")
     }.body()
+
+suspend fun ApiService.getClientSucursales(
+    token: String,
+    clientId: String,
+): List<ClientSucursalDto> =
+    client.get("clients/$clientId/sucursales") {
+        header("Authorization", "Bearer $token")
+    }.body()
+

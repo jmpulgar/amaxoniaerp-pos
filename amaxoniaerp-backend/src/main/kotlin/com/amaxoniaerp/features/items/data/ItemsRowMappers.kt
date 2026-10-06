@@ -73,7 +73,10 @@ internal fun mapRowToProduct(
         barcode1 = row[table.codigoBarras],
         barcode2 = row[table.codigoBarras2],
         barcode3 = row[table.codigoBarras3],
-        photoUrl = row[table.foto] ?: "",
+        photoUrl =
+            row.getOrNull(table.foto)?.takeIf { it.isNotBlank() }
+                ?: row.getOrNull(table.foto1)?.takeIf { it.isNotBlank() }
+                ?: "",
         department = (row[table.departamentoId].takeIf { it > 0 } ?: row[table.codDepartamento]).toString(),
         section = row[table.seccionId].toString(),
         family = row[table.familiaId].toString(),

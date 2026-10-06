@@ -3,11 +3,14 @@ package com.amaxonia.erp.data.repository
 import com.amaxonia.erp.data.local.LocalStore
 import com.amaxonia.erp.data.remote.ApiService
 import com.amaxonia.erp.data.remote.createClient
+import com.amaxonia.erp.data.remote.getClientSucursales
 import com.amaxonia.erp.data.remote.dto.ClientDto
+import com.amaxonia.erp.data.remote.dto.ClientSucursalDto
 import com.amaxonia.erp.data.remote.dto.CreateClientRequest
 import com.amaxonia.erp.data.remote.getClients
 import com.amaxonia.erp.data.remote.updateClient
 import com.amaxonia.erp.domain.model.Client
+import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.TaxpayerType
 import com.amaxonia.erp.domain.repository.ClientRepository
 
@@ -70,6 +73,15 @@ class ClientRepositoryImpl(
             val response = apiService.updateClient(token, id, request)
             response.toDomain()
         }
+
+    override suspend fun getClientSucursales(clientId: String): Result<List<ClientBranch>> =
+        runCatching {
+            if (clientId.isBlank() || clientId == "0" || clientId.equals("CF", ignoreCase = true)) {
+                return@runCatching emptyList()
+            }
+            val token = requireToken()
+            apiService.getClientSucursales(token, clientId).map { it.toDomain() }
+        }
 }
 
 private fun ClientDto.toDomain(): Client =
@@ -89,3 +101,16 @@ private fun ClientDto.toDomain(): Client =
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
     )
+
+private fun ClientSucursalDto.toDomain(): ClientBranch =
+    ClientBranch(
+        sucursalId = sucursalId,
+        clienteCodigo = clienteCodigo,
+        nombreSucursal = nombreSucursal,
+        nombreContacto = nombreContacto,
+        telefonoContacto = telefonoContacto,
+        correoContacto = correoContacto,
+        direccion = direccion,
+        observaciones = observaciones,
+    )
+

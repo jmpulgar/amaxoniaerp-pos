@@ -76,13 +76,12 @@ class CajaRepositoryImpl(
         }
 
     override suspend fun restoreActiveCajaIfValid() {
-        val saved = localStore.readActiveCaja()
-        if (saved != null && saved.first.isNotBlank()) {
-            _activeCajaName.update { saved.second.ifBlank { "Caja Principal" } }
-            val placeholderCaja = Caja(idCaja = saved.first, caja = saved.second)
-            _activeCaja.update { placeholderCaja }
+        val caja = localStore.readActiveCajaForToday()
+        if (caja != null && caja.idCaja.isNotBlank()) {
+            _activeCajaName.update { caja.displayName }
+            _activeCaja.update { caja }
             _sessionStatus.update { CajaSessionStatus.VERIFICANDO }
-            checkCajaStatus(saved.first)
+            checkCajaStatus(caja.idCaja)
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
@@ -236,20 +235,21 @@ class CajaRepositoryImpl(
         _sessionStatus.update {
             if (_activeCajaSecuencia.value != null) CajaSessionStatus.ABIERTA else CajaSessionStatus.PENDIENTE_APERTURA
         }
-        localStore.saveActiveCaja(caja.idCaja, caja.displayName)
+        localStore.saveActiveCaja(caja)
     }
 
     override suspend fun setActiveCaja(id: String, name: String) {
         val currentCaja = _activeCaja.value
+        val newCaja = Caja(idCaja = id, caja = name, descripcion = name)
         if (currentCaja?.idCaja != id) {
             _activeCajaSecuencia.update { null }
-            _activeCaja.update { Caja(idCaja = id, caja = name, descripcion = name) }
+            _activeCaja.update { newCaja }
         }
         _activeCajaName.update { name }
         _sessionStatus.update {
             if (_activeCajaSecuencia.value != null) CajaSessionStatus.ABIERTA else CajaSessionStatus.PENDIENTE_APERTURA
         }
-        localStore.saveActiveCaja(id, name)
+        localStore.saveActiveCaja(newCaja)
     }
 
     override suspend fun clearActiveCaja() {
@@ -257,7 +257,7 @@ class CajaRepositoryImpl(
         _activeCajaName.update { "Caja no seleccionada" }
         _activeCajaSecuencia.update { null }
         _sessionStatus.update { CajaSessionStatus.SIN_CAJA }
-        localStore.saveActiveCaja("", "")
+        localStore.clearActiveCaja()
     }
 
     override suspend fun markSequenceClosed() {

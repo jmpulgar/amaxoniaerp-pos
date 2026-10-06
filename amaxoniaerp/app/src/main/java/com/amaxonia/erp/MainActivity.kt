@@ -52,6 +52,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        DependencyContainer.customerDisplayManager.start(this)
+    }
+
+    override fun onStop() {
+        DependencyContainer.customerDisplayManager.stop()
+        super.onStop()
+    }
 }
 
 @Composable
@@ -60,6 +70,16 @@ private fun PosAppContent() {
     var isLoadingSession by remember { mutableStateOf(true) }
     var currentCompanySession by remember { mutableStateOf<CompanySession?>(null) }
     var pendingSelectionSession by remember { mutableStateOf<AuthSession?>(null) }
+
+    LaunchedEffect(currentCompanySession) {
+        currentCompanySession?.let { session ->
+            DependencyContainer.customerDisplayManager.updateCompanyInfo(
+                companyName = session.company.name,
+                countryCode = session.company.countryCode.orEmpty(),
+                branchName = "",
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
         val savedCompanySession = DependencyContainer.authRepository.getActiveCompanySession()
@@ -119,13 +139,24 @@ private fun PosAppContent() {
                 DependencyContainer.createSettingsViewModel()
             }
 
+            val activeCaja by DependencyContainer.cajaRepository.activeCaja.collectAsStateWithLifecycle()
             val activeCajaName by DependencyContainer.cajaRepository.activeCajaName.collectAsStateWithLifecycle()
             val activeCajaSecuencia by DependencyContainer.cajaRepository.activeCajaSecuencia.collectAsStateWithLifecycle()
 
+            val sucursalNombre = activeCaja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
+            val rawFecha = activeCajaSecuencia?.fechaApertura
+            val formattedFecha = rawFecha?.let(com.amaxonia.erp.domain.util.CajaDateParser::formatDisplayDate)
+            val isDiaAnterior = activeCajaSecuencia != null && com.amaxonia.erp.domain.util.CajaDateParser.isFromPreviousDay(rawFecha)
+            val usuarioApertura = activeCajaSecuencia?.usuarioApertura
+
             MainShellScreen(
                 session = currentSession,
+                activeSucursalName = sucursalNombre,
                 activeCajaName = activeCajaName,
                 isCajaOpen = activeCajaSecuencia != null,
+                isCajaDiaAnterior = isDiaAnterior,
+                cajaFechaApertura = formattedFecha,
+                usuarioApertura = usuarioApertura,
                 onLogout = {
                     scope.launch {
                         DependencyContainer.authRepository.logout()

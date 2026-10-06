@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.amaxonia.erp.BuildConfig
 import com.amaxonia.erp.data.remote.AppJson
 import com.amaxonia.erp.data.remote.dto.LoginResponse
+import com.amaxonia.erp.domain.model.Caja
 import com.amaxonia.erp.domain.model.ServerCountries
 import com.amaxonia.erp.domain.model.ServerCountry
 import com.amaxonia.erp.domain.model.printer.PrinterType
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
+import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("amaxonia_erp_pos")
 
@@ -31,6 +33,7 @@ open class LocalStore(
     private val selectedCountryKey = stringPreferencesKey("selected_country_code")
 
     private val companySessionKey = stringPreferencesKey("company_session")
+    private val activeCajaSnapshotKey = stringPreferencesKey("active_caja_snapshot")
     private val activeCajaIdKey = stringPreferencesKey("active_caja_id")
     private val activeCajaNameKey = stringPreferencesKey("active_caja_name")
     private val activeSucursalIdKey = stringPreferencesKey("active_sucursal_id")
@@ -64,6 +67,7 @@ open class LocalStore(
         dataStore.edit { prefs ->
             prefs.remove(authSessionKey)
             prefs.remove(companySessionKey)
+            prefs.remove(activeCajaSnapshotKey)
             prefs.remove(activeCajaIdKey)
             prefs.remove(activeCajaNameKey)
             prefs.remove(activeSucursalIdKey)
@@ -116,6 +120,7 @@ open class LocalStore(
     suspend fun clearCompanySession() {
         dataStore.edit { prefs ->
             prefs.remove(companySessionKey)
+            prefs.remove(activeCajaSnapshotKey)
             prefs.remove(activeCajaIdKey)
             prefs.remove(activeCajaNameKey)
             prefs.remove(activeSucursalIdKey)
@@ -123,14 +128,52 @@ open class LocalStore(
         }
     }
 
-    suspend fun saveActiveCaja(id: String, name: String) {
+    open suspend fun saveActiveCaja(caja: Caja) {
+        val session = readCompanySession()
+        val snapshot = ActiveCajaSnapshot(
+            companyDb = session?.company?.adminDb.orEmpty(),
+            date = LocalDate.now().toString(),
+            caja = caja,
+        )
+        val json = AppJson.encodeToString(snapshot)
         dataStore.edit { prefs ->
-            prefs[activeCajaIdKey] = id
-            prefs[activeCajaNameKey] = name
+            prefs[activeCajaSnapshotKey] = json
+            prefs[activeCajaIdKey] = caja.idCaja
+            prefs[activeCajaNameKey] = caja.displayName
         }
     }
 
+    open suspend fun readActiveCajaForToday(): Caja? {
+        val json = dataStore.data.first()[activeCajaSnapshotKey] ?: return null
+        val snapshot = runCatching { AppJson.decodeFromString<ActiveCajaSnapshot>(json) }.getOrNull()
+        val session = readCompanySession()
+        val isSameCompany = session?.company?.adminDb.orEmpty() == snapshot?.companyDb
+        val isToday = snapshot?.date == LocalDate.now().toString()
+        return if (snapshot != null && isSameCompany && isToday) {
+            snapshot.caja
+        } else {
+            clearActiveCaja()
+            null
+        }
+    }
+
+    open suspend fun clearActiveCaja() {
+        dataStore.edit { prefs ->
+            prefs.remove(activeCajaSnapshotKey)
+            prefs.remove(activeCajaIdKey)
+            prefs.remove(activeCajaNameKey)
+        }
+    }
+
+    suspend fun saveActiveCaja(id: String, name: String) {
+        saveActiveCaja(Caja(idCaja = id, caja = name, descripcion = name))
+    }
+
     open suspend fun readActiveCaja(): Pair<String, String>? {
+        val todayCaja = readActiveCajaForToday()
+        if (todayCaja != null) {
+            return Pair(todayCaja.idCaja, todayCaja.displayName)
+        }
         val prefs = dataStore.data.first()
         val id = prefs[activeCajaIdKey] ?: return null
         val name = prefs[activeCajaNameKey] ?: ""
@@ -241,19 +284,19 @@ open class LocalStore(
         dataStore.edit { prefs -> prefs[customerDisplayEnabledKey] = enabled }
     }
 
-    fun customerDisplayEnabledFlow(): Flow<Boolean> =
-        dataStore.data.map { prefs -> prefs[customerDisplayEnabledKey] ?: false }
+    open fun customerDisplayEnabledFlow(): Flow<Boolean> =
+        dataStore.data.map { prefs -> prefs[customerDisplayEnabledKey] ?: true }
 
-    suspend fun readCustomerDisplayEnabled(): Boolean = customerDisplayEnabledFlow().first()
+    open suspend fun readCustomerDisplayEnabled(): Boolean = customerDisplayEnabledFlow().first()
 
     suspend fun saveAutoPrintReceipt(enabled: Boolean) {
         dataStore.edit { prefs -> prefs[autoPrintReceiptKey] = enabled }
     }
 
-    fun autoPrintReceiptFlow(): Flow<Boolean> =
+    open fun autoPrintReceiptFlow(): Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[autoPrintReceiptKey] ?: true }
 
-    suspend fun readAutoPrintReceipt(): Boolean = autoPrintReceiptFlow().first()
+    open suspend fun readAutoPrintReceipt(): Boolean = autoPrintReceiptFlow().first()
 }
 
 @kotlinx.serialization.Serializable
@@ -269,4 +312,11 @@ data class CompanySessionSnapshot(
     val userId: Int,
     val username: String,
     val userRole: String,
+)
+
+@kotlinx.serialization.Serializable
+data class ActiveCajaSnapshot(
+    val companyDb: String,
+    val date: String,
+    val caja: Caja,
 )
