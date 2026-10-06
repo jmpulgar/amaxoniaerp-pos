@@ -11,6 +11,7 @@ import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.CheckoutOrderUseCase
 import com.amaxonia.kiosk.domain.payment.DevMockPaymentTerminal
 import com.amaxonia.kiosk.domain.payment.PaymentTerminal
+import com.amaxonia.kiosk.hardware.locktask.LockTaskController
 import com.amaxonia.kiosk.hardware.printer.KioskPrinter
 import com.amaxonia.kiosk.hardware.printer.SunmiPrinterManager
 import com.amaxonia.kiosk.ui.accessibility.AccessibilityManager
@@ -40,4 +41,5 @@ class AppGraph(
         )
     val accessibilityManager: AccessibilityManager = AccessibilityManager()
     val idleTimerManager: IdleTimerManager = IdleTimerManager()
+    val lockTaskController: LockTaskController = LockTaskController(context)
 }

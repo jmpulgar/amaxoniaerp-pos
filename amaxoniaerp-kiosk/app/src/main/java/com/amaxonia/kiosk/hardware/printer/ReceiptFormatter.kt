@@ -123,4 +123,51 @@ object ReceiptFormatter {
         val padding = width - truncatedLeft.length - right.length
         return truncatedLeft + " ".repeat(maxOf(1, padding)) + right
     }
+
+    fun createDiagnosticReceipt(): KioskPaymentResponse {
+        return KioskPaymentResponse(
+            orderNumber = "TEST-999",
+            status = "COMPLETED",
+            invoice =
+                com.amaxonia.kiosk.core.network.KioskInvoiceInfo(
+                    codFactura = "DIAG-0001",
+                    cufe = null,
+                    qr = "https://amaxonia.com/diag",
+                ),
+            dispatch = "RETIRO_MOSTRADOR",
+            receipt =
+                com.amaxonia.kiosk.core.network.KioskReceipt(
+                    companyName = "AMAXONIA KIOSK - TEST DE IMPRESIÓN",
+                    ruc = "8-888-8888",
+                    dv = "88",
+                    address = "Terminal K2 - Verificación de Hardware",
+                    orderNumber = "TEST-999",
+                    diningMode = "COMER_AQUI",
+                    tableTent = "01",
+                    customerName = "Técnico de Servicio",
+                    customerId = "0-000-000",
+                    date = "2026-10-05 12:00:00",
+                    lines =
+                        listOf(
+                            com.amaxonia.kiosk.core.network.KioskReceiptLine(
+                                qty = 1,
+                                description = "Verificación de Impresión 80mm",
+                                price = "0.00",
+                                total = "0.00",
+                                modifiers = listOf("Cabezal térmico OK", "Cortador de papel OK"),
+                            ),
+                        ),
+                    subtotal = "0.00",
+                    tax = "0.00",
+                    total = "0.00",
+                    paymentBrand = "PRUEBA",
+                    paymentLast4 = "0000",
+                    paymentAuthCode = "AUTHTEST",
+                    paymentReference = "REFTEST",
+                    invoiceNumber = "DIAG-0001",
+                    cufe = null,
+                    qr = "https://amaxonia.com/diag",
+                ),
+        )
+    }
 }

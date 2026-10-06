@@ -1,5 +1,6 @@
 package com.amaxonia.kiosk
 
+import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Bundle
@@ -14,7 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,8 +35,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
+import com.amaxonia.kiosk.hardware.printer.ReceiptFormatter
 import com.amaxonia.kiosk.ui.accessibility.AccessibilityBar
 import com.amaxonia.kiosk.ui.accessibility.AccessibleContainer
+import com.amaxonia.kiosk.ui.admin.AdminMenuDialog
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
 import com.amaxonia.kiosk.ui.customer.CustomerIdScreen
@@ -54,6 +60,7 @@ import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import com.amaxonia.kiosk.ui.tabletent.TableTentScreen
 import com.amaxonia.kiosk.ui.tabletent.TableTentViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -64,6 +71,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         appGraph.idleTimerManager.start(lifecycleScope)
+        if (appGraph.lockTaskController.isDeviceOwner()) {
+            appGraph.lockTaskController.startLockTask(this)
+        }
 
         // Lock to vertical portrait (1080x1920)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -211,6 +221,51 @@ fun KioskNavHost(
             KioskDestinations.PAIRING
         }
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var showAdminMenu by remember { mutableStateOf(false) }
+    val isLockTaskActive by appGraph.lockTaskController.isLockTaskActive.collectAsStateWithLifecycle()
+    val completedOrder by appGraph.completedOrderState.collectAsStateWithLifecycle()
+
+    if (showAdminMenu) {
+        AdminMenuDialog(
+            isLockTaskActive = isLockTaskActive,
+            hasLastOrder = completedOrder != null,
+            onRePair = {
+                showAdminMenu = false
+                appGraph.tokenStorage.clear()
+                navController.navigate(KioskDestinations.PAIRING) {
+                    popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+                }
+            },
+            onTestPrint = {
+                showAdminMenu = false
+                coroutineScope.launch {
+                    appGraph.printer.printReceipt(ReceiptFormatter.createDiagnosticReceipt())
+                }
+            },
+            onReprintLastReceipt = {
+                showAdminMenu = false
+                completedOrder?.let { order ->
+                    coroutineScope.launch {
+                        appGraph.printer.printReceipt(order.paymentResponse)
+                    }
+                }
+            },
+            onToggleLockTask = {
+                val activity = context as? Activity
+                if (activity != null) {
+                    if (isLockTaskActive) {
+                        appGraph.lockTaskController.stopLockTask(activity)
+                    } else {
+                        appGraph.lockTaskController.startLockTask(activity)
+                    }
+                }
+            },
+            onDismiss = { showAdminMenu = false },
+        )
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -247,7 +302,7 @@ fun KioskNavHost(
                     navController.navigate(KioskDestinations.DINING_MODE)
                 },
                 onAdminUnlocked = {
-                    navController.navigate(KioskDestinations.PAIRING)
+                    showAdminMenu = true
                 },
             )
         }
@@ -409,7 +464,6 @@ fun KioskNavHost(
         }
 
         composable(KioskDestinations.ORDER_NUMBER) {
-            val completedOrder by appGraph.completedOrderState.collectAsStateWithLifecycle()
             val order = completedOrder
             if (order != null) {
                 LaunchedEffect(order.orderNumber) {

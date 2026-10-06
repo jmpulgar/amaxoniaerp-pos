@@ -78,6 +78,10 @@ android {
             excludes += "META-INF/io.netty.versions.properties"
         }
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 detekt {
