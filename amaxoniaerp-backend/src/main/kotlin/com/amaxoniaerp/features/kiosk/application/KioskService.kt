@@ -1,15 +1,15 @@
 package com.amaxoniaerp.features.kiosk.application
 
-import com.amaxoniaerp.JwtConfig
+import com.amaxoniaerp.features.kiosk.data.KioskCajaRepository
 import com.amaxoniaerp.features.kiosk.data.KioskCatalogRepository
+import com.amaxoniaerp.features.kiosk.data.KioskComboRepository
 import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.data.KioskCustomerRepository
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
+import com.amaxoniaerp.features.kiosk.data.KioskSchemaInspector
+import com.amaxoniaerp.features.kiosk.data.KioskSettingsRepository
 import com.amaxoniaerp.features.kiosk.domain.KioskCatalogResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
-import com.amaxoniaerp.features.kiosk.domain.KioskDevice
-import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
-import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskPayResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskPaymentMethod
 import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
@@ -19,14 +19,10 @@ import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskYappyQrResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskYappyStatusResponse
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
 import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
-import java.security.SecureRandom
-import java.time.LocalDateTime
 
 class KioskRateLimitException(
     message: String,
@@ -36,16 +32,35 @@ class KioskAuthenticationException(
     message: String,
 ) : RuntimeException(message)
 
+/** El tenant no tiene las tablas `kiosco_pedido*` (falta la migración del administrativo). */
+class KioskNotEnabledException : RuntimeException("El kiosco no está habilitado en esta empresa (falta migración)")
+
+/** Caja y prefijo que el kiosco envía en `X-Kiosk-Caja` / `X-Kiosk-Prefix`. */
+data class KioskCajaSelection(
+    val countryCode: String,
+    val companyDb: String,
+    val userId: Int?,
+    val idCaja: String,
+    val prefix: String,
+)
+
+/**
+ * Operaciones del kiosco de autoservicio. El kiosco usa el mismo login que el POS (token de
+ * empresa) y vende sobre una caja del ERP elegida en el equipo; ver [resolveContext].
+ */
 class KioskService(
-    private val kioskDeviceRepository: KioskDeviceRepository,
     private val unlockRateLimiter: UnlockRateLimiter,
-    private val jwtConfig: JwtConfig,
     private val databaseResolver: (countryCode: String, companyDb: String) -> Database,
-    private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(),
-    private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(),
-    private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(),
-    private val placeKioskOrderService: PlaceKioskOrderService = PlaceKioskOrderService(kioskOrderRepository = kioskOrderRepository),
+    private val schemaInspector: KioskSchemaInspector = KioskSchemaInspector(),
+    private val kioskSettingsRepository: KioskSettingsRepository = KioskSettingsRepository(schemaInspector),
+    private val kioskConfigRepository: KioskConfigRepository = KioskConfigRepository(kioskSettingsRepository),
+    private val kioskCatalogRepository: KioskCatalogRepository = KioskCatalogRepository(KioskComboRepository(schemaInspector)),
+    private val kioskOrderRepository: KioskOrderRepository = KioskOrderRepository(KioskComboRepository(schemaInspector)),
+    private val placeKioskOrderService: PlaceKioskOrderService =
+        PlaceKioskOrderService(kioskOrderRepository = kioskOrderRepository, kioskSettingsRepository = kioskSettingsRepository),
     private val kioskYappyService: KioskYappyService? = null,
+    private val kioskCajaRepository: KioskCajaRepository = KioskCajaRepository(),
+    private val kioskCustomerRepository: KioskCustomerRepository = KioskCustomerRepository(),
 ) {
     private val json =
         Json {
@@ -54,98 +69,35 @@ class KioskService(
             explicitNulls = false
         }
 
-    suspend fun pairDevice(request: KioskPairingRequest): Result<KioskPairingResponse> =
-        runCatching {
-            val countryCode = request.countryCode.trim().uppercase()
-            val companyDb = request.companyDb.trim()
-            val pairingCode = request.pairingCode.trim()
+    /**
+     * Construye el contexto del kiosco desde la caja elegida: debe existir y estar activa
+     * (si no, null). Sucursal, almacén y vendedor salen de la caja igual que en `GET /api/cajas`
+     * (almacén de la caja → por defecto de la sucursal → `parametros_generales.cod_almacen`;
+     * vendedor del usuario → de la caja → de la sucursal → 0, como el POS). El cliente genérico
+     * es `parametros_generales.default_cod_cliente_factura` resuelto a `clientes.id_cliente`.
+     */
+    suspend fun resolveContext(selection: KioskCajaSelection): KioskRequestContext? {
+        val database = databaseResolver(selection.countryCode, selection.companyDb)
+        val caja =
+            kioskCajaRepository.findActiveCaja(database, selection.countryCode, selection.idCaja, selection.userId)
+                ?: return null
+        val settings = kioskSettingsRepository.load(database)
+        val defaultCode = settings.defaultCodClienteFactura ?: DEFAULT_CUSTOMER_CODE
+        val idClienteGenerico = kioskCustomerRepository.resolveClientId(database, defaultCode) ?: defaultCode
 
-            if (countryCode.length != 2) {
-                throw IllegalArgumentException("countryCode debe tener 2 letras")
-            }
-            if (companyDb.isBlank() || companyDb.contains("..")) {
-                throw IllegalArgumentException("companyDb inválido")
-            }
-            if (pairingCode.isBlank()) {
-                throw IllegalArgumentException("pairingCode no puede estar vacío")
-            }
-
-            val database = databaseResolver(countryCode, companyDb)
-            val candidates = kioskDeviceRepository.findCandidateDevices(database)
-            // Compare against the DB clock: the admin writes codigo_expira_en in the DB server's local time.
-            val now = kioskDeviceRepository.currentDatabaseTime(database)
-
-            val hashedInputSha256 = sha256(pairingCode)
-
-            val matchedDevice =
-                candidates.firstOrNull { device ->
-                    val hash = device.codigoEmparejamientoHash
-                    val expira = device.codigoExpiraEn
-                    if (hash.isNullOrBlank()) return@firstOrNull false
-                    if (expira != null && now.isAfter(expira)) return@firstOrNull false
-
-                    if (hash.startsWith("$2")) {
-                        try {
-                            BCrypt.checkpw(pairingCode, hash)
-                        } catch (_: Exception) {
-                            false
-                        }
-                    } else {
-                        hash.equals(hashedInputSha256, ignoreCase = true)
-                    }
-                } ?: throw KioskAuthenticationException("Código de emparejamiento inválido o expirado")
-
-            val rawDeviceToken = generateSecureToken()
-            val tokenHash = sha256(rawDeviceToken)
-
-            val updated =
-                kioskDeviceRepository.updateDevicePairing(
-                    database = database,
-                    deviceId = matchedDevice.id,
-                    tokenHash = tokenHash,
-                    now = now,
-                )
-            if (!updated) {
-                throw IllegalStateException("No se pudo actualizar el estado del dispositivo")
-            }
-
-            val jwtToken =
-                JWT
-                    .create()
-                    .withIssuer(jwtConfig.domain)
-                    .withAudience(jwtConfig.audience)
-                    .withClaim("token_type", "kiosk")
-                    .withClaim("role", "KIOSK")
-                    .withClaim("device_id", matchedDevice.id)
-                    .withClaim("device_name", matchedDevice.nombre)
-                    .withClaim("country_code", countryCode)
-                    .withClaim("admin_db", companyDb)
-                    .withClaim("company_db", companyDb)
-                    .withClaim("prefix", matchedDevice.prefijoPedido)
-                    .withClaim("box_id", matchedDevice.idCaja)
-                    .withClaim("branch_id", matchedDevice.idSucursal)
-                    .withClaim("warehouse_id", matchedDevice.idAlmacen)
-                    .withClaim("seller_code", matchedDevice.codVendedor)
-                    .withClaim("customer_id", matchedDevice.idClienteGenerico)
-                    .sign(Algorithm.HMAC256(jwtConfig.secret))
-
-            KioskPairingResponse(
-                deviceId = matchedDevice.id,
-                deviceToken = jwtToken,
-                deviceName = matchedDevice.nombre,
-                prefix = matchedDevice.prefijoPedido,
-            )
-        }
-
-    suspend fun verifyDeviceActive(
-        countryCode: String,
-        companyDb: String,
-        deviceId: String,
-    ): KioskDevice? {
-        val database = databaseResolver(countryCode, companyDb)
-        val device = kioskDeviceRepository.findDeviceById(database, deviceId) ?: return null
-        kioskDeviceRepository.touchLastContact(database, deviceId, LocalDateTime.now())
-        return device
+        return KioskRequestContext(
+            countryCode = selection.countryCode,
+            companyDb = selection.companyDb,
+            deviceId = caja.idCaja,
+            deviceName = caja.name,
+            prefix = selection.prefix,
+            idCaja = caja.idCaja,
+            idSucursal = caja.idSucursal,
+            idAlmacen = caja.idAlmacen,
+            codVendedor = caja.codVendedor,
+            idClienteGenerico = idClienteGenerico,
+            userId = selection.userId,
+        )
     }
 
     suspend fun unlock(
@@ -153,20 +105,21 @@ class KioskService(
         request: KioskUnlockRequest,
     ): Result<Unit> =
         runCatching {
-            val deviceId = kioskContext.deviceId
-            if (unlockRateLimiter.isRateLimited(deviceId)) {
+            // Intentos por empresa + caja + usuario (antes: por dispositivo emparejado).
+            val limiterKey = "${kioskContext.companyDb}|${kioskContext.idCaja}|${kioskContext.userId ?: 0}"
+            if (unlockRateLimiter.isRateLimited(limiterKey)) {
                 throw KioskRateLimitException("Demasiados intentos fallidos. Intente de nuevo en 5 minutos.")
             }
 
             val password = request.password
             if (password.isBlank()) {
-                unlockRateLimiter.recordFailure(deviceId)
+                unlockRateLimiter.recordFailure(limiterKey)
                 throw KioskAuthenticationException("Contraseña requerida")
             }
 
             val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
             val hashedClave =
-                kioskDeviceRepository.getClaveKiosko(database)
+                kioskSettingsRepository.load(database).claveKiosko
                     ?: throw IllegalStateException("No hay clave de kiosco configurada en parametros_generales")
 
             val valid =
@@ -182,11 +135,11 @@ class KioskService(
                 }
 
             if (!valid) {
-                unlockRateLimiter.recordFailure(deviceId)
+                unlockRateLimiter.recordFailure(limiterKey)
                 throw KioskAuthenticationException("Contraseña de desbloqueo incorrecta")
             }
 
-            unlockRateLimiter.recordSuccess(deviceId)
+            unlockRateLimiter.recordSuccess(limiterKey)
         }
 
     suspend fun getConfig(kioskContext: KioskRequestContext): Result<Pair<KioskConfigResponse, String>> =
@@ -205,9 +158,11 @@ class KioskService(
                 } else {
                     listOf(KioskPaymentMethod.CARD)
                 }
-            val config = baseConfig.copy(paymentMethods = paymentMethods)
-            val jsonString = json.encodeToString(KioskConfigResponse.serializer(), config)
-            val etag = "\"" + sha256(jsonString) + "\""
+            val unversioned = baseConfig.copy(paymentMethods = paymentMethods, version = 0)
+            val contentHash = sha256(json.encodeToString(KioskConfigResponse.serializer(), unversioned))
+            // version deriva del contenido: cambia solo cuando cambia la configuración.
+            val config = unversioned.copy(version = contentHash.take(VERSION_HEX_DIGITS).toInt(HEX_RADIX))
+            val etag = "\"" + sha256(json.encodeToString(KioskConfigResponse.serializer(), config)) + "\""
             Pair(config, etag)
         }
 
@@ -234,7 +189,7 @@ class KioskService(
             if (idempotencyKey.isBlank()) {
                 throw IllegalArgumentException("Header Idempotency-Key es requerido")
             }
-            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            val database = requireKioskOrderTables(kioskContext)
             kioskOrderRepository.createQuote(
                 database = database,
                 kioskContext = kioskContext,
@@ -252,7 +207,7 @@ class KioskService(
             if (orderId.isBlank()) {
                 throw IllegalArgumentException("orderId no puede estar vacío")
             }
-            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            val database = requireKioskOrderTables(kioskContext)
             placeKioskOrderService.payOrder(
                 database = database,
                 kioskContext = kioskContext,
@@ -267,7 +222,7 @@ class KioskService(
     ): Result<KioskYappyQrResponse> =
         runCatching {
             val yappy = kioskYappyService ?: throw KioskYappyNotConfiguredException()
-            yappy.createQr(databaseResolver(kioskContext.countryCode, kioskContext.companyDb), kioskContext, orderId)
+            yappy.createQr(requireKioskOrderTables(kioskContext), kioskContext, orderId)
         }
 
     suspend fun getYappyStatus(
@@ -277,7 +232,7 @@ class KioskService(
     ): Result<KioskYappyStatusResponse> =
         runCatching {
             val yappy = kioskYappyService ?: throw KioskYappyNotConfiguredException()
-            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            val database = requireKioskOrderTables(kioskContext)
             yappy.getStatus(database, kioskContext, orderId, transactionId)
         }
 
@@ -289,20 +244,25 @@ class KioskService(
     ): Result<Unit> =
         runCatching {
             val yappy = kioskYappyService ?: return@runCatching
-            val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+            val database = requireKioskOrderTables(kioskContext)
             yappy.cancel(database, kioskContext, orderId, transactionId)
         }
+
+    /** Base de la empresa si tiene las tablas `kiosco_pedido*`; si no, [KioskNotEnabledException]. */
+    private suspend fun requireKioskOrderTables(kioskContext: KioskRequestContext): Database {
+        val database = databaseResolver(kioskContext.countryCode, kioskContext.companyDb)
+        if (!schemaInspector.hasKioskOrderTables(database)) throw KioskNotEnabledException()
+        return database
+    }
 
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
     }
-
-    private fun generateSecureToken(): String {
-        val randomBytes = ByteArray(SECURE_TOKEN_BYTES)
-        SecureRandom().nextBytes(randomBytes)
-        return randomBytes.joinToString("") { "%02x".format(it) }
-    }
 }
 
-private const val SECURE_TOKEN_BYTES = 32
+private const val DEFAULT_CUSTOMER_CODE = "CF"
+
+/** 7 dígitos hex (28 bits) caben en un Int positivo. */
+private const val VERSION_HEX_DIGITS = 7
+private const val HEX_RADIX = 16

@@ -8,6 +8,8 @@ import com.amaxoniaerp.features.items.data.ItemsTablePA
 import com.amaxoniaerp.features.items.data.ItemsTableVE
 import com.amaxoniaerp.features.kiosk.domain.KioskCatalogResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskCategoryDto
+import com.amaxoniaerp.features.kiosk.domain.KioskComboGroup
+import com.amaxoniaerp.features.kiosk.domain.KioskComboRules
 import com.amaxoniaerp.features.kiosk.domain.KioskItemDto
 import com.amaxoniaerp.features.kiosk.domain.KioskModifierGroupDto
 import com.amaxoniaerp.features.kiosk.domain.KioskModifierOptionDto
@@ -15,18 +17,26 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
-import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
+import java.math.RoundingMode
 
-class KioskCatalogRepository {
+/**
+ * Catálogo del kiosco: departamentos visibles en POS, precio nivel A y combos/modificadores
+ * del modelo del ERP ([KioskComboRepository]). Los grupos INCLUIDO no se eligen: se omiten de
+ * `modifierGroups` y se resumen como "Incluye: ..." en la descripción del producto.
+ */
+class KioskCatalogRepository(
+    private val comboRepository: KioskComboRepository = KioskComboRepository(),
+) {
     suspend fun getCatalog(
         database: Database,
         countryCode: String,
         companyDb: String,
-    ): KioskCatalogResponse =
-        dbQuery(database) {
+    ): KioskCatalogResponse {
+        val comboSchema = comboRepository.schema(database)
+        return dbQuery(database) {
             val normalizedCountry = countryCode.uppercase()
 
             // 1. Obtener departamentos visibles en POS (visible_pos = 1 y visible = true)
@@ -96,85 +106,11 @@ class KioskCatalogRepository {
 
             val itemIds = itemRows.map { it[itemsTable.idItem] }
 
-            // 4. Modificadores vinculados a los items
-            val modifierRelations =
-                (ItemModifierRelationTable innerJoin ItemModifierGroupTable)
-                    .selectAll()
-                    .where {
-                        (ItemModifierRelationTable.idItem inList itemIds) and
-                            (ItemModifierGroupTable.activo eq true)
-                    }.orderBy(
-                        ItemModifierRelationTable.idItem to SortOrder.ASC,
-                        ItemModifierRelationTable.orden to SortOrder.ASC,
-                        ItemModifierGroupTable.orden to SortOrder.ASC,
-                    ).toList()
-
-            val groupIds = modifierRelations.map { it[ItemModifierGroupTable.id] }.distinct()
-
-            val modifierOptionsByGroup =
-                if (groupIds.isNotEmpty()) {
-                    ItemModifierTable
-                        .selectAll()
-                        .where {
-                            (ItemModifierTable.idGrupo inList groupIds) and
-                                (ItemModifierTable.activo eq true)
-                        }.orderBy(ItemModifierTable.orden to SortOrder.ASC)
-                        .groupBy { it[ItemModifierTable.idGrupo] }
-                } else {
-                    emptyMap()
-                }
-
-            // Consultar stock de items asociados a modificadores para marcar soldOut en opciones
-            val associatedItemIds =
-                modifierOptionsByGroup.values
-                    .flatten()
-                    .mapNotNull { it[ItemModifierTable.idItemAsociado]?.takeIf { id -> id > 0 } }
-                    .distinct()
-
-            val associatedStockMap =
-                if (validarStock && associatedItemIds.isNotEmpty()) {
-                    itemsTable
-                        .selectAll()
-                        .where { itemsTable.idItem inList associatedItemIds }
-                        .associate { it[itemsTable.idItem] to (it[itemsTable.existenciaTotal] <= 0) }
-                } else {
-                    emptyMap()
-                }
-
-            // Mapear grupos por item
-            val groupsByItemId = mutableMapOf<Int, MutableList<KioskModifierGroupDto>>()
-            for (rel in modifierRelations) {
-                val itemId = rel[ItemModifierRelationTable.idItem]
-                val groupId = rel[ItemModifierGroupTable.id]
-                val options =
-                    modifierOptionsByGroup[groupId]?.map { optRow ->
-                        val associatedId = optRow[ItemModifierTable.idItemAsociado]
-                        val optionSoldOut =
-                            if (validarStock && associatedId != null && associatedId > 0) {
-                                associatedStockMap[associatedId] ?: false
-                            } else {
-                                false
-                            }
-                        KioskModifierOptionDto(
-                            id = optRow[ItemModifierTable.id],
-                            name = optRow[ItemModifierTable.nombre],
-                            extraPrice = formatDecimal(optRow[ItemModifierTable.precioAdicional]),
-                            soldOut = optionSoldOut,
-                        )
-                    } ?: emptyList()
-
-                val groupDto =
-                    KioskModifierGroupDto(
-                        id = groupId,
-                        name = rel[ItemModifierGroupTable.nombre],
-                        min = rel[ItemModifierGroupTable.minSeleccion],
-                        max = rel[ItemModifierGroupTable.maxSeleccion],
-                        isMandatory = rel[ItemModifierGroupTable.esObligatorio],
-                        isCombo = rel[ItemModifierGroupTable.esCombo],
-                        options = options,
-                    )
-                groupsByItemId.getOrPut(itemId) { mutableListOf() }.add(groupDto)
-            }
+            // 4. Combos y modificadores (item_combos → grupos → grupo_items)
+            val groupsByItemId =
+                comboSchema
+                    ?.let { comboRepository.loadGroupsByItem(it, itemsTable, itemIds, validarStock) }
+                    .orEmpty()
 
             // 5. Construir items DTO
             val itemsDto =
@@ -201,25 +137,25 @@ class KioskCatalogRepository {
                     val soldOut = if (validarStock) stock <= 0 else false
 
                     val ivaValue = row[itemsTable.iva]
-                    val taxRate =
-                        if (row[itemsTable.montoExento]) {
-                            "0.00"
-                        } else if (ivaValue > BigDecimal.ZERO) {
-                            formatDecimal(ivaValue)
-                        } else {
-                            formatDecimal(defaultTax)
+                    val taxRateValue =
+                        when {
+                            row[itemsTable.montoExento] -> BigDecimal.ZERO
+                            ivaValue > BigDecimal.ZERO -> ivaValue
+                            else -> defaultTax
                         }
+                    val taxRate = formatDecimal(taxRateValue)
+                    val groups = groupsByItemId[itemId].orEmpty()
 
                     KioskItemDto(
                         id = itemId,
                         categoryId = resolvedCatId,
                         name = row[itemsTable.descripcion1].trim(),
-                        description = desc,
+                        description = KioskComboRules.describeItem(desc, groups),
                         price = formatDecimal(row[itemsTable.precio1]),
                         taxRate = taxRate,
                         imageUrl = imageUrl,
                         soldOut = soldOut,
-                        modifierGroups = groupsByItemId[itemId] ?: emptyList(),
+                        modifierGroups = KioskComboRules.selectableGroups(groups).map { it.toDto(taxRateValue) },
                     )
                 }
 
@@ -228,6 +164,35 @@ class KioskCatalogRepository {
                 items = itemsDto,
             )
         }
+    }
+
+    /**
+     * `extraPrice` va en la misma base que `price` (sin impuesto): el extra con impuesto de
+     * `grupo_items` convertido con la tasa del producto, para que price + extras + taxRate cuadre
+     * con la cotización del servidor.
+     */
+    private fun KioskComboGroup.toDto(taxRate: BigDecimal): KioskModifierGroupDto =
+        KioskModifierGroupDto(
+            id = id,
+            name = name,
+            min = effectiveMin,
+            max = effectiveMax,
+            isMandatory = effectiveMin > 0,
+            isCombo = tipo == KioskComboRules.TIPO_COMBO,
+            options =
+                options.map { option ->
+                    KioskModifierOptionDto(
+                        id = option.id,
+                        name = option.name,
+                        extraPrice =
+                            formatDecimal(
+                                KioskComboRules.extraSinIva(option.extraConIva, taxRate).setScale(2, RoundingMode.HALF_UP),
+                            ),
+                        soldOut = option.soldOut,
+                        isDefault = option.isDefault,
+                    )
+                },
+        )
 
     private fun formatDecimal(value: BigDecimal): String {
         val scaled = if (value.scale() < 2) value.setScale(2) else value

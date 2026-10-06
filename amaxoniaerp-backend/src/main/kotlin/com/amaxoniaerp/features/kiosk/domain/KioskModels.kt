@@ -6,21 +6,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Serializable
-data class KioskPairingRequest(
-    val countryCode: String,
-    val companyDb: String,
-    val pairingCode: String,
-)
-
-@Serializable
-data class KioskPairingResponse(
-    val deviceId: String,
-    val deviceToken: String,
-    val deviceName: String,
-    val prefix: String,
-)
-
-@Serializable
 data class KioskUnlockRequest(
     val password: String,
 )
@@ -68,6 +53,8 @@ data class KioskModifierOptionDto(
     val name: String,
     val extraPrice: String,
     val soldOut: Boolean = false,
+    /** Opción marcada por defecto en el combo (`grupo_items.por_defecto`). */
+    val isDefault: Boolean = false,
 )
 
 @Serializable
@@ -239,23 +226,20 @@ data class KioskPayResponse(
     val status: String,
 )
 
-data class KioskDevice(
-    val id: String,
-    val nombre: String,
-    val prefijoPedido: String,
+/** Caja del ERP elegida en el kiosco, con sucursal, almacén y vendedor ya resueltos. */
+data class KioskCaja(
     val idCaja: String,
+    val name: String,
     val idSucursal: Int,
     val idAlmacen: Int,
     val codVendedor: Int,
-    val idClienteGenerico: String,
-    val tokenHash: String?,
-    val codigoEmparejamientoHash: String?,
-    val codigoExpiraEn: LocalDateTime?,
-    val activo: Boolean,
-    val ultimoContacto: LocalDateTime?,
-    val creadoEn: LocalDateTime,
 )
 
+/**
+ * Contexto de una petición del kiosco: empresa del JWT de empresa (mismo login que el POS) y
+ * caja/prefijo de los headers `X-Kiosk-Caja` / `X-Kiosk-Prefix`. `deviceId` es el `idCaja`
+ * (numeración diaria y pertenencia de pedidos por caja) y `deviceName` la descripción de la caja.
+ */
 data class KioskRequestContext(
     val countryCode: String,
     val companyDb: String,
@@ -267,6 +251,8 @@ data class KioskRequestContext(
     val idAlmacen: Int,
     val codVendedor: Int,
     val idClienteGenerico: String,
+    /** `user_id` del token de empresa; null si el token no lo trae. */
+    val userId: Int? = null,
 )
 
 data class KioskSalePrerequisites(

@@ -1,6 +1,5 @@
 package com.amaxoniaerp.composition
 
-import com.amaxoniaerp.JwtConfig
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.auth.domain.AuthService
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
@@ -13,8 +12,13 @@ import com.amaxoniaerp.features.kiosk.application.KioskYappyService
 import com.amaxoniaerp.features.kiosk.application.PlaceKioskOrderService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
 import com.amaxoniaerp.features.kiosk.application.YappySessionManager
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
+import com.amaxoniaerp.features.kiosk.data.KioskCajaRepository
+import com.amaxoniaerp.features.kiosk.data.KioskCatalogRepository
+import com.amaxoniaerp.features.kiosk.data.KioskComboRepository
+import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
+import com.amaxoniaerp.features.kiosk.data.KioskSchemaInspector
+import com.amaxoniaerp.features.kiosk.data.KioskSettingsRepository
 import com.amaxoniaerp.features.kiosk.data.KioskYappyConfigRepository
 import com.amaxoniaerp.features.kiosk.data.yappy.YappyClient
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyGateway
@@ -59,7 +63,7 @@ fun buildAppDependencies(application: Application): AppDependencies {
     val yappyQrType = YappyQrType.fromConfig(application.loadConfigValue("YAPPY_QR_TYPE", "yappy.qrType", dotenv))
     val kiosk =
         buildKioskDependencies(
-            jwtConfig = jwtConfig,
+            cajaRepository = caja.cajaRepository,
             cajaSession = caja.cajaSession,
             processSaleUseCase = mesas.processSaleUseCase,
             yappyGateway = YappyClient(yappyHttpClient),
@@ -102,15 +106,17 @@ private fun buildMesasDependencies(feFactory: ElectronicInvoiceProcessorFactory)
 }
 
 private fun buildKioskDependencies(
-    jwtConfig: JwtConfig,
+    cajaRepository: CajaRepository,
     cajaSession: CajaSessionWorkflow,
     processSaleUseCase: ProcessSaleUseCase,
     yappyGateway: YappyGateway,
     yappyQrType: YappyQrType,
 ): KioskDependencies {
-    val kioskDeviceRepository = KioskDeviceRepository()
-    val unlockRateLimiter = UnlockRateLimiter()
-    val kioskOrderRepository = KioskOrderRepository()
+    // Un solo inspector de esquema: cachea por empresa qué tablas/columnas opcionales existen.
+    val schemaInspector = KioskSchemaInspector()
+    val settingsRepository = KioskSettingsRepository(schemaInspector)
+    val comboRepository = KioskComboRepository(schemaInspector)
+    val kioskOrderRepository = KioskOrderRepository(comboRepository)
     val kioskYappyService =
         KioskYappyService(
             kioskOrderRepository = kioskOrderRepository,
@@ -125,18 +131,22 @@ private fun buildKioskDependencies(
             cajaSessionWorkflow = cajaSession,
             processSaleUseCase = processSaleUseCase,
             yappyPaymentVerifier = kioskYappyService,
+            kioskSettingsRepository = settingsRepository,
         )
     val kioskService =
         KioskService(
-            kioskDeviceRepository = kioskDeviceRepository,
-            unlockRateLimiter = unlockRateLimiter,
-            jwtConfig = jwtConfig,
+            unlockRateLimiter = UnlockRateLimiter(),
             databaseResolver = { countryCode, companyDb ->
                 DatabaseManager.connectToCompanyDb(countryCode, companyDb)
             },
+            schemaInspector = schemaInspector,
+            kioskSettingsRepository = settingsRepository,
+            kioskConfigRepository = KioskConfigRepository(settingsRepository),
+            kioskCatalogRepository = KioskCatalogRepository(comboRepository),
             kioskOrderRepository = kioskOrderRepository,
             placeKioskOrderService = placeKioskOrderService,
             kioskYappyService = kioskYappyService,
+            kioskCajaRepository = KioskCajaRepository(cajaRepository),
         )
     return KioskDependencies(kioskService)
 }

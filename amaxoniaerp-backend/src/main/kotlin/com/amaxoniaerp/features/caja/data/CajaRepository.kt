@@ -99,17 +99,22 @@ class CajaRepository {
             mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames, all)
         }
 
+    /**
+     * Caja por id. Con [userId] el vendedor por defecto se resuelve igual que en `GET /api/cajas`
+     * (vendedor del usuario, luego el de la caja, luego el de la sucursal).
+     */
     suspend fun getCajaById(
         database: Database,
         countryCode: String,
         id: String,
+        userId: Int? = null,
     ): Caja? =
         dbQuery(database) {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames)
+            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames, userId)
         }
 
     suspend fun createCaja(

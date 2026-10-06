@@ -18,53 +18,57 @@
       "id": 101,
       "categoryId": 1,
       "name": "Hamburguesa Clásica",
-      "description": "Carne 100% res, queso cheddar, lechuga y tomate",
+      "description": "Carne 100% res, queso cheddar, lechuga y tomate. Incluye: Papas Fritas",
       "price": "5.50",
       "taxRate": "7.00",
       "imageUrl": "/api/data/PA/momi_pa/item/burger.jpg",
       "soldOut": false,
       "modifierGroups": [
         {
-          "id": 1,
-          "name": "Bebida del Combo",
+          "id": 11,
+          "name": "BEBIDA",
           "min": 1,
           "max": 1,
           "isMandatory": true,
           "isCombo": true,
           "options": [
             {
-              "id": 1,
+              "id": 111,
               "name": "Coca Cola Sin Azúcar",
               "extraPrice": "0.00",
-              "soldOut": false
+              "soldOut": false,
+              "isDefault": true
             },
             {
-              "id": 2,
+              "id": 112,
               "name": "Sprite",
               "extraPrice": "0.00",
-              "soldOut": false
+              "soldOut": false,
+              "isDefault": false
             }
           ]
         },
         {
-          "id": 2,
-          "name": "Extras",
+          "id": 12,
+          "name": "EXTRAS",
           "min": 0,
           "max": 3,
           "isMandatory": false,
           "isCombo": false,
           "options": [
             {
-              "id": 3,
-              "name": "Tocineta Extra",
-              "extraPrice": "1.50",
-              "soldOut": false
+              "id": 121,
+              "name": "TOCINETA EXTRA",
+              "extraPrice": "1.40",
+              "soldOut": false,
+              "isDefault": false
             },
             {
-              "id": 4,
-              "name": "Queso Cheddar Extra",
-              "extraPrice": "1.00",
-              "soldOut": false
+              "id": 122,
+              "name": "QUESO CHEDDAR EXTRA",
+              "extraPrice": "0.93",
+              "soldOut": false,
+              "isDefault": false
             }
           ]
         }

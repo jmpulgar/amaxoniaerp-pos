@@ -1,42 +1,30 @@
 package com.amaxoniaerp.features.kiosk.route
 
-import com.amaxoniaerp.JwtConfig
+import com.amaxoniaerp.features.caja.data.CajaTablePA
+import com.amaxoniaerp.features.clients.data.ClientsTable
+import com.amaxoniaerp.features.kiosk.application.KioskCajaSelection
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceTable
-import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
-import com.amaxoniaerp.features.kiosk.domain.KioskPairingResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import com.zaxxer.hikari.HikariConfig
+import com.amaxoniaerp.features.kiosk.route.KioskTestSupport.kioskClient
+import com.amaxoniaerp.features.kiosk.route.KioskTestSupport.kioskHeaders
 import com.zaxxer.hikari.HikariDataSource
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.header
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.install
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import org.mindrot.jbcrypt.BCrypt
-import java.security.MessageDigest
-import java.time.LocalDateTime
-import java.util.UUID
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -45,95 +33,27 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Autenticación del kiosco con el login del POS (token de empresa) + headers de caja/prefijo,
+ * resolución del contexto desde la caja y desbloqueo con la clave del kiosco.
+ */
 class KioskAuthRoutesTest {
     private lateinit var dataSource: HikariDataSource
     private lateinit var database: Database
-    private val jwtConfig =
-        JwtConfig(
-            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-            domain = "http://localhost:8080",
-            audience = "http://localhost:8080/kiosk",
-            realm = "Amaxonia Kiosk Test",
-        )
-
-    private val json =
-        Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = false
-            explicitNulls = false
-        }
-
-    private val kioskDeviceRepository = KioskDeviceRepository()
-    private val unlockRateLimiter = UnlockRateLimiter(maxAttempts = 5, windowSeconds = 60)
     private lateinit var kioskService: KioskService
-
-    private val testCountry = "PA"
-    private val testCompanyDb = "momi_test"
-    private val testDeviceId = UUID.randomUUID().toString()
-    private val rawPairingCode = "12345678"
-    private val rawAdminPassword = "secretKioskPassword"
+    private val unlockRateLimiter = UnlockRateLimiter()
+    private val rawAdminPassword = "AdminKiosko2026!"
 
     @BeforeTest
     fun setUp() {
-        dataSource =
-            HikariDataSource(
-                HikariConfig().apply {
-                    jdbcUrl = "jdbc:h2:mem:kiosk_auth_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                    driverClassName = "org.h2.Driver"
-                    maximumPoolSize = 2
-                    isAutoCommit = false
-                },
-            )
+        dataSource = KioskTestSupport.newDataSource("kiosk_auth")
         database = Database.connect(dataSource)
+        kioskService = KioskService(unlockRateLimiter = unlockRateLimiter, databaseResolver = { _, _ -> database })
 
-        kioskService =
-            KioskService(
-                kioskDeviceRepository = kioskDeviceRepository,
-                unlockRateLimiter = unlockRateLimiter,
-                jwtConfig = jwtConfig,
-                databaseResolver = { _, _ -> database },
-            )
-
+        KioskTestSupport.createParametrosGenerales(database)
+        KioskTestSupport.createCajaSchema(database, cajaDescripcion = "Kiosco Albrook")
         transaction(database) {
-            exec(
-                """
-                CREATE TABLE IF NOT EXISTS parametros_generales (
-                    cod_empresa INT PRIMARY KEY,
-                    default_cod_cliente_factura VARCHAR(80) NOT NULL,
-                    clave_kiosko VARCHAR(255)
-                )
-                """.trimIndent(),
-            )
-            SchemaUtils.create(KioskDeviceTable)
-
-            // Seed parametros_generales
-            val hashedAdminPw = BCrypt.hashpw(rawAdminPassword, BCrypt.gensalt(10))
-            exec(
-                "INSERT INTO parametros_generales (cod_empresa, default_cod_cliente_factura, clave_kiosko) " +
-                    "VALUES (1, 'CF', '$hashedAdminPw')",
-            )
-
-            // Seed device ready for pairing
-            val shaPairingCode =
-                MessageDigest
-                    .getInstance("SHA-256")
-                    .digest(rawPairingCode.toByteArray())
-                    .joinToString("") { "%02x".format(it) }
-
-            KioskDeviceTable.insert {
-                it[id] = testDeviceId
-                it[nombre] = "Kiosco Entrada 1"
-                it[prefijoPedido] = "K1"
-                it[idCaja] = "caja-kiosk-1"
-                it[idSucursal] = 1
-                it[idAlmacen] = 1
-                it[codVendedor] = 101
-                it[idClienteGenerico] = "CLI-GEN"
-                it[codigoEmparejamientoHash] = shaPairingCode
-                it[codigoExpiraEn] = LocalDateTime.now().plusHours(2)
-                it[activo] = true
-                it[creadoEn] = LocalDateTime.now()
-            }
+            exec("UPDATE parametros_generales SET clave_kiosko = '${BCrypt.hashpw(rawAdminPassword, BCrypt.gensalt())}'")
         }
     }
 
@@ -142,187 +62,163 @@ class KioskAuthRoutesTest {
         dataSource.close()
     }
 
-    private fun issueToken(
-        tokenType: String,
-        role: String,
-        deviceId: String = testDeviceId,
-    ): String =
-        JWT
-            .create()
-            .withIssuer(jwtConfig.domain)
-            .withAudience(jwtConfig.audience)
-            .withClaim("token_type", tokenType)
-            .withClaim("role", role)
-            .withClaim("device_id", deviceId)
-            .withClaim("device_name", "Kiosco Entrada 1")
-            .withClaim("country_code", testCountry)
-            .withClaim("admin_db", testCompanyDb)
-            .withClaim("company_db", testCompanyDb)
-            .withClaim("prefix", "K1")
-            .withClaim("box_id", "caja-kiosk-1")
-            .withClaim("branch_id", 1)
-            .withClaim("warehouse_id", 1)
-            .withClaim("seller_code", 101)
-            .withClaim("customer_id", "CLI-GEN")
-            .sign(Algorithm.HMAC256(jwtConfig.secret))
+    private suspend fun HttpClient.unlock(
+        password: String,
+        token: String = KioskTestSupport.companyToken(),
+    ): HttpResponse =
+        post("/api/v1/kiosk/unlock") {
+            kioskHeaders(token = token)
+            contentType(ContentType.Application.Json)
+            setBody(KioskUnlockRequest(password))
+        }
 
     @Test
-    fun `pairing fails with invalid or expired code and succeeds with valid code`() =
+    fun `kiosk endpoints require the POS company token`() =
         testApplication {
-            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                json(json)
+            val client = kioskClient(kioskService)
+
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/api/v1/kiosk/config").status)
+
+            val identityToken = KioskTestSupport.companyToken(tokenType = "identity")
+            val forbidden = client.get("/api/v1/kiosk/config") { kioskHeaders(token = identityToken) }
+            assertEquals(HttpStatusCode.Forbidden, forbidden.status)
+            assertTrue(forbidden.bodyAsText().contains("Se requiere token de empresa"))
+
+            val ok = client.get("/api/v1/kiosk/config") { kioskHeaders() }
+            assertEquals(HttpStatusCode.OK, ok.status)
+        }
+
+    @Test
+    fun `pairing endpoint no longer exists`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+            val response = client.post("/api/v1/kiosk/pairing") { kioskHeaders() }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `missing or invalid kiosk headers answer 400 with a clear message`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+
+            val noCaja = client.get("/api/v1/kiosk/config") { kioskHeaders(caja = null) }
+            assertEquals(HttpStatusCode.BadRequest, noCaja.status)
+            assertTrue(noCaja.bodyAsText().contains("Falta el header X-Kiosk-Caja"))
+
+            val noPrefix = client.get("/api/v1/kiosk/config") { kioskHeaders(prefix = null) }
+            assertEquals(HttpStatusCode.BadRequest, noPrefix.status)
+            assertTrue(noPrefix.bodyAsText().contains("Falta el header X-Kiosk-Prefix"))
+
+            for (invalid in listOf("K-1", "TOOLONG", "K 1")) {
+                val response = client.get("/api/v1/kiosk/config") { kioskHeaders(prefix = invalid) }
+                assertEquals(HttpStatusCode.BadRequest, response.status, "prefijo $invalid")
+                assertTrue(response.bodyAsText().contains("X-Kiosk-Prefix inválido"))
             }
-            installKtorSecurity()
-            routing {
-                kioskRoutes(kioskService)
-            }
+        }
 
-            val client =
-                createClient {
-                    install(ContentNegotiation) {
-                        json(json)
-                    }
-                }
+    @Test
+    fun `unknown or inactive caja is rejected`() =
+        testApplication {
+            val client = kioskClient(kioskService)
 
-            // 1. Wrong code -> 401
-            val wrongResponse =
-                client.post("/api/v1/kiosk/pairing") {
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskPairingRequest(testCountry, testCompanyDb, "99999999"))
-                }
-            assertEquals(HttpStatusCode.Unauthorized, wrongResponse.status)
+            val unknown = client.get("/api/v1/kiosk/config") { kioskHeaders(caja = "NO-EXISTE") }
+            assertEquals(HttpStatusCode.BadRequest, unknown.status)
+            assertTrue(unknown.bodyAsText().contains("Caja del kiosco no válida"))
 
-            // 2. Correct code -> 200
-            val okResponse =
-                client.post("/api/v1/kiosk/pairing") {
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskPairingRequest(testCountry, testCompanyDb, rawPairingCode))
-                }
-            assertEquals(HttpStatusCode.OK, okResponse.status)
-            val pairingResult = json.decodeFromString<KioskPairingResponse>(okResponse.bodyAsText())
-            assertEquals(testDeviceId, pairingResult.deviceId)
-            assertEquals("K1", pairingResult.prefix)
-            assertNotNull(pairingResult.deviceToken)
-
-            // 3. Pairing again with same code fails (single-use)
-            val reusedResponse =
-                client.post("/api/v1/kiosk/pairing") {
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskPairingRequest(testCountry, testCompanyDb, rawPairingCode))
-                }
-            assertEquals(HttpStatusCode.Unauthorized, reusedResponse.status)
-
-            // 4. Verify DB updated
             transaction(database) {
-                val dev = KioskDeviceTable.selectAll().where { KioskDeviceTable.id eq testDeviceId }.single()
-                assertNull(dev[KioskDeviceTable.codigoEmparejamientoHash])
-                assertNull(dev[KioskDeviceTable.codigoExpiraEn])
-                assertNotNull(dev[KioskDeviceTable.tokenHash])
+                CajaTablePA.update({ CajaTablePA.idCaja eq KioskTestSupport.CAJA_ID }) { it[codEstatus] = 0 }
             }
+            val inactive = client.get("/api/v1/kiosk/config") { kioskHeaders() }
+            assertEquals(HttpStatusCode.BadRequest, inactive.status)
+            assertTrue(inactive.bodyAsText().contains("Caja del kiosco no válida"))
         }
 
     @Test
-    fun `token isolation - user company token is rejected on kiosk unlock`() =
-        testApplication {
-            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                json(json)
-            }
-            installKtorSecurity()
-            routing {
-                kioskRoutes(kioskService)
-            }
-
-            val client =
-                createClient {
-                    install(ContentNegotiation) {
-                        json(json)
-                    }
+    fun `context is resolved from the caja, the logged user and parametros_generales`() =
+        runBlocking {
+            transaction(database) {
+                exec("UPDATE parametros_generales SET default_cod_cliente_factura = '0001'")
+                ClientsTable.insert {
+                    it[idCliente] = "UUID-CLIENTE-GENERICO"
+                    it[codCliente] = "1"
+                    it[rif] = "CF"
+                    it[dv] = "0"
+                    it[nombre] = "CLIENTE CONTADO"
+                    it[direccion] = "Panamá"
                 }
-
-            val userCompanyToken = issueToken(tokenType = "company", role = "user")
-            val response =
-                client.post("/api/v1/kiosk/unlock") {
-                    header(HttpHeaders.Authorization, "Bearer $userCompanyToken")
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskUnlockRequest(rawAdminPassword))
-                }
-
-            assertEquals(HttpStatusCode.Forbidden, response.status)
-            assertTrue(response.bodyAsText().contains("Se requiere rol KIOSK"))
-        }
-
-    @Test
-    fun `unlock endpoint validates bcrypt password and enforces rate limiting`() =
-        testApplication {
-            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                json(json)
-            }
-            installKtorSecurity()
-            routing {
-                kioskRoutes(kioskService)
             }
 
-            val client =
-                createClient {
-                    install(ContentNegotiation) {
-                        json(json)
-                    }
-                }
-
-            val kioskToken = issueToken(tokenType = "kiosk", role = "KIOSK")
-
-            // 1. Wrong password 5 times
-            for (i in 1..5) {
-                val failedResp =
-                    client.post("/api/v1/kiosk/unlock") {
-                        header(HttpHeaders.Authorization, "Bearer $kioskToken")
-                        contentType(ContentType.Application.Json)
-                        setBody(KioskUnlockRequest("wrongPassword$i"))
-                    }
-                assertEquals(HttpStatusCode.Unauthorized, failedResp.status)
-            }
-
-            // 2. 6th attempt should be blocked by rate limiter with 429 Too Many Requests
-            val blockedResp =
-                client.post("/api/v1/kiosk/unlock") {
-                    header(HttpHeaders.Authorization, "Bearer $kioskToken")
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskUnlockRequest(rawAdminPassword))
-                }
-            assertEquals(HttpStatusCode.TooManyRequests, blockedResp.status)
-            assertTrue(blockedResp.bodyAsText().contains("Demasiados intentos fallidos"))
-
-            // 3. Clear rate limiter to test happy path
-            unlockRateLimiter.recordSuccess(testDeviceId)
-
-            val successResp =
-                client.post("/api/v1/kiosk/unlock") {
-                    header(HttpHeaders.Authorization, "Bearer $kioskToken")
-                    contentType(ContentType.Application.Json)
-                    setBody(KioskUnlockRequest(rawAdminPassword))
-                }
-            assertEquals(HttpStatusCode.NoContent, successResp.status)
-        }
-
-    private fun io.ktor.server.testing.ApplicationTestBuilder.installKtorSecurity() {
-        install(io.ktor.server.auth.Authentication) {
-            jwt {
-                realm = jwtConfig.realm ?: "test"
-                verifier(
-                    JWT
-                        .require(Algorithm.HMAC256(jwtConfig.secret))
-                        .withAudience(jwtConfig.audience)
-                        .withIssuer(jwtConfig.domain)
-                        .build(),
+            val context =
+                kioskService.resolveContext(
+                    KioskCajaSelection(
+                        countryCode = "PA",
+                        companyDb = KioskTestSupport.COMPANY_DB,
+                        userId = KioskTestSupport.USER_ID,
+                        idCaja = KioskTestSupport.CAJA_ID,
+                        prefix = "K2",
+                    ),
                 )
-                validate { credential ->
-                    if (credential.payload.audience.contains(jwtConfig.audience)) {
-                        JWTPrincipal(credential.payload)
-                    } else {
-                        null
-                    }
-                }
-            }
+
+            assertNotNull(context)
+            assertEquals(KioskTestSupport.CAJA_ID, context.idCaja)
+            assertEquals(KioskTestSupport.CAJA_ID, context.deviceId)
+            assertEquals("Kiosco Albrook", context.deviceName)
+            assertEquals("K2", context.prefix)
+            assertEquals(1, context.idSucursal)
+            // PA no tiene almacén en la caja: almacén por defecto de ventas de la sucursal.
+            assertEquals(3, context.idAlmacen)
+            assertEquals(KioskTestSupport.SELLER_ID, context.codVendedor)
+            // default_cod_cliente_factura '0001' → cod_cliente '1' → id_cliente.
+            assertEquals("UUID-CLIENTE-GENERICO", context.idClienteGenerico)
+            assertEquals(KioskTestSupport.USER_ID, context.userId)
         }
-    }
+
+    @Test
+    fun `context falls back to the configured code when the generic client does not exist`() =
+        runBlocking {
+            transaction(database) { exec("UPDATE parametros_generales SET default_cod_cliente_factura = 'NOEXISTE'") }
+            val context =
+                kioskService.resolveContext(
+                    KioskCajaSelection("PA", KioskTestSupport.COMPANY_DB, null, KioskTestSupport.CAJA_ID, "K1"),
+                )
+            assertNotNull(context)
+            assertEquals("NOEXISTE", context.idClienteGenerico)
+            assertNull(context.userId)
+            assertNull(
+                kioskService.resolveContext(KioskCajaSelection("PA", KioskTestSupport.COMPANY_DB, null, "OTRA", "K1")),
+            )
+        }
+
+    @Test
+    fun `unlock endpoint validates bcrypt password and enforces rate limiting per caja and user`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+
+            for (i in 1..5) {
+                assertEquals(HttpStatusCode.Unauthorized, client.unlock("wrongPassword$i").status)
+            }
+
+            val blocked = client.unlock(rawAdminPassword)
+            assertEquals(HttpStatusCode.TooManyRequests, blocked.status)
+            assertTrue(blocked.bodyAsText().contains("Demasiados intentos fallidos"))
+
+            // Otro usuario en la misma caja tiene su propio contador.
+            val otherUser = client.unlock(rawAdminPassword, token = KioskTestSupport.companyToken(userId = 99))
+            assertEquals(HttpStatusCode.NoContent, otherUser.status)
+
+            unlockRateLimiter.recordSuccess("${KioskTestSupport.COMPANY_DB}|${KioskTestSupport.CAJA_ID}|${KioskTestSupport.USER_ID}")
+            assertEquals(HttpStatusCode.NoContent, client.unlock(rawAdminPassword).status)
+        }
+
+    @Test
+    fun `unlock without clave_kiosko column answers 400`() =
+        testApplication {
+            transaction(database) { exec("ALTER TABLE parametros_generales DROP COLUMN clave_kiosko") }
+            val service = KioskService(unlockRateLimiter = UnlockRateLimiter(), databaseResolver = { _, _ -> database })
+            val client = kioskClient(service)
+
+            val response = client.unlock(rawAdminPassword)
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("No hay clave de kiosco configurada"))
+        }
 }

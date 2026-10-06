@@ -7,6 +7,7 @@ import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.kiosk.application.dispatch.KioskDispatchConfig
 import com.amaxoniaerp.features.kiosk.application.dispatch.OrderDispatchPolicyFactory
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
+import com.amaxoniaerp.features.kiosk.data.KioskSettingsRepository
 import com.amaxoniaerp.features.kiosk.domain.KioskInvoiceInfo
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskPayResponse
@@ -39,6 +40,7 @@ class PlaceKioskOrderService(
     private val processSaleUseCase: ProcessSaleUseCase? = null,
     private val dispatchPolicyFactory: OrderDispatchPolicyFactory = OrderDispatchPolicyFactory(),
     private val yappyPaymentVerifier: KioskYappyPaymentVerifier? = null,
+    private val kioskSettingsRepository: KioskSettingsRepository = KioskSettingsRepository(),
 ) {
     private val logger = LoggerFactory.getLogger(PlaceKioskOrderService::class.java)
 
@@ -62,7 +64,7 @@ class PlaceKioskOrderService(
         val method = normalizePaymentMethod(request.method)
         validatePayable(database, kioskContext, order, request, method)
 
-        val prereqs = kioskOrderRepository.loadSalePrerequisites(database, kioskContext, order)
+        val prereqs = loadSalePrerequisites(database, kioskContext, order)
         val payment =
             resolveSalePayment(method, request, prereqs)
                 ?: return completeYappyWithoutPaymentMethod(database, order, request, prereqs)
@@ -91,6 +93,15 @@ class PlaceKioskOrderService(
             prereqs = prereqs,
             status = statusResponse,
         )
+    }
+
+    private suspend fun loadSalePrerequisites(
+        database: Database,
+        kioskContext: KioskRequestContext,
+        order: KioskOrderRecord,
+    ): KioskSalePrerequisites {
+        val settings = kioskSettingsRepository.load(database)
+        return kioskOrderRepository.loadSalePrerequisites(database, kioskContext, order, settings)
     }
 
     private fun normalizePaymentMethod(raw: String): String {
@@ -505,7 +516,7 @@ class PlaceKioskOrderService(
         kioskContext: KioskRequestContext,
         order: KioskOrderRecord,
     ): KioskPayResponse {
-        val prereqs = kioskOrderRepository.loadSalePrerequisites(database, kioskContext, order)
+        val prereqs = loadSalePrerequisites(database, kioskContext, order)
         val codFactura = kioskOrderRepository.getInvoiceCode(database, kioskContext.countryCode, order.idFactura) ?: order.idFactura ?: ""
 
         var totalSubtotal = BigDecimal.ZERO

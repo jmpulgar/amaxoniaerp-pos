@@ -7,53 +7,11 @@ import org.jetbrains.exposed.sql.javatime.datetime
 import com.amaxoniaerp.core.database.SchemaDimensions as S
 
 /**
- * Dispositivos Kiosco registrados y emparejados.
- */
-object KioskDeviceTable : Table("kiosco_dispositivo") {
-    val id = char("id", S.VARCHAR_LENGTH_36)
-    val nombre = varchar("nombre", S.VARCHAR_LENGTH_80)
-    val prefijoPedido = varchar("prefijo_pedido", S.VARCHAR_LENGTH_5).default("K1")
-    val idCaja = varchar("id_caja", S.VARCHAR_LENGTH_36)
-    val idSucursal = integer("id_sucursal")
-    val idAlmacen = integer("id_almacen")
-    val codVendedor = integer("cod_vendedor")
-    val idClienteGenerico = varchar("id_cliente_generico", S.VARCHAR_LENGTH_36)
-    val tokenHash = char("token_hash", S.VARCHAR_LENGTH_64).nullable()
-    val codigoEmparejamientoHash = char("codigo_emparejamiento_hash", S.VARCHAR_LENGTH_64).nullable()
-    val codigoExpiraEn = datetime("codigo_expira_en").nullable()
-    val activo = bool("activo").default(true)
-    val ultimoContacto = datetime("ultimo_contacto").nullable()
-    val creadoEn = datetime("creado_en")
-
-    override val primaryKey = PrimaryKey(id)
-
-    init {
-        index("ix_kiosco_dispositivo_caja", false, idCaja)
-        index("ix_kiosco_dispositivo_token", false, tokenHash)
-    }
-}
-
-/**
- * Medios (imágenes o videos) para el Attract Loop del kiosco.
- */
-object KioskMediaTable : Table("kiosco_media") {
-    val id = integer("id").autoIncrement()
-    val tipo = varchar("tipo", S.VARCHAR_LENGTH_10) // 'IMAGE' o 'VIDEO'
-    val archivo = varchar("archivo", S.VARCHAR_LENGTH_255)
-    val orden = integer("orden").default(0)
-    val duracionSeg = integer("duracion_seg").default(6)
-    val activo = bool("activo").default(true)
-    val updatedAt = datetime("updated_at")
-
-    override val primaryKey = PrimaryKey(id)
-
-    init {
-        index("ix_kiosco_media_activo_orden", false, activo, orden)
-    }
-}
-
-/**
  * Pedidos generados desde el kiosco (cotizados, pagados, facturados, etc.).
+ *
+ * Las tablas `kiosco_pedido*` las crea la migración del administrativo; si un tenant aún no
+ * las tiene, el kiosco responde 503 (ver [KioskSchemaInspector.hasKioskOrderTables]).
+ * `id_dispositivo` guarda el `idCaja` del kiosco: la numeración diaria es por caja y fecha.
  */
 object KioskOrderTable : Table("kiosco_pedido") {
     val id = char("id", S.VARCHAR_LENGTH_36) // = Idempotency-Key
@@ -120,17 +78,22 @@ object KioskOrderItemModifierTable : Table("kiosco_pedido_item_modificador") {
 }
 
 /**
- * Vista de lectura/escritura de configuración del Kiosco sobre parametros_generales.
+ * Columnas de `parametros_generales` que usa el kiosco. Todas salvo `cod_empresa` y
+ * `default_cod_cliente_factura` son opcionales en el tenant: solo se leen con `select`
+ * explícito de las columnas detectadas por [KioskSchemaInspector] (ver [KioskSettingsRepository]),
+ * nunca con `selectAll()`.
  */
 object KioskParametrosTable : Table("parametros_generales") {
     val codEmpresa = integer("cod_empresa")
-    val defaultCodClienteFactura = varchar("default_cod_cliente_factura", S.VARCHAR_LENGTH_80)
-    val kioscoDestinoPedido = varchar("kiosco_destino_pedido", S.VARCHAR_LENGTH_30).default("RETIRO_MOSTRADOR")
+    val defaultCodClienteFactura = varchar("default_cod_cliente_factura", S.VARCHAR_LENGTH_80).nullable()
+    val kioscoDestinoPedido = varchar("kiosco_destino_pedido", S.VARCHAR_LENGTH_30).nullable()
     val kioscoImpresoraCocinaIp = varchar("kiosco_impresora_cocina_ip", S.VARCHAR_LENGTH_45).nullable()
-    val kioscoModalidades = varchar("kiosco_modalidades", S.VARCHAR_LENGTH_30).default("COMER_AQUI,PARA_LLEVAR")
-    val kioscoColorMarca = varchar("kiosco_color_marca", 7).nullable()
-    val kioscoConfigVersion = integer("kiosco_config_version").default(1)
+    val kioscoModalidades = varchar("kiosco_modalidades", S.VARCHAR_LENGTH_30).nullable()
     val claveKiosko = varchar("clave_kiosko", S.VARCHAR_LENGTH_255).nullable()
+    val banner1 = varchar("banner_1", S.VARCHAR_LENGTH_255).nullable()
+    val banner2 = varchar("banner_2", S.VARCHAR_LENGTH_255).nullable()
+    val banner3 = varchar("banner_3", S.VARCHAR_LENGTH_255).nullable()
+    val menu1 = varchar("menu_1", S.VARCHAR_LENGTH_255).nullable()
 }
 
 /**
@@ -154,7 +117,7 @@ object KioskYappyParametrosTable : Table("parametros_generales") {
 
 /**
  * Proyección opcional de `parametros_generales.yappy_tipo_qr` (DYN|HYB). La columna NO es
- * obligatoria (doc/runbooks/optional_yappy_tipo_qr.sql): solo se consulta con un `select`
+ * obligatoria (la agrega la migración del kiosco del administrativo): solo se consulta con un `select`
  * explícito después de comprobar que existe en el tenant, nunca con `selectAll()`.
  */
 object KioskYappyQrTypeParametrosTable : Table("parametros_generales") {

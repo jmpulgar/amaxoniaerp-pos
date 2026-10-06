@@ -7,6 +7,8 @@ import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTableFactory
 import com.amaxoniaerp.features.items.data.BaseItemsTable
 import com.amaxoniaerp.features.items.data.ItemsTableFactory
+import com.amaxoniaerp.features.kiosk.domain.KioskComboGroup
+import com.amaxoniaerp.features.kiosk.domain.KioskComboRules
 import com.amaxoniaerp.features.kiosk.domain.KioskItemTaxInfo
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderItemRecord
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderModifierRecord
@@ -37,7 +39,9 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class KioskOrderRepository {
+class KioskOrderRepository(
+    private val comboRepository: KioskComboRepository = KioskComboRepository(),
+) {
     suspend fun findQuoteById(
         database: Database,
         countryCode: String,
@@ -161,8 +165,9 @@ class KioskOrderRepository {
         kioskContext: KioskRequestContext,
         idempotencyKey: String,
         request: KioskQuoteRequest,
-    ): KioskQuoteResponse =
-        dbQuery(database) {
+    ): KioskQuoteResponse {
+        val comboSchema = comboRepository.schema(database)
+        return dbQuery(database) {
             val existing = loadQuoteById(idempotencyKey, kioskContext.countryCode)
             if (existing != null) {
                 return@dbQuery existing
@@ -174,7 +179,7 @@ class KioskOrderRepository {
             val tableTent = request.tableTent?.trim()?.takeIf { it.isNotBlank() }
 
             // 2. Parámetros generales
-            val pricing = loadQuotePricingContext(kioskContext.countryCode, request)
+            val pricing = loadQuotePricingContext(kioskContext.countryCode, request, comboSchema)
 
             // 3-4. Validar y calcular cada línea
             val calculatedLines =
@@ -228,6 +233,7 @@ class KioskOrderRepository {
                 lines = calculatedLines.map { it.toResponse() },
             )
         }
+    }
 
     /** Valida modalidad, líneas y cantidades; devuelve la modalidad normalizada. */
     private fun validateQuoteRequest(request: KioskQuoteRequest): String {
@@ -245,6 +251,7 @@ class KioskOrderRepository {
     private fun loadQuotePricingContext(
         countryCode: String,
         request: KioskQuoteRequest,
+        comboSchema: KioskComboSchema?,
     ): QuotePricingContext {
         val paramsTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
         val paramsRow =
@@ -265,7 +272,12 @@ class KioskOrderRepository {
                 .where { (itemsTable.idItem inList requestedItemIds) and (itemsTable.estatus eq "A") }
                 .associateBy { it[itemsTable.idItem] }
 
-        return QuotePricingContext(itemsTable, itemsMap, validarStock, defaultTax)
+        val groupsByItem =
+            comboSchema
+                ?.let { comboRepository.loadGroupsByItem(it, itemsTable, itemsMap.keys, validarStock) }
+                .orEmpty()
+
+        return QuotePricingContext(itemsTable, itemsMap, validarStock, defaultTax, groupsByItem)
     }
 
     private fun calculateQuoteLine(
@@ -283,35 +295,22 @@ class KioskOrderRepository {
             "Producto '$itemName' se encuentra agotado"
         }
 
-        // Grupos de modificadores asociados al item
-        val groupsAssigned =
-            (ItemModifierRelationTable innerJoin ItemModifierGroupTable)
-                .selectAll()
-                .where {
-                    (ItemModifierRelationTable.idItem eq lineReq.itemId) and
-                        (ItemModifierGroupTable.activo eq true)
-                }.toList()
-
-        val selectedModifiers = resolveSelectedModifiers(lineReq, itemName, groupsAssigned, pricing)
-        validateGroupSelections(groupsAssigned, selectedModifiers)
-
-        // Cálculo en Money / BigDecimal
-        val basePrice = itemRow[itemsTable.precio1].setScale(2, RoundingMode.HALF_UP)
-        val modifiersExtra =
-            selectedModifiers
-                .sumOf { it.modifier.precioAdicional }
-                .setScale(2, RoundingMode.HALF_UP)
-
-        val unitPrice = basePrice + modifiersExtra
-        val qtyBd = BigDecimal.valueOf(lineReq.qty.toLong())
-        val lineSubtotal = (unitPrice * qtyBd).setScale(2, RoundingMode.HALF_UP)
-
         val taxRate =
             when {
                 itemRow[itemsTable.montoExento] -> BigDecimal.ZERO
                 itemRow[itemsTable.iva] > BigDecimal.ZERO -> itemRow[itemsTable.iva]
                 else -> pricing.defaultTax
             }
+
+        // Opciones del combo (id_grupo_item): pertenencia, agotados y mínimo/máximo por grupo.
+        val groups = pricing.groupsByItem[lineReq.itemId].orEmpty()
+        val selected = KioskComboRules.validateSelection(itemName, groups, lineReq.modifiers)
+
+        // Precio sin impuesto = precio1 + extras convertidos a base sin impuesto (regla del POS PHP).
+        val basePrice = itemRow[itemsTable.precio1].setScale(2, RoundingMode.HALF_UP)
+        val unitPrice = basePrice + KioskComboRules.lineExtraSinIva(selected, taxRate)
+        val qtyBd = BigDecimal.valueOf(lineReq.qty.toLong())
+        val lineSubtotal = (unitPrice * qtyBd).setScale(2, RoundingMode.HALF_UP)
         val lineTax = (lineSubtotal * taxRate).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
 
         return CalculatedLine(
@@ -324,93 +323,15 @@ class KioskOrderRepository {
             tax = lineTax,
             total = lineSubtotal + lineTax,
             note = lineReq.note?.trim()?.takeIf { it.isNotBlank() },
-            modifiers = selectedModifiers.map { it.modifier },
-        )
-    }
-
-    /** Valida que los modificadores enviados pertenezcan a los grupos del item y tengan stock. */
-    private fun resolveSelectedModifiers(
-        lineReq: KioskQuoteLineRequest,
-        itemName: String,
-        groupsAssigned: List<ResultRow>,
-        pricing: QuotePricingContext,
-    ): List<SelectedModifier> {
-        val assignedGroupIds = groupsAssigned.map { it[ItemModifierGroupTable.id] }.toSet()
-
-        // Opciones de modificadores disponibles para los grupos asignados
-        val availableModifiers =
-            if (assignedGroupIds.isNotEmpty()) {
-                ItemModifierTable
-                    .selectAll()
-                    .where {
-                        (ItemModifierTable.idGrupo inList assignedGroupIds) and
-                            (ItemModifierTable.activo eq true)
-                    }.associateBy { it[ItemModifierTable.id] }
-            } else {
-                emptyMap()
-            }
-
-        return lineReq.modifiers.map { modId ->
-            val modRow =
-                availableModifiers[modId]
-                    ?: throw IllegalArgumentException("Modificador $modId no válido para el producto '$itemName'")
-
-            // Si tiene item asociado y se valida stock, verificar disponibilidad
-            if (pricing.validarStock) {
-                ensureAssociatedItemInStock(modRow, pricing.itemsTable)
-            }
-
-            SelectedModifier(
-                groupId = modRow[ItemModifierTable.idGrupo],
-                modifier =
+            modifiers =
+                selected.map { option ->
                     CalculatedModifier(
-                        id = modId,
-                        nombre = modRow[ItemModifierTable.nombre],
-                        precioAdicional = modRow[ItemModifierTable.precioAdicional],
-                    ),
-            )
-        }
-    }
-
-    private fun ensureAssociatedItemInStock(
-        modRow: ResultRow,
-        itemsTable: BaseItemsTable,
-    ) {
-        val associatedItemId = modRow[ItemModifierTable.idItemAsociado]
-        if (associatedItemId == null || associatedItemId <= 0) return
-        val associatedItem =
-            itemsTable
-                .select(itemsTable.idItem, itemsTable.existenciaTotal)
-                .where { itemsTable.idItem eq associatedItemId }
-                .singleOrNull()
-        require(!(associatedItem != null && associatedItem[itemsTable.existenciaTotal] <= 0)) {
-            "Modificador '${modRow[ItemModifierTable.nombre]}' se encuentra agotado"
-        }
-    }
-
-    /** Valida mínimos y máximos de selección por grupo de modificadores. */
-    private fun validateGroupSelections(
-        groupsAssigned: List<ResultRow>,
-        selectedModifiers: List<SelectedModifier>,
-    ) {
-        val selectedCountByGroupId = selectedModifiers.groupingBy { it.groupId }.eachCount()
-        for (groupRow in groupsAssigned) {
-            val groupId = groupRow[ItemModifierGroupTable.id]
-            val groupName = groupRow[ItemModifierGroupTable.nombre]
-            val esObligatorio = groupRow[ItemModifierGroupTable.esObligatorio]
-            val minSeleccion = groupRow[ItemModifierGroupTable.minSeleccion]
-            val maxSeleccion = groupRow[ItemModifierGroupTable.maxSeleccion]
-
-            val effectiveMin = if (esObligatorio && minSeleccion == 0) 1 else minSeleccion
-            val selectedCount = selectedCountByGroupId[groupId] ?: 0
-
-            require(selectedCount >= effectiveMin) {
-                "El grupo '$groupName' requiere al menos $effectiveMin selección(es)"
-            }
-            require(!(maxSeleccion > 0 && selectedCount > maxSeleccion)) {
-                "El grupo '$groupName' permite un máximo de $maxSeleccion selección(es)"
-            }
-        }
+                        id = option.option.id,
+                        nombre = option.displayName.take(MODIFIER_NAME_MAX_LENGTH),
+                        precioAdicional = KioskComboRules.extraSinIva(option.extraConIva, taxRate),
+                    )
+                },
+        )
     }
 
     private fun nextDailySequence(
@@ -601,6 +522,7 @@ class KioskOrderRepository {
         database: Database,
         kioskContext: KioskRequestContext,
         order: KioskOrderRecord,
+        settings: KioskSettings,
     ): KioskSalePrerequisites =
         dbQuery(database) {
             val sucursalRow =
@@ -679,18 +601,6 @@ class KioskOrderRepository {
                     emptyMap()
                 }
 
-            val (destino, cocinaIp) =
-                run {
-                    val paramRow =
-                        KioskParametrosTable
-                            .select(KioskParametrosTable.kioscoDestinoPedido, KioskParametrosTable.kioscoImpresoraCocinaIp)
-                            .limit(1)
-                            .singleOrNull()
-                    val dest = paramRow?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-                    val ip = paramRow?.get(KioskParametrosTable.kioscoImpresoraCocinaIp)
-                    Pair(dest, ip)
-                }
-
             KioskSalePrerequisites(
                 branchSerie = sucursalSerie,
                 branchName = companyName,
@@ -707,8 +617,8 @@ class KioskOrderRepository {
                 paymentMethodId = formaPagoId,
                 yappyPaymentMethodId = yappyFormaPagoId,
                 itemDetails = itemDetails,
-                dispatchDestination = destino,
-                kitchenPrinterIp = cocinaIp,
+                dispatchDestination = settings.dispatch,
+                kitchenPrinterIp = settings.kitchenPrinterIp,
             )
         }
 
@@ -733,23 +643,20 @@ class KioskOrderRepository {
 
 private const val ESTADO_COTIZADO = "COTIZADO"
 private const val STORAGE_SCALE = 4
+private const val MODIFIER_NAME_MAX_LENGTH = 80
 
 private data class QuotePricingContext(
     val itemsTable: BaseItemsTable,
     val itemsMap: Map<Int, ResultRow>,
     val validarStock: Boolean,
     val defaultTax: BigDecimal,
+    val groupsByItem: Map<Int, List<KioskComboGroup>>,
 )
 
 private data class CalculatedModifier(
     val id: Int,
     val nombre: String,
     val precioAdicional: BigDecimal,
-)
-
-private data class SelectedModifier(
-    val groupId: Int,
-    val modifier: CalculatedModifier,
 )
 
 private data class CalculatedLine(

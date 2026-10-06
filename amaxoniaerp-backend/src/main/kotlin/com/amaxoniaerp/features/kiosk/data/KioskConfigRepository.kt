@@ -14,60 +14,53 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
+import java.net.URLEncoder
 
-class KioskConfigRepository {
+/**
+ * Configuración del kiosco: ajustes defensivos de `parametros_generales` ([KioskSettingsRepository]),
+ * medios del attract loop desde los banners del ERP y multimoneda. `version` la calcula
+ * [com.amaxoniaerp.features.kiosk.application.KioskService] a partir del contenido.
+ */
+class KioskConfigRepository(
+    private val settingsRepository: KioskSettingsRepository = KioskSettingsRepository(),
+) {
     suspend fun getKioskConfig(
         database: Database,
         countryCode: String,
         companyDb: String,
-    ): KioskConfigResponse =
-        dbQuery(database) {
-            // 1. Parametros Kiosco
-            val paramsRow =
-                KioskParametrosTable
-                    .selectAll()
-                    .limit(1)
-                    .singleOrNull()
+    ): KioskConfigResponse {
+        val settings = settingsRepository.load(database)
+        val currencyConfig = dbQuery(database) { resolveCurrencyConfig(countryCode) }
+        val normalizedCountry = countryCode.uppercase()
 
-            val version = paramsRow?.get(KioskParametrosTable.kioscoConfigVersion) ?: 1
-            val brandColor = paramsRow?.get(KioskParametrosTable.kioscoColorMarca)
-            val dispatch = paramsRow?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-            val modalidadesRaw = paramsRow?.get(KioskParametrosTable.kioscoModalidades) ?: "COMER_AQUI,PARA_LLEVAR"
-            val diningModes = modalidadesRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            val defaultCustomerId = paramsRow?.get(KioskParametrosTable.defaultCodClienteFactura) ?: "CF"
+        return KioskConfigResponse(
+            version = 0,
+            brandColor = null,
+            logoUrl = null,
+            media = settings.mediaFiles.map { toMediaItem(it, normalizedCountry, companyDb) },
+            diningModes = settings.diningModes,
+            dispatch = settings.dispatch,
+            defaultCustomerId = settings.defaultCodClienteFactura ?: DEFAULT_CUSTOMER_CODE,
+            currency = currencyConfig,
+            country = normalizedCountry,
+            paymentMethods = listOf(KioskPaymentMethod.CARD),
+        )
+    }
 
-            // 2. Media
-            val mediaList =
-                KioskMediaTable
-                    .selectAll()
-                    .where { KioskMediaTable.activo eq true }
-                    .orderBy(KioskMediaTable.orden to SortOrder.ASC)
-                    .map { row ->
-                        val archivo = row[KioskMediaTable.archivo]
-                        val type = row[KioskMediaTable.tipo].uppercase()
-                        KioskMediaItem(
-                            type = type,
-                            url = "/api/data/$countryCode/$companyDb/banners/$archivo",
-                            durationSec = row[KioskMediaTable.duracionSeg],
-                        )
-                    }
-
-            // 3. Multimoneda y tasas
-            val currencyConfig = resolveCurrencyConfig(countryCode)
-
-            KioskConfigResponse(
-                version = version,
-                brandColor = brandColor,
-                logoUrl = null,
-                media = mediaList,
-                diningModes = diningModes,
-                dispatch = dispatch,
-                defaultCustomerId = defaultCustomerId,
-                currency = currencyConfig,
-                country = countryCode.uppercase(),
-                paymentMethods = listOf(KioskPaymentMethod.CARD),
-            )
-        }
+    private fun toMediaItem(
+        storedValue: String,
+        countryCode: String,
+        companyDb: String,
+    ): KioskMediaItem {
+        val filename = storedValue.replace('\\', '/').substringAfterLast('/').ifBlank { storedValue }
+        val isVideo = filename.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
+        val encoded = URLEncoder.encode(filename, Charsets.UTF_8).replace("+", "%20")
+        return KioskMediaItem(
+            type = if (isVideo) MEDIA_VIDEO else MEDIA_IMAGE,
+            url = "/api/data/$countryCode/$companyDb/banners/$encoded",
+            durationSec = if (isVideo) 0 else IMAGE_DURATION_SEC,
+        )
+    }
 
     private fun resolveCurrencyConfig(countryCode: String): KioskCurrencyConfig {
         val normalizedCountry = countryCode.uppercase()
@@ -131,3 +124,9 @@ class KioskConfigRepository {
         )
     }
 }
+
+private const val DEFAULT_CUSTOMER_CODE = "CF"
+private const val MEDIA_IMAGE = "IMAGE"
+private const val MEDIA_VIDEO = "VIDEO"
+private const val IMAGE_DURATION_SEC = 8
+private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mkv", "mov")

@@ -1,9 +1,9 @@
 package com.amaxoniaerp.features.kiosk.route
 
 import com.amaxoniaerp.features.kiosk.application.KioskAuthenticationException
+import com.amaxoniaerp.features.kiosk.application.KioskNotEnabledException
 import com.amaxoniaerp.features.kiosk.application.KioskRateLimitException
 import com.amaxoniaerp.features.kiosk.application.KioskService
-import com.amaxoniaerp.features.kiosk.domain.KioskPairingRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskPaymentRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskQuoteRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
@@ -29,8 +29,7 @@ private val kioskRoutesLogger = LoggerFactory.getLogger("com.amaxoniaerp.feature
 
 fun Route.kioskRoutes(kioskService: KioskService) {
     route("/api/v1/kiosk") {
-        kioskPairingRoute(kioskService)
-
+        // Mismo token de empresa del POS (POST /auth/login + /auth/company) + X-Kiosk-Caja / X-Kiosk-Prefix.
         authenticate {
             kioskConfigRoute(kioskService)
             kioskCatalogRoute(kioskService)
@@ -39,39 +38,6 @@ fun Route.kioskRoutes(kioskService: KioskService) {
             kioskYappyRoutes(kioskService)
             kioskUnlockRoute(kioskService)
         }
-    }
-}
-
-/**
- * Emparejamiento inicial de un dispositivo kiosco con código de un solo uso.
- */
-private fun Route.kioskPairingRoute(kioskService: KioskService) {
-    post("/pairing") {
-        val request = call.receiveOrBadRequest<KioskPairingRequest>() ?: return@post
-
-        kioskService
-            .pairDevice(request)
-            .onSuccess { response ->
-                call.respond(HttpStatusCode.OK, response)
-            }.onFailure { error ->
-                when (error) {
-                    is IllegalArgumentException ->
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf(
-                                "error" to (error.message ?: "Solicitud inválida"),
-                            ),
-                        )
-                    is KioskAuthenticationException ->
-                        call.respond(
-                            HttpStatusCode.Unauthorized,
-                            mapOf(
-                                "error" to (error.message ?: "No autorizado"),
-                            ),
-                        )
-                    else -> call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (error.message ?: "Error interno")))
-                }
-            }
     }
 }
 
@@ -253,6 +219,11 @@ private suspend inline fun <reified T : Any> ApplicationCall.respondWithEtag(
 
 private suspend fun ApplicationCall.respondOrderError(error: Throwable) {
     when (error) {
+        is KioskNotEnabledException ->
+            respond(
+                HttpStatusCode.ServiceUnavailable,
+                mapOf("error" to (error.message ?: "El kiosco no está habilitado en esta empresa")),
+            )
         is IllegalArgumentException ->
             respond(
                 HttpStatusCode.BadRequest,

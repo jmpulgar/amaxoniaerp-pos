@@ -1,6 +1,5 @@
 package com.amaxoniaerp.features.kiosk.route
 
-import com.amaxoniaerp.JwtConfig
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.data.CajaDetalleAperturaTable
 import com.amaxoniaerp.features.caja.data.CajaDetalleCierreFormaPagoTable
@@ -8,7 +7,9 @@ import com.amaxoniaerp.features.caja.data.CajaDetalleCierreTable
 import com.amaxoniaerp.features.caja.data.CajaSecuenciaTable
 import com.amaxoniaerp.features.caja.data.CajaTablePA
 import com.amaxoniaerp.features.caja.data.ExposedCajaSessionStore
+import com.amaxoniaerp.features.caja.data.SucursalAlmacenTable
 import com.amaxoniaerp.features.caja.data.SucursalTable
+import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.electronicinvoice.application.ElectronicInvoiceStrategy
 import com.amaxoniaerp.features.electronicinvoice.application.ProcessorFactory
@@ -20,9 +21,6 @@ import com.amaxoniaerp.features.kiosk.application.PlaceKioskOrderService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
 import com.amaxoniaerp.features.kiosk.application.YappySessionManager
 import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceRepository
-import com.amaxoniaerp.features.kiosk.data.KioskDeviceTable
-import com.amaxoniaerp.features.kiosk.data.KioskMediaTable
 import com.amaxoniaerp.features.kiosk.data.KioskOrderItemModifierTable
 import com.amaxoniaerp.features.kiosk.data.KioskOrderItemTable
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
@@ -41,6 +39,7 @@ import com.amaxoniaerp.features.kiosk.domain.yappy.YappyQr
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyQrType
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyTransactionStatus
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyUpstreamException
+import com.amaxoniaerp.features.kiosk.route.KioskTestSupport.kioskHeaders
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
 import com.amaxoniaerp.features.sales.data.ProcessSaleTransactionalRepository
@@ -55,7 +54,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -99,13 +97,7 @@ class KioskYappyRoutesTest {
     private lateinit var database: Database
     private lateinit var kioskService: KioskService
 
-    private val jwtConfig =
-        JwtConfig(
-            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-            domain = "http://localhost:8080",
-            audience = "http://localhost:8080/kiosk",
-            realm = "Amaxonia Kiosk Test",
-        )
+    private val jwtConfig = KioskTestSupport.jwtConfig
 
     private val json =
         Json {
@@ -114,7 +106,6 @@ class KioskYappyRoutesTest {
             explicitNulls = false
         }
 
-    private val testDeviceId = UUID.randomUUID().toString()
     private val testCajaId = "CAJA-01"
     private val gateway = FakeYappyGateway()
     private var lastSaleRequest: ProcessSaleRequest? = null
@@ -180,9 +171,7 @@ class KioskYappyRoutesTest {
             )
         kioskService =
             KioskService(
-                kioskDeviceRepository = KioskDeviceRepository(),
                 unlockRateLimiter = UnlockRateLimiter(),
-                jwtConfig = jwtConfig,
                 databaseResolver = { _, _ -> database },
                 kioskConfigRepository = KioskConfigRepository(),
                 kioskOrderRepository = kioskOrderRepository,
@@ -239,9 +228,9 @@ class KioskYappyRoutesTest {
             )
 
             SchemaUtils.create(
-                KioskDeviceTable,
-                KioskMediaTable,
                 SucursalTable,
+                SucursalAlmacenTable,
+                VendedorTable,
                 ClientsTable,
                 CajaTablePA,
                 CajaSecuenciaTable,
@@ -256,18 +245,6 @@ class KioskYappyRoutesTest {
                 SalesFacturaTablePA,
             )
 
-            KioskDeviceTable.insert {
-                it[id] = testDeviceId
-                it[nombre] = "Multiplaza"
-                it[prefijoPedido] = "K1"
-                it[idCaja] = testCajaId
-                it[idSucursal] = 1
-                it[idAlmacen] = 1
-                it[codVendedor] = 10
-                it[idClienteGenerico] = "CF"
-                it[activo] = true
-                it[creadoEn] = LocalDateTime.now()
-            }
             SucursalTable.insert {
                 it[idSucursal] = 1
                 it[codigo] = "SUC-01"
@@ -279,7 +256,7 @@ class KioskYappyRoutesTest {
                 it[idCaja] = testCajaId
                 it[codCaja] = "C01"
                 it[serieCaja] = "01"
-                it[descripcion] = "Caja Kiosco 1"
+                it[descripcion] = "Multiplaza"
                 it[idSucursal] = 1
                 it[yappyDeviceId] = "UNIDAD-K1"
                 it[yappyGroupId] = "GRUPO-K1"
@@ -328,7 +305,7 @@ class KioskYappyRoutesTest {
         transaction(database) {
             KioskOrderTable.insert {
                 it[id] = orderId
-                it[idDispositivo] = testDeviceId
+                it[idDispositivo] = testCajaId
                 it[numeroPedidoDiario] = 7
                 it[codigoPedido] = "K1-007"
                 it[fecha] = LocalDate.now()
@@ -375,18 +352,8 @@ class KioskYappyRoutesTest {
         transaction(database) { exec("UPDATE parametros_generales SET yappy_api_key = NULL") }
     }
 
-    private fun token(): String =
-        JWT
-            .create()
-            .withIssuer(jwtConfig.domain)
-            .withAudience(jwtConfig.audience)
-            .withClaim("token_type", "kiosk")
-            .withClaim("role", "KIOSK")
-            .withClaim("device_id", testDeviceId)
-            .withClaim("country_code", "PA")
-            .withClaim("admin_db", "momi_pa")
-            .withClaim("company_db", "momi_pa")
-            .sign(Algorithm.HMAC256(jwtConfig.secret))
+    /** Token de empresa del POS (mismo login) para la empresa momi_pa. */
+    private fun token(): String = KioskTestSupport.companyToken()
 
     private fun ApplicationTestBuilder.kioskClient(): HttpClient {
         install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json(json) }
@@ -408,14 +375,14 @@ class KioskYappyRoutesTest {
     }
 
     private suspend fun HttpClient.createQr(orderId: String): HttpResponse =
-        post("/api/v1/kiosk/orders/$orderId/yappy") { header(HttpHeaders.Authorization, "Bearer ${token()}") }
+        post("/api/v1/kiosk/orders/$orderId/yappy") { kioskHeaders(token = token()) }
 
     private suspend fun HttpClient.pay(
         orderId: String,
         request: KioskPaymentRequest,
     ): HttpResponse =
         post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${token()}")
+            kioskHeaders(token = token())
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -592,7 +559,7 @@ class KioskYappyRoutesTest {
 
             val response =
                 client.get("/api/v1/kiosk/orders/$orderId/yappy/TX-55") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
@@ -611,14 +578,14 @@ class KioskYappyRoutesTest {
 
             val mismatch =
                 client.get("/api/v1/kiosk/orders/$orderId/yappy/OTHER-TX") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
             assertEquals(HttpStatusCode.Conflict, mismatch.status)
 
             gateway.failure = YappyUpstreamException("Yappy respondió con error (HTTP 500)")
             val upstream =
                 client.get("/api/v1/kiosk/orders/$orderId/yappy/TX-55") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
             assertEquals(HttpStatusCode.BadGateway, upstream.status)
         }
@@ -633,7 +600,7 @@ class KioskYappyRoutesTest {
 
             val response =
                 client.delete("/api/v1/kiosk/orders/$orderId/yappy/TX-77") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
             assertEquals(HttpStatusCode.NoContent, response.status)
             assertEquals(listOf("TX-77"), gateway.cancelled)
@@ -644,7 +611,7 @@ class KioskYappyRoutesTest {
             gateway.failure = YappyUpstreamException("timeout")
             val failing =
                 client.delete("/api/v1/kiosk/orders/missing/yappy/TX-0") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
             assertEquals(HttpStatusCode.NoContent, failing.status)
         }
@@ -659,7 +626,7 @@ class KioskYappyRoutesTest {
 
             val response =
                 client.delete("/api/v1/kiosk/orders/$orderId/yappy/TX-PAID") {
-                    header(HttpHeaders.Authorization, "Bearer ${token()}")
+                    kioskHeaders(token = token())
                 }
 
             assertEquals(HttpStatusCode.NoContent, response.status)
@@ -873,13 +840,13 @@ class KioskYappyRoutesTest {
         testApplication {
             val client = kioskClient()
 
-            val configured = client.get("/api/v1/kiosk/config") { header(HttpHeaders.Authorization, "Bearer ${token()}") }
+            val configured = client.get("/api/v1/kiosk/config") { kioskHeaders(token = token()) }
             assertEquals(HttpStatusCode.OK, configured.status)
             val configuredEtag = configured.headers[HttpHeaders.ETag]
             assertEquals(listOf("CARD", "YAPPY"), json.decodeFromString<KioskConfigResponse>(configured.bodyAsText()).paymentMethods)
 
             disableYappyCredentials()
-            val notConfigured = client.get("/api/v1/kiosk/config") { header(HttpHeaders.Authorization, "Bearer ${token()}") }
+            val notConfigured = client.get("/api/v1/kiosk/config") { kioskHeaders(token = token()) }
             assertEquals(listOf("CARD"), json.decodeFromString<KioskConfigResponse>(notConfigured.bodyAsText()).paymentMethods)
             assertTrue(configuredEtag != notConfigured.headers[HttpHeaders.ETag], "paymentMethods debe formar parte del ETag")
         }
@@ -892,13 +859,13 @@ class KioskYappyRoutesTest {
                 exec("UPDATE caja SET yappy_device_id = NULL, yappy_group_id = NULL")
             }
 
-            val withoutUnit = client.get("/api/v1/kiosk/config") { header(HttpHeaders.Authorization, "Bearer ${token()}") }
+            val withoutUnit = client.get("/api/v1/kiosk/config") { kioskHeaders(token = token()) }
             assertEquals(listOf("CARD"), json.decodeFromString<KioskConfigResponse>(withoutUnit.bodyAsText()).paymentMethods)
 
             transaction(database) {
                 exec("UPDATE parametros_generales SET yappy_id_unidad = 'UNIDAD-EXPRESS', yappy_id_grupo = 'GRUPO-EXPRESS'")
             }
-            val withFallback = client.get("/api/v1/kiosk/config") { header(HttpHeaders.Authorization, "Bearer ${token()}") }
+            val withFallback = client.get("/api/v1/kiosk/config") { kioskHeaders(token = token()) }
             assertEquals(listOf("CARD", "YAPPY"), json.decodeFromString<KioskConfigResponse>(withFallback.bodyAsText()).paymentMethods)
         }
 

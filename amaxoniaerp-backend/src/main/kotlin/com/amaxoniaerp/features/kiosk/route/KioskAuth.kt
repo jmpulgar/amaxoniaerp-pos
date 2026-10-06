@@ -1,56 +1,67 @@
 package com.amaxoniaerp.features.kiosk.route
 
-import com.amaxoniaerp.core.tenant.extractKioskTokenClaims
-import com.amaxoniaerp.core.tenant.hasKioskPrincipal
+import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
+import com.amaxoniaerp.core.tenant.userIdOrNull
+import com.amaxoniaerp.features.kiosk.application.KioskCajaSelection
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 
+/** Caja del ERP sobre la que vende el kiosco (elegida en el equipo tras el login del POS). */
+const val KIOSK_CAJA_HEADER = "X-Kiosk-Caja"
+
+/** Prefijo de los números de pedido del kiosco (1 a 5 caracteres A-Z / 0-9). */
+const val KIOSK_PREFIX_HEADER = "X-Kiosk-Prefix"
+
+private val KIOSK_PREFIX_PATTERN = Regex("^[A-Z0-9]{1,5}$")
+
+/**
+ * Resuelve el contexto del kiosco: el mismo token de empresa del POS (seam
+ * [resolveCompanyRequestContext]) más los headers [KIOSK_CAJA_HEADER] y [KIOSK_PREFIX_HEADER].
+ * Responde 401/403/400 y devuelve null cuando falta algo o la caja no es válida.
+ */
 suspend fun ApplicationCall.resolveKioskRequestContext(kioskService: KioskService): KioskRequestContext? =
     run {
-        if (!hasKioskPrincipal()) {
-            respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token de autenticación requerido"))
+        val company = resolveCompanyRequestContext() ?: return@run null
+
+        val idCaja = request.headers[KIOSK_CAJA_HEADER]?.trim()
+        if (idCaja.isNullOrEmpty()) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "Falta el header $KIOSK_CAJA_HEADER con la caja del kiosco"))
             return@run null
         }
 
-        val claims = extractKioskTokenClaims()
-        if (claims == null) {
-            respond(HttpStatusCode.Unauthorized, mapOf("error" to "Token de autenticación requerido"))
+        val rawPrefix = request.headers[KIOSK_PREFIX_HEADER]?.trim()
+        if (rawPrefix.isNullOrEmpty()) {
+            respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to "Falta el header $KIOSK_PREFIX_HEADER con el prefijo de pedidos del kiosco"),
+            )
+            return@run null
+        }
+        val prefix = rawPrefix.uppercase()
+        if (!KIOSK_PREFIX_PATTERN.matches(prefix)) {
+            respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to "$KIOSK_PREFIX_HEADER inválido: debe tener de 1 a 5 letras (A-Z) o números"),
+            )
             return@run null
         }
 
-        if (claims.role != "KIOSK" && claims.tokenType != "kiosk") {
-            respond(HttpStatusCode.Forbidden, mapOf("error" to "Se requiere rol KIOSK"))
+        val context =
+            kioskService.resolveContext(
+                KioskCajaSelection(
+                    countryCode = company.countryCode.uppercase(),
+                    companyDb = company.adminDb,
+                    userId = company.userIdOrNull(),
+                    idCaja = idCaja,
+                    prefix = prefix,
+                ),
+            )
+        if (context == null) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "Caja del kiosco no válida"))
             return@run null
         }
-
-        val deviceId = claims.deviceId
-        val countryCode = claims.countryCode
-        val companyDb = claims.companyDb
-
-        if (deviceId.isBlank() || countryCode.isBlank() || companyDb.isBlank()) {
-            respond(HttpStatusCode.BadRequest, mapOf("error" to "Claims de kiosco incompletos en token"))
-            return@run null
-        }
-
-        val activeDevice = kioskService.verifyDeviceActive(countryCode, companyDb, deviceId)
-        if (activeDevice == null || !activeDevice.activo) {
-            respond(HttpStatusCode.Unauthorized, mapOf("error" to "Dispositivo kiosco inactivo o revocado"))
-            return@run null
-        }
-
-        KioskRequestContext(
-            countryCode = countryCode,
-            companyDb = companyDb,
-            deviceId = deviceId,
-            deviceName = activeDevice.nombre,
-            prefix = activeDevice.prefijoPedido,
-            idCaja = activeDevice.idCaja,
-            idSucursal = activeDevice.idSucursal,
-            idAlmacen = activeDevice.idAlmacen,
-            codVendedor = activeDevice.codVendedor,
-            idClienteGenerico = activeDevice.idClienteGenerico,
-        )
+        context
     }
