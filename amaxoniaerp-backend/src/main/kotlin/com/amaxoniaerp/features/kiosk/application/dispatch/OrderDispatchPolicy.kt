@@ -20,12 +20,11 @@ class CounterPickupDispatchPolicy : OrderDispatchPolicy {
         order: KioskOrderRecord,
         config: KioskDispatchConfig,
         itemNames: Map<Int, String>,
-    ): DispatchResult {
-        return DispatchResult.CounterPickup(
+    ): DispatchResult =
+        DispatchResult.CounterPickup(
             orderNumber = order.codigoPedido,
             message = "Pedido asignado para retiro en mostrador: ${order.codigoPedido}",
         )
-    }
 }
 
 class TableDeliveryDispatchPolicy : OrderDispatchPolicy {
@@ -82,7 +81,12 @@ class KitchenPrinterDispatchPolicy(
         val sendResult = printerClient.sendBytes(printerIp, config.kitchenPrinterPort, ticketBytes)
         return sendResult.fold(
             onSuccess = {
-                logger.info("Order {} successfully printed to kitchen printer at {}:{}", order.codigoPedido, printerIp, config.kitchenPrinterPort)
+                logger.info(
+                    "Order {} successfully printed to kitchen printer at {}:{}",
+                    order.codigoPedido,
+                    printerIp,
+                    config.kitchenPrinterPort,
+                )
                 DispatchResult.KitchenPrinter(
                     orderNumber = order.codigoPedido,
                     printerIp = printerIp,
@@ -92,7 +96,13 @@ class KitchenPrinterDispatchPolicy(
                 )
             },
             onFailure = { error ->
-                logger.error("Failed to print kitchen ticket for order {} to {}:{}", order.codigoPedido, printerIp, config.kitchenPrinterPort, error)
+                logger.error(
+                    "Failed to print kitchen ticket for order {} to {}:{}",
+                    order.codigoPedido,
+                    printerIp,
+                    config.kitchenPrinterPort,
+                    error,
+                )
                 DispatchResult.KitchenPrinter(
                     orderNumber = order.codigoPedido,
                     printerIp = printerIp,
@@ -116,6 +126,5 @@ class OrderDispatchPolicyFactory(
             KioskDispatchDestination.MESAS -> TableDeliveryDispatchPolicy()
         }
 
-    fun getPolicy(destinationStr: String?): OrderDispatchPolicy =
-        getPolicy(KioskDispatchDestination.fromString(destinationStr))
+    fun getPolicy(destinationStr: String?): OrderDispatchPolicy = getPolicy(KioskDispatchDestination.fromString(destinationStr))
 }

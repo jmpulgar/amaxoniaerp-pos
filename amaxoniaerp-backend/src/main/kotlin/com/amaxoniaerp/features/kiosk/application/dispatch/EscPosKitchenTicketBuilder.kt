@@ -22,7 +22,9 @@ object EscPosKitchenTicketBuilder {
         val out = ByteArrayOutputStream()
 
         fun write(bytes: ByteArray) = out.write(bytes)
+
         fun writeText(text: String) = out.write(text.toByteArray(charset))
+
         fun writeLine(text: String = "") {
             writeText(text)
             out.write('\n'.code)

@@ -17,6 +17,27 @@ _Nada todavía._
 
 ---
 
+## [0.0.2] — 2026-10-06
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 2 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flowerp-prod-release.apk` |
+| SHA-256 | `C9CFFE5709911540961E01222BC275EAE3D37D8637EEC6AF465FED4AB78F8476` |
+
+### Requisitos
+- Backend desplegado con el commit del kiosco (endpoints `/api/v1/kiosk/*`).
+- Base de la empresa migrada con `db/2026/2026-10-06-KIOSCO-AUTOSERVICIO.sql` (admin PHP, `execute_queries_pa.py`).
+- Menú "Kioscos" registrado con `db/2026/2026-10-06-INSERT-INTO-MODULO-KIOSCOS.sql` (selectra_conf_pyme).
+
+### Corregido
+- La URL del servidor por defecto apuntaba a `https://api.amaxonia.com/`, que no existe. Ahora es `https://api.listoerp.app/` (el mismo backend del POS).
+- La pantalla de emparejamiento ahora explica dónde se genera el código (Configuración → Kioscos → «Generar código») y da un ejemplo de base de datos.
+- El backend compara el vencimiento del código con el reloj de la base de datos: el servidor del backend (Caracas, UTC-4) y la base PA (UTC-5) tienen husos distintos y el código aparecía vencido al instante.
+
+---
+
 ## [0.0.1] — 2026-10-06
 
 Primera versión de pruebas para SUNMI K2 (Android 9 / API 28, vertical 1080×1920).

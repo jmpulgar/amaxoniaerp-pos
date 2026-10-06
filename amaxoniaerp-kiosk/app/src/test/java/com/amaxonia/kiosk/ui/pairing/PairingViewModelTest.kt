@@ -1,5 +1,6 @@
 package com.amaxonia.kiosk.ui.pairing
 
+import com.amaxonia.kiosk.BuildConfig
 import com.amaxonia.kiosk.core.network.KioskApiClient
 import com.amaxonia.kiosk.core.network.KioskHttpClientFactory
 import com.amaxonia.kiosk.core.network.KioskTokenStorage
@@ -48,7 +49,7 @@ class PairingViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals("PA", state.countryCode)
-        assertEquals("http://10.0.2.2:8080", state.serverUrl)
+        assertEquals(BuildConfig.DEFAULT_SERVER_URL, state.serverUrl)
         assertEquals("", state.companyDb)
         assertEquals("", state.pairingCode)
         assertFalse(state.isLoading)

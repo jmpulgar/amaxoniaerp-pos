@@ -40,7 +40,10 @@ class SucursalRepository {
             }
         }
 
-    suspend fun getSucursalById(database: Database, id: Int): SucursalDto? =
+    suspend fun getSucursalById(
+        database: Database,
+        id: Int,
+    ): SucursalDto? =
         dbQuery(database) {
             val row =
                 SucursalTable
@@ -66,7 +69,10 @@ class SucursalRepository {
             )
         }
 
-    suspend fun createSucursal(database: Database, request: SaveSucursalRequest): SucursalDto =
+    suspend fun createSucursal(
+        database: Database,
+        request: SaveSucursalRequest,
+    ): SucursalDto =
         dbQuery(database) {
             val insertedId =
                 SucursalTable.insert {
@@ -98,7 +104,11 @@ class SucursalRepository {
             )
         }
 
-    suspend fun updateSucursal(database: Database, id: Int, request: SaveSucursalRequest): SucursalDto? =
+    suspend fun updateSucursal(
+        database: Database,
+        id: Int,
+        request: SaveSucursalRequest,
+    ): SucursalDto? =
         dbQuery(database) {
             val updatedRows =
                 SucursalTable.update({ SucursalTable.idSucursal eq id }) {

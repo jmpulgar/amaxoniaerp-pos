@@ -1,8 +1,8 @@
 package com.amaxoniaerp.features.kiosk.data
 
-import com.amaxoniaerp.core.database.SchemaDimensions as S
 import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.Table
+import com.amaxoniaerp.core.database.SchemaDimensions as S
 
 /**
  * Grupos de modificadores (ej. Tamaño, Término, Extras, Bebidas).

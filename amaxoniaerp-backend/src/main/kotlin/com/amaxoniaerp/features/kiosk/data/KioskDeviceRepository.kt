@@ -6,12 +6,15 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class KioskDeviceRepository {
-
-    suspend fun findDeviceById(database: Database, id: String): KioskDevice? =
+    suspend fun findDeviceById(
+        database: Database,
+        id: String,
+    ): KioskDevice? =
         dbQuery(database) {
             KioskDeviceTable
                 .selectAll()
@@ -34,7 +37,7 @@ class KioskDeviceRepository {
      */
     suspend fun currentDatabaseTime(database: Database): LocalDateTime =
         dbQuery(database) {
-            exec("SELECT NOW()") { rs ->
+            TransactionManager.current().exec("SELECT NOW()") { rs ->
                 rs.next()
                 rs.getTimestamp(1).toLocalDateTime()
             } ?: LocalDateTime.now()
@@ -47,21 +50,25 @@ class KioskDeviceRepository {
         now: LocalDateTime,
     ): Boolean =
         dbQuery(database) {
-            val updated = KioskDeviceTable.update({ KioskDeviceTable.id eq deviceId }) {
-                it[KioskDeviceTable.tokenHash] = tokenHash
-                it[KioskDeviceTable.codigoEmparejamientoHash] = null
-                it[KioskDeviceTable.codigoExpiraEn] = null
-                it[KioskDeviceTable.ultimoContacto] = now
-            }
+            val updated =
+                KioskDeviceTable.update({ KioskDeviceTable.id eq deviceId }) {
+                    it[KioskDeviceTable.tokenHash] = tokenHash
+                    it[KioskDeviceTable.codigoEmparejamientoHash] = null
+                    it[KioskDeviceTable.codigoExpiraEn] = null
+                    it[KioskDeviceTable.ultimoContacto] = now
+                }
             updated > 0
         }
 
-    suspend fun touchLastContact(database: Database, deviceId: String, now: LocalDateTime) =
-        dbQuery(database) {
-            KioskDeviceTable.update({ KioskDeviceTable.id eq deviceId }) {
-                it[ultimoContacto] = now
-            }
+    suspend fun touchLastContact(
+        database: Database,
+        deviceId: String,
+        now: LocalDateTime,
+    ) = dbQuery(database) {
+        KioskDeviceTable.update({ KioskDeviceTable.id eq deviceId }) {
+            it[ultimoContacto] = now
         }
+    }
 
     suspend fun getClaveKiosko(database: Database): String? =
         dbQuery(database) {

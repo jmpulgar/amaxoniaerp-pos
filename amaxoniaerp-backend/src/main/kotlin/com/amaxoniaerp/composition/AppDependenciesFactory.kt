@@ -119,23 +119,25 @@ private fun buildKioskDependencies(
             sessionManager = YappySessionManager(yappyGateway),
             defaultQrType = yappyQrType,
         )
-    val placeKioskOrderService = PlaceKioskOrderService(
-        kioskOrderRepository = kioskOrderRepository,
-        cajaSessionWorkflow = cajaSession,
-        processSaleUseCase = processSaleUseCase,
-        yappyPaymentVerifier = kioskYappyService,
-    )
-    val kioskService = KioskService(
-        kioskDeviceRepository = kioskDeviceRepository,
-        unlockRateLimiter = unlockRateLimiter,
-        jwtConfig = jwtConfig,
-        databaseResolver = { countryCode, companyDb ->
-            DatabaseManager.connectToCompanyDb(countryCode, companyDb)
-        },
-        kioskOrderRepository = kioskOrderRepository,
-        placeKioskOrderService = placeKioskOrderService,
-        kioskYappyService = kioskYappyService,
-    )
+    val placeKioskOrderService =
+        PlaceKioskOrderService(
+            kioskOrderRepository = kioskOrderRepository,
+            cajaSessionWorkflow = cajaSession,
+            processSaleUseCase = processSaleUseCase,
+            yappyPaymentVerifier = kioskYappyService,
+        )
+    val kioskService =
+        KioskService(
+            kioskDeviceRepository = kioskDeviceRepository,
+            unlockRateLimiter = unlockRateLimiter,
+            jwtConfig = jwtConfig,
+            databaseResolver = { countryCode, companyDb ->
+                DatabaseManager.connectToCompanyDb(countryCode, companyDb)
+            },
+            kioskOrderRepository = kioskOrderRepository,
+            placeKioskOrderService = placeKioskOrderService,
+            kioskYappyService = kioskYappyService,
+        )
     return KioskDependencies(kioskService)
 }
 

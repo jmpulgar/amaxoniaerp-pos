@@ -1,10 +1,10 @@
 package com.amaxoniaerp.features.kiosk.data
 
-import com.amaxoniaerp.core.database.SchemaDimensions as S
 import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.datetime
+import com.amaxoniaerp.core.database.SchemaDimensions as S
 
 /**
  * Dispositivos Kiosco registrados y emparejados.
@@ -67,6 +67,7 @@ object KioskOrderTable : Table("kiosco_pedido") {
     val idCliente = varchar("id_cliente", S.VARCHAR_LENGTH_36)
     val total = decimal("total", S.DECIMAL_PRECISION_18, S.DECIMAL_SCALE_4)
     val quoteExpiraEn = datetime("quote_expira_en")
+
     // Yappy reutiliza las columnas de pago (sin cambio de esquema): pago_marca = 'YAPPY' y
     // pago_referencia = transactionId desde que se genera el QR (ver KioskOrderRecord.pagoMetodo).
     val pagoReferencia = varchar("pago_referencia", S.VARCHAR_LENGTH_64).nullable()

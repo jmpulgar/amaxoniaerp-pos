@@ -18,18 +18,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class KioskSchemaTest {
-
     private lateinit var dataSource: HikariDataSource
     private lateinit var database: Database
 
     @BeforeTest
     fun setUp() {
-        val config = HikariConfig().apply {
-            jdbcUrl = "jdbc:h2:mem:kiosk_test_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-            driverClassName = "org.h2.Driver"
-            maximumPoolSize = 2
-            isAutoCommit = false
-        }
+        val config =
+            HikariConfig().apply {
+                jdbcUrl = "jdbc:h2:mem:kiosk_test_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                driverClassName = "org.h2.Driver"
+                maximumPoolSize = 2
+                isAutoCommit = false
+            }
         dataSource = HikariDataSource(config)
         database = Database.connect(dataSource)
     }
@@ -43,7 +43,10 @@ class KioskSchemaTest {
     fun `exposed schema creation and CRUD on kiosk and modifier tables`() {
         transaction(database) {
             // Parametros generales base table for test
-            exec("CREATE TABLE IF NOT EXISTS parametros_generales (cod_empresa INT, default_cod_cliente_factura VARCHAR(80), clave_kiosko VARCHAR(255))")
+            exec(
+                "CREATE TABLE IF NOT EXISTS parametros_generales " +
+                    "(cod_empresa INT, default_cod_cliente_factura VARCHAR(80), clave_kiosko VARCHAR(255))",
+            )
 
             SchemaUtils.create(
                 KioskDeviceTable,
@@ -86,19 +89,21 @@ class KioskSchemaTest {
             assertEquals("VIDEO", media.first()[KioskMediaTable.tipo])
 
             // 3. Modifier group & options
-            val groupId = ItemModifierGroupTable.insert {
-                it[nombre] = "Bebidas"
-                it[minSeleccion] = 1
-                it[maxSeleccion] = 1
-                it[esObligatorio] = true
-                it[esCombo] = true
-            } get ItemModifierGroupTable.id
+            val groupId =
+                ItemModifierGroupTable.insert {
+                    it[nombre] = "Bebidas"
+                    it[minSeleccion] = 1
+                    it[maxSeleccion] = 1
+                    it[esObligatorio] = true
+                    it[esCombo] = true
+                } get ItemModifierGroupTable.id
 
-            val modId = ItemModifierTable.insert {
-                it[idGrupo] = groupId
-                it[nombre] = "Coca Cola Sin Azucar"
-                it[precioAdicional] = BigDecimal("0.5000")
-            } get ItemModifierTable.id
+            val modId =
+                ItemModifierTable.insert {
+                    it[idGrupo] = groupId
+                    it[nombre] = "Coca Cola Sin Azucar"
+                    it[precioAdicional] = BigDecimal("0.5000")
+                } get ItemModifierTable.id
 
             ItemModifierRelationTable.insert {
                 it[idItem] = 100
@@ -160,8 +165,9 @@ class KioskSchemaTest {
 
     @Test
     fun `migration script 006 runs cleanly on PA and VE base schemas`() {
-        val scriptStream = javaClass.getResourceAsStream("/migrations/006_kiosk_tables.sql")
-            ?: error("006_kiosk_tables.sql not found")
+        val scriptStream =
+            javaClass.getResourceAsStream("/migrations/006_kiosk_tables.sql")
+                ?: error("006_kiosk_tables.sql not found")
         val sqlScript = scriptStream.bufferedReader().use { it.readText() }
 
         // Test on simulated PA schema
@@ -171,13 +177,17 @@ class KioskSchemaTest {
         testScriptAgainstSchema("VE", sqlScript)
     }
 
-    private fun testScriptAgainstSchema(country: String, fullScript: String) {
-        val testDbConfig = HikariConfig().apply {
-            jdbcUrl = "jdbc:h2:mem:migration_${country}_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-            driverClassName = "org.h2.Driver"
-            maximumPoolSize = 1
-            isAutoCommit = false
-        }
+    private fun testScriptAgainstSchema(
+        country: String,
+        fullScript: String,
+    ) {
+        val testDbConfig =
+            HikariConfig().apply {
+                jdbcUrl = "jdbc:h2:mem:migration_${country}_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                driverClassName = "org.h2.Driver"
+                maximumPoolSize = 1
+                isAutoCommit = false
+            }
         HikariDataSource(testDbConfig).use { ds ->
             val db = Database.connect(ds)
             transaction(db) {
@@ -230,26 +240,28 @@ class KioskSchemaTest {
                 }
 
                 // Execute statements from migration script
-                val statements = fullScript
-                    .lines()
-                    .filterNot { it.trim().startsWith("--") }
-                    .joinToString("\n")
-                    .split(";")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
+                val statements =
+                    fullScript
+                        .lines()
+                        .filterNot { it.trim().startsWith("--") }
+                        .joinToString("\n")
+                        .split(";")
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
 
                 for (stmt in statements) {
                     exec(stmt)
                 }
 
                 // Verify tables exist and alter column worked
-                val tablesCheck = exec("SHOW TABLES") { rs ->
-                    val names = mutableListOf<String>()
-                    while (rs.next()) {
-                        names.add(rs.getString(1).lowercase())
-                    }
-                    names
-                } ?: emptyList()
+                val tablesCheck =
+                    exec("SHOW TABLES") { rs ->
+                        val names = mutableListOf<String>()
+                        while (rs.next()) {
+                            names.add(rs.getString(1).lowercase())
+                        }
+                        names
+                    } ?: emptyList()
 
                 assertTrue(tablesCheck.contains("kiosco_dispositivo"))
                 assertTrue(tablesCheck.contains("kiosco_media"))
@@ -261,13 +273,14 @@ class KioskSchemaTest {
                 assertTrue(tablesCheck.contains("kiosco_pedido_item_modificador"))
 
                 // Verify columns added to parametros_generales
-                val columnsCheck = exec("SHOW COLUMNS FROM parametros_generales") { rs ->
-                    val cols = mutableListOf<String>()
-                    while (rs.next()) {
-                        cols.add(rs.getString(1).lowercase())
-                    }
-                    cols
-                } ?: emptyList()
+                val columnsCheck =
+                    exec("SHOW COLUMNS FROM parametros_generales") { rs ->
+                        val cols = mutableListOf<String>()
+                        while (rs.next()) {
+                            cols.add(rs.getString(1).lowercase())
+                        }
+                        cols
+                    } ?: emptyList()
 
                 assertTrue(columnsCheck.contains("kiosco_destino_pedido"))
                 assertTrue(columnsCheck.contains("kiosco_impresora_cocina_ip"))

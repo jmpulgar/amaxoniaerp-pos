@@ -33,7 +33,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
-import io.ktor.server.auth.authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.routing.routing
@@ -52,26 +51,26 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class KioskQuoteRoutesTest {
-
     private lateinit var dataSource: HikariDataSource
     private lateinit var database: Database
 
-    private val jwtConfig = JwtConfig(
-        secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-        domain = "http://localhost:8080",
-        audience = "http://localhost:8080/kiosk",
-        realm = "Amaxonia Kiosk Test",
-    )
+    private val jwtConfig =
+        JwtConfig(
+            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
+            domain = "http://localhost:8080",
+            audience = "http://localhost:8080/kiosk",
+            realm = "Amaxonia Kiosk Test",
+        )
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
     private val kioskDeviceRepository = KioskDeviceRepository()
     private val kioskCatalogRepository = KioskCatalogRepository()
@@ -85,24 +84,26 @@ class KioskQuoteRoutesTest {
 
     @BeforeTest
     fun setUp() {
-        dataSource = HikariDataSource(
-            HikariConfig().apply {
-                jdbcUrl = "jdbc:h2:mem:kiosk_quote_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                driverClassName = "org.h2.Driver"
-                maximumPoolSize = 2
-                isAutoCommit = false
-            },
-        )
+        dataSource =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = "jdbc:h2:mem:kiosk_quote_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                    driverClassName = "org.h2.Driver"
+                    maximumPoolSize = 2
+                    isAutoCommit = false
+                },
+            )
         database = Database.connect(dataSource)
 
-        kioskService = KioskService(
-            kioskDeviceRepository = kioskDeviceRepository,
-            unlockRateLimiter = unlockRateLimiter,
-            jwtConfig = jwtConfig,
-            databaseResolver = { _, _ -> database },
-            kioskCatalogRepository = kioskCatalogRepository,
-            kioskOrderRepository = kioskOrderRepository,
-        )
+        kioskService =
+            KioskService(
+                kioskDeviceRepository = kioskDeviceRepository,
+                unlockRateLimiter = unlockRateLimiter,
+                jwtConfig = jwtConfig,
+                databaseResolver = { _, _ -> database },
+                kioskCatalogRepository = kioskCatalogRepository,
+                kioskOrderRepository = kioskOrderRepository,
+            )
 
         transaction(database) {
             exec(
@@ -274,7 +275,8 @@ class KioskQuoteRoutesTest {
     }
 
     private fun generateValidKioskJwt(): String =
-        JWT.create()
+        JWT
+            .create()
             .withIssuer(jwtConfig.domain)
             .withAudience(jwtConfig.audience)
             .withClaim("token_type", "kiosk")
@@ -295,7 +297,8 @@ class KioskQuoteRoutesTest {
             jwt {
                 realm = jwtConfig.realm ?: "test"
                 verifier(
-                    JWT.require(Algorithm.HMAC256(jwtConfig.secret))
+                    JWT
+                        .require(Algorithm.HMAC256(jwtConfig.secret))
                         .withAudience(jwtConfig.audience)
                         .withIssuer(jwtConfig.domain)
                         .build(),
@@ -312,246 +315,277 @@ class KioskQuoteRoutesTest {
     }
 
     @Test
-    fun `POST quote calculates exact totals with modifiers in Money and assigns K1-001`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `POST quote calculates exact totals with modifiers in Money and assigns K1-001`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            val idempotencyKey = UUID.randomUUID().toString()
+
+            // Pedido: 2 x Hamburguesa Clásica (base 5.50 + tocineta 1.50 + bebida 0.00 = 7.00 unitario)
+            // Subtotal = 14.00, Impuesto 7% = 0.98, Total = 14.98
+            val quoteRequest =
+                KioskQuoteRequest(
+                    diningMode = "COMER_AQUI",
+                    tableTent = "42",
+                    customerId = "CF",
+                    lines =
+                        listOf(
+                            KioskQuoteLineRequest(
+                                itemId = 101,
+                                qty = 2,
+                                note = "Bien cocida",
+                                modifiers = listOf(1, 3), // 1 = Coca Cola, 3 = Tocineta Extra (+1.50)
+                            ),
+                        ),
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", idempotencyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val quote = json.decodeFromString<KioskQuoteResponse>(response.bodyAsText())
+
+            assertEquals(idempotencyKey, quote.orderId)
+            assertEquals("K1-001", quote.formattedOrderNumber)
+            assertEquals("14.00", quote.subtotal)
+            assertEquals("0.98", quote.tax)
+            assertEquals("14.98", quote.total)
+            assertEquals("COMER_AQUI", quote.diningMode)
+            assertEquals("42", quote.tableTent)
+            assertEquals(1, quote.lines.size)
+
+            val line = quote.lines[0]
+            assertEquals("7.00", line.unitPrice)
+            assertEquals("14.00", line.subtotal)
+            assertEquals("0.98", line.tax)
+            assertEquals("14.98", line.total)
+            assertEquals("Bien cocida", line.note)
+            assertEquals(2, line.modifiers.size)
+
+            // Verificar persistencia en base de datos
+            transaction(database) {
+                val dbOrder = KioskOrderTable.selectAll().where { KioskOrderTable.id eq idempotencyKey }.single()
+                assertEquals("K1-001", dbOrder[KioskOrderTable.codigoPedido])
+                assertEquals(1, dbOrder[KioskOrderTable.numeroPedidoDiario])
+                assertEquals("COTIZADO", dbOrder[KioskOrderTable.estado])
+
+                val dbItems = KioskOrderItemTable.selectAll().where { KioskOrderItemTable.idPedido eq idempotencyKey }.toList()
+                assertEquals(1, dbItems.size)
+
+                val dbMods =
+                    KioskOrderItemModifierTable
+                        .selectAll()
+                        .where { KioskOrderItemModifierTable.idPedido eq idempotencyKey }
+                        .toList()
+                assertEquals(2, dbMods.size)
+            }
+
+            // Probar idempotencia: llamada repetida con el mismo Idempotency-Key devuelve lo mismo sin duplicar
+            val repeatResponse =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", idempotencyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+            assertEquals(HttpStatusCode.OK, repeatResponse.status)
+            val repeatQuote = json.decodeFromString<KioskQuoteResponse>(repeatResponse.bodyAsText())
+            assertEquals("K1-001", repeatQuote.formattedOrderNumber)
+            assertEquals(quote.total, repeatQuote.total)
+
+            // Probar segundo pedido con NUEVO Idempotency-Key -> debe ser K1-002
+            val secondKey = UUID.randomUUID().toString()
+            val secondResponse =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", secondKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+            assertEquals(HttpStatusCode.OK, secondResponse.status)
+            val secondQuote = json.decodeFromString<KioskQuoteResponse>(secondResponse.bodyAsText())
+            assertEquals("K1-002", secondQuote.formattedOrderNumber)
         }
-
-        val token = generateValidKioskJwt()
-        val idempotencyKey = UUID.randomUUID().toString()
-
-        // Pedido: 2 x Hamburguesa Clásica (base 5.50 + tocineta 1.50 + bebida 0.00 = 7.00 unitario)
-        // Subtotal = 14.00, Impuesto 7% = 0.98, Total = 14.98
-        val quoteRequest = KioskQuoteRequest(
-            diningMode = "COMER_AQUI",
-            tableTent = "42",
-            customerId = "CF",
-            lines = listOf(
-                KioskQuoteLineRequest(
-                    itemId = 101,
-                    qty = 2,
-                    note = "Bien cocida",
-                    modifiers = listOf(1, 3), // 1 = Coca Cola, 3 = Tocineta Extra (+1.50)
-                ),
-            ),
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", idempotencyKey)
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        val quote = json.decodeFromString<KioskQuoteResponse>(response.bodyAsText())
-
-        assertEquals(idempotencyKey, quote.orderId)
-        assertEquals("K1-001", quote.formattedOrderNumber)
-        assertEquals("14.00", quote.subtotal)
-        assertEquals("0.98", quote.tax)
-        assertEquals("14.98", quote.total)
-        assertEquals("COMER_AQUI", quote.diningMode)
-        assertEquals("42", quote.tableTent)
-        assertEquals(1, quote.lines.size)
-
-        val line = quote.lines[0]
-        assertEquals("7.00", line.unitPrice)
-        assertEquals("14.00", line.subtotal)
-        assertEquals("0.98", line.tax)
-        assertEquals("14.98", line.total)
-        assertEquals("Bien cocida", line.note)
-        assertEquals(2, line.modifiers.size)
-
-        // Verificar persistencia en base de datos
-        transaction(database) {
-            val dbOrder = KioskOrderTable.selectAll().where { KioskOrderTable.id eq idempotencyKey }.single()
-            assertEquals("K1-001", dbOrder[KioskOrderTable.codigoPedido])
-            assertEquals(1, dbOrder[KioskOrderTable.numeroPedidoDiario])
-            assertEquals("COTIZADO", dbOrder[KioskOrderTable.estado])
-
-            val dbItems = KioskOrderItemTable.selectAll().where { KioskOrderItemTable.idPedido eq idempotencyKey }.toList()
-            assertEquals(1, dbItems.size)
-
-            val dbMods = KioskOrderItemModifierTable.selectAll().where { KioskOrderItemModifierTable.idPedido eq idempotencyKey }.toList()
-            assertEquals(2, dbMods.size)
-        }
-
-        // Probar idempotencia: llamada repetida con el mismo Idempotency-Key devuelve lo mismo sin duplicar
-        val repeatResponse = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", idempotencyKey)
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-        assertEquals(HttpStatusCode.OK, repeatResponse.status)
-        val repeatQuote = json.decodeFromString<KioskQuoteResponse>(repeatResponse.bodyAsText())
-        assertEquals("K1-001", repeatQuote.formattedOrderNumber)
-        assertEquals(quote.total, repeatQuote.total)
-
-        // Probar segundo pedido con NUEVO Idempotency-Key -> debe ser K1-002
-        val secondKey = UUID.randomUUID().toString()
-        val secondResponse = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", secondKey)
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-        assertEquals(HttpStatusCode.OK, secondResponse.status)
-        val secondQuote = json.decodeFromString<KioskQuoteResponse>(secondResponse.bodyAsText())
-        assertEquals("K1-002", secondQuote.formattedOrderNumber)
-    }
 
     @Test
-    fun `POST quote rejects when mandatory modifier is omitted`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `POST quote rejects when mandatory modifier is omitted`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            // No incluye bebida (Grupo 1 es obligatorio / min 1)
+            val quoteRequest =
+                KioskQuoteRequest(
+                    diningMode = "COMER_AQUI",
+                    lines =
+                        listOf(
+                            KioskQuoteLineRequest(
+                                itemId = 101,
+                                qty = 1,
+                                modifiers = emptyList(),
+                            ),
+                        ),
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", UUID.randomUUID().toString())
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Bebida del Combo"))
         }
-
-        val token = generateValidKioskJwt()
-        // No incluye bebida (Grupo 1 es obligatorio / min 1)
-        val quoteRequest = KioskQuoteRequest(
-            diningMode = "COMER_AQUI",
-            lines = listOf(
-                KioskQuoteLineRequest(
-                    itemId = 101,
-                    qty = 1,
-                    modifiers = emptyList(),
-                ),
-            ),
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", UUID.randomUUID().toString())
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertTrue(response.bodyAsText().contains("Bebida del Combo"))
-    }
 
     @Test
-    fun `POST quote rejects when modifier exceeds maximum selection`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `POST quote rejects when modifier exceeds maximum selection`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            // Selecciona 2 bebidas cuando max es 1
+            val quoteRequest =
+                KioskQuoteRequest(
+                    diningMode = "COMER_AQUI",
+                    lines =
+                        listOf(
+                            KioskQuoteLineRequest(
+                                itemId = 101,
+                                qty = 1,
+                                modifiers = listOf(1, 2), // Bebidas 1 y 2
+                            ),
+                        ),
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", UUID.randomUUID().toString())
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("máximo"))
         }
-
-        val token = generateValidKioskJwt()
-        // Selecciona 2 bebidas cuando max es 1
-        val quoteRequest = KioskQuoteRequest(
-            diningMode = "COMER_AQUI",
-            lines = listOf(
-                KioskQuoteLineRequest(
-                    itemId = 101,
-                    qty = 1,
-                    modifiers = listOf(1, 2), // Bebidas 1 y 2
-                ),
-            ),
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", UUID.randomUUID().toString())
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertTrue(response.bodyAsText().contains("máximo"))
-    }
 
     @Test
-    fun `POST quote rejects when item is sold out`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `POST quote rejects when item is sold out`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            // Item 102 tiene stock 0
+            val quoteRequest =
+                KioskQuoteRequest(
+                    diningMode = "PARA_LLEVAR",
+                    lines =
+                        listOf(
+                            KioskQuoteLineRequest(
+                                itemId = 102,
+                                qty = 1,
+                            ),
+                        ),
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header("Idempotency-Key", UUID.randomUUID().toString())
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("agotado"))
         }
-
-        val token = generateValidKioskJwt()
-        // Item 102 tiene stock 0
-        val quoteRequest = KioskQuoteRequest(
-            diningMode = "PARA_LLEVAR",
-            lines = listOf(
-                KioskQuoteLineRequest(
-                    itemId = 102,
-                    qty = 1,
-                ),
-            ),
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header("Idempotency-Key", UUID.randomUUID().toString())
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertTrue(response.bodyAsText().contains("agotado"))
-    }
 
     @Test
-    fun `POST quote rejects when Idempotency-Key header is missing`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `POST quote rejects when Idempotency-Key header is missing`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            val quoteRequest =
+                KioskQuoteRequest(
+                    diningMode = "COMER_AQUI",
+                    lines =
+                        listOf(
+                            KioskQuoteLineRequest(
+                                itemId = 101,
+                                qty = 1,
+                                modifiers = listOf(1),
+                            ),
+                        ),
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/quote") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    // Sin Idempotency-Key
+                    contentType(ContentType.Application.Json)
+                    setBody(quoteRequest)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Idempotency-Key"))
         }
-
-        val token = generateValidKioskJwt()
-        val quoteRequest = KioskQuoteRequest(
-            diningMode = "COMER_AQUI",
-            lines = listOf(
-                KioskQuoteLineRequest(
-                    itemId = 101,
-                    qty = 1,
-                    modifiers = listOf(1),
-                ),
-            ),
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/quote") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            // Sin Idempotency-Key
-            contentType(ContentType.Application.Json)
-            setBody(quoteRequest)
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertTrue(response.bodyAsText().contains("Idempotency-Key"))
-    }
 }

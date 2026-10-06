@@ -10,6 +10,7 @@ import com.amaxoniaerp.features.kiosk.domain.KioskYappyStatusResponse
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyCharge
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyGateway
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyKioskConfig
+import com.amaxoniaerp.features.kiosk.domain.yappy.YappyQr
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyQrType
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyTransactionStatus
 import com.amaxoniaerp.features.kiosk.domain.yappy.YappyUpstreamException
@@ -66,11 +67,31 @@ class KioskYappyService(
         check(order.estado == ESTADO_COTIZADO) { "El pedido se encuentra en estado ${order.estado}" }
         check(!clock().isAfter(order.quoteExpiraEn)) { "La cotización del pedido ha expirado" }
 
-        val config = findConfig(database, kioskContext) ?: throw KioskYappyNotConfiguredException()
+        val config = requireConfig(database, kioskContext)
         order.yappyTransactionId?.let { previous -> releasePreviousTransaction(kioskContext, config, order, previous) }
 
         val qrType = yappyConfigRepository.findQrType(database) ?: defaultQrType
         val charge = KioskOrderCharge.from(order)
+        val qr = generateQr(kioskContext, config, qrType, order, charge)
+        assignTransactionOrRelease(database, kioskContext, config, order, qr.transactionId)
+        logger.info("[YAPPY] Pedido {} con QR {} transactionId={}", order.codigoPedido, qrType, qr.transactionId)
+
+        return KioskYappyQrResponse(
+            transactionId = qr.transactionId,
+            qrHash = qr.hash,
+            amount = charge.total.toPlainString(),
+            expiresInSec = QR_EXPIRES_IN_SEC,
+        )
+    }
+
+    /** Genera el QR en Yappy y valida el identificador de transacción devuelto. */
+    private suspend fun generateQr(
+        kioskContext: KioskRequestContext,
+        config: YappyKioskConfig,
+        qrType: YappyQrType,
+        order: KioskOrderRecord,
+        charge: KioskOrderCharge,
+    ): YappyQr {
         val qr =
             sessionManager.withSession(sessionKey(kioskContext), config) { token ->
                 yappyGateway.generateQr(
@@ -90,25 +111,28 @@ class KioskYappyService(
         if (qr.transactionId.length > MAX_TRANSACTION_ID_LENGTH) {
             throw YappyUpstreamException("Yappy devolvió un identificador de transacción inválido")
         }
+        return qr
+    }
 
-        // Sin columnas nuevas: pago_marca = 'YAPPY' y pago_referencia = transactionId (solo en COTIZADO).
-        if (!kioskOrderRepository.assignYappyTransaction(database, order.id, qr.transactionId)) {
-            // El pedido dejó de estar COTIZADO mientras se generaba el QR: no dejarlo cobrable.
-            runCatching {
-                sessionManager.withSession(sessionKey(kioskContext), config) { token ->
-                    yappyGateway.cancelTransaction(config.credentials, token, qr.transactionId)
-                }
-            }.onFailure { logger.warn("[YAPPY] No se pudo anular QR huérfano transactionId={}: {}", qr.transactionId, it.message) }
-            throw IllegalStateException("El pedido ${order.codigoPedido} ya no está pendiente de pago")
-        }
-        logger.info("[YAPPY] Pedido {} con QR {} transactionId={}", order.codigoPedido, qrType, qr.transactionId)
-
-        return KioskYappyQrResponse(
-            transactionId = qr.transactionId,
-            qrHash = qr.hash,
-            amount = charge.total.toPlainString(),
-            expiresInSec = QR_EXPIRES_IN_SEC,
-        )
+    /**
+     * Sin columnas nuevas: pago_marca = 'YAPPY' y pago_referencia = transactionId (solo en COTIZADO).
+     * Si el pedido dejó de estar COTIZADO mientras se generaba el QR, lo anula best-effort para no
+     * dejarlo cobrable y falla con [IllegalStateException].
+     */
+    private suspend fun assignTransactionOrRelease(
+        database: Database,
+        kioskContext: KioskRequestContext,
+        config: YappyKioskConfig,
+        order: KioskOrderRecord,
+        transactionId: String,
+    ) {
+        if (kioskOrderRepository.assignYappyTransaction(database, order.id, transactionId)) return
+        runCatching {
+            sessionManager.withSession(sessionKey(kioskContext), config) { token ->
+                yappyGateway.cancelTransaction(config.credentials, token, transactionId)
+            }
+        }.onFailure { logger.warn("[YAPPY] No se pudo anular QR huérfano transactionId={}: {}", transactionId, it.message) }
+        throw IllegalStateException("El pedido ${order.codigoPedido} ya no está pendiente de pago")
     }
 
     suspend fun getStatus(
@@ -119,7 +143,7 @@ class KioskYappyService(
     ): KioskYappyStatusResponse {
         val order = loadOwnedOrder(database, kioskContext, orderId)
         check(order.yappyTransactionId == transactionId) { "La transacción Yappy no corresponde al pedido" }
-        val config = findConfig(database, kioskContext) ?: throw KioskYappyNotConfiguredException()
+        val config = requireConfig(database, kioskContext)
         val status = fetchStatus(kioskContext, config, transactionId)
         return KioskYappyStatusResponse(transactionId = transactionId, status = status.name)
     }
@@ -252,6 +276,11 @@ class KioskYappyService(
         database: Database,
         kioskContext: KioskRequestContext,
     ): YappyKioskConfig? = yappyConfigRepository.findConfig(database, kioskContext.countryCode, kioskContext.idCaja)
+
+    private suspend fun requireConfig(
+        database: Database,
+        kioskContext: KioskRequestContext,
+    ): YappyKioskConfig = findConfig(database, kioskContext) ?: throw KioskYappyNotConfiguredException()
 
     private fun sessionKey(kioskContext: KioskRequestContext): YappySessionKey =
         YappySessionKey(companyDb = kioskContext.companyDb, idCaja = kioskContext.idCaja)

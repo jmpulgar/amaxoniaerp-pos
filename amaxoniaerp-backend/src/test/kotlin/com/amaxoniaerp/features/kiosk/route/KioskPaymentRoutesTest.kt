@@ -49,7 +49,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
-import io.ktor.server.auth.authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.routing.routing
@@ -75,22 +74,23 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KioskPaymentRoutesTest {
-
     private lateinit var dataSource: HikariDataSource
     private lateinit var database: Database
 
-    private val jwtConfig = JwtConfig(
-        secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-        domain = "http://localhost:8080",
-        audience = "http://localhost:8080/kiosk",
-        realm = "Amaxonia Kiosk Test",
-    )
+    private val jwtConfig =
+        JwtConfig(
+            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
+            domain = "http://localhost:8080",
+            audience = "http://localhost:8080/kiosk",
+            realm = "Amaxonia Kiosk Test",
+        )
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
     private val kioskDeviceRepository = KioskDeviceRepository()
     private val kioskCatalogRepository = KioskCatalogRepository()
@@ -102,11 +102,12 @@ class KioskPaymentRoutesTest {
     private val testDeviceId = UUID.randomUUID().toString()
     private val testCajaId = "CAJA-01"
 
-    private var feResultToReturn: ElectronicInvoiceResult = ElectronicInvoiceResult.Success(
-        cufe = "CUFE-PANAMA-998877",
-        qr = "https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-998877",
-        fechaRecepcionDGI = "2026-10-05 14:00:00",
-    )
+    private var feResultToReturn: ElectronicInvoiceResult =
+        ElectronicInvoiceResult.Success(
+            cufe = "CUFE-PANAMA-998877",
+            qr = "https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-998877",
+            fechaRecepcionDGI = "2026-10-05 14:00:00",
+        )
 
     private lateinit var processSaleUseCase: ProcessSaleUseCase
     private lateinit var placeKioskOrderService: PlaceKioskOrderService
@@ -114,56 +115,67 @@ class KioskPaymentRoutesTest {
 
     @BeforeTest
     fun setUp() {
-        dataSource = HikariDataSource(
-            HikariConfig().apply {
-                jdbcUrl = "jdbc:h2:mem:kiosk_pay_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                driverClassName = "org.h2.Driver"
-                maximumPoolSize = 2
-                isAutoCommit = false
-            },
-        )
+        dataSource =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = "jdbc:h2:mem:kiosk_pay_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                    driverClassName = "org.h2.Driver"
+                    maximumPoolSize = 2
+                    isAutoCommit = false
+                },
+            )
         database = Database.connect(dataSource)
 
-        val saleRepo = object : ProcessSaleTransactionalRepository() {
-            override fun process(countryCode: String, request: ProcessSaleRequest): ProcessSaleResponse {
-                val invId = request.idFactura ?: "INV-TEST-001"
-                return ProcessSaleResponse(
-                    success = true,
-                    idFactura = invId,
-                    codFactura = "FAC-PA-1001",
-                    codEstatus = 2,
-                )
+        val saleRepo =
+            object : ProcessSaleTransactionalRepository() {
+                override fun process(
+                    countryCode: String,
+                    request: ProcessSaleRequest,
+                ): ProcessSaleResponse {
+                    val invId = request.idFactura ?: "INV-TEST-001"
+                    return ProcessSaleResponse(
+                        success = true,
+                        idFactura = invId,
+                        codFactura = "FAC-PA-1001",
+                        codEstatus = 2,
+                    )
+                }
             }
-        }
 
-        val strategy = object : ElectronicInvoiceStrategy {
-            override val countryCode: String = testCountry
-            override suspend fun processElectronicInvoice(database: Database, invoiceId: String): ElectronicInvoiceResult {
-                return feResultToReturn
+        val strategy =
+            object : ElectronicInvoiceStrategy {
+                override val countryCode: String = testCountry
+
+                override suspend fun processElectronicInvoice(
+                    database: Database,
+                    invoiceId: String,
+                ): ElectronicInvoiceResult = feResultToReturn
             }
-        }
 
-        val feFactory = object : ProcessorFactory {
-            override fun forCountry(countryCode: String): ElectronicInvoiceStrategy = strategy
-        }
+        val feFactory =
+            object : ProcessorFactory {
+                override fun forCountry(countryCode: String): ElectronicInvoiceStrategy = strategy
+            }
 
         processSaleUseCase = ProcessSaleUseCase(saleRepo, feFactory)
         val cajaWorkflow = CajaSessionWorkflow(ExposedCajaSessionStore())
-        placeKioskOrderService = PlaceKioskOrderService(
-            kioskOrderRepository = kioskOrderRepository,
-            cajaSessionWorkflow = cajaWorkflow,
-            processSaleUseCase = processSaleUseCase,
-        )
+        placeKioskOrderService =
+            PlaceKioskOrderService(
+                kioskOrderRepository = kioskOrderRepository,
+                cajaSessionWorkflow = cajaWorkflow,
+                processSaleUseCase = processSaleUseCase,
+            )
 
-        kioskService = KioskService(
-            kioskDeviceRepository = kioskDeviceRepository,
-            unlockRateLimiter = unlockRateLimiter,
-            jwtConfig = jwtConfig,
-            databaseResolver = { _, _ -> database },
-            kioskCatalogRepository = kioskCatalogRepository,
-            kioskOrderRepository = kioskOrderRepository,
-            placeKioskOrderService = placeKioskOrderService,
-        )
+        kioskService =
+            KioskService(
+                kioskDeviceRepository = kioskDeviceRepository,
+                unlockRateLimiter = unlockRateLimiter,
+                jwtConfig = jwtConfig,
+                databaseResolver = { _, _ -> database },
+                kioskCatalogRepository = kioskCatalogRepository,
+                kioskOrderRepository = kioskOrderRepository,
+                placeKioskOrderService = placeKioskOrderService,
+            )
 
         transaction(database) {
             exec(
@@ -192,7 +204,10 @@ class KioskPaymentRoutesTest {
                 );
                 """.trimIndent(),
             )
-            exec("INSERT INTO parametros_generales (cod_empresa, validar_stock, porcentaje_impuesto_principal, rif) VALUES (1, 'SI', 7.00, '155688-1-554433');")
+            exec(
+                "INSERT INTO parametros_generales (cod_empresa, validar_stock, porcentaje_impuesto_principal, rif) " +
+                    "VALUES (1, 'SI', 7.00, '155688-1-554433');",
+            )
 
             exec(
                 """
@@ -318,8 +333,9 @@ class KioskPaymentRoutesTest {
         dataSource.close()
     }
 
-    private fun generateKioskToken(deviceId: String = testDeviceId): String {
-        return JWT.create()
+    private fun generateKioskToken(deviceId: String = testDeviceId): String =
+        JWT
+            .create()
             .withIssuer(jwtConfig.domain)
             .withAudience(jwtConfig.audience)
             .withClaim("token_type", "kiosk")
@@ -336,7 +352,6 @@ class KioskPaymentRoutesTest {
             .withClaim("seller_code", 10)
             .withClaim("customer_id", "CF")
             .sign(Algorithm.HMAC256(jwtConfig.secret))
-    }
 
     private fun ApplicationTestBuilder.configureKioskApp() {
         install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
@@ -346,7 +361,8 @@ class KioskPaymentRoutesTest {
             jwt {
                 realm = jwtConfig.realm ?: "Amaxonia Kiosk"
                 verifier(
-                    JWT.require(Algorithm.HMAC256(jwtConfig.secret))
+                    JWT
+                        .require(Algorithm.HMAC256(jwtConfig.secret))
                         .withAudience(jwtConfig.audience)
                         .withIssuer(jwtConfig.domain)
                         .build(),
@@ -400,225 +416,249 @@ class KioskPaymentRoutesTest {
     }
 
     @Test
-    fun `POST pay returns 200 OK with CUFE and QR when fiscal invoice succeeds`() = testApplication {
-        configureKioskApp()
-        val client = createClient {
-            install(ContentNegotiation) { json(json) }
+    fun `POST pay returns 200 OK with CUFE and QR when fiscal invoice succeeds`() =
+        testApplication {
+            configureKioskApp()
+            val client =
+                createClient {
+                    install(ContentNegotiation) { json(json) }
+                }
+
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
+
+            feResultToReturn =
+                ElectronicInvoiceResult.Success(
+                    cufe = "CUFE-PANAMA-123456",
+                    qr = "https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-123456",
+                    fechaRecepcionDGI = "2026-10-05 14:30:00",
+                )
+
+            val paymentRequest =
+                KioskPaymentRequest(
+                    transactionId = "tx-123",
+                    authCode = "AUTH7788",
+                    reference = "REF9900",
+                    last4 = "4242",
+                    brand = "VISA",
+                    amount = "5.89",
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+
+            val payResp = json.decodeFromString<KioskPayResponse>(response.bodyAsText())
+            assertEquals("K1-001", payResp.orderNumber)
+            assertEquals("FACTURADO", payResp.status)
+            assertEquals("RETIRO_MOSTRADOR", payResp.dispatch)
+            assertNotNull(payResp.invoice)
+            assertEquals("FAC-PA-1001", payResp.invoice?.codFactura)
+            assertEquals("CUFE-PANAMA-123456", payResp.invoice?.cufe)
+            assertEquals("https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-123456", payResp.invoice?.qr)
+
+            // Verificación de recibo
+            val receipt = payResp.receipt
+            assertEquals("Multiplaza Mall", receipt.companyName)
+            assertEquals("155688-1-554433", receipt.ruc)
+            assertEquals("K1-001", receipt.orderNumber)
+            assertEquals("COMER_AQUI", receipt.diningMode)
+            assertEquals("15", receipt.tableTent)
+            assertEquals("5.89", receipt.total)
+            assertEquals("VISA", receipt.paymentBrand)
+            assertEquals("4242", receipt.paymentLast4)
+            assertEquals("AUTH7788", receipt.paymentAuthCode)
+
+            // Verificar estado persistido en DB
+            transaction(database) {
+                val orderRow = KioskOrderTable.selectAll().where { KioskOrderTable.id eq orderId }.single()
+                assertEquals("FACTURADO", orderRow[KioskOrderTable.estado])
+                assertEquals("REF9900", orderRow[KioskOrderTable.pagoReferencia])
+                assertEquals("AUTH7788", orderRow[KioskOrderTable.pagoAutorizacion])
+                assertEquals("4242", orderRow[KioskOrderTable.pagoUltimos4])
+                assertEquals("VISA", orderRow[KioskOrderTable.pagoMarca])
+
+                // Verificar que se abrió una secuencia de caja para hoy
+                val secuencias = CajaSecuenciaTable.selectAll().where { CajaSecuenciaTable.idCaja eq testCajaId }.toList()
+                assertTrue(secuencias.isNotEmpty(), "Debe haber una secuencia de caja creada")
+            }
         }
-
-        val orderId = UUID.randomUUID().toString()
-        insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
-
-        feResultToReturn = ElectronicInvoiceResult.Success(
-            cufe = "CUFE-PANAMA-123456",
-            qr = "https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-123456",
-            fechaRecepcionDGI = "2026-10-05 14:30:00",
-        )
-
-        val paymentRequest = KioskPaymentRequest(
-            transactionId = "tx-123",
-            authCode = "AUTH7788",
-            reference = "REF9900",
-            last4 = "4242",
-            brand = "VISA",
-            amount = "5.89",
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
-
-        val payResp = json.decodeFromString<KioskPayResponse>(response.bodyAsText())
-        assertEquals("K1-001", payResp.orderNumber)
-        assertEquals("FACTURADO", payResp.status)
-        assertEquals("RETIRO_MOSTRADOR", payResp.dispatch)
-        assertNotNull(payResp.invoice)
-        assertEquals("FAC-PA-1001", payResp.invoice?.codFactura)
-        assertEquals("CUFE-PANAMA-123456", payResp.invoice?.cufe)
-        assertEquals("https://dgi-fe.mef.gob.pa/consultas/facturas?cufe=CUFE-PANAMA-123456", payResp.invoice?.qr)
-
-        // Verificación de recibo
-        val receipt = payResp.receipt
-        assertEquals("Multiplaza Mall", receipt.companyName)
-        assertEquals("155688-1-554433", receipt.ruc)
-        assertEquals("K1-001", receipt.orderNumber)
-        assertEquals("COMER_AQUI", receipt.diningMode)
-        assertEquals("15", receipt.tableTent)
-        assertEquals("5.89", receipt.total)
-        assertEquals("VISA", receipt.paymentBrand)
-        assertEquals("4242", receipt.paymentLast4)
-        assertEquals("AUTH7788", receipt.paymentAuthCode)
-
-        // Verificar estado persistido en DB
-        transaction(database) {
-            val orderRow = KioskOrderTable.selectAll().where { KioskOrderTable.id eq orderId }.single()
-            assertEquals("FACTURADO", orderRow[KioskOrderTable.estado])
-            assertEquals("REF9900", orderRow[KioskOrderTable.pagoReferencia])
-            assertEquals("AUTH7788", orderRow[KioskOrderTable.pagoAutorizacion])
-            assertEquals("4242", orderRow[KioskOrderTable.pagoUltimos4])
-            assertEquals("VISA", orderRow[KioskOrderTable.pagoMarca])
-
-            // Verificar que se abrió una secuencia de caja para hoy
-            val secuencias = CajaSecuenciaTable.selectAll().where { CajaSecuenciaTable.idCaja eq testCajaId }.toList()
-            assertTrue(secuencias.isNotEmpty(), "Debe haber una secuencia de caja creada")
-        }
-    }
 
     @Test
-    fun `POST pay returns 202 Accepted with PAID_PENDING_INVOICE when fiscal invoice fails`() = testApplication {
-        configureKioskApp()
-        val client = createClient {
-            install(ContentNegotiation) { json(json) }
+    fun `POST pay returns 202 Accepted with PAID_PENDING_INVOICE when fiscal invoice fails`() =
+        testApplication {
+            configureKioskApp()
+            val client =
+                createClient {
+                    install(ContentNegotiation) { json(json) }
+                }
+
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
+
+            feResultToReturn =
+                ElectronicInvoiceResult.Failure(
+                    codigo = "PAC_TIMEOUT",
+                    mensaje = "PAC no disponible tras 3 reintentos",
+                )
+
+            val paymentRequest =
+                KioskPaymentRequest(
+                    transactionId = "tx-failure-1",
+                    authCode = "AUTH-FAIL",
+                    reference = "REF-FAIL",
+                    last4 = "1111",
+                    brand = "MASTERCARD",
+                    amount = "5.89",
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+
+            assertEquals(HttpStatusCode.Accepted, response.status)
+
+            val payResp = json.decodeFromString<KioskPayResponse>(response.bodyAsText())
+            assertEquals("K1-001", payResp.orderNumber)
+            assertEquals("PAID_PENDING_INVOICE", payResp.status)
+            assertNull(payResp.invoice?.cufe)
+
+            // Verificar estado persistido en DB: PAGADO_SIN_FACTURA
+            transaction(database) {
+                val orderRow = KioskOrderTable.selectAll().where { KioskOrderTable.id eq orderId }.single()
+                assertEquals("PAGADO_SIN_FACTURA", orderRow[KioskOrderTable.estado])
+                assertTrue(orderRow[KioskOrderTable.motivoRechazo]!!.contains("PAC_TIMEOUT"))
+            }
         }
-
-        val orderId = UUID.randomUUID().toString()
-        insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
-
-        feResultToReturn = ElectronicInvoiceResult.Failure(
-            codigo = "PAC_TIMEOUT",
-            mensaje = "PAC no disponible tras 3 reintentos",
-        )
-
-        val paymentRequest = KioskPaymentRequest(
-            transactionId = "tx-failure-1",
-            authCode = "AUTH-FAIL",
-            reference = "REF-FAIL",
-            last4 = "1111",
-            brand = "MASTERCARD",
-            amount = "5.89",
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-
-        assertEquals(HttpStatusCode.Accepted, response.status)
-
-        val payResp = json.decodeFromString<KioskPayResponse>(response.bodyAsText())
-        assertEquals("K1-001", payResp.orderNumber)
-        assertEquals("PAID_PENDING_INVOICE", payResp.status)
-        assertNull(payResp.invoice?.cufe)
-
-        // Verificar estado persistido en DB: PAGADO_SIN_FACTURA
-        transaction(database) {
-            val orderRow = KioskOrderTable.selectAll().where { KioskOrderTable.id eq orderId }.single()
-            assertEquals("PAGADO_SIN_FACTURA", orderRow[KioskOrderTable.estado])
-            assertTrue(orderRow[KioskOrderTable.motivoRechazo]!!.contains("PAC_TIMEOUT"))
-        }
-    }
 
     @Test
-    fun `POST pay is idempotent when re-paying an already FACTURADO order`() = testApplication {
-        configureKioskApp()
-        val client = createClient {
-            install(ContentNegotiation) { json(json) }
+    fun `POST pay is idempotent when re-paying an already FACTURADO order`() =
+        testApplication {
+            configureKioskApp()
+            val client =
+                createClient {
+                    install(ContentNegotiation) { json(json) }
+                }
+
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
+
+            feResultToReturn =
+                ElectronicInvoiceResult.Success(
+                    cufe = "CUFE-IDEM-001",
+                    qr = "https://dgi.pa/qr/001",
+                )
+
+            val paymentRequest =
+                KioskPaymentRequest(
+                    transactionId = "tx-idem",
+                    authCode = "AUTH-IDEM",
+                    reference = "REF-IDEM",
+                    last4 = "4242",
+                    brand = "VISA",
+                    amount = "5.89",
+                )
+
+            // Primer pago exitoso
+            val firstResp =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+            assertEquals(HttpStatusCode.OK, firstResp.status)
+
+            // Reintento de pago sobre la misma orden
+            val secondResp =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+            assertEquals(HttpStatusCode.OK, secondResp.status)
+
+            val body = json.decodeFromString<KioskPayResponse>(secondResp.bodyAsText())
+            assertEquals("FACTURADO", body.status)
+            assertEquals("K1-001", body.orderNumber)
         }
-
-        val orderId = UUID.randomUUID().toString()
-        insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
-
-        feResultToReturn = ElectronicInvoiceResult.Success(
-            cufe = "CUFE-IDEM-001",
-            qr = "https://dgi.pa/qr/001",
-        )
-
-        val paymentRequest = KioskPaymentRequest(
-            transactionId = "tx-idem",
-            authCode = "AUTH-IDEM",
-            reference = "REF-IDEM",
-            last4 = "4242",
-            brand = "VISA",
-            amount = "5.89",
-        )
-
-        // Primer pago exitoso
-        val firstResp = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-        assertEquals(HttpStatusCode.OK, firstResp.status)
-
-        // Reintento de pago sobre la misma orden
-        val secondResp = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-        assertEquals(HttpStatusCode.OK, secondResp.status)
-
-        val body = json.decodeFromString<KioskPayResponse>(secondResp.bodyAsText())
-        assertEquals("FACTURADO", body.status)
-        assertEquals("K1-001", body.orderNumber)
-    }
 
     @Test
-    fun `POST pay returns 400 Bad Request when payment amount does not match order total`() = testApplication {
-        configureKioskApp()
-        val client = createClient {
-            install(ContentNegotiation) { json(json) }
+    fun `POST pay returns 400 Bad Request when payment amount does not match order total`() =
+        testApplication {
+            configureKioskApp()
+            val client =
+                createClient {
+                    install(ContentNegotiation) { json(json) }
+                }
+
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
+
+            val paymentRequest =
+                KioskPaymentRequest(
+                    transactionId = "tx-bad-amount",
+                    authCode = "AUTH123",
+                    reference = "REF123",
+                    last4 = "4242",
+                    brand = "VISA",
+                    amount = "10.00", // Mismatch!
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("no coincide con el total del pedido"))
         }
-
-        val orderId = UUID.randomUUID().toString()
-        insertTestOrder(orderId, estado = "COTIZADO", total = BigDecimal("5.89"))
-
-        val paymentRequest = KioskPaymentRequest(
-            transactionId = "tx-bad-amount",
-            authCode = "AUTH123",
-            reference = "REF123",
-            last4 = "4242",
-            brand = "VISA",
-            amount = "10.00", // Mismatch!
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertTrue(response.bodyAsText().contains("no coincide con el total del pedido"))
-    }
 
     @Test
-    fun `POST pay returns 409 Conflict when order quote has expired`() = testApplication {
-        configureKioskApp()
-        val client = createClient {
-            install(ContentNegotiation) { json(json) }
+    fun `POST pay returns 409 Conflict when order quote has expired`() =
+        testApplication {
+            configureKioskApp()
+            val client =
+                createClient {
+                    install(ContentNegotiation) { json(json) }
+                }
+
+            val orderId = UUID.randomUUID().toString()
+            // Cotización expiró hace 5 minutos
+            insertTestOrder(
+                orderId = orderId,
+                estado = "COTIZADO",
+                total = BigDecimal("5.89"),
+                expiresAt = LocalDateTime.now().minusMinutes(5),
+            )
+
+            val paymentRequest =
+                KioskPaymentRequest(
+                    transactionId = "tx-expired",
+                    authCode = "AUTH123",
+                    reference = "REF123",
+                    last4 = "4242",
+                    brand = "VISA",
+                    amount = "5.89",
+                )
+
+            val response =
+                client.post("/api/v1/kiosk/orders/$orderId/pay") {
+                    header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
+                    contentType(ContentType.Application.Json)
+                    setBody(paymentRequest)
+                }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertTrue(response.bodyAsText().contains("ha expirado"))
         }
-
-        val orderId = UUID.randomUUID().toString()
-        // Cotización expiró hace 5 minutos
-        insertTestOrder(
-            orderId = orderId,
-            estado = "COTIZADO",
-            total = BigDecimal("5.89"),
-            expiresAt = LocalDateTime.now().minusMinutes(5),
-        )
-
-        val paymentRequest = KioskPaymentRequest(
-            transactionId = "tx-expired",
-            authCode = "AUTH123",
-            reference = "REF123",
-            last4 = "4242",
-            brand = "VISA",
-            amount = "5.89",
-        )
-
-        val response = client.post("/api/v1/kiosk/orders/$orderId/pay") {
-            header(HttpHeaders.Authorization, "Bearer ${generateKioskToken()}")
-            contentType(ContentType.Application.Json)
-            setBody(paymentRequest)
-        }
-
-        assertEquals(HttpStatusCode.Conflict, response.status)
-        assertTrue(response.bodyAsText().contains("ha expirado"))
-    }
 }

@@ -228,24 +228,29 @@ class PlaceKioskOrderService(
         return if (openSecuencia != null && isOpenToday(openSecuencia.fechaApertura, today)) {
             openSecuencia
         } else {
-            val aperturaReq = AperturaRequest(
-                idCaja = kioskContext.idCaja,
-                montoApertura = 0.0,
-                idVendedor = kioskContext.codVendedor,
-                serieSucursal = branchSerie,
-                idSucursal = kioskContext.idSucursal,
-            )
-            cajaSessionWorkflow.open(
-                database = database,
-                countryCode = kioskContext.countryCode,
-                dbName = kioskContext.companyDb,
-                request = aperturaReq,
-                username = "KIOSK",
-            ).getOrThrow()
+            val aperturaReq =
+                AperturaRequest(
+                    idCaja = kioskContext.idCaja,
+                    montoApertura = 0.0,
+                    idVendedor = kioskContext.codVendedor,
+                    serieSucursal = branchSerie,
+                    idSucursal = kioskContext.idSucursal,
+                )
+            cajaSessionWorkflow
+                .open(
+                    database = database,
+                    countryCode = kioskContext.countryCode,
+                    dbName = kioskContext.companyDb,
+                    request = aperturaReq,
+                    username = "KIOSK",
+                ).getOrThrow()
         }
     }
 
-    private fun isOpenToday(fechaAperturaStr: String, today: LocalDate): Boolean {
+    private fun isOpenToday(
+        fechaAperturaStr: String,
+        today: LocalDate,
+    ): Boolean {
         if (fechaAperturaStr.isBlank()) return false
         val datePart = fechaAperturaStr.split(" ").firstOrNull() ?: return false
         return if (datePart.contains("-")) {
@@ -257,11 +262,18 @@ class PlaceKioskOrderService(
                 val month = parts[1].toIntOrNull()
                 val year = parts[2].toIntOrNull()
                 day == today.dayOfMonth && month == today.monthValue && year == today.year
-            } else false
-        } else false
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 
-    private fun dummyCajaSecuencia(kioskContext: KioskRequestContext, branchSerie: String): CajaSecuencia =
+    private fun dummyCajaSecuencia(
+        kioskContext: KioskRequestContext,
+        branchSerie: String,
+    ): CajaSecuencia =
         CajaSecuencia(
             idCajaSecuencia = "SEC-${kioskContext.idCaja}",
             idCaja = kioskContext.idCaja,
@@ -305,108 +317,115 @@ class PlaceKioskOrderService(
         var totalSubtotal = BigDecimal.ZERO
         var totalTax = BigDecimal.ZERO
 
-        val saleItems = order.items.map { itemRecord ->
-            val itemTaxInfo = prereqs.itemDetails[itemRecord.idItem]
-            val itemDesc = itemTaxInfo?.description ?: "Item ${itemRecord.idItem}"
-            val modNames = itemRecord.modifiers.map { it.nombre }
-            val fullDesc = if (modNames.isNotEmpty()) {
-                "$itemDesc (${modNames.joinToString(", ")})"
-            } else {
-                itemDesc
+        val saleItems =
+            order.items.map { itemRecord ->
+                val itemTaxInfo = prereqs.itemDetails[itemRecord.idItem]
+                val itemDesc = itemTaxInfo?.description ?: "Item ${itemRecord.idItem}"
+                val modNames = itemRecord.modifiers.map { it.nombre }
+                val fullDesc =
+                    if (modNames.isNotEmpty()) {
+                        "$itemDesc (${modNames.joinToString(", ")})"
+                    } else {
+                        itemDesc
+                    }
+
+                val taxRate =
+                    when {
+                        itemTaxInfo == null -> prereqs.defaultTaxRate
+                        itemTaxInfo.isExempt -> BigDecimal.ZERO
+                        itemTaxInfo.ivaRate > BigDecimal.ZERO -> itemTaxInfo.ivaRate
+                        else -> prereqs.defaultTaxRate
+                    }
+
+                val lineSubtotal = (itemRecord.precioUnitario * itemRecord.cantidad).setScale(2, RoundingMode.HALF_UP)
+                val lineTax = (lineSubtotal * taxRate).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+                val lineTotal = lineSubtotal + lineTax
+
+                totalSubtotal += lineSubtotal
+                totalTax += lineTax
+
+                SaleItemInput(
+                    idItem = itemRecord.idItem,
+                    itemAlmacen = kioskContext.idAlmacen,
+                    itemDescripcion = fullDesc,
+                    itemCantidad = itemRecord.cantidad.toDouble(),
+                    itemPrecioSinIva = itemRecord.precioUnitario.setScale(2, RoundingMode.HALF_UP).toDouble(),
+                    itemPIva = taxRate.toDouble(),
+                    itemTotalSinIva = lineSubtotal.toDouble(),
+                    itemTotalConIva = lineTotal.toDouble(),
+                    itemCantidadTotal = itemRecord.cantidad.toDouble(),
+                )
             }
-
-            val taxRate = when {
-                itemTaxInfo == null -> prereqs.defaultTaxRate
-                itemTaxInfo.isExempt -> BigDecimal.ZERO
-                itemTaxInfo.ivaRate > BigDecimal.ZERO -> itemTaxInfo.ivaRate
-                else -> prereqs.defaultTaxRate
-            }
-
-            val lineSubtotal = (itemRecord.precioUnitario * itemRecord.cantidad).setScale(2, RoundingMode.HALF_UP)
-            val lineTax = (lineSubtotal * taxRate).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
-            val lineTotal = lineSubtotal + lineTax
-
-            totalSubtotal += lineSubtotal
-            totalTax += lineTax
-
-            SaleItemInput(
-                idItem = itemRecord.idItem,
-                itemAlmacen = kioskContext.idAlmacen,
-                itemDescripcion = fullDesc,
-                itemCantidad = itemRecord.cantidad.toDouble(),
-                itemPrecioSinIva = itemRecord.precioUnitario.setScale(2, RoundingMode.HALF_UP).toDouble(),
-                itemPIva = taxRate.toDouble(),
-                itemTotalSinIva = lineSubtotal.toDouble(),
-                itemTotalConIva = lineTotal.toDouble(),
-                itemCantidadTotal = itemRecord.cantidad.toDouble(),
-            )
-        }
 
         val overallTotalDouble = order.total.setScale(2, RoundingMode.HALF_UP).toDouble()
         val overallSubtotalDouble = totalSubtotal.setScale(2, RoundingMode.HALF_UP).toDouble()
         val overallTaxDouble = totalTax.setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        val invoiceInput = SaleInvoiceInput(
-            idCliente = order.idCliente,
-            codCliente = prereqs.customerCod,
-            codVendedor = kioskContext.codVendedor,
-            idShop = kioskContext.idSucursal,
-            idSucursal = kioskContext.idSucursal,
-            idCaja = kioskContext.idCaja,
-            codigoCaja = prereqs.cajaCode,
-            idCajaSecuencia = activeSecuencia.idCajaSecuencia,
-            serieSucursal = activeSecuencia.serieSucursal,
-            formaPago = payment.formaPago,
-            codEstatus = 2,
-            subtotal = overallSubtotalDouble,
-            descuentosItemFactura = 0.0,
-            ivaTotalFactura = overallTaxDouble,
-            totalTotalFactura = overallTotalDouble,
-            montoItemsFactura = overallSubtotalDouble,
-            totalizarSubTotal = overallSubtotalDouble,
-            totalizarDescuentoParcial = 0.0,
-            totalizarTotalOperacion = overallSubtotalDouble,
-            totalizarPDescuentoGlobal = 0.0,
-            totalizarDescuentoGlobal = 0.0,
-            totalizarBaseImponible = overallSubtotalDouble,
-            totalizarMontoIva = overallTaxDouble,
-            totalizarTotalGeneral = overallTotalDouble,
-            usuarioCreacion = "KIOSK",
-            facturarA = prereqs.customerName,
-            facturarARuc = prereqs.customerRif,
-            facturarADireccion = prereqs.customerAddress,
-            facturarATelefono = prereqs.customerPhone,
-        )
+        val invoiceInput =
+            SaleInvoiceInput(
+                idCliente = order.idCliente,
+                codCliente = prereqs.customerCod,
+                codVendedor = kioskContext.codVendedor,
+                idShop = kioskContext.idSucursal,
+                idSucursal = kioskContext.idSucursal,
+                idCaja = kioskContext.idCaja,
+                codigoCaja = prereqs.cajaCode,
+                idCajaSecuencia = activeSecuencia.idCajaSecuencia,
+                serieSucursal = activeSecuencia.serieSucursal,
+                formaPago = payment.formaPago,
+                codEstatus = 2,
+                subtotal = overallSubtotalDouble,
+                descuentosItemFactura = 0.0,
+                ivaTotalFactura = overallTaxDouble,
+                totalTotalFactura = overallTotalDouble,
+                montoItemsFactura = overallSubtotalDouble,
+                totalizarSubTotal = overallSubtotalDouble,
+                totalizarDescuentoParcial = 0.0,
+                totalizarTotalOperacion = overallSubtotalDouble,
+                totalizarPDescuentoGlobal = 0.0,
+                totalizarDescuentoGlobal = 0.0,
+                totalizarBaseImponible = overallSubtotalDouble,
+                totalizarMontoIva = overallTaxDouble,
+                totalizarTotalGeneral = overallTotalDouble,
+                usuarioCreacion = "KIOSK",
+                facturarA = prereqs.customerName,
+                facturarARuc = prereqs.customerRif,
+                facturarADireccion = prereqs.customerAddress,
+                facturarATelefono = prereqs.customerPhone,
+            )
 
         return ProcessSaleRequest(
             procesar = 1,
             factura = invoiceInput,
             items = saleItems,
-            pagoResumen = SalePaymentSummaryInput(
-                totalizarMontoCancelar = overallTotalDouble,
-                totalizarMontoEfectivo = 0.0,
-                totalizarCambio = 0.0,
-                totalizarSaldoPendiente = 0.0,
-                montosPorTipo = mapOf(payment.montosPorTipoKey to overallTotalDouble),
-            ),
-            pagos = listOf(
-                SalePaymentInput(
-                    idFormaPago = payment.idFormaPago,
-                    tipoMovimiento = payment.tipoMovimiento,
-                    monto = overallTotalDouble,
-                    montoRecibido = overallTotalDouble,
-                    tdcProveedor = payment.tdcProveedor,
-                    tdcNumero = payment.tdcNumero,
-                    codigoVerificacion = payment.codigoVerificacion,
+            pagoResumen =
+                SalePaymentSummaryInput(
+                    totalizarMontoCancelar = overallTotalDouble,
+                    totalizarMontoEfectivo = 0.0,
+                    totalizarCambio = 0.0,
+                    totalizarSaldoPendiente = 0.0,
+                    montosPorTipo = mapOf(payment.montosPorTipoKey to overallTotalDouble),
                 ),
-            ),
-            moneda = SaleCurrencyInput(
-                multiMoneda = if (kioskContext.countryCode == "VE") "SI" else "NO",
-                monedaBase = 1,
-                abrMonedaBase = "USD",
-                monedaSecundaria = if (kioskContext.countryCode == "VE") 2 else 1,
-                abrMonedaSecundaria = if (kioskContext.countryCode == "VE") "VES" else "USD",
-            ),
+            pagos =
+                listOf(
+                    SalePaymentInput(
+                        idFormaPago = payment.idFormaPago,
+                        tipoMovimiento = payment.tipoMovimiento,
+                        monto = overallTotalDouble,
+                        montoRecibido = overallTotalDouble,
+                        tdcProveedor = payment.tdcProveedor,
+                        tdcNumero = payment.tdcNumero,
+                        codigoVerificacion = payment.codigoVerificacion,
+                    ),
+                ),
+            moneda =
+                SaleCurrencyInput(
+                    multiMoneda = if (kioskContext.countryCode == "VE") "SI" else "NO",
+                    monedaBase = 1,
+                    abrMonedaBase = "USD",
+                    monedaSecundaria = if (kioskContext.countryCode == "VE") 2 else 1,
+                    abrMonedaSecundaria = if (kioskContext.countryCode == "VE") "VES" else "USD",
+                ),
         )
     }
 
@@ -418,18 +437,19 @@ class PlaceKioskOrderService(
         status: String,
     ): KioskPayResponse {
         var totalSubtotal = BigDecimal.ZERO
-        val receiptLines = order.items.map { item ->
-            val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
-            val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
-            totalSubtotal += lineTotal
-            KioskReceiptLine(
-                qty = item.cantidad.toInt(),
-                description = itemDesc,
-                price = item.precioUnitario.setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                total = lineTotal.toPlainString(),
-                modifiers = item.modifiers.map { it.nombre },
-            )
-        }
+        val receiptLines =
+            order.items.map { item ->
+                val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
+                val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
+                totalSubtotal += lineTotal
+                KioskReceiptLine(
+                    qty = item.cantidad.toInt(),
+                    description = itemDesc,
+                    price = item.precioUnitario.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                    total = lineTotal.toPlainString(),
+                    modifiers = item.modifiers.map { it.nombre },
+                )
+            }
 
         val total = order.total.setScale(2, RoundingMode.HALF_UP)
         val tax = (total - totalSubtotal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
@@ -446,29 +466,30 @@ class PlaceKioskOrderService(
                 )
             }
 
-        val receipt = KioskReceipt(
-            companyName = prereqs.branchName,
-            ruc = prereqs.companyRif,
-            dv = prereqs.customerDv,
-            address = prereqs.branchAddress,
-            orderNumber = order.codigoPedido,
-            diningMode = order.modalidad,
-            tableTent = order.portamesa,
-            customerName = prereqs.customerName,
-            customerId = prereqs.customerRif,
-            date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-            lines = receiptLines,
-            subtotal = totalSubtotal.toPlainString(),
-            tax = tax.toPlainString(),
-            total = total.toPlainString(),
-            paymentBrand = receiptPayment.brand,
-            paymentLast4 = receiptPayment.last4,
-            paymentAuthCode = receiptPayment.authCode,
-            paymentReference = receiptPayment.reference,
-            invoiceNumber = saleResult?.codFactura,
-            cufe = saleResult?.cufe,
-            qr = saleResult?.qr,
-        )
+        val receipt =
+            KioskReceipt(
+                companyName = prereqs.branchName,
+                ruc = prereqs.companyRif,
+                dv = prereqs.customerDv,
+                address = prereqs.branchAddress,
+                orderNumber = order.codigoPedido,
+                diningMode = order.modalidad,
+                tableTent = order.portamesa,
+                customerName = prereqs.customerName,
+                customerId = prereqs.customerRif,
+                date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                lines = receiptLines,
+                subtotal = totalSubtotal.toPlainString(),
+                tax = tax.toPlainString(),
+                total = total.toPlainString(),
+                paymentBrand = receiptPayment.brand,
+                paymentLast4 = receiptPayment.last4,
+                paymentAuthCode = receiptPayment.authCode,
+                paymentReference = receiptPayment.reference,
+                invoiceNumber = saleResult?.codFactura,
+                cufe = saleResult?.cufe,
+                qr = saleResult?.qr,
+            )
 
         return KioskPayResponse(
             orderNumber = order.codigoPedido,
@@ -488,53 +509,56 @@ class PlaceKioskOrderService(
         val codFactura = kioskOrderRepository.getInvoiceCode(database, kioskContext.countryCode, order.idFactura) ?: order.idFactura ?: ""
 
         var totalSubtotal = BigDecimal.ZERO
-        val receiptLines = order.items.map { item ->
-            val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
-            val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
-            totalSubtotal += lineTotal
-            KioskReceiptLine(
-                qty = item.cantidad.toInt(),
-                description = itemDesc,
-                price = item.precioUnitario.setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                total = lineTotal.toPlainString(),
-                modifiers = item.modifiers.map { it.nombre },
-            )
-        }
+        val receiptLines =
+            order.items.map { item ->
+                val itemDesc = prereqs.itemDetails[item.idItem]?.description ?: "Item ${item.idItem}"
+                val lineTotal = (item.precioUnitario * item.cantidad).setScale(2, RoundingMode.HALF_UP)
+                totalSubtotal += lineTotal
+                KioskReceiptLine(
+                    qty = item.cantidad.toInt(),
+                    description = itemDesc,
+                    price = item.precioUnitario.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                    total = lineTotal.toPlainString(),
+                    modifiers = item.modifiers.map { it.nombre },
+                )
+            }
 
         val total = order.total.setScale(2, RoundingMode.HALF_UP)
         val tax = (total - totalSubtotal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP)
         val statusResponse = if (order.estado == "PAGADO_SIN_FACTURA") "PAID_PENDING_INVOICE" else "FACTURADO"
         val existingPayment = KioskReceiptPayment.fromStoredOrder(order)
 
-        val invoiceInfo = KioskInvoiceInfo(
-            codFactura = codFactura,
-            cufe = null,
-            qr = null,
-        )
+        val invoiceInfo =
+            KioskInvoiceInfo(
+                codFactura = codFactura,
+                cufe = null,
+                qr = null,
+            )
 
-        val receipt = KioskReceipt(
-            companyName = prereqs.branchName,
-            ruc = prereqs.companyRif,
-            dv = prereqs.customerDv,
-            address = prereqs.branchAddress,
-            orderNumber = order.codigoPedido,
-            diningMode = order.modalidad,
-            tableTent = order.portamesa,
-            customerName = prereqs.customerName,
-            customerId = prereqs.customerRif,
-            date = order.actualizadoEn.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-            lines = receiptLines,
-            subtotal = totalSubtotal.toPlainString(),
-            tax = tax.toPlainString(),
-            total = total.toPlainString(),
-            paymentBrand = existingPayment.brand,
-            paymentLast4 = existingPayment.last4,
-            paymentAuthCode = existingPayment.authCode,
-            paymentReference = existingPayment.reference,
-            invoiceNumber = codFactura,
-            cufe = null,
-            qr = null,
-        )
+        val receipt =
+            KioskReceipt(
+                companyName = prereqs.branchName,
+                ruc = prereqs.companyRif,
+                dv = prereqs.customerDv,
+                address = prereqs.branchAddress,
+                orderNumber = order.codigoPedido,
+                diningMode = order.modalidad,
+                tableTent = order.portamesa,
+                customerName = prereqs.customerName,
+                customerId = prereqs.customerRif,
+                date = order.actualizadoEn.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                lines = receiptLines,
+                subtotal = totalSubtotal.toPlainString(),
+                tax = tax.toPlainString(),
+                total = total.toPlainString(),
+                paymentBrand = existingPayment.brand,
+                paymentLast4 = existingPayment.last4,
+                paymentAuthCode = existingPayment.authCode,
+                paymentReference = existingPayment.reference,
+                invoiceNumber = codFactura,
+                cufe = null,
+                qr = null,
+            )
 
         return KioskPayResponse(
             orderNumber = order.codigoPedido,

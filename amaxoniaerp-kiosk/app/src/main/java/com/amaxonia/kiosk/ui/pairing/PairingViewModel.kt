@@ -1,8 +1,8 @@
 package com.amaxonia.kiosk.ui.pairing
 
-import com.amaxonia.kiosk.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.kiosk.BuildConfig
 import com.amaxonia.kiosk.core.network.KioskApiClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow

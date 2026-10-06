@@ -828,7 +828,12 @@ class KioskYappyRoutesTest {
             assertEquals("MASTERCARD", row[KioskOrderTable.pagoMarca])
             assertEquals("REF9", row[KioskOrderTable.pagoReferencia])
             assertNull(storedYappyTransaction(orderId))
-            assertEquals("TDC", lastSaleRequest!!.pagoResumen.montosPorTipo.keys.single())
+            assertEquals(
+                "TDC",
+                lastSaleRequest!!
+                    .pagoResumen.montosPorTipo.keys
+                    .single(),
+            )
 
             val again = json.decodeFromString<KioskPayResponse>(client.pay(orderId, card).bodyAsText())
             assertEquals("MASTERCARD", again.receipt.paymentBrand)

@@ -1,6 +1,8 @@
 package com.amaxoniaerp.features.kiosk.application.dispatch
 
-enum class KioskDispatchDestination(val code: String) {
+enum class KioskDispatchDestination(
+    val code: String,
+) {
     RETIRO_MOSTRADOR("RETIRO_MOSTRADOR"),
     IMPRESORA_COCINA("IMPRESORA_COCINA"),
     MESAS("MESAS"),

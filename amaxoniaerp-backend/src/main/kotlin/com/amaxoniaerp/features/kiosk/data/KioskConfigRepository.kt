@@ -16,56 +16,58 @@ import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
 
 class KioskConfigRepository {
-
     suspend fun getKioskConfig(
         database: Database,
         countryCode: String,
         companyDb: String,
-    ): KioskConfigResponse = dbQuery(database) {
-        // 1. Parametros Kiosco
-        val paramsRow = KioskParametrosTable
-            .selectAll()
-            .limit(1)
-            .singleOrNull()
+    ): KioskConfigResponse =
+        dbQuery(database) {
+            // 1. Parametros Kiosco
+            val paramsRow =
+                KioskParametrosTable
+                    .selectAll()
+                    .limit(1)
+                    .singleOrNull()
 
-        val version = paramsRow?.get(KioskParametrosTable.kioscoConfigVersion) ?: 1
-        val brandColor = paramsRow?.get(KioskParametrosTable.kioscoColorMarca)
-        val dispatch = paramsRow?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
-        val modalidadesRaw = paramsRow?.get(KioskParametrosTable.kioscoModalidades) ?: "COMER_AQUI,PARA_LLEVAR"
-        val diningModes = modalidadesRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-        val defaultCustomerId = paramsRow?.get(KioskParametrosTable.defaultCodClienteFactura) ?: "CF"
+            val version = paramsRow?.get(KioskParametrosTable.kioscoConfigVersion) ?: 1
+            val brandColor = paramsRow?.get(KioskParametrosTable.kioscoColorMarca)
+            val dispatch = paramsRow?.get(KioskParametrosTable.kioscoDestinoPedido) ?: "RETIRO_MOSTRADOR"
+            val modalidadesRaw = paramsRow?.get(KioskParametrosTable.kioscoModalidades) ?: "COMER_AQUI,PARA_LLEVAR"
+            val diningModes = modalidadesRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            val defaultCustomerId = paramsRow?.get(KioskParametrosTable.defaultCodClienteFactura) ?: "CF"
 
-        // 2. Media
-        val mediaList = KioskMediaTable
-            .selectAll()
-            .where { KioskMediaTable.activo eq true }
-            .orderBy(KioskMediaTable.orden to SortOrder.ASC)
-            .map { row ->
-                val archivo = row[KioskMediaTable.archivo]
-                val type = row[KioskMediaTable.tipo].uppercase()
-                KioskMediaItem(
-                    type = type,
-                    url = "/api/data/$countryCode/$companyDb/banners/$archivo",
-                    durationSec = row[KioskMediaTable.duracionSeg],
-                )
-            }
+            // 2. Media
+            val mediaList =
+                KioskMediaTable
+                    .selectAll()
+                    .where { KioskMediaTable.activo eq true }
+                    .orderBy(KioskMediaTable.orden to SortOrder.ASC)
+                    .map { row ->
+                        val archivo = row[KioskMediaTable.archivo]
+                        val type = row[KioskMediaTable.tipo].uppercase()
+                        KioskMediaItem(
+                            type = type,
+                            url = "/api/data/$countryCode/$companyDb/banners/$archivo",
+                            durationSec = row[KioskMediaTable.duracionSeg],
+                        )
+                    }
 
-        // 3. Multimoneda y tasas
-        val currencyConfig = resolveCurrencyConfig(countryCode)
+            // 3. Multimoneda y tasas
+            val currencyConfig = resolveCurrencyConfig(countryCode)
 
-        KioskConfigResponse(
-            version = version,
-            brandColor = brandColor,
-            logoUrl = null,
-            media = mediaList,
-            diningModes = diningModes,
-            dispatch = dispatch,
-            defaultCustomerId = defaultCustomerId,
-            currency = currencyConfig,
-            country = countryCode.uppercase(),
-            paymentMethods = listOf(KioskPaymentMethod.CARD),
-        )
-    }
+            KioskConfigResponse(
+                version = version,
+                brandColor = brandColor,
+                logoUrl = null,
+                media = mediaList,
+                diningModes = diningModes,
+                dispatch = dispatch,
+                defaultCustomerId = defaultCustomerId,
+                currency = currencyConfig,
+                country = countryCode.uppercase(),
+                paymentMethods = listOf(KioskPaymentMethod.CARD),
+            )
+        }
 
     private fun resolveCurrencyConfig(countryCode: String): KioskCurrencyConfig {
         val normalizedCountry = countryCode.uppercase()
@@ -106,19 +108,19 @@ class KioskConfigRepository {
         val secondaryAbr = paramsRow[paramsVE.abrMonedaSecundaria].ifBlank { "VES" }
 
         val tasasTableVE = TasasCambioTableFactory.forCountry("VE") as? TasasCambioTableVE
-        val tasaRow = if (tasasTableVE != null) {
-            tasasTableVE
-                .selectAll()
-                .where {
-                    (tasasTableVE.divisa eq monedaSecundariaId) and
-                        (tasasTableVE.monedabase eq monedaBaseId)
-                }
-                .orderBy(tasasTableVE.id to SortOrder.DESC)
-                .limit(1)
-                .singleOrNull()
-        } else {
-            null
-        }
+        val tasaRow =
+            if (tasasTableVE != null) {
+                tasasTableVE
+                    .selectAll()
+                    .where {
+                        (tasasTableVE.divisa eq monedaSecundariaId) and
+                            (tasasTableVE.monedabase eq monedaBaseId)
+                    }.orderBy(tasasTableVE.id to SortOrder.DESC)
+                    .limit(1)
+                    .singleOrNull()
+            } else {
+                null
+            }
 
         val rateValue = tasaRow?.get(tasasTableVE!!.tasaInversa) ?: BigDecimal("1.0000")
 

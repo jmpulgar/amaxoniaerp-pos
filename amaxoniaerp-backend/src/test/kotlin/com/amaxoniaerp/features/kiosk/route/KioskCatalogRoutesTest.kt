@@ -24,7 +24,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
-import io.ktor.server.auth.authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.routing.routing
@@ -48,22 +47,23 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class KioskCatalogRoutesTest {
-
     private lateinit var dataSource: HikariDataSource
     private lateinit var database: Database
 
-    private val jwtConfig = JwtConfig(
-        secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-        domain = "http://localhost:8080",
-        audience = "http://localhost:8080/kiosk",
-        realm = "Amaxonia Kiosk Test",
-    )
+    private val jwtConfig =
+        JwtConfig(
+            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
+            domain = "http://localhost:8080",
+            audience = "http://localhost:8080/kiosk",
+            realm = "Amaxonia Kiosk Test",
+        )
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
     private val kioskDeviceRepository = KioskDeviceRepository()
     private val kioskCatalogRepository = KioskCatalogRepository()
@@ -76,23 +76,25 @@ class KioskCatalogRoutesTest {
 
     @BeforeTest
     fun setUp() {
-        dataSource = HikariDataSource(
-            HikariConfig().apply {
-                jdbcUrl = "jdbc:h2:mem:kiosk_cat_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                driverClassName = "org.h2.Driver"
-                maximumPoolSize = 2
-                isAutoCommit = false
-            },
-        )
+        dataSource =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = "jdbc:h2:mem:kiosk_cat_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                    driverClassName = "org.h2.Driver"
+                    maximumPoolSize = 2
+                    isAutoCommit = false
+                },
+            )
         database = Database.connect(dataSource)
 
-        kioskService = KioskService(
-            kioskDeviceRepository = kioskDeviceRepository,
-            unlockRateLimiter = unlockRateLimiter,
-            jwtConfig = jwtConfig,
-            databaseResolver = { _, _ -> database },
-            kioskCatalogRepository = kioskCatalogRepository,
-        )
+        kioskService =
+            KioskService(
+                kioskDeviceRepository = kioskDeviceRepository,
+                unlockRateLimiter = unlockRateLimiter,
+                jwtConfig = jwtConfig,
+                databaseResolver = { _, _ -> database },
+                kioskCatalogRepository = kioskCatalogRepository,
+            )
 
         transaction(database) {
             exec(
@@ -320,7 +322,8 @@ class KioskCatalogRoutesTest {
     }
 
     private fun generateValidKioskJwt(): String =
-        JWT.create()
+        JWT
+            .create()
             .withIssuer(jwtConfig.domain)
             .withAudience(jwtConfig.audience)
             .withClaim("token_type", "kiosk")
@@ -339,7 +342,8 @@ class KioskCatalogRoutesTest {
             jwt {
                 realm = jwtConfig.realm ?: "test"
                 verifier(
-                    JWT.require(Algorithm.HMAC256(jwtConfig.secret))
+                    JWT
+                        .require(Algorithm.HMAC256(jwtConfig.secret))
                         .withAudience(jwtConfig.audience)
                         .withIssuer(jwtConfig.domain)
                         .build(),
@@ -356,117 +360,125 @@ class KioskCatalogRoutesTest {
     }
 
     @Test
-    fun `GET catalog returns only visible_pos = 1 departments, Price Level A and modifiers`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `GET catalog returns only visible_pos = 1 departments, Price Level A and modifiers`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt()
+            val response =
+                client.get("/api/v1/kiosk/catalog") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val etag = response.headers[HttpHeaders.ETag]
+            assertNotNull(etag)
+
+            val catalog = json.decodeFromString<KioskCatalogResponse>(response.bodyAsText())
+
+            // 1. Verificar Categorías: solo id 1 y 2 (no 3 visible_pos=0, no 4 visible=false)
+            assertEquals(2, catalog.categories.size)
+            val catNames = catalog.categories.map { it.name }
+            assertTrue(catNames.contains("Hamburguesas"))
+            assertTrue(catNames.contains("Bebidas"))
+            assertFalse(catNames.contains("Insumos Cocina"))
+            assertFalse(catNames.contains("Descontinuados"))
+
+            // 2. Verificar Items: solo de categorías 1 y 2
+            assertEquals(3, catalog.items.size)
+            val item101 = catalog.items.first { it.id == 101 }
+            assertEquals("Hamburguesa Clásica", item101.name)
+            assertEquals("5.50", item101.price) // Precio 1 (Nivel A)
+            assertEquals("7.00", item101.taxRate)
+            assertEquals("/api/data/PA/momi_pa/item/burger.jpg", item101.imageUrl)
+            assertFalse(item101.soldOut) // Existencia 20 > 0
+
+            // Item 102 agotado
+            val item102 = catalog.items.first { it.id == 102 }
+            assertTrue(item102.soldOut) // Existencia 0
+
+            // Insumos cocina (item 301) no debe estar
+            assertTrue(catalog.items.none { it.id == 301 })
+
+            // 3. Modificadores de Hamburguesa Clásica (101)
+            assertEquals(2, item101.modifierGroups.size)
+            val comboGroup = item101.modifierGroups.first { it.id == 1 }
+            assertEquals("Bebida del Combo", comboGroup.name)
+            assertTrue(comboGroup.isMandatory)
+            assertTrue(comboGroup.isCombo)
+            assertEquals(1, comboGroup.min)
+            assertEquals(1, comboGroup.max)
+            assertEquals(2, comboGroup.options.size)
+            assertEquals("Coca Cola Sin Azúcar", comboGroup.options[0].name)
+            assertEquals("0.00", comboGroup.options[0].extraPrice)
+            assertFalse(comboGroup.options[0].soldOut)
+
+            val extrasGroup = item101.modifierGroups.first { it.id == 2 }
+            assertEquals("Extras", extrasGroup.name)
+            assertFalse(extrasGroup.isMandatory)
+            assertFalse(extrasGroup.isCombo)
+            assertEquals(0, extrasGroup.min)
+            assertEquals(3, extrasGroup.max)
+            assertEquals(2, extrasGroup.options.size)
+            assertEquals("Tocineta Extra", extrasGroup.options[0].name)
+            assertEquals("1.50", extrasGroup.options[0].extraPrice)
         }
-
-        val token = generateValidKioskJwt()
-        val response = client.get("/api/v1/kiosk/catalog") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        val etag = response.headers[HttpHeaders.ETag]
-        assertNotNull(etag)
-
-        val catalog = json.decodeFromString<KioskCatalogResponse>(response.bodyAsText())
-
-        // 1. Verificar Categorías: solo id 1 y 2 (no 3 visible_pos=0, no 4 visible=false)
-        assertEquals(2, catalog.categories.size)
-        val catNames = catalog.categories.map { it.name }
-        assertTrue(catNames.contains("Hamburguesas"))
-        assertTrue(catNames.contains("Bebidas"))
-        assertFalse(catNames.contains("Insumos Cocina"))
-        assertFalse(catNames.contains("Descontinuados"))
-
-        // 2. Verificar Items: solo de categorías 1 y 2
-        assertEquals(3, catalog.items.size)
-        val item101 = catalog.items.first { it.id == 101 }
-        assertEquals("Hamburguesa Clásica", item101.name)
-        assertEquals("5.50", item101.price) // Precio 1 (Nivel A)
-        assertEquals("7.00", item101.taxRate)
-        assertEquals("/api/data/PA/momi_pa/item/burger.jpg", item101.imageUrl)
-        assertFalse(item101.soldOut) // Existencia 20 > 0
-
-        // Item 102 agotado
-        val item102 = catalog.items.first { it.id == 102 }
-        assertTrue(item102.soldOut) // Existencia 0
-
-        // Insumos cocina (item 301) no debe estar
-        assertTrue(catalog.items.none { it.id == 301 })
-
-        // 3. Modificadores de Hamburguesa Clásica (101)
-        assertEquals(2, item101.modifierGroups.size)
-        val comboGroup = item101.modifierGroups.first { it.id == 1 }
-        assertEquals("Bebida del Combo", comboGroup.name)
-        assertTrue(comboGroup.isMandatory)
-        assertTrue(comboGroup.isCombo)
-        assertEquals(1, comboGroup.min)
-        assertEquals(1, comboGroup.max)
-        assertEquals(2, comboGroup.options.size)
-        assertEquals("Coca Cola Sin Azúcar", comboGroup.options[0].name)
-        assertEquals("0.00", comboGroup.options[0].extraPrice)
-        assertFalse(comboGroup.options[0].soldOut)
-
-        val extrasGroup = item101.modifierGroups.first { it.id == 2 }
-        assertEquals("Extras", extrasGroup.name)
-        assertFalse(extrasGroup.isMandatory)
-        assertFalse(extrasGroup.isCombo)
-        assertEquals(0, extrasGroup.min)
-        assertEquals(3, extrasGroup.max)
-        assertEquals(2, extrasGroup.options.size)
-        assertEquals("Tocineta Extra", extrasGroup.options[0].name)
-        assertEquals("1.50", extrasGroup.options[0].extraPrice)
-    }
 
     @Test
-    fun `GET catalog returns 304 Not Modified when If-None-Match matches ETag`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `GET catalog returns 304 Not Modified when If-None-Match matches ETag`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
-        }
 
-        val token = generateValidKioskJwt()
-        val firstResponse = client.get("/api/v1/kiosk/catalog") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-        assertEquals(HttpStatusCode.OK, firstResponse.status)
-        val etag = firstResponse.headers[HttpHeaders.ETag]
-        assertNotNull(etag)
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
 
-        val secondResponse = client.get("/api/v1/kiosk/catalog") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header(HttpHeaders.IfNoneMatch, etag)
+            val token = generateValidKioskJwt()
+            val firstResponse =
+                client.get("/api/v1/kiosk/catalog") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+            assertEquals(HttpStatusCode.OK, firstResponse.status)
+            val etag = firstResponse.headers[HttpHeaders.ETag]
+            assertNotNull(etag)
+
+            val secondResponse =
+                client.get("/api/v1/kiosk/catalog") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header(HttpHeaders.IfNoneMatch, etag)
+                }
+            assertEquals(HttpStatusCode.NotModified, secondResponse.status)
+            assertEquals("", secondResponse.bodyAsText())
         }
-        assertEquals(HttpStatusCode.NotModified, secondResponse.status)
-        assertEquals("", secondResponse.bodyAsText())
-    }
 
     @Test
     fun `verify catalog-response fixture deserializes cleanly`() {
         val fixtureFile = File("../contracts/kiosk/catalog-response.json")
         val altFixtureFile = File("contracts/kiosk/catalog-response.json")
-        val content = if (fixtureFile.exists()) {
-            fixtureFile.readText()
-        } else if (altFixtureFile.exists()) {
-            altFixtureFile.readText()
-        } else {
-            File("D:/PROGRAMMING/Kotlin/Amaxonia/contracts/kiosk/catalog-response.json").readText()
-        }
+        val content =
+            if (fixtureFile.exists()) {
+                fixtureFile.readText()
+            } else if (altFixtureFile.exists()) {
+                altFixtureFile.readText()
+            } else {
+                File("D:/PROGRAMMING/Kotlin/Amaxonia/contracts/kiosk/catalog-response.json").readText()
+            }
 
         val response = json.decodeFromString<KioskCatalogResponse>(content)
         assertEquals(2, response.categories.size)

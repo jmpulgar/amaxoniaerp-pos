@@ -20,7 +20,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
-import io.ktor.server.auth.authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.routing.routing
@@ -41,24 +40,25 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class KioskConfigRoutesTest {
-
     private lateinit var dataSourcePA: HikariDataSource
     private lateinit var databasePA: Database
     private lateinit var dataSourceVE: HikariDataSource
     private lateinit var databaseVE: Database
 
-    private val jwtConfig = JwtConfig(
-        secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
-        domain = "http://localhost:8080",
-        audience = "http://localhost:8080/kiosk",
-        realm = "Amaxonia Kiosk Test",
-    )
+    private val jwtConfig =
+        JwtConfig(
+            secret = "test-secret-kiosk-test-must-be-very-long-32-chars",
+            domain = "http://localhost:8080",
+            audience = "http://localhost:8080/kiosk",
+            realm = "Amaxonia Kiosk Test",
+        )
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = false
+            explicitNulls = false
+        }
 
     private val kioskDeviceRepository = KioskDeviceRepository()
     private val kioskConfigRepository = KioskConfigRepository()
@@ -70,35 +70,38 @@ class KioskConfigRoutesTest {
 
     @BeforeTest
     fun setUp() {
-        dataSourcePA = HikariDataSource(
-            HikariConfig().apply {
-                jdbcUrl = "jdbc:h2:mem:kiosk_cfg_pa_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                driverClassName = "org.h2.Driver"
-                maximumPoolSize = 2
-                isAutoCommit = false
-            },
-        )
+        dataSourcePA =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = "jdbc:h2:mem:kiosk_cfg_pa_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                    driverClassName = "org.h2.Driver"
+                    maximumPoolSize = 2
+                    isAutoCommit = false
+                },
+            )
         databasePA = Database.connect(dataSourcePA)
 
-        dataSourceVE = HikariDataSource(
-            HikariConfig().apply {
-                jdbcUrl = "jdbc:h2:mem:kiosk_cfg_ve_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
-                driverClassName = "org.h2.Driver"
-                maximumPoolSize = 2
-                isAutoCommit = false
-            },
-        )
+        dataSourceVE =
+            HikariDataSource(
+                HikariConfig().apply {
+                    jdbcUrl = "jdbc:h2:mem:kiosk_cfg_ve_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1"
+                    driverClassName = "org.h2.Driver"
+                    maximumPoolSize = 2
+                    isAutoCommit = false
+                },
+            )
         databaseVE = Database.connect(dataSourceVE)
 
-        kioskService = KioskService(
-            kioskDeviceRepository = kioskDeviceRepository,
-            unlockRateLimiter = unlockRateLimiter,
-            jwtConfig = jwtConfig,
-            databaseResolver = { countryCode, _ ->
-                if (countryCode.equals("VE", ignoreCase = true)) databaseVE else databasePA
-            },
-            kioskConfigRepository = kioskConfigRepository,
-        )
+        kioskService =
+            KioskService(
+                kioskDeviceRepository = kioskDeviceRepository,
+                unlockRateLimiter = unlockRateLimiter,
+                jwtConfig = jwtConfig,
+                databaseResolver = { countryCode, _ ->
+                    if (countryCode.equals("VE", ignoreCase = true)) databaseVE else databasePA
+                },
+                kioskConfigRepository = kioskConfigRepository,
+            )
 
         // Setup PA schema
         transaction(databasePA) {
@@ -224,8 +227,13 @@ class KioskConfigRoutesTest {
         dataSourceVE.close()
     }
 
-    private fun generateValidKioskJwt(countryCode: String, companyDb: String, deviceId: String): String =
-        JWT.create()
+    private fun generateValidKioskJwt(
+        countryCode: String,
+        companyDb: String,
+        deviceId: String,
+    ): String =
+        JWT
+            .create()
             .withIssuer(jwtConfig.domain)
             .withAudience(jwtConfig.audience)
             .withClaim("token_type", "kiosk")
@@ -244,7 +252,8 @@ class KioskConfigRoutesTest {
             jwt {
                 realm = jwtConfig.realm ?: "test"
                 verifier(
-                    JWT.require(Algorithm.HMAC256(jwtConfig.secret))
+                    JWT
+                        .require(Algorithm.HMAC256(jwtConfig.secret))
                         .withAudience(jwtConfig.audience)
                         .withIssuer(jwtConfig.domain)
                         .build(),
@@ -261,99 +270,109 @@ class KioskConfigRoutesTest {
     }
 
     @Test
-    fun `GET config returns 200 with ETag and full configuration for PA`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `GET config returns 200 with ETag and full configuration for PA`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
+
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
+
+            val token = generateValidKioskJwt("PA", "momi_pa", testDeviceIdPA)
+            val response =
+                client.get("/api/v1/kiosk/config") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val etag = response.headers[HttpHeaders.ETag]
+            assertNotNull(etag)
+            assertTrue(etag.isNotBlank())
+
+            val config = json.decodeFromString<KioskConfigResponse>(response.bodyAsText())
+            assertEquals(2, config.version)
+            assertEquals("#E65100", config.brandColor)
+            assertEquals("RETIRO_MOSTRADOR", config.dispatch)
+            assertEquals(listOf("COMER_AQUI", "PARA_LLEVAR"), config.diningModes)
+            assertEquals(2, config.media.size)
+            assertEquals("IMAGE", config.media[0].type)
+            assertEquals("/api/data/PA/momi_pa/banners/promo1.jpg", config.media[0].url)
+            assertEquals(5, config.media[0].durationSec)
+            assertEquals("USD", config.currency.base)
+            assertEquals(null, config.currency.secondary)
+            assertEquals("1.0000", config.currency.rate)
+            assertEquals("PA", config.country)
+            // Sin KioskYappyService (o sin configuración Yappy) solo se ofrece tarjeta.
+            assertEquals(listOf("CARD"), config.paymentMethods)
         }
-
-        val token = generateValidKioskJwt("PA", "momi_pa", testDeviceIdPA)
-        val response = client.get("/api/v1/kiosk/config") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        val etag = response.headers[HttpHeaders.ETag]
-        assertNotNull(etag)
-        assertTrue(etag.isNotBlank())
-
-        val config = json.decodeFromString<KioskConfigResponse>(response.bodyAsText())
-        assertEquals(2, config.version)
-        assertEquals("#E65100", config.brandColor)
-        assertEquals("RETIRO_MOSTRADOR", config.dispatch)
-        assertEquals(listOf("COMER_AQUI", "PARA_LLEVAR"), config.diningModes)
-        assertEquals(2, config.media.size)
-        assertEquals("IMAGE", config.media[0].type)
-        assertEquals("/api/data/PA/momi_pa/banners/promo1.jpg", config.media[0].url)
-        assertEquals(5, config.media[0].durationSec)
-        assertEquals("USD", config.currency.base)
-        assertEquals(null, config.currency.secondary)
-        assertEquals("1.0000", config.currency.rate)
-        assertEquals("PA", config.country)
-        // Sin KioskYappyService (o sin configuración Yappy) solo se ofrece tarjeta.
-        assertEquals(listOf("CARD"), config.paymentMethods)
-    }
 
     @Test
-    fun `GET config returns 304 Not Modified when If-None-Match matches ETag`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `GET config returns 304 Not Modified when If-None-Match matches ETag`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
-        }
 
-        val token = generateValidKioskJwt("PA", "momi_pa", testDeviceIdPA)
-        val firstResponse = client.get("/api/v1/kiosk/config") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-        assertEquals(HttpStatusCode.OK, firstResponse.status)
-        val etag = firstResponse.headers[HttpHeaders.ETag]
-        assertNotNull(etag)
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
 
-        val secondResponse = client.get("/api/v1/kiosk/config") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            header(HttpHeaders.IfNoneMatch, etag)
+            val token = generateValidKioskJwt("PA", "momi_pa", testDeviceIdPA)
+            val firstResponse =
+                client.get("/api/v1/kiosk/config") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+            assertEquals(HttpStatusCode.OK, firstResponse.status)
+            val etag = firstResponse.headers[HttpHeaders.ETag]
+            assertNotNull(etag)
+
+            val secondResponse =
+                client.get("/api/v1/kiosk/config") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header(HttpHeaders.IfNoneMatch, etag)
+                }
+            assertEquals(HttpStatusCode.NotModified, secondResponse.status)
+            assertEquals("", secondResponse.bodyAsText())
+            assertEquals(etag, secondResponse.headers[HttpHeaders.ETag])
         }
-        assertEquals(HttpStatusCode.NotModified, secondResponse.status)
-        assertEquals("", secondResponse.bodyAsText())
-        assertEquals(etag, secondResponse.headers[HttpHeaders.ETag])
-    }
 
     @Test
-    fun `GET config returns multicurrency and exchange rate for VE`() = testApplication {
-        installKtorSecurity()
-        routing {
-            kioskRoutes(kioskService)
-        }
-
-        val client = createClient {
-            install(ContentNegotiation) {
-                json(json)
+    fun `GET config returns multicurrency and exchange rate for VE`() =
+        testApplication {
+            installKtorSecurity()
+            routing {
+                kioskRoutes(kioskService)
             }
-        }
 
-        val token = generateValidKioskJwt("VE", "momi_ve", testDeviceIdVE)
-        val response = client.get("/api/v1/kiosk/config") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
+            val client =
+                createClient {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                }
 
-        assertEquals(HttpStatusCode.OK, response.status)
-        val config = json.decodeFromString<KioskConfigResponse>(response.bodyAsText())
-        assertEquals("USD", config.currency.base)
-        assertEquals("VES", config.currency.secondary)
-        assertEquals("40.5", config.currency.rate)
-        assertEquals("VE", config.country)
-        assertEquals("IMPRESORA_COCINA", config.dispatch)
-    }
+            val token = generateValidKioskJwt("VE", "momi_ve", testDeviceIdVE)
+            val response =
+                client.get("/api/v1/kiosk/config") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val config = json.decodeFromString<KioskConfigResponse>(response.bodyAsText())
+            assertEquals("USD", config.currency.base)
+            assertEquals("VES", config.currency.secondary)
+            assertEquals("40.5", config.currency.rate)
+            assertEquals("VE", config.country)
+            assertEquals("IMPRESORA_COCINA", config.dispatch)
+        }
 }
