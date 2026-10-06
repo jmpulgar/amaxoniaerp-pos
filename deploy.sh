@@ -15,7 +15,10 @@ git pull origin "$BRANCH"
 
 echo "==> Build backend"
 cd "$BACKEND_DIR"
-./gradlew build
+# Stop leftover Gradle/Kotlin daemons from earlier builds: on this 4 GB server they get OOM-killed.
+./gradlew --stop || true
+pkill -f "kotlin-compiler-embeddable.*KotlinCompileDaemon" || true
+./gradlew build --no-daemon
 
 echo "==> Restart servicio"
 systemctl restart "$SERVICE_NAME"

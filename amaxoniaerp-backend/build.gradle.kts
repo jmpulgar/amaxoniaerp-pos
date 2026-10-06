@@ -39,6 +39,9 @@ jacoco {
 }
 
 tasks.test {
+    // One bounded test JVM so the server-side deploy build fits next to MySQL and the running backend.
+    maxParallelForks = 1
+    maxHeapSize = "512m"
     finalizedBy(tasks.jacocoTestReport)
 }
 
