@@ -46,23 +46,62 @@
     <!-- Admin menu -->
     <string name="admin_title">Panel de administración</string>
     <string name="admin_subtitle">Opciones técnicas del terminal</string>
-    <string name="admin_repair">Re-emparejar dispositivo</string>
+    <string name="admin_change_caja">Cambiar caja</string>
+    <string name="admin_logout">Cerrar sesión</string>
+    <string name="admin_session">%1$s · %2$s</string>
     <string name="admin_test_print">Imprimir ticket de prueba</string>
     <string name="admin_reprint">Reimprimir último ticket</string>
     <string name="admin_exit_kiosk">Salir del modo kiosco</string>
     <string name="admin_enter_kiosk">Activar modo kiosco</string>
     <string name="admin_close">Cerrar panel</string>
 
-    <!-- Pairing -->
-    <string name="pairing_title">Emparejar kiosco</string>
-    <string name="pairing_message">En el panel administrativo entra a Configuración → Kioscos, registra este kiosco y pulsa «Generar código». Luego escribe aquí el país, la base de datos de la empresa y ese código de 8 dígitos (vence en 15 minutos).</string>
-    <string name="pairing_country">País</string>
-    <string name="pairing_country_pa">Panamá (PA)</string>
-    <string name="pairing_country_ve">Venezuela (VE)</string>
-    <string name="pairing_server_url">URL del servidor</string>
-    <string name="pairing_company_db">Base de datos de la empresa (ej. demo_administrativo)</string>
-    <string name="pairing_code">Código de emparejamiento (8 caracteres)</string>
-    <string name="pairing_submit">Emparejar dispositivo</string>
+    <!-- Login (system user, same as the POS) -->
+    <string name="login_hero_title">Configura este kiosco</string>
+    <string name="login_hero_subtitle">Usa el mismo usuario y contraseña del sistema con los que entras al POS.</string>
+    <string name="login_title">Iniciar sesión</string>
+    <string name="login_username">Usuario</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_show_password">Mostrar contraseña</string>
+    <string name="login_hide_password">Ocultar contraseña</string>
+    <string name="login_country">País</string>
+    <string name="login_country_pa">Panamá</string>
+    <string name="login_country_ve">Venezuela</string>
+    <string name="login_submit">Entrar</string>
+    <string name="login_loading">Validando credenciales…</string>
+    <string name="login_advanced">Opciones avanzadas</string>
+    <string name="login_server_url">URL del servidor</string>
+    <string name="login_server_hint">Solo cámbiala si soporte técnico te lo indica.</string>
+    <string name="login_error_missing">El usuario y la contraseña son obligatorios</string>
+    <string name="login_error_invalid">Usuario o contraseña incorrectos</string>
+    <string name="login_error_connectivity">No se pudo conectar al servidor. Revisa la conexión a internet y la URL del servidor en Opciones avanzadas.</string>
+    <string name="login_error_server_url">La URL del servidor es obligatoria</string>
+    <string name="login_error_no_companies">Este usuario no tiene empresas asignadas</string>
+    <string name="login_error_unexpected">No se pudo iniciar sesión</string>
+    <string name="login_company_title">Elige la empresa</string>
+    <string name="login_company_subtitle">Tu usuario tiene acceso a varias empresas. ¿Para cuál venderá este kiosco?</string>
+    <string name="login_company_rif">RUC %1$s</string>
+    <string name="login_company_back">Usar otro usuario</string>
+    <string name="login_version">%1$s · versión %2$s</string>
+
+    <!-- Caja setup -->
+    <string name="caja_setup_title">Elige la caja de este kiosco</string>
+    <string name="caja_setup_subtitle">Las ventas del kiosco se registran en la caja que elijas.</string>
+    <string name="caja_setup_session">%1$s · %2$s</string>
+    <string name="caja_setup_list_title">Cajas activas</string>
+    <string name="caja_setup_code">Código %1$s</string>
+    <string name="caja_setup_branch">Sucursal %1$s</string>
+    <string name="caja_setup_loading">Cargando cajas…</string>
+    <string name="caja_setup_empty_title">No hay cajas activas</string>
+    <string name="caja_setup_empty_message">Activa una caja en el panel administrativo y vuelve a intentarlo.</string>
+    <string name="caja_setup_error_title">No se pudieron cargar las cajas</string>
+    <string name="caja_setup_prefix">Prefijo de pedidos</string>
+    <string name="caja_setup_prefix_hint">Usa un prefijo distinto en cada kiosco (K1, K2…)</string>
+    <string name="caja_setup_prefix_example">Los pedidos se verán así: %1$s</string>
+    <string name="caja_setup_prefix_error">Escribe de 1 a 5 letras o números</string>
+    <string name="caja_setup_start">Comenzar</string>
+    <string name="caja_setup_select_first">Elige una caja para continuar</string>
+    <string name="caja_setup_logout">Cerrar sesión</string>
+    <string name="caja_setup_invalid">La caja configurada ya no es válida. Elige otra.</string>
 
     <!-- Dining Mode Screen -->
     <string name="dining_mode_title">¿Dónde vas a comer hoy?</string>

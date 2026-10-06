@@ -236,4 +236,28 @@ class ProductCustomizerViewModelTest {
         assertEquals(1, addedLine.selectedModifiers.size)
         assertEquals("Pan Brioche", addedLine.selectedModifiers.first().optionName)
     }
+
+    @Test
+    fun `options flagged isDefault are preselected without exceeding max`() {
+        val combo =
+            sampleItem.copy(
+                modifierGroups =
+                    listOf(
+                        singleMandatoryGroup.copy(
+                            // The sold-out option is flagged too but must never be preselected.
+                            options = singleMandatoryGroup.options.map { it.copy(isDefault = it.id == 11 || it.soldOut) },
+                        ),
+                        multiOptionalGroup.copy(
+                            options = multiOptionalGroup.options.map { it.copy(isDefault = true) },
+                        ),
+                        mandatoryMultiGroup,
+                    ),
+            )
+
+        val state = ProductCustomizerViewModel(combo, orderGraph).uiState.value
+
+        assertEquals(listOf(11), state.selectedOptions[singleMandatoryGroup.id]?.map { it.id })
+        assertEquals(listOf(20, 21), state.selectedOptions[multiOptionalGroup.id]?.map { it.id })
+        assertNull(state.selectedOptions[mandatoryMultiGroup.id])
+    }
 }

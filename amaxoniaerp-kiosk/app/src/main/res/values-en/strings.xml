@@ -42,23 +42,62 @@
     <!-- Admin menu -->
     <string name="admin_title">Administration panel</string>
     <string name="admin_subtitle">Terminal technical options</string>
-    <string name="admin_repair">Re-pair device</string>
+    <string name="admin_change_caja">Change register</string>
+    <string name="admin_logout">Sign out</string>
+    <string name="admin_session">%1$s · %2$s</string>
     <string name="admin_test_print">Print test ticket</string>
     <string name="admin_reprint">Reprint last ticket</string>
     <string name="admin_exit_kiosk">Exit kiosk mode</string>
     <string name="admin_enter_kiosk">Enable kiosk mode</string>
     <string name="admin_close">Close panel</string>
 
-    <!-- Pairing -->
-    <string name="pairing_title">Pair kiosk</string>
-    <string name="pairing_message">In the admin panel open Configuración → Kioscos, register this kiosk and press «Generar código». Then enter the country, the company database and that 8-digit code here (it expires in 15 minutes).</string>
-    <string name="pairing_country">Country</string>
-    <string name="pairing_country_pa">Panama (PA)</string>
-    <string name="pairing_country_ve">Venezuela (VE)</string>
-    <string name="pairing_server_url">Server URL</string>
-    <string name="pairing_company_db">Company database (e.g. demo_administrativo)</string>
-    <string name="pairing_code">Pairing code (8 characters)</string>
-    <string name="pairing_submit">Pair device</string>
+    <!-- Login (system user, same as the POS) -->
+    <string name="login_hero_title">Set up this kiosk</string>
+    <string name="login_hero_subtitle">Use the same system user and password you use on the POS.</string>
+    <string name="login_title">Sign in</string>
+    <string name="login_username">User</string>
+    <string name="login_password">Password</string>
+    <string name="login_show_password">Show password</string>
+    <string name="login_hide_password">Hide password</string>
+    <string name="login_country">Country</string>
+    <string name="login_country_pa">Panama</string>
+    <string name="login_country_ve">Venezuela</string>
+    <string name="login_submit">Sign in</string>
+    <string name="login_loading">Checking credentials…</string>
+    <string name="login_advanced">Advanced options</string>
+    <string name="login_server_url">Server URL</string>
+    <string name="login_server_hint">Only change it if technical support asks you to.</string>
+    <string name="login_error_missing">User and password are required</string>
+    <string name="login_error_invalid">Wrong user or password</string>
+    <string name="login_error_connectivity">Could not reach the server. Check the internet connection and the server URL under Advanced options.</string>
+    <string name="login_error_server_url">The server URL is required</string>
+    <string name="login_error_no_companies">This user has no companies assigned</string>
+    <string name="login_error_unexpected">Could not sign in</string>
+    <string name="login_company_title">Choose the company</string>
+    <string name="login_company_subtitle">Your user can access several companies. Which one will this kiosk sell for?</string>
+    <string name="login_company_rif">Tax ID %1$s</string>
+    <string name="login_company_back">Use another user</string>
+    <string name="login_version">%1$s · version %2$s</string>
+
+    <!-- Caja setup -->
+    <string name="caja_setup_title">Choose this kiosk\'s register</string>
+    <string name="caja_setup_subtitle">Kiosk sales are recorded on the register you choose.</string>
+    <string name="caja_setup_session">%1$s · %2$s</string>
+    <string name="caja_setup_list_title">Active registers</string>
+    <string name="caja_setup_code">Code %1$s</string>
+    <string name="caja_setup_branch">Branch %1$s</string>
+    <string name="caja_setup_loading">Loading registers…</string>
+    <string name="caja_setup_empty_title">No active registers</string>
+    <string name="caja_setup_empty_message">Enable a register in the admin panel and try again.</string>
+    <string name="caja_setup_error_title">Could not load the registers</string>
+    <string name="caja_setup_prefix">Order prefix</string>
+    <string name="caja_setup_prefix_hint">Use a different prefix on each kiosk (K1, K2…)</string>
+    <string name="caja_setup_prefix_example">Orders will look like: %1$s</string>
+    <string name="caja_setup_prefix_error">Type 1 to 5 letters or numbers</string>
+    <string name="caja_setup_start">Start</string>
+    <string name="caja_setup_select_first">Choose a register to continue</string>
+    <string name="caja_setup_logout">Sign out</string>
+    <string name="caja_setup_invalid">The configured register is no longer valid. Choose another one.</string>
 
     <!-- Dining Mode Screen -->
     <string name="dining_mode_title">Where will you eat today?</string>

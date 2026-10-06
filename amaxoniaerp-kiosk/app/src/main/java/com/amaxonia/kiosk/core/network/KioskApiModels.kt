@@ -2,20 +2,90 @@ package com.amaxonia.kiosk.core.network
 
 import kotlinx.serialization.Serializable
 
+// --- System login (same contract as the POS: contracts/auth/*.json) ---
+
 @Serializable
-data class KioskPairingRequest(
-    val countryCode: String,
-    val companyDb: String,
-    val pairingCode: String,
+data class KioskLoginRequest(
+    val username: String,
+    val password: String,
 )
 
 @Serializable
-data class KioskPairingResponse(
-    val deviceId: String,
-    val deviceToken: String,
-    val deviceName: String,
-    val prefix: String,
+data class KioskAuthUserDto(
+    val id: Int,
+    val username: String,
+    val role: String = "",
 )
+
+@Serializable
+data class KioskCompanyDto(
+    val id: Int,
+    val name: String,
+    val rif: String? = null,
+)
+
+@Serializable
+data class KioskLoginResponse(
+    val token: String,
+    val user: KioskAuthUserDto,
+    val companies: List<KioskCompanyDto> = emptyList(),
+    val countryCode: String? = null,
+    val schemaType: String? = null,
+)
+
+@Serializable
+data class KioskSelectCompanyRequest(
+    val companyId: Int,
+)
+
+@Serializable
+data class KioskCompanyDetailsDto(
+    val id: Int,
+    val name: String,
+    val adminDb: String = "",
+    val accountingDb: String = "",
+    val payrollDb: String = "",
+    val rif: String? = null,
+)
+
+@Serializable
+data class KioskSelectCompanyResponse(
+    val success: Boolean = true,
+    val token: String,
+    val currentCompany: KioskCompanyDetailsDto,
+    val countryCode: String? = null,
+    val schemaType: String? = null,
+)
+
+/** One row of `GET api/cajas` (backend `features/caja/domain/Caja`); only the fields the kiosk uses. */
+@Serializable
+data class KioskCajaDto(
+    val idCaja: String,
+    val codCaja: String? = null,
+    val caja: String? = null,
+    val descripcion: String? = null,
+    val estatus: Int = CAJA_ACTIVE,
+    val idSucursal: Int? = null,
+    val serieCaja: String? = null,
+    val sucursalNombre: String? = null,
+    val sucursalCodigo: String? = null,
+) {
+    val isActive: Boolean
+        get() = estatus == CAJA_ACTIVE
+
+    /** Name shown to the operator: description, then the short name, then the code. */
+    val displayName: String
+        get() =
+            listOf(descripcion, caja, codCaja)
+                .firstOrNull { !it.isNullOrBlank() }
+                ?.trim()
+                ?: idCaja
+
+    companion object {
+        /** `caja.activo = 1` (same rule as the POS caja selector). */
+        const val CAJA_ACTIVE = 1
+    }
+}
 
 @Serializable
 data class KioskUnlockRequest(
@@ -64,6 +134,8 @@ data class KioskModifierOptionDto(
     val name: String,
     val extraPrice: String,
     val soldOut: Boolean = false,
+    /** Preselected in the customizer (default option of the Combos module). */
+    val isDefault: Boolean = false,
 )
 
 @Serializable

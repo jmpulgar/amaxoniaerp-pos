@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.LocalDrink
 import androidx.compose.material.icons.rounded.LocalPizza
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LunchDining
+import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.AlertDialog
@@ -257,7 +258,7 @@ fun AttractContent(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center),
         ) {
-            OfflineBanner()
+            OfflineBanner(message = uiState.outOfServiceMessage)
         }
 
         if (uiState.isAdminDialogOpen) {
@@ -379,7 +380,7 @@ private fun LanguagePill(
 }
 
 @Composable
-private fun OfflineBanner() {
+private fun OfflineBanner(message: String?) {
     Surface(
         modifier = Modifier.padding(56.dp),
         shape = MaterialTheme.shapes.extraLarge,
@@ -396,7 +397,12 @@ private fun OfflineBanner() {
                 modifier = Modifier.size(140.dp).background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.WifiOff, contentDescription = null, tint = FlowError, modifier = Modifier.size(80.dp))
+                Icon(
+                    imageVector = if (message != null) Icons.Rounded.SettingsSuggest else Icons.Rounded.WifiOff,
+                    contentDescription = null,
+                    tint = FlowError,
+                    modifier = Modifier.size(80.dp),
+                )
             }
             Spacer(Modifier.height(32.dp))
             Text(
@@ -406,7 +412,7 @@ private fun OfflineBanner() {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = stringResource(R.string.attract_out_of_service),
+                text = message ?: stringResource(R.string.attract_out_of_service),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
             )

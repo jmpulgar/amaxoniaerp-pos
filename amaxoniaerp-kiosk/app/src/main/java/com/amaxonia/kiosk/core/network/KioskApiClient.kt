@@ -14,54 +14,86 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
+
+/** Session-level outcomes of a kiosk call that the navigation must react to. */
+sealed interface KioskSessionEvent {
+    /** 401: the company token is no longer valid; the session was cleared → login. */
+    data object LoggedOut : KioskSessionEvent
+
+    /** 400 "Caja del kiosco no válida": the caja was cleared → caja setup. */
+    data object InvalidCaja : KioskSessionEvent
+}
 
 class KioskApiClient(
     private val httpClient: HttpClient,
     private val tokenStorage: KioskTokenStorage,
 ) {
-    private val baseUrl: String
-        get() {
-            val raw = tokenStorage.serverUrl?.trim() ?: BuildConfig.DEFAULT_SERVER_URL
-            return if (raw.endsWith("/")) raw else "$raw/"
-        }
+    private val _sessionEvents = MutableSharedFlow<KioskSessionEvent>(extraBufferCapacity = SESSION_EVENT_BUFFER)
 
-    suspend fun pair(
+    /** Emitted when a call invalidates the session or the caja (already cleared from storage). */
+    val sessionEvents: SharedFlow<KioskSessionEvent> = _sessionEvents.asSharedFlow()
+
+    private val baseUrl: String
+        get() = normalizeServerUrl(tokenStorage.serverUrl ?: BuildConfig.DEFAULT_SERVER_URL)
+
+    // --- System login (no session yet: explicit server URL and tokens) ---
+
+    /** `POST auth/login` with the system user, exactly like the POS. */
+    suspend fun login(
         serverUrl: String,
         countryCode: String,
-        companyDb: String,
-        pairingCode: String,
-    ): Result<KioskPairingResponse> =
-        runCatching {
-            val root = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"
-            val endpoint = "${root}api/v1/kiosk/pairing"
-
+        username: String,
+        password: String,
+    ): Result<KioskLoginResponse> =
+        authCall {
             val response =
-                httpClient.post(endpoint) {
+                httpClient.post("${normalizeServerUrl(serverUrl)}auth/login") {
+                    header(KioskHeaders.COUNTRY_CODE, countryCode.trim().uppercase())
                     contentType(ContentType.Application.Json)
-                    setBody(
-                        KioskPairingRequest(
-                            countryCode = countryCode.trim().uppercase(),
-                            companyDb = companyDb.trim(),
-                            pairingCode = pairingCode.trim(),
-                        ),
-                    )
+                    setBody(KioskLoginRequest(username = username.trim(), password = password))
                 }
-
-            checkResponse(response)
-            val body = response.body<KioskPairingResponse>()
-            tokenStorage.savePairing(
-                KioskDeviceCredentials(
-                    deviceId = body.deviceId,
-                    deviceToken = body.deviceToken,
-                    deviceName = body.deviceName,
-                    prefix = body.prefix,
-                    countryCode = countryCode.trim().uppercase(),
-                    companyDb = companyDb.trim(),
-                    serverUrl = root,
-                ),
-            )
-            body
+            if (response.status == HttpStatusCode.Unauthorized) {
+                throw KioskInvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE)
+            }
+            checkAuthResponse(response, fallback = "No se pudo iniciar sesión")
+            response.body<KioskLoginResponse>()
         }
+
+    /** `POST auth/company` with the identity token; returns the (non-expiring) company token. */
+    suspend fun selectCompany(
+        serverUrl: String,
+        identityToken: String,
+        companyId: Int,
+    ): Result<KioskSelectCompanyResponse> =
+        authCall {
+            val response =
+                httpClient.post("${normalizeServerUrl(serverUrl)}auth/company") {
+                    header(HttpHeaders.Authorization, "Bearer $identityToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(KioskSelectCompanyRequest(companyId))
+                }
+            checkAuthResponse(response, fallback = "No se pudo seleccionar la empresa")
+            response.body<KioskSelectCompanyResponse>()
+        }
+
+    /** `GET api/cajas` of the logged company (POS endpoint: needs `Company-DB` = adminDb). */
+    suspend fun getCajas(): Result<List<KioskCajaDto>> =
+        authCall {
+            val response =
+                httpClient.get("${baseUrl}api/cajas") {
+                    tokenStorage.authToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
+                    tokenStorage.companyDb?.let { header(KioskHeaders.COMPANY_DB, it) }
+                }
+            checkResponse(response)
+            response.body<List<KioskCajaDto>>()
+        }
+
+    // --- Kiosk endpoints (Authorization + X-Kiosk-Caja + X-Kiosk-Prefix added by the HTTP client) ---
 
     suspend fun getConfig(ifNoneMatch: String? = null): NetworkResult<KioskConfigResponse> =
         runCatching {
@@ -174,6 +206,10 @@ class KioskApiClient(
             checkResponse(response)
         }
 
+    /**
+     * Admin unlock with the kiosk password. The backend answers 401 for a wrong password, so a 401
+     * here means `false` and never logs the kiosk out (a revoked token surfaces on the next call).
+     */
     suspend fun unlock(password: String): Result<Boolean> =
         runCatching {
             val endpoint = "${baseUrl}api/v1/kiosk/unlock"
@@ -182,6 +218,7 @@ class KioskApiClient(
                     contentType(ContentType.Application.Json)
                     setBody(KioskUnlockRequest(password))
                 }
+            if (response.status == HttpStatusCode.Unauthorized) return@runCatching false
             checkResponse(response)
             response.status == HttpStatusCode.NoContent || response.status == HttpStatusCode.OK
         }
@@ -202,6 +239,30 @@ class KioskApiClient(
             items = items.map { it.copy(imageUrl = resolveAssetUrl(it.imageUrl)) },
         )
 
+    /** Maps transport failures to [KioskConnectivityException]; API errors pass through. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun <T> authCall(block: suspend () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: KioskApiException) {
+            Result.failure(e)
+        } catch (e: IOException) {
+            Result.failure(KioskConnectivityException(e))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
+    private suspend fun checkAuthResponse(
+        response: HttpResponse,
+        fallback: String,
+    ) {
+        if (isSuccessStatus(response.status)) return
+        val serverMessage = parseErrorMessage(response.bodyAsText()).takeIf { it.isNotBlank() && !it.trimStart().startsWith("<") }
+        throw KioskServerException(serverMessage ?: fallback, response.status.value, serverMessage)
+    }
+
     private suspend fun checkResponse(response: HttpResponse) {
         if (!isSuccessStatus(response.status)) {
             throw buildApiException(response)
@@ -218,13 +279,27 @@ class KioskApiClient(
         val errorBody = response.bodyAsText()
         val errorMessage = parseErrorMessage(errorBody)
         return when (response.status) {
-            HttpStatusCode.Unauthorized -> {
-                tokenStorage.clear()
-                KioskAuthenticationException("Credenciales de kiosco inválidas o sesión expirada (401)")
+            // 403 "Se requiere token de empresa": an identity token reached a kiosk call; same as a revoked session.
+            HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden.takeIf { isCompanyTokenRequiredError(errorMessage) } -> {
+                tokenStorage.clearSession()
+                _sessionEvents.tryEmit(KioskSessionEvent.LoggedOut)
+                KioskAuthenticationException("Sesión del kiosco vencida o revocada (401)")
             }
-            HttpStatusCode.BadRequest -> KioskBadRequestException("Petición inválida (400): $errorMessage")
+            HttpStatusCode.BadRequest ->
+                if (isInvalidCajaError(errorMessage)) {
+                    tokenStorage.clearCaja()
+                    _sessionEvents.tryEmit(KioskSessionEvent.InvalidCaja)
+                    KioskInvalidCajaException(errorMessage)
+                } else {
+                    KioskBadRequestException("Petición inválida (400): $errorMessage", errorMessage)
+                }
             HttpStatusCode.Conflict -> KioskConflictException(errorMessage)
-            else -> KioskServerException("Error del servidor (${response.status.value}): $errorMessage", response.status.value)
+            else ->
+                KioskServerException(
+                    "Error del servidor (${response.status.value}): $errorMessage",
+                    response.status.value,
+                    errorMessage,
+                )
         }
     }
 
@@ -233,4 +308,35 @@ class KioskApiClient(
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?: body
+
+    companion object {
+        private const val SESSION_EVENT_BUFFER = 4
+        const val INVALID_CREDENTIALS_MESSAGE = "Usuario o contraseña incorrectos"
+
+        /**
+         * 400s that mean the caja/prefix configured on this device is unusable: "Caja del kiosco no
+         * válida", or a missing/invalid `X-Kiosk-Caja` / `X-Kiosk-Prefix` header.
+         */
+        fun isInvalidCajaError(message: String?): Boolean {
+            val normalized = message?.lowercase()?.replace('á', 'a').orEmpty()
+            return (normalized.contains("caja del kiosco") && normalized.contains("no valida")) ||
+                normalized.contains(KioskHeaders.CAJA.lowercase()) ||
+                normalized.contains(KioskHeaders.PREFIX.lowercase())
+        }
+
+        /** Backend 403 `{"error":"Se requiere token de empresa"}`. */
+        fun isCompanyTokenRequiredError(message: String?): Boolean = message?.lowercase()?.contains("token de empresa") == true
+
+        /** Trims, adds `https://` when the scheme is missing and guarantees a trailing slash. */
+        fun normalizeServerUrl(raw: String): String {
+            val trimmed = raw.trim()
+            val withScheme =
+                if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                    trimmed
+                } else {
+                    "https://$trimmed"
+                }
+            return if (withScheme.endsWith("/")) withScheme else "$withScheme/"
+        }
+    }
 }

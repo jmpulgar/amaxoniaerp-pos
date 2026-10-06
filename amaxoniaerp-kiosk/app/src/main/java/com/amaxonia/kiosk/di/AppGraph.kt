@@ -106,6 +106,25 @@ class AppGraph(
     /** Clears everything tied to the current customer. Every path back to Attract goes through here. */
     fun resetSession() = sessionResetter.resetSession()
 
+    /** "Cambiar caja" / caja rejected: forget the caja and everything cached for it. */
+    fun changeCaja() {
+        tokenStorage.clearCaja()
+        forgetKioskData()
+    }
+
+    /** "Cerrar sesión": drop the session (server URL, country and prefix are kept). */
+    fun logout() {
+        tokenStorage.clearSession()
+        forgetKioskData()
+    }
+
+    /** In-memory data of the previous company/caja (also used after the API already cleared storage). */
+    fun forgetKioskData() {
+        resetSession()
+        configRepository.clear()
+        catalogState.value = null
+    }
+
     /** Retries paid-but-unregistered orders from the Room outbox. */
     fun syncPendingPayments() {
         appScope.launch(Dispatchers.IO) {

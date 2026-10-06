@@ -1,7 +1,8 @@
 package com.amaxonia.kiosk.ui.navigation
 
 object KioskDestinations {
-    const val PAIRING = "pairing"
+    const val LOGIN = "login"
+    const val CAJA_SETUP = "caja_setup"
     const val ATTRACT = "attract"
     const val MENU = "menu"
     const val CUSTOMIZER = "customizer"
@@ -15,8 +16,8 @@ object KioskDestinations {
     const val ORDER_NUMBER = "order_number"
 
     /** Routes where the idle timer must not run at all (no customer session in progress). */
-    val idleExemptRoutes: Set<String> = setOf(PAIRING, ATTRACT, ORDER_NUMBER)
+    val idleExemptRoutes: Set<String> = setOf(LOGIN, CAJA_SETUP, ATTRACT, ORDER_NUMBER)
 
     /** Attract and the order number fade/scale instead of sliding: they open and close a session. */
-    val sessionBoundaryRoutes: Set<String> = setOf(ATTRACT, ORDER_NUMBER, PAIRING)
+    val sessionBoundaryRoutes: Set<String> = setOf(ATTRACT, ORDER_NUMBER, LOGIN, CAJA_SETUP)
 }

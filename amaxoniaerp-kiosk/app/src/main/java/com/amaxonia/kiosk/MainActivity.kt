@@ -37,6 +37,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.amaxonia.kiosk.core.network.KioskSessionEvent
 import com.amaxonia.kiosk.di.AppGraph
 import com.amaxonia.kiosk.domain.flow.CheckoutFlowPolicy
 import com.amaxonia.kiosk.domain.payment.PaymentMethod
@@ -46,12 +47,16 @@ import com.amaxonia.kiosk.ui.accessibility.KioskChrome
 import com.amaxonia.kiosk.ui.admin.AdminMenuDialog
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
+import com.amaxonia.kiosk.ui.cajasetup.CajaSetupScreen
+import com.amaxonia.kiosk.ui.cajasetup.CajaSetupViewModel
 import com.amaxonia.kiosk.ui.customer.CustomerIdScreen
 import com.amaxonia.kiosk.ui.customer.CustomerIdViewModel
 import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
 import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
 import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
 import com.amaxonia.kiosk.ui.idle.IdleWarningDialog
+import com.amaxonia.kiosk.ui.login.LoginScreen
+import com.amaxonia.kiosk.ui.login.LoginViewModel
 import com.amaxonia.kiosk.ui.menu.MenuScreen
 import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
@@ -60,8 +65,6 @@ import com.amaxonia.kiosk.ui.navigation.kioskExitTransition
 import com.amaxonia.kiosk.ui.navigation.kioskPopEnterTransition
 import com.amaxonia.kiosk.ui.navigation.kioskPopExitTransition
 import com.amaxonia.kiosk.ui.navigation.navigateAsRoot
-import com.amaxonia.kiosk.ui.pairing.PairingScreen
-import com.amaxonia.kiosk.ui.pairing.PairingViewModel
 import com.amaxonia.kiosk.ui.payment.CompletedOrderInfo
 import com.amaxonia.kiosk.ui.payment.OrderNumberScreen
 import com.amaxonia.kiosk.ui.payment.PaymentScreen
@@ -232,12 +235,34 @@ fun KioskNavHost(
 ) {
     val startDestination =
         remember {
-            if (appGraph.tokenStorage.isPaired()) KioskDestinations.ATTRACT else KioskDestinations.PAIRING
+            when {
+                !appGraph.tokenStorage.isLoggedIn() -> KioskDestinations.LOGIN
+                !appGraph.tokenStorage.hasCaja() -> KioskDestinations.CAJA_SETUP
+                else -> KioskDestinations.ATTRACT
+            }
         }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showAdminMenu by remember { mutableStateOf(false) }
+    // Set when the server rejected the configured caja, so the caja screen explains why it is back.
+    var cajaRejected by remember { mutableStateOf(false) }
+
+    // A kiosk call answered 401 (session revoked) or 400 "Caja del kiosco no válida": the API client
+    // already cleared storage; drop in-memory data and send the operator to the right setup screen.
+    LaunchedEffect(navController) {
+        appGraph.apiClient.sessionEvents.collect { event ->
+            showAdminMenu = false
+            appGraph.forgetKioskData()
+            when (event) {
+                KioskSessionEvent.LoggedOut -> navController.navigateAsRoot(KioskDestinations.LOGIN)
+                KioskSessionEvent.InvalidCaja -> {
+                    cajaRejected = true
+                    navController.navigateAsRoot(KioskDestinations.CAJA_SETUP)
+                }
+            }
+        }
+    }
     val isLockTaskActive by appGraph.lockTaskController.isLockTaskActive.collectAsStateWithLifecycle()
     val completedOrder by appGraph.completedOrderState.collectAsStateWithLifecycle()
     val catalog by appGraph.catalogState.collectAsStateWithLifecycle()
@@ -257,11 +282,21 @@ fun KioskNavHost(
         AdminMenuDialog(
             isLockTaskActive = isLockTaskActive,
             hasLastOrder = completedOrder != null,
-            onRePair = {
+            sessionLabel =
+                listOfNotNull(appGraph.tokenStorage.cajaName, appGraph.tokenStorage.companyName)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                    .ifBlank { null },
+            onChangeCaja = {
                 showAdminMenu = false
-                appGraph.tokenStorage.clear()
-                appGraph.resetSession()
-                navController.navigateAsRoot(KioskDestinations.PAIRING)
+                cajaRejected = false
+                appGraph.changeCaja()
+                navController.navigateAsRoot(KioskDestinations.CAJA_SETUP)
+            },
+            onLogout = {
+                showAdminMenu = false
+                appGraph.logout()
+                navController.navigateAsRoot(KioskDestinations.LOGIN)
             },
             onTestPrint = {
                 showAdminMenu = false
@@ -299,19 +334,49 @@ fun KioskNavHost(
         popEnterTransition = { kioskPopEnterTransition() },
         popExitTransition = { kioskPopExitTransition() },
     ) {
-        composable(KioskDestinations.PAIRING) {
+        composable(KioskDestinations.LOGIN) {
             // Under lock task there is nowhere to go back to.
             BackHandler {}
             val viewModel =
                 viewModel {
-                    PairingViewModel(
+                    LoginViewModel(
                         apiClient = appGraph.apiClient,
-                        initialServerUrl = appGraph.tokenStorage.serverUrl ?: BuildConfig.DEFAULT_SERVER_URL,
+                        tokenStorage = appGraph.tokenStorage,
+                        defaultServerUrl = BuildConfig.DEFAULT_SERVER_URL,
+                        defaultCountryCode = BuildConfig.DEFAULT_COUNTRY_CODE,
                     )
                 }
-            PairingScreen(
+            LoginScreen(
                 viewModel = viewModel,
-                onPairingSuccess = { navController.navigateAsRoot(KioskDestinations.ATTRACT) },
+                onLoggedIn = {
+                    appGraph.forgetKioskData()
+                    cajaRejected = false
+                    navController.navigateAsRoot(KioskDestinations.CAJA_SETUP)
+                },
+            )
+        }
+
+        composable(KioskDestinations.CAJA_SETUP) {
+            BackHandler {}
+            val viewModel =
+                viewModel {
+                    CajaSetupViewModel(
+                        apiClient = appGraph.apiClient,
+                        tokenStorage = appGraph.tokenStorage,
+                        previousCajaInvalid = cajaRejected,
+                    )
+                }
+            CajaSetupScreen(
+                viewModel = viewModel,
+                onStarted = {
+                    cajaRejected = false
+                    appGraph.forgetKioskData()
+                    navController.navigateAsRoot(KioskDestinations.ATTRACT)
+                },
+                onLoggedOut = {
+                    appGraph.forgetKioskData()
+                    navController.navigateAsRoot(KioskDestinations.LOGIN)
+                },
             )
         }
 

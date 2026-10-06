@@ -3,6 +3,7 @@ package com.amaxonia.kiosk.ui.attract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.network.KioskApiClient
+import com.amaxonia.kiosk.core.network.KioskApiException
 import com.amaxonia.kiosk.core.network.KioskMediaItem
 import com.amaxonia.kiosk.core.network.KioskTokenStorage
 import com.amaxonia.kiosk.core.network.NetworkResult
@@ -24,6 +25,8 @@ data class AttractUiState(
     val mediaList: List<KioskMediaItem> = emptyList(),
     val currentMediaIndex: Int = 0,
     val isOffline: Boolean = false,
+    /** Server reason for being out of service (503, e.g. kiosk migration missing); null = generic text. */
+    val outOfServiceMessage: String? = null,
     val isAdminDialogOpen: Boolean = false,
     val adminPassword: String = "",
     val adminErrorMessage: String? = null,
@@ -32,6 +35,14 @@ data class AttractUiState(
     val currentMedia: KioskMediaItem?
         get() = mediaList.getOrNull(currentMediaIndex)
 }
+
+/** 503 = the company cannot serve the kiosk (e.g. "falta migración"): show the server text on the banner. */
+private fun Throwable.outOfServiceMessage(): String? =
+    (this as? KioskApiException)
+        ?.takeIf { it.statusCode == HTTP_SERVICE_UNAVAILABLE }
+        ?.let { it.serverMessage?.takeIf(String::isNotBlank) ?: it.message }
+
+private const val HTTP_SERVICE_UNAVAILABLE = 503
 
 class AttractViewModel(
     private val apiClient: KioskApiClient,
@@ -67,10 +78,12 @@ class AttractViewModel(
                                 mediaList = config?.media.orEmpty(),
                                 currentMediaIndex = if (result is NetworkResult.Success) 0 else it.currentMediaIndex,
                                 isOffline = false,
+                                outOfServiceMessage = null,
                             )
                         }
                     }
                     is NetworkResult.Failure -> {
+                        val serviceMessage = result.error.outOfServiceMessage()
                         _uiState.update {
                             val cachedMedia = config?.media ?: it.mediaList
                             it.copy(
@@ -78,7 +91,8 @@ class AttractViewModel(
                                 brandColor = config?.brandColor ?: it.brandColor,
                                 logoUrl = config?.logoUrl ?: it.logoUrl,
                                 mediaList = cachedMedia,
-                                isOffline = cachedMedia.isEmpty(),
+                                isOffline = serviceMessage != null || cachedMedia.isEmpty(),
+                                outOfServiceMessage = serviceMessage,
                             )
                         }
                     }

@@ -222,4 +222,26 @@ class AttractViewModelTest {
             assertFalse(viewModel.uiState.value.isAdminDialogOpen)
             assertNull(viewModel.uiState.value.adminErrorMessage)
         }
+
+    @Test
+    fun `503 shows the server reason on the out-of-service banner`() =
+        runTest(testDispatcher) {
+            val storage = KioskTokenStorage(context = null)
+            val message = "El kiosco no está habilitado en esta empresa (falta migración)"
+            val engine =
+                MockEngine {
+                    respond(
+                        content = """{"error":"$message"}""",
+                        status = HttpStatusCode.ServiceUnavailable,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val client = KioskApiClient(KioskHttpClientFactory.create(storage, engine), storage)
+            val viewModel = AttractViewModel(client, storage)
+            viewModel.loadConfigJob?.join()
+
+            val state = viewModel.uiState.value
+            assertTrue(state.isOffline)
+            assertEquals(message, state.outOfServiceMessage)
+        }
 }

@@ -28,4 +28,9 @@ class KioskConfigRepository(
         }
         return result
     }
+
+    /** Forgets the cached config (logout / caja change: the next company or caja may differ). */
+    fun clear() {
+        _config.value = null
+    }
 }

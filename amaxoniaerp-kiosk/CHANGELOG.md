@@ -17,6 +17,37 @@ _Nada todavía._
 
 ---
 
+## [0.0.3] — 2026-10-06
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 3 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flowerp-prod-release.apk` |
+| SHA-256 | `915B9F13D20F4D6218E230F6417A21ADCE7ADB5143BB8BFD8E60AD1E94986CDD` |
+
+### Requisitos
+- Backend desplegado con el kiosco por usuario del sistema: endpoints `/api/v1/kiosk/*` con token de empresa y headers `X-Kiosk-Caja` / `X-Kiosk-Prefix` (ya no existe `POST /api/v1/kiosk/pairing`).
+- Base de la empresa migrada con `db/2026/2026-10-06-KIOSCO-AUTOSERVICIO.sql` (admin PHP, `execute_queries_pa.py`). Sin esta migración el kiosco muestra «El kiosco no está habilitado en esta empresa (falta migración)».
+- Al menos una caja activa en la empresa y un usuario del sistema con acceso a ella (el mismo con el que se entra al POS).
+
+### Cambiado
+- Inicio de sesión con usuario y contraseña del sistema (igual que el POS: `auth/login` + `auth/company`) y selección de caja en el equipo; se elimina el código de emparejamiento.
+- Pantalla de inicio de sesión con país (Panamá por defecto / Venezuela) y la URL del servidor oculta en «Opciones avanzadas». Si el usuario tiene varias empresas se elige una.
+- Pantalla de caja: lista de cajas activas y «Prefijo de pedidos» (por defecto `K1`, de 1 a 5 letras o números). Usa un prefijo distinto en cada kiosco (K1, K2…).
+- Menú de administración: «Re-emparejar» se reemplaza por «Cambiar caja» y «Cerrar sesión».
+- Si el servidor revoca la sesión el kiosco vuelve al inicio de sesión; si la caja deja de ser válida vuelve a la selección de caja. Los kioscos con la versión 0.0.2 (emparejados) piden iniciar sesión al actualizar.
+
+### Agregado
+- Combos y extras desde el módulo de Combos existente: las opciones marcadas por defecto vienen preseleccionadas en el personalizador (sin pasar el máximo del grupo).
+- Banners del Attract desde Parámetros Generales → Configurar Kiosko (imágenes 8 s, videos hasta el final).
+- El aviso «Fuera de servicio» muestra el motivo que envía el servidor (por ejemplo, la migración pendiente).
+
+### Corregido
+- Una contraseña de administrador incorrecta ya no borra la configuración del kiosco.
+
+---
+
 ## [0.0.2] — 2026-10-06
 
 | Dato | Valor |
@@ -53,7 +84,7 @@ Primera versión de pruebas para SUNMI K2 (Android 9 / API 28, vertical 1080×19
 ### Requisitos
 - **Backend** `amaxoniaerp-backend` con los endpoints de kiosco (B1–B9) y Yappy (`/orders/{id}/yappy`, `paymentMethods` en `/config`). Sin cambios de esquema obligatorios.
 - **Admin PHP**: caja con `yappy_device_id` / `yappy_group_id`, credenciales Yappy en Parámetros Generales y forma de pago `YAPPY`.
-- **Opcional**: columna `parametros_generales.yappy_tipo_qr` (`doc/runbooks/optional_yappy_tipo_qr.sql`) para elegir QR Dinámico/Híbrido desde el admin; sin ella se usa Dinámico.
+- Tipo de QR Yappy (`parametros_generales.yappy_tipo_qr`, Dinámico/Híbrido): la columna la crea la migración `db/2026/2026-10-06-KIOSCO-AUTOSERVICIO.sql` y se edita en Parámetros Generales → Configurar Kiosko; sin valor se usa Dinámico.
 
 ### Agregado
 - Flujo completo de autoservicio: Emparejamiento → Attract (video/imagen en loop) → Comer aquí / Para llevar → Menú → Personalizador de combos y modificadores → Revisión → Portamesa (solo destino MESAS + Comer aquí) → Cliente (Consumidor Final o RUC/Cédula) → Método de pago → Pago → Número de pedido.

@@ -55,7 +55,7 @@ fun AnimatedContentTransitionScope<NavBackStackEntry>.kioskPopExitTransition(): 
         slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, navSpec()) + fadeOut(navSpec())
     }
 
-/** Clears the whole back stack and shows [route] as the only destination (Attract, Pairing, OrderNumber). */
+/** Clears the whole back stack and shows [route] as the only destination (Attract, Login, CajaSetup, OrderNumber). */
 fun NavController.navigateAsRoot(route: String) {
     navigate(route) {
         popUpTo(graph.id) { inclusive = true }

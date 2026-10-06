@@ -2,9 +2,9 @@ package com.amaxonia.kiosk.testutil
 
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskApiClient
-import com.amaxonia.kiosk.core.network.KioskDeviceCredentials
 import com.amaxonia.kiosk.core.network.KioskHttpClientFactory
 import com.amaxonia.kiosk.core.network.KioskItemDto
+import com.amaxonia.kiosk.core.network.KioskSession
 import com.amaxonia.kiosk.core.network.KioskTokenStorage
 import com.amaxonia.kiosk.data.db.PendingPayment
 import com.amaxonia.kiosk.data.db.PendingPaymentDao
@@ -78,19 +78,23 @@ fun approvedCard(amount: String = "9.10") =
         amount = Money.fromString(amount),
     )
 
-fun pairedTokenStorage(): KioskTokenStorage =
+fun testSession(token: String = "token-test") =
+    KioskSession(
+        token = token,
+        userId = 7,
+        username = "cajero1",
+        companyId = 2,
+        companyName = "Compañía Prueba",
+        companyDb = "test_db",
+        countryCode = "PA",
+        serverUrl = "http://localhost:8080/",
+    )
+
+/** Storage of a kiosk that is logged in with caja "CAJA-1" and prefix K1. */
+fun loggedInTokenStorage(): KioskTokenStorage =
     KioskTokenStorage().apply {
-        savePairing(
-            KioskDeviceCredentials(
-                deviceId = "dev-1",
-                deviceToken = "token-test",
-                deviceName = "K1",
-                prefix = "K1",
-                countryCode = "PA",
-                companyDb = "test_db",
-                serverUrl = "http://localhost:8080",
-            ),
-        )
+        saveSession(testSession())
+        saveCaja(cajaId = "CAJA-1", cajaName = "Caja Kiosco", prefix = "K1")
     }
 
 /**
@@ -101,7 +105,7 @@ class RecordingApi(
     handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
 ) {
     val engine = MockEngine { request -> handler(request) }
-    val storage = pairedTokenStorage()
+    val storage = loggedInTokenStorage()
     val client = KioskApiClient(KioskHttpClientFactory.create(storage, engine), storage)
 
     val requests: List<HttpRequestData>

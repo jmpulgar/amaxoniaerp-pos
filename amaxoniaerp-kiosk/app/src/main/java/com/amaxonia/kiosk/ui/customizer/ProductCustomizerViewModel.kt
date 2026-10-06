@@ -163,12 +163,13 @@ class ProductCustomizerViewModel(
         fun initialSelections(item: KioskItemDto): Map<Int, List<KioskModifierOptionDto>> {
             val map = mutableMapOf<Int, List<KioskModifierOptionDto>>()
             for (group in item.modifierGroups) {
-                // If mandatory single-choice, auto-select first available option
-                if (group.isMandatory && group.min == 1 && group.max == 1) {
-                    val defaultOption = group.options.firstOrNull { !it.soldOut }
-                    if (defaultOption != null) {
-                        map[group.id] = listOf(defaultOption)
-                    }
+                // Options flagged as default in the Combos module come preselected (never more than max).
+                val defaults = group.options.filter { it.isDefault && !it.soldOut }.take(group.max.coerceAtLeast(0))
+                if (defaults.isNotEmpty()) {
+                    map[group.id] = defaults
+                } else if (group.isMandatory && group.min == 1 && group.max == 1) {
+                    // Mandatory single choice without a default: auto-select the first available option.
+                    group.options.firstOrNull { !it.soldOut }?.let { map[group.id] = listOf(it) }
                 }
             }
             return map

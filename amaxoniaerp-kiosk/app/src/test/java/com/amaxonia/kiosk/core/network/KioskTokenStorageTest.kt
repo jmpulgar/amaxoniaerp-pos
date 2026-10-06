@@ -127,8 +127,17 @@ class KioskTokenStorageTest {
         }
     }
 
-    private val credentials =
-        KioskDeviceCredentials("dev-1", "token-1", "K1", "K1", "PA", "db", "http://localhost:8080/")
+    private val session =
+        KioskSession(
+            token = "token-1",
+            userId = 7,
+            username = "cajero1",
+            companyId = 2,
+            companyName = "Compañía Prueba",
+            companyDb = "t_prueba",
+            countryCode = "PA",
+            serverUrl = "http://localhost:8080/",
+        )
 
     @Test
     fun `opening is lazy - nothing touches the keystore until warmUp or first access`() {
@@ -150,24 +159,24 @@ class KioskTokenStorageTest {
         val storage = KioskTokenStorage(prefsFactory = factory)
 
         storage.warmUp()
-        storage.savePairing(credentials)
+        storage.saveSession(session)
 
         assertEquals(1, factory.destroys)
         assertEquals(2, factory.creates)
-        assertEquals("token-1", factory.current.data["kiosk_device_token"])
+        assertEquals("token-1", factory.current.data[KioskTokenStorage.KEY_AUTH_TOKEN])
         assertTrue(storage.isReady.value)
     }
 
     @Test
-    fun `corrupted ciphertext on read recreates the store and returns unpaired instead of crashing`() {
+    fun `corrupted ciphertext on read recreates the store and returns logged out instead of crashing`() {
         val factory = FakeFactory()
         val storage = KioskTokenStorage(prefsFactory = factory)
-        storage.savePairing(credentials)
+        storage.saveSession(session)
         val fresh = KioskTokenStorage(prefsFactory = factory)
         factory.current.failReads = true
 
-        assertNull(fresh.deviceToken)
-        assertFalse(fresh.isPaired())
+        assertNull(fresh.authToken)
+        assertFalse(fresh.isLoggedIn())
         assertEquals(1, factory.destroys)
         assertTrue(factory.current.data.isEmpty())
     }
@@ -178,20 +187,96 @@ class KioskTokenStorageTest {
         val storage = KioskTokenStorage(prefsFactory = factory)
 
         storage.warmUp()
-        storage.savePairing(credentials)
+        storage.saveSession(session)
 
         assertTrue(storage.isReady.value)
-        assertEquals("token-1", storage.deviceToken)
-        assertTrue(storage.isPaired())
+        assertEquals("token-1", storage.authToken)
+        assertTrue(storage.isLoggedIn())
     }
 
     @Test
-    fun `clear removes the pairing`() {
+    fun `session and caja are persisted with the documented keys`() {
+        val factory = FakeFactory()
+        val storage = KioskTokenStorage(prefsFactory = factory)
+
+        storage.saveSession(session)
+        assertTrue(storage.isLoggedIn())
+        assertFalse(storage.hasCaja())
+
+        storage.saveCaja(cajaId = "c-1", cajaName = "Caja Kiosco", prefix = "K2")
+
+        assertTrue(storage.hasCaja())
+        val data = factory.current.data
+        assertEquals("2", data[KioskTokenStorage.KEY_COMPANY_ID])
+        assertEquals("t_prueba", data[KioskTokenStorage.KEY_COMPANY_DB])
+        assertEquals("c-1", data[KioskTokenStorage.KEY_CAJA_ID])
+        assertEquals("Caja Kiosco", data[KioskTokenStorage.KEY_CAJA_NAME])
+        assertEquals("K2", data[KioskTokenStorage.KEY_PREFIX])
+        assertEquals("http://localhost:8080/", data[KioskTokenStorage.KEY_SERVER_URL])
+    }
+
+    @Test
+    fun `clearSession logs out but keeps server URL, country and prefix`() {
         val storage = KioskTokenStorage(prefsFactory = FakeFactory())
-        storage.savePairing(credentials)
+        storage.saveSession(session)
+        storage.saveCaja(cajaId = "c-1", cajaName = "Caja Kiosco", prefix = "K2")
+
+        storage.clearSession()
+
+        assertFalse(storage.isLoggedIn())
+        assertFalse(storage.hasCaja())
+        assertNull(storage.cajaId)
+        assertEquals("http://localhost:8080/", storage.serverUrl)
+        assertEquals("PA", storage.countryCode)
+        assertEquals("K2", storage.prefix)
+    }
+
+    @Test
+    fun `clearCaja keeps the login`() {
+        val storage = KioskTokenStorage(prefsFactory = FakeFactory())
+        storage.saveSession(session)
+        storage.saveCaja(cajaId = "c-1", cajaName = "Caja Kiosco", prefix = "K2")
+
+        storage.clearCaja()
+
+        assertTrue(storage.isLoggedIn())
+        assertFalse(storage.hasCaja())
+    }
+
+    @Test
+    fun `a 0_0_2 install with only pairing credentials is sent to login without crashing`() {
+        val factory = FakeFactory()
+        factory.current.data.putAll(
+            mapOf(
+                "kiosk_device_id" to "dev-1",
+                "kiosk_device_token" to "legacy-token",
+                "kiosk_device_name" to "Kiosco 1",
+                "kiosk_prefix" to "K1",
+                "kiosk_country_code" to "PA",
+                "kiosk_company_db" to "demo_administrativo",
+                "kiosk_server_url" to "https://api.listoerp.app/",
+            ),
+        )
+        val storage = KioskTokenStorage(prefsFactory = factory)
+
+        storage.warmUp()
+
+        assertFalse(storage.isLoggedIn())
+        assertFalse(storage.hasCaja())
+        KioskTokenStorage.LEGACY_KEYS.forEach { assertNull(factory.current.data[it]) }
+        assertNull(storage.companyDb)
+        assertEquals("https://api.listoerp.app/", storage.serverUrl)
+        assertEquals("K1", storage.prefix)
+    }
+
+    @Test
+    fun `clear wipes everything`() {
+        val storage = KioskTokenStorage(prefsFactory = FakeFactory())
+        storage.saveSession(session)
 
         storage.clear()
 
-        assertFalse(storage.isPaired())
+        assertFalse(storage.isLoggedIn())
+        assertNull(storage.serverUrl)
     }
 }

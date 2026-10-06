@@ -39,8 +39,8 @@ android {
         minSdk = 28
         targetSdk = 36
         // Bump both on every build handed to a kiosk and log it in CHANGELOG.md (versionCode must always increase).
-        versionCode = 2
-        versionName = "0.0.2"
+        versionCode = 3
+        versionName = "0.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,6 +65,8 @@ android {
     productFlavors {
         create("flowerp") {
             dimension = "brand"
+            // Country preselected on the login screen (same as the POS `amaxonia` flavor).
+            buildConfigField("String", "DEFAULT_COUNTRY_CODE", "\"PA\"")
         }
 
         create("dev") {

@@ -16,11 +16,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.PointOfSale
 import androidx.compose.material.icons.rounded.Print
-import androidx.compose.material.icons.rounded.QrCode
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,12 +49,14 @@ private const val DISABLED_ALPHA = 0.4f
 fun AdminMenuDialog(
     isLockTaskActive: Boolean,
     hasLastOrder: Boolean,
-    onRePair: () -> Unit,
+    onChangeCaja: () -> Unit,
+    onLogout: () -> Unit,
     onTestPrint: () -> Unit,
     onReprintLastReceipt: () -> Unit,
     onToggleLockTask: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    sessionLabel: String? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Dialog(
@@ -89,7 +92,7 @@ fun AdminMenuDialog(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = stringResource(R.string.admin_subtitle),
+                    text = sessionLabel ?: stringResource(R.string.admin_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -97,7 +100,11 @@ fun AdminMenuDialog(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AdminActionRow(text = stringResource(R.string.admin_repair), icon = Icons.Rounded.QrCode, onClick = onRePair)
+                    AdminActionRow(
+                        text = stringResource(R.string.admin_change_caja),
+                        icon = Icons.Rounded.PointOfSale,
+                        onClick = onChangeCaja,
+                    )
                     AdminActionRow(text = stringResource(R.string.admin_test_print), icon = Icons.Rounded.Print, onClick = onTestPrint)
                     AdminActionRow(
                         text = stringResource(R.string.admin_reprint),
@@ -109,6 +116,11 @@ fun AdminMenuDialog(
                         text = stringResource(if (isLockTaskActive) R.string.admin_exit_kiosk else R.string.admin_enter_kiosk),
                         icon = if (isLockTaskActive) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
                         onClick = onToggleLockTask,
+                    )
+                    AdminActionRow(
+                        text = stringResource(R.string.admin_logout),
+                        icon = Icons.AutoMirrored.Rounded.Logout,
+                        onClick = onLogout,
                     )
                 }
 
