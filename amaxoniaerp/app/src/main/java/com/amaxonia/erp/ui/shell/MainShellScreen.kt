@@ -92,6 +92,9 @@ fun MainShellScreen(
     activeSucursalName: String = "Sucursal Principal",
     activeCajaName: String = "Caja 01",
     isCajaOpen: Boolean = true,
+    isCajaDiaAnterior: Boolean = false,
+    cajaFechaApertura: String? = null,
+    usuarioApertura: String? = null,
     posContent: @Composable (onNavigateToCajas: () -> Unit) -> Unit,
     clientsContent: @Composable () -> Unit,
     productsContent: @Composable () -> Unit,
@@ -128,6 +131,10 @@ fun MainShellScreen(
                         session = session,
                         activeSucursalName = activeSucursalName,
                         activeCajaName = activeCajaName,
+                        isCajaOpen = isCajaOpen,
+                        isCajaDiaAnterior = isCajaDiaAnterior,
+                        cajaFechaApertura = cajaFechaApertura,
+                        usuarioApertura = usuarioApertura,
                         isCompact = isCompact,
                         onCajaClick = {
                             currentModule = ErpModule.CAJAS
@@ -254,10 +261,21 @@ fun MainShellScreen(
                         }
                     },
                     actions = {
+                        val badgeLabel = when {
+                            !isCajaOpen -> "$activeCajaName (Cerrada)"
+                            isCajaDiaAnterior -> "$activeCajaName (Día Anterior)"
+                            !cajaFechaApertura.isNullOrBlank() -> "$activeCajaName • $cajaFechaApertura"
+                            else -> activeCajaName
+                        }
+                        val badgeTone = when {
+                            !isCajaOpen -> PosVisualTone.Error
+                            isCajaDiaAnterior -> PosVisualTone.Warning
+                            else -> PosVisualTone.Success
+                        }
                         // Badge interactivo de Caja Activa en píldora armonizada
                         PosStatusBadge(
-                            label = if (isCajaOpen) activeCajaName else "$activeCajaName (Cerrada)",
-                            tone = if (isCajaOpen) PosVisualTone.Success else PosVisualTone.Error,
+                            label = badgeLabel,
+                            tone = badgeTone,
                             modifier =
                                 Modifier
                                     .padding(end = 12.dp)
@@ -298,6 +316,10 @@ private fun SidebarHeader(
     session: CompanySession,
     activeSucursalName: String,
     activeCajaName: String,
+    isCajaOpen: Boolean = true,
+    isCajaDiaAnterior: Boolean = false,
+    cajaFechaApertura: String? = null,
+    usuarioApertura: String? = null,
     isCompact: Boolean = false,
     onCajaClick: () -> Unit,
 ) {
@@ -376,25 +398,59 @@ private fun SidebarHeader(
                     .fillMaxWidth()
                     .clickable { onCajaClick() },
         ) {
-            Row(
+            Column(
                 modifier = Modifier.padding(if (isCompact) 10.dp else 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = activeCajaName,
-                    color = PosPalette.FixedWhite,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = if (isCompact) 13.sp else 14.sp,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Cambiar caja",
-                    tint = PosPalette.FixedWhite,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = activeCajaName,
+                        color = PosPalette.FixedWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isCompact) 13.sp else 14.sp,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Cambiar caja",
+                        tint = PosPalette.FixedWhite,
+                    )
+                }
+                if (isCajaOpen) {
+                    if (!cajaFechaApertura.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "Abierta: $cajaFechaApertura${if (isCajaDiaAnterior) " (Jornada anterior)" else ""}",
+                            color = if (isCajaDiaAnterior) MaterialTheme.colorScheme.tertiary else PosPalette.FixedWhite.copy(alpha = 0.85f),
+                            fontWeight = if (isCajaDiaAnterior) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (!usuarioApertura.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Aperturada por: $usuarioApertura",
+                            color = PosPalette.FixedWhite.copy(alpha = 0.75f),
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "Cerrada · Requiere apertura",
+                        color = PosPalette.FixedWhite.copy(alpha = 0.75f),
+                        fontSize = 11.sp,
+                    )
+                }
             }
         }
     }

@@ -15,6 +15,7 @@ import com.amaxonia.erp.domain.model.printer.FiscalDeviceDiagnostics
 import com.amaxonia.erp.domain.model.printer.PrinterType
 import com.amaxonia.erp.domain.model.printer.PrinterTypePolicy
 import com.amaxonia.erp.domain.model.printer.TheFactorySettings
+import com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -26,6 +27,7 @@ class SettingsViewModel(
     private val localStore: LocalStore,
     private val fiscalDiagnostics: FiscalDeviceDiagnostics? = null,
     private val printGateway: DefaultInvoicePrintGateway? = null,
+    private val customerDisplayManager: CustomerDisplayManager? = null,
 ) : ViewModel() {
 
     private val _selectedPrinterType = MutableStateFlow(PrinterType.NONE)
@@ -45,6 +47,12 @@ class SettingsViewModel(
 
     private val _autoPrintReceipt = MutableStateFlow(true)
     val autoPrintReceipt = _autoPrintReceipt.asStateFlow()
+
+    private val _customerDisplayEnabled = MutableStateFlow(true)
+    val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
+
+    val isSecondaryDisplayAvailable = customerDisplayManager?.isSecondaryDisplayAvailable
+        ?: MutableStateFlow(false).asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
@@ -86,6 +94,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             localStore.autoPrintReceiptFlow().collect { enabled ->
                 _autoPrintReceipt.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            localStore.customerDisplayEnabledFlow().collect { enabled ->
+                _customerDisplayEnabled.value = enabled
             }
         }
     }
@@ -136,6 +149,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             runCatching { localStore.saveAutoPrintReceipt(enabled) }
                 .onFailure { _errorMessage.value = "Error al guardar opción de auto-impresión" }
+        }
+    }
+
+    fun onCustomerDisplayToggled(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { localStore.saveCustomerDisplayEnabled(enabled) }
+                .onFailure { _errorMessage.value = "Error al guardar opción de pantalla de cliente" }
         }
     }
 

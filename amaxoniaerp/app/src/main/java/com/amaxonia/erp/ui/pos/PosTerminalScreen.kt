@@ -32,20 +32,26 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,6 +74,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -85,10 +92,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.domain.model.Client
+import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.Product
+import com.amaxonia.erp.domain.model.SellerSummary
+import com.amaxonia.erp.ui.common.SellerSelectorBottomSheet
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import com.amaxonia.erp.ui.components.AdaptiveAmountOptions
 import com.amaxonia.erp.ui.components.AdaptiveAmountText
 import com.amaxonia.erp.ui.components.PosEmptyState
@@ -133,6 +152,11 @@ fun PosTerminalScreen(
                 onClearCart = viewModel::clearCart,
                 onOpenPayment = viewModel::openPaymentDialog,
                 onSelectClient = { viewModel.openClientDialog() },
+                onRemoveClient = { viewModel.removeSelectedClient() },
+                onChangeSeller = { viewModel.openSellerSheet() },
+                onSelectBranch = viewModel::selectClientBranch,
+                onNavigateToCajas = onNavigateToCajas,
+                onRenovarCaja = viewModel::renovarCajaDiaAnterior,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -150,7 +174,11 @@ fun PosTerminalScreen(
                 onClearCart = viewModel::clearCart,
                 onOpenPayment = viewModel::openPaymentDialog,
                 onSelectClient = { viewModel.openClientDialog() },
+                onRemoveClient = { viewModel.removeSelectedClient() },
+                onChangeSeller = { viewModel.openSellerSheet() },
+                onSelectBranch = viewModel::selectClientBranch,
                 onNavigateToCajas = onNavigateToCajas,
+                onRenovarCaja = viewModel::renovarCajaDiaAnterior,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -201,12 +229,21 @@ fun PosTerminalScreen(
         )
     }
 
-
     if (state.showClientDialog) {
-        ClientQuickSelectionDialog(
+        ClientSelectionDialog(
             currentClient = state.selectedClient,
+            onSearch = viewModel::searchClients,
             onClientSelected = viewModel::selectClient,
             onDismiss = viewModel::dismissClientDialog,
+        )
+    }
+
+    if (state.showSellerSheet) {
+        SellerSelectorBottomSheet(
+            sellers = state.availableSellers,
+            selectedSellerId = state.selectedSeller?.id,
+            onSelect = viewModel::selectSeller,
+            onDismiss = viewModel::dismissSellerSheet,
         )
     }
 }
@@ -228,9 +265,35 @@ private fun PosTerminalLandscapeLayout(
     onClearCart: () -> Unit,
     onOpenPayment: () -> Unit,
     onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    onChangeSeller: () -> Unit,
+    onSelectBranch: (ClientBranch) -> Unit,
+    onNavigateToCajas: () -> Unit,
+    onRenovarCaja: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier) {
+        PosHeaderBar(
+            cajaName = state.activeCajaName,
+            isCajaOpen = state.isCajaOpen,
+            isDiaAnterior = state.isCajaDiaAnterior,
+            fechaApertura = state.cajaFechaApertura,
+            sucursalNombre = state.sucursalNombre,
+            almacenNombre = state.almacenNombre,
+            usuarioApertura = state.usuarioApertura,
+            client = state.selectedClient,
+            onClientClick = onSelectClient,
+            onCajaClick = onNavigateToCajas,
+            onRenovar = onRenovarCaja,
+            isRenovando = state.isRenovandoCaja,
+        )
+
+        Row(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+        ) {
         // --- Panel Izquierdo: Catálogo de Productos ---
         Column(
             modifier =
@@ -366,45 +429,24 @@ private fun PosTerminalLandscapeLayout(
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            // Fila de información del cliente compacta
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectClient() }
-                        .padding(bottom = 6.dp),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Cliente:",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            state.selectedClient?.name ?: "CONSUMIDOR FINAL",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Text(
-                        "Cambiar",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+            // Panel superior consolidado: Cliente + Vendedor
+            CartClientVendorPanel(
+                state = state,
+                onSelectClient = onSelectClient,
+                onRemoveClient = onRemoveClient,
+                onChangeSeller = onChangeSeller,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+
+            // Selector de Sucursal del Cliente (cuando tiene sucursales disponibles)
+            if (state.clientBranches.isNotEmpty()) {
+                ClientSucursalSelectorCard(
+                    sucursales = state.clientBranches,
+                    selectedSucursal = state.selectedClientBranch,
+                    isRequiredMissing = state.branchSelectionRequiredError,
+                    onSelect = onSelectBranch,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
             }
 
             // Lista de renglones del carrito
@@ -520,6 +562,7 @@ private fun PosTerminalLandscapeLayout(
         }
     }
 }
+}
 
 /**
  * Layout Monocolumna con Pestañas para Teléfonos y Pantallas en Modo Vertical.
@@ -538,7 +581,11 @@ private fun PosTerminalPortraitLayout(
     onClearCart: () -> Unit,
     onOpenPayment: () -> Unit,
     onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    onChangeSeller: () -> Unit,
+    onSelectBranch: (ClientBranch) -> Unit,
     onNavigateToCajas: () -> Unit,
+    onRenovarCaja: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -547,9 +594,15 @@ private fun PosTerminalPortraitLayout(
             cajaName = state.activeCajaName,
             isCajaOpen = state.isCajaOpen,
             isDiaAnterior = state.isCajaDiaAnterior,
+            fechaApertura = state.cajaFechaApertura,
+            sucursalNombre = state.sucursalNombre,
+            almacenNombre = state.almacenNombre,
+            usuarioApertura = state.usuarioApertura,
             client = state.selectedClient,
             onClientClick = onSelectClient,
             onCajaClick = onNavigateToCajas,
+            onRenovar = onRenovarCaja,
+            isRenovando = state.isRenovandoCaja,
         )
 
         // --- Pestañas estilizadas ---
@@ -619,6 +672,9 @@ private fun PosTerminalPortraitLayout(
                     onClearCart = onClearCart,
                     onOpenPayment = onOpenPayment,
                     onSelectClient = onSelectClient,
+                    onRemoveClient = onRemoveClient,
+                    onChangeSeller = onChangeSeller,
+                    onSelectBranch = onSelectBranch,
                 )
             }
         }
@@ -630,64 +686,193 @@ private fun PosHeaderBar(
     cajaName: String?,
     isCajaOpen: Boolean,
     isDiaAnterior: Boolean = false,
+    fechaApertura: String? = null,
+    sucursalNombre: String? = null,
+    almacenNombre: String? = null,
+    usuarioApertura: String? = null,
     client: Client?,
     onClientClick: () -> Unit,
     onCajaClick: () -> Unit,
+    onRenovar: () -> Unit = {},
+    isRenovando: Boolean = false,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
+        border =
+            BorderStroke(
+                1.dp,
+                if (isCajaOpen && isDiaAnterior) {
+                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                },
+            ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Píldora de estado de caja
-            val badgeLabel = when {
-                !isCajaOpen -> "Caja Cerrada"
-                isDiaAnterior -> "${cajaName ?: "Caja"} (Día Anterior)"
-                else -> cajaName ?: "Caja"
-            }
-            val badgeTone = when {
-                !isCajaOpen -> PosVisualTone.Error
-                isDiaAnterior -> PosVisualTone.Warning
-                else -> PosVisualTone.Success
-            }
-            PosStatusBadge(
-                label = badgeLabel,
-                tone = badgeTone,
-                modifier = Modifier.clickable { onCajaClick() },
-            )
-
-            // Selector rápido de cliente
-            Surface(
-                shape = PosExtraShapes.Pill,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.clickable { onClientClick() },
+            // Contenedor de estado de caja interactivo
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clip(PosExtraShapes.CardRadius)
+                        .clickable { onCajaClick() }
+                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                val badgeLabel = when {
+                    !isCajaOpen -> "Caja Cerrada"
+                    isDiaAnterior -> "${cajaName ?: "Caja"} (Día Anterior)"
+                    else -> cajaName ?: "Caja"
+                }
+                val badgeTone = when {
+                    !isCajaOpen -> PosVisualTone.Error
+                    isDiaAnterior -> PosVisualTone.Warning
+                    else -> PosVisualTone.Success
+                }
+
+                PosStatusBadge(
+                    label = badgeLabel,
+                    tone = badgeTone,
+                    icon = if (isCajaOpen) (if (isDiaAnterior) Icons.Default.Warning else Icons.Default.LockOpen) else Icons.Default.Lock,
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    // Fila de metadatos de sesión: Fecha de apertura y Persona que abrió
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (!fechaApertura.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = if (isDiaAnterior) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = fechaApertura,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = if (isDiaAnterior) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+
+                        if (!usuarioApertura.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = "Por: $usuarioApertura",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    // Fila de ubicación: Sucursal y Almacén
+                    val branchText = sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
+                    val locationParts = listOfNotNull(branchText, almacenNombre?.takeIf(String::isNotBlank))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storefront,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        )
+                        Text(
+                            text = locationParts.joinToString(" • "),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Derecha: Botón renovar si aplica + Selector rápido de cliente
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (isCajaOpen && isDiaAnterior) {
+                    OutlinedButton(
+                        onClick = onRenovar,
+                        enabled = !isRenovando,
+                        shape = PosExtraShapes.Pill,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary),
+                    ) {
+                        if (isRenovando) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.tertiary,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Renovando…", fontSize = 11.sp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Renovar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Selector rápido de cliente
+                Surface(
+                    shape = PosExtraShapes.Pill,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.clickable { onClientClick() },
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = client?.name ?: "CONSUMIDOR FINAL",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = client?.name ?: "CONSUMIDOR FINAL",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -859,11 +1044,35 @@ private fun ProductGridItem(
                 contentAlignment = Alignment.Center,
             ) {
                 if (product.photoUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = product.photoUrl,
+                    SubcomposeAsyncImage(
+                        model =
+                            ImageRequest.Builder(LocalContext.current)
+                                .data(product.photoUrl)
+                                .crossfade(true)
+                                .build(),
                         contentDescription = product.description,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
+                        loading = {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                )
+                            }
+                        },
+                        error = {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = MaterialTheme.colorScheme.outline,
+                            )
+                        },
                     )
                 } else {
                     Icon(
@@ -955,6 +1164,9 @@ private fun CartTab(
     onClearCart: () -> Unit,
     onOpenPayment: () -> Unit,
     onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    onChangeSeller: () -> Unit,
+    onSelectBranch: (ClientBranch) -> Unit,
 ) {
     if (state.cart.isEmpty()) {
         Box(
@@ -977,43 +1189,24 @@ private fun CartTab(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            // Fila de información del cliente
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectClient() }
-                        .padding(bottom = 8.dp),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            "Cliente:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            state.selectedClient?.name ?: "CONSUMIDOR FINAL",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Text(
-                        "Cambiar",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+            // Panel superior consolidado: Cliente + Vendedor
+            CartClientVendorPanel(
+                state = state,
+                onSelectClient = onSelectClient,
+                onRemoveClient = onRemoveClient,
+                onChangeSeller = onChangeSeller,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            // Selector de Sucursal del Cliente (cuando tiene sucursales disponibles)
+            if (state.clientBranches.isNotEmpty()) {
+                ClientSucursalSelectorCard(
+                    sucursales = state.clientBranches,
+                    selectedSucursal = state.selectedClientBranch,
+                    isRequiredMissing = state.branchSelectionRequiredError,
+                    onSelect = onSelectBranch,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
             }
 
             // Lista de renglones del carrito
@@ -1831,75 +2024,112 @@ private fun SaleSuccessDialog(
 
 
 @Composable
-private fun ClientQuickSelectionDialog(
+private fun ClientSelectionDialog(
     currentClient: Client?,
+    onSearch: suspend (String) -> List<Client>,
     onClientSelected: (Client) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<Client>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        isSearching = true
+        searchResults = onSearch(searchQuery)
+        isSearching = false
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = PosExtraShapes.DialogRadius,
         title = {
-            Text(
-                "Seleccionar Cliente",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Seleccionar Cliente",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Clear, contentDescription = "Cerrar")
+                }
+            }
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Selecciona el cliente para esta venta:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
+            ) {
+                // Buscador
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Buscar por nombre, RUC, cédula o código...") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = PosExtraShapes.InputRadius,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(14.dp))
 
-                // Opción Consumidor Final predeterminado
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Opción Rápida: Consumidor Final (CF)
                 Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor =
-                                if (currentClient?.code == "CF") {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                        ),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (currentClient?.code == "CF" || currentClient == null) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    ),
                     shape = PosExtraShapes.CardRadius,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onClientSelected(
-                                    Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF"),
-                                )
-                            },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onClientSelected(
+                                Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF")
+                            )
+                        },
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(36.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Default.Person,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp),
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "CONSUMIDOR FINAL",
                                 fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
@@ -1907,6 +2137,138 @@ private fun ClientQuickSelectionDialog(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        if (currentClient?.code == "CF" || currentClient == null) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (isSearching) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                } else if (searchResults.isEmpty() && searchQuery.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "No se encontraron clientes para '$searchQuery'",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(searchResults.filter { it.code != "CF" && it.id != "0" }, key = { it.id.ifBlank { it.code } }) { client ->
+                            val isSelected = currentClient?.id == client.id || (currentClient?.code == client.code && client.code.isNotBlank())
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                ),
+                                shape = PosExtraShapes.CardRadius,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onClientSelected(client) },
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        modifier = Modifier.size(34.dp),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Person,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            client.fullName.ifBlank { client.name },
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            if (client.identification.isNotBlank()) {
+                                                Text(
+                                                    "ID: ${client.identification}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            if (client.code.isNotBlank()) {
+                                                Text(
+                                                    "Cód: ${client.code}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                        if (client.address.isNotBlank()) {
+                                            Text(
+                                                client.address,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1918,4 +2280,277 @@ private fun ClientQuickSelectionDialog(
             }
         },
     )
+}
+
+@Composable
+internal fun CartClientVendorPanel(
+    state: PosUiState,
+    onSelectClient: () -> Unit,
+    onRemoveClient: () -> Unit,
+    onChangeSeller: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = PosExtraShapes.CardRadius,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Sección Cliente
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onSelectClient() }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val client = state.selectedClient
+                val isCustomClient = client != null && client.code != "CF" && client.id != "0"
+
+                Surface(
+                    shape = CircleShape,
+                    color = if (isCustomClient) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = if (isCustomClient) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Cliente",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = if (isCustomClient) client!!.fullName.ifBlank { client.name } else "CONSUMIDOR FINAL",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (isCustomClient) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f),
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        IconButton(onClick = onRemoveClient, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Quitar cliente",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.50f),
+                        modifier = Modifier.size(22.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Asignar cliente",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Divisor vertical
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(26.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
+            )
+
+            // Sección Vendedor
+            val canChange = state.availableSellers.isNotEmpty()
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(enabled = canChange) { onChangeSeller() }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.60f),
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Storefront,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Vendedor",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = state.selectedSeller?.nombre ?: "Sin vendedor",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (canChange) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                        modifier = Modifier.size(22.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Cambiar vendedor",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ClientSucursalSelectorCard(
+    sucursales: List<ClientBranch>,
+    selectedSucursal: ClientBranch?,
+    isRequiredMissing: Boolean,
+    onSelect: (ClientBranch) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hasMultiple = sucursales.size > 1
+
+    Card(
+        shape = PosExtraShapes.CardRadius,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isRequiredMissing) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isRequiredMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(
+                text = if (hasMultiple) "Sucursal del cliente" else "Sucursal del cliente asignada",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            if (hasMultiple) {
+                var expanded by remember { mutableStateOf(false) }
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OutlinedTextField(
+                        value = selectedSucursal?.nombreSucursal.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        isError = isRequiredMissing,
+                        placeholder = { Text("Seleccionar sucursal...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        shape = PosExtraShapes.InputRadius,
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                            .fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        sucursales.forEach { sucursal ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(sucursal.nombreSucursal, fontWeight = FontWeight.SemiBold)
+                                        sucursal.direccion?.takeIf { it.isNotBlank() }?.let {
+                                            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    onSelect(sucursal)
+                                    expanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                if (isRequiredMissing) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Este cliente tiene varias sucursales. Selecciona una para continuar.",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            } else {
+                Text(
+                    text = selectedSucursal?.nombreSucursal ?: sucursales.firstOrNull()?.nombreSucursal.orEmpty(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = if (isRequiredMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                )
+                selectedSucursal?.direccion?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }

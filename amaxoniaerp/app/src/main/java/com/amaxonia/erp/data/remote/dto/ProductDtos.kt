@@ -1,5 +1,6 @@
 package com.amaxonia.erp.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -12,13 +13,26 @@ data class ProductDto(
     val barcode2: String? = null,
     val barcode3: String? = null,
     val photoUrl: String? = null,
+    @SerialName("photo_url")
+    val photoUrlSnake: String? = null,
+    @SerialName("foto")
+    val foto: String? = null,
+    @SerialName("foto1")
+    val foto1: String? = null,
     val department: String? = null,
     val isExempt: Boolean? = null,
     val taxRate: Double? = null,
     val costActual: Double? = null,
     val unitPackage: String? = null,
     val prices: List<PriceDto> = emptyList(),
-)
+) {
+    val rawPhoto: String
+        get() = photoUrl?.takeIf { it.isNotBlank() }
+            ?: photoUrlSnake?.takeIf { it.isNotBlank() }
+            ?: foto?.takeIf { it.isNotBlank() }
+            ?: foto1?.takeIf { it.isNotBlank() }
+            ?: ""
+}
 
 @Serializable
 data class PriceDto(

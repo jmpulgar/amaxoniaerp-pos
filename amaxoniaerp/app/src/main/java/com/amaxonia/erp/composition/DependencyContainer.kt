@@ -75,6 +75,13 @@ object DependencyContainer {
         )
     }
 
+    val customerDisplayManager: com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager by lazy {
+        com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager(
+            appContext = checkNotNull(appContext) { "DependencyContainer not initialized" },
+            localStore = localStore,
+        )
+    }
+
     fun initialize(context: Context) {
         if (appContext == null) {
             appContext = context.applicationContext
@@ -111,6 +118,7 @@ object DependencyContainer {
             localStore = localStore,
             fiscalDiagnostics = fiscalDiagnostics,
             printGateway = defaultInvoicePrintGateway,
+            customerDisplayManager = customerDisplayManager,
         )
 
     fun createPosTerminalViewModel(): com.amaxonia.erp.ui.pos.PosTerminalViewModel =
@@ -121,5 +129,6 @@ object DependencyContainer {
             salesRepository = salesRepository,
             localStore = localStore,
             printGateway = defaultInvoicePrintGateway,
+            customerDisplayManager = customerDisplayManager,
         )
 }

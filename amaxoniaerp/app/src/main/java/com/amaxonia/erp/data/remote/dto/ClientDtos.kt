@@ -37,3 +37,16 @@ data class CreateClientRequest(
     val foreignAuthTypeId: String? = null,
     val countryId: Int = 170,
 )
+
+@Serializable
+data class ClientSucursalDto(
+    val sucursalId: Int,
+    val clienteCodigo: String,
+    val nombreSucursal: String,
+    val nombreContacto: String? = null,
+    val telefonoContacto: String? = null,
+    val correoContacto: String? = null,
+    val direccion: String? = null,
+    val observaciones: String? = null,
+)
+

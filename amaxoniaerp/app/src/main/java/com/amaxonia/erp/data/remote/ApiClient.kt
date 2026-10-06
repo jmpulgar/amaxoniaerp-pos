@@ -27,6 +27,9 @@ val AppJson =
 class ApiClient(
     private var baseUrl: String = BuildConfig.BASE_URL,
 ) {
+    val currentBaseUrl: String
+        get() = baseUrl
+
     private var client: HttpClient? = null
 
     fun getHttpClient(): HttpClient = client ?: createHttpClient().also { client = it }

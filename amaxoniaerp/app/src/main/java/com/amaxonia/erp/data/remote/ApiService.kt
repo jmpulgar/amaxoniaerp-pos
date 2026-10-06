@@ -17,6 +17,9 @@ import java.io.IOException
 class ApiService(
     private val apiClient: ApiClient,
 ) {
+    val baseUrl: String
+        get() = apiClient.currentBaseUrl
+
     internal val client: HttpClient
         get() = apiClient.getHttpClient()
 

@@ -3,7 +3,9 @@ package com.amaxonia.erp.ui.pos
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.domain.model.Client
+import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.Product
+import com.amaxonia.erp.domain.model.SellerSummary
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -66,6 +68,13 @@ data class PosUiState(
     val searchQuery: String = "",
     val cart: List<CartItem> = emptyList(),
     val selectedClient: Client? = null,
+    val clientBranches: List<ClientBranch> = emptyList(),
+    val selectedClientBranch: ClientBranch? = null,
+    val isLoadingBranches: Boolean = false,
+    val branchSelectionRequiredError: Boolean = false,
+    val selectedSeller: SellerSummary? = null,
+    val availableSellers: List<SellerSummary> = emptyList(),
+    val showSellerSheet: Boolean = false,
     val activeCajaName: String? = null,
     val activeCajaId: String? = null,
     val isCajaOpen: Boolean = false,
@@ -73,6 +82,9 @@ data class PosUiState(
     val showAvisoCajaAnterior: Boolean = false,
     val cajaFechaApertura: String? = null,
     val isRenovandoCaja: Boolean = false,
+    val sucursalNombre: String? = null,
+    val almacenNombre: String? = null,
+    val usuarioApertura: String? = null,
     val paymentMethods: List<FormaPagoDto> = emptyList(),
     val selectedPaymentMethod: FormaPagoDto? = null,
     val receivedAmountText: String = "",
