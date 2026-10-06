@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 data class ReviewUiState(
     val lines: List<CartLine> = emptyList(),
@@ -27,6 +29,25 @@ data class ReviewUiState(
 
     val isEmpty: Boolean
         get() = lines.isEmpty()
+
+    /** Estimated tax (ITBMS / IVA) per line, same rounding as the backend quote. Final amount comes from the quote. */
+    val estimatedTax: Money
+        get() = lines.fold(Money.ZERO) { acc, line -> acc + line.estimatedTax() }
+
+    val estimatedTotal: Money
+        get() = subtotal + estimatedTax
+
+    /** Panamá (no secondary currency) labels tax as ITBMS; Venezuela as IVA. */
+    val usesItbms: Boolean
+        get() = currency.secondary.isNullOrBlank()
+}
+
+private val HUNDRED = BigDecimal(100)
+private const val MONEY_SCALE = 2
+
+private fun CartLine.estimatedTax(): Money {
+    val rate = item.taxRate.trim().toBigDecimalOrNull()?.takeIf { it.signum() > 0 } ?: return Money.ZERO
+    return Money(lineTotal.amount.multiply(rate).divide(HUNDRED, MONEY_SCALE, RoundingMode.HALF_UP), lineTotal.currency)
 }
 
 class ReviewViewModel(

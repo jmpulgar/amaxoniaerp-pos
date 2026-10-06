@@ -25,10 +25,25 @@ sealed interface PaymentResult {
 }
 
 interface PaymentTerminal {
+    /** False when no card terminal is installed/configured; CARD is then not offered to the customer. */
+    val isAvailable: Boolean
+
     suspend fun processPayment(
         amount: Money,
         orderId: String,
     ): PaymentResult
 
     suspend fun cancelPayment(): Boolean
+}
+
+/** Used when the build has no card terminal adapter: reports itself unavailable and never charges. */
+class UnavailablePaymentTerminal : PaymentTerminal {
+    override val isAvailable: Boolean = false
+
+    override suspend fun processPayment(
+        amount: Money,
+        orderId: String,
+    ): PaymentResult = PaymentResult.Error(message = "Terminal de pago no disponible")
+
+    override suspend fun cancelPayment(): Boolean = false
 }

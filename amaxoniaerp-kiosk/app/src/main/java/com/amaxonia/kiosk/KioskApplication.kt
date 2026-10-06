@@ -11,6 +11,7 @@ class KioskApplication : Application() {
         super.onCreate()
         instance = this
         appGraph = AppGraph(this)
+        appGraph.start()
     }
 
     companion object {

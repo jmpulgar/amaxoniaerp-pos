@@ -204,4 +204,53 @@ class IdleTimerManagerTest {
 
             manager.stop()
         }
+
+    @Test
+    fun paused_doesNotTickWhilePaymentInFlight_andResumesWithFullWindow() =
+        runTest {
+            var timedOut = false
+            val manager =
+                IdleTimerManager(
+                    idleTimeoutSeconds = 60,
+                    warningTimeoutSeconds = 20,
+                    onTimeoutExpired = { timedOut = true },
+                )
+
+            manager.start(this)
+            manager.setEnabled(true)
+            manager.setPaused(true)
+            // A 90 s card payment with nobody touching the screen must not trigger the idle reset.
+            advanceTimeBy(120_000)
+            runCurrent()
+            assertFalse(manager.state.value.isWarningVisible)
+            assertFalse(timedOut)
+
+            manager.setPaused(false)
+            advanceTimeBy(59_000)
+            runCurrent()
+            assertFalse(manager.state.value.isWarningVisible)
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertTrue(manager.state.value.isWarningVisible)
+
+            manager.stop()
+        }
+
+    @Test
+    fun pausing_hidesAVisibleWarning() =
+        runTest {
+            val manager = IdleTimerManager(idleTimeoutSeconds = 2, warningTimeoutSeconds = 5)
+
+            manager.start(this)
+            manager.setEnabled(true)
+            advanceTimeBy(2000)
+            runCurrent()
+            assertTrue(manager.state.value.isWarningVisible)
+
+            manager.setPaused(true)
+            assertFalse(manager.state.value.isWarningVisible)
+            assertTrue(manager.state.value.isPaused)
+
+            manager.stop()
+        }
 }

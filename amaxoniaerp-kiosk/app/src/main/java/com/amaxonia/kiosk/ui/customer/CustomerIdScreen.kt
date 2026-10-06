@@ -1,51 +1,75 @@
 package com.amaxonia.kiosk.ui.customer
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Business
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Flight
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.ui.components.CheckoutStep
+import com.amaxonia.kiosk.ui.components.CheckoutStepper
+import com.amaxonia.kiosk.ui.components.KioskButton
+import com.amaxonia.kiosk.ui.components.KioskCard
+import com.amaxonia.kiosk.ui.components.KioskHeader
+import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
+import com.amaxonia.kiosk.ui.components.NumericKeypad
+import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.kioskPressable
+import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
+import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val DocTypes = listOf("CEDULA", "RUC", "PASAPORTE")
+private const val PASSPORT_INDEX = 2
+private const val ICON_RATIO = 0.52f
+
 @Composable
 fun CustomerIdScreen(
     viewModel: CustomerIdViewModel,
@@ -60,93 +84,99 @@ fun CustomerIdScreen(
         color = MaterialTheme.colorScheme.background,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Datos de Facturación",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Regresar",
-                        )
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-            )
+            KioskHeader(title = stringResource(R.string.checkout_step_details), onBack = onBack)
+            CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.DETAILS)
 
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 48.dp, vertical = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            ScrollableFillColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                // Centered while only the two choices show; top-aligned once the invoice form expands.
+                verticalArrangement = if (uiState.isCustomBilling) Arrangement.Top else Arrangement.Center,
+                contentPadding = PaddingValues(horizontal = 48.dp, vertical = 32.dp),
             ) {
                 Text(
-                    text = "¿Cómo deseas tu comprobante?",
-                    style =
-                        MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            textAlign = TextAlign.Center,
-                        ),
+                    text = stringResource(R.string.customer_title),
+                    style = MaterialTheme.typography.displaySmall,
+                    textAlign = TextAlign.Center,
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Selecciona una opción para continuar con tu pago",
-                    style =
-                        MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        ),
+                    text = stringResource(R.string.customer_subtitle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
+                Spacer(modifier = Modifier.height(40.dp))
 
-                Spacer(modifier = Modifier.height(36.dp))
-
-                // Option 1: Consumidor Final (1-tap fast checkout)
                 CustomerOptionCard(
-                    title = "Consumidor Final",
-                    subtitle = "Sin datos fiscales (Factura estándar inmediata)",
-                    icon = Icons.Default.Person,
+                    title = stringResource(R.string.customer_final_title),
+                    subtitle = stringResource(R.string.customer_final_desc),
+                    icon = Icons.Rounded.Person,
                     isSelected = !uiState.isCustomBilling,
+                    compact = uiState.isCustomBilling,
                     onClick = {
                         viewModel.toggleCustomBilling(false)
                         viewModel.selectConsumidorFinal(onCustomerConfirmed)
                     },
                 )
-
                 Spacer(modifier = Modifier.height(24.dp))
-
-                // Option 2: Factura con Datos (RUC / Cédula)
                 CustomerOptionCard(
-                    title = "Factura con RUC / Cédula",
-                    subtitle = "Ingresa tus datos fiscales para emitir factura a tu nombre o empresa",
-                    icon = Icons.Default.Badge,
+                    title = stringResource(R.string.customer_custom_title),
+                    subtitle = stringResource(R.string.customer_custom_desc),
+                    icon = Icons.Rounded.ReceiptLong,
                     isSelected = uiState.isCustomBilling,
+                    compact = uiState.isCustomBilling,
                     onClick = { viewModel.toggleCustomBilling(true) },
                 )
 
-                if (uiState.isCustomBilling) {
-                    Spacer(modifier = Modifier.height(28.dp))
+                AnimatedVisibility(
+                    visible = uiState.isCustomBilling,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
                     CustomBillingForm(
                         uiState = uiState,
-                        onDocTypeChanged = viewModel::onDocTypeChanged,
-                        onDocNumberChanged = viewModel::onDocNumberChanged,
-                        onDvChanged = viewModel::onDvChanged,
-                        onNameChanged = viewModel::onNameChanged,
-                        onSubmit = { viewModel.submitCustomCustomer(onCustomerConfirmed) },
+                        viewModel = viewModel,
+                        modifier = Modifier.padding(top = 36.dp),
                     )
                 }
             }
+
+            BottomActionBar {
+                if (uiState.isCustomBilling) {
+                    KioskButton(
+                        text = stringResource(R.string.customer_confirm),
+                        onClick = { viewModel.submitCustomCustomer(onCustomerConfirmed) },
+                        dimmed = !uiState.isValid,
+                        trailing = {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    KioskButton(
+                        text = stringResource(R.string.customer_continue_final),
+                        onClick = { viewModel.selectConsumidorFinal(onCustomerConfirmed) },
+                        icon = Icons.Rounded.Person,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BottomActionBar(content: @Composable () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = colors.surface,
+        shadowElevation = 20.dp,
+        shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
+        border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {
+            content()
         }
     }
 }
@@ -157,59 +187,42 @@ private fun CustomerOptionCard(
     subtitle: String,
     icon: ImageVector,
     isSelected: Boolean,
+    compact: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val borderColor =
-        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    val containerColor =
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
-
-    Card(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(if (isSelected) 3.dp else 1.dp, borderColor),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 2.dp),
-    ) {
+    val colors = MaterialTheme.colorScheme
+    val disc = if (isSelected) KioskColors.ctaBrush else SolidColor(colors.secondaryContainer)
+    val discSize by animateDpAsState(if (compact) 96.dp else 136.dp, label = "option_disc")
+    KioskCard(modifier = Modifier.fillMaxWidth(), selected = isSelected, onClick = onClick) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = if (compact) 140.dp else 220.dp)
+                    .padding(horizontal = 32.dp, vertical = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                color =
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.size(64.dp),
-            ) {
+            Box(modifier = Modifier.size(discSize).background(disc, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint =
-                        if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(16.dp),
+                    tint = if (isSelected) colors.onPrimary else colors.onSecondaryContainer,
+                    modifier = Modifier.size(discSize * ICON_RATIO),
                 )
             }
-
-            Spacer(modifier = Modifier.width(24.dp))
-
+            Spacer(modifier = Modifier.width(32.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
+                    color = colors.onSurface,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = subtitle,
-                    style =
-                        MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+            }
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(16.dp))
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = colors.secondary, modifier = Modifier.size(56.dp))
             }
         }
     }
@@ -218,102 +231,132 @@ private fun CustomerOptionCard(
 @Composable
 private fun CustomBillingForm(
     uiState: CustomerIdUiState,
-    onDocTypeChanged: (String) -> Unit,
-    onDocNumberChanged: (String) -> Unit,
-    onDvChanged: (String) -> Unit,
-    onNameChanged: (String) -> Unit,
-    onSubmit: () -> Unit,
+    viewModel: CustomerIdViewModel,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-    ) {
-        Column(modifier = Modifier.padding(28.dp)) {
-            Text(
-                text = "Tipo de Documento",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            )
+    val colors = MaterialTheme.colorScheme
+    val isPassport = uiState.docType == DocTypes[PASSPORT_INDEX]
 
-            Spacer(modifier = Modifier.height(10.dp))
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        KioskSegmentedControl(
+            options =
+                listOf(
+                    stringResource(R.string.customer_doc_cedula) to Icons.Rounded.Badge,
+                    stringResource(R.string.customer_doc_ruc) to Icons.Rounded.Business,
+                    stringResource(R.string.customer_doc_passport) to Icons.Rounded.Flight,
+                ),
+            selectedIndex = DocTypes.indexOf(uiState.docType).coerceAtLeast(0),
+            onSelect = { index -> viewModel.onDocTypeChanged(DocTypes[index]) },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf("CEDULA" to "Cédula", "RUC" to "RUC", "PASAPORTE" to "Pasaporte").forEach { (key, label) ->
-                    FilterChip(
-                        selected = uiState.docType == key,
-                        onClick = { onDocTypeChanged(key) },
-                        label = { Text(label, fontWeight = FontWeight.SemiBold) },
-                        colors =
-                            FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = uiState.docNumber,
-                    onValueChange = onDocNumberChanged,
-                    label = { Text("Número de Documento / RUC *") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                )
-
-                if (uiState.docType == "RUC" || uiState.docType == "CEDULA") {
-                    OutlinedTextField(
-                        value = uiState.dv,
-                        onValueChange = onDvChanged,
-                        label = { Text("DV") },
-                        modifier = Modifier.width(90.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+        if (isPassport) {
             OutlinedTextField(
-                value = uiState.name,
-                onValueChange = onNameChanged,
-                label = { Text("Nombre o Razón Social *") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                value = uiState.docNumber,
+                onValueChange = viewModel::onDocNumberChanged,
+                label = { Text(stringResource(R.string.customer_doc_id)) },
+                textStyle = MaterialTheme.typography.headlineMedium,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                shape = MaterialTheme.shapes.medium,
+                colors = kioskFieldColors(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
             )
-
-            if (uiState.errorMessage != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = uiState.errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                KeypadField(
+                    label = stringResource(R.string.customer_doc_id),
+                    value = uiState.docNumber,
+                    active = uiState.activeField == CustomerField.DOC_NUMBER,
+                    onClick = { viewModel.onActiveFieldChanged(CustomerField.DOC_NUMBER) },
+                    modifier = Modifier.weight(1f),
                 )
+                if (uiState.hasDv) {
+                    KeypadField(
+                        label = stringResource(R.string.customer_dv),
+                        value = uiState.dv,
+                        active = uiState.activeField == CustomerField.DV,
+                        onClick = { viewModel.onActiveFieldChanged(CustomerField.DV) },
+                        modifier = Modifier.width(200.dp),
+                    )
+                }
             }
+        }
 
-            Spacer(modifier = Modifier.height(28.dp))
+        OutlinedTextField(
+            value = uiState.name,
+            onValueChange = viewModel::onNameChanged,
+            label = { Text(stringResource(R.string.customer_name), style = MaterialTheme.typography.labelMedium) },
+            textStyle = MaterialTheme.typography.headlineMedium,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+            shape = MaterialTheme.shapes.medium,
+            colors = kioskFieldColors(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+        )
 
-            Button(
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            ) {
-                Text(
-                    text = "Confirmar y Continuar",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                )
-            }
+        if (uiState.errorMessage != null) {
+            Text(
+                text =
+                    stringResource(
+                        if (uiState.docNumber.isBlank()) R.string.customer_error_doc else R.string.customer_error_name,
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.error,
+            )
+        }
+
+        if (!isPassport) {
+            NumericKeypad(
+                onDigit = viewModel::onKeypadInput,
+                onBackspace = viewModel::onKeypadBackspace,
+                extraKey = "-",
+                onExtraKey = { viewModel.onKeypadInput('-') },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
+
+@Composable
+private fun KeypadField(
+    label: String,
+    value: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val borderColor by animateColorAsState(if (active) colors.primary else colors.outline, label = "keypad_field_border")
+    val shape = MaterialTheme.shapes.medium
+    Column(
+        modifier =
+            modifier
+                .heightIn(min = 120.dp)
+                .kioskPressable(pressedScale = 0.98f, onClick = onClick)
+                .background(colors.surface, shape)
+                .border(if (active) 5.dp else 2.dp, borderColor, shape)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+    ) {
+        Text(text = label, style = MaterialTheme.typography.labelMedium, color = if (active) colors.primary else colors.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = if (active) "$value|" else value.ifEmpty { "—" },
+            style = MaterialTheme.typography.headlineMedium,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Text fields styled like the keypad fields: white, brand outline when focused. */
+@Composable
+private fun kioskFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+    )

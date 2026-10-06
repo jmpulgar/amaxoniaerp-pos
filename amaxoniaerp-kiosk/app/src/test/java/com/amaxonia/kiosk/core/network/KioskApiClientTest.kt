@@ -246,6 +246,7 @@ class KioskApiClientTest {
                             last4 = "4242",
                             brand = "VISA",
                             amount = "10.70",
+                            method = "CARD",
                         ),
                 )
 
@@ -301,5 +302,134 @@ class KioskApiClientTest {
             assertTrue(result.isFailure)
             assertTrue(result.exceptionOrNull() is KioskAuthenticationException)
             assertFalse(tokenStorage.isPaired())
+        }
+
+    private fun yappyClient(
+        handler:
+            suspend io.ktor.client.engine.mock.MockRequestHandleScope.(
+                io.ktor.client.request.HttpRequestData,
+            ) -> io.ktor.client.request.HttpResponseData,
+    ): Pair<KioskApiClient, MockEngine> {
+        tokenStorage.serverUrl = "http://localhost:8080"
+        tokenStorage.deviceToken = "token-abc"
+        val engine = MockEngine { request -> handler(request) }
+        return KioskApiClient(KioskHttpClientFactory.create(tokenStorage, engine), tokenStorage) to engine
+    }
+
+    @Test
+    fun `createYappyCharge posts to the order and parses the charge`() =
+        runTest {
+            val (client, engine) =
+                yappyClient {
+                    respond(
+                        content = """{"transactionId":"YP-1","qrHash":"hash-1","amount":"12.50","expiresInSec":180}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+            val charge = client.createYappyCharge("ord-1").getOrThrow()
+
+            val request = engine.requestHistory.single()
+            assertEquals("POST", request.method.value)
+            assertEquals("/api/v1/kiosk/orders/ord-1/yappy", request.url.encodedPath)
+            assertEquals("Bearer token-abc", request.headers[HttpHeaders.Authorization])
+            assertEquals("hash-1", charge.qrHash)
+            assertEquals("12.50", charge.amount)
+            assertEquals(180, charge.expiresInSec)
+        }
+
+    @Test
+    fun `createYappyCharge maps 409 to KioskConflictException and 503 keeps the status code and error message`() =
+        runTest {
+            val (conflictClient, _) =
+                yappyClient {
+                    respond(
+                        """{"error":"Orden expirada"}""",
+                        HttpStatusCode.Conflict,
+                        headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val conflict = conflictClient.createYappyCharge("ord-1").exceptionOrNull()
+            assertTrue(conflict is KioskConflictException)
+            assertEquals("Orden expirada", conflict?.message)
+
+            val (unavailableClient, _) =
+                yappyClient {
+                    respond(
+                        """{"error":"Yappy no configurado"}""",
+                        HttpStatusCode.ServiceUnavailable,
+                        headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val unavailable = unavailableClient.createYappyCharge("ord-1").exceptionOrNull() as KioskApiException
+            assertEquals(503, unavailable.statusCode)
+            assertTrue(unavailable.message.orEmpty().contains("Yappy no configurado"))
+        }
+
+    @Test
+    fun `getYappyStatus and cancelYappyCharge hit the transaction resource`() =
+        runTest {
+            val (client, engine) =
+                yappyClient { request ->
+                    if (request.method.value == "DELETE") {
+                        respond("", HttpStatusCode.NoContent)
+                    } else {
+                        respond(
+                            """{"transactionId":"YP-1","status":"COMPLETED"}""",
+                            HttpStatusCode.OK,
+                            headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    }
+                }
+
+            assertEquals("COMPLETED", client.getYappyStatus("ord-1", "YP-1").getOrThrow().status)
+            assertTrue(client.cancelYappyCharge("ord-1", "YP-1").isSuccess)
+
+            assertEquals(listOf("GET", "DELETE"), engine.requestHistory.map { it.method.value })
+            assertTrue(engine.requestHistory.all { it.url.encodedPath == "/api/v1/kiosk/orders/ord-1/yappy/YP-1" })
+        }
+
+    @Test
+    fun `getConfig parses paymentMethods`() =
+        runTest {
+            val (client, _) =
+                yappyClient {
+                    respond(
+                        """{"version":1,"paymentMethods":["CARD","YAPPY"],"dispatch":"MESAS","diningModes":["COMER_AQUI"]}""",
+                        HttpStatusCode.OK,
+                        headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+            val config = (client.getConfig() as NetworkResult.Success).data
+            assertEquals(listOf("CARD", "YAPPY"), config.paymentMethods)
+            assertEquals("MESAS", config.dispatch)
+        }
+
+    @Test
+    fun `relative asset paths are resolved against the paired server`() =
+        runTest {
+            val (client, _) =
+                yappyClient {
+                    val body =
+                        if (it.url.encodedPath.endsWith("/catalog")) {
+                            """{"categories":[{"id":1,"name":"B","iconUrl":"https://cdn.example/i.png"}],""" +
+                                """"items":[{"id":1,"categoryId":1,"name":"H","description":null,"price":"1.00",""" +
+                                """"taxRate":"7.00","imageUrl":"/api/data/PA/db/item/b.jpg","soldOut":false,"modifierGroups":[]}]}"""
+                        } else {
+                            """{"logoUrl":"/api/data/PA/db/logo.png",""" +
+                                """"media":[{"type":"IMAGE","url":"/api/data/PA/db/banners/a.jpg","durationSec":5}]}"""
+                        }
+                    respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
+                }
+
+            val catalog = (client.getCatalog() as NetworkResult.Success).data
+            assertEquals("http://localhost:8080/api/data/PA/db/item/b.jpg", catalog.items.single().imageUrl)
+            assertEquals("https://cdn.example/i.png", catalog.categories.single().iconUrl)
+
+            val config = (client.getConfig() as NetworkResult.Success).data
+            assertEquals("http://localhost:8080/api/data/PA/db/logo.png", config.logoUrl)
+            assertEquals("http://localhost:8080/api/data/PA/db/banners/a.jpg", config.media.single().url)
         }
 }

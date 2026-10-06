@@ -1,321 +1,194 @@
 package com.amaxonia.kiosk.domain.checkout
 
-import com.amaxonia.kiosk.core.network.KioskApiClient
-import com.amaxonia.kiosk.core.network.KioskDeviceCredentials
-import com.amaxonia.kiosk.core.network.KioskHttpClientFactory
-import com.amaxonia.kiosk.core.network.KioskItemDto
-import com.amaxonia.kiosk.core.network.KioskTokenStorage
+import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskQuoteResponse
 import com.amaxonia.kiosk.data.db.PendingPayment
-import com.amaxonia.kiosk.data.db.PendingPaymentDao
 import com.amaxonia.kiosk.domain.cart.OrderGraph
-import com.amaxonia.kiosk.domain.payment.DevMockPaymentTerminal
-import io.ktor.client.engine.mock.MockEngine
+import com.amaxonia.kiosk.domain.payment.PaymentMethod
+import com.amaxonia.kiosk.domain.payment.PaymentResult
+import com.amaxonia.kiosk.testutil.FakePaymentTerminal
+import com.amaxonia.kiosk.testutil.FakePendingPaymentDao
+import com.amaxonia.kiosk.testutil.RecordingApi
+import com.amaxonia.kiosk.testutil.bodyText
+import com.amaxonia.kiosk.testutil.json
+import com.amaxonia.kiosk.testutil.payResponseJson
+import com.amaxonia.kiosk.testutil.quoteJson
+import com.amaxonia.kiosk.testutil.sampleItem
 import io.ktor.client.engine.mock.respond
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class FakePendingPaymentDao : PendingPaymentDao {
-    val payments = mutableMapOf<String, PendingPayment>()
-
-    override suspend fun insert(payment: PendingPayment) {
-        payments[payment.orderId] = payment
-    }
-
-    override suspend fun update(payment: PendingPayment) {
-        payments[payment.orderId] = payment
-    }
-
-    override suspend fun getByStatus(status: String): List<PendingPayment> {
-        return payments.values.filter { it.status == status }
-    }
-
-    override suspend fun getByOrderId(orderId: String): PendingPayment? {
-        return payments[orderId]
-    }
-
-    override suspend fun delete(orderId: String) {
-        payments.remove(orderId)
-    }
-}
-
 class CheckoutOrderUseCaseTest {
-    private lateinit var tokenStorage: KioskTokenStorage
     private lateinit var orderGraph: OrderGraph
     private lateinit var fakeDao: FakePendingPaymentDao
 
-    private val sampleItem =
-        KioskItemDto(
-            id = 1,
-            categoryId = 1,
-            name = "Combo Hamburguesa",
-            description = "Con papas y soda",
-            price = "8.50",
-            taxRate = "7.00",
-            imageUrl = null,
-            soldOut = false,
-            modifierGroups = emptyList(),
-        )
-
-    private val quoteResponseJson =
-        """
-        {
-            "orderId": "ord-uuid-1234",
-            "formattedOrderNumber": "K1-042",
-            "subtotal": "8.50",
-            "tax": "0.60",
-            "total": "9.10",
-            "expiresAt": "2026-10-05T18:00:00Z",
-            "diningMode": "COMER_AQUI",
-            "tableTent": null,
-            "customerId": "CF",
-            "lines": []
-        }
-        """.trimIndent()
-
-    private val payResponseJson =
-        """
-        {
-            "orderNumber": "K1-042",
-            "status": "FISCAL_SUCCESS",
-            "invoice": {
-                "codFactura": "FAC-2026-001",
-                "cufe": "CUFE123456789",
-                "qr": "https://dgi.mef.gob.pa/fe/123",
-                "fechaRecepcionDGI": "2026-10-05 16:30:00"
-            },
-            "dispatch": "RETIRO_MOSTRADOR",
-            "receipt": {
-                "companyName": "Amaxonia Kiosk",
-                "ruc": "12345-1-12345",
-                "dv": "42",
-                "address": null,
-                "orderNumber": "K1-042",
-                "diningMode": "COMER_AQUI",
-                "tableTent": null,
-                "customerName": "Consumidor Final",
-                "customerId": "CF",
-                "date": "2026-10-05 16:30:00",
-                "lines": [],
-                "subtotal": "8.50",
-                "tax": "0.60",
-                "total": "9.10",
-                "paymentBrand": "VISA",
-                "paymentLast4": "4242",
-                "paymentAuthCode": "AUT123456",
-                "paymentReference": "REF12345"
-            }
-        }
-        """.trimIndent()
+    private val quote: KioskQuoteResponse = Json { ignoreUnknownKeys = true }.decodeFromString(quoteJson())
 
     @Before
     fun setUp() {
-        tokenStorage = KioskTokenStorage()
-        tokenStorage.clear()
-        tokenStorage.savePairing(
-            KioskDeviceCredentials(
-                deviceId = "dev-1",
-                deviceToken = "token-test",
-                deviceName = "K1",
-                prefix = "K1",
-                countryCode = "PA",
-                companyDb = "test_db",
-                serverUrl = "http://localhost:8080",
-            ),
-        )
-
         orderGraph = OrderGraph()
         orderGraph.addLine(sampleItem, qty = 1)
         fakeDao = FakePendingPaymentDao()
     }
 
-    @Test
-    fun `successful checkout executes quote, terminal payment, outbox insert, and backend pay`() =
-        runTest {
-            val mockEngine =
-                MockEngine { request ->
-                    when (request.url.encodedPath) {
-                        "/api/v1/kiosk/orders/quote" -> {
-                            respond(
-                                content = quoteResponseJson,
-                                status = HttpStatusCode.OK,
-                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                            )
-                        }
-                        "/api/v1/kiosk/orders/ord-uuid-1234/pay" -> {
-                            respond(
-                                content = payResponseJson,
-                                status = HttpStatusCode.OK,
-                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                            )
-                        }
-                        else -> respond("Not Found", HttpStatusCode.NotFound)
-                    }
-                }
-
-            val httpClient = KioskHttpClientFactory.create(tokenStorage, mockEngine)
-            val apiClient = KioskApiClient(httpClient, tokenStorage)
-            val terminal = DevMockPaymentTerminal(shouldSucceed = true, simulatedDelayMs = 0)
-
-            val useCase = CheckoutOrderUseCase(apiClient, terminal, fakeDao)
-            val result = useCase.execute(orderGraph)
-
-            assertTrue(result is CheckoutResult.Success)
-            val success = result as CheckoutResult.Success
-            assertEquals("K1-042", success.paymentResponse.orderNumber)
-            assertEquals("ord-uuid-1234", success.quote.orderId)
-            assertEquals("4242", success.payment.last4)
-
-            // Verify outbox was recorded and updated to SYNCED
-            val pending = fakeDao.getByOrderId("ord-uuid-1234")
-            assertNotNull(pending)
-            assertEquals("SYNCED", pending?.status)
+    private fun happyApi() =
+        RecordingApi { request ->
+            when (request.url.encodedPath) {
+                "/api/v1/kiosk/orders/quote" -> json(quoteJson())
+                "/api/v1/kiosk/orders/ord-uuid-1234/pay" -> json(payResponseJson)
+                else -> respond("Not Found", HttpStatusCode.NotFound)
+            }
         }
 
     @Test
-    fun `quote failure aborts flow and does not call terminal`() =
+    fun `quote is a separate step and sends the idempotency key`() =
         runTest {
-            val mockEngine =
-                MockEngine {
-                    respond(
-                        content = """{"error": "Stock insuficiente"}""",
-                        status = HttpStatusCode.BadRequest,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
+            val api = happyApi()
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(), fakeDao)
 
-            val httpClient = KioskHttpClientFactory.create(tokenStorage, mockEngine)
-            val apiClient = KioskApiClient(httpClient, tokenStorage)
-            val terminal = DevMockPaymentTerminal(shouldSucceed = true, simulatedDelayMs = 0)
+            val result = useCase.quote(CheckoutOrderUseCase.buildQuoteRequest(orderGraph), "key-1")
 
-            val useCase = CheckoutOrderUseCase(apiClient, terminal, fakeDao)
-            val result = useCase.execute(orderGraph)
+            assertEquals("9.10", result.getOrThrow().total)
+            assertEquals("key-1", api.requests.single().headers["Idempotency-Key"])
+            assertTrue(fakeDao.payments.isEmpty())
+        }
 
-            assertTrue(result is CheckoutResult.QuoteFailed)
-            assertEquals(0, fakeDao.payments.size)
+    @Test
+    fun `payWithCard charges exactly the quote total and registers method CARD`() =
+        runTest {
+            val api = happyApi()
+            val terminal = FakePaymentTerminal()
+            var approvedCalled = false
+            val useCase = CheckoutOrderUseCase(api.client, terminal, fakeDao)
+
+            val result = useCase.payWithCard(quote) { approvedCalled = true }
+
+            assertTrue(result is CheckoutResult.Success)
+            assertTrue(approvedCalled)
+            assertEquals(Money.fromString("9.10"), terminal.lastAmount)
+            val payBody = Json.parseToJsonElement(api.requestsTo("POST", "/pay").single().bodyText()).jsonObject
+            assertEquals("CARD", payBody["method"]?.jsonPrimitive?.content)
+            assertEquals("9.10", payBody["amount"]?.jsonPrimitive?.content)
+            assertEquals(PendingPayment.STATUS_SYNCED, fakeDao.getByOrderId("ord-uuid-1234")?.status)
+            assertEquals("CARD", fakeDao.getByOrderId("ord-uuid-1234")?.method)
         }
 
     @Test
     fun `terminal declined payment terminates flow without calling backend pay`() =
         runTest {
-            val mockEngine =
-                MockEngine { request ->
-                    if (request.url.encodedPath == "/api/v1/kiosk/orders/quote") {
-                        respond(
-                            content = quoteResponseJson,
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                        )
-                    } else {
-                        respond("Should not be called", HttpStatusCode.InternalServerError)
-                    }
-                }
+            val api = happyApi()
+            val terminal = FakePaymentTerminal(result = PaymentResult.Declined("FONDOS INSUFICIENTES"))
+            val useCase = CheckoutOrderUseCase(api.client, terminal, fakeDao)
 
-            val httpClient = KioskHttpClientFactory.create(tokenStorage, mockEngine)
-            val apiClient = KioskApiClient(httpClient, tokenStorage)
-            val terminal = DevMockPaymentTerminal(shouldSucceed = false, failureReason = "FONDOS INSUFICIENTES", simulatedDelayMs = 0)
+            val result = useCase.payWithCard(quote)
 
-            val useCase = CheckoutOrderUseCase(apiClient, terminal, fakeDao)
-            val result = useCase.execute(orderGraph)
-
-            assertTrue(result is CheckoutResult.PaymentDeclined)
-            val declined = result as CheckoutResult.PaymentDeclined
-            assertEquals("FONDOS INSUFICIENTES", declined.reason)
+            assertEquals(CheckoutResult.PaymentDeclined("FONDOS INSUFICIENTES"), result)
+            assertTrue(api.requestsTo("POST", "/pay").isEmpty())
             assertEquals(0, fakeDao.payments.size)
         }
 
     @Test
-    fun `backend pay network failure preserves payment in Room outbox with PENDING status`() =
+    fun `backend pay failure preserves payment in Room outbox with PENDING status`() =
         runTest {
-            val mockEngine =
-                MockEngine { request ->
-                    when (request.url.encodedPath) {
-                        "/api/v1/kiosk/orders/quote" -> {
-                            respond(
-                                content = quoteResponseJson,
-                                status = HttpStatusCode.OK,
-                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                            )
-                        }
-                        "/api/v1/kiosk/orders/ord-uuid-1234/pay" -> {
-                            respond(
-                                content = """{"error": "DGI Gateway Timeout"}""",
-                                status = HttpStatusCode.GatewayTimeout,
-                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                            )
-                        }
-                        else -> respond("Not Found", HttpStatusCode.NotFound)
+            val api =
+                RecordingApi { request ->
+                    if (request.url.encodedPath.endsWith("/pay")) {
+                        json("""{"error": "DGI Gateway Timeout"}""", HttpStatusCode.GatewayTimeout)
+                    } else {
+                        json(quoteJson())
                     }
                 }
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(), fakeDao)
 
-            val httpClient = KioskHttpClientFactory.create(tokenStorage, mockEngine)
-            val apiClient = KioskApiClient(httpClient, tokenStorage)
-            val terminal = DevMockPaymentTerminal(shouldSucceed = true, simulatedDelayMs = 0)
-
-            val useCase = CheckoutOrderUseCase(apiClient, terminal, fakeDao)
-            val result = useCase.execute(orderGraph)
+            val result = useCase.payWithCard(quote)
 
             assertTrue(result is CheckoutResult.PaidPendingSync)
-            val pendingSync = result as CheckoutResult.PaidPendingSync
-            assertEquals("ord-uuid-1234", pendingSync.quote.orderId)
-
-            // Outbox preserved!
             val pending = fakeDao.getByOrderId("ord-uuid-1234")
             assertNotNull(pending)
-            assertEquals("PENDING", pending?.status)
+            assertEquals(PendingPayment.STATUS_PENDING, pending?.status)
             assertEquals(1, pending?.attempts)
+            assertTrue(pending?.lastError.orEmpty().contains("DGI Gateway Timeout"))
         }
 
     @Test
-    fun `syncPendingPayments successfully retries pending outbox orders`() =
+    fun `registerPayment stores the method in the outbox`() =
         runTest {
-            val mockEngine =
-                MockEngine { request ->
+            val api = happyApi()
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(), fakeDao)
+
+            useCase.registerPayment(quote, com.amaxonia.kiosk.testutil.approvedCard(), PaymentMethod.YAPPY)
+
+            assertEquals("YAPPY", fakeDao.getByOrderId("ord-uuid-1234")?.method)
+        }
+
+    @Test
+    fun `syncPendingPayments retries pending orders sending the stored method`() =
+        runTest {
+            val api =
+                RecordingApi { request ->
                     if (request.url.encodedPath == "/api/v1/kiosk/orders/ord-pending-999/pay") {
-                        respond(
-                            content = payResponseJson,
-                            status = HttpStatusCode.OK,
-                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                        )
+                        json(payResponseJson)
                     } else {
                         respond("Not Found", HttpStatusCode.NotFound)
                     }
                 }
-
-            val httpClient = KioskHttpClientFactory.create(tokenStorage, mockEngine)
-            val apiClient = KioskApiClient(httpClient, tokenStorage)
-            val terminal = DevMockPaymentTerminal(shouldSucceed = true, simulatedDelayMs = 0)
-
             fakeDao.insert(
                 PendingPayment(
                     orderId = "ord-pending-999",
-                    transactionId = "TXN-999",
-                    authCode = "AUT999",
-                    reference = "REF999",
-                    last4 = "4242",
-                    brand = "VISA",
+                    transactionId = "YP-999",
+                    authCode = "",
+                    reference = "YP-999",
+                    last4 = "",
+                    brand = "YAPPY",
                     amount = "9.10",
-                    status = "PENDING",
+                    status = PendingPayment.STATUS_PENDING,
                     attempts = 1,
                     lastError = "Connection timeout",
+                    method = "YAPPY",
                 ),
             )
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(), fakeDao)
 
-            val useCase = CheckoutOrderUseCase(apiClient, terminal, fakeDao)
             val syncResults = useCase.syncPendingPayments()
 
             assertEquals(1, syncResults.size)
             assertTrue(syncResults.first().success)
-            assertEquals("ord-pending-999", syncResults.first().orderId)
+            val body = Json.parseToJsonElement(api.requests.single().bodyText()).jsonObject
+            assertEquals("YAPPY", body["method"]?.jsonPrimitive?.content)
+            assertEquals(PendingPayment.STATUS_SYNCED, fakeDao.getByOrderId("ord-pending-999")?.status)
+        }
 
-            val updatedPayment = fakeDao.getByOrderId("ord-pending-999")
-            assertEquals("SYNCED", updatedPayment?.status)
+    @Test
+    fun `syncPendingPayments keeps failed orders pending and counts the attempt`() =
+        runTest {
+            val api = RecordingApi { respond("down", HttpStatusCode.ServiceUnavailable) }
+            fakeDao.insert(
+                PendingPayment(
+                    orderId = "o-1",
+                    transactionId = "T",
+                    authCode = "A",
+                    reference = "R",
+                    last4 = "4242",
+                    brand = "VISA",
+                    amount = "1.00",
+                    status = PendingPayment.STATUS_PENDING,
+                ),
+            )
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(), fakeDao)
+
+            val results = useCase.syncPendingPayments()
+
+            assertFalse(results.single().success)
+            assertEquals(PendingPayment.STATUS_PENDING, fakeDao.getByOrderId("o-1")?.status)
+            assertEquals(1, fakeDao.getByOrderId("o-1")?.attempts)
         }
 }

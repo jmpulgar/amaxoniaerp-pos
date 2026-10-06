@@ -9,12 +9,16 @@ private const val AUTH_MIN = 100000
 private const val AUTH_MAX = 999999
 private const val REF_MODULO = 100000000
 
+/** Simulated card terminal. Lives only in the `dev` flavor; production never ships a mock. */
 class DevMockPaymentTerminal(
     var shouldSucceed: Boolean = true,
     var failureReason: String = "FONDOS INSUFICIENTES",
     var simulatedDelayMs: Long = 1000L,
 ) : PaymentTerminal {
+    @Volatile
     private var isCancelled = false
+
+    override val isAvailable: Boolean = true
 
     override suspend fun processPayment(
         amount: Money,

@@ -18,6 +18,8 @@ data class IdleTimerState(
     val isWarningVisible: Boolean = false,
     val remainingSeconds: Int = DEFAULT_WARNING_TIMEOUT_SECONDS,
     val isEnabled: Boolean = false,
+    /** Paused while a payment is in flight: the payment screens run their own timeouts. */
+    val isPaused: Boolean = false,
 )
 
 class IdleTimerManager(
@@ -76,6 +78,23 @@ class IdleTimerManager(
         }
     }
 
+    /**
+     * Pauses the countdown without changing [IdleTimerState.isEnabled] (used while a card/Yappy
+     * payment is in progress, when nobody touches the screen). Resuming restarts the idle window.
+     */
+    fun setPaused(paused: Boolean) {
+        if (_state.value.isPaused == paused) return
+        idleSecondsRemaining = idleTimeoutSeconds
+        warningSecondsRemaining = warningTimeoutSeconds
+        _state.update {
+            it.copy(
+                isPaused = paused,
+                isWarningVisible = false,
+                remainingSeconds = warningTimeoutSeconds,
+            )
+        }
+    }
+
     fun onUserActivity() {
         if (!_state.value.isEnabled || _state.value.isWarningVisible) {
             return
@@ -118,7 +137,7 @@ class IdleTimerManager(
     }
 
     private fun onTick() {
-        if (!_state.value.isEnabled) {
+        if (!_state.value.isEnabled || _state.value.isPaused) {
             return
         }
 

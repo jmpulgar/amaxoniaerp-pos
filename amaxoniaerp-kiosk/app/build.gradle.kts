@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,7 +9,26 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.roborazzi)
 }
+
+// Release signing comes from env vars or the untracked keystore.properties (same scheme as amaxoniaerp-pos).
+val privateSigningPropertiesFile = rootProject.file("keystore.properties")
+val privateSigningProperties =
+    Properties().apply {
+        if (privateSigningPropertiesFile.isFile) {
+            privateSigningPropertiesFile.inputStream().use(::load)
+        }
+    }
+
+fun privateSigningValue(name: String): String? =
+    System.getenv(name)?.takeIf(String::isNotBlank)
+        ?: privateSigningProperties.getProperty(name)?.takeIf(String::isNotBlank)
+
+val releaseKeystorePath = privateSigningValue("KIOSK_KEYSTORE_FILE")
+val releaseKeystorePassword = privateSigningValue("KIOSK_KEYSTORE_PASSWORD")
+val releaseKeyAlias = privateSigningValue("KIOSK_KEY_ALIAS")
+val releaseKeyPassword = privateSigningValue("KIOSK_KEY_PASSWORD")
 
 android {
     namespace = "com.amaxonia.kiosk"
@@ -17,8 +38,9 @@ android {
         applicationId = "com.amaxonia.kiosk"
         minSdk = 28
         targetSdk = 36
+        // Bump both on every build handed to a kiosk and log it in CHANGELOG.md (versionCode must always increase).
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -26,9 +48,25 @@ android {
         }
     }
 
-    flavorDimensions += "environment"
+    signingConfigs {
+        create("release") {
+            if (releaseKeystorePath != null) {
+                storeFile = rootProject.file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    // brand: white-label identity (colors, logo, names). environment: backend + payment terminal wiring.
+    flavorDimensions += listOf("brand", "environment")
 
     productFlavors {
+        create("flowerp") {
+            dimension = "brand"
+        }
+
         create("dev") {
             dimension = "environment"
             applicationIdSuffix = ".dev"
@@ -39,7 +77,7 @@ android {
         create("prod") {
             dimension = "environment"
             buildConfigField("boolean", "IS_DEV", "false")
-            buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://api.amaxonia.com/\"")
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://api.listoerp.app/\"")
         }
     }
 
@@ -48,6 +86,9 @@ android {
             isMinifyEnabled = false
         }
         release {
+            if (releaseKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -81,7 +122,15 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Compose screenshot tests (Robolectric) need merged resources and the test manifest.
+        unitTests.isIncludeAndroidResources = true
     }
+}
+
+// Screenshot tests only render/compare under the Roborazzi tasks (recordRoborazziFlowerpDevDebug,
+// verifyRoborazziFlowerpDevDebug, compareRoborazziFlowerpDevDebug); a plain unit test run skips them.
+roborazzi {
+    outputDir.set(file("screenshots"))
 }
 
 detekt {
@@ -123,6 +172,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.security.crypto)
 
     // Media (ExoPlayer & Coil)
     implementation(libs.androidx.media3.exoplayer)
@@ -131,6 +181,9 @@ dependencies {
 
     // Hardware (Sunmi Printer)
     implementation(libs.sunmi.printer)
+
+    // QR rendering (Yappy payment codes)
+    implementation(libs.zxing.core)
 
     // Testing
     testImplementation(libs.junit)
@@ -141,4 +194,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.room.testing)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
 }

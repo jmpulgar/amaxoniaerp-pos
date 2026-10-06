@@ -106,25 +106,21 @@ class MenuViewModel(
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         val job =
             viewModelScope.launch {
-                val result = apiClient.getCatalog(tokenStorage.catalogEtag)
+                // Only revalidate with the ETag when a catalog is actually held in memory; otherwise a
+                // 304 after a process restart would leave the menu empty.
+                val cached = catalogState?.value
+                val result = apiClient.getCatalog(if (cached != null) tokenStorage.catalogEtag else null)
                 when (result) {
                     is NetworkResult.Success -> {
-                        val catalog = result.data
-                        catalogState?.value = catalog
-                        val sortedCategories = catalog.categories.sortedBy { it.order }
-                        val firstCatId = sortedCategories.firstOrNull()?.id
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                categories = sortedCategories,
-                                selectedCategoryId = it.selectedCategoryId ?: firstCatId,
-                                items = catalog.items,
-                                errorMessage = null,
-                            )
-                        }
+                        catalogState?.value = result.data
+                        showCatalog(result.data)
                     }
                     is NetworkResult.NotModified -> {
-                        _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                        if (cached != null) {
+                            showCatalog(cached)
+                        } else {
+                            _uiState.update { it.copy(isLoading = false, errorMessage = null) }
+                        }
                     }
                     is NetworkResult.Failure -> {
                         _uiState.update {
@@ -138,5 +134,19 @@ class MenuViewModel(
             }
         loadCatalogJob = job
         return job
+    }
+
+    private fun showCatalog(catalog: KioskCatalogResponse) {
+        val sortedCategories = catalog.categories.sortedBy { it.order }
+        val firstCatId = sortedCategories.firstOrNull()?.id
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                categories = sortedCategories,
+                selectedCategoryId = it.selectedCategoryId ?: firstCatId,
+                items = catalog.items,
+                errorMessage = null,
+            )
+        }
     }
 }

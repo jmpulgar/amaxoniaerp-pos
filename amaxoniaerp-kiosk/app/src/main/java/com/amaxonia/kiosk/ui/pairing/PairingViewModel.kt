@@ -1,5 +1,6 @@
 package com.amaxonia.kiosk.ui.pairing
 
+import com.amaxonia.kiosk.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.network.KioskApiClient
@@ -14,10 +15,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val PAIRING_CODE_LENGTH = 8
-private const val DEFAULT_EMULATOR_URL = "http://10.0.2.2:8080"
+private val DEFAULT_SERVER_URL: String = BuildConfig.DEFAULT_SERVER_URL
 
 data class PairingUiState(
-    val serverUrl: String = DEFAULT_EMULATOR_URL,
+    val serverUrl: String = DEFAULT_SERVER_URL,
     val countryCode: String = "PA",
     val companyDb: String = "",
     val pairingCode: String = "",
@@ -36,7 +37,7 @@ class PairingViewModel(
     private val _uiState =
         MutableStateFlow(
             PairingUiState(
-                serverUrl = initialServerUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_EMULATOR_URL,
+                serverUrl = initialServerUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_SERVER_URL,
             ),
         )
     val uiState: StateFlow<PairingUiState> = _uiState.asStateFlow()

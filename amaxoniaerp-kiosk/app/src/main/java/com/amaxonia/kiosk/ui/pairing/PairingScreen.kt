@@ -14,18 +14,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -50,6 +50,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.ui.components.BrandWordmark
+import com.amaxonia.kiosk.ui.components.KioskButton
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -80,31 +83,24 @@ fun PairingScreen(
             Column(
                 modifier =
                     Modifier
-                        .width(620.dp)
+                        .widthIn(max = 840.dp)
+                        .fillMaxWidth()
                         .padding(horizontal = 32.dp, vertical = 48.dp)
                         .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 // Header
+                BrandWordmark(height = 88.dp)
+                Spacer(modifier = Modifier.height(32.dp))
                 Text(
-                    text = "AMAXONIA",
-                    style =
-                        MaterialTheme.typography.labelLarge.copy(
-                            letterSpacing = 4.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        ),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Emparejamiento de Kiosco",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    text = stringResource(R.string.pairing_title),
+                    style = MaterialTheme.typography.displaySmall,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Ingrese los datos de conexión y el código generado en el panel administrativo para registrar este dispositivo.",
+                    text = stringResource(R.string.pairing_message),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -120,14 +116,14 @@ fun PairingScreen(
                             CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                             ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ErrorOutline,
+                                imageVector = Icons.Rounded.ErrorOutline,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
                             )
@@ -145,7 +141,7 @@ fun PairingScreen(
 
                 // Country Selector
                 Text(
-                    text = "País",
+                    text = stringResource(R.string.pairing_country),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 )
@@ -154,13 +150,13 @@ fun PairingScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     CountryOption(
-                        label = "Panamá (PA)",
+                        label = stringResource(R.string.pairing_country_pa),
                         selected = uiState.countryCode == "PA",
                         onClick = { viewModel.onCountryCodeChanged("PA") },
                         modifier = Modifier.weight(1f),
                     )
                     CountryOption(
-                        label = "Venezuela (VE)",
+                        label = stringResource(R.string.pairing_country_ve),
                         selected = uiState.countryCode == "VE",
                         onClick = { viewModel.onCountryCodeChanged("VE") },
                         modifier = Modifier.weight(1f),
@@ -173,9 +169,10 @@ fun PairingScreen(
                 OutlinedTextField(
                     value = uiState.serverUrl,
                     onValueChange = viewModel::onServerUrlChanged,
-                    label = { Text("URL del Servidor") },
+                    label = { Text(stringResource(R.string.pairing_server_url)) },
+                    textStyle = MaterialTheme.typography.bodyLarge,
                     leadingIcon = {
-                        Icon(Icons.Default.Dns, contentDescription = null)
+                        Icon(Icons.Rounded.Dns, contentDescription = null)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -183,7 +180,7 @@ fun PairingScreen(
                         KeyboardOptions(
                             imeAction = ImeAction.Next,
                         ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -192,9 +189,10 @@ fun PairingScreen(
                 OutlinedTextField(
                     value = uiState.companyDb,
                     onValueChange = viewModel::onCompanyDbChanged,
-                    label = { Text("Base de Datos de Empresa") },
+                    label = { Text(stringResource(R.string.pairing_company_db)) },
+                    textStyle = MaterialTheme.typography.bodyLarge,
                     leadingIcon = {
-                        Icon(Icons.Default.Storage, contentDescription = null)
+                        Icon(Icons.Rounded.Storage, contentDescription = null)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -202,7 +200,7 @@ fun PairingScreen(
                         KeyboardOptions(
                             imeAction = ImeAction.Next,
                         ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -211,9 +209,9 @@ fun PairingScreen(
                 OutlinedTextField(
                     value = uiState.pairingCode,
                     onValueChange = viewModel::onPairingCodeChanged,
-                    label = { Text("Código de Emparejamiento (8 caracteres)") },
+                    label = { Text(stringResource(R.string.pairing_code)) },
                     leadingIcon = {
-                        Icon(Icons.Default.Key, contentDescription = null)
+                        Icon(Icons.Rounded.Key, contentDescription = null)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -240,36 +238,22 @@ fun PairingScreen(
                         OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                         ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
-                // Submit Button
-                Button(
-                    onClick = {
-                        focusManager.clearFocus()
-                        viewModel.submitPairing()
-                    },
-                    enabled = !uiState.isLoading,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Text(
-                            text = "Emparejar Dispositivo",
-                            style =
-                                MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                ),
-                        )
-                    }
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(88.dp), strokeWidth = 8.dp)
+                } else {
+                    KioskButton(
+                        text = stringResource(R.string.pairing_submit),
+                        onClick = {
+                            focusManager.clearFocus()
+                            viewModel.submitPairing()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -291,9 +275,9 @@ private fun CountryOption(
     Box(
         modifier =
             modifier
-                .height(52.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(12.dp))
+                .height(88.dp)
+                .clip(MaterialTheme.shapes.small)
+                .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = MaterialTheme.shapes.small)
                 .background(backgroundColor)
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -303,7 +287,7 @@ private fun CountryOption(
             horizontalArrangement = Arrangement.Center,
         ) {
             Icon(
-                imageVector = Icons.Default.Public,
+                imageVector = Icons.Rounded.Public,
                 contentDescription = null,
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
@@ -312,7 +296,7 @@ private fun CountryOption(
             Text(
                 text = label,
                 style =
-                    MaterialTheme.typography.bodyMedium.copy(
+                    MaterialTheme.typography.titleSmall.copy(
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                     ),

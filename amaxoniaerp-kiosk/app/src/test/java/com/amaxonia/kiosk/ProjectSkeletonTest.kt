@@ -1,6 +1,7 @@
 package com.amaxonia.kiosk
 
-import com.amaxonia.kiosk.ui.theme.PrimaryRed
+import com.amaxonia.kiosk.ui.theme.FlowGradient
+import com.amaxonia.kiosk.ui.theme.FlowIndigo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
@@ -16,6 +17,7 @@ class ProjectSkeletonTest {
 
     @Test
     fun testThemeColorDefinition() {
-        assertEquals(androidx.compose.ui.graphics.Color(0xFFD32F2F), PrimaryRed)
+        // The brand gradient starts on the Flow ERP primary indigo.
+        assertEquals(FlowIndigo, FlowGradient.first())
     }
 }

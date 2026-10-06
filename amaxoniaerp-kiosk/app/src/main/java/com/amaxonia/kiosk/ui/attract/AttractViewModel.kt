@@ -6,6 +6,7 @@ import com.amaxonia.kiosk.core.network.KioskApiClient
 import com.amaxonia.kiosk.core.network.KioskMediaItem
 import com.amaxonia.kiosk.core.network.KioskTokenStorage
 import com.amaxonia.kiosk.core.network.NetworkResult
+import com.amaxonia.kiosk.data.config.KioskConfigRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,8 @@ data class AttractUiState(
 
 class AttractViewModel(
     private val apiClient: KioskApiClient,
-    private val tokenStorage: KioskTokenStorage,
+    tokenStorage: KioskTokenStorage,
+    private val configRepository: KioskConfigRepository = KioskConfigRepository(apiClient, tokenStorage),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AttractUiState())
     val uiState: StateFlow<AttractUiState> = _uiState.asStateFlow()
@@ -53,34 +55,30 @@ class AttractViewModel(
         _uiState.update { it.copy(isLoading = true) }
         val job =
             viewModelScope.launch {
-                val result = apiClient.getConfig(tokenStorage.configEtag)
+                val result = configRepository.refresh()
+                val config = configRepository.config.value
                 when (result) {
-                    is NetworkResult.Success -> {
-                        val config = result.data
+                    is NetworkResult.Success, is NetworkResult.NotModified -> {
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                brandColor = config.brandColor,
-                                logoUrl = config.logoUrl,
-                                mediaList = config.media,
-                                currentMediaIndex = 0,
-                                isOffline = false,
-                            )
-                        }
-                    }
-                    is NetworkResult.NotModified -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
+                                brandColor = config?.brandColor,
+                                logoUrl = config?.logoUrl,
+                                mediaList = config?.media.orEmpty(),
+                                currentMediaIndex = if (result is NetworkResult.Success) 0 else it.currentMediaIndex,
                                 isOffline = false,
                             )
                         }
                     }
                     is NetworkResult.Failure -> {
                         _uiState.update {
+                            val cachedMedia = config?.media ?: it.mediaList
                             it.copy(
                                 isLoading = false,
-                                isOffline = it.mediaList.isEmpty(),
+                                brandColor = config?.brandColor ?: it.brandColor,
+                                logoUrl = config?.logoUrl ?: it.logoUrl,
+                                mediaList = cachedMedia,
+                                isOffline = cachedMedia.isEmpty(),
                             )
                         }
                     }

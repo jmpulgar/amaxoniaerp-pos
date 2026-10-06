@@ -11,6 +11,9 @@ private const val MAX_DOC_LENGTH = 20
 private const val MAX_DV_LENGTH = 4
 private const val MAX_NAME_LENGTH = 80
 
+/** Which field the on-screen numeric keypad is typing into. */
+enum class CustomerField { DOC_NUMBER, DV }
+
 data class CustomerIdUiState(
     val isCustomBilling: Boolean = false,
     val docType: String = "CEDULA",
@@ -18,7 +21,12 @@ data class CustomerIdUiState(
     val dv: String = "",
     val name: String = "",
     val errorMessage: String? = null,
+    val activeField: CustomerField = CustomerField.DOC_NUMBER,
 ) {
+    /** RUC and Cédula carry a check digit (DV); passports do not. */
+    val hasDv: Boolean
+        get() = docType == "RUC" || docType == "CEDULA"
+
     val isValid: Boolean
         get() = !isCustomBilling || (docNumber.isNotBlank() && name.isNotBlank())
 }
@@ -34,7 +42,31 @@ class CustomerIdViewModel(
     }
 
     fun onDocTypeChanged(type: String) {
-        _uiState.update { it.copy(docType = type) }
+        _uiState.update {
+            val keepField = type == "RUC" || type == "CEDULA"
+            it.copy(docType = type, activeField = if (keepField) it.activeField else CustomerField.DOC_NUMBER)
+        }
+    }
+
+    fun onActiveFieldChanged(field: CustomerField) {
+        _uiState.update { it.copy(activeField = field) }
+    }
+
+    /** Appends a keypad character to the active field (DV accepts digits only). */
+    fun onKeypadInput(char: Char) {
+        val current = _uiState.value
+        when (current.activeField) {
+            CustomerField.DOC_NUMBER -> onDocNumberChanged(current.docNumber + char)
+            CustomerField.DV -> if (char.isDigit()) onDvChanged(current.dv + char)
+        }
+    }
+
+    fun onKeypadBackspace() {
+        val current = _uiState.value
+        when (current.activeField) {
+            CustomerField.DOC_NUMBER -> onDocNumberChanged(current.docNumber.dropLast(1))
+            CustomerField.DV -> onDvChanged(current.dv.dropLast(1))
+        }
     }
 
     fun onDocNumberChanged(number: String) {

@@ -1,94 +1,167 @@
 <resources>
-    <string name="app_name">Amaxonia Kiosk</string>
     <string name="btn_back">Back</string>
     <string name="btn_continue">Continue</string>
     <string name="btn_cancel">Cancel</string>
     <string name="btn_accept">Accept</string>
     <string name="btn_retry">Retry</string>
 
+    <!-- Content descriptions -->
+    <string name="cd_add">Add</string>
+    <string name="cd_cart">Your order</string>
+    <string name="cd_increase">Increase quantity</string>
+    <string name="cd_decrease">Decrease quantity</string>
+    <string name="cd_backspace">Delete</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_remove">Remove</string>
+    <string name="cd_clear">Clear</string>
+
+    <!-- Checkout stepper -->
+    <string name="checkout_step_order">Order</string>
+    <string name="checkout_step_details">Details</string>
+    <string name="checkout_step_pay">Pay</string>
+
+    <!-- Cancel order -->
+    <string name="cancel_order_title">Cancel your order?</string>
+    <string name="cancel_order_message">All items will be removed and you will go back to the start screen.</string>
+    <string name="cancel_order_confirm">Yes, cancel order</string>
+    <string name="cancel_order_keep">No, keep my order</string>
+
     <!-- Attract Screen -->
-    <string name="attract_touch_to_start">TOUCH HERE TO START</string>
-    <string name="attract_out_of_service">This terminal is temporarily out of service.\nPlease proceed to the main counter.</string>
+    <string name="attract_touch_to_start">Touch to order</string>
+    <string name="attract_welcome">Hello!</string>
+    <string name="attract_tagline">Order fast and easy, no lines</string>
+    <string name="attract_out_of_service_title">Out of service</string>
+    <string name="attract_out_of_service">This kiosk is temporarily out of service.\nPlease go to the main counter.</string>
+
+    <!-- Admin unlock -->
+    <string name="admin_unlock_title">Administrator access</string>
+    <string name="admin_unlock_message">Enter the administrator password to configure or exit kiosk mode.</string>
+    <string name="admin_unlock_password">Password</string>
+    <string name="admin_unlock_confirm">Unlock</string>
+
+    <!-- Admin menu -->
+    <string name="admin_title">Administration panel</string>
+    <string name="admin_subtitle">Terminal technical options</string>
+    <string name="admin_repair">Re-pair device</string>
+    <string name="admin_test_print">Print test ticket</string>
+    <string name="admin_reprint">Reprint last ticket</string>
+    <string name="admin_exit_kiosk">Exit kiosk mode</string>
+    <string name="admin_enter_kiosk">Enable kiosk mode</string>
+    <string name="admin_close">Close panel</string>
+
+    <!-- Pairing -->
+    <string name="pairing_title">Pair kiosk</string>
+    <string name="pairing_message">In the admin panel open Configuración → Kioscos, register this kiosk and press «Generar código». Then enter the country, the company database and that 8-digit code here (it expires in 15 minutes).</string>
+    <string name="pairing_country">Country</string>
+    <string name="pairing_country_pa">Panama (PA)</string>
+    <string name="pairing_country_ve">Venezuela (VE)</string>
+    <string name="pairing_server_url">Server URL</string>
+    <string name="pairing_company_db">Company database (e.g. demo_administrativo)</string>
+    <string name="pairing_code">Pairing code (8 characters)</string>
+    <string name="pairing_submit">Pair device</string>
 
     <!-- Dining Mode Screen -->
     <string name="dining_mode_title">Where will you eat today?</string>
-    <string name="dining_mode_subtitle">Select an option to start your order</string>
-    <string name="dining_mode_dine_in_title">Dine In</string>
-    <string name="dining_mode_dine_in_desc">To eat here at the restaurant</string>
-    <string name="dining_mode_takeaway_title">Takeaway</string>
-    <string name="dining_mode_takeaway_desc">Packed to take anywhere you like</string>
+    <string name="dining_mode_subtitle">Choose an option to start your order</string>
+    <string name="dining_mode_dine_in_title">Eat here</string>
+    <string name="dining_mode_dine_in_desc">Enjoy it at the restaurant</string>
+    <string name="dining_mode_takeaway_title">Take out</string>
+    <string name="dining_mode_takeaway_desc">We pack it for you to go</string>
 
     <!-- Menu Screen -->
     <string name="menu_title">Menu</string>
-    <string name="menu_categories">Categories</string>
-    <string name="menu_view_cart">View Cart</string>
-    <string name="menu_items_count">%1$d items</string>
-    <string name="menu_item_count_single">1 item</string>
-    <string name="menu_sold_out">Sold Out</string>
-    <string name="menu_search_hint">Search product…</string>
-    <string name="menu_empty_categories">No categories available</string>
+    <string name="menu_view_cart">View my order</string>
+    <string name="menu_cancel_order">Cancel</string>
+    <string name="menu_sold_out">Sold out</string>
     <string name="menu_empty_products">No products in this category</string>
-    <string name="menu_ref_currency">Ref.</string>
+    <string name="menu_added_toast">Added to your order!</string>
+    <string name="menu_load_error">We couldn\'t load the menu</string>
+    <plurals name="menu_product_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
 
     <!-- Customizer Screen -->
-    <string name="customizer_title">Customize</string>
-    <string name="customizer_required">Required (Choose %1$d)</string>
-    <string name="customizer_optional">Optional (Up to %1$d)</string>
-    <string name="customizer_kitchen_note">Kitchen note (max 80 chars)</string>
-    <string name="customizer_add_to_cart">Add to cart</string>
-    <string name="customizer_missing_required">Please select all required options</string>
+    <string name="customizer_required_choose">Required · Choose %1$d</string>
+    <string name="customizer_required_min">Required · At least %1$d</string>
+    <string name="customizer_optional_one">Optional · Choose 1</string>
+    <string name="customizer_optional_up_to">Optional · Up to %1$d</string>
+    <string name="customizer_group_error_one">Choose an option to continue</string>
+    <string name="customizer_group_error_min">Choose at least %1$d options</string>
+    <string name="customizer_kitchen_note">Kitchen note (optional)</string>
+    <string name="customizer_note_placeholder">E.g. no salt, sauce on the side…</string>
+    <string name="customizer_add_to_cart">Add to order · %1$s</string>
+    <string name="customizer_added">Added!</string>
+    <string name="customizer_missing_required">Complete the required options</string>
+    <string name="customizer_extra_price">+%1$s</string>
 
     <!-- Review Screen -->
-    <string name="review_title">Your Order</string>
-    <string name="review_subtitle">Review details before paying</string>
-    <string name="review_empty_cart">Your cart is empty</string>
-    <string name="review_empty_cta">Return to menu</string>
+    <string name="review_title">Your order</string>
+    <plurals name="review_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <string name="review_empty_cart">Your order is empty</string>
+    <string name="review_empty_hint">Add something delicious from the menu to continue</string>
+    <string name="review_empty_cta">See the menu</string>
     <string name="review_subtotal">Subtotal</string>
-    <string name="review_tax">Tax</string>
+    <string name="review_tax_itbms">ITBMS (tax)</string>
+    <string name="review_tax_iva">VAT</string>
     <string name="review_total">Total</string>
-    <string name="review_add_more">Add more items</string>
-    <string name="review_proceed_pay">Proceed to Payment</string>
-    <string name="review_clear_cart">Empty cart</string>
+    <string name="review_continue_shopping">Keep shopping</string>
+    <string name="review_pay">Pay · %1$s</string>
+    <string name="review_clear_cart">Empty</string>
+    <string name="review_note">Note: %1$s</string>
+    <string name="review_unit_price">%1$s each</string>
 
     <!-- Customer ID Screen -->
     <string name="customer_title">Do you want an invoice with your details?</string>
-    <string name="customer_subtitle">Select an option for your tax receipt</string>
+    <string name="customer_subtitle">If you don\'t need one, continue as Final Consumer</string>
     <string name="customer_final_title">Final Consumer</string>
-    <string name="customer_final_desc">Quick and without additional tax details</string>
-    <string name="customer_custom_title">Custom Invoice</string>
-    <string name="customer_custom_desc">Enter your Tax ID or National ID for tax credit</string>
-    <string name="customer_doc_id">Tax ID / National ID</string>
-    <string name="customer_dv">Check Digit (DV)</string>
-    <string name="customer_name">Name or Business Name</string>
+    <string name="customer_final_desc">No tax details · fastest</string>
+    <string name="customer_custom_title">Invoice with Tax ID / ID card</string>
+    <string name="customer_custom_desc">Enter your details to issue the invoice in your name</string>
+    <string name="customer_doc_cedula">ID card</string>
+    <string name="customer_doc_ruc">Tax ID (RUC)</string>
+    <string name="customer_doc_passport">Passport</string>
+    <string name="customer_doc_id">Document number</string>
+    <string name="customer_dv">DV</string>
+    <string name="customer_name">Name or business name</string>
+    <string name="customer_continue_final">Continue as Final Consumer</string>
+    <string name="customer_confirm">Confirm and continue</string>
+    <string name="customer_error_doc">Enter the document number</string>
+    <string name="customer_error_name">Enter the name or business name</string>
 
     <!-- Table Tent Screen -->
-    <string name="table_tent_title">Table Tent Number</string>
-    <string name="table_tent_subtitle">Enter the number on the table tent in your hand</string>
-
-    <!-- Payment Screen -->
-    <string name="payment_instruction">Tap or insert your card or device</string>
-    <string name="payment_terminal_hint">Follow the instructions on the payment terminal</string>
-    <string name="payment_processing">Processing payment…</string>
-    <string name="payment_declined">Payment declined</string>
-    <string name="payment_timeout">Payment time expired</string>
+    <string name="table_tent_title">Enter your table tent number</string>
+    <string name="table_tent_subtitle">Take a table tent next to the kiosk and place it on your table. We\'ll bring your order.</string>
+    <string name="table_tent_confirm">Confirm table %1$s</string>
+    <string name="table_tent_confirm_empty">Confirm table tent</string>
+    <string name="table_tent_skip">I don\'t have a table tent</string>
 
     <!-- Order Number Screen -->
-    <string name="order_number_title">Thank you for your purchase!</string>
-    <string name="order_number_take_receipt">Please collect your printed receipt below</string>
-    <string name="order_number_table_dest">We will bring your order to table %1$s</string>
+    <string name="order_number_title">Thank you!</string>
+    <string name="order_number_subtitle">Your payment was approved</string>
+    <string name="order_number_label">Your order number</string>
+    <string name="order_number_take_receipt">Take your printed receipt below</string>
+    <string name="order_number_print_failed">Ask for your receipt at the counter</string>
+    <string name="order_number_table_dest">We\'ll bring your order to table %1$s</string>
+    <string name="order_number_table_chip">Table %1$s</string>
     <string name="order_number_counter_dest">Pick up your order at the counter when your number is called</string>
-    <string name="order_number_auto_close">This screen will close automatically</string>
+    <string name="order_number_auto_close">Back to start in %1$d s</string>
+    <string name="order_number_finish">Done</string>
 
     <!-- Idle Warning Dialog -->
     <string name="idle_dialog_title">Are you still there?</string>
     <string name="idle_dialog_message">Your order will be cancelled due to inactivity in %1$d seconds.</string>
-    <string name="idle_dialog_continue">Continue with my order</string>
+    <string name="idle_dialog_continue">Yes, continue</string>
     <string name="idle_dialog_cancel">Cancel order</string>
 
     <!-- Accessibility & Languages -->
-    <string name="a11y_mode_title">Accessible Mode</string>
-    <string name="a11y_reach_mode">Low Reach</string>
-    <string name="a11y_high_contrast">High Contrast</string>
+    <string name="a11y_mode_title">Accessible mode</string>
+    <string name="a11y_reach_mode">Low screen</string>
+    <string name="a11y_reach_mode_active">Low screen mode on</string>
+    <string name="a11y_high_contrast">Contrast</string>
     <string name="a11y_language">Language</string>
     <string name="a11y_spanish">Español</string>
     <string name="a11y_english">English</string>

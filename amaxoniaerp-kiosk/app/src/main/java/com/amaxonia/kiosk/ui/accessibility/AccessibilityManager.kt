@@ -23,6 +23,13 @@ data class AccessibilityState(
     val language: KioskLanguage = KioskLanguage.SPANISH,
 )
 
+/** Callbacks of the accessibility strip shown above every ordering screen. */
+class AccessibilityActions(
+    val onToggleAccessibleMode: () -> Unit,
+    val onToggleHighContrast: () -> Unit,
+    val onToggleLanguage: () -> Unit,
+)
+
 class AccessibilityManager {
     private val _state = MutableStateFlow(AccessibilityState())
     val state: StateFlow<AccessibilityState> = _state.asStateFlow()

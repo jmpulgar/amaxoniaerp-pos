@@ -18,13 +18,22 @@ sealed class NetworkResult<out T> {
     data class Failure(val error: Throwable) : NetworkResult<Nothing>()
 }
 
-open class KioskApiException(message: String) : Exception(message)
+open class KioskApiException(
+    message: String,
+    val statusCode: Int? = null,
+) : Exception(message)
 
-class KioskAuthenticationException(message: String) : KioskApiException(message)
+class KioskAuthenticationException(message: String) : KioskApiException(message, statusCode = 401)
 
-class KioskBadRequestException(message: String) : KioskApiException(message)
+class KioskBadRequestException(message: String) : KioskApiException(message, statusCode = 400)
 
-class KioskServerException(message: String) : KioskApiException(message)
+/** 409: the order is expired or not in a state that allows the requested operation. */
+class KioskConflictException(message: String) : KioskApiException(message, statusCode = 409)
+
+class KioskServerException(
+    message: String,
+    statusCode: Int = 500,
+) : KioskApiException(message, statusCode)
 
 object KioskHttpClientFactory {
     val jsonConfig =

@@ -1,46 +1,57 @@
 package com.amaxonia.kiosk.ui.tabletent
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.TableRestaurant
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.ui.components.CheckoutStep
+import com.amaxonia.kiosk.ui.components.CheckoutStepper
+import com.amaxonia.kiosk.ui.components.KioskButton
+import com.amaxonia.kiosk.ui.components.KioskButtonStyle
+import com.amaxonia.kiosk.ui.components.KioskHeader
+import com.amaxonia.kiosk.ui.components.KioskTouchTarget
+import com.amaxonia.kiosk.ui.components.NumericKeypad
+import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
+import com.amaxonia.kiosk.ui.theme.KioskColors
+import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TableTentScreen(
     viewModel: TableTentViewModel,
@@ -49,243 +60,130 @@ fun TableTentScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val colors = MaterialTheme.colorScheme
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        color = colors.background,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Identificador de Mesa",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Regresar",
-                        )
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-            )
+            KioskHeader(title = stringResource(R.string.checkout_step_details), onBack = onBack)
+            CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.DETAILS)
 
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
+            ScrollableFillColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 64.dp, vertical = 32.dp),
             ) {
-                // Header Info
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Introduce el número de tu portamesa",
-                        style =
-                            MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign = TextAlign.Center,
-                            ),
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Toma un identificador ubicado al lado del kiosco para llevar tu comida a la mesa",
-                        style =
-                            MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            ),
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    // Big Number Display
                     Box(
-                        modifier =
-                            Modifier
-                                .size(width = 240.dp, height = 100.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .border(
-                                    width = 2.dp,
-                                    color =
-                                        if (uiState.isValid) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.outlineVariant
-                                        },
-                                    shape = RoundedCornerShape(20.dp),
-                                ),
+                        modifier = Modifier.size(136.dp).background(colors.primaryContainer, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = uiState.tentNumber.ifEmpty { "---" },
-                            style =
-                                MaterialTheme.typography.displayMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    color =
-                                        if (uiState.isValid) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        },
-                                    letterSpacing = 4.dp.value.spValueToEm(),
-                                ),
-                        )
+                        Box(
+                            modifier = Modifier.size(104.dp).background(KioskColors.ctaBrush, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.TableRestaurant,
+                                contentDescription = null,
+                                tint = colors.onPrimary,
+                                modifier = Modifier.size(60.dp),
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = stringResource(R.string.table_tent_title),
+                        style = MaterialTheme.typography.displaySmall,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.table_tent_subtitle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    TentNumberDisplay(number = uiState.tentNumber, valid = uiState.isValid)
                 }
 
-                // Numeric Keypad (3x4)
+                Spacer(modifier = Modifier.height(32.dp))
+
                 NumericKeypad(
                     onDigit = viewModel::onDigit,
                     onBackspace = viewModel::onBackspace,
-                    onClear = viewModel::onClear,
+                    extraKey = "C",
+                    onExtraKey = viewModel::onClear,
+                    modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth(),
                 )
+            }
 
-                // Actions
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = colors.surface,
+                shadowElevation = 20.dp,
+                shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
+                border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Button(
+                    KioskButton(
+                        text =
+                            if (uiState.isValid) {
+                                stringResource(R.string.table_tent_confirm, uiState.tentNumber)
+                            } else {
+                                stringResource(R.string.table_tent_confirm_empty)
+                            },
                         onClick = { viewModel.confirm(onConfirmed) },
                         enabled = uiState.isValid,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    ) {
-                        Text(
-                            text = if (uiState.isValid) "Confirmar Mesa #${uiState.tentNumber}" else "Confirmar Portamesa",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        )
-                    }
-
-                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    KioskButton(
+                        text = stringResource(R.string.table_tent_skip),
                         onClick = { viewModel.skip(onConfirmed) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(
-                            text = "No tengo portamesa / Retirar en Mostrador",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NumericKeypad(
-    onDigit: (Char) -> Unit,
-    onBackspace: () -> Unit,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val rows =
-        listOf(
-            listOf('1', '2', '3'),
-            listOf('4', '5', '6'),
-            listOf('7', '8', '9'),
-        )
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                row.forEach { digit ->
-                    KeypadButton(
-                        text = digit.toString(),
-                        onClick = { onDigit(digit) },
+                        style = KioskButtonStyle.Ghost,
+                        height = KioskTouchTarget,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         }
+    }
+}
 
-        // Bottom row: Clear, 0, Backspace
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            KeypadButton(
-                text = "C",
-                textColor = MaterialTheme.colorScheme.error,
-                onClick = onClear,
-            )
-            KeypadButton(
-                text = "0",
-                onClick = { onDigit('0') },
-            )
-            KeypadIconButton(
-                icon = Icons.AutoMirrored.Filled.Backspace,
-                onClick = onBackspace,
+@Composable
+private fun TentNumberDisplay(
+    number: String,
+    valid: Boolean,
+) {
+    val colors = MaterialTheme.colorScheme
+    val border by animateColorAsState(if (valid) colors.primary else colors.outline, label = "tent_border")
+    val shape = MaterialTheme.shapes.extraLarge
+    Box(
+        modifier =
+            Modifier
+                .widthIn(min = 420.dp)
+                .height(180.dp)
+                .background(colors.surface, shape)
+                .border(if (valid) 6.dp else 3.dp, border, shape)
+                .padding(horizontal = 48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedContent(
+            targetState = number,
+            transitionSpec = {
+                (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy), initialScale = 0.7f) + fadeIn()) togetherWith fadeOut()
+            },
+            label = "tent_number",
+        ) { value ->
+            Text(
+                text = value.ifEmpty { "– – –" },
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = 120.sp, lineHeight = 124.sp, letterSpacing = 8.sp),
+                color = if (value.isEmpty()) colors.outline else colors.primary,
             )
         }
     }
-}
-
-@Composable
-private fun KeypadButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    textColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    Box(
-        modifier =
-            modifier
-                .size(76.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style =
-                MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                ),
-        )
-    }
-}
-
-@Composable
-private fun KeypadIconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .size(76.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = "Borrar",
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(28.dp),
-        )
-    }
-}
-
-private fun Float.spValueToEm(): androidx.compose.ui.unit.TextUnit {
-    return androidx.compose.ui.unit.TextUnit(this, androidx.compose.ui.unit.TextUnitType.Sp)
 }

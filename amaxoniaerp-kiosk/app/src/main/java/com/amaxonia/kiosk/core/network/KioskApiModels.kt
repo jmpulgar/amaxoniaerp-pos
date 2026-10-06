@@ -47,6 +47,7 @@ data class KioskConfigResponse(
     val defaultCustomerId: String = "CF",
     val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
     val country: String = "PA",
+    val paymentMethods: List<String> = listOf("CARD"),
 )
 
 @Serializable
@@ -154,6 +155,7 @@ data class KioskPaymentRequest(
     val last4: String,
     val brand: String,
     val amount: String,
+    val method: String,
 )
 
 @Serializable
@@ -207,4 +209,23 @@ data class KioskPaymentResponse(
     val invoice: KioskInvoiceInfo? = null,
     val dispatch: String,
     val receipt: KioskReceipt,
+)
+
+@Serializable
+data class KioskYappyChargeResponse(
+    val transactionId: String,
+    val qrHash: String,
+    val amount: String,
+    val expiresInSec: Int,
+)
+
+@Serializable
+data class KioskYappyStatusResponse(
+    val transactionId: String,
+    val status: String,
+)
+
+@Serializable
+data class KioskErrorResponse(
+    val error: String? = null,
 )
