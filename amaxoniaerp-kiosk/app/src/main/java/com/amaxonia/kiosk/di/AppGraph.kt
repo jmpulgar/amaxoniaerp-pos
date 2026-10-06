@@ -13,6 +13,8 @@ import com.amaxonia.kiosk.domain.payment.DevMockPaymentTerminal
 import com.amaxonia.kiosk.domain.payment.PaymentTerminal
 import com.amaxonia.kiosk.hardware.printer.KioskPrinter
 import com.amaxonia.kiosk.hardware.printer.SunmiPrinterManager
+import com.amaxonia.kiosk.ui.accessibility.AccessibilityManager
+import com.amaxonia.kiosk.ui.idle.IdleTimerManager
 import com.amaxonia.kiosk.ui.payment.CompletedOrderInfo
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,4 +38,6 @@ class AppGraph(
             paymentTerminal = paymentTerminal,
             pendingPaymentDao = pendingPaymentDao,
         )
+    val accessibilityManager: AccessibilityManager = AccessibilityManager()
+    val idleTimerManager: IdleTimerManager = IdleTimerManager()
 }

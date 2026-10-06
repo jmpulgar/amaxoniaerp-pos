@@ -1,3 +1,95 @@
 <resources>
     <string name="app_name">Amaxonia Kiosko</string>
+    <string name="btn_back">Regresar</string>
+    <string name="btn_continue">Continuar</string>
+    <string name="btn_cancel">Cancelar</string>
+    <string name="btn_accept">Aceptar</string>
+    <string name="btn_retry">Reintentar</string>
+
+    <!-- Attract Screen -->
+    <string name="attract_touch_to_start">TOCA AQUÍ PARA COMENZAR</string>
+    <string name="attract_out_of_service">Este terminal está fuera de servicio temporalmente.\nPor favor acérquese a la caja principal.</string>
+
+    <!-- Dining Mode Screen -->
+    <string name="dining_mode_title">¿Dónde vas a comer hoy?</string>
+    <string name="dining_mode_subtitle">Selecciona una opción para comenzar tu pedido</string>
+    <string name="dining_mode_dine_in_title">Comer en el local</string>
+    <string name="dining_mode_dine_in_desc">Para comer aquí en el restaurante</string>
+    <string name="dining_mode_takeaway_title">Para llevar</string>
+    <string name="dining_mode_takeaway_desc">Empacado para llevar a donde quieras</string>
+
+    <!-- Menu Screen -->
+    <string name="menu_title">Menú</string>
+    <string name="menu_categories">Categorías</string>
+    <string name="menu_view_cart">Ver Carrito</string>
+    <string name="menu_items_count">%1$d ítems</string>
+    <string name="menu_item_count_single">1 ítem</string>
+    <string name="menu_sold_out">Agotado</string>
+    <string name="menu_search_hint">Buscar producto…</string>
+    <string name="menu_empty_categories">Sin categorías disponibles</string>
+    <string name="menu_empty_products">No hay productos en esta categoría</string>
+    <string name="menu_ref_currency">Ref.</string>
+
+    <!-- Customizer Screen -->
+    <string name="customizer_title">Personalizar</string>
+    <string name="customizer_required">Obligatorio (Elige %1$d)</string>
+    <string name="customizer_optional">Opcional (Hasta %1$d)</string>
+    <string name="customizer_kitchen_note">Nota para cocina (máx 80 caracteres)</string>
+    <string name="customizer_add_to_cart">Agregar al carrito</string>
+    <string name="customizer_missing_required">Selecciona todas las opciones obligatorias</string>
+
+    <!-- Review Screen -->
+    <string name="review_title">Tu Pedido</string>
+    <string name="review_subtitle">Revisa los detalles antes de pagar</string>
+    <string name="review_empty_cart">Tu carrito está vacío</string>
+    <string name="review_empty_cta">Volver al menú</string>
+    <string name="review_subtotal">Subtotal</string>
+    <string name="review_tax">Impuesto</string>
+    <string name="review_total">Total</string>
+    <string name="review_add_more">Agregar más productos</string>
+    <string name="review_proceed_pay">Continuar al Pago</string>
+    <string name="review_clear_cart">Vaciar carrito</string>
+
+    <!-- Customer ID Screen -->
+    <string name="customer_title">¿Deseas factura con tus datos?</string>
+    <string name="customer_subtitle">Selecciona una opción para tu comprobante fiscal</string>
+    <string name="customer_final_title">Consumidor Final</string>
+    <string name="customer_final_desc">Rápido y sin datos fiscales adicionales</string>
+    <string name="customer_custom_title">Factura Personalizada</string>
+    <string name="customer_custom_desc">Ingresa tu RUC o Cédula para el crédito fiscal</string>
+    <string name="customer_doc_id">RUC / Cédula</string>
+    <string name="customer_dv">Dígito Verificador (DV)</string>
+    <string name="customer_name">Nombre o Razón Social</string>
+
+    <!-- Table Tent Screen -->
+    <string name="table_tent_title">Número de Portamesa</string>
+    <string name="table_tent_subtitle">Ingresa el número del portamesa que tienes en la mano</string>
+
+    <!-- Payment Screen -->
+    <string name="payment_instruction">Acerca tu tarjeta o dispositivo</string>
+    <string name="payment_terminal_hint">Sigue las instrucciones en el terminal de pago</string>
+    <string name="payment_processing">Procesando pago…</string>
+    <string name="payment_declined">Pago rechazado</string>
+    <string name="payment_timeout">Tiempo agotado para realizar el pago</string>
+
+    <!-- Order Number Screen -->
+    <string name="order_number_title">¡Gracias por tu compra!</string>
+    <string name="order_number_take_receipt">Por favor retira tu comprobante impreso abajo</string>
+    <string name="order_number_table_dest">Llevaremos tu pedido a la mesa %1$s</string>
+    <string name="order_number_counter_dest">Retira tu pedido en el mostrador cuando llamen tu número</string>
+    <string name="order_number_auto_close">Esta pantalla se cerrará automáticamente</string>
+
+    <!-- Idle Warning Dialog -->
+    <string name="idle_dialog_title">¿Sigues ahí?</string>
+    <string name="idle_dialog_message">Tu pedido se cancelará por inactividad en %1$d segundos.</string>
+    <string name="idle_dialog_continue">Continuar con mi pedido</string>
+    <string name="idle_dialog_cancel">Cancelar pedido</string>
+
+    <!-- Accessibility & Languages -->
+    <string name="a11y_mode_title">Modo Accesible</string>
+    <string name="a11y_reach_mode">Alcance Reducido</string>
+    <string name="a11y_high_contrast">Alto Contraste</string>
+    <string name="a11y_language">Idioma</string>
+    <string name="a11y_spanish">Español</string>
+    <string name="a11y_english">English</string>
 </resources>

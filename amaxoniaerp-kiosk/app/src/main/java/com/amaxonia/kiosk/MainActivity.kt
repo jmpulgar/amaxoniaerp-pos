@@ -1,25 +1,38 @@
 package com.amaxonia.kiosk
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.amaxonia.kiosk.di.AppGraph
+import com.amaxonia.kiosk.ui.accessibility.AccessibilityBar
+import com.amaxonia.kiosk.ui.accessibility.AccessibleContainer
 import com.amaxonia.kiosk.ui.attract.AttractScreen
 import com.amaxonia.kiosk.ui.attract.AttractViewModel
 import com.amaxonia.kiosk.ui.customer.CustomerIdScreen
@@ -27,6 +40,7 @@ import com.amaxonia.kiosk.ui.customer.CustomerIdViewModel
 import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
 import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
 import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
+import com.amaxonia.kiosk.ui.idle.IdleWarningDialog
 import com.amaxonia.kiosk.ui.menu.MenuScreen
 import com.amaxonia.kiosk.ui.menu.MenuViewModel
 import com.amaxonia.kiosk.ui.navigation.KioskDestinations
@@ -40,6 +54,7 @@ import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import com.amaxonia.kiosk.ui.tabletent.TableTentScreen
 import com.amaxonia.kiosk.ui.tabletent.TableTentViewModel
 import com.amaxonia.kiosk.ui.theme.AmaxoniaKioskTheme
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val appGraph: AppGraph
@@ -48,6 +63,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        appGraph.idleTimerManager.start(lifecycleScope)
+
         // Lock to vertical portrait (1080x1920)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
@@ -55,15 +72,13 @@ class MainActivity : ComponentActivity() {
         enableImmersiveMode()
 
         setContent {
-            AmaxoniaKioskTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    KioskRoot(appGraph = appGraph)
-                }
-            }
+            KioskRoot(appGraph = appGraph)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        appGraph.idleTimerManager.stop()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -85,6 +100,110 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun KioskRoot(appGraph: AppGraph) {
     val navController = rememberNavController()
+    val accessibilityState by appGraph.accessibilityManager.state.collectAsStateWithLifecycle()
+    val idleTimerState by appGraph.idleTimerManager.state.collectAsStateWithLifecycle()
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val isOrderingScreen =
+        currentRoute != null &&
+            currentRoute != KioskDestinations.ATTRACT &&
+            currentRoute != KioskDestinations.PAIRING &&
+            currentRoute != KioskDestinations.ORDER_NUMBER
+
+    LaunchedEffect(isOrderingScreen) {
+        appGraph.idleTimerManager.setEnabled(isOrderingScreen)
+    }
+
+    LaunchedEffect(navController) {
+        appGraph.idleTimerManager.onTimeoutExpired = {
+            appGraph.orderGraph.reset()
+            appGraph.completedOrderState.value = null
+            navController.navigate(KioskDestinations.ATTRACT) {
+                popUpTo(KioskDestinations.ATTRACT) { inclusive = true }
+            }
+        }
+    }
+
+    val currentConfig = LocalConfiguration.current
+    val localizedConfig =
+        remember(accessibilityState.language, currentConfig) {
+            Configuration(currentConfig).apply {
+                setLocale(Locale.forLanguageTag(accessibilityState.language.code))
+            }
+        }
+    val context = LocalContext.current
+    val localizedContext =
+        remember(localizedConfig, context) {
+            context.createConfigurationContext(localizedConfig)
+        }
+
+    CompositionLocalProvider(
+        LocalConfiguration provides localizedConfig,
+        LocalContext provides localizedContext,
+    ) {
+        AmaxoniaKioskTheme(highContrast = accessibilityState.isHighContrast) {
+            Surface(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent(PointerEventPass.Initial)
+                                    appGraph.idleTimerManager.onUserActivity()
+                                }
+                            }
+                        },
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (isOrderingScreen) {
+                            AccessibilityBar(
+                                state = accessibilityState,
+                                onToggleAccessibleMode = {
+                                    appGraph.accessibilityManager.toggleAccessibleMode()
+                                },
+                                onToggleHighContrast = {
+                                    appGraph.accessibilityManager.toggleHighContrast()
+                                },
+                                onToggleLanguage = {
+                                    appGraph.accessibilityManager.toggleLanguage()
+                                },
+                            )
+                        }
+
+                        AccessibleContainer(
+                            isAccessibleMode = isOrderingScreen && accessibilityState.isAccessibleMode,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            KioskNavHost(
+                                navController = navController,
+                                appGraph = appGraph,
+                            )
+                        }
+                    }
+
+                    if (idleTimerState.isWarningVisible) {
+                        IdleWarningDialog(
+                            remainingSeconds = idleTimerState.remainingSeconds,
+                            onContinue = { appGraph.idleTimerManager.continueOrdering() },
+                            onCancel = { appGraph.idleTimerManager.cancelOrder() },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun KioskNavHost(
+    navController: NavHostController,
+    appGraph: AppGraph,
+) {
     val startDestination =
         if (appGraph.tokenStorage.isPaired()) {
             KioskDestinations.ATTRACT

@@ -35,9 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.amaxonia.kiosk.R
 
 const val MODE_DINE_IN = "COMER_AQUI"
 const val MODE_TAKEAWAY = "PARA_LLEVAR"
@@ -61,7 +63,7 @@ fun DiningModeScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Regresar",
+                            contentDescription = stringResource(R.string.btn_back),
                             modifier = Modifier.size(32.dp),
                         )
                     }
@@ -81,7 +83,7 @@ fun DiningModeScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "¿Dónde vas a comer hoy?",
+                    text = stringResource(R.string.dining_mode_title),
                     style =
                         MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
@@ -93,7 +95,7 @@ fun DiningModeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Selecciona una opción para comenzar tu pedido",
+                    text = stringResource(R.string.dining_mode_subtitle),
                     style =
                         MaterialTheme.typography.titleMedium.copy(
                             textAlign = TextAlign.Center,
@@ -104,8 +106,8 @@ fun DiningModeScreen(
                 Spacer(modifier = Modifier.height(56.dp))
 
                 DiningModeOptionCard(
-                    title = "Comer en el Local",
-                    subtitle = "Disfruta de tu comida servida caliente en nuestras mesas",
+                    title = stringResource(R.string.dining_mode_dine_in_title),
+                    subtitle = stringResource(R.string.dining_mode_dine_in_desc),
                     icon = Icons.Default.Restaurant,
                     isSelected = currentMode == MODE_DINE_IN,
                     onClick = { onModeSelected(MODE_DINE_IN) },
@@ -114,8 +116,8 @@ fun DiningModeScreen(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 DiningModeOptionCard(
-                    title = "Para Llevar",
-                    subtitle = "Empacado de forma segura y listo para retirar en mostrador",
+                    title = stringResource(R.string.dining_mode_takeaway_title),
+                    subtitle = stringResource(R.string.dining_mode_takeaway_desc),
                     icon = Icons.Default.Fastfood,
                     isSelected = currentMode == MODE_TAKEAWAY,
                     onClick = { onModeSelected(MODE_TAKEAWAY) },
@@ -137,7 +139,11 @@ private fun DiningModeOptionCard(
     val borderColor =
         if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     val containerColor =
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface
+        if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
 
     Card(
         modifier =
@@ -190,16 +196,14 @@ private fun DiningModeOptionCard(
                     style =
                         MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
                         ),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = subtitle,
-                    style =
-                        MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

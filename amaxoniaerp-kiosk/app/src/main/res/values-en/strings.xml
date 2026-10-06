@@ -1,0 +1,95 @@
+<resources>
+    <string name="app_name">Amaxonia Kiosk</string>
+    <string name="btn_back">Back</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_accept">Accept</string>
+    <string name="btn_retry">Retry</string>
+
+    <!-- Attract Screen -->
+    <string name="attract_touch_to_start">TOUCH HERE TO START</string>
+    <string name="attract_out_of_service">This terminal is temporarily out of service.\nPlease proceed to the main counter.</string>
+
+    <!-- Dining Mode Screen -->
+    <string name="dining_mode_title">Where will you eat today?</string>
+    <string name="dining_mode_subtitle">Select an option to start your order</string>
+    <string name="dining_mode_dine_in_title">Dine In</string>
+    <string name="dining_mode_dine_in_desc">To eat here at the restaurant</string>
+    <string name="dining_mode_takeaway_title">Takeaway</string>
+    <string name="dining_mode_takeaway_desc">Packed to take anywhere you like</string>
+
+    <!-- Menu Screen -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_categories">Categories</string>
+    <string name="menu_view_cart">View Cart</string>
+    <string name="menu_items_count">%1$d items</string>
+    <string name="menu_item_count_single">1 item</string>
+    <string name="menu_sold_out">Sold Out</string>
+    <string name="menu_search_hint">Search product…</string>
+    <string name="menu_empty_categories">No categories available</string>
+    <string name="menu_empty_products">No products in this category</string>
+    <string name="menu_ref_currency">Ref.</string>
+
+    <!-- Customizer Screen -->
+    <string name="customizer_title">Customize</string>
+    <string name="customizer_required">Required (Choose %1$d)</string>
+    <string name="customizer_optional">Optional (Up to %1$d)</string>
+    <string name="customizer_kitchen_note">Kitchen note (max 80 chars)</string>
+    <string name="customizer_add_to_cart">Add to cart</string>
+    <string name="customizer_missing_required">Please select all required options</string>
+
+    <!-- Review Screen -->
+    <string name="review_title">Your Order</string>
+    <string name="review_subtitle">Review details before paying</string>
+    <string name="review_empty_cart">Your cart is empty</string>
+    <string name="review_empty_cta">Return to menu</string>
+    <string name="review_subtotal">Subtotal</string>
+    <string name="review_tax">Tax</string>
+    <string name="review_total">Total</string>
+    <string name="review_add_more">Add more items</string>
+    <string name="review_proceed_pay">Proceed to Payment</string>
+    <string name="review_clear_cart">Empty cart</string>
+
+    <!-- Customer ID Screen -->
+    <string name="customer_title">Do you want an invoice with your details?</string>
+    <string name="customer_subtitle">Select an option for your tax receipt</string>
+    <string name="customer_final_title">Final Consumer</string>
+    <string name="customer_final_desc">Quick and without additional tax details</string>
+    <string name="customer_custom_title">Custom Invoice</string>
+    <string name="customer_custom_desc">Enter your Tax ID or National ID for tax credit</string>
+    <string name="customer_doc_id">Tax ID / National ID</string>
+    <string name="customer_dv">Check Digit (DV)</string>
+    <string name="customer_name">Name or Business Name</string>
+
+    <!-- Table Tent Screen -->
+    <string name="table_tent_title">Table Tent Number</string>
+    <string name="table_tent_subtitle">Enter the number on the table tent in your hand</string>
+
+    <!-- Payment Screen -->
+    <string name="payment_instruction">Tap or insert your card or device</string>
+    <string name="payment_terminal_hint">Follow the instructions on the payment terminal</string>
+    <string name="payment_processing">Processing payment…</string>
+    <string name="payment_declined">Payment declined</string>
+    <string name="payment_timeout">Payment time expired</string>
+
+    <!-- Order Number Screen -->
+    <string name="order_number_title">Thank you for your purchase!</string>
+    <string name="order_number_take_receipt">Please collect your printed receipt below</string>
+    <string name="order_number_table_dest">We will bring your order to table %1$s</string>
+    <string name="order_number_counter_dest">Pick up your order at the counter when your number is called</string>
+    <string name="order_number_auto_close">This screen will close automatically</string>
+
+    <!-- Idle Warning Dialog -->
+    <string name="idle_dialog_title">Are you still there?</string>
+    <string name="idle_dialog_message">Your order will be cancelled due to inactivity in %1$d seconds.</string>
+    <string name="idle_dialog_continue">Continue with my order</string>
+    <string name="idle_dialog_cancel">Cancel order</string>
+
+    <!-- Accessibility & Languages -->
+    <string name="a11y_mode_title">Accessible Mode</string>
+    <string name="a11y_reach_mode">Low Reach</string>
+    <string name="a11y_high_contrast">High Contrast</string>
+    <string name="a11y_language">Language</string>
+    <string name="a11y_spanish">Español</string>
+    <string name="a11y_english">English</string>
+</resources>
