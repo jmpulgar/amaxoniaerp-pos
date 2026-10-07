@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,6 +83,24 @@ class KioskDatabaseMigrationTest {
             assertEquals("CARD", migrated.method)
             assertEquals(PendingPayment.STATUS_PENDING, migrated.status)
             assertEquals("YAPPY", db.pendingPaymentDao().getByOrderId("ord-v2")?.method)
+            db.close()
+        }
+
+    @Test
+    fun `migration up to 3 adds an empty paymentMethodId and stores the chosen card method`() =
+        runBlocking {
+            createVersion1Database()
+
+            val db =
+                KioskDatabase
+                    .withMigrations(Room.databaseBuilder(context, KioskDatabase::class.java, dbName))
+                    .allowMainThreadQueries()
+                    .build()
+            val migrated = db.pendingPaymentDao().getByOrderId("ord-v1")
+            db.pendingPaymentDao().insert(migrated!!.copy(orderId = "ord-v3", paymentMethodId = 49))
+
+            assertNull(migrated.paymentMethodId)
+            assertEquals(49, db.pendingPaymentDao().getByOrderId("ord-v3")?.paymentMethodId)
             db.close()
         }
 }

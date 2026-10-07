@@ -108,12 +108,18 @@ class MenuViewModel(
     }
 
     fun loadCatalog(): Job {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        // A catalog already in memory (prefetched during the attract loop) is shown on the first
+        // frame; the server is then only revalidated in the background.
+        val cached = catalogState?.value
+        if (cached != null && _uiState.value.items.isEmpty()) {
+            showCatalog(cached)
+        } else {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        }
         val job =
             viewModelScope.launch {
                 // Only revalidate with the ETag when a catalog is actually held in memory; otherwise a
                 // 304 after a process restart would leave the menu empty.
-                val cached = catalogState?.value
                 val result = apiClient.getCatalog(if (cached != null) tokenStorage.catalogEtag else null)
                 when (result) {
                     is NetworkResult.Success -> {
@@ -131,7 +137,13 @@ class MenuViewModel(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                errorMessage = it.errorMessage ?: result.error.message ?: "Error al cargar catálogo",
+                                // A menu already on screen keeps working; only an empty one shows the error.
+                                errorMessage =
+                                    if (it.items.isNotEmpty()) {
+                                        null
+                                    } else {
+                                        it.errorMessage ?: result.error.message ?: "Error al cargar catálogo"
+                                    },
                             )
                         }
                     }

@@ -43,10 +43,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.domain.payment.PaymentMethod
 import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
@@ -72,15 +74,20 @@ private val MinTileHeight = 260.dp
 private val MaxTileHeight = 560.dp
 private val LandscapeHeroReserve = 380.dp
 private val LandscapeMaxWidth = 1600.dp
+private val CompactTileHeight = 180.dp
+private val BadgeSize = 200.dp
+private val CompactBadgeSize = 136.dp
+private const val MAX_TILES_PER_ROW = 2
 
 /**
  * "¿Cómo deseas pagar?": quotes the order (spec §3 Quote step) and offers the available methods as
- * giant cards. With a single method it forwards immediately via [onMethodSelected] (skip = true).
+ * giant cards (CARD as one tile per company card method when the config lists them). With a single
+ * choice it forwards immediately via [onMethodSelected] (skip = true).
  */
 @Composable
 fun PaymentMethodScreen(
     viewModel: PaymentMethodViewModel,
-    onMethodSelected: (method: PaymentMethod, skipped: Boolean) -> Unit,
+    onMethodSelected: (method: PaymentMethod, cardOption: KioskCardOption?, skipped: Boolean) -> Unit,
     onBack: () -> Unit,
     onBackToOrder: () -> Unit,
     modifier: Modifier = Modifier,
@@ -90,11 +97,11 @@ fun PaymentMethodScreen(
     // Re-validate the quote every time the screen is shown again (e.g. back from an expired payment).
     LaunchedEffect(Unit) { viewModel.ensureQuote() }
     LaunchedEffect(uiState.autoSelectedMethod) {
-        uiState.autoSelectedMethod?.let { onMethodSelected(it, true) }
+        uiState.autoSelectedMethod?.let { onMethodSelected(it, uiState.autoSelectedCardOption, true) }
     }
     PaymentMethodContent(
         uiState = uiState,
-        onSelect = { onMethodSelected(it, false) },
+        onSelect = { method, cardOption -> onMethodSelected(method, cardOption, false) },
         onRetry = viewModel::ensureQuote,
         onBack = onBack,
         onBackToOrder = onBackToOrder,
@@ -106,7 +113,7 @@ fun PaymentMethodScreen(
 @Composable
 fun PaymentMethodContent(
     uiState: PaymentMethodUiState,
-    onSelect: (PaymentMethod) -> Unit,
+    onSelect: (PaymentMethod, KioskCardOption?) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onBackToOrder: () -> Unit,
@@ -164,28 +171,60 @@ fun PaymentMethodContent(
     }
 }
 
+/** One tile on the chooser: a company card method (or the generic card when none is listed), or Yappy. */
+private data class MethodChoice(
+    val method: PaymentMethod,
+    val cardOption: KioskCardOption? = null,
+)
+
+private fun PaymentMethodUiState.choices(): List<MethodChoice> =
+    methods.flatMap { method ->
+        if (method == PaymentMethod.CARD && cardOptions.isNotEmpty()) {
+            cardOptions.map { MethodChoice(method, it) }
+        } else {
+            listOf(MethodChoice(method))
+        }
+    }
+
 @Composable
 private fun MethodChoices(
     uiState: PaymentMethodUiState,
-    onSelect: (PaymentMethod) -> Unit,
+    onSelect: (PaymentMethod, KioskCardOption?) -> Unit,
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
+    val choices = remember(uiState.methods, uiState.cardOptions) { uiState.choices() }
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         // Tiles share the room left under the amount (bottom 60 % of the screen), within sane bounds.
-        val methodCount = uiState.methods.size.coerceAtLeast(1)
-        // Landscape: the tiles sit side by side under the amount and share its full width.
-        val sideBySide = maxWidth > maxHeight && methodCount > 1
+        val choiceCount = choices.size.coerceAtLeast(1)
+        // Landscape: the tiles sit side by side under the amount (two per row when there are more).
+        val sideBySide = maxWidth > maxHeight && choiceCount > 1
+        val perRow = if (sideBySide) minOf(choiceCount, MAX_TILES_PER_ROW) else 1
+        val rows = (choiceCount + perRow - 1) / perRow
+        // Three or more stacked tiles (e.g. VISA, MASTERCARD, débito and Yappy) get a denser layout.
+        val compact = rows > 2
         val tileHeight =
             if (sideBySide) {
-                (maxHeight - LandscapeHeroReserve).coerceIn(MinTileHeight, MaxTileHeight)
+                ((maxHeight - LandscapeHeroReserve) / rows - TileGap).coerceIn(CompactTileHeight, MaxTileHeight)
             } else {
-                ((maxHeight - HeroReserve) / methodCount - TileGap).coerceIn(MinTileHeight, MaxTileHeight)
+                ((maxHeight - HeroReserve) / choiceCount - TileGap).coerceIn(
+                    if (compact) CompactTileHeight else MinTileHeight,
+                    MaxTileHeight,
+                )
             }
-        val tile: @Composable (PaymentMethod, Modifier) -> Unit = { method, tileModifier ->
-            when (method) {
-                PaymentMethod.CARD -> CardMethodTile(height = tileHeight, onClick = { onSelect(method) }, modifier = tileModifier)
-                PaymentMethod.YAPPY -> YappyMethodTile(height = tileHeight, onClick = { onSelect(method) }, modifier = tileModifier)
+        val tile: @Composable (MethodChoice, Modifier) -> Unit = { choice, tileModifier ->
+            val onClick = { onSelect(choice.method, choice.cardOption) }
+            when {
+                choice.cardOption != null ->
+                    CardOptionTile(
+                        option = choice.cardOption,
+                        height = tileHeight,
+                        compact = compact,
+                        onClick = onClick,
+                        modifier = tileModifier,
+                    )
+                choice.method == PaymentMethod.CARD -> CardMethodTile(height = tileHeight, onClick = onClick, modifier = tileModifier)
+                else -> YappyMethodTile(height = tileHeight, onClick = onClick, modifier = tileModifier)
             }
         }
         Column(
@@ -216,14 +255,18 @@ private fun MethodChoices(
                 }
             }
             if (sideBySide) {
-                Row(horizontalArrangement = Arrangement.spacedBy(TileGap)) {
-                    uiState.methods.forEachIndexed { index, method ->
-                        reveal(index, Modifier.weight(1f)) { tile(method, Modifier) }
+                choices.chunked(perRow).forEachIndexed { rowIndex, rowChoices ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(TileGap)) {
+                        rowChoices.forEachIndexed { index, choice ->
+                            reveal(rowIndex * perRow + index, Modifier.weight(1f)) { tile(choice, Modifier) }
+                        }
+                        // A short last row keeps the same tile width as the full rows above it.
+                        repeat(perRow - rowChoices.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             } else {
-                uiState.methods.forEachIndexed { index, method ->
-                    reveal(index, Modifier) { tile(method, Modifier) }
+                choices.forEachIndexed { index, choice ->
+                    reveal(index, Modifier) { tile(choice, Modifier) }
                 }
             }
         }
@@ -252,6 +295,60 @@ private fun CardMethodTile(
                 tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(104.dp),
             )
+        }
+    }
+}
+
+/** A company card method (VISA, MASTERCARD...): flat white tile with the ERP logo and its name. */
+@Composable
+private fun CardOptionTile(
+    option: KioskCardOption,
+    height: Dp,
+    compact: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val badgeSize = if (compact) CompactBadgeSize else BadgeSize
+    KioskCard(modifier = modifier.fillMaxWidth().height(height), onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 44.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(badgeSize).background(colors.surfaceVariant, MaterialTheme.shapes.medium),
+                contentAlignment = Alignment.Center,
+            ) {
+                CardOptionLogo(dataUri = option.image, size = badgeSize * 0.7f)
+            }
+            Spacer(Modifier.width(40.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = option.name,
+                    style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
+                    color = colors.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.payflow_method_card_option_subtitle),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Box(
+                modifier = Modifier.size(if (compact) 72.dp else 96.dp).background(colors.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(if (compact) 44.dp else 56.dp),
+                )
+            }
         }
     }
 }

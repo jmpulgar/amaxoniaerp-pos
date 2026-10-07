@@ -12,6 +12,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -59,11 +62,30 @@ class AttractViewModel(
         private set
 
     init {
+        // A config already held (or restored from disk) shows its banners at once, before the
+        // network answers; the refresh below then revalidates it in the background.
+        configRepository.config
+            .filterNotNull()
+            .onEach { config ->
+                _uiState.update {
+                    if (it.mediaList.isNotEmpty() || config.media.isEmpty()) {
+                        it
+                    } else {
+                        it.copy(
+                            isLoading = false,
+                            brandColor = config.brandColor,
+                            logoUrl = config.logoUrl,
+                            mediaList = config.media,
+                            currentMediaIndex = 0,
+                        )
+                    }
+                }
+            }.launchIn(viewModelScope)
         loadConfigJob = loadConfig()
     }
 
     fun loadConfig(): Job {
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = it.mediaList.isEmpty()) }
         val job =
             viewModelScope.launch {
                 val result = configRepository.refresh()
@@ -76,7 +98,9 @@ class AttractViewModel(
                                 brandColor = config?.brandColor,
                                 logoUrl = config?.logoUrl,
                                 mediaList = config?.media.orEmpty(),
-                                currentMediaIndex = if (result is NetworkResult.Success) 0 else it.currentMediaIndex,
+                                // Keep the loop where it is unless the banners themselves changed.
+                                currentMediaIndex =
+                                    if (config?.media.orEmpty() == it.mediaList) it.currentMediaIndex else 0,
                                 isOffline = false,
                                 outOfServiceMessage = null,
                             )

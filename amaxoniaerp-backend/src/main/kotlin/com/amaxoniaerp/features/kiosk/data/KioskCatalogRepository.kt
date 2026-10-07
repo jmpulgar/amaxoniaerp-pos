@@ -53,7 +53,7 @@ class KioskCatalogRepository(
                         KioskCategoryDto(
                             id = id,
                             name = name,
-                            iconUrl = null,
+                            iconUrl = departamentoImageUrl(row[DepartamentoTable.foto], countryCode, companyDb),
                             order = index + 1,
                         )
                     }
@@ -201,3 +201,18 @@ class KioskCatalogRepository(
         }
     }
 }
+
+/**
+ * Imagen propia del departamento (módulo Mantenimiento → Departamento del ERP): `departamento.foto`
+ * guarda "fotos/{id}_foto.{ext}" y el archivo vive en {data}/departamento/{id}_foto.{ext}.
+ */
+internal fun departamentoImageUrl(
+    foto: String?,
+    countryCode: String,
+    companyDb: String,
+): String? =
+    foto
+        ?.trim()
+        ?.substringAfterLast('/')
+        ?.takeIf { it.isNotBlank() && !it.contains("..") }
+        ?.let { "/api/data/$countryCode/$companyDb/departamento/$it" }

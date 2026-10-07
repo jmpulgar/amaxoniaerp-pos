@@ -8,10 +8,12 @@ import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.kiosk.application.KioskCajaSelection
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
+import com.amaxoniaerp.features.kiosk.domain.KioskCardOptionDto
 import com.amaxoniaerp.features.kiosk.domain.KioskConfigResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskMediaItem
 import com.amaxoniaerp.features.kiosk.route.KioskTestSupport.kioskClient
 import com.amaxoniaerp.features.kiosk.route.KioskTestSupport.kioskHeaders
+import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
 import com.zaxxer.hikari.HikariDataSource
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -100,6 +102,62 @@ class KioskConfigRoutesTest {
             assertEquals("PA", config.country)
             assertEquals("USD", config.currency.base)
             assertEquals(listOf("CARD"), config.paymentMethods)
+        }
+
+    @Test
+    fun `GET config lists the active card payment methods of caja_forma_pago`() =
+        testApplication {
+            KioskTestSupport.createParametrosGenerales(databasePA)
+            transaction(databasePA) {
+                SchemaUtils.create(CajaFormaPagoTable)
+
+                fun formaPago(
+                    id: Int,
+                    siglas: String,
+                    descripcion: String,
+                    orden: Int,
+                    dgi: String? = null,
+                    activo: Int = 1,
+                    pos: Int = 1,
+                    imagen: String = "",
+                ) = CajaFormaPagoTable.insert {
+                    it[idFormaPago] = id
+                    it[CajaFormaPagoTable.siglas] = siglas
+                    it[CajaFormaPagoTable.descripcion] = descripcion
+                    it[formaPagoFact] = dgi
+                    it[CajaFormaPagoTable.activo] = activo
+                    it[CajaFormaPagoTable.pos] = pos
+                    it[CajaFormaPagoTable.orden] = orden
+                    it[CajaFormaPagoTable.imagen] = imagen
+                    it[grupo] = 0
+                }
+                formaPago(15, "CASH", "EFECTIVO", 1, dgi = "02")
+                formaPago(50, "TDC", "MASTERCARD", 4, dgi = "03")
+                formaPago(49, "TDC", "VISA", 3, dgi = "03", imagen = "data:image/png;base64,AAAA")
+                formaPago(44, "TDD", "TARJETA DE DEBITO", 5)
+                formaPago(34, "AMEX", "AMERICAN EXPRESS", 10, activo = 0)
+                formaPago(60, "TDC", "TARJETA OCULTA", 11, pos = 0)
+                formaPago(55, "YAPPY", "YAPPY", 3)
+            }
+
+            val config = kioskClient(newService()).config()
+
+            assertEquals(
+                listOf(
+                    KioskCardOptionDto(49, "VISA", "TDC", "data:image/png;base64,AAAA"),
+                    KioskCardOptionDto(50, "MASTERCARD", "TDC", null),
+                    KioskCardOptionDto(44, "TARJETA DE DEBITO", "TDD", null),
+                ),
+                config.cardOptions,
+            )
+        }
+
+    @Test
+    fun `GET config has no card options when the tenant lacks caja_forma_pago`() =
+        testApplication {
+            KioskTestSupport.createParametrosGenerales(databasePA)
+
+            assertEquals(emptyList(), kioskClient(newService()).config().cardOptions)
         }
 
     @Test

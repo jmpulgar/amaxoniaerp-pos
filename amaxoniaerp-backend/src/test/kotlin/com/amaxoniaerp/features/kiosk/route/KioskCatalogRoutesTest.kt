@@ -58,7 +58,7 @@ class KioskCatalogRoutesTest {
     private fun seedCatalog() {
         transaction(database) {
             SchemaUtils.create(DepartamentoTable, ItemsTablePA)
-            department(1, "HAM", "Hamburguesas", visible = true, visiblePos = 1)
+            department(1, "HAM", "Hamburguesas", visible = true, visiblePos = 1, foto = "fotos/1_foto.png")
             department(2, "BEB", "Bebidas", visible = true, visiblePos = 1)
             department(3, "INS", "Insumos Cocina", visible = true, visiblePos = 0)
             department(4, "DESC", "Descontinuados", visible = false, visiblePos = 1)
@@ -96,6 +96,7 @@ class KioskCatalogRoutesTest {
         name: String,
         visible: Boolean,
         visiblePos: Int,
+        foto: String? = null,
     ) {
         DepartamentoTable.insert {
             it[DepartamentoTable.id] = id
@@ -103,6 +104,7 @@ class KioskCatalogRoutesTest {
             it[descripcion] = name
             it[DepartamentoTable.visible] = visible
             it[DepartamentoTable.visiblePos] = visiblePos
+            it[DepartamentoTable.foto] = foto
         }
     }
 
@@ -187,6 +189,11 @@ class KioskCatalogRoutesTest {
             val catalog = kioskClient(newService()).catalog()
 
             assertEquals(listOf("Bebidas", "Hamburguesas"), catalog.categories.map { it.name })
+            // Imagen propia del departamento (departamento.foto), no la del primer producto.
+            assertEquals(
+                listOf(null, "/api/data/PA/momi_pa/departamento/1_foto.png"),
+                catalog.categories.map { it.iconUrl },
+            )
             assertEquals(setOf(101, 102, 201, 202), catalog.items.map { it.id }.toSet())
 
             val burger = catalog.items.first { it.id == 101 }

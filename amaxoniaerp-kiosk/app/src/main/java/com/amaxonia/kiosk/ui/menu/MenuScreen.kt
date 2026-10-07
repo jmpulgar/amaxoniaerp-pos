@@ -93,8 +93,8 @@ import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
 
 private const val TOAST_DURATION_MS = 1400L
-private const val CATEGORY_SWAP_IN_MS = 220
-private const val CATEGORY_SWAP_OUT_MS = 100
+private const val CATEGORY_SWAP_IN_MS = 160
+private const val CATEGORY_SWAP_OUT_MS = 80
 private const val SOLD_OUT_CONTENT_ALPHA = 0.5f
 private const val PRODUCT_COLUMNS = 3
 private const val LANDSCAPE_PRODUCT_COLUMNS = 5

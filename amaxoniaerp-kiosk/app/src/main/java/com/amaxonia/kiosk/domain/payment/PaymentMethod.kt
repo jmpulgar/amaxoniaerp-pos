@@ -13,15 +13,17 @@ enum class PaymentMethod(
 
         /**
          * Methods the customer can actually use: the ones enabled in the company config, minus CARD
-         * when this device has no working card terminal. Order follows the config.
+         * when this device has no working card terminal and the company lists no card methods to
+         * register manually ("sin pasarela"). Order follows the config.
          */
         fun available(
             configured: List<String>,
             cardTerminalAvailable: Boolean,
+            hasCardOptions: Boolean = false,
         ): List<PaymentMethod> =
             configured
                 .mapNotNull(::fromWire)
                 .distinct()
-                .filter { it != CARD || cardTerminalAvailable }
+                .filter { it != CARD || cardTerminalAvailable || hasCardOptions }
     }
 }

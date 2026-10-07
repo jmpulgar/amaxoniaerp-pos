@@ -3,6 +3,7 @@ package com.amaxonia.kiosk.ui.payment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.CheckoutOrderUseCase
@@ -37,6 +38,12 @@ sealed interface PaymentStep {
         val totalSeconds: Int = CARD_PAYMENT_TIMEOUT_SECONDS,
     ) : PaymentStep
 
+    /**
+     * "Sin pasarela": no card terminal is connected, so the customer confirms the chosen card
+     * method and the payment is registered manually (nothing is charged on the device).
+     */
+    data object AwaitingManualConfirmation : PaymentStep
+
     /** Card approved; registering the payment and fiscal invoice. Not cancellable. */
     data object Processing : PaymentStep
 
@@ -54,6 +61,8 @@ data class PaymentUiState(
     val step: PaymentStep = PaymentStep.Quoting,
     val totalAmount: Money? = null,
     val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
+    /** Card method picked on the method screen (VISA, MASTERCARD...); null = generic card. */
+    val cardOption: KioskCardOption? = null,
 ) {
     /** True while the payment runs on its own timeout (the idle timer must not interrupt it). */
     val isPaymentInFlight: Boolean
@@ -63,7 +72,12 @@ data class PaymentUiState(
 /**
  * Card payment. Charges exactly the server quote total (never the client-side subtotal); the
  * 90 s countdown starts only once the quote is known and the terminal is waiting for the card.
+ *
+ * Without a card terminal ([PaymentTerminal.isAvailable] false) and with a company card method
+ * chosen ([cardOption]), the payment is registered manually after the customer confirms it
+ * ("sin pasarela", for testing until a certified terminal is integrated): no money is charged.
  */
+@Suppress("LongParameterList")
 class PaymentViewModel(
     private val checkoutUseCase: CheckoutOrderUseCase,
     private val quoteOrder: QuoteOrderUseCase,
@@ -71,8 +85,11 @@ class PaymentViewModel(
     private val checkoutSession: CheckoutSession,
     private val orderGraph: OrderGraph,
     private val dispatch: String,
+    private val cardOption: KioskCardOption? = null,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(PaymentUiState(currency = orderGraph.currencyConfig.value))
+    private val _uiState = MutableStateFlow(PaymentUiState(currency = orderGraph.currencyConfig.value, cardOption = cardOption))
+    private val isManual: Boolean
+        get() = !paymentTerminal.isAvailable && cardOption != null
     val uiState: StateFlow<PaymentUiState> = _uiState.asStateFlow()
 
     private var countdownJob: Job? = null
@@ -96,6 +113,12 @@ class PaymentViewModel(
                         _uiState.update { it.copy(step = PaymentStep.Failed(PaymentFailure.QUOTE_FAILED, error.message.orEmpty())) }
                         return@launch
                     }
+                if (isManual) {
+                    _uiState.update {
+                        it.copy(totalAmount = Money.fromString(quote.total), step = PaymentStep.AwaitingManualConfirmation)
+                    }
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(
                         totalAmount = Money.fromString(quote.total),
@@ -105,14 +128,34 @@ class PaymentViewModel(
                 checkoutSession.setCardPaymentInFlight(true)
                 startCountdown()
                 val result =
-                    checkoutUseCase.payWithCard(quote) {
-                        countdownJob?.cancel()
-                        checkoutSession.setCardPaymentInFlight(false)
-                        _uiState.update { it.copy(step = PaymentStep.Processing) }
-                    }
+                    checkoutUseCase.payWithCard(
+                        quote,
+                        onApproved = {
+                            countdownJob?.cancel()
+                            checkoutSession.setCardPaymentInFlight(false)
+                            _uiState.update { it.copy(step = PaymentStep.Processing) }
+                        },
+                        paymentMethodId = cardOption?.id,
+                    )
                 countdownJob?.cancel()
                 checkoutSession.setCardPaymentInFlight(false)
                 if (!timedOut) handleCheckoutResult(result)
+            }
+    }
+
+    /** "Confirmar pago" on the manual (no terminal) step: registers the payment and the invoice. */
+    fun confirmManualPayment() {
+        val option = cardOption ?: return
+        if (_uiState.value.step != PaymentStep.AwaitingManualConfirmation) return
+        _uiState.update { it.copy(step = PaymentStep.Processing) }
+        checkoutJob =
+            viewModelScope.launch {
+                val quote =
+                    quoteOrder(orderGraph).getOrElse { error ->
+                        _uiState.update { it.copy(step = PaymentStep.Failed(PaymentFailure.QUOTE_FAILED, error.message.orEmpty())) }
+                        return@launch
+                    }
+                handleCheckoutResult(checkoutUseCase.registerManualCardPayment(quote, option))
             }
     }
 

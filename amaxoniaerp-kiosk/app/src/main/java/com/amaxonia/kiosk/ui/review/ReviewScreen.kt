@@ -1,8 +1,10 @@
 package com.amaxonia.kiosk.ui.review
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,16 +15,19 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Restaurant
@@ -40,11 +45,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
@@ -53,27 +61,26 @@ import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.CartLine
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
-import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskConfirmDialog
-import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.KioskIconButton
 import com.amaxonia.kiosk.ui.components.KioskImage
-import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
-import com.amaxonia.kiosk.ui.components.KioskTouchTarget
-import com.amaxonia.kiosk.ui.components.QuantityStepper
+import com.amaxonia.kiosk.ui.components.bottomHairline
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
+import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.secondaryText
 import com.amaxonia.kiosk.ui.components.topHairline
 import com.amaxonia.kiosk.ui.diningmode.MODE_DINE_IN
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
-import java.math.BigDecimal
 
-private val LineImageSize = 152.dp
-private val RemoveButtonSize = KioskTouchTarget
-private val SidePanelWidth = 680.dp
-private val StepperButtonSize = KioskTouchTarget
+private val LineImageSize = 96.dp
+private val LineMinHeight = 128.dp
+private val SidePanelWidth = 640.dp
+private val StepperButtonSize = 64.dp
+private val HeaderButtonSize = 72.dp
+private val SegmentHeight = 72.dp
+private val ActionButtonHeight = 104.dp
 
 @Composable
 fun ReviewScreen(
@@ -107,21 +114,11 @@ fun ReviewScreen(
         color = MaterialTheme.colorScheme.background,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            KioskHeader(
-                title = stringResource(R.string.review_title),
+            ReviewHeader(
+                uiState = uiState,
                 onBack = onContinueShopping,
-                actions = {
-                    if (!uiState.isEmpty) {
-                        KioskButton(
-                            text = stringResource(R.string.review_clear_cart),
-                            onClick = { showCancelDialog = true },
-                            style = KioskButtonStyle.Ghost,
-                            icon = Icons.Rounded.DeleteOutline,
-                            contentColor = MaterialTheme.colorScheme.error,
-                            height = KioskTouchTarget,
-                        )
-                    }
-                },
+                onClear = { showCancelDialog = true },
+                onDiningModeSelected = viewModel::setDiningMode,
             )
 
             if (uiState.isEmpty) {
@@ -155,155 +152,273 @@ fun ReviewScreen(
     }
 }
 
+/**
+ * Compact header: back arrow, "Revisa tu orden" with the item count, "Vaciar", and a slim
+ * "Comer aquí / Para llevar" switch underneath.
+ */
+@Composable
+private fun ReviewHeader(
+    uiState: ReviewUiState,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    onDiningModeSelected: (String) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth().bottomHairline(colors.outlineVariant),
+        color = colors.surface,
+        border = if (LocalHighContrast.current) BorderStroke(2.dp, colors.onSurface) else null,
+    ) {
+        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                KioskIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.btn_back),
+                    onClick = onBack,
+                    size = HeaderButtonSize,
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.review_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!uiState.isEmpty) {
+                        Text(
+                            text = pluralStringResource(R.plurals.review_item_count, uiState.totalItemCount, uiState.totalItemCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (!uiState.isEmpty) {
+                    KioskButton(
+                        text = stringResource(R.string.review_clear_cart),
+                        onClick = onClear,
+                        style = KioskButtonStyle.Ghost,
+                        icon = Icons.Rounded.DeleteOutline,
+                        contentColor = colors.error,
+                        height = HeaderButtonSize,
+                        textStyle = MaterialTheme.typography.titleSmall,
+                    )
+                }
+            }
+            if (!uiState.isEmpty) {
+                Spacer(Modifier.height(16.dp))
+                SlimSegmentedControl(
+                    options =
+                        listOf(
+                            stringResource(R.string.dining_mode_dine_in_title) to Icons.Rounded.Restaurant,
+                            stringResource(R.string.dining_mode_takeaway_title) to Icons.Rounded.ShoppingBag,
+                        ),
+                    selectedIndex = if (uiState.diningMode == MODE_TAKEAWAY) 1 else 0,
+                    onSelect = { index -> onDiningModeSelected(if (index == 1) MODE_TAKEAWAY else MODE_DINE_IN) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/** A slim pill switch (72 dp) for the dining mode; the selected half is filled in Flow indigo. */
+@Composable
+private fun SlimSegmentedControl(
+    options: List<Pair<String, ImageVector>>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val highContrast = LocalHighContrast.current
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .background(colors.surfaceVariant)
+                .then(if (highContrast) Modifier.border(2.dp, colors.onSurface, RoundedCornerShape(percent = 50)) else Modifier)
+                .padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        options.forEachIndexed { index, (label, icon) ->
+            val selected = index == selectedIndex
+            val container by animateColorAsState(if (selected) colors.primary else Color.Transparent, label = "segment_bg")
+            val tint by animateColorAsState(if (selected) colors.onPrimary else colors.onSurfaceVariant, label = "segment_fg")
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(SegmentHeight)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(container)
+                        .kioskPressable { onSelect(index) },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(text = label, style = MaterialTheme.typography.titleSmall, color = tint, maxLines = 1)
+            }
+        }
+    }
+}
+
 @Composable
 private fun CartLinesList(
     uiState: ReviewUiState,
     viewModel: ReviewViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val colors = MaterialTheme.colorScheme
     LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = modifier.background(colors.surface),
+        contentPadding = PaddingValues(vertical = 4.dp),
     ) {
-        item(key = "dining_mode") {
-            KioskSegmentedControl(
-                options =
-                    listOf(
-                        stringResource(R.string.dining_mode_dine_in_title) to Icons.Rounded.Restaurant,
-                        stringResource(R.string.dining_mode_takeaway_title) to Icons.Rounded.ShoppingBag,
-                    ),
-                selectedIndex = if (uiState.diningMode == MODE_TAKEAWAY) 1 else 0,
-                onSelect = { index -> viewModel.setDiningMode(if (index == 1) MODE_TAKEAWAY else MODE_DINE_IN) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        items(items = uiState.lines, key = { it.id }) { line ->
-            CartLineCard(
-                line = line,
-                currency = uiState.currency,
-                onIncrement = { viewModel.incrementQuantity(line.id) },
-                onDecrement = { viewModel.decrementQuantity(line.id) },
-                onRemove = { viewModel.removeLine(line.id) },
-                modifier = Modifier.animateItem(),
-            )
+        itemsIndexed(items = uiState.lines, key = { _, line -> line.id }) { index, line ->
+            Column(modifier = Modifier.animateItem()) {
+                if (index > 0) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 1.dp, color = colors.outlineVariant)
+                }
+                CartLineRow(
+                    line = line,
+                    currency = uiState.currency,
+                    onIncrement = { viewModel.incrementQuantity(line.id) },
+                    onDecrement = { viewModel.decrementQuantity(line.id) },
+                )
+            }
         }
     }
 }
 
+/**
+ * One compact order line (~130 dp): photo, name with its choices on one grey line (and the kitchen
+ * note), and on the right the line total above a pill stepper whose minus becomes a trash can at 1.
+ */
 @Composable
-private fun CartLineCard(
+private fun CartLineRow(
     line: CartLine,
     currency: KioskCurrencyConfig,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
-    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val lineTotal = line.lineTotal
     val secondaryTotal = remember(lineTotal, currency) { lineTotal.secondaryText(currency) }
     val glyph = remember(line.item.name) { foodGlyphFor(line.item.name) }
+    val choices = remember(line.selectedModifiers) { line.selectedModifiers.joinToString(" · ") { it.optionName } }
 
-    KioskCard(modifier = modifier.fillMaxWidth()) {
-        KioskIconButton(
-            icon = Icons.Rounded.Close,
-            contentDescription = stringResource(R.string.cd_remove),
-            onClick = onRemove,
-            size = RemoveButtonSize,
-            containerColor = colors.surfaceVariant,
-            contentColor = colors.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp),
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = LineMinHeight).padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        KioskImage(
+            url = line.item.imageUrl,
+            contentDescription = line.item.name,
+            placeholderIcon = glyph,
+            placeholderIconSize = 48.dp,
+            modifier = Modifier.size(LineImageSize).clip(RoundedCornerShape(16.dp)).background(colors.surfaceVariant),
         )
-        Column(modifier = Modifier.padding(start = 24.dp, end = 28.dp, top = 24.dp, bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                KioskImage(
-                    url = line.item.imageUrl,
-                    contentDescription = line.item.name,
-                    placeholderIcon = glyph,
-                    placeholderIconSize = 72.dp,
-                    modifier = Modifier.size(LineImageSize).clip(MaterialTheme.shapes.medium),
+        Spacer(modifier = Modifier.width(20.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = line.item.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (choices.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = choices,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(24.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = line.item.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = colors.onSurface,
-                        modifier = Modifier.padding(end = RemoveButtonSize),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.review_unit_price, line.unitPrice.toDisplayString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
-                    if (line.selectedModifiers.isNotEmpty() || !line.note.isNullOrBlank()) {
-                        Spacer(Modifier.height(12.dp))
-                        LineDetails(line)
-                    }
-                }
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                QuantityStepper(
-                    quantity = line.quantity,
-                    onDecrement = onDecrement,
-                    onIncrement = onIncrement,
-                    buttonSize = StepperButtonSize,
-                    decrementIcon = if (line.quantity <= 1) Icons.Rounded.DeleteOutline else Icons.Rounded.Remove,
+            if (!line.note.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.review_note, line.note),
+                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) {
-                    AnimatedContent(targetState = lineTotal.toDisplayString(), label = "line_total") { value ->
-                        Text(
-                            text = value,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                            color = colors.primary,
-                        )
-                    }
-                    if (secondaryTotal.isNotBlank()) {
-                        Text(text = secondaryTotal, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
-                    }
-                }
             }
+            if (line.quantity > 1) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.review_unit_price, line.unitPrice.toDisplayString()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(20.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            AnimatedContent(targetState = lineTotal.toDisplayString(), label = "line_total") { value ->
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                    color = colors.primary,
+                )
+            }
+            if (secondaryTotal.isNotBlank()) {
+                Text(text = secondaryTotal, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(10.dp))
+            PillStepper(quantity = line.quantity, onDecrement = onDecrement, onIncrement = onIncrement)
         }
     }
 }
 
-/** Chosen modifiers (with their extra cost) and the kitchen note of a cart line. */
+/** Compact [− 1 +] pill; at quantity 1 the minus is a red trash can that removes the line. */
 @Composable
-private fun LineDetails(line: CartLine) {
+private fun PillStepper(
+    quantity: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        line.selectedModifiers.forEach { mod ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).background(colors.secondary, CircleShape))
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = mod.optionName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                if (mod.extraPrice.amount > BigDecimal.ZERO) {
-                    Text(
-                        text = stringResource(R.string.customizer_extra_price, mod.extraPrice.toDisplayString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.primary,
-                    )
-                }
-            }
-        }
-        if (!line.note.isNullOrBlank()) {
+    val removes = quantity <= 1
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .background(colors.surfaceVariant)
+                .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        KioskIconButton(
+            icon = if (removes) Icons.Rounded.DeleteOutline else Icons.Rounded.Remove,
+            contentDescription = stringResource(if (removes) R.string.cd_remove else R.string.cd_decrease),
+            onClick = onDecrement,
+            size = StepperButtonSize,
+            containerColor = colors.surface,
+            contentColor = if (removes) colors.error else colors.onSurface,
+        )
+        AnimatedContent(targetState = quantity, label = "line_qty") { value ->
             Text(
-                text = stringResource(R.string.review_note, line.note),
-                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                color = colors.onSurfaceVariant,
+                text = value.toString(),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                color = colors.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(min = 56.dp),
             )
         }
+        KioskIconButton(
+            icon = Icons.Rounded.Add,
+            contentDescription = stringResource(R.string.cd_increase),
+            onClick = onIncrement,
+            size = StepperButtonSize,
+            containerColor = colors.primary,
+            contentColor = colors.onPrimary,
+        )
     }
 }
 
@@ -355,12 +470,7 @@ private fun ReviewBottomBar(
     Surface(
         modifier = if (sidePanel) modifier.fillMaxWidth() else modifier.fillMaxWidth().topHairline(colors.outlineVariant),
         color = colors.surface,
-        shape =
-            if (sidePanel) {
-                MaterialTheme.shapes.large
-            } else {
-                RoundedCornerShape(0.dp)
-            },
+        shape = if (sidePanel) MaterialTheme.shapes.large else RoundedCornerShape(0.dp),
         border =
             when {
                 LocalHighContrast.current -> BorderStroke(3.dp, colors.onSurface)
@@ -368,41 +478,44 @@ private fun ReviewBottomBar(
                 else -> null
             },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {
-            TotalsRow(
-                label =
-                    stringResource(R.string.review_subtotal) + " · " +
-                        pluralStringResource(R.plurals.review_item_count, uiState.totalItemCount, uiState.totalItemCount),
-                amount = uiState.subtotal,
-            )
-            TotalsRow(
-                label = stringResource(if (uiState.usesItbms) R.string.review_tax_itbms else R.string.review_tax_iva),
-                amount = uiState.estimatedTax,
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 2.dp, color = colors.outline)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp)) {
+            // Subtotal and tax sit in a soft grey block; the total stands out beneath it.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(colors.surfaceVariant, MaterialTheme.shapes.medium)
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+            ) {
+                TotalsRow(label = stringResource(R.string.review_subtotal), amount = uiState.subtotal)
+                TotalsRow(
+                    label = stringResource(if (uiState.usesItbms) R.string.review_tax_itbms else R.string.review_tax_iva),
+                    amount = uiState.estimatedTax,
+                )
+            }
+            Row(modifier = Modifier.padding(top = 14.dp, bottom = 18.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.review_total),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
                 Column(horizontalAlignment = Alignment.End) {
                     AnimatedContent(targetState = total.toDisplayString(), label = "review_total") { value ->
-                        Text(text = value, style = MaterialTheme.typography.displaySmall, color = colors.onSurface)
+                        Text(text = value, style = MaterialTheme.typography.headlineLarge, color = colors.primary)
                     }
                     if (secondaryTotal.isNotBlank()) {
                         Text(text = secondaryTotal, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
             val pay: @Composable (Modifier) -> Unit = { buttonModifier ->
                 KioskButton(
                     text = stringResource(R.string.review_pay, total.toDisplayString()),
                     onClick = onCheckout,
+                    height = ActionButtonHeight,
                     modifier = buttonModifier,
                     trailing = {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp))
+                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(36.dp))
                     },
                 )
             }
@@ -411,17 +524,19 @@ private fun ReviewBottomBar(
                     text = stringResource(R.string.review_continue_shopping),
                     onClick = onContinueShopping,
                     style = KioskButtonStyle.Secondary,
+                    icon = Icons.Rounded.Add,
+                    height = ActionButtonHeight,
                     modifier = buttonModifier,
                 )
             }
             if (sidePanel) {
                 pay(Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 keepShopping(Modifier.fillMaxWidth())
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    keepShopping(Modifier.weight(0.85f))
-                    pay(Modifier.weight(1.15f))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    keepShopping(Modifier.weight(0.8f))
+                    pay(Modifier.weight(1.2f))
                 }
             }
         }
@@ -436,10 +551,10 @@ private fun TotalsRow(
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        Text(text = amount.toDisplayString(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(text = amount.toDisplayString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }

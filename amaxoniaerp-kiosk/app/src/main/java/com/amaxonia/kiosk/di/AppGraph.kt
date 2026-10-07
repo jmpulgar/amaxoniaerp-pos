@@ -2,11 +2,13 @@ package com.amaxonia.kiosk.di
 
 import android.content.Context
 import android.util.Log
+import com.amaxonia.kiosk.core.media.KioskMediaPreloader
 import com.amaxonia.kiosk.core.network.KioskApiClient
 import com.amaxonia.kiosk.core.network.KioskCatalogResponse
 import com.amaxonia.kiosk.core.network.KioskConfigResponse
 import com.amaxonia.kiosk.core.network.KioskHttpClientFactory
 import com.amaxonia.kiosk.core.network.KioskTokenStorage
+import com.amaxonia.kiosk.core.network.NetworkResult
 import com.amaxonia.kiosk.data.config.KioskConfigRepository
 import com.amaxonia.kiosk.data.db.KioskDatabase
 import com.amaxonia.kiosk.data.db.PendingPaymentDao
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import java.io.File
 
 private const val TAG = "AppGraph"
 private const val DEFAULT_DISPATCH = "RETIRO_MOSTRADOR"
@@ -49,7 +52,16 @@ class AppGraph(
 
     val httpClient: HttpClient = KioskHttpClientFactory.create(tokenStorage)
     val apiClient: KioskApiClient = KioskApiClient(httpClient, tokenStorage)
-    val configRepository: KioskConfigRepository = KioskConfigRepository(apiClient, tokenStorage)
+
+    /** Downloads banners and catalog photos ahead of time (seamless attract loop, instant menu). */
+    val mediaPreloader: KioskMediaPreloader = KioskMediaPreloader(context, appScope)
+    val configRepository: KioskConfigRepository =
+        KioskConfigRepository(
+            apiClient = apiClient,
+            tokenStorage = tokenStorage,
+            cacheFile = File(context.filesDir, "kiosk_config.json"),
+            onConfigLoaded = { mediaPreloader.preloadBanners(it.media) },
+        )
 
     /** Company kiosk config (payment methods, dispatch, dining modes…); null until first loaded. */
     val config: StateFlow<KioskConfigResponse?> get() = configRepository.config
@@ -99,7 +111,14 @@ class AppGraph(
         }
         config
             .filterNotNull()
-            .onEach { orderGraph.setCurrencyConfig(it.currency) }
+            .onEach {
+                orderGraph.setCurrencyConfig(it.currency)
+                // While the attract loop runs, have the menu ready before the customer taps "start".
+                prefetchCatalog()
+            }.launchIn(appScope)
+        catalogState
+            .filterNotNull()
+            .onEach { mediaPreloader.preloadCatalog(it) }
             .launchIn(appScope)
     }
 
@@ -123,6 +142,17 @@ class AppGraph(
         resetSession()
         configRepository.clear()
         catalogState.value = null
+    }
+
+    /** Loads the catalog in the background when none is held yet (the menu then opens instantly). */
+    private fun prefetchCatalog() {
+        if (catalogState.value != null) return
+        appScope.launch(Dispatchers.IO) {
+            val result = apiClient.getCatalog()
+            if (result is NetworkResult.Success && catalogState.value == null && config.value != null) {
+                catalogState.value = result.data
+            }
+        }
     }
 
     /** Retries paid-but-unregistered orders from the Room outbox. */

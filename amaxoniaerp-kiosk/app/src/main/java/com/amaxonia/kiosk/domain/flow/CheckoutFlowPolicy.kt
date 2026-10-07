@@ -1,5 +1,6 @@
 package com.amaxonia.kiosk.domain.flow
 
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskConfigResponse
 import com.amaxonia.kiosk.domain.payment.PaymentMethod
 
@@ -24,5 +25,9 @@ object CheckoutFlowPolicy {
         PaymentMethod.available(
             configured = config?.paymentMethods ?: listOf(PaymentMethod.CARD.wireName),
             cardTerminalAvailable = cardTerminalAvailable,
+            hasCardOptions = !config?.cardOptions.isNullOrEmpty(),
         )
+
+    /** Card methods listed on the method screen (one tile each); empty = a single generic card tile. */
+    fun cardOptions(config: KioskConfigResponse?): List<KioskCardOption> = config?.cardOptions.orEmpty()
 }

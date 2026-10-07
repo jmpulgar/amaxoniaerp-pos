@@ -1,6 +1,7 @@
 package com.amaxonia.kiosk.ui.paymentmethod
 
 import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskQuoteResponse
 import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.QuoteOrderUseCase
@@ -63,6 +64,39 @@ class PaymentMethodViewModelTest {
             advanceUntilIdle()
 
             assertEquals(PaymentMethod.YAPPY, vm.uiState.value.autoSelectedMethod)
+        }
+
+    @Test
+    fun `several card methods are listed instead of auto-selecting CARD`() =
+        runTest(dispatcher) {
+            val cards = listOf(KioskCardOption(49, "VISA", "TDC"), KioskCardOption(50, "MASTERCARD", "TDC"))
+            val vm = PaymentMethodViewModel(quoteOrder, orderGraph, listOf(PaymentMethod.CARD), cards)
+            advanceUntilIdle()
+
+            assertEquals(cards, vm.uiState.value.cardOptions)
+            assertNull(vm.uiState.value.autoSelectedMethod)
+        }
+
+    @Test
+    fun `a single card method is auto-selected with its option`() =
+        runTest(dispatcher) {
+            val visa = KioskCardOption(49, "VISA", "TDC")
+            val vm = PaymentMethodViewModel(quoteOrder, orderGraph, listOf(PaymentMethod.CARD), listOf(visa))
+            advanceUntilIdle()
+
+            assertEquals(PaymentMethod.CARD, vm.uiState.value.autoSelectedMethod)
+            assertEquals(visa, vm.uiState.value.autoSelectedCardOption)
+        }
+
+    @Test
+    fun `card options are dropped when CARD is not available`() =
+        runTest(dispatcher) {
+            val vm = PaymentMethodViewModel(quoteOrder, orderGraph, listOf(PaymentMethod.YAPPY), listOf(KioskCardOption(49, "VISA")))
+            advanceUntilIdle()
+
+            assertEquals(emptyList<KioskCardOption>(), vm.uiState.value.cardOptions)
+            assertEquals(PaymentMethod.YAPPY, vm.uiState.value.autoSelectedMethod)
+            assertNull(vm.uiState.value.autoSelectedCardOption)
         }
 
     @Test

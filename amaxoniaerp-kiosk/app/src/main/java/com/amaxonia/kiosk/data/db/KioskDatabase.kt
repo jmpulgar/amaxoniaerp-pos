@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [PendingPayment::class], version = 2, exportSchema = false)
+@Database(entities = [PendingPayment::class], version = 3, exportSchema = false)
 abstract class KioskDatabase : RoomDatabase() {
     abstract fun pendingPaymentDao(): PendingPaymentDao
 
@@ -22,9 +22,17 @@ abstract class KioskDatabase : RoomDatabase() {
                 }
             }
 
+        /** v2 → v3: nullable `paymentMethodId` (chosen card method); old rows keep the default card method. */
+        val MIGRATION_2_3: Migration =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `pending_payments` ADD COLUMN `paymentMethodId` INTEGER")
+                }
+            }
+
         /** Registers every schema migration; Room is never allowed to fall back to a destructive rebuild. */
         fun withMigrations(builder: RoomDatabase.Builder<KioskDatabase>): RoomDatabase.Builder<KioskDatabase> =
-            builder.addMigrations(MIGRATION_1_2)
+            builder.addMigrations(MIGRATION_1_2, MIGRATION_2_3)
 
         fun build(context: Context): KioskDatabase {
             return withMigrations(

@@ -140,8 +140,9 @@ class OrderingScreenshotTest {
         val viewModel = ProductCustomizerViewModel(ScreenshotFixtures.comboDobleQueso, OrderGraph())
         val extras = ScreenshotFixtures.comboDobleQueso.modifierGroups.last()
         viewModel.toggleOption(extras, extras.options.first())
+        viewModel.startAt(ScreenshotFixtures.comboDobleQueso.modifierGroups.size)
         shots.snap("04_customizer_review") {
-            CustomizerScreen(viewModel = viewModel, onDismiss = {}, initialStep = ScreenshotFixtures.comboDobleQueso.modifierGroups.size)
+            CustomizerScreen(viewModel = viewModel, onDismiss = {})
         }
     }
 

@@ -99,9 +99,9 @@ private val GrayscaleFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setT
 private const val BREATH_PERIOD_MS = 1100
 private const val RING_START_ANGLE = -90f
 private const val FULL_SWEEP = 360f
-private const val STAGGER_BASE_DELAY_MS = 80
-private const val STAGGER_STEP_MS = 110
-private const val STAGGER_DURATION_MS = 420
+private const val STAGGER_BASE_DELAY_MS = 0
+private const val STAGGER_STEP_MS = 40
+private const val STAGGER_DURATION_MS = 220
 private const val QTY_ANIM_MS = 180
 private val KEY_RADIUS = 28.dp
 

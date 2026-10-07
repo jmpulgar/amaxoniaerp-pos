@@ -1,6 +1,7 @@
 package com.amaxonia.kiosk.domain.checkout
 
 import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskQuoteResponse
 import com.amaxonia.kiosk.data.db.PendingPayment
 import com.amaxonia.kiosk.domain.cart.OrderGraph
@@ -18,6 +19,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -70,7 +72,7 @@ class CheckoutOrderUseCaseTest {
             var approvedCalled = false
             val useCase = CheckoutOrderUseCase(api.client, terminal, fakeDao)
 
-            val result = useCase.payWithCard(quote) { approvedCalled = true }
+            val result = useCase.payWithCard(quote, onApproved = { approvedCalled = true })
 
             assertTrue(result is CheckoutResult.Success)
             assertTrue(approvedCalled)
@@ -128,6 +130,25 @@ class CheckoutOrderUseCaseTest {
             useCase.registerPayment(quote, com.amaxonia.kiosk.testutil.approvedCard(), PaymentMethod.YAPPY)
 
             assertEquals("YAPPY", fakeDao.getByOrderId("ord-uuid-1234")?.method)
+        }
+
+    @Test
+    fun `manual card payment registers the chosen card method without touching the terminal`() =
+        runTest {
+            val api = happyApi()
+            val terminal = FakePaymentTerminal(isAvailable = false)
+            val useCase = CheckoutOrderUseCase(api.client, terminal, fakeDao)
+
+            val result = useCase.registerManualCardPayment(quote, KioskCardOption(id = 50, name = "MASTERCARD", siglas = "TDC"))
+
+            assertTrue(result is CheckoutResult.Success)
+            assertEquals(0, terminal.processCalls)
+            val body = Json.parseToJsonElement(api.requests.last().bodyText()).jsonObject
+            assertEquals("CARD", body["method"]?.jsonPrimitive?.content)
+            assertEquals(50, body["paymentMethodId"]?.jsonPrimitive?.int)
+            assertEquals(CheckoutOrderUseCase.MANUAL_REFERENCE, body["reference"]?.jsonPrimitive?.content)
+            assertTrue(body["transactionId"]?.jsonPrimitive?.content.orEmpty().startsWith(CheckoutOrderUseCase.MANUAL_TRANSACTION_PREFIX))
+            assertEquals(50, fakeDao.getByOrderId("ord-uuid-1234")?.paymentMethodId)
         }
 
     @Test

@@ -33,10 +33,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.amaxonia.kiosk.core.network.KioskSessionEvent
 import com.amaxonia.kiosk.di.AppGraph
 import com.amaxonia.kiosk.domain.flow.CheckoutFlowPolicy
@@ -520,14 +522,15 @@ fun KioskNavHost(
                         quoteOrder = appGraph.quoteOrderUseCase,
                         orderGraph = appGraph.orderGraph,
                         methods = appGraph.availablePaymentMethods,
+                        cardOptions = CheckoutFlowPolicy.cardOptions(appGraph.config.value),
                     )
                 }
             PaymentMethodScreen(
                 viewModel = paymentMethodViewModel,
-                onMethodSelected = { method, skipped ->
+                onMethodSelected = { method, cardOption, skipped ->
                     val route =
                         when (method) {
-                            PaymentMethod.CARD -> KioskDestinations.PAYMENT
+                            PaymentMethod.CARD -> KioskDestinations.paymentRoute(cardOption?.id)
                             PaymentMethod.YAPPY -> KioskDestinations.YAPPY_PAYMENT
                         }
                     navController.navigate(route) {
@@ -539,7 +542,17 @@ fun KioskNavHost(
             )
         }
 
-        composable(KioskDestinations.PAYMENT) {
+        composable(
+            route = KioskDestinations.PAYMENT_ROUTE_PATTERN,
+            arguments =
+                listOf(
+                    navArgument(KioskDestinations.ARG_CARD_ID) {
+                        type = NavType.IntType
+                        defaultValue = KioskDestinations.NO_CARD_ID
+                    },
+                ),
+        ) { backStackEntry ->
+            val cardId = backStackEntry.arguments?.getInt(KioskDestinations.ARG_CARD_ID) ?: KioskDestinations.NO_CARD_ID
             val paymentViewModel =
                 viewModel {
                     PaymentViewModel(
@@ -549,6 +562,7 @@ fun KioskNavHost(
                         checkoutSession = appGraph.checkoutSession,
                         orderGraph = appGraph.orderGraph,
                         dispatch = appGraph.dispatch,
+                        cardOption = CheckoutFlowPolicy.cardOptions(appGraph.config.value).firstOrNull { it.id == cardId },
                     )
                 }
             val paymentState by paymentViewModel.uiState.collectAsStateWithLifecycle()

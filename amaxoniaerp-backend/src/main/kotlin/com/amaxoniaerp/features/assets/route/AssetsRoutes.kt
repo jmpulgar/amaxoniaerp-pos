@@ -20,7 +20,7 @@ import java.io.File
  *
  * En BD: item.foto = "fotos/1_foto.jpeg"; cliente = "{id_cliente}_foto.jpeg".
  * Físicamente: item en {data}/item/1_foto.jpeg; cliente en {data}/cliente_foto/{id}/{filename}.
- * Banners: {data}/banners/{filename}.
+ * Banners: {data}/banners/{filename}. Departamentos: departamento.foto = "fotos/21_foto.png" -> {data}/departamento/21_foto.png.
  *
  * Si ASSETS_BASE_URL está configurado, se redirige allí (ej. listoerp.app).
  * Si DATA_BASE_PATH está configurado y el archivo existe, se sirve desde disco.
@@ -48,6 +48,12 @@ fun Route.assetsRoutes(
          * URL: .../banners/{filename} (ej. .../banners/video_promo.mp4)
          */
         get("/banners/{filename}") { handlers.servirBanner(call) }
+
+        /**
+         * Imagen propia de un departamento (categoría del kiosco).
+         * Path en BD: "fotos/21_foto.png" -> archivo en departamento/21_foto.png
+         */
+        get("/departamento/{filename}") { handlers.servirDepartamento(call) }
     }
 }
 
@@ -134,6 +140,26 @@ internal class AssetsHandlers(
             }
 
             redirectToAssetsBase(call, scope, "banners/$filename")
+        }
+
+    suspend fun servirDepartamento(call: ApplicationCall) =
+        run {
+            val scope = call.resolveAssetScope() ?: return@run
+            val filename =
+                call.parameters["filename"]?.takeIf { it.isNotBlank() && !it.contains("..") }
+            if (filename == null) {
+                call.respond(HttpStatusCode.BadRequest, "filename inválido")
+                return@run
+            }
+
+            val localFile =
+                localFile(File(dataBasePath ?: "", "${scope.companyDb}/departamento/$filename"))
+            if (localFile != null) {
+                call.respondBytes(localFile.readBytes(), contentTypeForFilename(filename))
+                return@run
+            }
+
+            redirectToAssetsBase(call, scope, "departamento/$filename")
         }
 
     private fun localFile(file: File): File? {

@@ -2,12 +2,14 @@ package com.amaxonia.kiosk.ui.customizer
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +37,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
@@ -48,7 +54,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,7 +80,6 @@ import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskImage
 import com.amaxonia.kiosk.ui.components.QuantityStepper
-import com.amaxonia.kiosk.ui.components.bottomHairline
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
 import com.amaxonia.kiosk.ui.components.rightHairline
 import com.amaxonia.kiosk.ui.components.secondaryText
@@ -92,27 +96,28 @@ private const val STEP_SWAP_MS = 220
 private const val SOLD_OUT_ALPHA = 0.45f
 private const val OPTION_COLUMNS = 3
 private const val LANDSCAPE_OPTION_COLUMNS = 5
-private val StepsPanelWidth = 250.dp
+private const val UNREACHABLE_STEP_ALPHA = 0.5f
+private const val CHANGE_BORDER_ALPHA = 0.35f
+private val StepsPanelWidth = 260.dp
+private val WizardButtonHeight = 104.dp
 
 /**
  * Product customizer as a step-by-step wizard, the way fast-food self-order kiosks build a combo:
  * one modifier group per step ("Selecciona tu bebida", "Selecciona extra"…) with the steps listed on
  * the left, and a final "Revisar orden" step with quantity, kitchen note and "Agregar a mi orden".
- * Single-choice steps advance on their own once an option is picked.
+ * Single-choice steps advance on their own once an option is picked. Any step already reached can be
+ * reopened from the step list or from the "Cambiar" links of the review step; choices are kept.
  */
 @Composable
 fun CustomizerScreen(
     viewModel: ProductCustomizerViewModel,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    initialStep: Int = 0,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val item = uiState.item
     val groups = item.modifierGroups
-    val reviewStep = groups.size
-    var step by remember { mutableIntStateOf(initialStep.coerceIn(0, reviewStep)) }
-    var showStepError by remember { mutableStateOf(false) }
+    val step = uiState.currentStep
     var added by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -123,43 +128,22 @@ fun CustomizerScreen(
         }
     }
 
-    fun groupSatisfied(group: KioskModifierGroupDto): Boolean = (uiState.selectedOptions[group.id]?.size ?: 0) in group.min..group.max
-
-    fun goTo(target: Int) {
-        showStepError = false
-        step = target.coerceIn(0, reviewStep)
-    }
-
-    val onNext: () -> Unit = {
-        val group = groups.getOrNull(step)
-        if (group != null && !groupSatisfied(group)) {
-            showStepError = true
-        } else {
-            goTo(step + 1)
-        }
-    }
     val onAdd: () -> Unit = {
-        if (!added) {
-            val firstInvalid = groups.indexOfFirst { !groupSatisfied(it) }
-            if (firstInvalid >= 0) {
-                goTo(firstInvalid)
-                showStepError = true
-            } else {
-                viewModel.addToCart(onSuccess = { added = true })
-            }
-        }
+        if (!added) viewModel.addToCart(onSuccess = { added = true })
     }
-    val onBack: () -> Unit = { if (step == 0) onDismiss() else goTo(step - 1) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
-            ProductHeader(item = item, unitPrice = uiState.unitPrice)
+            ProductHeader(
+                item = item,
+                unitPrice = uiState.unitPrice,
+                stepNumber = step + 1,
+                stepCount = uiState.stepCount,
+            )
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 StepsPanel(
-                    groups = groups,
-                    currentStep = step,
-                    isDone = { index -> index < step && groupSatisfied(groups[index]) },
-                    onStepSelected = { target -> if (target <= step || groups.take(target).all(::groupSatisfied)) goTo(target) },
+                    uiState = uiState,
+                    onStepSelected = { target -> viewModel.goToStep(target) },
                     modifier = Modifier.width(StepsPanelWidth).fillMaxHeight(),
                 )
                 AnimatedContent(
@@ -177,16 +161,15 @@ fun CustomizerScreen(
                         GroupStep(
                             group = group,
                             selectedOptions = uiState.selectedOptions[group.id].orEmpty(),
-                            showError = showStepError && !groupSatisfied(group),
+                            showError = uiState.showStepError && !uiState.isGroupSatisfied(group),
                             onOptionToggled = { option ->
                                 val wasSelected = uiState.selectedOptions[group.id].orEmpty().any { it.id == option.id }
                                 viewModel.toggleOption(group, option)
-                                showStepError = false
                                 // Single choice: picking an option moves on, as on the reference kiosk.
                                 if (group.max == 1 && !wasSelected && !option.soldOut) {
                                     scope.launch {
                                         delay(AUTO_ADVANCE_MS)
-                                        if (step == current) goTo(current + 1)
+                                        viewModel.advanceFrom(current)
                                     }
                                 }
                             },
@@ -195,6 +178,7 @@ fun CustomizerScreen(
                         ReviewStep(
                             item = item,
                             uiState = uiState,
+                            onEditStep = { index -> viewModel.goToStep(index) },
                             onNoteChanged = viewModel::onNoteChanged,
                             onDecrement = viewModel::decrementQuantity,
                             onIncrement = viewModel::incrementQuantity,
@@ -203,84 +187,114 @@ fun CustomizerScreen(
                 }
             }
             WizardBottomBar(
-                isReview = step == reviewStep,
+                isFirstStep = step == 0,
+                isReview = uiState.isOnReviewStep,
                 added = added,
                 totalText = uiState.totalPrice.toDisplayString(),
-                onBack = onBack,
+                onBack = { viewModel.previousStep() },
                 onCancel = onDismiss,
-                onNext = onNext,
+                onNext = { viewModel.nextStep() },
                 onAdd = onAdd,
             )
         }
     }
 }
 
-/** Product photo, name and price across the top of every step. */
+/** Product photo, name and price across the top of every step, with "Paso 2 de 4" and a progress bar. */
 @Composable
 private fun ProductHeader(
     item: KioskItemDto,
     unitPrice: Money,
+    stepNumber: Int,
+    stepCount: Int,
 ) {
     val colors = MaterialTheme.colorScheme
     val glyph = remember(item.name) { foodGlyphFor(item.name) }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .bottomHairline(colors.outlineVariant)
-                .padding(horizontal = 32.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        KioskImage(
-            url = item.imageUrl,
-            contentDescription = item.name,
-            contentScale = ContentScale.Fit,
-            placeholderIcon = glyph,
-            placeholderIconSize = 64.dp,
-            modifier = Modifier.size(128.dp).clip(RoundedCornerShape(10.dp)),
-        )
-        Spacer(Modifier.width(28.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.headlineMedium,
-                color = colors.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+    val progress by animateFloatAsState(
+        targetValue = stepNumber.toFloat() / stepCount.coerceAtLeast(1),
+        animationSpec = tween(STEP_SWAP_MS),
+        label = "step_progress",
+    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            KioskImage(
+                url = item.imageUrl,
+                contentDescription = item.name,
+                contentScale = ContentScale.Fit,
+                placeholderIcon = glyph,
+                placeholderIconSize = 64.dp,
+                modifier = Modifier.size(128.dp).clip(RoundedCornerShape(10.dp)),
             )
-            Spacer(Modifier.height(4.dp))
-            Text(text = unitPrice.toDisplayString(), style = MaterialTheme.typography.titleLarge, color = colors.onSurfaceVariant)
+            Spacer(Modifier.width(28.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = colors.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(text = unitPrice.toDisplayString(), style = MaterialTheme.typography.titleLarge, color = colors.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(20.dp))
+            Text(
+                text = stringResource(R.string.customizer_step_progress, stepNumber, stepCount),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.primary,
+                maxLines = 1,
+                modifier =
+                    Modifier
+                        .background(colors.primaryContainer, RoundedCornerShape(percent = 50))
+                        .padding(horizontal = 22.dp, vertical = 10.dp),
+            )
+        }
+        // Thin progress bar doubling as the header's bottom border.
+        Box(modifier = Modifier.fillMaxWidth().height(6.dp).background(colors.outlineVariant)) {
+            Box(modifier = Modifier.fillMaxWidth(progress).fillMaxHeight().background(colors.primary))
         }
     }
 }
 
-/** Left list of steps: done (check), current (filled dot) and pending (empty dot), plus "Revisar orden". */
+/**
+ * Left list of steps: done (check), current (filled dot) and pending (empty dot), plus "Revisar orden".
+ * Done steps show what was chosen; every reachable step can be tapped to go back and fix it.
+ */
 @Composable
 private fun StepsPanel(
-    groups: List<KioskModifierGroupDto>,
-    currentStep: Int,
-    isDone: (Int) -> Boolean,
+    uiState: CustomizerUiState,
     onStepSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val groups = uiState.item.modifierGroups
     val reviewLabel = stringResource(R.string.customizer_step_review)
     val labels = remember(groups, reviewLabel) { groups.map { it.name } + reviewLabel }
     LazyColumn(
         modifier = modifier.rightHairline(colors.outlineVariant),
-        contentPadding = PaddingValues(vertical = 20.dp),
+        contentPadding = PaddingValues(vertical = 12.dp),
     ) {
         itemsIndexed(labels) { index, label ->
-            val current = index == currentStep
-            val done = index < groups.size && isDone(index)
+            val current = index == uiState.currentStep
+            val done = !current && uiState.isStepDone(index)
+            val reachable = uiState.canGoToStep(index)
+            val summary =
+                groups
+                    .getOrNull(index)
+                    ?.let { group -> uiState.selectedOptions[group.id].orEmpty().joinToString(" · ") { it.name } }
+                    .orEmpty()
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 104.dp)
-                        .background(if (current) colors.surfaceVariant else Color.Transparent)
-                        .clickable { onStepSelected(index) }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .background(if (current) colors.primaryContainer else Color.Transparent)
+                        .clickable(enabled = reachable && !current) { onStepSelected(index) }
+                        .graphicsLayer { alpha = if (reachable || current) 1f else UNREACHABLE_STEP_ALPHA }
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -297,16 +311,32 @@ private fun StepsPanel(
                             current -> colors.primary
                             else -> colors.outline
                         },
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(36.dp),
                 )
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (current) FontWeight.Black else FontWeight.Medium),
-                    color = if (current || done) colors.onSurface else colors.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (current) FontWeight.Black else FontWeight.Medium),
+                        color =
+                            when {
+                                current -> colors.primary
+                                done -> colors.onSurface
+                                else -> colors.onSurfaceVariant
+                            },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (done && summary.isNotEmpty()) {
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
@@ -448,56 +478,49 @@ private fun OptionTile(
     }
 }
 
-/** "Revisar orden": what was chosen, the kitchen note and the quantity. */
+/** "Revisar orden": each chosen group with a "Cambiar" link, the kitchen note and the quantity. */
 @Composable
 private fun ReviewStep(
     item: KioskItemDto,
     uiState: CustomizerUiState,
+    onEditStep: (Int) -> Unit,
     onNoteChanged: (String) -> Unit,
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    val chosen = remember(uiState.selectedOptions, item) { item.modifierGroups.flatMap { uiState.selectedOptions[it.id].orEmpty() } }
     val secondaryTotal = remember(uiState.totalPrice, uiState.currency) { uiState.totalPrice.secondaryText(uiState.currency) }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 32.dp, vertical = 32.dp),
     ) {
         Text(text = stringResource(R.string.customizer_step_review), style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(24.dp))
-        KioskCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(28.dp)) {
-                Text(text = item.name, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
-                if (!item.description.isNullOrBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(text = item.description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                }
-                if (chosen.isNotEmpty()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), thickness = 2.dp, color = colors.outlineVariant)
-                    chosen.forEach { option ->
-                        val extra = Money.fromString(option.extraPrice)
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Rounded.CheckCircle,
-                                contentDescription = null,
-                                tint = KioskColors.success,
-                                modifier = Modifier.size(32.dp),
+        if (!item.description.isNullOrBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(text = item.description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+        }
+        if (item.modifierGroups.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                text = stringResource(R.string.customizer_your_choices),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            KioskCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    item.modifierGroups.forEachIndexed { index, group ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 24.dp),
+                                thickness = 1.dp,
+                                color = colors.outlineVariant,
                             )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                text = option.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = colors.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (extra.amount > BigDecimal.ZERO) {
-                                Text(
-                                    text = stringResource(R.string.customizer_extra_price, extra.toDisplayString()),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = colors.onSurfaceVariant,
-                                )
-                            }
                         }
+                        ChoiceSummaryRow(
+                            group = group,
+                            chosen = uiState.selectedOptions[group.id].orEmpty(),
+                            onChange = { onEditStep(index) },
+                        )
                     }
                 }
             }
@@ -547,9 +570,65 @@ private fun ReviewStep(
     }
 }
 
-/** "Atrás" and "Cancelar" on the left; "Siguiente" or "Agregar a mi orden" on the right. */
+/** One group on the review step: its name, what was chosen (with extra cost) and "Cambiar". */
+@Composable
+private fun ChoiceSummaryRow(
+    group: KioskModifierGroupDto,
+    chosen: List<KioskModifierOptionDto>,
+    onChange: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val extras = remember(chosen) { chosen.fold(Money.ZERO) { acc, opt -> acc + Money.fromString(opt.extraPrice) } }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onChange)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = group.name, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = chosen.joinToString(" · ") { it.name }.ifEmpty { stringResource(R.string.customizer_no_selection) },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (chosen.isEmpty()) colors.onSurfaceVariant else colors.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (extras.amount > BigDecimal.ZERO) {
+                Text(
+                    text = stringResource(R.string.customizer_extra_price, extras.toDisplayString()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.primary,
+                )
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Row(
+            modifier =
+                Modifier
+                    .heightIn(min = 72.dp)
+                    .border(2.dp, colors.primary.copy(alpha = CHANGE_BORDER_ALPHA), RoundedCornerShape(percent = 50))
+                    .padding(horizontal = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Edit, contentDescription = null, tint = colors.primary, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text = stringResource(R.string.customizer_change), style = MaterialTheme.typography.titleSmall, color = colors.primary)
+        }
+    }
+}
+
+/**
+ * Fixed action bar; buttons never move between steps so the customer always finds them in the same
+ * place: "Cancelar" (left, quiet), "Atrás" (disabled on the first step) and the primary
+ * "Siguiente" / "Agregar a mi orden" (right, widest).
+ */
 @Composable
 private fun WizardBottomBar(
+    isFirstStep: Boolean,
     isReview: Boolean,
     added: Boolean,
     totalText: String,
@@ -562,19 +641,24 @@ private fun WizardBottomBar(
     Box(modifier = Modifier.fillMaxWidth().topHairline(colors.outlineVariant).padding(horizontal = 28.dp, vertical = 20.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             KioskButton(
+                text = stringResource(R.string.btn_cancel),
+                onClick = onCancel,
+                style = KioskButtonStyle.Ghost,
+                icon = Icons.Rounded.Close,
+                contentColor = colors.onSurfaceVariant,
+                height = WizardButtonHeight,
+                modifier = Modifier.weight(0.8f),
+            )
+            KioskButton(
                 text = stringResource(R.string.customizer_back),
                 onClick = onBack,
                 style = KioskButtonStyle.Secondary,
-                height = 104.dp,
-                modifier = Modifier.weight(0.7f),
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                enabled = !isFirstStep && !added,
+                height = WizardButtonHeight,
+                modifier = Modifier.weight(0.9f),
             )
-            KioskButton(
-                text = stringResource(R.string.btn_cancel),
-                onClick = onCancel,
-                style = KioskButtonStyle.Secondary,
-                height = 104.dp,
-                modifier = Modifier.weight(0.7f),
-            )
+            val showArrow = !isReview && !added
             KioskButton(
                 text =
                     when {
@@ -584,8 +668,14 @@ private fun WizardBottomBar(
                     },
                 onClick = if (isReview) onAdd else onNext,
                 icon = if (added) Icons.Rounded.CheckCircle else null,
-                height = 104.dp,
-                modifier = Modifier.weight(1.4f),
+                trailing =
+                    if (showArrow) {
+                        { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp)) }
+                    } else {
+                        null
+                    },
+                height = WizardButtonHeight,
+                modifier = Modifier.weight(1.5f),
             )
         }
     }

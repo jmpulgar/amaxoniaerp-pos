@@ -17,6 +17,56 @@ _Nada todavía._
 
 ---
 
+## [0.0.9] — 2026-10-07
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 9 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.9.apk` |
+| SHA-256 | `6067FD7EC4FD6E07CFC623DC1FB10AFA7D0F3C31C8BF5F1359AE575D09810194` |
+
+### Requisitos
+- **Backend nuevo**: envía la imagen propia de cada categoría (`iconUrl`, desde `departamento.foto`) y sirve `/api/data/{país}/{empresa}/departamento/{archivo}` (desde `DATA_BASE_PATH` o redirigiendo a `ASSETS_BASE_URL`). Incluye también lo de 0.0.8.
+- Sin migraciones: la columna `departamento.foto` ya existe en el ERP.
+
+### Corregido
+- **Imágenes de las categorías:** ahora se muestra la foto cargada en Mantenimiento → Departamento del ERP. Antes el backend no la enviaba y el kiosko usaba la foto del primer producto de la categoría. Si un departamento no tiene foto, se sigue usando la del primer producto.
+
+---
+
+## [0.0.8] — 2026-10-07
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 8 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.8.apk` |
+| SHA-256 | `11C8A95AD8CACE7317DBFC5A107AB4D541F5E5A3EB2F06AC00B295C35449C57F` |
+
+### Requisitos
+- **Backend nuevo** (envía `cardOptions` en `/config` y acepta `paymentMethodId` en `/pay`). Con el backend anterior el kiosko no muestra tarjetas y vuelve a ir directo a Yappy.
+- Sin migraciones de base de datos de la empresa: las tarjetas salen de `caja_forma_pago` (activas, visibles en POS, siglas TDC/TDD/AMEX/TARJETA o `FormaPagoFact` 03/04).
+- La base local del kiosko pasa a la versión 3 (migración automática, solo agrega una columna).
+
+### Agregado
+- **Formas de pago con tarjeta de la empresa** (p. ej. VISA, MASTERCARD, Tarjeta de débito) con su logo del ERP, junto a Yappy.
+- **Pago sin pasarela (pruebas):** si el equipo no tiene terminal de tarjeta, al elegir una tarjeta se muestra una confirmación (total, forma de pago y aviso de que **no se cobra nada**). «Confirmar pago» genera el pedido, la factura y el recibo con la forma de pago elegida (referencia `SIN PASARELA`).
+- Personalizador: «Paso X de N» con barra de progreso, lista de pasos tocable para volver a cualquier paso anterior y, en «Revisar orden», un botón «Cambiar» por cada grupo.
+
+### Cambiado
+- **Botones del personalizador** en una barra fija: «Cancelar» a la izquierda, «Atrás» al centro (deshabilitado en el primer paso, nunca cambia de lugar) y «Siguiente» / «Agregar a mi orden · $X» a la derecha. Volver atrás conserva lo elegido.
+- **«Revisa tu orden» más compacta y moderna:** filas de ~128 dp con foto pequeña, opciones en una sola línea, total de la línea y un selector [− 1 +] (el − se vuelve papelera en 1); sin la ✕ de la esquina ni tarjetas pesadas; selector Comer aquí / Para llevar más delgado; resumen Subtotal / ITBMS / Total más limpio.
+- **Más rápida:** transiciones entre pantallas de 200 ms (antes 320 ms), entradas escalonadas más cortas, el menú y sus fotos se precargan en segundo plano al cargar la configuración y la última configuración se guarda en el equipo para mostrar los banners al instante al reiniciar.
+
+### Corregido
+- **Pantalla negra entre banners:** los banners (imágenes y videos) se descargan y guardan en caché al configurar la caja y en cada carga de configuración; el siguiente banner aparece con un fundido solo cuando ya está listo, y el anterior se queda visible mientras tanto. Un video único ahora se repite.
+
+### Pendiente
+- Yappy sigue fallando: hace falta el registro `[YAPPY]` del backend de un intento fallido. Sospecha principal: Yappy devuelve su error como `{status:{code:"YP-…"}}` (a veces con HTTP 200) y el backend lo reporta como «no devolvió transactionId/token», ocultando el código real.
+
+---
+
 ## [0.0.7] — 2026-10-07
 
 | Dato | Valor |

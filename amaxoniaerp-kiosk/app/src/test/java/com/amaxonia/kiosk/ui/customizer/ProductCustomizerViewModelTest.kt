@@ -260,4 +260,91 @@ class ProductCustomizerViewModelTest {
         assertEquals(listOf(20, 21), state.selectedOptions[multiOptionalGroup.id]?.map { it.id })
         assertNull(state.selectedOptions[mandatoryMultiGroup.id])
     }
+
+    @Test
+    fun `nextStep blocks on an unsatisfied group and keeps the step`() {
+        val item = sampleItem.copy(modifierGroups = listOf(mandatoryMultiGroup, multiOptionalGroup))
+        val viewModel = ProductCustomizerViewModel(item, orderGraph)
+
+        assertFalse(viewModel.nextStep())
+        assertEquals(0, viewModel.uiState.value.currentStep)
+        assertTrue(viewModel.uiState.value.showStepError)
+
+        viewModel.toggleOption(mandatoryMultiGroup, mandatoryMultiGroup.options[0])
+        assertFalse(viewModel.uiState.value.showStepError)
+        viewModel.toggleOption(mandatoryMultiGroup, mandatoryMultiGroup.options[1])
+        assertTrue(viewModel.nextStep())
+        assertEquals(1, viewModel.uiState.value.currentStep)
+        assertEquals(1, viewModel.uiState.value.furthestStep)
+    }
+
+    @Test
+    fun `previousStep keeps earlier selections and stops at the first step`() {
+        val viewModel = ProductCustomizerViewModel(sampleItem, orderGraph)
+        viewModel.toggleOption(singleMandatoryGroup, singleMandatoryGroup.options[1])
+        viewModel.nextStep()
+        viewModel.toggleOption(multiOptionalGroup, multiOptionalGroup.options[0])
+        viewModel.nextStep()
+        assertTrue(viewModel.uiState.value.isOnReviewStep)
+
+        assertTrue(viewModel.previousStep())
+        assertTrue(viewModel.previousStep())
+        assertFalse(viewModel.previousStep())
+
+        val state = viewModel.uiState.value
+        assertEquals(0, state.currentStep)
+        assertEquals(2, state.furthestStep)
+        assertEquals(listOf(11), state.selectedOptions[singleMandatoryGroup.id]?.map { it.id })
+        assertEquals(listOf(20), state.selectedOptions[multiOptionalGroup.id]?.map { it.id })
+    }
+
+    @Test
+    fun `goToStep allows reached steps and refuses skipping an incomplete group`() {
+        val item = sampleItem.copy(modifierGroups = listOf(mandatoryMultiGroup, multiOptionalGroup))
+        val viewModel = ProductCustomizerViewModel(item, orderGraph)
+
+        // Review step is unreachable while the first mandatory group is incomplete.
+        assertFalse(viewModel.goToStep(2))
+        assertFalse(viewModel.goToStep(-1))
+        assertEquals(0, viewModel.uiState.value.currentStep)
+
+        viewModel.toggleOption(mandatoryMultiGroup, mandatoryMultiGroup.options[0])
+        viewModel.toggleOption(mandatoryMultiGroup, mandatoryMultiGroup.options[1])
+        assertTrue(viewModel.goToStep(2))
+        assertEquals(2, viewModel.uiState.value.furthestStep)
+
+        // From the review step, "Cambiar" jumps back to any group.
+        assertTrue(viewModel.goToStep(0))
+        assertEquals(0, viewModel.uiState.value.currentStep)
+        assertTrue(viewModel.uiState.value.isStepDone(0))
+        assertTrue(viewModel.goToStep(2))
+    }
+
+    @Test
+    fun `advanceFrom ignores a stale auto-advance after the customer moved`() {
+        val viewModel = ProductCustomizerViewModel(sampleItem, orderGraph)
+        viewModel.nextStep()
+        viewModel.previousStep()
+        viewModel.goToStep(1)
+
+        viewModel.advanceFrom(0)
+        assertEquals(1, viewModel.uiState.value.currentStep)
+
+        viewModel.advanceFrom(1)
+        assertEquals(2, viewModel.uiState.value.currentStep)
+    }
+
+    @Test
+    fun `addToCart with an incomplete group sends the wizard back to it`() {
+        val item = sampleItem.copy(modifierGroups = listOf(singleMandatoryGroup, mandatoryMultiGroup))
+        val viewModel = ProductCustomizerViewModel(item, orderGraph)
+        viewModel.startAt(2)
+
+        viewModel.addToCart(onSuccess = {})
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.currentStep)
+        assertTrue(state.showStepError)
+        assertEquals(0, orderGraph.lines.value.size)
+    }
 }

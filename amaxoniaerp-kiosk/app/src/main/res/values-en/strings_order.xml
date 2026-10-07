@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Customizer wizard navigation and compact order review (0.0.8). -->
+<resources>
+    <string name="customizer_step_progress">Step %1$d of %2$d</string>
+    <string name="customizer_change">Change</string>
+    <string name="customizer_no_selection">No selection</string>
+    <string name="customizer_your_choices">Your choices</string>
+</resources>

@@ -22,7 +22,34 @@ data class CustomizerUiState(
     val note: String = "",
     val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
     val validationErrors: Map<Int, String> = emptyMap(),
+    /** Wizard step: one per modifier group, then the "Revisar orden" step at [reviewStep]. */
+    val currentStep: Int = 0,
+    /** Furthest step the customer has reached; every step up to it can be revisited from the step list. */
+    val furthestStep: Int = 0,
+    /** The current step was left without meeting its minimum ("Siguiente" pressed too early). */
+    val showStepError: Boolean = false,
 ) {
+    val reviewStep: Int
+        get() = item.modifierGroups.size
+
+    val stepCount: Int
+        get() = reviewStep + 1
+
+    val isOnReviewStep: Boolean
+        get() = currentStep == reviewStep
+
+    fun isGroupSatisfied(group: KioskModifierGroupDto): Boolean = (selectedOptions[group.id]?.size ?: 0) in group.min..group.max
+
+    /** Done = already visited and its selection is valid (shown with a check in the step list). */
+    fun isStepDone(index: Int): Boolean =
+        index < currentStep.coerceAtLeast(furthestStep) &&
+            item.modifierGroups.getOrNull(index)?.let(::isGroupSatisfied) == true
+
+    /** Steps up to the furthest reached, or any step whose previous groups are all valid. */
+    fun canGoToStep(index: Int): Boolean =
+        index in 0..reviewStep &&
+            (index <= furthestStep || item.modifierGroups.take(index).all(::isGroupSatisfied))
+
     val unitPrice: Money
         get() {
             val base = Money.fromString(item.price)
@@ -101,8 +128,54 @@ class ProductCustomizerViewModel(
             current.copy(
                 selectedOptions = updatedSelections,
                 validationErrors = updatedErrors,
+                showStepError = false,
             )
         }
+    }
+
+    /**
+     * Jumps to [index] from the step list or a "Cambiar" link on the review step. Only steps already
+     * reached (or reachable because every previous group is valid) are allowed; selections are kept.
+     */
+    fun goToStep(index: Int): Boolean {
+        if (!_uiState.value.canGoToStep(index)) return false
+        _uiState.update {
+            it.copy(currentStep = index, furthestStep = maxOf(it.furthestStep, index), showStepError = false)
+        }
+        return true
+    }
+
+    /** "Siguiente": moves on only when the current group meets its minimum; otherwise flags the error. */
+    fun nextStep(): Boolean {
+        val state = _uiState.value
+        val group = state.item.modifierGroups.getOrNull(state.currentStep) ?: return false
+        val satisfied = state.isGroupSatisfied(group)
+        if (satisfied) {
+            val target = state.currentStep + 1
+            _uiState.update { it.copy(currentStep = target, furthestStep = maxOf(it.furthestStep, target), showStepError = false) }
+        } else {
+            _uiState.update { it.copy(showStepError = true) }
+        }
+        return satisfied
+    }
+
+    /** Auto-advance after a single-choice pick, unless the customer already moved to another step. */
+    fun advanceFrom(step: Int) {
+        if (_uiState.value.currentStep == step) nextStep()
+    }
+
+    /** "Atrás": the previous step, with its selections intact. False on the first step. */
+    fun previousStep(): Boolean {
+        val state = _uiState.value
+        if (state.currentStep == 0) return false
+        _uiState.update { it.copy(currentStep = it.currentStep - 1, showStepError = false) }
+        return true
+    }
+
+    /** Opens the wizard directly on [step] (e.g. screenshots of the review step). */
+    fun startAt(step: Int) {
+        val target = step.coerceIn(0, _uiState.value.reviewStep)
+        _uiState.update { it.copy(currentStep = target, furthestStep = maxOf(it.furthestStep, target), showStepError = false) }
     }
 
     fun incrementQuantity() {
@@ -136,7 +209,15 @@ class ProductCustomizerViewModel(
         }
 
         if (errors.isNotEmpty()) {
-            _uiState.update { it.copy(validationErrors = errors) }
+            // Send the customer back to the first incomplete group, with the error shown.
+            val firstInvalid = item.modifierGroups.indexOfFirst { it.id in errors }
+            _uiState.update {
+                it.copy(
+                    validationErrors = errors,
+                    currentStep = if (firstInvalid >= 0) firstInvalid else it.currentStep,
+                    showStepError = true,
+                )
+            }
             return
         }
 

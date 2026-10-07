@@ -37,6 +37,17 @@ data class KioskConfigResponse(
     val country: String,
     /** Métodos de pago habilitados para este kiosco: siempre "CARD"; "YAPPY" si está configurado. */
     val paymentMethods: List<String>,
+    /** Formas de pago con tarjeta de `caja_forma_pago` que el kiosco lista (VISA, MASTERCARD, débito...). */
+    val cardOptions: List<KioskCardOptionDto> = emptyList(),
+)
+
+/** Una forma de pago con tarjeta: `id` = `caja_forma_pago.id_forma_pago`; `image` = data URI del ERP. */
+@Serializable
+data class KioskCardOptionDto(
+    val id: Int,
+    val name: String,
+    val siglas: String,
+    val image: String? = null,
 )
 
 @Serializable
@@ -152,6 +163,8 @@ data class KioskPaymentRequest(
     val brand: String = "",
     val amount: String,
     val method: String = KioskPaymentMethod.CARD,
+    /** Tarjeta: forma de pago elegida (`cardOptions[].id`); null = la forma TDC por defecto. */
+    val paymentMethodId: Int? = null,
 )
 
 object KioskPaymentMethod {

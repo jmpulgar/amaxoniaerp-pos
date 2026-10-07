@@ -28,9 +28,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Contactless
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.CreditCardOff
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.rounded.TimerOff
 import androidx.compose.material3.Icon
@@ -51,14 +53,18 @@ import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
+import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.softShadow
+import com.amaxonia.kiosk.ui.paymentmethod.CardOptionLogo
 import com.amaxonia.kiosk.ui.theme.FlowSuccess
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
 private const val ARROW_BOUNCE_MS = 700
 private const val ARROW_TRAVEL_PX = 36f
+private val ManualMaxWidth = 960.dp
 
 /**
  * Card payment screen: amount huge, a pulsing card badge and an animated arrow pointing down to
@@ -81,6 +87,7 @@ fun PaymentScreen(
         uiState = uiState,
         onCancel = { viewModel.cancelPayment(onBack) },
         onRetry = viewModel::retry,
+        onConfirmManual = viewModel::confirmManualPayment,
         modifier = modifier,
     )
 }
@@ -92,12 +99,16 @@ fun PaymentContent(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onConfirmManual: () -> Unit = {},
 ) {
     val step = uiState.step
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
             PaymentHeader(
-                title = stringResource(R.string.payflow_card_title),
+                title =
+                    stringResource(
+                        if (step == PaymentStep.AwaitingManualConfirmation) R.string.payflow_manual_title else R.string.payflow_card_title,
+                    ),
                 onBack = if (uiState.isPaymentInFlight) null else onCancel,
             )
             AnimatedContent(
@@ -121,6 +132,8 @@ fun PaymentContent(
                             onCancel = onCancel,
                         )
                     }
+                    StepKey.MANUAL ->
+                        ManualConfirmView(uiState = uiState, onConfirm = onConfirmManual, onChangeMethod = onCancel)
                     StepKey.PROCESSING, StepKey.COMPLETED ->
                         PaymentBusyView(
                             title = stringResource(R.string.payflow_processing_title),
@@ -139,12 +152,13 @@ fun PaymentContent(
     }
 }
 
-private enum class StepKey { QUOTING, AWAITING, PROCESSING, COMPLETED, ERROR }
+private enum class StepKey { QUOTING, AWAITING, MANUAL, PROCESSING, COMPLETED, ERROR }
 
 private fun PaymentStep.contentKey(): StepKey =
     when (this) {
         PaymentStep.Quoting -> StepKey.QUOTING
         is PaymentStep.AwaitingPayment -> StepKey.AWAITING
+        PaymentStep.AwaitingManualConfirmation -> StepKey.MANUAL
         PaymentStep.Processing -> StepKey.PROCESSING
         is PaymentStep.Completed -> StepKey.COMPLETED
         is PaymentStep.Declined, is PaymentStep.Failed -> StepKey.ERROR
@@ -202,6 +216,101 @@ private fun AwaitingCardView(
         }
 
         CancelWithCountdown(secondsRemaining, totalSeconds, arrowOffset, onCancel)
+    }
+}
+
+/**
+ * "Sin pasarela" confirmation: total, the chosen card method and a clear notice that no terminal is
+ * connected (the payment is recorded manually), with "Confirmar pago" and "Cambiar forma de pago".
+ */
+@Composable
+private fun ManualConfirmView(
+    uiState: PaymentUiState,
+    onConfirm: () -> Unit,
+    onChangeMethod: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val option = uiState.cardOption
+    ScrollableFillColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 24.dp),
+    ) {
+        AmountHero(total = uiState.totalAmount, currency = uiState.currency)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp).centeredMaxWidth(ManualMaxWidth),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            KioskCard(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.padding(32.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(144.dp).background(colors.surfaceVariant, MaterialTheme.shapes.medium),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CardOptionLogo(dataUri = option?.image, size = 100.dp)
+                    }
+                    Spacer(Modifier.width(32.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.payflow_manual_method_label),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = option?.name ?: stringResource(R.string.payflow_method_card_title),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = colors.onSurface,
+                        )
+                    }
+                }
+            }
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(colors.primaryContainer, MaterialTheme.shapes.medium)
+                        .padding(28.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(56.dp),
+                )
+                Spacer(Modifier.width(24.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.payflow_manual_notice_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colors.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.payflow_manual_notice_body),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onPrimaryContainer,
+                    )
+                }
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().centeredMaxWidth(ManualMaxWidth),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            KioskButton(
+                text = stringResource(R.string.payflow_manual_confirm),
+                onClick = onConfirm,
+                icon = Icons.Rounded.CheckCircle,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            KioskButton(
+                text = stringResource(R.string.payflow_change_method),
+                onClick = onChangeMethod,
+                style = KioskButtonStyle.Secondary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.kiosk.application.dispatch.KioskDispatchConfig
 import com.amaxoniaerp.features.kiosk.application.dispatch.OrderDispatchPolicyFactory
+import com.amaxoniaerp.features.kiosk.data.KioskCardOptionRepository
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
 import com.amaxoniaerp.features.kiosk.data.KioskSettingsRepository
 import com.amaxoniaerp.features.kiosk.domain.KioskInvoiceInfo
@@ -41,6 +42,7 @@ class PlaceKioskOrderService(
     private val dispatchPolicyFactory: OrderDispatchPolicyFactory = OrderDispatchPolicyFactory(),
     private val yappyPaymentVerifier: KioskYappyPaymentVerifier? = null,
     private val kioskSettingsRepository: KioskSettingsRepository = KioskSettingsRepository(),
+    private val kioskCardOptionRepository: KioskCardOptionRepository = KioskCardOptionRepository(),
 ) {
     private val logger = LoggerFactory.getLogger(PlaceKioskOrderService::class.java)
 
@@ -63,10 +65,11 @@ class PlaceKioskOrderService(
 
         val method = normalizePaymentMethod(request.method)
         validatePayable(database, kioskContext, order, request, method)
+        val cardFormaPagoId = resolveCardFormaPagoId(database, method, request)
 
         val prereqs = loadSalePrerequisites(database, kioskContext, order)
         val payment =
-            resolveSalePayment(method, request, prereqs)
+            resolveSalePayment(method, request, prereqs, cardFormaPagoId)
                 ?: return completeYappyWithoutPaymentMethod(database, order, request, prereqs)
 
         // 1. Asegurar secuencia de caja abierta para hoy (auto-close si había una de un día anterior)
@@ -149,16 +152,35 @@ class PlaceKioskOrderService(
         }
     }
 
+    /**
+     * Tarjeta con `paymentMethodId`: debe ser una de las formas de pago con tarjeta que el kiosco
+     * lista en `/config` (`cardOptions`); cualquier otra se rechaza (400). Sin id: la TDC por defecto.
+     */
+    private suspend fun resolveCardFormaPagoId(
+        database: Database,
+        method: String,
+        request: KioskPaymentRequest,
+    ): Int? {
+        val requested = request.paymentMethodId ?: return null
+        if (method != KioskPaymentMethod.CARD) return null
+        val option = kioskCardOptionRepository.find(database, requested)
+        require(option != null) { "Forma de pago con tarjeta no válida: $requested" }
+        return option.id
+    }
+
     /** null cuando el pago es Yappy y la empresa no tiene forma de pago YAPPY en caja_forma_pago. */
     private fun resolveSalePayment(
         method: String,
         request: KioskPaymentRequest,
         prereqs: KioskSalePrerequisites,
+        cardFormaPagoId: Int?,
     ): KioskSalePayment? =
         if (method == KioskPaymentMethod.YAPPY) {
             prereqs.yappyPaymentMethodId?.let { KioskSalePayment.yappy(request.transactionId.trim(), it) }
         } else {
-            KioskSalePayment.card(request, prereqs.paymentMethodId)
+            // Se conserva la semántica "TDC" (tipoMovimiento / montos por tipo) para cualquier tarjeta:
+            // solo cambia el id_forma_pago, igual que el POS al elegir VISA o MASTERCARD.
+            KioskSalePayment.card(request, cardFormaPagoId ?: prereqs.paymentMethodId)
         }
 
     /**

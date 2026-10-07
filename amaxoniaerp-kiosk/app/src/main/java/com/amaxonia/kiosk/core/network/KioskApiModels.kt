@@ -118,6 +118,17 @@ data class KioskConfigResponse(
     val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
     val country: String = "PA",
     val paymentMethods: List<String> = listOf("CARD"),
+    /** Card payment methods of the company (`caja_forma_pago`: VISA, MASTERCARD, débito...). */
+    val cardOptions: List<KioskCardOption> = emptyList(),
+)
+
+/** A card payment method the kiosk lists; [id] is `caja_forma_pago.id_forma_pago`, [image] a data URI. */
+@Serializable
+data class KioskCardOption(
+    val id: Int,
+    val name: String,
+    val siglas: String = "",
+    val image: String? = null,
 )
 
 @Serializable
@@ -228,6 +239,8 @@ data class KioskPaymentRequest(
     val brand: String,
     val amount: String,
     val method: String,
+    /** CARD only: the chosen `cardOptions[].id`; null = the company's default card method. */
+    val paymentMethodId: Int? = null,
 )
 
 @Serializable

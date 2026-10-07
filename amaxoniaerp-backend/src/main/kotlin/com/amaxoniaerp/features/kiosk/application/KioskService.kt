@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.kiosk.application
 
 import com.amaxoniaerp.features.kiosk.data.KioskCajaRepository
+import com.amaxoniaerp.features.kiosk.data.KioskCardOptionRepository
 import com.amaxoniaerp.features.kiosk.data.KioskCatalogRepository
 import com.amaxoniaerp.features.kiosk.data.KioskComboRepository
 import com.amaxoniaerp.features.kiosk.data.KioskConfigRepository
@@ -62,6 +63,9 @@ class KioskService(
     private val kioskCajaRepository: KioskCajaRepository = KioskCajaRepository(),
     private val kioskCustomerRepository: KioskCustomerRepository = KioskCustomerRepository(),
 ) {
+    // Sin estado y sin dependencias: no se inyecta (el constructor ya está en el límite de parámetros).
+    private val kioskCardOptionRepository = KioskCardOptionRepository()
+
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -158,7 +162,8 @@ class KioskService(
                 } else {
                     listOf(KioskPaymentMethod.CARD)
                 }
-            val unversioned = baseConfig.copy(paymentMethods = paymentMethods, version = 0)
+            val cardOptions = kioskCardOptionRepository.list(database)
+            val unversioned = baseConfig.copy(paymentMethods = paymentMethods, cardOptions = cardOptions, version = 0)
             val contentHash = sha256(json.encodeToString(KioskConfigResponse.serializer(), unversioned))
             // version deriva del contenido: cambia solo cuando cambia la configuración.
             val config = unversioned.copy(version = contentHash.take(VERSION_HEX_DIGITS).toInt(HEX_RADIX))

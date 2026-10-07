@@ -61,4 +61,10 @@
     <string name="payflow_yappy_upstream_body">Try again in a few seconds.</string>
     <string name="payflow_yappy_network_title">No connection</string>
     <string name="payflow_yappy_network_body">Check the connection and try again.</string>
+    <string name="payflow_method_card_option_subtitle">Card payment</string>
+    <string name="payflow_manual_title">Confirm your payment</string>
+    <string name="payflow_manual_method_label">Payment method</string>
+    <string name="payflow_manual_notice_title">No payment terminal connected</string>
+    <string name="payflow_manual_notice_body">The payment will be recorded manually with this method and the invoice will be issued. Nothing is charged on this device.</string>
+    <string name="payflow_manual_confirm">Confirm payment</string>
 </resources>

@@ -61,4 +61,10 @@
     <string name="payflow_yappy_upstream_body">Intenta de nuevo en unos segundos.</string>
     <string name="payflow_yappy_network_title">Sin conexión</string>
     <string name="payflow_yappy_network_body">Revisa la conexión e intenta de nuevo.</string>
+    <string name="payflow_method_card_option_subtitle">Pago con tarjeta</string>
+    <string name="payflow_manual_title">Confirma tu pago</string>
+    <string name="payflow_manual_method_label">Forma de pago</string>
+    <string name="payflow_manual_notice_title">Sin terminal de pago conectado</string>
+    <string name="payflow_manual_notice_body">El pago se registrará manualmente con esta forma de pago y se emitirá la factura. No se realizará ningún cobro en este equipo.</string>
+    <string name="payflow_manual_confirm">Confirmar pago</string>
 </resources>

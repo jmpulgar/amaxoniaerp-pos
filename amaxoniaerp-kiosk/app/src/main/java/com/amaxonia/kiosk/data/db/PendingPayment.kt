@@ -21,6 +21,8 @@ data class PendingPayment(
     /** Payment method wire name (CARD / YAPPY). Added in schema v2. */
     @ColumnInfo(defaultValue = "CARD")
     val method: String = "CARD",
+    /** Card payment method chosen on the kiosk (`caja_forma_pago.id_forma_pago`). Added in schema v3. */
+    val paymentMethodId: Int? = null,
 ) {
     companion object {
         const val STATUS_PENDING = "PENDING"

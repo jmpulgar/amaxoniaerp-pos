@@ -3,6 +3,7 @@ package com.amaxonia.kiosk.ui.paymentmethod
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.QuoteOrderUseCase
@@ -30,20 +31,39 @@ data class PaymentMethodUiState(
     val total: Money? = null,
     val currency: KioskCurrencyConfig = KioskCurrencyConfig(),
     val methods: List<PaymentMethod> = emptyList(),
+    /** Company card methods (VISA, MASTERCARD...): CARD shows one tile per option instead of one generic tile. */
+    val cardOptions: List<KioskCardOption> = emptyList(),
 ) {
-    /** With a single usable method the selection screen is skipped right after the quote. */
+    /**
+     * With a single usable choice the selection screen is skipped right after the quote. CARD with
+     * several card options is not a single choice: the customer still picks the card type.
+     */
     val autoSelectedMethod: PaymentMethod?
-        get() = if (step == PaymentMethodStep.Ready) methods.singleOrNull() else null
+        get() =
+            if (step == PaymentMethodStep.Ready) {
+                methods.singleOrNull()?.takeUnless { it == PaymentMethod.CARD && cardOptions.size > 1 }
+            } else {
+                null
+            }
+
+    /** Card option implied by an auto-selected CARD (the only one listed), else null. */
+    val autoSelectedCardOption: KioskCardOption?
+        get() = if (autoSelectedMethod == PaymentMethod.CARD) cardOptions.singleOrNull() else null
 }
 
 class PaymentMethodViewModel(
     private val quoteOrder: QuoteOrderUseCase,
     private val orderGraph: OrderGraph,
     methods: List<PaymentMethod>,
+    cardOptions: List<KioskCardOption> = emptyList(),
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(
-            PaymentMethodUiState(methods = methods, currency = orderGraph.currencyConfig.value),
+            PaymentMethodUiState(
+                methods = methods,
+                cardOptions = if (PaymentMethod.CARD in methods) cardOptions else emptyList(),
+                currency = orderGraph.currencyConfig.value,
+            ),
         )
     val uiState: StateFlow<PaymentMethodUiState> = _uiState.asStateFlow()
 

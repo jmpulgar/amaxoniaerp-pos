@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -99,11 +98,16 @@ fun Modifier.kioskPressable(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed && enabled) pressedScale else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        // Stiff and without bounce: the press reads instantly and settles before the next screen shows.
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh),
         label = "press_scale",
     )
     return this
-        .scale(scale)
+        // Read at draw time only: a press animates without recomposing the pressed content.
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
         .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
 }
 

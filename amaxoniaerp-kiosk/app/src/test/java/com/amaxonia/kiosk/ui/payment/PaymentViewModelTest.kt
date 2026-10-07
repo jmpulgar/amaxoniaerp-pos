@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.amaxonia.kiosk.core.money.Money
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskPaymentResponse
 import com.amaxonia.kiosk.core.network.KioskQuoteResponse
 import com.amaxonia.kiosk.domain.cart.OrderGraph
@@ -18,6 +19,7 @@ import com.amaxonia.kiosk.testutil.payResponseJson
 import com.amaxonia.kiosk.testutil.quoteJson
 import com.amaxonia.kiosk.testutil.sampleItem
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +36,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -195,6 +198,43 @@ class PaymentViewModelTest {
 
             assertTrue(cancelled)
             assertEquals(1, terminal.cancelCalls)
+        }
+
+    @Test
+    fun `without a terminal the chosen card method is confirmed manually and completes the order`() =
+        runTest(dispatcher) {
+            val visa = KioskCardOption(id = 49, name = "VISA", siglas = "TDC")
+            terminal = FakePaymentTerminal(isAvailable = false)
+            coEvery { checkoutUseCase.registerManualCardPayment(quote, visa) } returns
+                CheckoutResult.Success(quote, approvedCard(), paymentResponse)
+            val vm = PaymentViewModel(checkoutUseCase, quoteOrder, terminal, session(), orderGraph, "RETIRO_MOSTRADOR", visa)
+            advanceUntilIdle()
+
+            assertEquals(PaymentStep.AwaitingManualConfirmation, vm.uiState.value.step)
+            assertEquals(Money.fromString("9.10"), vm.uiState.value.totalAmount)
+            assertFalse("the idle timer may reset an abandoned confirmation", vm.uiState.value.isPaymentInFlight)
+            advanceTimeBy(CARD_PAYMENT_TIMEOUT_SECONDS * 1000L + 1)
+            assertEquals("no terminal countdown in manual mode", PaymentStep.AwaitingManualConfirmation, vm.uiState.value.step)
+
+            vm.confirmManualPayment()
+            advanceUntilIdle()
+
+            assertEquals("K1-042", (vm.uiState.value.step as PaymentStep.Completed).info.orderNumber)
+            assertEquals(0, terminal.processCalls)
+            coVerify(exactly = 0) { checkoutUseCase.payWithCard(any(), any(), any()) }
+        }
+
+    @Test
+    fun `with a terminal the chosen card method id is sent with the card payment`() =
+        runTest(dispatcher) {
+            val visa = KioskCardOption(id = 49, name = "VISA", siglas = "TDC")
+            coEvery { checkoutUseCase.payWithCard(quote, any(), 49) } returns
+                CheckoutResult.Success(quote, approvedCard(), paymentResponse)
+
+            val vm = PaymentViewModel(checkoutUseCase, quoteOrder, terminal, session(), orderGraph, "RETIRO_MOSTRADOR", visa)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.step is PaymentStep.Completed)
         }
 
     @Test

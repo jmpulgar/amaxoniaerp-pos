@@ -3,8 +3,10 @@ package com.amaxonia.kiosk.ui.attract
 import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -58,7 +60,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -79,6 +88,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -87,6 +97,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.core.media.KioskImages
 import com.amaxonia.kiosk.core.media.KioskMediaCache
 import com.amaxonia.kiosk.core.network.KioskMediaItem
 import com.amaxonia.kiosk.ui.accessibility.KioskLanguage
@@ -114,6 +125,8 @@ import kotlin.math.sin
 /** Banners are vertical posters, 2:3 (e.g. 1024 x 1536 or 1080 x 1620). */
 private const val POSTER_ASPECT = 2f / 3f
 private const val DEFAULT_IMAGE_DURATION_SEC = 8
+private const val BANNER_FADE_MS = 450
+private const val FAILED_BANNER_RETRY_MS = 1_500L
 private const val SECONDS_TO_MILLIS = 1000L
 private const val TAP_HINT_PERIOD_MS = 700
 private const val ART_LOOP_MS = 6_000
@@ -187,7 +200,7 @@ fun AttractContent(
                 modifier =
                     posterModifier
                         .clipToBounds()
-                        .background(Color.Black)
+                        .background(MaterialTheme.colorScheme.surface)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = startIfOnline),
             ) {
                 AttractPoster(uiState = uiState, onMediaFinished = onMediaFinished)
@@ -252,11 +265,115 @@ private fun AttractPoster(
 ) {
     val current = uiState.currentMedia
     when {
-        current != null && current.type.equals("VIDEO", ignoreCase = true) ->
-            VideoAttractPlayer(url = current.url, onMediaEnded = onMediaFinished)
-        current != null && current.type.equals("IMAGE", ignoreCase = true) ->
-            ImageAttractDisplay(mediaItem = current, onDurationExpired = onMediaFinished)
+        current != null && (current.isVideo || current.isImage) ->
+            BannerCarousel(
+                media = current,
+                mediaIndex = uiState.currentMediaIndex,
+                loopSingle = uiState.mediaList.size == 1,
+                onMediaFinished = onMediaFinished,
+            )
+        // First config load in progress: keep the plain surface instead of flashing the fallback art.
+        uiState.isLoading -> Unit
         else -> FallbackAttractDisplay(brandColorHex = uiState.brandColor)
+    }
+}
+
+private val KioskMediaItem.isVideo: Boolean get() = type.equals("VIDEO", ignoreCase = true)
+private val KioskMediaItem.isImage: Boolean get() = type.equals("IMAGE", ignoreCase = true)
+
+private fun KioskMediaItem.displayMillis(): Long = (if (durationSec > 0) durationSec else DEFAULT_IMAGE_DURATION_SEC) * SECONDS_TO_MILLIS
+
+/** One banner of the carousel stack; it becomes visible only once its first frame is ready. */
+private class BannerLayer(
+    val id: Long,
+    val mediaIndex: Int,
+    val media: KioskMediaItem,
+) {
+    val alpha = Animatable(0f)
+    var ready by mutableStateOf(false)
+    var failed by mutableStateOf(false)
+}
+
+/**
+ * Seamless banner loop: the next banner is composed on top, invisible, and only fades in once it
+ * has actually loaded (image decoded / first video frame rendered). The previous banner stays on
+ * screen underneath until then and is dropped afterwards, so changing banner never shows an empty
+ * (black) frame. An image's display time starts when it becomes visible.
+ */
+@Composable
+private fun BannerCarousel(
+    media: KioskMediaItem,
+    mediaIndex: Int,
+    loopSingle: Boolean,
+    onMediaFinished: () -> Unit,
+) {
+    val layers = remember { mutableStateListOf<BannerLayer>() }
+    var nextId by remember { mutableLongStateOf(0L) }
+    val finished by rememberUpdatedState(onMediaFinished)
+
+    LaunchedEffect(mediaIndex, media) {
+        val top = layers.lastOrNull()
+        if (top == null || top.mediaIndex != mediaIndex || top.media != media) {
+            layers += BannerLayer(id = nextId++, mediaIndex = mediaIndex, media = media)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        layers.forEach { layer ->
+            key(layer.id) {
+                BannerLayerEffects(layer = layer, layers = layers, onFinished = { finished() })
+                val isTop = layer === layers.lastOrNull()
+                Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = layer.alpha.value }) {
+                    if (layer.media.isVideo) {
+                        VideoAttractPlayer(
+                            url = layer.media.url,
+                            loop = loopSingle,
+                            onFirstFrame = { layer.ready = true },
+                            onError = { layer.failed = true },
+                            onMediaEnded = { if (isTop) finished() },
+                        )
+                    } else {
+                        ImageAttractDisplay(
+                            url = layer.media.url,
+                            onLoaded = { layer.ready = true },
+                            onError = { layer.failed = true },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Fades [layer] in once ready, drops the banners under it, then runs an image's display time. */
+@Composable
+private fun BannerLayerEffects(
+    layer: BannerLayer,
+    layers: SnapshotStateList<BannerLayer>,
+    onFinished: () -> Unit,
+) {
+    LaunchedEffect(layer.ready, layer.failed) {
+        when {
+            layer.ready -> {
+                // The very first banner appears at once; later ones cross-fade over the previous one.
+                if (layers.firstOrNull() === layer) {
+                    layer.alpha.snapTo(1f)
+                } else {
+                    layer.alpha.animateTo(1f, tween(BANNER_FADE_MS, easing = LinearOutSlowInEasing))
+                }
+                repeat(layers.indexOf(layer).coerceAtLeast(0)) { layers.removeAt(0) }
+                if (layer.media.isImage) {
+                    delay(layer.media.displayMillis())
+                    if (layers.lastOrNull() === layer) onFinished()
+                }
+            }
+            layer.failed -> {
+                // Unreachable banner (offline, deleted): it stays invisible, the previous banner keeps
+                // showing, and the loop moves on to the next one.
+                delay(FAILED_BANNER_RETRY_MS)
+                if (layers.lastOrNull() === layer) onFinished()
+            }
+        }
     }
 }
 
@@ -470,12 +587,19 @@ private fun OfflineBanner(message: String?) {
 @Composable
 private fun VideoAttractPlayer(
     url: String,
+    loop: Boolean,
+    onFirstFrame: () -> Unit,
+    onError: () -> Unit,
     onMediaEnded: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val firstFrame by rememberUpdatedState(onFirstFrame)
+    val failed by rememberUpdatedState(onError)
+    val ended by rememberUpdatedState(onMediaEnded)
     val exoPlayer =
         remember(url) {
+            // Plays from the disk cache filled by the media preloader (network only on a cache miss).
             val cacheFactory = KioskMediaCache.getCacheDataSourceFactory(context)
             val mediaSourceFactory = DefaultMediaSourceFactory(cacheFactory)
 
@@ -484,13 +608,18 @@ private fun VideoAttractPlayer(
                 .build()
                 .apply {
                     volume = 0f // Silent attract loop
-                    repeatMode = Player.REPEAT_MODE_OFF
                     addListener(
                         object : Player.Listener {
+                            override fun onRenderedFirstFrame() {
+                                firstFrame()
+                            }
+
+                            override fun onPlayerError(error: PlaybackException) {
+                                failed()
+                            }
+
                             override fun onPlaybackStateChanged(playbackState: Int) {
-                                if (playbackState == Player.STATE_ENDED) {
-                                    onMediaEnded()
-                                }
+                                if (playbackState == Player.STATE_ENDED) ended()
                             }
                         },
                     )
@@ -499,6 +628,10 @@ private fun VideoAttractPlayer(
                     playWhenReady = true
                 }
         }
+    // A single video banner loops forever; with several, the carousel moves on when it ends.
+    LaunchedEffect(exoPlayer, loop) {
+        exoPlayer.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
 
     DisposableEffect(exoPlayer) {
         onDispose {
@@ -512,6 +645,9 @@ private fun VideoAttractPlayer(
                 player = exoPlayer
                 useController = false
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                // No black shutter: the layer stays invisible until the first frame is rendered.
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setKeepContentOnPlayerReset(true)
                 layoutParams =
                     ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -525,21 +661,20 @@ private fun VideoAttractPlayer(
 
 @Composable
 private fun ImageAttractDisplay(
-    mediaItem: KioskMediaItem,
-    onDurationExpired: () -> Unit,
+    url: String,
+    onLoaded: () -> Unit,
+    onError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val durationSec = if (mediaItem.durationSec > 0) mediaItem.durationSec else DEFAULT_IMAGE_DURATION_SEC
-
-    LaunchedEffect(mediaItem.url) {
-        delay(durationSec * SECONDS_TO_MILLIS)
-        onDurationExpired()
-    }
-
+    val context = LocalContext.current
+    // Same request as the preloader: a preloaded banner is a memory-cache hit on the first frame.
+    val request = remember(url) { KioskImages.bannerRequest(context, url) }
     AsyncImage(
-        model = mediaItem.url,
+        model = request,
         contentDescription = null,
         contentScale = ContentScale.Crop,
+        onSuccess = { onLoaded() },
+        onError = { onError() },
         modifier = modifier.fillMaxSize(),
     )
 }

@@ -175,6 +175,23 @@ class KioskPaymentRoutesTest {
                 it[pos] = 1
                 it[activo] = 1
             }
+            CajaFormaPagoTable.insert {
+                it[idFormaPago] = 50
+                it[siglas] = "TDC"
+                it[codigo] = 35
+                it[descripcion] = "MASTERCARD"
+                it[formaPagoFact] = "03"
+                it[pos] = 1
+                it[activo] = 1
+            }
+            CajaFormaPagoTable.insert {
+                it[idFormaPago] = 15
+                it[siglas] = "CASH"
+                it[codigo] = 1
+                it[descripcion] = "EFECTIVO"
+                it[pos] = 1
+                it[activo] = 1
+            }
         }
     }
 
@@ -227,6 +244,7 @@ class KioskPaymentRoutesTest {
     private fun card(
         amount: String = "5.89",
         transactionId: String = "tx-123",
+        paymentMethodId: Int? = null,
     ) = KioskPaymentRequest(
         transactionId = transactionId,
         authCode = "AUTH7788",
@@ -234,6 +252,7 @@ class KioskPaymentRoutesTest {
         last4 = "4242",
         brand = "VISA",
         amount = amount,
+        paymentMethodId = paymentMethodId,
     )
 
     private suspend fun HttpClient.pay(
@@ -291,6 +310,46 @@ class KioskPaymentRoutesTest {
                 val secuencias = CajaSecuenciaTable.selectAll().where { CajaSecuenciaTable.idCaja eq KioskTestSupport.CAJA_ID }.toList()
                 assertTrue(secuencias.isNotEmpty(), "Debe haber una secuencia de caja creada")
             }
+        }
+
+    @Test
+    fun `POST pay registers the card payment method chosen on the kiosk`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId)
+
+            val response = client.pay(orderId, card(paymentMethodId = 50))
+
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            val pago = assertNotNull(lastSaleRequest).pagos.single()
+            assertEquals(50, pago.idFormaPago)
+            assertEquals("ING", pago.tipoMovimiento)
+        }
+
+    @Test
+    fun `POST pay without a chosen card keeps the default TDC payment method`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId)
+
+            assertEquals(HttpStatusCode.OK, client.pay(orderId).status)
+            assertEquals(2, assertNotNull(lastSaleRequest).pagos.single().idFormaPago)
+        }
+
+    @Test
+    fun `POST pay rejects a payment method that is not a card option`() =
+        testApplication {
+            val client = kioskClient(kioskService)
+            val orderId = UUID.randomUUID().toString()
+            insertTestOrder(orderId)
+
+            val response = client.pay(orderId, card(paymentMethodId = 15))
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("no válida"))
+            assertNull(lastSaleRequest)
         }
 
     @Test

@@ -13,5 +13,8 @@ object DepartamentoTable : Table("departamento") {
     val visible = bool("visible").default(true)
     val visiblePos = flexibleInt("visible_pos").default(1)
 
+    /** Foto propia del departamento, p. ej. "fotos/21_foto.png" (archivo en {data}/departamento/21_foto.png). */
+    val foto = varchar("foto", S.VARCHAR_LENGTH_60).nullable()
+
     override val primaryKey = PrimaryKey(id)
 }

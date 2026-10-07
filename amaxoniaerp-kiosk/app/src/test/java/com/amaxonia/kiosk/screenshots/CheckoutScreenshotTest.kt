@@ -98,7 +98,7 @@ class CheckoutScreenshotTest {
                         total = total,
                         methods = listOf(PaymentMethod.CARD, PaymentMethod.YAPPY),
                     ),
-                onSelect = {},
+                onSelect = { _, _ -> },
                 onRetry = {},
                 onBack = {},
                 onBackToOrder = {},

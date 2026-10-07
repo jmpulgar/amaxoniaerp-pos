@@ -1,5 +1,6 @@
 package com.amaxonia.kiosk.domain.flow
 
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskConfigResponse
 import com.amaxonia.kiosk.core.network.KioskHttpClientFactory
 import com.amaxonia.kiosk.domain.payment.PaymentMethod
@@ -34,6 +35,18 @@ class CheckoutFlowPolicyTest {
         assertEquals(listOf(PaymentMethod.YAPPY), CheckoutFlowPolicy.availablePaymentMethods(both, false))
         assertEquals(listOf(PaymentMethod.CARD), CheckoutFlowPolicy.availablePaymentMethods(null, true))
         assertEquals(emptyList<PaymentMethod>(), CheckoutFlowPolicy.availablePaymentMethods(null, false))
+    }
+
+    @Test
+    fun `without a terminal CARD stays available when the company lists card methods`() {
+        val withCards =
+            KioskConfigResponse(
+                paymentMethods = listOf("CARD", "YAPPY"),
+                cardOptions = listOf(KioskCardOption(id = 49, name = "VISA", siglas = "TDC")),
+            )
+        assertEquals(listOf(PaymentMethod.CARD, PaymentMethod.YAPPY), CheckoutFlowPolicy.availablePaymentMethods(withCards, false))
+        assertEquals(listOf(49), CheckoutFlowPolicy.cardOptions(withCards).map { it.id })
+        assertEquals(emptyList<KioskCardOption>(), CheckoutFlowPolicy.cardOptions(null))
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.amaxonia.kiosk.domain.checkout
 
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskApiClient
+import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskPaymentRequest
 import com.amaxonia.kiosk.core.network.KioskPaymentResponse
 import com.amaxonia.kiosk.core.network.KioskQuoteLineRequest
@@ -17,6 +18,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 sealed interface CheckoutResult {
     data class Success(
@@ -67,20 +69,49 @@ class CheckoutOrderUseCase(
         idempotencyKey: String,
     ): Result<KioskQuoteResponse> = apiClient.quoteOrder(idempotencyKey, request)
 
-    /** Charges exactly `quote.total` on the card terminal. [onApproved] fires before the backend registration. */
+    /**
+     * Charges exactly `quote.total` on the card terminal. [onApproved] fires before the backend
+     * registration; [paymentMethodId] is the card method the customer picked (null = default).
+     */
     suspend fun payWithCard(
         quote: KioskQuoteResponse,
         onApproved: () -> Unit = {},
+        paymentMethodId: Int? = null,
     ): CheckoutResult =
         when (val payment = paymentTerminal.processPayment(Money.fromString(quote.total), quote.orderId)) {
             is PaymentResult.Success -> {
                 onApproved()
-                registerPayment(quote, payment, PaymentMethod.CARD)
+                registerPayment(quote, payment, PaymentMethod.CARD, paymentMethodId)
             }
             is PaymentResult.Declined -> CheckoutResult.PaymentDeclined(payment.reason)
             is PaymentResult.Cancelled -> CheckoutResult.PaymentCancelled
             is PaymentResult.Error -> CheckoutResult.PaymentTerminalError(payment.message)
         }
+
+    /**
+     * "Sin pasarela": no card terminal is connected, so the card payment is registered as a manual
+     * one (the cashier collects it) and the order is invoiced with the chosen card method.
+     * SAFETY: nothing is charged here. This path exists for testing while no certified terminal is
+     * integrated; a production kiosk that must not give orders away needs a real terminal adapter.
+     */
+    suspend fun registerManualCardPayment(
+        quote: KioskQuoteResponse,
+        option: KioskCardOption,
+    ): CheckoutResult =
+        registerPayment(
+            quote = quote,
+            payment =
+                PaymentResult.Success(
+                    transactionId = "$MANUAL_TRANSACTION_PREFIX${UUID.randomUUID()}",
+                    authCode = MANUAL_AUTH_CODE,
+                    reference = MANUAL_REFERENCE,
+                    last4 = "",
+                    brand = option.siglas.ifBlank { option.name }.take(MAX_BRAND_LENGTH),
+                    amount = Money.fromString(quote.total),
+                ),
+            method = PaymentMethod.CARD,
+            paymentMethodId = option.id,
+        )
 
     /**
      * Persists the approved payment to the outbox and registers it with the backend. Runs
@@ -90,10 +121,11 @@ class CheckoutOrderUseCase(
         quote: KioskQuoteResponse,
         payment: PaymentResult.Success,
         method: PaymentMethod,
+        paymentMethodId: Int? = null,
     ): CheckoutResult =
         withContext(NonCancellable) {
             outboxMutex.withLock {
-                val pendingPayment = createPendingPayment(quote, payment, method)
+                val pendingPayment = createPendingPayment(quote, payment, method, paymentMethodId)
                 pendingPaymentDao.insert(pendingPayment)
 
                 apiClient.payOrder(quote.orderId, pendingPayment.toRequest()).fold(
@@ -142,6 +174,7 @@ class CheckoutOrderUseCase(
         quote: KioskQuoteResponse,
         payment: PaymentResult.Success,
         method: PaymentMethod,
+        paymentMethodId: Int?,
     ) = PendingPayment(
         orderId = quote.orderId,
         transactionId = payment.transactionId,
@@ -152,6 +185,7 @@ class CheckoutOrderUseCase(
         amount = quote.total,
         status = PendingPayment.STATUS_PENDING,
         method = method.wireName,
+        paymentMethodId = paymentMethodId,
     )
 
     private fun PendingPayment.toRequest() =
@@ -163,9 +197,15 @@ class CheckoutOrderUseCase(
             brand = brand,
             amount = amount,
             method = method,
+            paymentMethodId = paymentMethodId,
         )
 
     companion object {
+        const val MANUAL_TRANSACTION_PREFIX = "MANUAL-"
+        const val MANUAL_AUTH_CODE = "MANUAL"
+        const val MANUAL_REFERENCE = "SIN PASARELA"
+        private const val MAX_BRAND_LENGTH = 20
+
         fun buildQuoteRequest(orderGraph: OrderGraph) =
             KioskQuoteRequest(
                 diningMode = orderGraph.diningMode.value,
