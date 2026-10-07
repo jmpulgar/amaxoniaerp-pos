@@ -266,6 +266,7 @@ internal fun findCajaRowById(
     defaultBySucursal: Map<Int, Int?>,
     activeSellers: List<SellerRecord>,
     warehouseNames: Map<Int, String> = emptyMap(),
+    userId: Int? = null,
 ): Caja? {
     val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
     val isVE = countryCode.equals("VE", ignoreCase = true)
@@ -287,7 +288,7 @@ internal fun findCajaRowById(
                 activeSellers = activeSellers,
                 availableSellers = availableSellers,
                 warehouseNames = warehouseNames,
-                userIdToken = null,
+                userIdToken = userId?.toString(),
             )
         }
 }

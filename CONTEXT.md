@@ -99,3 +99,25 @@ _Avoid_: "lista de precios" (reservado al campo legacy `itemListaPrecio="BASE"`)
 **Empresa (tenant)**:
 Compañía que delimita todos los datos: catálogo, feed, cajas, facturas. El cursor y el outbox se filtran por empresa.
 _Avoid_: "tenantId" en conversación de negocio; "compañía DB"
+
+### Kiosco
+
+**Kiosco**:
+Dispositivo de autoservicio desatendido (app `amaxoniaerp-kiosk`) donde el cliente final arma y envía su pedido. No tiene caja ni usuario logueado; actúa con identidad de dispositivo.
+_Avoid_: "POS de autoservicio", "terminal" (el terminal es el hardware)
+
+**Pedido de kiosco**:
+Orden creada desde un kiosco con clave de idempotencia propia. No es una factura: su destino (cobro en caja, cocina, fiscal) lo define ADR-009.
+_Avoid_: "venta" o "factura" mientras no se haya cobrado
+
+**Emparejamiento**:
+Canje único de un código generado en el admin por un token de dispositivo con rol `KIOSK`, revocable desde el admin.
+_Avoid_: "login del kiosco"
+
+**Attract loop**:
+Rotación de banners/videos (`parametros_generales`) que muestra el kiosco mientras está inactivo; al expirar la inactividad se descarta el carrito y vuelve el loop.
+_Avoid_: "salvapantallas", "publicidad"
+
+**Clave de kiosco**:
+Contraseña (bcrypt en `parametros_generales.clave_kiosko`) para salir del modo kiosco; se verifica solo en el servidor.
+_Avoid_: "PIN de admin"

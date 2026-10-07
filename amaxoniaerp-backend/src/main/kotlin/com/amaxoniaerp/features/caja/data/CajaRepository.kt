@@ -6,14 +6,14 @@ import com.amaxoniaerp.features.caja.domain.CajaCierreSummary
 import com.amaxoniaerp.features.caja.domain.CajaSecuencia
 import com.amaxoniaerp.features.caja.domain.CajaSecuenciaData
 import com.amaxoniaerp.features.caja.domain.SaveCajaRequest
-import java.math.BigDecimal
-import java.math.RoundingMode
-import java.util.UUID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.update
 import org.slf4j.LoggerFactory
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.UUID
 
 /**
  * Repositorio de caja: queries tipo Archetype A (catálogo, resumen de
@@ -99,17 +99,22 @@ class CajaRepository {
             mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames, all)
         }
 
+    /**
+     * Caja por id. Con [userId] el vendedor por defecto se resuelve igual que en `GET /api/cajas`
+     * (vendedor del usuario, luego el de la caja, luego el de la sucursal).
+     */
     suspend fun getCajaById(
         database: Database,
         countryCode: String,
         id: String,
+        userId: Int? = null,
     ): Caja? =
         dbQuery(database) {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames)
+            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames, userId)
         }
 
     suspend fun createCaja(

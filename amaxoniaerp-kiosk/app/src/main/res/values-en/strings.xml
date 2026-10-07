@@ -1,0 +1,224 @@
+<resources>
+    <string name="btn_back">Back</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_accept">Accept</string>
+    <string name="btn_retry">Retry</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_add">Add</string>
+    <string name="cd_cart">Your order</string>
+    <string name="cd_increase">Increase quantity</string>
+    <string name="cd_decrease">Decrease quantity</string>
+    <string name="cd_backspace">Delete</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_remove">Remove</string>
+    <string name="cd_clear">Clear</string>
+
+    <!-- Checkout stepper -->
+    <string name="checkout_step_order">Order</string>
+    <string name="checkout_step_details">Details</string>
+    <string name="checkout_step_pay">Pay</string>
+
+    <!-- Cancel order -->
+    <string name="cancel_order_title">Cancel your order?</string>
+    <string name="cancel_order_message">All items will be removed and you will go back to the start screen.</string>
+    <string name="cancel_order_confirm">Yes, cancel order</string>
+    <string name="cancel_order_keep">No, keep my order</string>
+
+    <!-- Attract Screen -->
+    <string name="attract_touch_to_start">Touch the screen to begin</string>
+    <string name="attract_start_order">Start a new order</string>
+    <string name="attract_welcome">Hello!</string>
+    <string name="attract_tagline">Order fast and easy, no lines</string>
+    <string name="attract_out_of_service_title">Out of service</string>
+    <string name="attract_out_of_service">This kiosk is temporarily out of service.\nPlease go to the main counter.</string>
+
+    <!-- Admin unlock -->
+    <string name="admin_unlock_title">Administrator access</string>
+    <string name="admin_unlock_message">Enter the administrator password to configure or exit kiosk mode.</string>
+    <string name="admin_unlock_password">Password</string>
+    <string name="admin_unlock_confirm">Unlock</string>
+
+    <!-- Admin menu -->
+    <string name="admin_title">Administration panel</string>
+    <string name="admin_subtitle">Terminal technical options</string>
+    <string name="admin_change_caja">Change register</string>
+    <string name="admin_logout">Sign out</string>
+    <string name="admin_session">%1$s · %2$s</string>
+    <string name="admin_test_print">Print test ticket</string>
+    <string name="admin_reprint">Reprint last ticket</string>
+    <string name="admin_exit_kiosk">Exit kiosk mode</string>
+    <string name="admin_enter_kiosk">Enable kiosk mode</string>
+    <string name="admin_close">Close panel</string>
+
+    <!-- Login (system user, same as the POS) -->
+    <string name="login_hero_title">Set up this kiosk</string>
+    <string name="login_hero_subtitle">Use the same system user and password you use on the POS.</string>
+    <string name="login_title">Sign in</string>
+    <string name="login_username">User</string>
+    <string name="login_password">Password</string>
+    <string name="login_show_password">Show password</string>
+    <string name="login_hide_password">Hide password</string>
+    <string name="login_country">Country</string>
+    <string name="login_country_pa">Panama</string>
+    <string name="login_country_ve">Venezuela</string>
+    <string name="login_submit">Sign in</string>
+    <string name="login_loading">Checking credentials…</string>
+    <string name="login_advanced">Advanced options</string>
+    <string name="login_server_url">Server URL</string>
+    <string name="login_server_hint">Only change it if technical support asks you to.</string>
+    <string name="login_error_missing">User and password are required</string>
+    <string name="login_error_invalid">Wrong user or password</string>
+    <string name="login_error_connectivity">Could not reach the server. Check the internet connection and the server URL under Advanced options.</string>
+    <string name="login_error_server_url">The server URL is required</string>
+    <string name="login_error_no_companies">This user has no companies assigned</string>
+    <string name="login_error_unexpected">Could not sign in</string>
+    <string name="login_company_title">Choose the company</string>
+    <string name="login_company_subtitle">Your user can access several companies. Which one will this kiosk sell for?</string>
+    <string name="login_company_rif">Tax ID %1$s</string>
+    <string name="login_company_back">Use another user</string>
+    <string name="login_version">%1$s · version %2$s</string>
+
+    <!-- Caja setup -->
+    <string name="caja_setup_title">Choose this kiosk\'s register</string>
+    <string name="caja_setup_subtitle">Kiosk sales are recorded on the register you choose.</string>
+    <string name="caja_setup_session">%1$s · %2$s</string>
+    <string name="caja_setup_list_title">Active registers</string>
+    <string name="caja_setup_code">Code %1$s</string>
+    <string name="caja_setup_branch">Branch %1$s</string>
+    <string name="caja_setup_loading">Loading registers…</string>
+    <string name="caja_setup_empty_title">No active registers</string>
+    <string name="caja_setup_empty_message">Enable a register in the admin panel and try again.</string>
+    <string name="caja_setup_error_title">Could not load the registers</string>
+    <string name="caja_setup_prefix">Order prefix</string>
+    <string name="caja_setup_prefix_hint">Use a different prefix on each kiosk (K1, K2…)</string>
+    <string name="caja_setup_prefix_example">Orders will look like: %1$s</string>
+    <string name="caja_setup_prefix_error">Type 1 to 5 letters or numbers</string>
+    <string name="caja_setup_start">Start</string>
+    <string name="caja_setup_select_first">Choose a register to continue</string>
+    <string name="caja_setup_logout">Sign out</string>
+    <string name="caja_setup_invalid">The configured register is no longer valid. Choose another one.</string>
+
+    <!-- Dining Mode Screen -->
+    <string name="dining_mode_title">Where will you eat today?</string>
+    <string name="dining_mode_subtitle">Choose an option to start your order</string>
+    <string name="dining_mode_dine_in_title">Eat here</string>
+    <string name="dining_mode_dine_in_desc">Enjoy it at the restaurant</string>
+    <string name="dining_mode_takeaway_title">Take out</string>
+    <string name="dining_mode_takeaway_desc">We pack it for you to go</string>
+
+    <!-- Menu Screen -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_home">Home</string>
+    <string name="menu_discover">Discover our menu</string>
+    <string name="menu_recommended">Recommended for you</string>
+    <string name="menu_view_cart">View my order</string>
+    <string name="menu_cancel_order">Cancel order</string>
+    <string name="menu_sold_out">Sold out</string>
+    <string name="menu_empty_products">No products in this category</string>
+    <string name="menu_added_toast">Added to your order!</string>
+    <string name="menu_load_error">We couldn\'t load the menu</string>
+    <string name="menu_suggestions_title">We also suggest</string>
+    <string name="menu_suggestions_skip">No, thanks</string>
+    <string name="menu_suggestions_continue">Continue to my order</string>
+    <plurals name="menu_product_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+
+    <!-- Customizer Screen -->
+    <string name="customizer_required_choose">Required · Choose %1$d</string>
+    <string name="customizer_required_min">Required · At least %1$d</string>
+    <string name="customizer_optional_one">Optional · Choose 1</string>
+    <string name="customizer_optional_up_to">Optional · Up to %1$d</string>
+    <string name="customizer_group_error_one">Choose an option to continue</string>
+    <string name="customizer_group_error_min">Choose at least %1$d options</string>
+    <string name="customizer_kitchen_note">Kitchen note (optional)</string>
+    <string name="customizer_note_placeholder">E.g. no salt, sauce on the side…</string>
+    <string name="customizer_add_to_cart">Add to order · %1$s</string>
+    <string name="customizer_added">Added!</string>
+    <string name="customizer_missing_required">Complete the required options</string>
+    <string name="customizer_extra_price">+%1$s</string>
+    <string name="customizer_step_review">Review order</string>
+    <string name="customizer_select_group">Choose %1$s</string>
+    <string name="customizer_quantity">Quantity</string>
+    <string name="customizer_back">Back</string>
+    <string name="customizer_next">Next</string>
+    <string name="customizer_add_to_order">Add to my order · %1$s</string>
+
+    <!-- Review Screen -->
+    <string name="review_title">Review your order</string>
+    <plurals name="review_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <string name="review_empty_cart">Your order is empty</string>
+    <string name="review_empty_hint">Add something delicious from the menu to continue</string>
+    <string name="review_empty_cta">See the menu</string>
+    <string name="review_subtotal">Subtotal</string>
+    <string name="review_tax_itbms">ITBMS (tax)</string>
+    <string name="review_tax_iva">VAT</string>
+    <string name="review_total">Total</string>
+    <string name="review_continue_shopping">Order more</string>
+    <string name="review_pay">Complete order · %1$s</string>
+    <string name="review_clear_cart">Empty</string>
+    <string name="review_note">Note: %1$s</string>
+    <string name="review_unit_price">%1$s each</string>
+
+    <!-- Customer ID Screen -->
+    <string name="customer_title">Do you want an invoice with your details?</string>
+    <string name="customer_subtitle">If you don\'t need one, continue as Final Consumer</string>
+    <string name="customer_question">Do you need a personalized invoice?</string>
+    <string name="customer_question_hint">If not, we issue it to Final Consumer.</string>
+    <string name="customer_no_thanks">No, thanks</string>
+    <string name="customer_yes">Yes, with my details</string>
+    <string name="customer_final_title">Final Consumer</string>
+    <string name="customer_final_desc">No tax details · fastest</string>
+    <string name="customer_custom_title">Invoice with Tax ID / ID card</string>
+    <string name="customer_custom_desc">Enter your details to issue the invoice in your name</string>
+    <string name="customer_doc_cedula">ID card</string>
+    <string name="customer_doc_ruc">Tax ID (RUC)</string>
+    <string name="customer_doc_passport">Passport</string>
+    <string name="customer_doc_id">Document number</string>
+    <string name="customer_dv">DV</string>
+    <string name="customer_name">Name or business name</string>
+    <string name="customer_continue_final">Continue as Final Consumer</string>
+    <string name="customer_confirm">Confirm and continue</string>
+    <string name="customer_error_doc">Enter the document number</string>
+    <string name="customer_error_name">Enter the name or business name</string>
+
+    <!-- Table Tent Screen -->
+    <string name="table_tent_title">Enter your table tent number</string>
+    <string name="table_tent_subtitle">Take a table tent next to the kiosk and place it on your table. We\'ll bring your order.</string>
+    <string name="table_tent_confirm">Confirm table %1$s</string>
+    <string name="table_tent_confirm_empty">Confirm table tent</string>
+    <string name="table_tent_skip">I don\'t have a table tent</string>
+
+    <!-- Order Number Screen -->
+    <string name="order_number_title">Thank you!</string>
+    <string name="order_number_subtitle">Your payment was approved</string>
+    <string name="order_number_label">Your order number</string>
+    <string name="order_number_take_receipt">Take your printed receipt below</string>
+    <string name="order_number_print_failed">Ask for your receipt at the counter</string>
+    <string name="order_number_table_dest">We\'ll bring your order to table %1$s</string>
+    <string name="order_number_table_chip">Table %1$s</string>
+    <string name="order_number_counter_dest">Pick up your order at the counter when your number is called</string>
+    <string name="order_number_auto_close">Back to start in %1$d s</string>
+    <string name="order_number_finish">Done</string>
+
+    <!-- Idle Warning Dialog -->
+    <string name="idle_dialog_title">Are you still there?</string>
+    <string name="idle_dialog_message">Your order will be cancelled due to inactivity in %1$d seconds.</string>
+    <string name="idle_dialog_continue">Yes, continue</string>
+    <string name="idle_dialog_cancel">Cancel order</string>
+
+    <!-- Accessibility & Languages -->
+    <string name="a11y_mode_title">Accessible mode</string>
+    <string name="a11y_reach_mode">Low screen</string>
+    <string name="a11y_reach_mode_active">Low screen mode on</string>
+    <string name="a11y_high_contrast">Contrast</string>
+    <string name="a11y_language">Language</string>
+    <string name="a11y_spanish">Español</string>
+    <string name="a11y_english">English</string>
+</resources>

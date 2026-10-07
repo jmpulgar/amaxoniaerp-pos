@@ -1,0 +1,353 @@
+package com.amaxoniaerp.features.kiosk.domain
+
+import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.LocalDateTime
+
+@Serializable
+data class KioskUnlockRequest(
+    val password: String,
+)
+
+@Serializable
+data class KioskMediaItem(
+    val type: String, // "IMAGE" or "VIDEO"
+    val url: String,
+    val durationSec: Int,
+)
+
+@Serializable
+data class KioskCurrencyConfig(
+    val base: String,
+    val secondary: String?,
+    val rate: String,
+)
+
+@Serializable
+data class KioskConfigResponse(
+    val version: Int,
+    val brandColor: String?,
+    val logoUrl: String?,
+    val media: List<KioskMediaItem>,
+    val diningModes: List<String>,
+    val dispatch: String,
+    val defaultCustomerId: String,
+    val currency: KioskCurrencyConfig,
+    val country: String,
+    /** Métodos de pago habilitados para este kiosco: siempre "CARD"; "YAPPY" si está configurado. */
+    val paymentMethods: List<String>,
+    /** Formas de pago con tarjeta de `caja_forma_pago` que el kiosco lista (VISA, MASTERCARD, débito...). */
+    val cardOptions: List<KioskCardOptionDto> = emptyList(),
+)
+
+/** Una forma de pago con tarjeta: `id` = `caja_forma_pago.id_forma_pago`; `image` = data URI del ERP. */
+@Serializable
+data class KioskCardOptionDto(
+    val id: Int,
+    val name: String,
+    val siglas: String,
+    val image: String? = null,
+)
+
+@Serializable
+data class KioskCategoryDto(
+    val id: Int,
+    val name: String,
+    val iconUrl: String? = null,
+    val order: Int = 0,
+)
+
+@Serializable
+data class KioskModifierOptionDto(
+    val id: Int,
+    val name: String,
+    val extraPrice: String,
+    val soldOut: Boolean = false,
+    /** Opción marcada por defecto en el combo (`grupo_items.por_defecto`). */
+    val isDefault: Boolean = false,
+)
+
+@Serializable
+data class KioskModifierGroupDto(
+    val id: Int,
+    val name: String,
+    val min: Int,
+    val max: Int,
+    val isMandatory: Boolean,
+    val isCombo: Boolean,
+    val options: List<KioskModifierOptionDto>,
+)
+
+@Serializable
+data class KioskItemDto(
+    val id: Int,
+    val categoryId: Int,
+    val name: String,
+    val description: String?,
+    val price: String,
+    val taxRate: String,
+    val imageUrl: String?,
+    val soldOut: Boolean,
+    val modifierGroups: List<KioskModifierGroupDto>,
+)
+
+@Serializable
+data class KioskCatalogResponse(
+    val categories: List<KioskCategoryDto>,
+    val items: List<KioskItemDto>,
+)
+
+@Serializable
+data class KioskQuoteLineRequest(
+    val itemId: Int,
+    val qty: Int,
+    val note: String? = null,
+    val modifiers: List<Int> = emptyList(),
+)
+
+@Serializable
+data class KioskQuoteRequest(
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerId: String? = null,
+    val lines: List<KioskQuoteLineRequest>,
+)
+
+@Serializable
+data class KioskQuoteLineModifierResponse(
+    val id: Int,
+    val name: String,
+    val extraPrice: String,
+)
+
+@Serializable
+data class KioskQuoteLineResponse(
+    val line: Int,
+    val itemId: Int,
+    val name: String,
+    val qty: Int,
+    val unitPrice: String,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val note: String? = null,
+    val modifiers: List<KioskQuoteLineModifierResponse> = emptyList(),
+)
+
+@Serializable
+data class KioskQuoteResponse(
+    val orderId: String,
+    val formattedOrderNumber: String,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val expiresAt: String,
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerId: String,
+    val lines: List<KioskQuoteLineResponse>,
+)
+
+/**
+ * Confirmación de pago del kiosco. `method` es opcional para no romper clientes previos (CARD).
+ * Para YAPPY solo son relevantes `transactionId` (el devuelto al generar el QR) y `amount`;
+ * los campos de tarjeta pueden omitirse.
+ */
+@Serializable
+data class KioskPaymentRequest(
+    val transactionId: String,
+    val authCode: String = "",
+    val reference: String = "",
+    val last4: String = "",
+    val brand: String = "",
+    val amount: String,
+    val method: String = KioskPaymentMethod.CARD,
+    /** Tarjeta: forma de pago elegida (`cardOptions[].id`); null = la forma TDC por defecto. */
+    val paymentMethodId: Int? = null,
+)
+
+object KioskPaymentMethod {
+    const val CARD = "CARD"
+    const val YAPPY = "YAPPY"
+}
+
+@Serializable
+data class KioskYappyQrResponse(
+    val transactionId: String,
+    val qrHash: String,
+    val amount: String,
+    val expiresInSec: Int,
+)
+
+@Serializable
+data class KioskYappyStatusResponse(
+    val transactionId: String,
+    val status: String,
+)
+
+@Serializable
+data class KioskInvoiceInfo(
+    val codFactura: String,
+    val cufe: String? = null,
+    val qr: String? = null,
+    val fechaRecepcionDGI: String? = null,
+    val numeroDocumentoFiscal: String? = null,
+    val numeroControl: String? = null,
+)
+
+@Serializable
+data class KioskReceiptLine(
+    val qty: Int,
+    val description: String,
+    val price: String,
+    val total: String,
+    val modifiers: List<String> = emptyList(),
+)
+
+@Serializable
+data class KioskReceipt(
+    val companyName: String,
+    val ruc: String? = null,
+    val dv: String? = null,
+    val address: String? = null,
+    val orderNumber: String,
+    val diningMode: String,
+    val tableTent: String? = null,
+    val customerName: String,
+    val customerId: String,
+    val date: String,
+    val lines: List<KioskReceiptLine>,
+    val subtotal: String,
+    val tax: String,
+    val total: String,
+    val paymentBrand: String,
+    val paymentLast4: String,
+    val paymentAuthCode: String,
+    val paymentReference: String,
+    val invoiceNumber: String? = null,
+    val cufe: String? = null,
+    val qr: String? = null,
+)
+
+@Serializable
+data class KioskPayResponse(
+    val orderNumber: String,
+    val invoice: KioskInvoiceInfo? = null,
+    val dispatch: String,
+    val receipt: KioskReceipt,
+    val status: String,
+)
+
+/** Caja del ERP elegida en el kiosco, con sucursal, almacén y vendedor ya resueltos. */
+data class KioskCaja(
+    val idCaja: String,
+    val name: String,
+    val idSucursal: Int,
+    val idAlmacen: Int,
+    val codVendedor: Int,
+)
+
+/**
+ * Contexto de una petición del kiosco: empresa del JWT de empresa (mismo login que el POS) y
+ * caja/prefijo de los headers `X-Kiosk-Caja` / `X-Kiosk-Prefix`. `deviceId` es el `idCaja`
+ * (numeración diaria y pertenencia de pedidos por caja) y `deviceName` la descripción de la caja.
+ */
+data class KioskRequestContext(
+    val countryCode: String,
+    val companyDb: String,
+    val deviceId: String,
+    val deviceName: String,
+    val prefix: String,
+    val idCaja: String,
+    val idSucursal: Int,
+    val idAlmacen: Int,
+    val codVendedor: Int,
+    val idClienteGenerico: String,
+    /** `user_id` del token de empresa; null si el token no lo trae. */
+    val userId: Int? = null,
+)
+
+data class KioskSalePrerequisites(
+    val branchSerie: String,
+    val branchName: String,
+    val branchAddress: String,
+    val companyRif: String?,
+    val defaultTaxRate: BigDecimal,
+    val cajaCode: String,
+    val customerName: String,
+    val customerRif: String,
+    val customerAddress: String,
+    val customerPhone: String,
+    val customerDv: String?,
+    val customerCod: String,
+    val paymentMethodId: Int,
+    /** `caja_forma_pago.id_forma_pago` con siglas YAPPY; null si la empresa no la tiene. */
+    val yappyPaymentMethodId: Int? = null,
+    val itemDetails: Map<Int, KioskItemTaxInfo>,
+    val dispatchDestination: String,
+    val kitchenPrinterIp: String?,
+)
+
+data class KioskItemTaxInfo(
+    val description: String,
+    val isExempt: Boolean,
+    val ivaRate: BigDecimal,
+)
+
+data class KioskOrderRecord(
+    val id: String,
+    val idDispositivo: String,
+    val numeroPedidoDiario: Int,
+    val codigoPedido: String,
+    val fecha: LocalDate,
+    val estado: String,
+    val modalidad: String,
+    val portamesa: String?,
+    val idCliente: String,
+    val total: BigDecimal,
+    val quoteExpiraEn: LocalDateTime,
+    val pagoReferencia: String?,
+    val pagoAutorizacion: String?,
+    val pagoUltimos4: String?,
+    val pagoMarca: String?,
+    val idFactura: String?,
+    val motivoRechazo: String?,
+    val creadoEn: LocalDateTime,
+    val actualizadoEn: LocalDateTime,
+    val items: List<KioskOrderItemRecord>,
+) {
+    /**
+     * Método de pago derivado de las columnas existentes (sin columna propia): un pedido es
+     * Yappy cuando `pago_marca = 'YAPPY'`; cualquier otra marca (o ninguna) es tarjeta.
+     */
+    val pagoMetodo: String
+        get() =
+            if (pagoMarca?.trim().equals(KioskPaymentMethod.YAPPY, ignoreCase = true)) {
+                KioskPaymentMethod.YAPPY
+            } else {
+                KioskPaymentMethod.CARD
+            }
+
+    /** Transacción Yappy vigente/pagada: `pago_referencia` solo cuando el pedido es Yappy. */
+    val yappyTransactionId: String?
+        get() = if (pagoMetodo == KioskPaymentMethod.YAPPY) pagoReferencia?.trim()?.takeIf { it.isNotEmpty() } else null
+}
+
+data class KioskOrderItemRecord(
+    val idPedido: String,
+    val linea: Int,
+    val idItem: Int,
+    val cantidad: BigDecimal,
+    val precioUnitario: BigDecimal,
+    val nota: String?,
+    val modifiers: List<KioskOrderModifierRecord>,
+)
+
+data class KioskOrderModifierRecord(
+    val idPedido: String,
+    val linea: Int,
+    val idModificador: Int,
+    val nombre: String,
+    val precioAdicional: BigDecimal,
+)

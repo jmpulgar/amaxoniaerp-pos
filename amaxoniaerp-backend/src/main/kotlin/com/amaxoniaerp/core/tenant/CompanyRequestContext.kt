@@ -78,6 +78,9 @@ suspend fun CompanyRequestContext.requireUserId(call: ApplicationCall): Int? =
         userId
     }
 
+/** Claim `user_id` del token de empresa, o null si no viene (sin responder al cliente). */
+fun CompanyRequestContext.userIdOrNull(): Int? = principal.payload.getClaim("user_id").asInt()
+
 /**
  * Requiere el header `Company-DB` y valida que coincida con el `admin_db`
  * autenticado (defensa ante confusiones de tenant).

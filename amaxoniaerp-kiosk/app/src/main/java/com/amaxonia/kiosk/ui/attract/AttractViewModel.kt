@@ -1,0 +1,205 @@
+package com.amaxonia.kiosk.ui.attract
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.amaxonia.kiosk.core.network.KioskApiClient
+import com.amaxonia.kiosk.core.network.KioskApiException
+import com.amaxonia.kiosk.core.network.KioskMediaItem
+import com.amaxonia.kiosk.core.network.KioskTokenStorage
+import com.amaxonia.kiosk.core.network.NetworkResult
+import com.amaxonia.kiosk.data.config.KioskConfigRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+private const val SECRET_TAP_COUNT = 5
+private const val SECRET_TAP_WINDOW_MS = 3000L
+
+data class AttractUiState(
+    val isLoading: Boolean = true,
+    val brandColor: String? = null,
+    val logoUrl: String? = null,
+    val mediaList: List<KioskMediaItem> = emptyList(),
+    val currentMediaIndex: Int = 0,
+    val isOffline: Boolean = false,
+    /** Server reason for being out of service (503, e.g. kiosk migration missing); null = generic text. */
+    val outOfServiceMessage: String? = null,
+    val isAdminDialogOpen: Boolean = false,
+    val adminPassword: String = "",
+    val adminErrorMessage: String? = null,
+    val isAdminLoading: Boolean = false,
+) {
+    val currentMedia: KioskMediaItem?
+        get() = mediaList.getOrNull(currentMediaIndex)
+}
+
+/** 503 = the company cannot serve the kiosk (e.g. "falta migración"): show the server text on the banner. */
+private fun Throwable.outOfServiceMessage(): String? =
+    (this as? KioskApiException)
+        ?.takeIf { it.statusCode == HTTP_SERVICE_UNAVAILABLE }
+        ?.let { it.serverMessage?.takeIf(String::isNotBlank) ?: it.message }
+
+private const val HTTP_SERVICE_UNAVAILABLE = 503
+
+class AttractViewModel(
+    private val apiClient: KioskApiClient,
+    tokenStorage: KioskTokenStorage,
+    private val configRepository: KioskConfigRepository = KioskConfigRepository(apiClient, tokenStorage),
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(AttractUiState())
+    val uiState: StateFlow<AttractUiState> = _uiState.asStateFlow()
+
+    private var lastTapTimestamp = 0L
+    private var tapCount = 0
+
+    var loadConfigJob: Job? = null
+        private set
+
+    init {
+        // A config already held (or restored from disk) shows its banners at once, before the
+        // network answers; the refresh below then revalidates it in the background.
+        configRepository.config
+            .filterNotNull()
+            .onEach { config ->
+                _uiState.update {
+                    if (it.mediaList.isNotEmpty() || config.media.isEmpty()) {
+                        it
+                    } else {
+                        it.copy(
+                            isLoading = false,
+                            brandColor = config.brandColor,
+                            logoUrl = config.logoUrl,
+                            mediaList = config.media,
+                            currentMediaIndex = 0,
+                        )
+                    }
+                }
+            }.launchIn(viewModelScope)
+        loadConfigJob = loadConfig()
+    }
+
+    fun loadConfig(): Job {
+        _uiState.update { it.copy(isLoading = it.mediaList.isEmpty()) }
+        val job =
+            viewModelScope.launch {
+                val result = configRepository.refresh()
+                val config = configRepository.config.value
+                when (result) {
+                    is NetworkResult.Success, is NetworkResult.NotModified -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                brandColor = config?.brandColor,
+                                logoUrl = config?.logoUrl,
+                                mediaList = config?.media.orEmpty(),
+                                // Keep the loop where it is unless the banners themselves changed.
+                                currentMediaIndex =
+                                    if (config?.media.orEmpty() == it.mediaList) it.currentMediaIndex else 0,
+                                isOffline = false,
+                                outOfServiceMessage = null,
+                            )
+                        }
+                    }
+                    is NetworkResult.Failure -> {
+                        val serviceMessage = result.error.outOfServiceMessage()
+                        _uiState.update {
+                            val cachedMedia = config?.media ?: it.mediaList
+                            it.copy(
+                                isLoading = false,
+                                brandColor = config?.brandColor ?: it.brandColor,
+                                logoUrl = config?.logoUrl ?: it.logoUrl,
+                                mediaList = cachedMedia,
+                                isOffline = serviceMessage != null || cachedMedia.isEmpty(),
+                                outOfServiceMessage = serviceMessage,
+                            )
+                        }
+                    }
+                }
+            }
+        loadConfigJob = job
+        return job
+    }
+
+    fun advanceToNextMedia() {
+        val count = _uiState.value.mediaList.size
+        if (count > 0) {
+            _uiState.update {
+                it.copy(currentMediaIndex = (it.currentMediaIndex + 1) % count)
+            }
+        }
+    }
+
+    fun onSecretTap() {
+        val now = System.currentTimeMillis()
+        if (now - lastTapTimestamp > SECRET_TAP_WINDOW_MS) {
+            tapCount = 1
+        } else {
+            tapCount++
+        }
+        lastTapTimestamp = now
+
+        if (tapCount >= SECRET_TAP_COUNT) {
+            tapCount = 0
+            _uiState.update {
+                it.copy(
+                    isAdminDialogOpen = true,
+                    adminPassword = "",
+                    adminErrorMessage = null,
+                )
+            }
+        }
+    }
+
+    fun dismissAdminDialog() {
+        _uiState.update {
+            it.copy(
+                isAdminDialogOpen = false,
+                adminPassword = "",
+                adminErrorMessage = null,
+                isAdminLoading = false,
+            )
+        }
+    }
+
+    fun onAdminPasswordChanged(password: String) {
+        _uiState.update { it.copy(adminPassword = password, adminErrorMessage = null) }
+    }
+
+    fun submitAdminUnlock(onUnlocked: () -> Unit): Job {
+        val password = _uiState.value.adminPassword
+        if (password.isBlank()) {
+            _uiState.update { it.copy(adminErrorMessage = "La contraseña es requerida") }
+            return Job().apply { complete() }
+        }
+
+        _uiState.update { it.copy(isAdminLoading = true, adminErrorMessage = null) }
+        return viewModelScope.launch {
+            val result = apiClient.unlock(password)
+            result.fold(
+                onSuccess = { success ->
+                    _uiState.update { it.copy(isAdminLoading = false) }
+                    if (success) {
+                        dismissAdminDialog()
+                        onUnlocked()
+                    } else {
+                        _uiState.update { it.copy(adminErrorMessage = "Contraseña incorrecta") }
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isAdminLoading = false,
+                            adminErrorMessage = error.message ?: "Error al autenticar",
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
