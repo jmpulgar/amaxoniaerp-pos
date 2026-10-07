@@ -31,7 +31,8 @@
     <string name="cancel_order_keep">No, seguir con mi pedido</string>
 
     <!-- Attract Screen -->
-    <string name="attract_touch_to_start">Toca para ordenar</string>
+    <string name="attract_touch_to_start">Toca la pantalla para comenzar</string>
+    <string name="attract_start_order">Iniciar una nueva orden</string>
     <string name="attract_welcome">¡Hola!</string>
     <string name="attract_tagline">Ordena fácil, rápido y sin filas</string>
     <string name="attract_out_of_service_title">Fuera de servicio</string>
@@ -113,12 +114,18 @@
 
     <!-- Menu Screen -->
     <string name="menu_title">Menú</string>
-    <string name="menu_view_cart">Ver mi pedido</string>
-    <string name="menu_cancel_order">Cancelar</string>
+    <string name="menu_home">Inicio</string>
+    <string name="menu_discover">Descubre nuestro menú</string>
+    <string name="menu_recommended">Productos recomendados</string>
+    <string name="menu_view_cart">Ver mi orden</string>
+    <string name="menu_cancel_order">Cancelar orden</string>
     <string name="menu_sold_out">Agotado</string>
     <string name="menu_empty_products">No hay productos en esta categoría</string>
     <string name="menu_added_toast">¡Agregado a tu pedido!</string>
     <string name="menu_load_error">No pudimos cargar el menú</string>
+    <string name="menu_suggestions_title">También te sugerimos</string>
+    <string name="menu_suggestions_skip">No, gracias</string>
+    <string name="menu_suggestions_continue">Continuar con mi orden</string>
     <plurals name="menu_product_count">
         <item quantity="one">%1$d producto</item>
         <item quantity="other">%1$d productos</item>
@@ -137,9 +144,15 @@
     <string name="customizer_added">¡Agregado!</string>
     <string name="customizer_missing_required">Completa las opciones obligatorias</string>
     <string name="customizer_extra_price">+%1$s</string>
+    <string name="customizer_step_review">Revisar orden</string>
+    <string name="customizer_select_group">Selecciona %1$s</string>
+    <string name="customizer_quantity">Cantidad</string>
+    <string name="customizer_back">Atrás</string>
+    <string name="customizer_next">Siguiente</string>
+    <string name="customizer_add_to_order">Agregar a mi orden · %1$s</string>
 
     <!-- Review Screen -->
-    <string name="review_title">Tu pedido</string>
+    <string name="review_title">Revisa tu orden</string>
     <plurals name="review_item_count">
         <item quantity="one">%1$d producto</item>
         <item quantity="other">%1$d productos</item>
@@ -151,8 +164,8 @@
     <string name="review_tax_itbms">ITBMS</string>
     <string name="review_tax_iva">IVA</string>
     <string name="review_total">Total</string>
-    <string name="review_continue_shopping">Seguir comprando</string>
-    <string name="review_pay">Pagar · %1$s</string>
+    <string name="review_continue_shopping">Pedir más</string>
+    <string name="review_pay">Orden completa · %1$s</string>
     <string name="review_clear_cart">Vaciar</string>
     <string name="review_note">Nota: %1$s</string>
     <string name="review_unit_price">%1$s c/u</string>
@@ -160,6 +173,10 @@
     <!-- Customer ID Screen -->
     <string name="customer_title">¿Quieres factura con tus datos?</string>
     <string name="customer_subtitle">Si no la necesitas, continúa como Consumidor Final</string>
+    <string name="customer_question">¿Necesitas personalizar tu factura?</string>
+    <string name="customer_question_hint">Si no la necesitas, la emitimos como Consumidor Final.</string>
+    <string name="customer_no_thanks">No, gracias</string>
+    <string name="customer_yes">Sí, con mis datos</string>
     <string name="customer_final_title">Consumidor Final</string>
     <string name="customer_final_desc">Sin datos fiscales · más rápido</string>
     <string name="customer_custom_title">Factura con RUC / Cédula</string>

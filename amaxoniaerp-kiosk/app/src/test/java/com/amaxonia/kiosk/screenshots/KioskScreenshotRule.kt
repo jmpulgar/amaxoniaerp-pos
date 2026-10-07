@@ -160,7 +160,7 @@ class KioskScreenshotRule : TestRule {
                     KioskChrome(
                         state = AccessibilityState(isAccessibleMode = variant.accessible, isHighContrast = variant.highContrast),
                         isOrderingScreen = orderingScreen,
-                        actions = AccessibilityActions({}, {}, {}),
+                        actions = AccessibilityActions({}, {}),
                         content = content,
                     )
                 }

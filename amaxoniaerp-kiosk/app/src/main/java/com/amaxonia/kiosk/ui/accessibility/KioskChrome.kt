@@ -6,8 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * App chrome around every screen: the accessibility strip (ordering screens only) and the
- * "pantalla baja" container that lowers the content. Shared by the activity and screenshot tests.
+ * App chrome around every screen: the "pantalla baja" container that lowers the content and, on
+ * ordering screens, the slim accessibility footer at the very bottom (as on fast-food self-order
+ * kiosks). Shared by the activity and screenshot tests.
  */
 @Composable
 fun KioskChrome(
@@ -18,18 +19,17 @@ fun KioskChrome(
     content: @Composable () -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        if (isOrderingScreen) {
-            AccessibilityBar(
-                state = state,
-                onToggleAccessibleMode = actions.onToggleAccessibleMode,
-                onToggleHighContrast = actions.onToggleHighContrast,
-                onToggleLanguage = actions.onToggleLanguage,
-            )
-        }
         AccessibleContainer(
             isAccessibleMode = isOrderingScreen && state.isAccessibleMode,
             modifier = Modifier.weight(1f),
             content = content,
         )
+        if (isOrderingScreen) {
+            AccessibilityBar(
+                state = state,
+                onToggleAccessibleMode = actions.onToggleAccessibleMode,
+                onToggleLanguage = actions.onToggleLanguage,
+            )
+        }
     }
 }

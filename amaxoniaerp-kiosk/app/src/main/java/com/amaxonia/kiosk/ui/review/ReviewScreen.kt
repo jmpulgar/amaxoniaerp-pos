@@ -51,9 +51,6 @@ import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.CartLine
-import com.amaxonia.kiosk.ui.components.CheckoutStep
-import com.amaxonia.kiosk.ui.components.CheckoutStepper
-import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
@@ -65,9 +62,8 @@ import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
 import com.amaxonia.kiosk.ui.components.KioskTouchTarget
 import com.amaxonia.kiosk.ui.components.QuantityStepper
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
-import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
 import com.amaxonia.kiosk.ui.components.secondaryText
-import com.amaxonia.kiosk.ui.components.softShadow
+import com.amaxonia.kiosk.ui.components.topHairline
 import com.amaxonia.kiosk.ui.diningmode.MODE_DINE_IN
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
@@ -127,7 +123,6 @@ fun ReviewScreen(
                     }
                 },
             )
-            CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.ORDER)
 
             if (uiState.isEmpty) {
                 EmptyCartView(onExploreMenu = onContinueShopping, modifier = Modifier.weight(1f))
@@ -358,16 +353,20 @@ private fun ReviewBottomBar(
     val secondaryTotal = remember(total, uiState.currency) { total.secondaryText(uiState.currency) }
 
     Surface(
-        modifier = if (sidePanel) modifier.fillMaxWidth().softShadow(40.dp, Depth.Medium) else modifier.fillMaxWidth(),
+        modifier = if (sidePanel) modifier.fillMaxWidth() else modifier.fillMaxWidth().topHairline(colors.outlineVariant),
         color = colors.surface,
-        shadowElevation = if (sidePanel) 0.dp else 20.dp,
         shape =
             if (sidePanel) {
-                RoundedCornerShape(40.dp)
+                MaterialTheme.shapes.large
             } else {
-                RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
+                RoundedCornerShape(0.dp)
             },
-        border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
+        border =
+            when {
+                LocalHighContrast.current -> BorderStroke(3.dp, colors.onSurface)
+                sidePanel -> BorderStroke(2.dp, colors.outlineVariant)
+                else -> null
+            },
     ) {
         Column(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {
             TotalsRow(

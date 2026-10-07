@@ -110,11 +110,12 @@ object ScreenshotFixtures {
     fun menuState(
         cartCount: Int = 3,
         cartSubtotal: String = "18.85",
+        selectedCategoryId: Int? = BURGERS,
     ): MenuUiState =
         MenuUiState(
             isLoading = false,
             categories = categories,
-            selectedCategoryId = BURGERS,
+            selectedCategoryId = selectedCategoryId,
             items = items,
             cartItemCount = cartCount,
             cartSubtotal = Money.fromString(cartSubtotal),

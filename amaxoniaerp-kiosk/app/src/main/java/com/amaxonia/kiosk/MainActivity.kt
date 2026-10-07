@@ -196,7 +196,6 @@ fun KioskRoot(appGraph: AppGraph) {
                             actions =
                                 AccessibilityActions(
                                     onToggleAccessibleMode = appGraph.accessibilityManager::toggleAccessibleMode,
-                                    onToggleHighContrast = appGraph.accessibilityManager::toggleHighContrast,
                                     onToggleLanguage = appGraph.accessibilityManager::toggleLanguage,
                                 ),
                         ) {

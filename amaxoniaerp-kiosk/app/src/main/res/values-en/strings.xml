@@ -27,7 +27,8 @@
     <string name="cancel_order_keep">No, keep my order</string>
 
     <!-- Attract Screen -->
-    <string name="attract_touch_to_start">Touch to order</string>
+    <string name="attract_touch_to_start">Touch the screen to begin</string>
+    <string name="attract_start_order">Start a new order</string>
     <string name="attract_welcome">Hello!</string>
     <string name="attract_tagline">Order fast and easy, no lines</string>
     <string name="attract_out_of_service_title">Out of service</string>
@@ -109,12 +110,18 @@
 
     <!-- Menu Screen -->
     <string name="menu_title">Menu</string>
+    <string name="menu_home">Home</string>
+    <string name="menu_discover">Discover our menu</string>
+    <string name="menu_recommended">Recommended for you</string>
     <string name="menu_view_cart">View my order</string>
-    <string name="menu_cancel_order">Cancel</string>
+    <string name="menu_cancel_order">Cancel order</string>
     <string name="menu_sold_out">Sold out</string>
     <string name="menu_empty_products">No products in this category</string>
     <string name="menu_added_toast">Added to your order!</string>
     <string name="menu_load_error">We couldn\'t load the menu</string>
+    <string name="menu_suggestions_title">We also suggest</string>
+    <string name="menu_suggestions_skip">No, thanks</string>
+    <string name="menu_suggestions_continue">Continue to my order</string>
     <plurals name="menu_product_count">
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
@@ -133,9 +140,15 @@
     <string name="customizer_added">Added!</string>
     <string name="customizer_missing_required">Complete the required options</string>
     <string name="customizer_extra_price">+%1$s</string>
+    <string name="customizer_step_review">Review order</string>
+    <string name="customizer_select_group">Choose %1$s</string>
+    <string name="customizer_quantity">Quantity</string>
+    <string name="customizer_back">Back</string>
+    <string name="customizer_next">Next</string>
+    <string name="customizer_add_to_order">Add to my order · %1$s</string>
 
     <!-- Review Screen -->
-    <string name="review_title">Your order</string>
+    <string name="review_title">Review your order</string>
     <plurals name="review_item_count">
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
@@ -147,8 +160,8 @@
     <string name="review_tax_itbms">ITBMS (tax)</string>
     <string name="review_tax_iva">VAT</string>
     <string name="review_total">Total</string>
-    <string name="review_continue_shopping">Keep shopping</string>
-    <string name="review_pay">Pay · %1$s</string>
+    <string name="review_continue_shopping">Order more</string>
+    <string name="review_pay">Complete order · %1$s</string>
     <string name="review_clear_cart">Empty</string>
     <string name="review_note">Note: %1$s</string>
     <string name="review_unit_price">%1$s each</string>
@@ -156,6 +169,10 @@
     <!-- Customer ID Screen -->
     <string name="customer_title">Do you want an invoice with your details?</string>
     <string name="customer_subtitle">If you don\'t need one, continue as Final Consumer</string>
+    <string name="customer_question">Do you need a personalized invoice?</string>
+    <string name="customer_question_hint">If not, we issue it to Final Consumer.</string>
+    <string name="customer_no_thanks">No, thanks</string>
+    <string name="customer_yes">Yes, with my details</string>
     <string name="customer_final_title">Final Consumer</string>
     <string name="customer_final_desc">No tax details · fastest</string>
     <string name="customer_custom_title">Invoice with Tax ID / ID card</string>

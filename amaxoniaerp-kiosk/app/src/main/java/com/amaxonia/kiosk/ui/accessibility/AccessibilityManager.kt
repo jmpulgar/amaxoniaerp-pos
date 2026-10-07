@@ -23,10 +23,9 @@ data class AccessibilityState(
     val language: KioskLanguage = KioskLanguage.SPANISH,
 )
 
-/** Callbacks of the accessibility strip shown above every ordering screen. */
+/** Callbacks of the accessibility footer shown under every ordering screen. */
 class AccessibilityActions(
     val onToggleAccessibleMode: () -> Unit,
-    val onToggleHighContrast: () -> Unit,
     val onToggleLanguage: () -> Unit,
 )
 

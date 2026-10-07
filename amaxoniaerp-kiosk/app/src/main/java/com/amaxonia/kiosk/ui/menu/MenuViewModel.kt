@@ -83,6 +83,11 @@ class MenuViewModel(
         _uiState.update { it.copy(selectedCategoryId = categoryId) }
     }
 
+    /** Back to the menu home ("Descubre nuestro menú"): no category selected. */
+    fun showHome() {
+        _uiState.update { it.copy(selectedCategoryId = null) }
+    }
+
     fun onProductClicked(
         item: KioskItemDto,
         onOpenCustomizer: (Int) -> Unit,
@@ -138,12 +143,12 @@ class MenuViewModel(
 
     private fun showCatalog(catalog: KioskCatalogResponse) {
         val sortedCategories = catalog.categories.sortedBy { it.order }
-        val firstCatId = sortedCategories.firstOrNull()?.id
         _uiState.update {
             it.copy(
                 isLoading = false,
                 categories = sortedCategories,
-                selectedCategoryId = it.selectedCategoryId ?: firstCatId,
+                // The menu opens on its home page; keep the category the customer was browsing.
+                selectedCategoryId = it.selectedCategoryId?.takeIf { id -> sortedCategories.any { cat -> cat.id == id } },
                 items = catalog.items,
                 errorMessage = null,
             )

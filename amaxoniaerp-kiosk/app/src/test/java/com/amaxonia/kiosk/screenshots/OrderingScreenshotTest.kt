@@ -12,6 +12,7 @@ import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
 import com.amaxonia.kiosk.ui.diningmode.MODE_DINE_IN
 import com.amaxonia.kiosk.ui.idle.IdleWarningDialog
 import com.amaxonia.kiosk.ui.menu.MenuContent
+import com.amaxonia.kiosk.ui.menu.SuggestionsOverlay
 import com.amaxonia.kiosk.ui.review.ReviewScreen
 import com.amaxonia.kiosk.ui.review.ReviewViewModel
 import org.junit.Rule
@@ -100,6 +101,51 @@ class OrderingScreenshotTest {
         }
 
     @Test
+    fun menuHome() =
+        shots.snap("03_menu_home") {
+            MenuContent(
+                uiState = ScreenshotFixtures.menuState(selectedCategoryId = null),
+                diningMode = MODE_DINE_IN,
+                onCategorySelected = {},
+                onProductClicked = {},
+                onRetry = {},
+                onViewCart = {},
+                onBackToAttract = {},
+            )
+        }
+
+    @Test
+    fun menuSuggestions() =
+        shots.snap("03_menu_suggestions") {
+            val state = ScreenshotFixtures.menuState()
+            MenuContent(
+                uiState = state,
+                diningMode = MODE_DINE_IN,
+                onCategorySelected = {},
+                onProductClicked = {},
+                onRetry = {},
+                onViewCart = {},
+                onBackToAttract = {},
+            )
+            SuggestionsOverlay(
+                suggestions = state.items.filter { it.categoryId in AddOnCategories }.take(6),
+                currency = state.currency,
+                onProductClicked = {},
+                onDone = {},
+            )
+        }
+
+    @Test
+    fun customizerReview() {
+        val viewModel = ProductCustomizerViewModel(ScreenshotFixtures.comboDobleQueso, OrderGraph())
+        val extras = ScreenshotFixtures.comboDobleQueso.modifierGroups.last()
+        viewModel.toggleOption(extras, extras.options.first())
+        shots.snap("04_customizer_review") {
+            CustomizerScreen(viewModel = viewModel, onDismiss = {}, initialStep = ScreenshotFixtures.comboDobleQueso.modifierGroups.size)
+        }
+    }
+
+    @Test
     fun customizer() = customizer(Variant.NORMAL)
 
     @Test
@@ -156,6 +202,8 @@ class OrderingScreenshotTest {
             IdleWarningDialog(remainingSeconds = 12, onContinue = {}, onCancel = {})
         }
 }
+
+private val AddOnCategories = setOf(ScreenshotFixtures.SIDES, ScreenshotFixtures.DRINKS)
 
 /** SUNMI K2 24" portrait: 1080 x 1920 px at ~mdpi. */
 const val KIOSK_QUALIFIERS = "es-w1080dp-h1920dp-port-mdpi"

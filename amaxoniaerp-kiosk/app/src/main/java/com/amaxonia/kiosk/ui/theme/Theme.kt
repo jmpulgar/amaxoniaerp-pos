@@ -34,7 +34,7 @@ private val LightColorScheme =
         onTertiary = SurfaceWhite,
         tertiaryContainer = FlowLavenderSoft,
         onTertiaryContainer = FlowLavenderDeep,
-        background = FlowBackground,
+        background = SurfaceWhite,
         onBackground = FlowInk,
         surface = SurfaceWhite,
         onSurface = FlowInk,
@@ -106,11 +106,11 @@ val KioskTypography =
 
 val KioskShapes =
     Shapes(
-        extraSmall = RoundedCornerShape(12.dp),
-        small = RoundedCornerShape(18.dp),
-        medium = RoundedCornerShape(28.dp),
-        large = RoundedCornerShape(36.dp),
-        extraLarge = RoundedCornerShape(48.dp),
+        extraSmall = RoundedCornerShape(6.dp),
+        small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp),
+        large = RoundedCornerShape(14.dp),
+        extraLarge = RoundedCornerShape(20.dp),
     )
 
 @Composable
@@ -147,17 +147,17 @@ object KioskColors {
         @Composable @ReadOnlyComposable
         get() = if (LocalHighContrast.current) Color.White else FlowSuccessOnDark
 
-    /** Indigo → blue, safe behind white text (lavender is excluded from text-bearing surfaces). */
+    /** Flat brand indigo behind white text (primary CTAs, selected states). */
     val ctaBrush: Brush
         @Composable @ReadOnlyComposable
         get() = if (LocalHighContrast.current) SolidColor(Color.Black) else CtaGradientBrush
 
-    /** Pale lavender → pale blue wash: food placeholders and quiet illustration backgrounds. */
+    /** Quiet light grey: food placeholders and illustration backgrounds. */
     val softBrush: Brush
         @Composable @ReadOnlyComposable
         get() = if (LocalHighContrast.current) SolidColor(Color.White) else SoftGradientBrush
 
-    /** Deep indigo → blue: dark hero bands that carry white text (cart bar, amount heroes). */
+    /** Flat brand indigo for bands that carry white text (amount heroes). */
     val deepBrush: Brush
         @Composable @ReadOnlyComposable
         get() = if (LocalHighContrast.current) SolidColor(Color.Black) else DeepGradientBrush
@@ -173,7 +173,8 @@ object KioskColors {
         get() = if (LocalHighContrast.current) SolidColor(Color.Black) else HeroGradientBrush
 }
 
-private val CtaGradientBrush = Brush.linearGradient(listOf(FlowIndigo, FlowBlue))
+// Self-order kiosk look: flat brand colors, no gradients on functional surfaces.
+private val CtaGradientBrush = SolidColor(FlowIndigo)
 private val HeroGradientBrush = Brush.linearGradient(FlowGradient)
-private val SoftGradientBrush = Brush.linearGradient(listOf(FlowLavenderSoft, FlowBlueSoft))
-private val DeepGradientBrush = Brush.linearGradient(listOf(FlowIndigoDeep, FlowIndigo, FlowBlue))
+private val SoftGradientBrush = SolidColor(FlowBackground)
+private val DeepGradientBrush = SolidColor(FlowIndigo)

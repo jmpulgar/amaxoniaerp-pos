@@ -1,15 +1,15 @@
 package com.amaxonia.kiosk.ui.menu
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -36,9 +37,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,14 +57,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
@@ -73,39 +76,43 @@ import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.core.network.KioskItemDto
 import com.amaxonia.kiosk.ui.components.BrandWordmark
 import com.amaxonia.kiosk.ui.components.CountBadge
-import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskConfirmDialog
-import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.KioskImage
 import com.amaxonia.kiosk.ui.components.KioskToast
-import com.amaxonia.kiosk.ui.components.KioskTouchTarget
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
-import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.outline
+import com.amaxonia.kiosk.ui.components.rightHairline
 import com.amaxonia.kiosk.ui.components.secondaryText
-import com.amaxonia.kiosk.ui.components.softShadow
+import com.amaxonia.kiosk.ui.components.topHairline
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
-import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
 
 private const val TOAST_DURATION_MS = 1400L
-private const val CATEGORY_SWAP_IN_MS = 260
-private const val CATEGORY_SWAP_OUT_MS = 120
-private const val SOLD_OUT_CONTENT_ALPHA = 0.6f
-private const val PRODUCT_IMAGE_RATIO = 1.12f
-private const val LANDSCAPE_IMAGE_RATIO = 1.4f
-private const val MUTED_ALPHA = 0.8f
-private val CategoryRailWidth = 240.dp
-private val ProductCardMinWidth = 300.dp
+private const val CATEGORY_SWAP_IN_MS = 220
+private const val CATEGORY_SWAP_OUT_MS = 100
+private const val SOLD_OUT_CONTENT_ALPHA = 0.5f
+private const val PRODUCT_COLUMNS = 3
+private const val LANDSCAPE_PRODUCT_COLUMNS = 5
+private const val HOME_TILE_COLUMNS = 2
+private const val LANDSCAPE_HOME_TILE_COLUMNS = 4
+private const val RECOMMENDED_COUNT = 3
+private const val LANDSCAPE_RECOMMENDED_COUNT = 5
+private const val SUGGESTION_COUNT = 6
+private const val SCRIM_ALPHA = 0.55f
+private val SideMenuWidth = 280.dp
+private val SoldOutVeil = Color(0x99FFFFFF)
 
-/** Bottom padding so the last row scrolls clear of the floating cart bar. */
-private val CartBarClearance = 220.dp
-private val SoldOutVeil = Color(0x99121212)
+/** Category names that make good "También te sugerimos" add-ons (sides, drinks, desserts, coffee). */
+private val SuggestionKeywords =
+    listOf(
+        "acompa", "papa", "side", "fries", "bebida", "drink", "refresco", "soda", "jugo", "juice",
+        "postre", "dessert", "helado", "café", "cafe", "coffee", "extra",
+    )
 
 @Composable
 fun MenuScreen(
@@ -121,6 +128,7 @@ fun MenuScreen(
         uiState = uiState,
         diningMode = diningMode,
         onCategorySelected = viewModel::selectCategory,
+        onShowHome = viewModel::showHome,
         onProductClicked = { item -> viewModel.onProductClicked(item, onOpenCustomizer) },
         onRetry = { viewModel.loadCatalog() },
         onViewCart = onViewCart,
@@ -129,7 +137,12 @@ fun MenuScreen(
     )
 }
 
-/** Stateless menu (rendered directly by screenshot tests). */
+/**
+ * Stateless menu (rendered directly by screenshot tests), laid out like a fast-food self-order
+ * kiosk: a category side menu with "Inicio" on the left, the home page ("Descubre nuestro menú") or
+ * a three-column product grid on the right, and the order bar (bag, total, "Ver mi orden") at the
+ * bottom. "Ver mi orden" first offers add-ons ("También te sugerimos").
+ */
 @Composable
 fun MenuContent(
     uiState: MenuUiState,
@@ -140,8 +153,11 @@ fun MenuContent(
     onViewCart: () -> Unit,
     onBackToAttract: () -> Unit,
     modifier: Modifier = Modifier,
+    onShowHome: () -> Unit = {},
 ) {
     var showCancelDialog by remember { mutableStateOf(false) }
+    var showSuggestions by remember { mutableStateOf(false) }
+    val suggestions = remember(uiState.items, uiState.categories) { suggestionsFor(uiState) }
 
     // "¡Agregado!" feedback whenever the cart grows while the menu is visible.
     var lastCount by remember { mutableIntStateOf(-1) }
@@ -177,11 +193,6 @@ fun MenuContent(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                KioskHeader(
-                    title = null,
-                    leading = { BrandWordmark(height = 80.dp) },
-                    actions = { DiningModeChip(isTakeaway = diningMode == MODE_TAKEAWAY) },
-                )
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     when {
                         uiState.isLoading && uiState.items.isEmpty() ->
@@ -193,36 +204,53 @@ fun MenuContent(
                             CatalogError(onRetry = onRetry, modifier = Modifier.align(Alignment.Center))
                         else ->
                             Row(modifier = Modifier.fillMaxSize()) {
-                                CategoryRail(
+                                SideMenu(
                                     categories = uiState.categories,
+                                    items = uiState.items,
                                     selectedCategoryId = uiState.selectedCategoryId,
+                                    isTakeaway = diningMode == MODE_TAKEAWAY,
+                                    onHome = onShowHome,
                                     onCategorySelected = onCategorySelected,
-                                    modifier = Modifier.width(CategoryRailWidth).fillMaxHeight(),
+                                    modifier = Modifier.width(SideMenuWidth).fillMaxHeight(),
                                 )
-                                ProductArea(
+                                MainArea(
                                     uiState = uiState,
+                                    onCategorySelected = onCategorySelected,
                                     onProductClicked = onProductClicked,
                                     modifier = Modifier.weight(1f).fillMaxHeight(),
                                 )
                             }
                     }
+                    KioskToast(
+                        visible = toastVisible,
+                        text = stringResource(R.string.menu_added_toast),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp, start = SideMenuWidth),
+                    )
                 }
-            }
-
-            // The cart bar floats over the grid so its rounded top corners reveal the menu behind it.
-            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                KioskToast(
-                    visible = toastVisible,
-                    text = stringResource(R.string.menu_added_toast),
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 24.dp, start = CategoryRailWidth),
-                )
-                CartBottomBar(
+                OrderBar(
                     itemCount = uiState.cartItemCount,
                     total = uiState.cartSubtotal,
                     currency = uiState.currency,
-                    onViewCart = onViewCart,
+                    onViewCart = {
+                        if (suggestions.isNotEmpty()) showSuggestions = true else onViewCart()
+                    },
                     onCancel = {
                         if (uiState.cartItemCount > 0) showCancelDialog = true else onBackToAttract()
+                    },
+                )
+            }
+
+            AnimatedVisibility(visible = showSuggestions, enter = fadeIn(), exit = fadeOut()) {
+                SuggestionsOverlay(
+                    suggestions = suggestions,
+                    currency = uiState.currency,
+                    onProductClicked = { item ->
+                        if (item.modifierGroups.isNotEmpty()) showSuggestions = false
+                        onProductClicked(item)
+                    },
+                    onDone = {
+                        showSuggestions = false
+                        onViewCart()
                     },
                 )
             }
@@ -230,33 +258,16 @@ fun MenuContent(
     }
 }
 
-@Composable
-private fun DiningModeChip(isTakeaway: Boolean) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        shape = RoundedCornerShape(percent = 50),
-        color = colors.secondaryContainer,
-        contentColor = colors.onSecondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 28.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = if (isTakeaway) Icons.Rounded.ShoppingBag else Icons.Rounded.Restaurant,
-                contentDescription = null,
-                modifier = Modifier.size(36.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text =
-                    stringResource(
-                        if (isTakeaway) R.string.dining_mode_takeaway_title else R.string.dining_mode_dine_in_title,
-                    ),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-    }
+/** Up to [SUGGESTION_COUNT] available add-ons from side/drink/dessert categories. */
+private fun suggestionsFor(uiState: MenuUiState): List<KioskItemDto> {
+    val addOnCategories =
+        uiState.categories
+            .filter { category -> SuggestionKeywords.any { category.name.lowercase().contains(it) } }
+            .map { it.id }
+            .toSet()
+    return uiState.items
+        .filter { it.categoryId in addOnCategories && !it.soldOut }
+        .take(SUGGESTION_COUNT)
 }
 
 @Composable
@@ -282,303 +293,361 @@ private fun CatalogError(
     }
 }
 
+/** Left side menu: logo, dining mode, "Inicio" and the category list. */
 @Composable
-private fun CategoryRail(
+private fun SideMenu(
     categories: List<KioskCategoryDto>,
+    items: List<KioskItemDto>,
     selectedCategoryId: Int?,
+    isTakeaway: Boolean,
+    onHome: () -> Unit,
     onCategorySelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
-        border = if (LocalHighContrast.current) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
+        modifier = modifier.rightHairline(colors.outlineVariant),
+        color = colors.surface,
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 20.dp, bottom = CartBarClearance),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            items(categories, key = { it.id }) { cat ->
-                CategoryRailItem(
-                    category = cat,
-                    isSelected = cat.id == selectedCategoryId,
-                    onClick = { onCategorySelected(cat.id) },
+            item(key = "logo") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 12.dp),
+                ) {
+                    BrandWordmark(height = 64.dp)
+                    Spacer(Modifier.height(16.dp))
+                    DiningModeTag(isTakeaway = isTakeaway)
+                }
+            }
+            item(key = "home") {
+                SideMenuItem(
+                    label = stringResource(R.string.menu_home),
+                    selected = selectedCategoryId == null,
+                    onClick = onHome,
+                ) { tint -> Icon(Icons.Rounded.Home, contentDescription = null, tint = tint, modifier = Modifier.size(44.dp)) }
+            }
+            item(key = "menu_label") {
+                Text(
+                    text = stringResource(R.string.menu_title),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                    color = colors.onSurface,
+                    modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CategoryRailItem(
-    category: KioskCategoryDto,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    val highContrast = LocalHighContrast.current
-    val background by animateColorAsState(
-        if (isSelected) colors.primaryContainer else Color.Transparent,
-        label = "rail_bg",
-    )
-    val indicatorWidth by animateDpAsState(if (isSelected) 8.dp else 0.dp, label = "rail_indicator")
-    val glyph = remember(category.name) { foodGlyphFor(category.name) }
-    val disc = if (isSelected) KioskColors.ctaBrush else KioskColors.softBrush
-
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 184.dp)
-                .padding(end = 16.dp)
-                .clip(RoundedCornerShape(topEnd = 36.dp, bottomEnd = 36.dp))
-                .background(background)
-                .kioskPressable(onClick = onClick),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .width(indicatorWidth)
-                    .height(112.dp)
-                    .background(colors.primary, RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)),
-        )
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 20.dp, bottom = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(108.dp)
-                        .then(if (isSelected) Modifier.softShadow(54.dp, Depth.Low) else Modifier)
-                        .background(disc, CircleShape)
-                        .outline(if (highContrast) 2.dp else 0.dp, colors.onSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!category.iconUrl.isNullOrBlank()) {
+            items(categories, key = { it.id }) { category ->
+                val imageUrl = remember(category, items) { categoryImageUrl(category, items) }
+                val glyph = remember(category.name) { foodGlyphFor(category.name) }
+                SideMenuItem(
+                    label = category.name,
+                    selected = category.id == selectedCategoryId,
+                    onClick = { onCategorySelected(category.id) },
+                ) { _ ->
                     KioskImage(
-                        url = category.iconUrl,
+                        url = imageUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         placeholderIcon = glyph,
-                        placeholderIconSize = 56.dp,
-                        modifier = Modifier.size(84.dp).clip(CircleShape),
-                    )
-                } else {
-                    Icon(
-                        imageVector = glyph,
-                        contentDescription = null,
-                        tint = if (isSelected) colors.onPrimary else colors.primary,
-                        modifier = Modifier.size(56.dp),
+                        placeholderIconSize = 32.dp,
+                        modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = category.name,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold),
-                color = if (isSelected) colors.onPrimaryContainer else colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
 
+/** Dine in / takeaway reminder under the logo. */
 @Composable
-private fun ProductArea(
+private fun DiningModeTag(isTakeaway: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = if (isTakeaway) Icons.Rounded.ShoppingBag else Icons.Rounded.Restaurant,
+            contentDescription = null,
+            tint = colors.secondary,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(if (isTakeaway) R.string.dining_mode_takeaway_title else R.string.dining_mode_dine_in_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SideMenuItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    leading: @Composable (tint: Color) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val accent = colors.secondary
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 104.dp)
+                .background(if (selected) colors.surfaceVariant else Color.Transparent)
+                .drawBehind {
+                    if (selected) drawRect(color = accent, size = Size(8.dp.toPx(), size.height))
+                }
+                .clickable(onClick = onClick)
+                .padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            leading(if (selected) colors.primary else colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Black else FontWeight.Medium),
+            color = if (selected) colors.onSurface else colors.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Home page or the selected category's product grid. */
+@Composable
+private fun MainArea(
     uiState: MenuUiState,
+    onCategorySelected: (Int) -> Unit,
     onProductClicked: (KioskItemDto) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedContent(
         targetState = uiState.selectedCategoryId,
-        transitionSpec = {
-            (fadeIn(tween(CATEGORY_SWAP_IN_MS)) + slideInVertically(tween(CATEGORY_SWAP_IN_MS)) { it / 12 }) togetherWith
-                fadeOut(tween(CATEGORY_SWAP_OUT_MS))
-        },
+        transitionSpec = { fadeIn(tween(CATEGORY_SWAP_IN_MS)) togetherWith fadeOut(tween(CATEGORY_SWAP_OUT_MS)) },
         modifier = modifier,
         label = "category_swap",
     ) { categoryId ->
-        val items =
-            remember(uiState.items, categoryId) {
-                if (categoryId == null) uiState.items else uiState.items.filter { it.categoryId == categoryId }
-            }
-        val categoryName = uiState.categories.firstOrNull { it.id == categoryId }?.name ?: stringResource(R.string.menu_title)
+        if (categoryId == null) {
+            MenuHome(uiState = uiState, onCategorySelected = onCategorySelected, onProductClicked = onProductClicked)
+        } else {
+            CategoryProducts(uiState = uiState, categoryId = categoryId, onProductClicked = onProductClicked)
+        }
+    }
+}
 
-        LazyVerticalGrid(
-            // Two columns on the 1080 dp portrait canvas, four or five on landscape screens.
-            columns = GridCells.Adaptive(ProductCardMinWidth),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-            contentPadding = PaddingValues(start = 28.dp, end = 32.dp, top = 32.dp, bottom = CartBarClearance),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
-                Column {
-                    Text(
-                        text = categoryName,
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = pluralStringResource(R.plurals.menu_product_count, items.size, items.size),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+/** "Descubre nuestro menú": a tile per category, then a row of recommended products. */
+@Composable
+private fun MenuHome(
+    uiState: MenuUiState,
+    onCategorySelected: (Int) -> Unit,
+    onProductClicked: (KioskItemDto) -> Unit,
+) {
+    val landscape = LocalKioskCanvas.current.isLandscape
+    val recommendedCount = if (landscape) LANDSCAPE_RECOMMENDED_COUNT else RECOMMENDED_COUNT
+    val recommended =
+        remember(uiState.items, recommendedCount) {
+            // One available product per category, so the row shows variety.
+            uiState.items.filterNot { it.soldOut }.distinctBy { it.categoryId }.take(recommendedCount)
+        }
+    val columns = if (landscape) LANDSCAPE_HOME_TILE_COLUMNS else HOME_TILE_COLUMNS
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns * recommendedCount),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 32.dp, bottom = 32.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "title", span = { GridItemSpan(maxLineSpan) }) { SectionTitle(stringResource(R.string.menu_discover)) }
+        items(uiState.categories, key = { "cat_${it.id}" }, span = { GridItemSpan(recommendedCount) }) { category ->
+            CategoryTile(
+                category = category,
+                imageUrl = remember(category, uiState.items) { categoryImageUrl(category, uiState.items) },
+                onClick = { onCategorySelected(category.id) },
+            )
+        }
+        if (recommended.isNotEmpty()) {
+            item(key = "recommended_title", span = { GridItemSpan(maxLineSpan) }) {
+                SectionTitle(stringResource(R.string.menu_recommended), modifier = Modifier.padding(top = 20.dp))
             }
-            if (items.isEmpty()) {
-                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = stringResource(R.string.menu_empty_products),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 48.dp),
-                    )
-                }
-            }
-            items(items, key = { it.id }) { item ->
-                ProductCard(
-                    item = item,
-                    categoryName = categoryName,
-                    currency = uiState.currency,
-                    onClick = { onProductClicked(item) },
-                )
+            items(recommended, key = { "rec_${it.id}" }, span = { GridItemSpan(columns) }) { item ->
+                ProductCard(item = item, categoryName = categoryName(uiState, item), currency = uiState.currency, onClick = {
+                    onProductClicked(item)
+                })
             }
         }
     }
 }
 
+@Composable
+private fun SectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineLarge,
+        color = MaterialTheme.colorScheme.onBackground,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/** Home tile: category name on top, its picture in the lower right. */
+@Composable
+private fun CategoryTile(
+    category: KioskCategoryDto,
+    imageUrl: String?,
+    onClick: () -> Unit,
+) {
+    val glyph = remember(category.name) { foodGlyphFor(category.name) }
+    KioskCard(modifier = Modifier.fillMaxWidth().height(220.dp), onClick = onClick) {
+        Text(
+            text = category.name,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 22.dp, end = 20.dp),
+        )
+        KioskImage(
+            url = imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            placeholderIcon = glyph,
+            placeholderIconSize = 72.dp,
+            modifier =
+                Modifier.align(
+                    Alignment.BottomEnd,
+                ).padding(end = 16.dp, bottom = 16.dp).size(110.dp).clip(RoundedCornerShape(10.dp)),
+        )
+    }
+}
+
+@Composable
+private fun CategoryProducts(
+    uiState: MenuUiState,
+    categoryId: Int,
+    onProductClicked: (KioskItemDto) -> Unit,
+) {
+    val items = remember(uiState.items, categoryId) { uiState.items.filter { it.categoryId == categoryId } }
+    val categoryName = uiState.categories.firstOrNull { it.id == categoryId }?.name ?: stringResource(R.string.menu_title)
+    val columns = if (LocalKioskCanvas.current.isLandscape) LANDSCAPE_PRODUCT_COLUMNS else PRODUCT_COLUMNS
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 32.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { SectionTitle(categoryName, Modifier.padding(bottom = 8.dp)) }
+        if (items.isEmpty()) {
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = stringResource(R.string.menu_empty_products),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 48.dp),
+                )
+            }
+        }
+        items(items, key = { it.id }) { item ->
+            ProductCard(item = item, categoryName = categoryName, currency = uiState.currency, onClick = { onProductClicked(item) })
+        }
+    }
+}
+
+/** Square product tile: photo, name and price, the whole tile is the touch target. */
 @Composable
 private fun ProductCard(
     item: KioskItemDto,
     categoryName: String,
     currency: KioskCurrencyConfig,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val money = remember(item.price) { Money.fromString(item.price) }
     val secondaryText = remember(money, currency) { money.secondaryText(currency) }
     val glyph = remember(item.name, categoryName) { foodGlyphFor(item.name, categoryName) }
-    val imageShape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
     val contentAlpha = if (item.soldOut) SOLD_OUT_CONTENT_ALPHA else 1f
 
     KioskCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
+        selected = selected,
         onClick = if (item.soldOut) null else onClick,
     ) {
-        Column {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        // Flatter photos on landscape screens, where height is the scarce axis.
-                        .aspectRatio(if (LocalKioskCanvas.current.isLandscape) LANDSCAPE_IMAGE_RATIO else PRODUCT_IMAGE_RATIO)
-                        .clip(imageShape),
-            ) {
-                KioskImage(
-                    url = item.imageUrl,
-                    contentDescription = item.name,
-                    grayscale = item.soldOut,
-                    placeholderIcon = glyph,
-                    placeholderIconSize = 128.dp,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                if (item.soldOut) {
-                    SoldOutOverlay()
-                }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp).graphicsLayer { alpha = contentAlpha },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            KioskImage(
+                url = item.imageUrl,
+                contentDescription = item.name,
+                contentScale = ContentScale.Fit,
+                grayscale = item.soldOut,
+                placeholderIcon = glyph,
+                placeholderIconSize = 96.dp,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.onSurface,
+                textAlign = TextAlign.Center,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = money.toDisplayString(),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                color = colors.onSurface,
+                maxLines = 1,
+            )
+            if (secondaryText.isNotBlank()) {
+                Text(text = secondaryText, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
             }
-
-            Column(
-                modifier =
-                    Modifier
-                        .padding(start = 24.dp, end = 20.dp, top = 20.dp, bottom = 24.dp)
-                        .graphicsLayer { alpha = contentAlpha },
-            ) {
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.onSurface,
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = money.toDisplayString(),
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                            color = colors.primary,
-                            maxLines = 1,
-                        )
-                        if (secondaryText.isNotBlank()) {
-                            Text(
-                                text = secondaryText,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = colors.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                    if (!item.soldOut) {
-                        AddRoundButton()
-                    }
-                }
-            }
+        }
+        if (item.soldOut) SoldOutOverlay()
+        if (selected) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = colors.secondary,
+                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(48.dp).background(colors.surface, CircleShape),
+            )
         }
     }
 }
 
-/** Decorative "+" (the whole card is the touch target, so this is not separately clickable). */
-@Composable
-private fun AddRoundButton() {
-    Box(
-        modifier =
-            Modifier
-                .size(80.dp)
-                .softShadow(40.dp, Depth.Low)
-                .background(KioskColors.ctaBrush, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.Add,
-            contentDescription = stringResource(R.string.cd_add),
-            tint = Color.White,
-            modifier = Modifier.size(48.dp),
-        )
-    }
-}
-
-/** Sold out: a calm dark veil with a white pill (red is reserved for errors). */
+/** Sold out: a white veil with a dark label (red is reserved for errors). */
 @Composable
 private fun BoxScope.SoldOutOverlay() {
-    val pill = RoundedCornerShape(percent = 50)
+    val shape = RoundedCornerShape(8.dp)
     Box(modifier = Modifier.matchParentSize().background(SoldOutVeil))
     Text(
         text = stringResource(R.string.menu_sold_out),
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-        color = MaterialTheme.colorScheme.onSurface,
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+        color = MaterialTheme.colorScheme.surface,
         modifier =
             Modifier
                 .align(Alignment.Center)
-                .background(MaterialTheme.colorScheme.surface, pill)
-                .outline(if (LocalHighContrast.current) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, pill)
-                .padding(horizontal = 32.dp, vertical = 14.dp),
+                .background(MaterialTheme.colorScheme.onSurface, shape)
+                .outline(if (LocalHighContrast.current) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, shape)
+                .padding(horizontal = 24.dp, vertical = 10.dp),
     )
 }
 
+/** Bottom order bar: bag with count and total on the left, "Ver mi orden" and "Cancelar orden" on the right. */
 @Composable
-private fun CartBottomBar(
+private fun OrderBar(
     itemCount: Int,
     total: Money,
     currency: KioskCurrencyConfig,
@@ -586,68 +655,132 @@ private fun CartBottomBar(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val highContrast = LocalHighContrast.current
+    val colors = MaterialTheme.colorScheme
     val secondaryTotal = remember(total, currency) { total.secondaryText(currency) }
-    val shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
-    val onBar = Color.White
-    val muted = onBar.copy(alpha = if (highContrast) 1f else MUTED_ALPHA)
-
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .softShadow(40.dp, Depth.High)
-                .background(KioskColors.deepBrush, shape)
-                .padding(horizontal = 28.dp, vertical = 28.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        KioskButton(
-            text = stringResource(R.string.menu_cancel_order),
-            onClick = onCancel,
-            style = KioskButtonStyle.Ghost,
-            contentColor = onBar,
-            height = KioskTouchTarget,
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Box(modifier = Modifier.size(96.dp)) {
-            Icon(
-                imageVector = Icons.Rounded.ShoppingBag,
-                contentDescription = stringResource(R.string.cd_cart),
-                tint = onBar,
-                modifier = Modifier.size(72.dp).align(Alignment.BottomStart),
-            )
-            CountBadge(
-                count = itemCount,
-                size = 52.dp,
-                modifier = Modifier.align(Alignment.TopEnd).offset(x = 6.dp),
-            )
-        }
-
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = stringResource(R.string.review_total),
-                style = MaterialTheme.typography.labelMedium,
-                color = muted,
-            )
-            AnimatedContent(targetState = total.toDisplayString(), label = "cart_total") { value ->
-                Text(text = value, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black), color = onBar)
+    Surface(modifier = modifier.fillMaxWidth().topHairline(colors.outlineVariant), color = colors.surface) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.size(104.dp)) {
+                Icon(
+                    imageVector = Icons.Rounded.ShoppingBag,
+                    contentDescription = stringResource(R.string.cd_cart),
+                    tint = colors.primary,
+                    modifier = Modifier.size(84.dp).align(Alignment.BottomStart),
+                )
+                if (itemCount > 0) {
+                    CountBadge(count = itemCount, size = 48.dp, modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp))
+                }
             }
-            if (secondaryTotal.isNotBlank()) {
-                Text(text = secondaryTotal, style = MaterialTheme.typography.labelSmall, color = muted)
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                AnimatedContent(targetState = total.toDisplayString(), label = "cart_total") { value ->
+                    Text(text = value, style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+                }
+                if (secondaryTotal.isNotBlank()) {
+                    Text(text = secondaryTotal, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+                }
+            }
+            Column(modifier = Modifier.width(500.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                KioskButton(
+                    text = stringResource(R.string.menu_view_cart),
+                    onClick = onViewCart,
+                    enabled = itemCount > 0,
+                    height = 104.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                KioskButton(
+                    text = stringResource(R.string.menu_cancel_order),
+                    onClick = onCancel,
+                    style = KioskButtonStyle.Secondary,
+                    height = 72.dp,
+                    textStyle = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
-
-        KioskButton(
-            text = stringResource(R.string.menu_view_cart),
-            onClick = onViewCart,
-            style = KioskButtonStyle.Light,
-            enabled = itemCount > 0,
-            trailing = {
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(40.dp))
-            },
-        )
     }
 }
+
+/** "También te sugerimos": add-ons offered before the order review, dismissed with "No, gracias". */
+@Composable
+internal fun SuggestionsOverlay(
+    suggestions: List<KioskItemDto>,
+    currency: KioskCurrencyConfig,
+    onProductClicked: (KioskItemDto) -> Unit,
+    onDone: () -> Unit,
+) {
+    var addedIds by remember { mutableStateOf(emptySet<Int>()) }
+    val landscape = LocalKioskCanvas.current.isLandscape
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = SCRIM_ALPHA))
+                // Swallows taps so nothing behind the sheet reacts.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedVisibility(visible = true, enter = scaleIn(initialScale = 0.94f) + fadeIn()) {
+            Surface(
+                modifier = Modifier.padding(40.dp).widthIn(max = if (landscape) 1400.dp else 980.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(modifier = Modifier.padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(R.string.menu_suggestions_title),
+                        style = MaterialTheme.typography.displaySmall,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(32.dp))
+                    val columns = if (landscape) SUGGESTION_COUNT else PRODUCT_COLUMNS
+                    suggestions.chunked(columns).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                            row.forEach { item ->
+                                ProductCard(
+                                    item = item,
+                                    categoryName = "",
+                                    currency = currency,
+                                    selected = item.id in addedIds,
+                                    onClick = {
+                                        if (item.modifierGroups.isEmpty()) addedIds = addedIds + item.id
+                                        onProductClicked(item)
+                                    },
+                                    modifier = Modifier.width(SuggestionCardWidth),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    KioskButton(
+                        text =
+                            stringResource(
+                                if (addedIds.isEmpty()) R.string.menu_suggestions_skip else R.string.menu_suggestions_continue,
+                            ),
+                        onClick = onDone,
+                        style = if (addedIds.isEmpty()) KioskButtonStyle.Secondary else KioskButtonStyle.Primary,
+                        modifier = Modifier.widthIn(min = 560.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val SuggestionCardWidth: Dp = 270.dp
+
+private fun categoryName(
+    uiState: MenuUiState,
+    item: KioskItemDto,
+): String = uiState.categories.firstOrNull { it.id == item.categoryId }?.name.orEmpty()
+
+/** The category's own icon, or else the photo of its first product. */
+private fun categoryImageUrl(
+    category: KioskCategoryDto,
+    items: List<KioskItemDto>,
+): String? =
+    category.iconUrl?.takeIf { it.isNotBlank() }
+        ?: items.firstOrNull { it.categoryId == category.id && !it.imageUrl.isNullOrBlank() }?.imageUrl

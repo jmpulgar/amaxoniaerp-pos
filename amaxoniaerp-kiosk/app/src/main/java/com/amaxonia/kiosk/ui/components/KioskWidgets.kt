@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -209,6 +210,26 @@ fun KioskIconButton(
     }
 }
 
+/** Thin divider along the bottom edge (flat headers instead of shadows). */
+fun Modifier.bottomHairline(color: Color): Modifier =
+    drawBehind {
+        val stroke = 2.dp.toPx()
+        drawRect(color = color, topLeft = Offset(0f, size.height - stroke), size = Size(size.width, stroke))
+    }
+
+/** Thin divider along the top edge (bottom bars against the content above). */
+fun Modifier.topHairline(color: Color): Modifier =
+    drawBehind {
+        drawRect(color = color, size = Size(size.width, 2.dp.toPx()))
+    }
+
+/** Thin divider along the right edge (side menus against the content). */
+fun Modifier.rightHairline(color: Color): Modifier =
+    drawBehind {
+        val stroke = 2.dp.toPx()
+        drawRect(color = color, topLeft = Offset(size.width - stroke, 0f), size = Size(stroke, size.height))
+    }
+
 /** App header: optional back button, title (or custom leading content) and trailing actions. */
 @Composable
 fun KioskHeader(
@@ -219,7 +240,7 @@ fun KioskHeader(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().softShadow(0.dp, Depth.Low),
+        modifier = modifier.fillMaxWidth().bottomHairline(MaterialTheme.colorScheme.outlineVariant),
         color = MaterialTheme.colorScheme.surface,
         border = if (LocalHighContrast.current) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
     ) {

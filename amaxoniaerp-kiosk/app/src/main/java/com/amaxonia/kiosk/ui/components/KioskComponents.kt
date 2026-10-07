@@ -2,7 +2,6 @@ package com.amaxonia.kiosk.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
@@ -24,10 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,19 +36,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.amaxonia.kiosk.R
-import com.amaxonia.kiosk.ui.theme.FlowBlueDeep
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 
@@ -77,16 +71,17 @@ fun Modifier.centeredMaxWidth(max: Dp = KioskContentMaxWidth): Modifier =
         .fillMaxWidth()
 
 private const val BADGE_POP_SCALE = 1.45f
-private val PILL_RADIUS = 999.dp
-private val CARD_RADIUS = 36.dp
-private val SELECTED_BORDER = 5.dp
+private val BUTTON_RADIUS = 10.dp
+private const val BUTTON_PRESSED_SCALE = 0.98f
+private val CARD_BORDER = 2.dp
+private val SELECTED_BORDER = 4.dp
 private val HC_BORDER = 3.dp
 private const val DISABLED_ALPHA = 0.4f
-private const val OUTLINE_ALPHA = 0.25f
+private const val OUTLINE_ALPHA = 0.55f
 
 /**
- * Primary = brand gradient CTA; Accent = flat brand blue; Secondary = white with indigo outline;
- * Light = white elevated pill for dark/gradient bars; Ghost = transparent outline.
+ * Primary = solid brand indigo CTA; Accent = solid brand blue; Secondary = white with a grey outline;
+ * Light = white with indigo text; Ghost = transparent outline.
  */
 enum class KioskButtonStyle { Primary, Accent, Secondary, Light, Ghost }
 
@@ -139,45 +134,42 @@ fun KioskButton(
         when (style) {
             KioskButtonStyle.Primary -> colors.primary to colors.onPrimary
             KioskButtonStyle.Accent -> colors.secondary to colors.onSecondary
-            KioskButtonStyle.Secondary -> colors.surface to colors.primary
+            KioskButtonStyle.Secondary -> colors.surface to colors.onSurface
             KioskButtonStyle.Light -> colors.surface to colors.primary
             KioskButtonStyle.Ghost -> Color.Transparent to colors.onSurface
         }
     val content = if (contentColor != Color.Unspecified) contentColor else defaultContent
-    val shape = RoundedCornerShape(percent = 50)
+    // Self-order kiosk buttons: flat rectangles with softly rounded corners, no gradients or shadows.
+    val shape = RoundedCornerShape(BUTTON_RADIUS)
     val border =
         when {
             highContrast -> BorderStroke(3.dp, if (style == KioskButtonStyle.Ghost) content else colors.onSurface)
-            style == KioskButtonStyle.Secondary -> BorderStroke(3.dp, colors.primary.copy(alpha = OUTLINE_ALPHA))
-            style == KioskButtonStyle.Ghost -> BorderStroke(3.dp, content.copy(alpha = 0.35f))
+            style == KioskButtonStyle.Secondary || style == KioskButtonStyle.Light ->
+                BorderStroke(
+                    2.dp,
+                    colors.outline.copy(alpha = OUTLINE_ALPHA),
+                )
+            style == KioskButtonStyle.Ghost -> BorderStroke(2.dp, content.copy(alpha = 0.35f))
             else -> null
         }
     val active = enabled && !dimmed
     val alpha = if (active) 1f else DISABLED_ALPHA
-    val elevated =
-        (style == KioskButtonStyle.Primary || style == KioskButtonStyle.Accent || style == KioskButtonStyle.Light) && active
-    // Primary CTAs carry the Flow brand gradient (flat black in high-contrast mode).
-    val gradient = style == KioskButtonStyle.Primary && !highContrast
-    val gradientBrush = KioskColors.ctaBrush
-    val ctaShadowTint = if (highContrast) Color.Transparent else FlowBlueDeep
 
     Surface(
         modifier =
             modifier
                 .defaultMinSize(minHeight = height)
-                .kioskPressable(enabled = enabled, onClick = onClick)
-                .then(if (elevated) Modifier.softShadow(PILL_RADIUS, Depth.Medium, ctaShadowTint) else Modifier),
+                .kioskPressable(enabled = enabled, pressedScale = BUTTON_PRESSED_SCALE, onClick = onClick),
         shape = shape,
-        color = if (gradient || container == Color.Transparent) Color.Transparent else container.copy(alpha = alpha),
+        color = if (container == Color.Transparent) Color.Transparent else container.copy(alpha = alpha),
         contentColor = content.copy(alpha = alpha),
         border = border,
     ) {
         Row(
             modifier =
                 Modifier
-                    .then(if (gradient) Modifier.background(gradientBrush, shape, alpha) else Modifier)
                     .height(height)
-                    .padding(horizontal = 40.dp),
+                    .padding(horizontal = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
@@ -200,7 +192,7 @@ fun KioskButton(
     }
 }
 
-/** Large rounded white card with a soft, layered brand shadow — the base tile for products, options and choices. */
+/** Flat white tile with a thin grey border — the base for products, options and choices. */
 @Composable
 fun KioskCard(
     modifier: Modifier = Modifier,
@@ -210,24 +202,24 @@ fun KioskCard(
 ) {
     val colors = MaterialTheme.colorScheme
     val highContrast = LocalHighContrast.current
-    val shape = MaterialTheme.shapes.large
+    val shape = MaterialTheme.shapes.medium
     val borderColor =
         when {
             selected -> if (highContrast) colors.primary else colors.secondary
             highContrast -> colors.onSurface
-            else -> Color.Transparent
+            else -> colors.outlineVariant
         }
     val borderWidth =
         when {
             selected -> SELECTED_BORDER
             highContrast -> HC_BORDER
-            else -> 0.dp
+            else -> CARD_BORDER
         }
     Box(
         modifier =
             modifier
-                .then(if (onClick != null) Modifier.kioskPressable(onClick = onClick) else Modifier)
-                .softShadow(CARD_RADIUS, if (selected) Depth.High else Depth.Medium)
+                .then(if (onClick != null) Modifier.kioskPressable(pressedScale = BUTTON_PRESSED_SCALE, onClick = onClick) else Modifier)
+                .clip(shape)
                 .background(colors.surface, shape)
                 .outline(width = borderWidth, color = borderColor, shape = shape),
         content = content,
@@ -303,94 +295,5 @@ fun CountBadge(
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
             color = MaterialTheme.colorScheme.onSecondary,
         )
-    }
-}
-
-/** Localized labels for [CheckoutStepper]: Pedido → Datos → Pago. */
-@Composable
-fun rememberCheckoutSteps(): List<String> {
-    val order = stringResource(R.string.checkout_step_order)
-    val details = stringResource(R.string.checkout_step_details)
-    val pay = stringResource(R.string.checkout_step_pay)
-    return remember(order, details, pay) { listOf(order, details, pay) }
-}
-
-/** Index of each checkout screen inside [rememberCheckoutSteps]. */
-object CheckoutStep {
-    const val ORDER = 0
-    const val DETAILS = 1
-    const val PAY = 2
-}
-
-/**
- * Checkout progress indicator (Pedido → Datos → Pago) shown on checkout screens so the
- * customer always knows how close they are to finishing.
- */
-@Composable
-fun CheckoutStepper(
-    steps: List<String>,
-    currentIndex: Int,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    val done = colors.secondary
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        steps.forEachIndexed { index, label ->
-            val isDone = index < currentIndex
-            val active = index == currentIndex
-            val dotSize by animateDpAsState(if (active) 52.dp else 44.dp, label = "step_dot")
-            Box(
-                modifier =
-                    Modifier
-                        .size(dotSize)
-                        .background(
-                            color =
-                                when {
-                                    isDone -> done
-                                    active -> colors.primary
-                                    else -> colors.surface
-                                },
-                            shape = CircleShape,
-                        ).outline(if (isDone || active) 0.dp else 3.dp, colors.outlineVariant, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (isDone) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp),
-                    )
-                } else {
-                    Text(
-                        text = (index + 1).toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (active) colors.onPrimary else colors.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = label,
-                style =
-                    MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = if (active) FontWeight.Black else FontWeight.Bold,
-                    ),
-                color = if (active) colors.onBackground else colors.onSurfaceVariant,
-            )
-            if (index < steps.lastIndex) {
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .padding(horizontal = 16.dp)
-                            .height(6.dp)
-                            .background(if (isDone) done else colors.outlineVariant, RoundedCornerShape(3.dp)),
-                )
-            }
-        }
     }
 }

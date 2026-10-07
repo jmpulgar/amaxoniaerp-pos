@@ -57,9 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
-import com.amaxonia.kiosk.ui.components.CheckoutStep
-import com.amaxonia.kiosk.ui.components.CheckoutStepper
 import com.amaxonia.kiosk.ui.components.KioskButton
+import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
@@ -67,7 +66,6 @@ import com.amaxonia.kiosk.ui.components.NumericKeypad
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
 import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.kioskPressable
-import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
@@ -93,7 +91,15 @@ fun CustomerIdScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             KioskHeader(title = stringResource(R.string.checkout_step_details), onBack = onBack)
-            CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.DETAILS)
+
+            if (!uiState.isCustomBilling) {
+                InvoiceQuestion(
+                    onNoThanks = { viewModel.selectConsumidorFinal(onCustomerConfirmed) },
+                    onYes = { viewModel.toggleCustomBilling(true) },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                return@Column
+            }
 
             if (landscape && uiState.isCustomBilling) {
                 LandscapeInvoiceForm(
@@ -288,14 +294,67 @@ private fun LandscapeInvoiceForm(
     }
 }
 
+/** First question, as on fast-food kiosks: most customers answer "No, gracias" (Consumidor Final). */
+@Composable
+private fun InvoiceQuestion(
+    onNoThanks: () -> Unit,
+    onYes: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier.size(180.dp).background(colors.surfaceVariant, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.ReceiptLong, contentDescription = null, tint = colors.primary, modifier = Modifier.size(100.dp))
+        }
+        Spacer(modifier = Modifier.height(40.dp))
+        Text(
+            text = stringResource(R.string.customer_question),
+            style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.customer_question_hint),
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(56.dp))
+        Row(
+            modifier = Modifier.centeredMaxWidth(QuestionButtonsMaxWidth),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            KioskButton(
+                text = stringResource(R.string.customer_no_thanks),
+                onClick = onNoThanks,
+                style = KioskButtonStyle.Secondary,
+                modifier = Modifier.weight(1f),
+            )
+            KioskButton(
+                text = stringResource(R.string.customer_yes),
+                onClick = onYes,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+private val QuestionButtonsMaxWidth = 900.dp
+
 @Composable
 private fun BottomActionBar(content: @Composable () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = colors.surface,
-        shadowElevation = 20.dp,
-        shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
+        shape = RoundedCornerShape(0.dp),
         border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
     ) {
         Box(modifier = Modifier.centeredMaxWidth().padding(horizontal = 40.dp, vertical = 28.dp)) {

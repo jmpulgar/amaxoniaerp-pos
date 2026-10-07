@@ -17,6 +17,58 @@ _Nada todavía._
 
 ---
 
+## [0.0.7] — 2026-10-07
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 7 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.7.apk` |
+| SHA-256 | `0DA03959275B3F8D3A8D9D9F7F9AE1049E317F4217AF91948A3C242E839AB099` |
+
+### Requisitos
+- Backend con el cambio de `expiresAt` (se envía como instante UTC, p. ej. `2026-10-07T15:04:05Z`). La app también entiende el formato anterior sin zona, así que funciona con un backend sin desplegar, pero conviene desplegarlo.
+- Sin migraciones nuevas.
+
+### Corregido
+- **Yappy: «Tu pedido expiró».** La app no entendía la hora de vencimiento de la cotización (el servidor la mandaba sin zona horaria) y la daba siempre por vigente, así que intentaba cobrar cotizaciones de más de 10 minutos que el servidor rechazaba. Ahora la lee en cualquier formato, vuelve a cotizar 60 s antes de que venza y, si no la puede leer, cotiza de nuevo en vez de reutilizarla.
+
+### Quitado
+- Botón «Contraste» del pie de pantalla (queda «Pantalla baja» e idioma).
+
+### Pendiente
+- Cierre inesperado («Flow ERP Kiosko keeps stopping»): falta el registro del error del equipo para saber la causa.
+- Yappy que se queda en «Generando tu código…»: falta revisar los registros `[YAPPY]` del backend del momento de la prueba.
+
+---
+
+## [0.0.6] — 2026-10-06
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 6 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.6.apk` |
+| SHA-256 | `0D892E9F4F2BEC174B782D76BA0B0D825143E4182D005A1F33EE4ACC8D426FF7` |
+
+### Requisitos
+- Los mismos de 0.0.5 (mismo backend; sin migraciones nuevas).
+- Los banners del ERP (`banner_1`..`banner_3`) ahora se muestran como póster vertical **2:3** (p. ej. 1024 × 1536 o 1080 × 1620). Imágenes de otra proporción se recortan por los lados.
+
+### Cambiado
+- Experiencia de pedido rediseñada siguiendo el flujo de los kioscos de autoservicio de comida rápida (colores Flow ERP):
+  - **Inicio (Attract):** el banner ocupa la parte superior como póster y debajo hay un panel blanco con el logo, el botón grande «Iniciar una nueva orden» y los idiomas Español / English.
+  - **«¿Dónde vas a comer hoy?»:** pantalla blanca con dos tarjetas cuadradas (Comer aquí / Para llevar) y «Cancelar orden».
+  - **Menú:** barra lateral con logo, modalidad, «Inicio» y las categorías con su imagen; página de inicio «Descubre nuestro menú» (mosaicos por categoría y «Productos recomendados»); cuadrícula de productos de 3 columnas (5 en horizontal); barra inferior con la bolsa, el total, «Ver mi orden» y «Cancelar orden».
+  - **«También te sugerimos»:** al tocar «Ver mi orden» se ofrecen acompañantes, bebidas o postres antes de revisar el pedido («No, gracias» para seguir).
+  - **Personalizador por pasos:** un paso por grupo de opciones («Selecciona tamaño del combo», «Elige tu bebida»…) con la lista de pasos a la izquierda, avance automático en las opciones de una sola elección y un paso final «Revisar orden» con nota para cocina, cantidad y «Agregar a mi orden». Botones «Atrás», «Cancelar» y «Siguiente».
+  - **Revisa tu orden:** botones «Pedir más» y «Orden completa».
+  - **Factura:** primero se pregunta «¿Necesitas personalizar tu factura?» con «No, gracias» (Consumidor Final) o «Sí, con mis datos».
+  - Pantalla baja, contraste e idioma pasan a un pie de pantalla discreto en lugar de la barra superior.
+  - Estilo visual plano: fondo blanco, tarjetas con borde gris fino, botones rectangulares en índigo Flow, sin degradados ni sombras en las superficies de pedido. Se quitó el indicador de pasos Pedido → Datos → Pago.
+
+---
+
 ## [0.0.5] — 2026-10-06
 
 | Dato | Valor |

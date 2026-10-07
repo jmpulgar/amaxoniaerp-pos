@@ -55,8 +55,6 @@ import androidx.compose.ui.unit.sp
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
-import com.amaxonia.kiosk.ui.components.CheckoutStep
-import com.amaxonia.kiosk.ui.components.CheckoutStepper
 import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
@@ -85,15 +83,6 @@ fun PaymentHeader(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         KioskHeader(title = title, onBack = onBack)
-        CheckoutStepper(
-            steps =
-                listOf(
-                    stringResource(R.string.payflow_step_order),
-                    stringResource(R.string.payflow_step_details),
-                    stringResource(R.string.payflow_step_pay),
-                ),
-            currentIndex = CheckoutStep.PAY,
-        )
     }
 }
 

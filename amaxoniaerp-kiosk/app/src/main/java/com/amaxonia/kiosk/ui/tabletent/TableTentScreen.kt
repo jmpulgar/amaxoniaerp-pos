@@ -43,8 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
-import com.amaxonia.kiosk.ui.components.CheckoutStep
-import com.amaxonia.kiosk.ui.components.CheckoutStepper
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskHeader
@@ -52,7 +50,6 @@ import com.amaxonia.kiosk.ui.components.KioskTouchTarget
 import com.amaxonia.kiosk.ui.components.NumericKeypad
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
 import com.amaxonia.kiosk.ui.components.centeredMaxWidth
-import com.amaxonia.kiosk.ui.components.rememberCheckoutSteps
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
@@ -75,7 +72,6 @@ fun TableTentScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             KioskHeader(title = stringResource(R.string.checkout_step_details), onBack = onBack)
-            CheckoutStepper(steps = rememberCheckoutSteps(), currentIndex = CheckoutStep.DETAILS)
 
             if (LocalKioskCanvas.current.isLandscape) {
                 // Landscape: prompt, number and actions on the left; the keypad on the right.
@@ -135,8 +131,7 @@ fun TableTentScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = colors.surface,
-                shadowElevation = 20.dp,
-                shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
+                shape = RoundedCornerShape(0.dp),
                 border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
             ) {
                 Box(modifier = Modifier.padding(horizontal = 40.dp, vertical = 28.dp)) {

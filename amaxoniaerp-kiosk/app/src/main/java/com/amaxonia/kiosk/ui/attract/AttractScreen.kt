@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -91,11 +94,9 @@ import com.amaxonia.kiosk.ui.components.BrandWordmark
 import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.FlowWaves
 import com.amaxonia.kiosk.ui.components.KioskButton
-import com.amaxonia.kiosk.ui.components.breathing
 import com.amaxonia.kiosk.ui.components.brushTint
 import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.softShadow
-import com.amaxonia.kiosk.ui.theme.FlowBlue
 import com.amaxonia.kiosk.ui.theme.FlowError
 import com.amaxonia.kiosk.ui.theme.FlowGradient
 import com.amaxonia.kiosk.ui.theme.FlowIndigo
@@ -110,11 +111,11 @@ import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
 
+/** Banners are vertical posters, 2:3 (e.g. 1024 x 1536 or 1080 x 1620). */
+private const val POSTER_ASPECT = 2f / 3f
 private const val DEFAULT_IMAGE_DURATION_SEC = 8
 private const val SECONDS_TO_MILLIS = 1000L
 private const val TAP_HINT_PERIOD_MS = 700
-private const val SCRIM_ALPHA = 0.7f
-private const val TOP_SCRIM_ALPHA = 0.45f
 private const val ART_LOOP_MS = 6_000
 private const val TWO_PI = (2 * PI).toFloat()
 private const val BUBBLE_ALPHA = 0.14f
@@ -123,7 +124,6 @@ private const val HERO_TOP_FRACTION = 0.23f
 private val BUBBLE_FLOAT = 14.dp
 private val HeroPlateSize = 420.dp
 private val LandscapePlateSize = 340.dp
-private val CtaMaxWidth = 1040.dp
 private const val LANDSCAPE_HERO_TOP_FRACTION = 0.24f
 private const val PLATE_GLYPH_FRACTION = 232f / 420f
 private val WaveFrontBrush = Brush.verticalGradient(listOf(FlowIndigo, FlowIndigoDeep))
@@ -179,89 +179,46 @@ fun AttractContent(
     onLanguageSelected: ((KioskLanguage) -> Unit)? = null,
 ) {
     val landscape = LocalKioskCanvas.current.isLandscape
-    Box(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) {
-                    if (!uiState.isOffline) {
-                        onStartOrder()
-                    }
-                },
-    ) {
-        val current = uiState.currentMedia
-        when {
-            current != null && current.type.equals("VIDEO", ignoreCase = true) ->
-                VideoAttractPlayer(
-                    url = current.url,
-                    onMediaEnded = { onMediaFinished() },
-                )
-            current != null && current.type.equals("IMAGE", ignoreCase = true) ->
-                ImageAttractDisplay(
-                    mediaItem = current,
-                    onDurationExpired = { onMediaFinished() },
-                )
-            else -> FallbackAttractDisplay(brandColorHex = uiState.brandColor)
-        }
-
-        // Top scrim + brand logo (5 quick taps on the logo open the admin unlock dialog).
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(320.dp)
-                    .background(Brush.verticalGradient(listOf(FlowIndigoDeep.copy(alpha = TOP_SCRIM_ALPHA), Color.Transparent))),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = if (landscape) 32.dp else 56.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSecretTap() }
-                    .padding(16.dp),
-        ) {
-            if (!uiState.logoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = uiState.logoUrl,
-                    contentDescription = stringResource(R.string.brand_name),
-                    modifier = Modifier.height(if (landscape) 96.dp else 112.dp),
-                )
-            } else {
-                BrandWordmark(onDark = true, height = if (landscape) 108.dp else 132.dp)
+    val startIfOnline = { if (!uiState.isOffline) onStartOrder() }
+    val poster =
+        @Composable { posterModifier: Modifier ->
+            // The promo poster (ERP banners) is itself a giant "touch to order" target.
+            Box(
+                modifier =
+                    posterModifier
+                        .clipToBounds()
+                        .background(Color.Black)
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = startIfOnline),
+            ) {
+                AttractPoster(uiState = uiState, onMediaFinished = onMediaFinished)
             }
         }
+    val panel =
+        @Composable { panelModifier: Modifier ->
+            AttractStartPanel(
+                isOffline = uiState.isOffline,
+                logoUrl = uiState.logoUrl,
+                onStartOrder = startIfOnline,
+                onSecretTap = onSecretTap,
+                language = language,
+                onLanguageSelected = onLanguageSelected,
+                landscape = landscape,
+                modifier = panelModifier,
+            )
+        }
 
-        // Bottom scrim with language pills and the giant CTA.
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, FlowIndigoDeep.copy(alpha = SCRIM_ALPHA))))
-                    .padding(
-                        start = 56.dp,
-                        end = 56.dp,
-                        top = if (landscape) 120.dp else 220.dp,
-                        bottom = if (landscape) 56.dp else 72.dp,
-                    ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AnimatedVisibility(visible = !uiState.isOffline, enter = fadeIn(), exit = fadeOut()) {
-                // Never stretched edge to edge on wide (landscape) screens.
-                Column(modifier = Modifier.widthIn(max = CtaMaxWidth), horizontalAlignment = Alignment.CenterHorizontally) {
-                    TouchToOrderCta(onClick = onStartOrder)
-                    if (onLanguageSelected != null) {
-                        Spacer(Modifier.height(40.dp))
-                        LanguagePills(selected = language, onSelected = onLanguageSelected)
-                    }
-                }
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        if (landscape) {
+            // Landscape: the vertical poster on the left, the start panel on the right.
+            Row(modifier = Modifier.fillMaxSize()) {
+                poster(Modifier.fillMaxHeight().aspectRatio(POSTER_ASPECT))
+                panel(Modifier.weight(1f).fillMaxHeight())
+            }
+        } else {
+            // Portrait: a 2:3 poster across the top and the white start panel underneath.
+            Column(modifier = Modifier.fillMaxSize()) {
+                poster(Modifier.fillMaxWidth().aspectRatio(POSTER_ASPECT))
+                panel(Modifier.weight(1f).fillMaxWidth())
             }
         }
 
@@ -287,8 +244,93 @@ fun AttractContent(
     }
 }
 
+/** The ERP banners (images or videos) in a loop, or the branded poster when none are configured. */
 @Composable
-private fun TouchToOrderCta(onClick: () -> Unit) {
+private fun AttractPoster(
+    uiState: AttractUiState,
+    onMediaFinished: () -> Unit,
+) {
+    val current = uiState.currentMedia
+    when {
+        current != null && current.type.equals("VIDEO", ignoreCase = true) ->
+            VideoAttractPlayer(url = current.url, onMediaEnded = onMediaFinished)
+        current != null && current.type.equals("IMAGE", ignoreCase = true) ->
+            ImageAttractDisplay(mediaItem = current, onDurationExpired = onMediaFinished)
+        else -> FallbackAttractDisplay(brandColorHex = uiState.brandColor)
+    }
+}
+
+/**
+ * White panel under the poster: the brand logo (5 quick taps open the admin unlock dialog), the big
+ * "start a new order" button and the language choice.
+ */
+@Composable
+private fun AttractStartPanel(
+    isOffline: Boolean,
+    logoUrl: String?,
+    onStartOrder: () -> Unit,
+    onSecretTap: () -> Unit,
+    language: KioskLanguage?,
+    onLanguageSelected: ((KioskLanguage) -> Unit)?,
+    landscape: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val logo =
+        @Composable { height: Dp ->
+            Box(
+                modifier =
+                    Modifier
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onSecretTap)
+                        .padding(8.dp),
+            ) {
+                BrandWordmark(logoUrl = logoUrl, height = height)
+            }
+        }
+    val languages =
+        @Composable {
+            if (onLanguageSelected != null) {
+                LanguagePills(selected = language, onSelected = onLanguageSelected)
+            }
+        }
+    if (landscape) {
+        Column(
+            modifier = modifier.padding(horizontal = 64.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            logo(140.dp)
+            Spacer(Modifier.height(40.dp))
+            WelcomeTexts(textAlign = TextAlign.Center, onDark = false)
+            Spacer(Modifier.height(56.dp))
+            if (!isOffline) StartOrderButton(onClick = onStartOrder, modifier = Modifier.fillMaxWidth().height(200.dp))
+            Spacer(Modifier.height(32.dp))
+            languages()
+        }
+    } else {
+        Column(
+            modifier = modifier.padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(176.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                logo(96.dp)
+                Spacer(Modifier.width(24.dp))
+                if (!isOffline) StartOrderButton(onClick = onStartOrder, modifier = Modifier.weight(1f).fillMaxHeight())
+            }
+            Spacer(Modifier.height(14.dp))
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { languages() }
+        }
+    }
+}
+
+/** The big brand button: "Iniciar una nueva orden" with a tapping hand that nudges the customer. */
+@Composable
+private fun StartOrderButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val transition = rememberInfiniteTransition(label = "tap_hint")
     val tapOffset by transition.animateFloat(
         initialValue = 0f,
@@ -296,51 +338,40 @@ private fun TouchToOrderCta(onClick: () -> Unit) {
         animationSpec = infiniteRepeatable(tween(TAP_HINT_PERIOD_MS, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "tap_offset",
     )
-    val density = LocalDensity.current
-    val tapTravelPx = with(density) { 14.dp.toPx() }
+    val tapTravelPx = with(LocalDensity.current) { 12.dp.toPx() }
     val highContrast = LocalHighContrast.current
+    val colors = MaterialTheme.colorScheme
 
     Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .breathing(maxScale = 1.03f)
-                .kioskPressable(onClick = onClick)
-                .softShadow(100.dp, Depth.High, tint = FlowIndigoDeep),
-        shape = RoundedCornerShape(percent = 50),
-        color = Color.White,
-        contentColor = FlowIndigo,
-        border = if (highContrast) BorderStroke(6.dp, Color.Black) else null,
+        modifier = modifier.kioskPressable(pressedScale = 0.98f, onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = colors.primary,
+        contentColor = colors.onPrimary,
+        border = if (highContrast) BorderStroke(4.dp, Color.Black) else null,
     ) {
         Row(
-            modifier =
-                Modifier
-                    .height(200.dp)
-                    .padding(start = 40.dp, end = 56.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
         ) {
-            Box(
-                modifier = Modifier.size(136.dp).background(KioskColors.ctaBrush, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.TouchApp,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier =
-                        Modifier
-                            .size(80.dp)
-                            .graphicsLayer { translationY = tapOffset * tapTravelPx },
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.attract_start_order),
+                    style = MaterialTheme.typography.headlineLarge,
+                    maxLines = 2,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.attract_touch_to_start),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onPrimary.copy(alpha = 0.85f),
+                    maxLines = 1,
                 )
             }
-            Spacer(Modifier.width(40.dp))
-            Text(
-                text = stringResource(R.string.attract_touch_to_start),
-                style = MaterialTheme.typography.displaySmall,
-                color = if (highContrast) Color.Black else FlowIndigo,
-                maxLines = 2,
-                modifier = Modifier.weight(1f, fill = false),
+            Spacer(Modifier.width(24.dp))
+            Icon(
+                imageVector = Icons.Rounded.TouchApp,
+                contentDescription = null,
+                modifier = Modifier.size(96.dp).graphicsLayer { translationY = tapOffset * tapTravelPx },
             )
         }
     }
@@ -351,7 +382,7 @@ private fun LanguagePills(
     selected: KioskLanguage?,
     onSelected: (KioskLanguage) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         LanguagePill(
             flag = stringResource(R.string.lang_flag_es),
             label = stringResource(R.string.a11y_spanish),
@@ -374,20 +405,22 @@ private fun LanguagePill(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier.kioskPressable(onClick = onClick),
-        shape = RoundedCornerShape(percent = 50),
-        color = if (selected) Color.White else FlowIndigoDeep.copy(alpha = 0.45f),
-        contentColor = if (selected) FlowIndigo else Color.White,
-        border = BorderStroke(if (selected) 5.dp else 3.dp, if (selected) FlowBlue else Color.White.copy(alpha = 0.7f)),
+        shape = RoundedCornerShape(10.dp),
+        color = colors.surface,
+        contentColor = colors.onSurface,
+        border = BorderStroke(if (selected) 4.dp else 2.dp, if (selected) colors.secondary else colors.outlineVariant),
     ) {
         Row(
-            modifier = Modifier.height(96.dp).padding(horizontal = 36.dp),
+            modifier = Modifier.height(72.dp).width(240.dp).padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
-            Text(text = flag, fontSize = 40.sp)
-            Spacer(Modifier.width(16.dp))
-            Text(text = label, style = MaterialTheme.typography.titleLarge)
+            Text(text = flag, fontSize = 32.sp)
+            Spacer(Modifier.width(14.dp))
+            Text(text = label, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -647,18 +680,21 @@ private fun HeroPlate(
 }
 
 @Composable
-private fun WelcomeTexts(textAlign: TextAlign) {
+private fun WelcomeTexts(
+    textAlign: TextAlign,
+    onDark: Boolean = true,
+) {
     Text(
         text = stringResource(R.string.attract_welcome),
         style = MaterialTheme.typography.displayLarge.copy(fontSize = 128.sp, lineHeight = 132.sp),
-        color = Color.White,
+        color = if (onDark) Color.White else MaterialTheme.colorScheme.primary,
         textAlign = textAlign,
     )
     Spacer(modifier = Modifier.height(16.dp))
     Text(
         text = stringResource(R.string.attract_tagline),
         style = MaterialTheme.typography.headlineMedium,
-        color = FlowIndigoSoft,
+        color = if (onDark) FlowIndigoSoft else MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = textAlign,
     )
 }

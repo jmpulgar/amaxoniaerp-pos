@@ -57,9 +57,9 @@ enum class Depth(
     val offsetY: Dp,
     val alpha: Float,
 ) {
-    Low(blur = 14.dp, offsetY = 4.dp, alpha = 0.08f),
-    Medium(blur = 28.dp, offsetY = 10.dp, alpha = 0.12f),
-    High(blur = 44.dp, offsetY = 18.dp, alpha = 0.20f),
+    Low(blur = 8.dp, offsetY = 2.dp, alpha = 0.04f),
+    Medium(blur = 16.dp, offsetY = 4.dp, alpha = 0.06f),
+    High(blur = 28.dp, offsetY = 8.dp, alpha = 0.10f),
 }
 
 /**

@@ -115,8 +115,9 @@ class MenuViewModelTest {
             assertFalse(state.isLoading)
             assertNull(state.errorMessage)
             assertEquals(2, state.categories.size)
-            assertEquals(1, state.selectedCategoryId)
-            assertEquals(2, state.filteredItems.size)
+            // The menu opens on its home page (no category selected) showing every item.
+            assertNull(state.selectedCategoryId)
+            assertEquals(state.items.size, state.filteredItems.size)
         }
 
     @Test
