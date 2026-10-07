@@ -13,9 +13,11 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.ZoneId
 
 class QuoteOrderUseCaseTest {
     private val orderGraph = OrderGraph().apply { addLine(sampleItem) }
@@ -82,4 +84,29 @@ class QuoteOrderUseCaseTest {
             assertEquals(2, api.requests.size)
             assertNotEquals(api.requests[0].headers["Idempotency-Key"], api.requests[1].headers["Idempotency-Key"])
         }
+
+    @Test
+    fun `quote about to expire is re-quoted before paying`() =
+        runTest {
+            // Expires 30 s after "now": inside the safety margin, so it is not reused.
+            val api = RecordingApi { json(quoteJson(expiresAt = "2026-10-05T12:00:30Z")) }
+            val (quoteOrder, _) = build(api)
+
+            quoteOrder(orderGraph)
+            quoteOrder(orderGraph)
+
+            assertEquals(2, api.requests.size)
+        }
+
+    @Test
+    fun `server-local expiry without zone is understood`() {
+        val zone = ZoneId.of("America/Panama")
+        assertEquals(
+            Instant.parse("2026-10-05T17:10:00Z"),
+            QuoteOrderUseCase.parseExpiry("2026-10-05T12:10:00", zone),
+        )
+        assertEquals(Instant.parse("2026-10-05T17:10:00Z"), QuoteOrderUseCase.parseExpiry("2026-10-05T17:10:00Z", zone))
+        assertEquals(Instant.parse("2026-10-05T17:10:00Z"), QuoteOrderUseCase.parseExpiry("2026-10-05T12:10:00-05:00", zone))
+        assertNull(QuoteOrderUseCase.parseExpiry("mañana", zone))
+    }
 }

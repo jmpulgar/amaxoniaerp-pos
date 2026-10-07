@@ -37,7 +37,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 
 class KioskOrderRepository(
     private val comboRepository: KioskComboRepository = KioskComboRepository(),
@@ -152,7 +152,7 @@ class KioskOrderRepository(
             subtotal = subtotal.toPlainString(),
             tax = tax.toPlainString(),
             total = total.toPlainString(),
-            expiresAt = orderRow[KioskOrderTable.quoteExpiraEn].format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            expiresAt = orderRow[KioskOrderTable.quoteExpiraEn].toInstantString(),
             diningMode = orderRow[KioskOrderTable.modalidad],
             tableTent = orderRow[KioskOrderTable.portamesa],
             customerId = orderRow[KioskOrderTable.idCliente].trim(),
@@ -226,7 +226,7 @@ class KioskOrderRepository(
                 subtotal = overallSubtotal.toPlainString(),
                 tax = overallTax.toPlainString(),
                 total = overallTotal.toPlainString(),
-                expiresAt = expiresAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                expiresAt = expiresAt.toInstantString(),
                 diningMode = diningMode,
                 tableTent = tableTent,
                 customerId = customerId,
@@ -692,3 +692,10 @@ private fun CalculatedLine.toResponse(): KioskQuoteLineResponse =
                 )
             },
     )
+
+/**
+ * `quote_expira_en` se guarda en hora local del servidor (`LocalDateTime.now()`). Se envía como
+ * instante UTC ISO-8601 (`2026-10-07T15:04:05Z`) para que el kiosco lo interprete sin ambigüedad
+ * de zona horaria y sepa cuándo debe volver a cotizar.
+ */
+internal fun LocalDateTime.toInstantString(): String = atZone(ZoneId.systemDefault()).toInstant().toString()
