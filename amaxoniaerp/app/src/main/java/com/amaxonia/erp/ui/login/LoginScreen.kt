@@ -27,8 +27,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +58,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
+import com.amaxonia.erp.ui.util.KeyboardHelper
+import com.amaxonia.erp.ui.util.forceShowKeyboardOnTouch
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -71,11 +79,13 @@ import com.amaxonia.erp.ui.components.isLandscape
 import com.amaxonia.erp.ui.theme.PosExtraShapes
 import com.amaxonia.erp.ui.theme.PosPalette
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
     onCompanySessionReady: (CompanySession) -> Unit,
     onRequiresCompanySelection: (AuthSession) -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -94,6 +104,23 @@ fun LoginScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (onBack != null) {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+            }
+        },
     ) { paddingValues ->
         Box(
             modifier =
@@ -101,7 +128,7 @@ fun LoginScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .imePadding(),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopCenter,
         ) {
             LoginForm(
                 state = state,
@@ -300,11 +327,16 @@ private fun UsernameField(
 ) {
     LoginFieldLabel(R.string.login_username_label)
     Spacer(modifier = Modifier.height(8.dp))
+    val view = LocalView.current
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(stringResource(R.string.login_username_placeholder)) },
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .forceShowKeyboardOnTouch(),
         singleLine = true,
         shape = RoundedCornerShape(16.dp),
         leadingIcon = {
@@ -313,6 +345,15 @@ private fun UsernameField(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
             )
+        },
+        trailingIcon = {
+            IconButton(onClick = { KeyboardHelper.forceShow(view) }) {
+                Icon(
+                    imageVector = Icons.Default.Keyboard,
+                    contentDescription = "Abrir teclado",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
         colors = loginFieldColors(),
@@ -334,7 +375,11 @@ private fun PasswordField(
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(stringResource(R.string.login_password_placeholder)) },
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .forceShowKeyboardOnTouch(),
         singleLine = true,
         shape = RoundedCornerShape(16.dp),
         leadingIcon = {

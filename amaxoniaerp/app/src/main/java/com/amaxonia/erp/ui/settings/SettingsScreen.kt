@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +51,7 @@ import com.amaxonia.erp.ui.theme.SuccessGreen
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     modifier: Modifier = Modifier,
+    onNavigateToVisibilitySettings: (() -> Unit)? = null,
 ) {
     val selectedPrinterType by viewModel.selectedPrinterType.collectAsStateWithLifecycle()
     val availablePrinterTypes by viewModel.availablePrinterTypes.collectAsStateWithLifecycle()
@@ -286,6 +290,56 @@ fun SettingsScreen(
                             checked = allowDiscounts,
                             onCheckedChange = viewModel::onAllowDiscountsChanged,
                         )
+                    }
+                }
+            }
+
+            if (onNavigateToVisibilitySettings != null) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "Modo Offline y Visibilidad",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                ElevatedCard(
+                    onClick = onNavigateToVisibilitySettings,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Rounded.Tune,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Ajustes de Visibilidad",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                            )
+                            Text(
+                                text = "Configura la descarga de catálogos y filtro de productos por departamento y clientes por sucursal.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

@@ -1,0 +1,597 @@
+package com.amaxonia.erp.ui.welcome
+
+import android.content.Intent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import com.amaxonia.erp.R
+import com.amaxonia.erp.ui.theme.PosPalette
+import kotlin.math.sin
+
+private const val WAVE_Y_RATIO = 0.46f
+private const val WAVE_FRONT_AMPLITUDE = 26f
+private const val WAVE_BACK_AMPLITUDE = 16f
+private const val WAVE_BACK_PHASE_FACTOR = 0.8f
+private const val WAVE_BACK_CYCLES = 3f
+private const val WAVE_FRONT_CYCLES = 4f
+private const val WAVE_STEP_PX = 4
+private const val LOGO_WIDTH_FRACTION = 0.65f
+private const val FADE_IN_MILLIS = 600
+private const val WAVE_PERIOD_MILLIS = 4000
+
+private data class WelcomeWaveColors(
+    val backTop: Color,
+    val backBottom: Color,
+    val frontStart: Color,
+    val frontMid: Color,
+    val frontEnd: Color,
+    val scrim: Color,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WelcomeScreen(
+    onLoginClick: () -> Unit,
+    onRequestAccountClick: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val gradientStart = colorResource(R.color.brand_gradient_start)
+    val gradientEnd = colorResource(R.color.brand_gradient_end)
+    val taglineColor = colorResource(R.color.brand_welcome_tagline)
+    val waveColors = rememberWelcomeWaveColors()
+    val websiteUrl = stringResource(R.string.brand_website_url)
+    val supportUrl = stringResource(R.string.brand_support_url)
+    var showContactSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val contentAlpha = rememberFadeInAlpha()
+    val wavePhase = rememberWavePhase()
+
+    fun openLink(url: String) {
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+        }
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(PosPalette.FixedWhite),
+    ) {
+        WelcomeWaves(wavePhase = wavePhase, colors = waveColors)
+        WelcomeBrandScrim(
+            gradientStart = gradientStart,
+            gradientEnd = gradientEnd,
+        )
+
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+        ) {
+            val minContentHeight = maxHeight
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(min = minContentHeight)
+                        .alpha(contentAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                WelcomeBrandHeader(taglineColor = taglineColor)
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(bottom = 24.dp),
+                ) {
+                    WelcomeHero()
+                    WelcomeActions(
+                        onLoginClick = onLoginClick,
+                        onRequestAccountClick = {
+                            onRequestAccountClick()
+                            showContactSheet = true
+                        },
+                    )
+                }
+            }
+        }
+
+        if (showContactSheet) {
+            WelcomeContactSheet(
+                sheetState = sheetState,
+                websiteUrl = websiteUrl,
+                supportUrl = supportUrl,
+                onDismiss = { showContactSheet = false },
+                onOpenLink = ::openLink,
+            )
+        }
+    }
+}
+
+/** Colores de las capas de las olas */
+@Composable
+private fun rememberWelcomeWaveColors(): WelcomeWaveColors =
+    WelcomeWaveColors(
+        backTop = colorResource(R.color.brand_wave_back_top),
+        backBottom = colorResource(R.color.brand_wave_back_bottom),
+        frontStart = colorResource(R.color.brand_wave_front_start),
+        frontMid = colorResource(R.color.brand_wave_front_mid),
+        frontEnd = colorResource(R.color.brand_wave_front_end),
+        scrim = colorResource(R.color.brand_wave_scrim),
+    )
+
+/** Fade-in sutil al entrar a la pantalla */
+@Composable
+private fun rememberFadeInAlpha(): Float {
+    val contentAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        contentAlpha.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = FADE_IN_MILLIS, easing = FastOutSlowInEasing),
+        )
+    }
+    return contentAlpha.value
+}
+
+/** Fase continua de la animación de ola */
+@Composable
+private fun rememberWavePhase(): Float {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = WAVE_PERIOD_MILLIS, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "wavePhase",
+    )
+    return wavePhase
+}
+
+/** Refuerzo de gradiente sutil para anclar la zona de texto al color de marca */
+@Composable
+private fun WelcomeBrandScrim(
+    gradientStart: Color,
+    gradientEnd: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    gradientStart.copy(alpha = 0.0f),
+                                    gradientStart.copy(alpha = 0.0f),
+                                    gradientEnd.copy(alpha = 0.18f),
+                                ),
+                        ),
+                ),
+    )
+}
+
+/** Olas animadas de la zona inferior (dibujo en Canvas) */
+@Composable
+private fun WelcomeWaves(
+    wavePhase: Float,
+    colors: WelcomeWaveColors,
+) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val waveY = size.height * WAVE_Y_RATIO
+        drawBackWave(
+            width = size.width,
+            height = size.height,
+            waveY = waveY,
+            wavePhase = wavePhase,
+            colors = colors,
+        )
+        drawFrontWave(
+            width = size.width,
+            height = size.height,
+            waveY = waveY,
+            wavePhase = wavePhase,
+            colors = colors,
+        )
+        drawRect(
+            color = colors.scrim,
+            topLeft = Offset(0f, waveY),
+            size =
+                androidx.compose.ui.geometry
+                    .Size(size.width, size.height - waveY),
+        )
+    }
+}
+
+/** Ola trasera con gradiente suave */
+private fun DrawScope.drawBackWave(
+    width: Float,
+    height: Float,
+    waveY: Float,
+    wavePhase: Float,
+    colors: WelcomeWaveColors,
+) {
+    val backWave =
+        Path().apply {
+            moveTo(0f, height)
+            lineTo(0f, waveY + WAVE_BACK_AMPLITUDE)
+            for (x in 0..width.toInt() step WAVE_STEP_PX) {
+                val xf = x.toFloat()
+                val y =
+                    waveY +
+                        WAVE_BACK_AMPLITUDE *
+                        sin(wavePhase * WAVE_BACK_PHASE_FACTOR + xf / width * WAVE_BACK_CYCLES * Math.PI).toFloat()
+                lineTo(xf, y)
+            }
+            lineTo(width, height)
+            close()
+        }
+    drawPath(
+        path = backWave,
+        brush =
+            Brush.verticalGradient(
+                colors = listOf(colors.backTop, colors.backBottom),
+                startY = waveY - WAVE_BACK_AMPLITUDE,
+                endY = height,
+            ),
+        style = Fill,
+    )
+}
+
+/** Ola frontal principal con gradiente saturado */
+private fun DrawScope.drawFrontWave(
+    width: Float,
+    height: Float,
+    waveY: Float,
+    wavePhase: Float,
+    colors: WelcomeWaveColors,
+) {
+    val frontWave =
+        Path().apply {
+            moveTo(0f, height)
+            lineTo(0f, waveY)
+            for (x in 0..width.toInt() step WAVE_STEP_PX) {
+                val xf = x.toFloat()
+                val y = waveY + WAVE_FRONT_AMPLITUDE * sin(wavePhase + xf / width * WAVE_FRONT_CYCLES * Math.PI).toFloat()
+                lineTo(xf, y)
+            }
+            lineTo(width, height)
+            close()
+        }
+    drawPath(
+        path = frontWave,
+        brush =
+            Brush.linearGradient(
+                colors = listOf(colors.frontStart, colors.frontMid, colors.frontEnd),
+                start = Offset(0f, waveY),
+                end = Offset(width, height),
+            ),
+        style = Fill,
+    )
+}
+
+/** Logo grande sobre fondo blanco + tagline de marca */
+@Composable
+private fun WelcomeBrandHeader(taglineColor: Color) {
+    Spacer(modifier = Modifier.height(28.dp))
+
+    Image(
+        painter = painterResource(id = R.drawable.brand_logo),
+        contentDescription = stringResource(R.string.brand_logo_description),
+        modifier =
+            Modifier
+                .fillMaxWidth(LOGO_WIDTH_FRACTION)
+                .heightIn(max = 120.dp)
+                .aspectRatio(2f),
+        contentScale = ContentScale.Fit,
+    )
+
+    Spacer(modifier = Modifier.height(14.dp))
+
+    Text(
+        text = stringResource(R.string.brand_welcome_tagline),
+        style =
+            MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 0.2.sp,
+            ),
+        color = Color.White,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(horizontal = 40.dp),
+    )
+}
+
+/** Zona de bienvenida sobre el fondo azul */
+@Composable
+private fun WelcomeHero() {
+    Text(
+        text = stringResource(R.string.welcome_title),
+        style =
+            MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp,
+            ),
+        color = PosPalette.FixedWhite,
+        textAlign = TextAlign.Center,
+    )
+
+    Spacer(modifier = Modifier.height(6.dp))
+
+    Text(
+        text = stringResource(R.string.brand_welcome_message),
+        style = MaterialTheme.typography.bodyLarge,
+        color = PosPalette.FixedWhite,
+        textAlign = TextAlign.Center,
+        lineHeight = 22.sp,
+        modifier = Modifier.padding(horizontal = 36.dp),
+    )
+
+    Spacer(modifier = Modifier.height(20.dp))
+}
+
+/** Botones de acción */
+@Composable
+private fun WelcomeActions(
+    onLoginClick: () -> Unit,
+    onRequestAccountClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .padding(horizontal = 32.dp)
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        LoginButton(onClick = onLoginClick)
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        RequestAccountButton(onClick = onRequestAccountClick)
+    }
+}
+
+/** Botón principal de inicio de sesión */
+@Composable
+private fun LoginButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = PosPalette.FixedWhite,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ),
+        elevation =
+            ButtonDefaults.buttonElevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 2.dp,
+            ),
+    ) {
+        Text(
+            text = stringResource(R.string.welcome_login_button),
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+        )
+    }
+}
+
+/** Botón outline para solicitar cuenta */
+@Composable
+private fun RequestAccountButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+        shape = RoundedCornerShape(14.dp),
+        border =
+            ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                width = 1.5.dp,
+                brush =
+                    Brush.linearGradient(
+                        colors =
+                            listOf(
+                                PosPalette.FixedWhite,
+                                PosPalette.FixedWhite.copy(alpha = 0.7f),
+                            ),
+                    ),
+            ),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = PosPalette.Transparent,
+                contentColor = PosPalette.FixedWhite,
+            ),
+    ) {
+        Text(
+            text = stringResource(R.string.welcome_request_account),
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            color = PosPalette.FixedWhite,
+        )
+    }
+}
+
+/** Bottom sheet de contacto */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WelcomeContactSheet(
+    sheetState: androidx.compose.material3.SheetState,
+    websiteUrl: String,
+    supportUrl: String,
+    onDismiss: () -> Unit,
+    onOpenLink: (String) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 48.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.contact_sheet_title),
+                style =
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                    ),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            Text(
+                text = stringResource(R.string.contact_sheet_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 24.dp),
+            )
+
+            ContactOptionItem(
+                icon = Icons.Default.Language,
+                text = stringResource(R.string.brand_website_label),
+                onClick = {
+                    onDismiss()
+                    onOpenLink(websiteUrl)
+                },
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ContactOptionItem(
+                icon = Icons.Default.Phone,
+                text = stringResource(R.string.brand_support_label),
+                onClick = {
+                    onDismiss()
+                    onOpenLink(supportUrl)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactOptionItem(
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onClick() }
+                .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = text,
+            style =
+                MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                ),
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}

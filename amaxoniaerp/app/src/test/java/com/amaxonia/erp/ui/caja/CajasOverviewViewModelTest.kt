@@ -54,6 +54,7 @@ class CajasOverviewViewModelTest {
         )
 
         var statusResponse = CajaStatusResponse(isOpen = false, cajaSecuencia = null)
+        val statusResponsesByCajaId = mutableMapOf<String, CajaStatusResponse>()
         var lastAperturaRequest: AperturaRequest? = null
         var lastCierreRequest: CierreCajaRequest? = null
         var nextCodigo = "SEC-001"
@@ -95,7 +96,8 @@ class CajasOverviewViewModelTest {
 
         override suspend fun restoreActiveCajaIfValid() {}
 
-        override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> = Result.success(statusResponse)
+        override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> =
+            Result.success(statusResponsesByCajaId[cajaId] ?: statusResponse)
 
         override suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse> {
             lastAperturaRequest = request
@@ -293,5 +295,30 @@ class CajasOverviewViewModelTest {
         assertEquals(2, cierreReq?.detalle_formapago?.size)
         assertEquals("Cierre cuadrado con propina", cierreReq?.observacion_cierre)
         assertFalse(viewModel.state.value.isCajaOpen)
+    }
+
+    @Test
+    fun loadCajas_populatesCajasStatusMap_identifyingVencidaAndClosed() = runTest {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val vencidaSec = CajaSecuencia(
+            idCajaSecuencia = "old-sec-1",
+            idCaja = "1",
+            fechaApertura = "$yesterday 10:00:00",
+            montoApertura = 50.0,
+        )
+        fakeRepo.statusResponsesByCajaId["1"] = CajaStatusResponse(isOpen = true, cajaSecuencia = vencidaSec)
+        fakeRepo.statusResponsesByCajaId["2"] = CajaStatusResponse(isOpen = false, cajaSecuencia = null)
+
+        viewModel = CajasOverviewViewModel(fakeRepo)
+        advanceUntilIdle()
+
+        val map = viewModel.state.value.cajasStatusMap
+        assertNotNull(map["1"])
+        assertTrue(map["1"]!!.isOpen)
+        assertTrue(map["1"]!!.isDiaAnterior)
+
+        assertNotNull(map["2"])
+        assertFalse(map["2"]!!.isOpen)
+        assertFalse(map["2"]!!.isDiaAnterior)
     }
 }

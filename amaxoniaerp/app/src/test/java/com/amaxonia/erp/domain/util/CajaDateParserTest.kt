@@ -72,4 +72,32 @@ class CajaDateParserTest {
     fun isFromPreviousDay_withNullReturnsFalse() {
         assertFalse(CajaDateParser.isFromPreviousDay(null))
     }
+
+    @Test
+    fun isFromPreviousDay_calendarDayRollover_strictlyEvaluatesCalendarDay() {
+        val today = LocalDate.of(2026, 10, 7)
+        // Opened yesterday late at night (23:55), checked today in early morning (00:05):
+        // Calendar day comparison must evaluate to true because it is a new day!
+        val lateYesterday = "2026-10-06 23:55:00"
+        assertTrue(CajaDateParser.isFromPreviousDay(lateYesterday, today))
+
+        // Opened today early in the morning:
+        val earlyToday = "2026-10-07 00:05:00"
+        assertFalse(CajaDateParser.isFromPreviousDay(earlyToday, today))
+    }
+
+    @Test
+    fun parseLocalDate_withIsoOffsetAndFractionalSeconds() {
+        val parsedUtc = CajaDateParser.parseLocalDate("2026-10-06T23:55:00.123Z")
+        assertNotNull(parsedUtc)
+        assertEquals(LocalDate.of(2026, 10, 6), parsedUtc)
+
+        val parsedOffset = CajaDateParser.parseLocalDate("2026-10-06T18:00:00-05:00")
+        assertNotNull(parsedOffset)
+        assertEquals(LocalDate.of(2026, 10, 6), parsedOffset)
+
+        val parsedSqlFractional = CajaDateParser.parseLocalDate("2026-10-06 14:30:00.123456")
+        assertNotNull(parsedSqlFractional)
+        assertEquals(LocalDate.of(2026, 10, 6), parsedSqlFractional)
+    }
 }

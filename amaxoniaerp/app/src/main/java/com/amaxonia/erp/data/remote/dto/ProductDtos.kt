@@ -56,6 +56,16 @@ data class CreateProductRequest(
 
 @Serializable
 data class DepartmentDto(
-    val id: Int,
-    val name: String,
+    val id: Int = 0,
+    val name: String = "",
+    val nombre: String? = null,
+    val descripcion: String? = null,
+) {
+    val displayName: String
+        get() = name.ifBlank { nombre ?: descripcion ?: "Departamento $id" }
+}
+
+@Serializable
+data class DepartmentsResponse(
+    val data: List<DepartmentDto> = emptyList(),
 )

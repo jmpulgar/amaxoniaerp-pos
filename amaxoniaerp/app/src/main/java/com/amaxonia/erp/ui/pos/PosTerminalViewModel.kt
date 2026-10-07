@@ -21,12 +21,21 @@ import com.amaxonia.erp.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.SellerSummary
 import com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.amaxonia.erp.BuildConfig
+import com.amaxonia.erp.data.local.db.PendingInvoiceDao
+import com.amaxonia.erp.data.local.db.PendingInvoiceEntity
+import com.amaxonia.erp.data.remote.AppJson
+import com.amaxonia.erp.data.remote.NetworkMonitor
+import java.util.Locale
+import java.util.UUID
 
 class PosTerminalViewModel(
     private val productRepository: ProductRepository,
@@ -36,6 +45,10 @@ class PosTerminalViewModel(
     private val localStore: LocalStore,
     private val printGateway: DefaultInvoicePrintGateway? = null,
     private val customerDisplayManager: CustomerDisplayManager? = null,
+    private val promotionRepository: com.amaxonia.erp.domain.repository.PromotionRepository? = null,
+    private val pendingInvoiceDao: PendingInvoiceDao? = null,
+    private val networkMonitor: NetworkMonitor? = null,
+    private val onOfflineInvoiceQueued: (() -> Unit)? = null,
 ) : ViewModel() {
 
 
@@ -46,6 +59,20 @@ class PosTerminalViewModel(
         loadInitialData()
         observeCajaChanges()
         observeCustomerDisplaySync()
+        observeSettings()
+    }
+
+    private fun observeSettings() {
+        viewModelScope.launch {
+            localStore.allowEditPricesFlow().collect { allowed ->
+                _uiState.update { it.copy(allowEditPrices = allowed) }
+            }
+        }
+        viewModelScope.launch {
+            localStore.allowDiscountsFlow().collect { allowed ->
+                _uiState.update { it.copy(allowDiscounts = allowed) }
+            }
+        }
     }
 
     private fun observeCustomerDisplaySync() {
@@ -120,14 +147,26 @@ class PosTerminalViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             // 1. Load active caja & status
-            val activeCaja = cajaRepository.activeCaja.value
-            val cajaId = activeCaja?.idCaja ?: cajaRepository.getActiveCaja()?.first
+            var activeCaja = cajaRepository.activeCaja.value
+            var cajaId = activeCaja?.idCaja ?: cajaRepository.getActiveCaja()?.first
+
+            if (cajaId == null) {
+                cajaRepository.getCajas().onSuccess { cajas ->
+                    val openCaja = findFirstOpenCaja(cajas) ?: cajas.singleOrNull() ?: cajas.firstOrNull()
+                    if (openCaja != null) {
+                        cajaRepository.setActiveCaja(openCaja)
+                        activeCaja = openCaja
+                        cajaId = openCaja.idCaja
+                    }
+                }
+            }
+
             var isCajaOpen = false
             var isDiaAnterior = false
             var formattedFecha: String? = null
             var usuarioApertura: String? = null
             if (cajaId != null) {
-                val statusResult = cajaRepository.checkCajaStatus(cajaId)
+                val statusResult = cajaRepository.checkCajaStatus(cajaId!!)
                 val status = statusResult.getOrNull()
                 isCajaOpen = status?.isOpen == true
                 val rawFecha = status?.cajaSecuencia?.fechaApertura
@@ -166,12 +205,16 @@ class PosTerminalViewModel(
             val productsResult = productRepository.getAllProducts(page = 1, pageSize = 50)
             val products = productsResult.getOrElse { emptyList() }
 
+            // 6. Load promotions
+            val promotions = promotionRepository?.getPromotions()?.getOrElse { emptyList() } ?: emptyList()
+
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     products = products,
                     filteredProducts = products,
                     departments = departments,
+                    allPromotions = promotions,
                     activeCajaId = cajaId,
                     activeCajaName = activeCaja?.displayName ?: cajaRepository.activeCajaName.value,
                     sucursalNombre = branchName,
@@ -218,15 +261,161 @@ class PosTerminalViewModel(
         }
     }
 
+    fun getActivePromotionsFor(productId: String): List<com.amaxonia.erp.domain.model.Promocion> {
+        return _uiState.value.allPromotions.filter { promo ->
+            promo.activo && (promo.idItem == productId || promo.detalles.any { it.idItem == productId })
+        }
+    }
+
     fun addToCart(product: Product) {
+        val promos = getActivePromotionsFor(product.id)
+        if (promos.isNotEmpty()) {
+            _uiState.update {
+                it.copy(
+                    pendingPromotionProduct = product,
+                    promotionOptions = promos,
+                    showPromotionChoice = true,
+                )
+            }
+        } else {
+            addIndividualToCart(product, 1.0)
+        }
+    }
+
+    fun openQuantityPicker(product: Product) {
+        _uiState.update { it.copy(quantityPickerProduct = product) }
+    }
+
+    fun dismissQuantityPicker() {
+        _uiState.update { it.copy(quantityPickerProduct = null) }
+    }
+
+    fun confirmProductQuantity(product: Product, quantity: Double) {
+        dismissQuantityPicker()
+        val promos = getActivePromotionsFor(product.id)
+        if (promos.isNotEmpty()) {
+            _uiState.update {
+                it.copy(
+                    pendingPromotionProduct = product,
+                    promotionOptions = promos,
+                    showPromotionChoice = true,
+                )
+            }
+        } else {
+            addIndividualToCart(product, quantity.coerceAtLeast(1.0))
+        }
+    }
+
+    fun dismissPromotionChoice() {
+        _uiState.update {
+            it.copy(
+                showPromotionChoice = false,
+                pendingPromotionProduct = null,
+                promotionOptions = emptyList(),
+            )
+        }
+    }
+
+    fun addIndividualFromPromotionChoice(quantity: Double) {
+        val product = _uiState.value.pendingPromotionProduct ?: return
+        dismissPromotionChoice()
+        addIndividualToCart(product, quantity.coerceAtLeast(1.0))
+    }
+
+    fun addPromotionToCart(promocion: com.amaxonia.erp.domain.model.Promocion, times: Int = 1) {
+        val safeTimes = times.coerceAtLeast(1)
         _uiState.update { state ->
-            val existingIndex = state.cart.indexOfFirst { it.product.id == product.id }
+            val currentItems = state.cart
+            if (currentItems.any { it.promocionId == promocion.id }) {
+                val updated = updatePromotionLines(currentItems, promocion.id, safeTimes, append = true)
+                return@update state.copy(
+                    cart = updated,
+                    showPromotionChoice = false,
+                    pendingPromotionProduct = null,
+                    promotionOptions = emptyList(),
+                )
+            }
+            val promotionLines = promocion.detalles.map { detalle ->
+                val baseQuantity = detalle.cantidadTotal.toDouble().takeIf { it > 0.0 }
+                    ?: detalle.cantidad.toDouble().coerceAtLeast(1.0)
+                val quantity = baseQuantity * safeTimes
+                val unitPriceWithTax = if (quantity > 0.0) detalle.totalConIva.toDouble() / quantity else 0.0
+                CartItem(
+                    product = detalle.product.copy(
+                        isExempt = detalle.iva.toDouble() <= 0.0,
+                        taxRate = detalle.iva.toDouble(),
+                    ),
+                    quantity = quantity,
+                    unitPriceWithTax = unitPriceWithTax,
+                    discountPercent = detalle.descuento.toDouble(),
+                    promocionId = promocion.id,
+                    promocionCodigo = promocion.codigo,
+                    promocionNombre = promocion.nombre,
+                    promocionTipo = promocion.tipo,
+                    promocionGrupo = detalle.grupo,
+                    promocionDetalleId = detalle.id,
+                    promocionVeces = safeTimes,
+                )
+            }
+            state.copy(
+                cart = currentItems + promotionLines,
+                showPromotionChoice = false,
+                pendingPromotionProduct = null,
+                promotionOptions = emptyList(),
+            )
+        }
+    }
+
+    fun updatePromotionQuantity(promocionId: String, times: Int) {
+        if (times <= 0) {
+            removePromotion(promocionId)
+            return
+        }
+        _uiState.update { state ->
+            val updated = updatePromotionLines(state.cart, promocionId, times, append = false)
+            state.copy(cart = updated)
+        }
+    }
+
+    fun removePromotion(promocionId: String) {
+        _uiState.update { state ->
+            state.copy(cart = state.cart.filterNot { it.promocionId == promocionId })
+        }
+    }
+
+    private fun updatePromotionLines(
+        items: List<CartItem>,
+        promotionId: String,
+        times: Int,
+        append: Boolean,
+    ): List<CartItem> {
+        val safeTimes = times.coerceAtLeast(1)
+        return items.map { item ->
+            if (item.promocionId != promotionId) return@map item
+            val currentTimes = item.promocionVeces.coerceAtLeast(1)
+            val nextTimes = if (append) currentTimes + safeTimes else safeTimes
+            val baseQuantity = item.quantity / currentTimes
+            val nextQuantity = baseQuantity * nextTimes
+            val unitPriceWithTax = if (nextQuantity > 0.0) {
+                (item.unitPriceWithTax * item.quantity) / nextQuantity
+            } else item.unitPriceWithTax
+            item.copy(
+                quantity = nextQuantity,
+                promocionVeces = nextTimes,
+                unitPriceWithTax = unitPriceWithTax,
+            )
+        }
+    }
+
+    fun addIndividualToCart(product: Product, quantity: Double = 1.0) {
+        _uiState.update { state ->
+            val existingIndex = state.cart.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
             val updatedCart = state.cart.toMutableList()
             if (existingIndex >= 0) {
                 val current = updatedCart[existingIndex]
-                updatedCart[existingIndex] = current.copy(quantity = current.quantity + 1.0)
+                updatedCart[existingIndex] = current.copy(quantity = current.quantity + quantity)
             } else {
-                updatedCart.add(CartItem(product = product, quantity = 1.0))
+                updatedCart.add(CartItem(product = product, quantity = quantity))
             }
             state.copy(cart = updatedCart)
         }
@@ -235,7 +424,7 @@ class PosTerminalViewModel(
     fun incrementQuantity(productId: String) {
         _uiState.update { state ->
             val updatedCart = state.cart.map { item ->
-                if (item.product.id == productId) {
+                if (item.product.id == productId && !item.isPromotionLine) {
                     item.copy(quantity = item.quantity + 1.0)
                 } else item
             }
@@ -246,7 +435,7 @@ class PosTerminalViewModel(
     fun decrementQuantity(productId: String) {
         _uiState.update { state ->
             val updatedCart = state.cart.mapNotNull { item ->
-                if (item.product.id == productId) {
+                if (item.product.id == productId && !item.isPromotionLine) {
                     val newQty = item.quantity - 1.0
                     if (newQty > 0) item.copy(quantity = newQty) else null
                 } else item
@@ -255,9 +444,66 @@ class PosTerminalViewModel(
         }
     }
 
+    fun setItemQuantity(productId: String, quantity: Double) {
+        if (quantity <= 0.0) {
+            removeFromCart(productId)
+            return
+        }
+        _uiState.update { state ->
+            val updatedCart = state.cart.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    item.copy(quantity = quantity)
+                } else item
+            }
+            state.copy(cart = updatedCart)
+        }
+    }
+
+    fun updateItemPrice(productId: String, newPriceWithTax: Double) {
+        _uiState.update { state ->
+            val updatedCart = state.cart.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    item.copy(
+                        unitPriceWithTax = newPriceWithTax.coerceAtLeast(0.0),
+                        isManualPrice = true,
+                    )
+                } else item
+            }
+            state.copy(cart = updatedCart)
+        }
+    }
+
+    fun updateItemPriceLevel(productId: String, priceLevelLabel: String) {
+        _uiState.update { state ->
+            val updatedCart = state.cart.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    val level = item.product.prices.firstOrNull { it.label.equals(priceLevelLabel, ignoreCase = true) }
+                    val newPrice = level?.pricePlusTax?.takeIf { it > 0.0 } ?: level?.price ?: item.unitPriceWithTax
+                    item.copy(
+                        unitPriceWithTax = newPrice,
+                        selectedPriceLabel = priceLevelLabel,
+                        isManualPrice = false,
+                    )
+                } else item
+            }
+            state.copy(cart = updatedCart)
+        }
+    }
+
+    fun updateItemDiscount(productId: String, discountPercent: Double) {
+        _uiState.update { state ->
+            val updatedCart = state.cart.map { item ->
+                if (item.product.id == productId && !item.isPromotionLine) {
+                    item.copy(discountPercent = discountPercent.coerceIn(0.0, 100.0))
+                } else item
+            }
+            state.copy(cart = updatedCart)
+        }
+    }
+
     fun removeFromCart(productId: String) {
         _uiState.update { state ->
-            state.copy(cart = state.cart.filterNot { it.product.id == productId })
+            state.copy(cart = state.cart.filterNot { it.product.id == productId && !it.isPromotionLine })
         }
     }
 
@@ -342,11 +588,6 @@ class PosTerminalViewModel(
             return
         }
 
-        if (state.isCajaDiaAnterior) {
-            _uiState.update { it.copy(showAvisoCajaAnterior = true) }
-            return
-        }
-
         if (state.clientBranches.size > 1 && state.selectedClientBranch == null) {
             _uiState.update {
                 it.copy(
@@ -361,7 +602,7 @@ class PosTerminalViewModel(
         _uiState.update {
             it.copy(
                 showPaymentDialog = true,
-                receivedAmountText = if (total > 0.0) total.toString() else "0.0",
+                receivedAmountText = if (total > 0.0) String.format(Locale.US, "%.2f", total) else "0.00",
                 errorMessage = null,
             )
         }
@@ -419,6 +660,16 @@ class PosTerminalViewModel(
         }
     }
 
+    private suspend fun findFirstOpenCaja(cajas: List<com.amaxonia.erp.domain.model.Caja>): com.amaxonia.erp.domain.model.Caja? =
+        coroutineScope {
+            cajas.map { caja ->
+                async {
+                    val isOpen = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()?.isOpen == true
+                    if (isOpen) caja else null
+                }
+            }.mapNotNull { it.await() }.firstOrNull()
+        }
+
     fun dismissSuccessDialog() {
         _uiState.update {
             it.copy(
@@ -460,7 +711,27 @@ class PosTerminalViewModel(
     }
 
     fun selectPaymentMethod(method: FormaPagoDto) {
-        _uiState.update { it.copy(selectedPaymentMethod = method) }
+        val isCash = isCashPaymentMethod(method)
+        val currentTotal = _uiState.value.summary.total
+        _uiState.update { current ->
+            current.copy(
+                selectedPaymentMethod = method,
+                receivedAmountText = if (!isCash && currentTotal > 0.0) {
+                    String.format(Locale.US, "%.2f", currentTotal)
+                } else {
+                    current.receivedAmountText.ifBlank {
+                        if (currentTotal > 0.0) String.format(Locale.US, "%.2f", currentTotal) else "0.00"
+                    }
+                },
+            )
+        }
+    }
+
+    fun setExactAmount() {
+        val total = _uiState.value.summary.total
+        if (total > 0.0) {
+            _uiState.update { it.copy(receivedAmountText = String.format(Locale.US, "%.2f", total)) }
+        }
     }
 
     fun processSale() {
@@ -518,13 +789,20 @@ class PosTerminalViewModel(
                     itemDescripcion = item.product.description,
                     itemCantidad = item.quantity,
                     itemPrecioSinIva = item.unitPriceWithoutTax,
-                    itemPIva = item.product.taxRate,
-                    itemTotalSinIva = item.subtotalWithoutTax,
+                    itemDescuento = item.discountPercent,
+                    itemMontoDescuento = item.discountAmountWithoutTax,
+                    itemPIva = item.taxRate,
+                    itemTotalSinIva = item.totalWithoutTax,
                     itemTotalConIva = item.totalWithTax,
                     itemCantidadTotal = item.quantity,
                     itemCodigo = item.product.code,
                     itemReferencia = item.product.reference,
                     esProductoFisico = true,
+                    promocionTipo = item.promocionTipo,
+                    promocionId = item.promocionId.orEmpty(),
+                    promocionCantidad = if (item.isPromotionLine) item.quantity else 0.0,
+                    promocionCodigo = item.promocionCodigo,
+                    promocionNombre = item.promocionNombre,
                 )
             }
 
@@ -553,6 +831,62 @@ class PosTerminalViewModel(
                 pagoResumen = paymentSummary,
                 pagos = payments,
             )
+
+            val isOnline = networkMonitor?.isOnline() ?: true
+            val tenantId = session?.company?.id?.toString() ?: ""
+            val countryCode = session?.company?.countryCode.takeIf { !it.isNullOrBlank() }
+                ?: runCatching { localStore.readSelectedCountry()?.code }.getOrNull()
+                ?: BuildConfig.DEFAULT_COUNTRY_CODE
+
+            // Ruta offline directa si no hay conexión a internet
+            if (!isOnline && pendingInvoiceDao != null) {
+                val now = System.currentTimeMillis()
+                val localId = UUID.randomUUID().toString()
+                val localNumber = "OFF-$now"
+                val offlineRequest = request.copy(idFactura = localId, codFactura = localNumber)
+                val total = summary.total
+                val clientName = state.selectedClient?.name ?: "CONSUMIDOR FINAL"
+
+                val pendingEntity = PendingInvoiceEntity(
+                    id = localId,
+                    countryCode = countryCode,
+                    payloadJson = AppJson.encodeToString(
+                        ProcessSaleRequestDto.serializer(),
+                        offlineRequest,
+                    ),
+                    localInvoiceNumber = localNumber,
+                    clientName = clientName,
+                    tenantId = tenantId,
+                    total = total,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+                pendingInvoiceDao.insert(pendingEntity)
+                onOfflineInvoiceQueued?.invoke()
+
+                val completedInfo = CompletedSaleInfo(
+                    facturaId = localId,
+                    numeroFactura = localNumber,
+                    clientName = clientName,
+                    total = total,
+                    receivedAmount = received,
+                    changeAmount = change,
+                    paymentMethodName = state.selectedPaymentMethod?.descripcion ?: state.selectedPaymentMethod?.codigo ?: "Efectivo",
+                )
+                _uiState.update {
+                    it.copy(
+                        isProcessingSale = false,
+                        showPaymentDialog = false,
+                        cart = emptyList(),
+                        completedSaleInvoice = localNumber,
+                        completedSaleInfo = completedInfo,
+                        printFeedbackMessage = null,
+                        isPrintingReceipt = false,
+                    )
+                }
+                customerDisplayManager?.showSaleSuccess(completedInfo)
+                return@launch
+            }
 
             val result = salesRepository.processSale(request)
 
@@ -586,11 +920,67 @@ class PosTerminalViewModel(
                     printReceipt(targetFacturaId)
                 }
             }.onFailure { ex ->
-                _uiState.update {
-                    it.copy(
-                        isProcessingSale = false,
-                        errorMessage = ex.message ?: "Error al procesar la venta",
+                val msg = ex.message.orEmpty()
+                val isNetworkError = !isOnline ||
+                    ex is java.io.IOException ||
+                    msg.contains("timeout", ignoreCase = true) ||
+                    msg.contains("connect", ignoreCase = true) ||
+                    msg.contains("failed to connect", ignoreCase = true) ||
+                    msg.contains("No address associated", ignoreCase = true)
+
+                if (isNetworkError && pendingInvoiceDao != null) {
+                    val now = System.currentTimeMillis()
+                    val localId = UUID.randomUUID().toString()
+                    val localNumber = "OFF-$now"
+                    val offlineRequest = request.copy(idFactura = localId, codFactura = localNumber)
+                    val total = summary.total
+                    val clientName = state.selectedClient?.name ?: "CONSUMIDOR FINAL"
+
+                    val pendingEntity = PendingInvoiceEntity(
+                        id = localId,
+                        countryCode = countryCode,
+                        payloadJson = AppJson.encodeToString(
+                            ProcessSaleRequestDto.serializer(),
+                            offlineRequest,
+                        ),
+                        localInvoiceNumber = localNumber,
+                        clientName = clientName,
+                        tenantId = tenantId,
+                        total = total,
+                        createdAt = now,
+                        updatedAt = now,
                     )
+                    pendingInvoiceDao.insert(pendingEntity)
+                    onOfflineInvoiceQueued?.invoke()
+
+                    val completedInfo = CompletedSaleInfo(
+                        facturaId = localId,
+                        numeroFactura = localNumber,
+                        clientName = clientName,
+                        total = total,
+                        receivedAmount = received,
+                        changeAmount = change,
+                        paymentMethodName = state.selectedPaymentMethod?.descripcion ?: state.selectedPaymentMethod?.codigo ?: "Efectivo",
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isProcessingSale = false,
+                            showPaymentDialog = false,
+                            cart = emptyList(),
+                            completedSaleInvoice = localNumber,
+                            completedSaleInfo = completedInfo,
+                            printFeedbackMessage = null,
+                            isPrintingReceipt = false,
+                        )
+                    }
+                    customerDisplayManager?.showSaleSuccess(completedInfo)
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isProcessingSale = false,
+                            errorMessage = ex.message ?: "Error al procesar la venta",
+                        )
+                    }
                 }
             }
         }

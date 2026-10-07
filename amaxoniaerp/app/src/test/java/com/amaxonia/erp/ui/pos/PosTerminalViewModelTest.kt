@@ -42,6 +42,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.amaxonia.erp.domain.model.ItemCarrito
+import com.amaxonia.erp.domain.model.Promocion
+import com.amaxonia.erp.domain.model.PromocionDetalle
+import com.amaxonia.erp.domain.repository.PromotionRepository
+import java.math.BigDecimal
 import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -117,6 +122,20 @@ class PosTerminalViewModelTest {
         override suspend fun readActiveSucursal(): Pair<String, String>? = Pair("1", "Sucursal 1")
         override suspend fun readAutoPrintReceipt(): Boolean = false
         override fun customerDisplayEnabledFlow(): kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false)
+        override fun allowEditPricesFlow(): kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true)
+        override suspend fun readAllowEditPrices(): Boolean = true
+        override fun allowDiscountsFlow(): kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true)
+        override suspend fun readAllowDiscounts(): Boolean = true
+    }
+
+    private class FakePromotionRepository(
+        var promotionsResult: Result<List<Promocion>> = Result.success(emptyList()),
+    ) : PromotionRepository {
+        override suspend fun getPromotions(forceRefresh: Boolean): Result<List<Promocion>> = promotionsResult
+        override suspend fun getActivePromotionsForProduct(productId: String): Result<List<Promocion>> =
+            promotionsResult.map { list ->
+                list.filter { it.activo && (it.idItem == productId || it.detalles.any { d -> d.idItem == productId }) }
+            }
     }
 
     private class FakeCajaRepository : CajaRepository {
@@ -261,6 +280,53 @@ class PosTerminalViewModelTest {
 
         assertTrue(vm.uiState.value.showCajaWarningDialog)
         assertFalse(vm.uiState.value.showPaymentDialog)
+    }
+
+    @Test
+    fun openPaymentDialog_doesNotBlock_whenCajaIsDiaAnterior() = runTest {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        fakeCajaRepo.statusResponse = CajaStatusResponse(
+            isOpen = true,
+            cajaSecuencia = CajaSecuencia(
+                idCajaSecuencia = "sec-old",
+                idCaja = "1",
+                fechaApertura = "$yesterday 08:30:00",
+                montoApertura = 50.0,
+            ),
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Verify caja is detected as previous day
+        assertTrue(vm.uiState.value.isCajaOpen)
+        assertTrue(vm.uiState.value.isCajaDiaAnterior)
+        assertTrue(vm.uiState.value.showAvisoCajaAnterior)
+
+        // Dismiss the modal (cashier chooses "Continuar")
+        vm.dismissAvisoCajaAnterior()
+        assertFalse(vm.uiState.value.showAvisoCajaAnterior)
+
+        // Add product and open payment dialog
+        vm.addToCart(
+            Product(
+                id = "1",
+                code = "P01",
+                description = "Test Product",
+                prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
+            )
+        )
+        vm.openPaymentDialog()
+
+        // Must NOT be blocked! Payment dialog opens normally
+        assertFalse(vm.uiState.value.showCajaWarningDialog)
+        assertTrue(vm.uiState.value.showPaymentDialog)
     }
 
     @Test
@@ -522,4 +588,339 @@ class PosTerminalViewModelTest {
         assertEquals("6234-5678", lastRequest.factura.facturarATelefono)
         assertEquals(88, lastRequest.items.first().codVendedor)
     }
+
+    @Test
+    fun quantityPicker_opensAndConfirmsQuantity() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first()
+        vm.openQuantityPicker(product)
+        assertEquals(product, vm.uiState.value.quantityPickerProduct)
+
+        vm.dismissQuantityPicker()
+        assertNull(vm.uiState.value.quantityPickerProduct)
+
+        vm.confirmProductQuantity(product, 4.0)
+        advanceUntilIdle()
+
+        val cartItem = vm.uiState.value.cart.firstOrNull()
+        assertNotNull(cartItem)
+        assertEquals(4.0, cartItem!!.quantity, 0.001)
+    }
+
+    @Test
+    fun editItemPrice_and_discount_and_priceLevel() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first().copy(
+            prices = listOf(
+                PriceLevel(label = "A", price = 10.0, pricePlusTax = 11.6),
+                PriceLevel(label = "B", price = 8.0, pricePlusTax = 9.28),
+            ),
+        )
+        vm.addToCart(product)
+
+        // Manual price update
+        vm.updateItemPrice(product.id, 15.0)
+        var item = vm.uiState.value.cart.first()
+        assertEquals(15.0, item.unitPriceWithTax, 0.001)
+        assertTrue(item.isManualPrice)
+
+        // Discount update
+        vm.updateItemDiscount(product.id, 20.0)
+        item = vm.uiState.value.cart.first()
+        assertEquals(20.0, item.discountPercent, 0.001)
+
+        // Price level update
+        vm.updateItemPriceLevel(product.id, "B")
+        item = vm.uiState.value.cart.first()
+        assertEquals(9.28, item.unitPriceWithTax, 0.001)
+        assertEquals("B", item.selectedPriceLabel)
+        assertFalse(item.isManualPrice)
+    }
+
+    @Test
+    fun promotion_triggersModal_andAddsPromotionToCart_andUpdatesQuantity_andRemoves() = runTest {
+        val productRepo = FakeProductRepository()
+        val promoRepo = FakePromotionRepository()
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first()
+
+        val promo = Promocion(
+            id = "PROMO-1",
+            codigo = "COMBO-1",
+            inicio = null,
+            fin = null,
+            nombre = "Combo Familiar",
+            imagen = "",
+            descuentoGlobal = BigDecimal.ZERO,
+            idItem = product.id,
+            activo = true,
+            detalles = listOf(
+                PromocionDetalle(
+                    id = "DET-1",
+                    promocionId = "PROMO-1",
+                    idItem = product.id,
+                    productName = product.description,
+                    productCode = product.code,
+                    productReference = "",
+                    idTipoPrecio = "1",
+                    cantidad = BigDecimal("2"),
+                    cantidadTotal = BigDecimal("2"),
+                    unidadEmpaque = "UNIDAD",
+                    descuento = BigDecimal.ZERO,
+                    descuentoMonto = BigDecimal.ZERO,
+                    precio = BigDecimal("8.0"),
+                    impuesto = BigDecimal.ZERO,
+                    iva = BigDecimal("16.0"),
+                    totalConIva = BigDecimal("18.56"),
+                    totalSinIva = BigDecimal("16.00"),
+                    grupo = "1",
+                    product = product,
+                ),
+            ),
+        )
+        promoRepo.promotionsResult = Result.success(listOf(promo))
+
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+            promotionRepository = promoRepo,
+        )
+        advanceUntilIdle()
+
+        // Adding product with promo triggers modal choice
+        vm.addToCart(product)
+        assertTrue(vm.uiState.value.showPromotionChoice)
+        assertEquals(product, vm.uiState.value.pendingPromotionProduct)
+        assertEquals(1, vm.uiState.value.promotionOptions.size)
+
+        // Add promo to cart with 2 combos
+        vm.addPromotionToCart(promo, times = 2)
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.showPromotionChoice)
+        assertEquals(1, vm.uiState.value.cart.size)
+        val cartItem = vm.uiState.value.cart.first()
+        assertEquals(4.0, cartItem.quantity, 0.001) // 2 base * 2 times
+        assertEquals("PROMO-1", cartItem.promocionId)
+        assertEquals(2, cartItem.promocionVeces)
+
+        // Verify displayItems grouping
+        val displayItems = vm.uiState.value.displayItems
+        assertEquals(1, displayItems.size)
+        assertTrue(displayItems.first() is ItemCarrito.PromocionAgrupada)
+        val promoGroup = displayItems.first() as ItemCarrito.PromocionAgrupada
+        assertEquals("Combo Familiar", promoGroup.promocionNombre)
+
+        // Update promo quantity to 3
+        vm.updatePromotionQuantity("PROMO-1", 3)
+        assertEquals(6.0, vm.uiState.value.cart.first().quantity, 0.001)
+        assertEquals(3, vm.uiState.value.cart.first().promocionVeces)
+
+        // Remove promotion
+        vm.removePromotion("PROMO-1")
+        assertTrue(vm.uiState.value.cart.isEmpty())
+        assertTrue(vm.uiState.value.displayItems.isEmpty())
+    }
+
+    @Test
+    fun processSale_includesPromotionDataAndManualPrice() = runTest {
+        val productRepo = FakeProductRepository()
+        val salesRepo = FakeSalesRepository()
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first()
+
+        val promo = Promocion(
+            id = "PROMO-99",
+            codigo = "PROMO-CODE",
+            inicio = null,
+            fin = null,
+            nombre = "Promo Especial",
+            imagen = "",
+            descuentoGlobal = BigDecimal.ZERO,
+            idItem = product.id,
+            activo = true,
+            detalles = listOf(
+                PromocionDetalle(
+                    id = "DET-99",
+                    promocionId = "PROMO-99",
+                    idItem = product.id,
+                    productName = product.description,
+                    productCode = product.code,
+                    productReference = "",
+                    idTipoPrecio = "1",
+                    cantidad = BigDecimal("1"),
+                    cantidadTotal = BigDecimal("1"),
+                    unidadEmpaque = "UNIDAD",
+                    descuento = BigDecimal.ZERO,
+                    descuentoMonto = BigDecimal.ZERO,
+                    precio = BigDecimal("5.0"),
+                    impuesto = BigDecimal.ZERO,
+                    iva = BigDecimal("16.0"),
+                    totalConIva = BigDecimal("5.80"),
+                    totalSinIva = BigDecimal("5.00"),
+                    grupo = "1",
+                    product = product,
+                ),
+            ),
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = salesRepo,
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        vm.addPromotionToCart(promo, times = 1)
+        vm.openPaymentDialog()
+        vm.onReceivedAmountChange("10.00")
+        vm.processSale()
+        advanceUntilIdle()
+
+        val lastRequest = salesRepo.lastSaleRequest
+        assertNotNull(lastRequest)
+        val saleItem = lastRequest!!.items.first()
+        assertEquals("PROMO-99", saleItem.promocionId)
+        assertEquals("PROMO-CODE", saleItem.promocionCodigo)
+        assertEquals("Promo Especial", saleItem.promocionNombre)
+        assertEquals(1.0, saleItem.promocionCantidad, 0.001)
+    }
+
+    @Test
+    fun posCartSummary_calculatesGrossSubtotalAndDiscountTotalCorrectly() {
+        val product = Product(
+            id = "1",
+            code = "P1",
+            description = "Producto Test",
+            prices = listOf(PriceLevel(label = "General", price = 100.0, pricePlusTax = 116.0)),
+            isExempt = false,
+            taxRate = 16.0,
+        )
+
+        val cartItem = CartItem(
+            product = product,
+            quantity = 2.0,
+            unitPriceWithTax = 116.0,
+            discountPercent = 20.0,
+        )
+
+        val state = PosUiState(cart = listOf(cartItem))
+        val summary = state.summary
+
+        // grossSubtotal = 100.0 * 2 = 200.0
+        assertEquals(200.0, summary.grossSubtotal, 0.01)
+        // discountTotal = 200.0 * 0.20 = 40.0
+        assertEquals(40.0, summary.discountTotal, 0.01)
+        // net subtotal = 160.0
+        assertEquals(160.0, summary.subtotal, 0.01)
+        // tax = 160.0 * 0.16 = 25.60
+        assertEquals(25.60, summary.tax, 0.01)
+        // total = 185.60
+        assertEquals(185.60, summary.total, 0.01)
+    }
+
+    @Test
+    fun selectPaymentMethod_nonCashAutoPopulatesExactTotal() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(
+            Product(
+                id = "1",
+                code = "P1",
+                description = "Item",
+                prices = listOf(PriceLevel(label = "General", price = 50.0, pricePlusTax = 58.0)),
+                taxRate = 16.0,
+            )
+        )
+        val total = vm.uiState.value.summary.total
+        assertTrue(total > 0.0)
+
+        vm.openPaymentDialog()
+        vm.onReceivedAmountChange("100.00")
+        assertEquals("100.00", vm.uiState.value.receivedAmountText)
+
+        val cardMethod = FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta")
+        vm.selectPaymentMethod(cardMethod)
+
+        assertEquals(String.format(java.util.Locale.US, "%.2f", total), vm.uiState.value.receivedAmountText)
+    }
+
+    @Test
+    fun setExactAmount_setsReceivedAmountToExactTotal() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(
+            Product(
+                id = "1",
+                code = "P1",
+                description = "Item",
+                prices = listOf(PriceLevel(label = "General", price = 35.0, pricePlusTax = 35.0)),
+                isExempt = true,
+                taxRate = 0.0,
+            )
+        )
+        val total = vm.uiState.value.summary.total
+
+        vm.openPaymentDialog()
+        vm.onReceivedAmountChange("50.00")
+        assertEquals("50.00", vm.uiState.value.receivedAmountText)
+
+        vm.setExactAmount()
+        assertEquals(String.format(java.util.Locale.US, "%.2f", total), vm.uiState.value.receivedAmountText)
+    }
+
+    @Test
+    fun paymentHelpers_isCashAndCalculateSuggestedBillsWorkProperly() {
+        val cash1 = FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo")
+        val cash2 = FormaPagoDto(idFormaPago = 1, siglas = "EFEC", codigo = "CASH", descripcion = "Efectivo en Bs")
+        val card = FormaPagoDto(idFormaPago = 2, siglas = "TDD", codigo = "DEBITO", descripcion = "Tarjeta Débito")
+        val trans = FormaPagoDto(idFormaPago = 3, siglas = "TRANS", codigo = "TRANSFERENCIA", descripcion = "Transferencia")
+
+        assertTrue(isCashPaymentMethod(cash1))
+        assertTrue(isCashPaymentMethod(cash2))
+        assertFalse(isCashPaymentMethod(card))
+        assertFalse(isCashPaymentMethod(trans))
+
+        val bills = calculateSuggestedBills(13.50)
+        assertTrue(bills.contains(14.0))
+        assertTrue(bills.contains(15.0))
+        assertTrue(bills.contains(20.0))
+        assertTrue(bills.all { it >= 13.50 })
+    }
 }
+

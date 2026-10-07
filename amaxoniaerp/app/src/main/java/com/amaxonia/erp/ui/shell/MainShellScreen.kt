@@ -25,10 +25,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
@@ -80,6 +82,7 @@ enum class ErpModule(
     SUCURSALES("Sucursales", Icons.Default.Storefront),
     CAJAS("Cajas", Icons.Default.AccountBalanceWallet),
     SETTINGS("Configuración", Icons.Default.Settings),
+    VISIBILITY_SETTINGS("Ajustes de Visibilidad", Icons.Rounded.Tune),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,12 +98,15 @@ fun MainShellScreen(
     isCajaDiaAnterior: Boolean = false,
     cajaFechaApertura: String? = null,
     usuarioApertura: String? = null,
+    isOnline: Boolean = true,
+    onSyncManual: () -> Unit = {},
     posContent: @Composable (onNavigateToCajas: () -> Unit) -> Unit,
     clientsContent: @Composable () -> Unit,
     productsContent: @Composable () -> Unit,
     sucursalesContent: @Composable () -> Unit,
     cajasContent: @Composable () -> Unit,
-    settingsContent: @Composable () -> Unit,
+    settingsContent: @Composable (onNavigateToVisibilitySettings: () -> Unit) -> Unit,
+    offlineSettingsContent: @Composable (onBack: () -> Unit) -> Unit,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -174,6 +180,20 @@ fun MainShellScreen(
                                 scope.launch {
                                     drawerState.close()
                                     onChangeCompany()
+                                }
+                            },
+                        )
+
+                        // Sincronización manual de catálogo ("Actualizar datos")
+                        DrawerMenuItem(
+                            icon = Icons.Default.Refresh,
+                            label = "Actualizar datos",
+                            isSelected = false,
+                            isCompact = isCompact,
+                            onClick = {
+                                scope.launch {
+                                    drawerState.close()
+                                    onSyncManual()
                                 }
                             },
                         )
@@ -263,7 +283,7 @@ fun MainShellScreen(
                     actions = {
                         val badgeLabel = when {
                             !isCajaOpen -> "$activeCajaName (Cerrada)"
-                            isCajaDiaAnterior -> "$activeCajaName (Día Anterior)"
+                            isCajaDiaAnterior -> "$activeCajaName (Vencida)"
                             !cajaFechaApertura.isNullOrBlank() -> "$activeCajaName • $cajaFechaApertura"
                             else -> activeCajaName
                         }
@@ -272,6 +292,13 @@ fun MainShellScreen(
                             isCajaDiaAnterior -> PosVisualTone.Warning
                             else -> PosVisualTone.Success
                         }
+                        // Badge de conectividad (Online/Offline)
+                        PosStatusBadge(
+                            label = if (isOnline) "En línea" else "Sin conexión",
+                            tone = if (isOnline) PosVisualTone.Success else PosVisualTone.Error,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+
                         // Badge interactivo de Caja Activa en píldora armonizada
                         PosStatusBadge(
                             label = badgeLabel,
@@ -304,7 +331,8 @@ fun MainShellScreen(
                     ErpModule.PRODUCTS -> productsContent()
                     ErpModule.SUCURSALES -> sucursalesContent()
                     ErpModule.CAJAS -> cajasContent()
-                    ErpModule.SETTINGS -> settingsContent()
+                    ErpModule.SETTINGS -> settingsContent { currentModule = ErpModule.VISIBILITY_SETTINGS }
+                    ErpModule.VISIBILITY_SETTINGS -> offlineSettingsContent { currentModule = ErpModule.SETTINGS }
                 }
             }
         }
@@ -425,7 +453,7 @@ private fun SidebarHeader(
                     if (!cajaFechaApertura.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "Abierta: $cajaFechaApertura${if (isCajaDiaAnterior) " (Jornada anterior)" else ""}",
+                            text = "Abierta: $cajaFechaApertura${if (isCajaDiaAnterior) " (Vencida)" else ""}",
                             color = if (isCajaDiaAnterior) MaterialTheme.colorScheme.tertiary else PosPalette.FixedWhite.copy(alpha = 0.85f),
                             fontWeight = if (isCajaDiaAnterior) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 11.sp,

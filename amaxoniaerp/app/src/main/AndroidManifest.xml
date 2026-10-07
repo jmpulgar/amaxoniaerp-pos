@@ -2,6 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="com.sunmi.peripheral.printer.permission.PRINTER" />
+
+    <queries>
+        <package android:name="com.thefactory.hkapos.fiscal" />
+        <package android:name="com.thefactory.hkapos.fiscal.demo" />
+        <package android:name="com.thefactory.hkapos.fiscal.release" />
+        <package android:name="com.thefactory.hkapos.fiscal.demo.demo" />
+        <package android:name="woyou.aidlservice.jiuiv5" />
+        <package android:name="com.sunmi.peripheral.printer" />
+        <package android:name="com.imin.printer" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -14,9 +26,10 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:exported="true"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.AmaxoniaErp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

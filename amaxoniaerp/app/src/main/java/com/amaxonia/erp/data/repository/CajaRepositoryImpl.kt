@@ -76,7 +76,8 @@ class CajaRepositoryImpl(
         }
 
     override suspend fun restoreActiveCajaIfValid() {
-        val caja = localStore.readActiveCajaForToday()
+        val caja = localStore.readActiveCajaSnapshot()
+            ?: localStore.readActiveCaja()?.let { (id, name) -> Caja(idCaja = id, caja = name, descripcion = name) }
         if (caja != null && caja.idCaja.isNotBlank()) {
             _activeCajaName.update { caja.displayName }
             _activeCaja.update { caja }
@@ -94,11 +95,15 @@ class CajaRepositoryImpl(
         runCatching {
             val (token, adminDb) = getContext()
             val response = apiService.checkCajaStatus(token, adminDb, cajaId)
-            if (_activeCaja.value?.idCaja == cajaId) {
-                if (response.isOpen && response.cajaSecuencia != null && response.cajaSecuencia.idCaja == cajaId) {
-                    _activeCajaSecuencia.update { response.cajaSecuencia }
+            val trimmedCajaId = cajaId.trim()
+            val activeId = _activeCaja.value?.idCaja?.trim()
+            val sec = response.cajaSecuencia
+            val matchesSecCaja = sec != null && (sec.idCaja.isBlank() || sec.idCaja.trim() == trimmedCajaId)
+            if (activeId == null || activeId == trimmedCajaId) {
+                if (response.isOpen && matchesSecCaja) {
+                    _activeCajaSecuencia.update { sec }
                     _sessionStatus.update { CajaSessionStatus.ABIERTA }
-                } else {
+                } else if (_activeCaja.value != null && activeId == trimmedCajaId) {
                     _activeCajaSecuencia.update { null }
                     _sessionStatus.update { CajaSessionStatus.PENDIENTE_APERTURA }
                 }

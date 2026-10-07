@@ -18,4 +18,14 @@
     <string name="logout">Cerrar sesión</string>
     <string name="terminal_active">Terminal POS Activa</string>
     <string name="welcome_user">Bienvenido, %1$s</string>
+    <string name="brand_website_url">https://amaxonia.com</string>
+    <string name="brand_support_url">https://amaxonia.com/soporte</string>
+    <string name="brand_website_label">Sitio web oficial</string>
+    <string name="brand_support_label">Soporte técnico</string>
+    <string name="welcome_login_button">Iniciar sesión</string>
+    <string name="welcome_request_account">Solicitar tu cuenta</string>
+    <string name="welcome_title">Bienvenido</string>
+    <string name="contact_sheet_title">Solicitar Cuenta</string>
+    <string name="contact_sheet_subtitle">Elige cómo deseas contactarnos:</string>
+    <string name="navigate_back">Volver</string>
 </resources>

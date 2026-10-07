@@ -113,6 +113,11 @@ data class SaleItemDto(
     val idSegmento: Int? = null,
     @SerialName("id_familia")
     val idFamilia: Int? = null,
+    val promocionTipo: String = "",
+    val promocionId: String = "",
+    val promocionCantidad: Double = 0.0,
+    val promocionCodigo: String = "",
+    val promocionNombre: String = "",
 )
 
 @Serializable

@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.amaxonia.erp.composition.DependencyContainer
 import com.amaxonia.erp.domain.model.AuthSession
 import com.amaxonia.erp.domain.model.CompanySession
@@ -32,22 +33,52 @@ import com.amaxonia.erp.ui.products.ProductListScreen
 import com.amaxonia.erp.ui.settings.SettingsScreen
 import com.amaxonia.erp.ui.shell.MainShellScreen
 import com.amaxonia.erp.ui.sucursales.SucursalesScreen
+import com.amaxonia.erp.ui.welcome.WelcomeScreen
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import com.amaxonia.erp.ui.theme.PosTheme
+import com.amaxonia.erp.ui.util.KeyboardHelper
+import com.amaxonia.erp.data.sync.SyncScheduler
+import com.amaxonia.erp.ui.offlinesettings.OfflineSettingsScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DependencyContainer.initialize(applicationContext)
+        SyncScheduler.schedulePeriodic(applicationContext)
+        SyncScheduler.scheduleWeeklyReconcile(applicationContext)
         enableEdgeToEdge()
 
         setContent {
-            PosTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    PosAppContent()
+            val defaultController = LocalSoftwareKeyboardController.current
+            val view = LocalView.current
+            val enhancedController = remember(defaultController, view) {
+                object : SoftwareKeyboardController {
+                    override fun show() {
+                        defaultController?.show()
+                        KeyboardHelper.forceShow(view)
+                    }
+
+                    override fun hide() {
+                        defaultController?.hide()
+                        KeyboardHelper.hide(view)
+                    }
+                }
+            }
+
+            CompositionLocalProvider(
+                LocalSoftwareKeyboardController provides enhancedController,
+            ) {
+                PosTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        PosAppContent()
+                    }
                 }
             }
         }
@@ -58,6 +89,13 @@ class MainActivity : ComponentActivity() {
         DependencyContainer.customerDisplayManager.start(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            DependencyContainer.cajaRepository.restoreActiveCajaIfValid()
+        }
+    }
+
     override fun onStop() {
         DependencyContainer.customerDisplayManager.stop()
         super.onStop()
@@ -66,6 +104,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun PosAppContent() {
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     var isLoadingSession by remember { mutableStateOf(true) }
     var currentCompanySession by remember { mutableStateOf<CompanySession?>(null) }
@@ -138,7 +177,13 @@ private fun PosAppContent() {
             val settingsViewModel = remember(currentSession) {
                 DependencyContainer.createSettingsViewModel()
             }
+            val offlineSettingsViewModel = remember(currentSession) {
+                DependencyContainer.createOfflineSettingsViewModel()
+            }
 
+            val isOnline by DependencyContainer.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
+                initialValue = DependencyContainer.networkMonitor.isOnline(),
+            )
             val activeCaja by DependencyContainer.cajaRepository.activeCaja.collectAsStateWithLifecycle()
             val activeCajaName by DependencyContainer.cajaRepository.activeCajaName.collectAsStateWithLifecycle()
             val activeCajaSecuencia by DependencyContainer.cajaRepository.activeCajaSecuencia.collectAsStateWithLifecycle()
@@ -157,6 +202,10 @@ private fun PosAppContent() {
                 isCajaDiaAnterior = isDiaAnterior,
                 cajaFechaApertura = formattedFecha,
                 usuarioApertura = usuarioApertura,
+                isOnline = isOnline,
+                onSyncManual = {
+                    SyncScheduler.enqueueManual(context)
+                },
                 onLogout = {
                     scope.launch {
                         DependencyContainer.authRepository.logout()
@@ -190,8 +239,17 @@ private fun PosAppContent() {
                 cajasContent = {
                     CajasOverviewScreen(viewModel = cajasOverviewViewModel)
                 },
-                settingsContent = {
-                    SettingsScreen(viewModel = settingsViewModel)
+                settingsContent = { onNavigateToVisibility ->
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
+                        onNavigateToVisibilitySettings = onNavigateToVisibility,
+                    )
+                },
+                offlineSettingsContent = { onBack ->
+                    OfflineSettingsScreen(
+                        viewModel = offlineSettingsViewModel,
+                        onBack = onBack,
+                    )
                 },
             )
         }
@@ -216,17 +274,26 @@ private fun PosAppContent() {
         }
 
         else -> {
+            var showLoginScreen by remember { mutableStateOf(false) }
             val loginViewModel = remember { DependencyContainer.createLoginViewModel() }
-            LoginScreen(
-                viewModel = loginViewModel,
-                onCompanySessionReady = { companySession ->
-                    currentCompanySession = companySession
-                    pendingSelectionSession = null
-                },
-                onRequiresCompanySelection = { authSession ->
-                    pendingSelectionSession = authSession
-                },
-            )
+
+            if (!showLoginScreen) {
+                WelcomeScreen(
+                    onLoginClick = { showLoginScreen = true },
+                )
+            } else {
+                LoginScreen(
+                    viewModel = loginViewModel,
+                    onCompanySessionReady = { companySession ->
+                        currentCompanySession = companySession
+                        pendingSelectionSession = null
+                    },
+                    onRequiresCompanySelection = { authSession ->
+                        pendingSelectionSession = authSession
+                    },
+                    onBack = { showLoginScreen = false },
+                )
+            }
         }
     }
 }

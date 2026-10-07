@@ -3,16 +3,56 @@ package com.amaxonia.erp.composition
 import android.annotation.SuppressLint
 import android.content.Context
 import com.amaxonia.erp.data.local.LocalStore
+import com.amaxonia.erp.data.local.db.AppDatabase
 import com.amaxonia.erp.data.remote.ApiClient
 import com.amaxonia.erp.data.remote.ApiService
+import com.amaxonia.erp.data.remote.NetworkMonitor
+import com.amaxonia.erp.data.remote.SyncApi
 import com.amaxonia.erp.data.repository.AuthRepositoryImpl
+import com.amaxonia.erp.data.sync.OfflineSyncSettingsRepositoryImpl
+import com.amaxonia.erp.data.sync.OfflineSyncSettingsStore
+import com.amaxonia.erp.data.sync.SyncScheduler
 import com.amaxonia.erp.domain.repository.AuthRepository
+import com.amaxonia.erp.domain.repository.OfflineSyncSettingsRepository
 import com.amaxonia.erp.domain.usecase.AuthenticateUserUseCase
 import com.amaxonia.erp.ui.login.LoginViewModel
+import com.amaxonia.erp.ui.offlinesettings.OfflineSettingsViewModel
 
 @SuppressLint("StaticFieldLeak")
 object DependencyContainer {
     private var appContext: Context? = null
+
+    val database: AppDatabase by lazy {
+        AppDatabase.getInstance(checkNotNull(appContext) { "DependencyContainer not initialized" })
+    }
+
+    val networkMonitor: NetworkMonitor by lazy {
+        NetworkMonitor(checkNotNull(appContext) { "DependencyContainer not initialized" })
+    }
+
+    val offlineSyncSettingsStore: OfflineSyncSettingsStore by lazy {
+        OfflineSyncSettingsStore(checkNotNull(appContext) { "DependencyContainer not initialized" })
+    }
+
+    val syncApi: SyncApi by lazy {
+        SyncApi(apiService)
+    }
+
+    val offlineSyncSettingsRepository: OfflineSyncSettingsRepository by lazy {
+        OfflineSyncSettingsRepositoryImpl(
+            database = database,
+            syncApi = syncApi,
+            localStore = localStore,
+            productRepository = productRepository,
+            scopeStore = offlineSyncSettingsStore,
+            sucursalRepository = sucursalRepository,
+            bootstrapEnqueuer = {
+                appContext?.let { ctx ->
+                    SyncScheduler.enqueueBootstrap(ctx)
+                }
+            },
+        )
+    }
 
     val localStore: LocalStore by lazy {
         LocalStore(checkNotNull(appContext) { "DependencyContainer not initialized" })
@@ -35,11 +75,25 @@ object DependencyContainer {
     }
 
     val clientRepository: com.amaxonia.erp.domain.repository.ClientRepository by lazy {
-        com.amaxonia.erp.data.repository.ClientRepositoryImpl(apiService, localStore)
+        com.amaxonia.erp.data.repository.ClientRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            clientDao = database.clientDao(),
+            clientSucursalDao = database.clientSucursalDao(),
+            networkMonitor = networkMonitor,
+            scopeStore = offlineSyncSettingsStore,
+        )
     }
 
     val productRepository: com.amaxonia.erp.domain.repository.ProductRepository by lazy {
-        com.amaxonia.erp.data.repository.ProductRepositoryImpl(apiService, localStore)
+        com.amaxonia.erp.data.repository.ProductRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            productDao = database.productDao(),
+            departmentDao = database.departmentDao(),
+            networkMonitor = networkMonitor,
+            scopeStore = offlineSyncSettingsStore,
+        )
     }
 
     val sucursalRepository: com.amaxonia.erp.domain.repository.SucursalRepository by lazy {
@@ -52,6 +106,10 @@ object DependencyContainer {
 
     val salesRepository: com.amaxonia.erp.domain.repository.SalesRepository by lazy {
         com.amaxonia.erp.data.repository.SalesRepositoryImpl(apiService, localStore)
+    }
+
+    val promotionRepository: com.amaxonia.erp.domain.repository.PromotionRepository by lazy {
+        com.amaxonia.erp.data.repository.PromotionRepositoryImpl(apiService, localStore, productRepository)
     }
 
     val printerProvider: com.amaxonia.erp.domain.repository.PrinterProvider by lazy {
@@ -121,6 +179,9 @@ object DependencyContainer {
             customerDisplayManager = customerDisplayManager,
         )
 
+    fun createOfflineSettingsViewModel(): OfflineSettingsViewModel =
+        OfflineSettingsViewModel(offlineSyncSettingsRepository)
+
     fun createPosTerminalViewModel(): com.amaxonia.erp.ui.pos.PosTerminalViewModel =
         com.amaxonia.erp.ui.pos.PosTerminalViewModel(
             productRepository = productRepository,
@@ -130,5 +191,13 @@ object DependencyContainer {
             localStore = localStore,
             printGateway = defaultInvoicePrintGateway,
             customerDisplayManager = customerDisplayManager,
+            promotionRepository = promotionRepository,
+            pendingInvoiceDao = database.pendingInvoiceDao(),
+            networkMonitor = networkMonitor,
+            onOfflineInvoiceQueued = {
+                appContext?.let { ctx ->
+                    SyncScheduler.enqueuePendingInvoices(ctx)
+                }
+            },
         )
 }

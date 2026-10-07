@@ -19,6 +19,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class CajaStatusBadgeInfo(
+    val isOpen: Boolean,
+    val isDiaAnterior: Boolean,
+)
+
 data class CajasOverviewState(
     val cajas: List<Caja> = emptyList(),
     val activeCaja: Caja? = null,
@@ -39,6 +44,7 @@ data class CajasOverviewState(
     val isSavingCaja: Boolean = false,
     val cajaFormError: String? = null,
     val sucursales: List<Sucursal> = emptyList(),
+    val cajasStatusMap: Map<String, CajaStatusBadgeInfo> = emptyMap(),
 )
 
 class CajasOverviewViewModel(
@@ -59,13 +65,30 @@ class CajasOverviewViewModel(
             val savedActive = cajaRepository.getActiveCaja()
             cajaRepository.getCajas().fold(
                 onSuccess = { list ->
-                    val chosen = list.firstOrNull { it.idCaja == savedActive?.first }
-                        ?: list.firstOrNull()
+                    val statusMap = mutableMapOf<String, CajaStatusBadgeInfo>()
+                    for (caja in list) {
+                        val status = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()
+                        if (status != null) {
+                            val rawFecha = status.cajaSecuencia?.fechaApertura
+                            val isDiaAnterior = status.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                            statusMap[caja.idCaja] = CajaStatusBadgeInfo(
+                                isOpen = status.isOpen,
+                                isDiaAnterior = isDiaAnterior,
+                            )
+                        }
+                    }
+
+                    var chosen = list.firstOrNull { it.idCaja == savedActive?.first }
+                    if (chosen == null) {
+                        chosen = list.firstOrNull { statusMap[it.idCaja]?.isOpen == true } ?: list.firstOrNull()
+                    }
+
                     _state.update {
                         it.copy(
                             isLoading = false,
                             cajas = list,
                             activeCaja = chosen,
+                            cajasStatusMap = statusMap,
                         )
                     }
                     if (chosen != null) {
@@ -367,12 +390,18 @@ class CajasOverviewViewModel(
                 val formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
                 val isDiaAnterior = res.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
                 _state.update {
+                    val updatedMap = it.cajasStatusMap.toMutableMap()
+                    updatedMap[caja.idCaja] = CajaStatusBadgeInfo(
+                        isOpen = res.isOpen,
+                        isDiaAnterior = isDiaAnterior,
+                    )
                     it.copy(
                         isCajaOpen = res.isOpen,
                         activeSecuencia = res.cajaSecuencia,
                         cajaFechaApertura = formattedFecha,
                         isCajaDiaAnterior = isDiaAnterior,
                         showAvisoCajaAnterior = isDiaAnterior,
+                        cajasStatusMap = updatedMap,
                     )
                 }
             }

@@ -1,0 +1,38 @@
+package com.amaxonia.erp.ui.offlinesettings
+
+import androidx.lifecycle.ViewModel
+import com.amaxonia.erp.domain.repository.OfflineSettingsUiModel
+import com.amaxonia.erp.domain.repository.OfflineSyncSettingsRepository
+import kotlinx.coroutines.flow.StateFlow
+
+class OfflineSettingsViewModel(
+    private val repository: OfflineSyncSettingsRepository,
+) : ViewModel() {
+    val uiState: StateFlow<OfflineSettingsUiModel> = repository.uiState
+
+    fun start() = repository.start()
+
+    fun setSyncEnabled(enabled: Boolean) = repository.setSyncEnabled(enabled)
+
+    fun setProductModeAll(all: Boolean) = repository.setProductModeAll(all)
+
+    fun toggleDepartment(id: Int) = repository.toggleDepartment(id)
+
+    fun selectAllDepartments(ids: Set<Int>) = repository.selectAllDepartments(ids)
+
+    fun clearDepartments() = repository.clearDepartments()
+
+    fun setClientModeAll(all: Boolean) = repository.setClientModeAll(all)
+
+    fun toggleSucursal(id: String) = repository.toggleSucursal(id)
+
+    fun selectAllSucursales(ids: Set<String>) = repository.selectAllSucursales(ids)
+
+    fun clearSucursales() = repository.clearSucursales()
+
+    fun refreshPreview() = repository.refreshPreview()
+
+    fun reload() = repository.reload()
+
+    fun apply() = repository.apply()
+}

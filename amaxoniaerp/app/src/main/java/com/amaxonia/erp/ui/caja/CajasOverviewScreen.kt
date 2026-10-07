@@ -224,6 +224,7 @@ fun CajasOverviewScreen(
                                 val isSelected = state.activeCaja?.idCaja == caja.idCaja
                                 CajaListItemCard(
                                     caja = caja,
+                                    statusInfo = state.cajasStatusMap[caja.idCaja],
                                     isSelected = isSelected,
                                     onSelect = { viewModel.selectCaja(caja) },
                                     onEdit = { viewModel.openEditCajaDialog(caja) },
@@ -300,6 +301,7 @@ fun CajasOverviewScreen(
                             val isSelected = state.activeCaja?.idCaja == caja.idCaja
                             CajaListItemCard(
                                 caja = caja,
+                                statusInfo = state.cajasStatusMap[caja.idCaja],
                                 isSelected = isSelected,
                                 onSelect = { viewModel.selectCaja(caja) },
                                 onEdit = { viewModel.openEditCajaDialog(caja) },
@@ -426,7 +428,7 @@ private fun ActiveCajaFeaturedCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isOpen && isDiaAnterior) {
                         PosStatusBadge(
-                            label = "DÍA ANTERIOR",
+                            label = "VENCIDA",
                             tone = PosVisualTone.Warning,
                             icon = Icons.Default.Warning,
                         )
@@ -467,7 +469,7 @@ private fun ActiveCajaFeaturedCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Caja abierta desde ${fechaApertura ?: "un día anterior"}",
+                                text = "Caja vencida (Abierta desde ${fechaApertura ?: "un día anterior"})",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -475,7 +477,7 @@ private fun ActiveCajaFeaturedCard(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Para registrar las ventas en la jornada correspondiente, renueva la caja con un clic.",
+                            text = "Esta caja pertenece a una jornada anterior. Para registrar las ventas en la jornada correspondiente y mantener los reportes al día, renueva la caja con un clic.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -584,6 +586,7 @@ private fun ActiveCajaFeaturedCard(
 @Composable
 private fun CajaListItemCard(
     caja: Caja,
+    statusInfo: CajaStatusBadgeInfo?,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -641,6 +644,32 @@ private fun CajaListItemCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
+                }
+                if (statusInfo != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    when {
+                        statusInfo.isOpen && statusInfo.isDiaAnterior -> {
+                            PosStatusBadge(
+                                label = "VENCIDA",
+                                tone = PosVisualTone.Warning,
+                                icon = Icons.Default.Warning,
+                            )
+                        }
+                        statusInfo.isOpen -> {
+                            PosStatusBadge(
+                                label = "ABIERTA",
+                                tone = PosVisualTone.Success,
+                                icon = Icons.Default.LockOpen,
+                            )
+                        }
+                        else -> {
+                            PosStatusBadge(
+                                label = "CERRADA",
+                                tone = PosVisualTone.Neutral,
+                                icon = Icons.Default.Lock,
+                            )
+                        }
+                    }
                 }
                 if (isSelected) {
                     Spacer(modifier = Modifier.width(4.dp))
@@ -751,7 +780,7 @@ fun AvisoCajaAnteriorDialog(
         },
         title = {
             Text(
-                text = "Caja de día anterior abierta",
+                text = "Caja Vencida (Jornada anterior)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -762,13 +791,13 @@ fun AvisoCajaAnteriorDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "La caja actual está abierta desde el ${fechaApertura ?: "un día anterior"}.",
+                    text = "La caja actual está abierta desde el ${fechaApertura ?: "un día anterior"} y corresponde a una jornada anterior (Vencida).",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Para registrar las ventas en la jornada correspondiente y mantener los reportes al día, realiza el cierre de la jornada previa de esta caja.",
+                    text = "Para registrar las ventas en la jornada correspondiente y mantener los reportes al día, puedes realizar el cierre y renovación de la caja ahora, o continuar operando.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -792,7 +821,7 @@ fun AvisoCajaAnteriorDialog(
                 } else {
                     Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Cerrar y abrir")
+                    Text("Cerrar y abrir hoy")
                 }
             }
         },

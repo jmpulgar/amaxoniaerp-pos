@@ -28,7 +28,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("a
 open class LocalStore(
     context: Context,
 ) : CountrySelectionStore {
-    private val dataStore: DataStore<Preferences> by lazy { context.applicationContext.dataStore }
+    internal val dataStore: DataStore<Preferences> by lazy { context.applicationContext.dataStore }
     private val authSessionKey = stringPreferencesKey("auth_session")
     private val selectedCountryKey = stringPreferencesKey("selected_country_code")
 
@@ -143,19 +143,20 @@ open class LocalStore(
         }
     }
 
-    open suspend fun readActiveCajaForToday(): Caja? {
+    open suspend fun readActiveCajaSnapshot(): Caja? {
         val json = dataStore.data.first()[activeCajaSnapshotKey] ?: return null
-        val snapshot = runCatching { AppJson.decodeFromString<ActiveCajaSnapshot>(json) }.getOrNull()
+        val snapshot = runCatching { AppJson.decodeFromString<ActiveCajaSnapshot>(json) }.getOrNull() ?: return null
         val session = readCompanySession()
-        val isSameCompany = session?.company?.adminDb.orEmpty() == snapshot?.companyDb
-        val isToday = snapshot?.date == LocalDate.now().toString()
-        return if (snapshot != null && isSameCompany && isToday) {
+        val isSameCompany = session?.company?.adminDb.orEmpty() == snapshot.companyDb
+        return if (isSameCompany) {
             snapshot.caja
         } else {
             clearActiveCaja()
             null
         }
     }
+
+    open suspend fun readActiveCajaForToday(): Caja? = readActiveCajaSnapshot()
 
     open suspend fun clearActiveCaja() {
         dataStore.edit { prefs ->
@@ -170,9 +171,9 @@ open class LocalStore(
     }
 
     open suspend fun readActiveCaja(): Pair<String, String>? {
-        val todayCaja = readActiveCajaForToday()
-        if (todayCaja != null) {
-            return Pair(todayCaja.idCaja, todayCaja.displayName)
+        val cachedCaja = readActiveCajaSnapshot()
+        if (cachedCaja != null) {
+            return Pair(cachedCaja.idCaja, cachedCaja.displayName)
         }
         val prefs = dataStore.data.first()
         val id = prefs[activeCajaIdKey] ?: return null
@@ -266,19 +267,19 @@ open class LocalStore(
         dataStore.edit { prefs -> prefs[allowEditPricesKey] = enabled }
     }
 
-    fun allowEditPricesFlow(): Flow<Boolean> =
+    open fun allowEditPricesFlow(): Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[allowEditPricesKey] ?: true }
 
-    suspend fun readAllowEditPrices(): Boolean = allowEditPricesFlow().first()
+    open suspend fun readAllowEditPrices(): Boolean = allowEditPricesFlow().first()
 
     suspend fun saveAllowDiscounts(enabled: Boolean) {
         dataStore.edit { prefs -> prefs[allowDiscountsKey] = enabled }
     }
 
-    fun allowDiscountsFlow(): Flow<Boolean> =
+    open fun allowDiscountsFlow(): Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[allowDiscountsKey] ?: true }
 
-    suspend fun readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
+    open suspend fun readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
 
     suspend fun saveCustomerDisplayEnabled(enabled: Boolean) {
         dataStore.edit { prefs -> prefs[customerDisplayEnabledKey] = enabled }
