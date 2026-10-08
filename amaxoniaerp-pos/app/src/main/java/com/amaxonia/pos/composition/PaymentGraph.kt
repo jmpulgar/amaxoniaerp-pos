@@ -6,13 +6,16 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.readNoPrinterPdfFormat
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.saveLastPaymentSuccess
 import com.amaxonia.pos.data.printer.LocalInvoicePrintPayloadMapper
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
+import com.amaxonia.pos.data.printer.pdf.TicketPdfGenerator
 import com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
+import com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.PrinterType
 import com.amaxonia.pos.domain.usecase.payment.LoadPaymentContextUseCase
@@ -87,10 +90,83 @@ object PaymentGraph {
                 if (printer != null) {
                     printGenericReceipt(transactionId)
                 } else {
-                    downloadAndOpenReceiptPdf(context, transactionId)
+                    handleNoPrinterReceipt(context, transactionId)
                 }
             }
-            else -> downloadAndOpenReceiptPdf(context, transactionId)
+            else -> handleNoPrinterReceipt(context, transactionId)
+        }
+    }
+
+    private suspend fun handleNoPrinterReceipt(
+        context: Context,
+        transactionId: String,
+    ): Result<String> {
+        val format = DependencyContainer.localStore.readNoPrinterPdfFormat()
+        return when (format) {
+            NoPrinterPdfFormat.FACTURA_CARTA -> downloadAndOpenReceiptPdf(context, transactionId)
+            NoPrinterPdfFormat.TICKET_TERMICO -> generateAndOpenTicketPdf(context, transactionId)
+        }
+    }
+
+    private suspend fun generateAndOpenTicketPdf(
+        context: Context,
+        transactionId: String,
+    ): Result<String> {
+        val payloadResult =
+            if (transactionId.isNotBlank() && !transactionId.startsWith("OFF-")) {
+                DependencyContainer.salesRepository.getPrintPayload(transactionId)
+            } else {
+                Result.failure(IllegalStateException("Factura offline"))
+            }
+        val payload =
+            payloadResult.getOrElse { error ->
+                val company = DependencyContainer.localStore.readCompanySession()?.company
+                val caja = DependencyContainer.localStore.readActiveCajaForToday()
+                val transaction = DependencyContainer.transactionRepository.getTransactionById(transactionId).getOrNull()
+                if (transaction != null) {
+                    LocalInvoicePrintPayloadMapper.fromTransaction(transaction, company, caja)
+                } else {
+                    return Result.failure(error)
+                }
+            }
+        val countryCode =
+            DependencyContainer.localStore
+                .readSelectedCountry()
+                ?.code
+                .orEmpty()
+        val ticket =
+            when (countryCode.uppercase()) {
+                "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
+                else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
+            }
+
+        return runCatching {
+            val pdfBytes = TicketPdfGenerator.generatePdf(ticket)
+            val invoiceNumber = payload.numeroFactura.ifBlank { transactionId }
+            val cleanName = invoiceNumber.replace('/', '_').replace('\\', '_')
+            val pdfFile =
+                File(context.cacheDir, "ticket_$cleanName.pdf").apply {
+                    writeBytes(pdfBytes)
+                }
+            val uri =
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    pdfFile,
+                )
+            val intent =
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/pdf")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            context.startActivity(intent)
+            "Ticket en PDF generado correctamente"
+        }.recoverCatching { ex ->
+            if (ex is ActivityNotFoundException) {
+                "Ticket guardado en PDF (no se encontró visor de PDF)."
+            } else {
+                throw ex
+            }
         }
     }
 

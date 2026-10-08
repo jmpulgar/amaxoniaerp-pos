@@ -45,6 +45,7 @@ interface PosSettingsRepository {
     val allowEditPrices: Flow<Boolean>
     val allowDiscounts: Flow<Boolean>
     val customerDisplayEnabled: Flow<Boolean>
+    val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat>
 
     suspend fun currentCountry(): ServerCountry?
 
@@ -57,4 +58,6 @@ interface PosSettingsRepository {
     suspend fun saveAllowDiscounts(enabled: Boolean)
 
     suspend fun saveCustomerDisplayEnabled(enabled: Boolean)
+
+    suspend fun saveNoPrinterPdfFormat(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat)
 }

@@ -33,6 +33,8 @@ data class PromotionDetailResponse(
     @SerialName("impuesto_porcentaje") val impuestoPorcentaje: Double,
     val importe: Double,
     val grupo: String,
+    @SerialName("item_descripcion") val itemDescripcion: String = "",
+    @SerialName("item_codigo") val itemCodigo: String = "",
 )
 
 @Serializable

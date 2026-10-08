@@ -17,8 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,6 +76,7 @@ fun SettingsScreen(
     val allowDiscounts by viewModel.allowDiscounts.collectAsStateWithLifecycle()
     val customerDisplayEnabled by viewModel.customerDisplayEnabled.collectAsStateWithLifecycle()
     val isSecondaryDisplayAvailable by viewModel.isSecondaryDisplayAvailable.collectAsStateWithLifecycle()
+    val noPrinterPdfFormat by viewModel.noPrinterPdfFormat.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val isVE = PrinterType.THE_FACTORY_HKA in availablePrinterTypes
@@ -103,6 +106,15 @@ fun SettingsScreen(
                 isPA = isPA,
                 onSelectPrinterType = viewModel::onPrinterTypeSelected,
             )
+
+            if (selectedPrinterType == PrinterType.NONE) {
+                Spacer(modifier = Modifier.height(28.dp))
+
+                NoPrinterPdfFormatSection(
+                    selectedFormat = noPrinterPdfFormat,
+                    onSelectFormat = viewModel::onNoPrinterPdfFormatSelected,
+                )
+            }
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -279,6 +291,37 @@ private fun PrinterTypeSection(
             onSelect = { onSelectPrinterType(PrinterType.IMIN_SWIFT) },
         )
     }
+}
+
+/** Sección de selección de formato de PDF cuando no hay impresora configurada. */
+@Composable
+private fun NoPrinterPdfFormatSection(
+    selectedFormat: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat,
+    onSelectFormat: (com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat) -> Unit,
+) {
+    SettingsSectionHeader(
+        title = "Formato de Recibo en PDF",
+        subtitle = "Selecciona el formato de comprobante digital al cobrar sin impresora",
+        bottomPadding = 16,
+    )
+
+    PrinterOptionCard(
+        visual = PrinterOptionVisual(icon = Icons.Rounded.Description, iconTint = InfoBlue),
+        title = "Factura Digital (Carta)",
+        description = "Documento oficial tamaño carta emitido por la entidad fiscal (PAC / DGI).",
+        isSelected = selectedFormat == com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA,
+        onSelect = { onSelectFormat(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA) },
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    PrinterOptionCard(
+        visual = PrinterOptionVisual(icon = Icons.Rounded.ReceiptLong, iconTint = SuccessGreen),
+        title = "Ticket Térmico (PDF)",
+        description = "Comprobante en formato ticket de rollo (80mm) con detalle de productos, promociones y QR.",
+        isSelected = selectedFormat == com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.TICKET_TERMICO,
+        onSelect = { onSelectFormat(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.TICKET_TERMICO) },
+    )
 }
 
 /** Tarjeta de permisos de venta (edición de precios y descuentos en carrito). */

@@ -133,12 +133,18 @@ class TheFactoryHkaPayloadBuilder(
         }
 
         return detalles.map { det ->
-            // Descripción: rellenar con puntos si tiene menos de 5 caracteres
-            val descripcion =
-                if (det.descripcion.length < MIN_DESCRIPTION_LENGTH) {
-                    det.descripcion.padEnd(MIN_DESCRIPTION_LENGTH, '.')
+            val rawDescripcion =
+                if (!det.promocionNombre.isNullOrBlank() && !det.descripcion.contains(det.promocionNombre, ignoreCase = true)) {
+                    "${det.descripcion} (${det.promocionNombre})"
                 } else {
                     det.descripcion
+                }
+            // Descripción: rellenar con puntos si tiene menos de 5 caracteres
+            val descripcion =
+                if (rawDescripcion.length < MIN_DESCRIPTION_LENGTH) {
+                    rawDescripcion.padEnd(MIN_DESCRIPTION_LENGTH, '.')
+                } else {
+                    rawDescripcion
                 }
             val codigoCPBS = if (esGobierno) det.codigoCPBS?.takeIf { it.isNotBlank() } else DEFAULT_CPBS
             val codigoCPBSAbrev =

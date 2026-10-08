@@ -92,6 +92,7 @@ internal fun loadDetallesFE(invoiceId: String): List<FEDetalleData> =
                 importeIsc = row[FEFacturaDetalleReadTable.importeIsc]?.toDouble(),
                 idOti = row[FEFacturaDetalleReadTable.idOti],
                 importeOti = row[FEFacturaDetalleReadTable.importeOti]?.toDouble(),
+                promocionNombre = row[FEFacturaDetalleReadTable.promocionNombre]?.takeIf { it.isNotBlank() },
             )
         }
 

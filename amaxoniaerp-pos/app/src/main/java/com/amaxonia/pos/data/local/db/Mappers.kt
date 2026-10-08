@@ -189,4 +189,6 @@ fun PromocionDetalleDto.toEntity(promocionId: String): PromocionDetalleEntity =
         impuestoPorcentaje = resolvedTaxPercent,
         importe = importe,
         grupo = grupo,
+        itemDescripcion = itemDescripcion,
+        itemCodigo = itemCodigo,
     )

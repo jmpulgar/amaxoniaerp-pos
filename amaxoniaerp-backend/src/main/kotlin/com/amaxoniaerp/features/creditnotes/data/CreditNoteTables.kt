@@ -180,6 +180,8 @@ object CreditNoteFacturaDetalleTable : Table("factura_detalle") {
     val idOti = integer("id_oti").nullable()
     val importeOti = decimal("importe_oti", S.DECIMAL_PRECISION_20, 2).nullable()
     val anulado = bool("anulado").default(false)
+    val promocionCodigo = varchar("promocion_codigo", S.VARCHAR_LENGTH_15).nullable()
+    val promocionNombre = varchar("promocion_nombre", S.VARCHAR_LENGTH_200).nullable()
 
     override val primaryKey = PrimaryKey(idDetalleFactura)
 }

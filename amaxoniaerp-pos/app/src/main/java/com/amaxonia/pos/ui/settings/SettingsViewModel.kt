@@ -43,6 +43,8 @@ class SettingsViewModel(
     val allowDiscounts = _allowDiscounts.asStateFlow()
     private val _customerDisplayEnabled = MutableStateFlow(false)
     val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
+    private val _noPrinterPdfFormat = MutableStateFlow(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA)
+    val noPrinterPdfFormat = _noPrinterPdfFormat.asStateFlow()
 
     val isSecondaryDisplayAvailable: StateFlow<Boolean> =
         customerDisplayManager?.isSecondaryDisplayAvailable ?: MutableStateFlow(false)
@@ -56,6 +58,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.selectedPrinterType.collect { printerType ->
                 _selectedPrinterType.value = printerType
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.noPrinterPdfFormat.collect { format ->
+                _noPrinterPdfFormat.value = format
             }
         }
         viewModelScope.launch {
@@ -117,6 +124,19 @@ class SettingsViewModel(
             }.onFailure { throwable ->
                 _errorMessage.update {
                     throwable.message ?: "No se pudo guardar la configuracion de impresora"
+                }
+            }
+        }
+    }
+
+    fun onNoPrinterPdfFormatSelected(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat) {
+        if (_noPrinterPdfFormat.value == format) return
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveNoPrinterPdfFormat(format)
+            }.onFailure { throwable ->
+                _errorMessage.update {
+                    throwable.message ?: "No se pudo guardar el formato de PDF"
                 }
             }
         }

@@ -170,6 +170,32 @@ class PanamaInvoiceTicketFormatterTest {
         }
     }
 
+    @Test
+    fun formatsPromotionNameWhenPresent() {
+        val payloadWithPromo =
+            payload().copy(
+                productos =
+                    listOf(
+                        ProductoPrintDto(
+                            nombre = "Coca Cola 350ml",
+                            cantidad = "2",
+                            unidad = "UND",
+                            precioUnitario = "1.50",
+                            descuento = "0.50",
+                            impuesto = "0.21",
+                            total = "2.71",
+                            codigo = "CC01",
+                            tasaImpuesto = "7",
+                            promocionNombre = "2X1 VERANO",
+                        ),
+                    ),
+            )
+        val ticket = PanamaInvoiceTicketFormatter().format(payloadWithPromo)
+        val textElements = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+        assertTrue(textElements.any { it.contains("PROMO: 2X1 VERANO") })
+        assertTrue(textElements.any { it.contains("Coca Cola 350ml") })
+    }
+
     private fun payload(): FacturaPrintPayloadDto =
         FacturaPrintPayloadDto(
             facturaId = "1",

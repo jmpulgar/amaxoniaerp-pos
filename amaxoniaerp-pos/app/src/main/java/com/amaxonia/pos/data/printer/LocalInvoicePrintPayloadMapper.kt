@@ -135,6 +135,8 @@ object LocalInvoicePrintPayloadMapper {
                 total = formatMoney(item.itemTotalConIva),
                 codigo = item.itemCodigo.takeIf { it.isNotBlank() },
                 tasaImpuesto = formatTaxRate(item.itemPIva),
+                promocionNombre = item.promocionNombre?.takeIf { it.isNotBlank() },
+                promocionCodigo = item.promocionCodigo?.takeIf { it.isNotBlank() },
             )
         }
 

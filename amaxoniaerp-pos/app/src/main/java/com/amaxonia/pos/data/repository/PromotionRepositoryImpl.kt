@@ -64,15 +64,21 @@ class PromotionRepositoryImpl(
             activo = promocion.activo,
             detalles =
                 detalles.map { detalle ->
-                    val product = productDao.getById(detalle.idItem)?.toDomain() ?: fallbackProduct(detalle.idItem)
+                    val product =
+                        productDao.getById(detalle.idItem)?.toDomain()
+                            ?: fallbackProduct(
+                                id = detalle.idItem,
+                                fallbackDesc = detalle.itemDescripcion,
+                                fallbackCode = detalle.itemCodigo,
+                            )
                     val totalConIva = detalle.importe.bd()
                     val impuesto = detalle.impuesto.bd()
                     PromocionDetalle(
                         id = detalle.id,
                         promocionId = detalle.promocionId,
                         idItem = detalle.idItem,
-                        productName = product.description.ifBlank { "Producto ${detalle.idItem}" },
-                        productCode = product.code,
+                        productName = product.description.ifBlank { detalle.itemDescripcion.ifBlank { "Producto ${detalle.idItem}" } },
+                        productCode = product.code.ifBlank { detalle.itemCodigo },
                         productReference = product.reference,
                         idTipoPrecio = detalle.idTipoPrecio,
                         cantidad = detalle.cantidad.bd(),
@@ -91,10 +97,15 @@ class PromotionRepositoryImpl(
                 },
         )
 
-    private fun fallbackProduct(id: String): Product =
+    private fun fallbackProduct(
+        id: String,
+        fallbackDesc: String = "",
+        fallbackCode: String = "",
+    ): Product =
         Product(
             id = id,
-            description = "Producto $id",
+            code = fallbackCode,
+            description = fallbackDesc.ifBlank { "Producto $id" },
             prices = listOf(PriceLevel(label = "A")),
         )
 

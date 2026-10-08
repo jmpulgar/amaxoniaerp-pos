@@ -29,7 +29,7 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         CajaPaymentMethodEntity::class,
         CajaSesionEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -849,6 +849,14 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        internal val MIGRATION_21_22 =
+            object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE promocion_detalles ADD COLUMN itemDescripcion TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE promocion_detalles ADD COLUMN itemCodigo TEXT NOT NULL DEFAULT ''")
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -871,6 +879,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_18_19,
                 MIGRATION_19_20,
                 MIGRATION_20_21,
+                MIGRATION_21_22,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -901,6 +910,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_18_19,
                         MIGRATION_19_20,
                         MIGRATION_20_21,
+                        MIGRATION_21_22,
                     ).build()
                     .also { instance = it }
             }

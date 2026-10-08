@@ -300,6 +300,32 @@ class VenezuelaInvoiceTicketFormatterTest {
         }
     }
 
+    @Test
+    fun `20 - promocionNombre presente se formatea con etiqueta PROMO`() {
+        val payloadWithPromo =
+            payload().copy(
+                productos =
+                    listOf(
+                        ProductoPrintDto(
+                            nombre = "Harina PAN 1kg",
+                            cantidad = "2",
+                            unidad = "UND",
+                            precioUnitario = "1.20",
+                            descuento = "0.20",
+                            impuesto = "0.00",
+                            total = "2.20",
+                            codigo = "HP01",
+                            tasaImpuesto = "0",
+                            promocionNombre = "COMBO DESAYUNO",
+                        ),
+                    ),
+            )
+        val ticket = VenezuelaInvoiceTicketFormatter().format(payloadWithPromo)
+        val textElements = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+        assertTrue(textElements.any { it.contains("PROMO: COMBO DESAYUNO") })
+        assertTrue(textElements.any { it.contains("Harina PAN 1kg") })
+    }
+
     // ─── Fixture ───────────────────────────────────────────────────────────
 
     private fun payload(): FacturaPrintPayloadDto =

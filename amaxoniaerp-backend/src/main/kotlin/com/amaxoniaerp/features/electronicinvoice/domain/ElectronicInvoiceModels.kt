@@ -249,6 +249,7 @@ data class FEDetalleData(
     val importeIsc: Double?,
     val idOti: Int?,
     val importeOti: Double?,
+    val promocionNombre: String? = null,
 )
 
 data class FERetencionData(

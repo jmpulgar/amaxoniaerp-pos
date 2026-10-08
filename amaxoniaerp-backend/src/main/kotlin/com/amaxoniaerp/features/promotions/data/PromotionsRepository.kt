@@ -34,12 +34,15 @@ class PromotionsRepository {
                 TransactionManager.current().exec(
                     """
                     SELECT
-                        id, id_promocion, id_item, cantidad, cantidad_total, unidad_empaque,
-                        descuento, descuento_monto, id_tipo_precio, precio, impuesto,
-                        impuesto_porcentaje, importe, grupo
-                    FROM promocion_detalle
-                    WHERE id_promocion IN ($ids)
-                    ORDER BY id_promocion, grupo, id
+                        pd.id, pd.id_promocion, pd.id_item, pd.cantidad, pd.cantidad_total, pd.unidad_empaque,
+                        pd.descuento, pd.descuento_monto, pd.id_tipo_precio, pd.precio, pd.impuesto,
+                        pd.impuesto_porcentaje, pd.importe, pd.grupo,
+                        COALESCE(i.descripcion1, '') AS item_descripcion,
+                        COALESCE(i.cod_item, '') AS item_codigo
+                    FROM promocion_detalle pd
+                    LEFT JOIN item i ON i.id_item = pd.id_item
+                    WHERE pd.id_promocion IN ($ids)
+                    ORDER BY pd.id_promocion, pd.grupo, pd.id
                     """.trimIndent(),
                 ) { rs ->
                     buildList {
@@ -82,6 +85,8 @@ class PromotionsRepository {
             impuestoPorcentaje = impuestoPorcentaje,
             importe = getBigDecimalOrZero("importe").toDouble(),
             grupo = getString("grupo") ?: "",
+            itemDescripcion = runCatching { getString("item_descripcion") }.getOrNull()?.trim().orEmpty(),
+            itemCodigo = runCatching { getString("item_codigo") }.getOrNull()?.trim().orEmpty(),
         )
     }
 

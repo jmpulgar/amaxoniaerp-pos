@@ -45,6 +45,22 @@ fun LocalStore.selectedPrinterTypeFlow(): Flow<PrinterType> =
         PrinterTypePolicy.coerce(country, storedPrinter)
     }
 
+suspend fun LocalStore.saveNoPrinterPdfFormat(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat) {
+    dataStore.edit { prefs ->
+        prefs[noPrinterPdfFormatKey] = format.name
+    }
+}
+
+suspend fun LocalStore.readNoPrinterPdfFormat(): com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat =
+    noPrinterPdfFormatFlow().first()
+
+fun LocalStore.noPrinterPdfFormatFlow(): Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat> =
+    dataStore.data.map { prefs ->
+        prefs[noPrinterPdfFormatKey]
+            ?.let { stored -> com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.entries.firstOrNull { it.name == stored } }
+            ?: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA
+    }
+
 suspend fun LocalStore.saveTheFactorySettings(settings: TheFactorySettings) {
     val gatewayKey = settings.gatewayKey.trim()
     if (gatewayKey.isEmpty()) {

@@ -128,6 +128,9 @@ class VenezuelaInvoiceTicketFormatter {
                     ?.let { rate -> "($TAX_ABBR $rate%)" }
                     .orEmpty()
             add(TicketElement.Text("${product.nombre} $taxLabel".trim(), TicketAlign.LEFT, bold = true))
+            product.promocionNombre?.takeIfNotBlank()?.let { promoName ->
+                add(TicketElement.Text("  PROMO: $promoName", TicketAlign.LEFT))
+            }
             add(
                 TicketElement.Columns(
                     values =

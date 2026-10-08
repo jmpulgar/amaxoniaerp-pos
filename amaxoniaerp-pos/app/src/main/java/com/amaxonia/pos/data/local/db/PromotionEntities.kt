@@ -40,6 +40,8 @@ data class PromocionDetalleEntity(
     val impuestoPorcentaje: Double,
     val importe: Double,
     val grupo: String,
+    val itemDescripcion: String = "",
+    val itemCodigo: String = "",
 )
 
 data class PromocionCompleta(

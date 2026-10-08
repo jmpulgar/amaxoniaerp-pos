@@ -59,6 +59,10 @@ data class PromocionDetalleDto(
     @Serializable(with = FlexibleDoubleSerializer::class)
     val importe: Double = 0.0,
     val grupo: String = "",
+    @SerialName("item_descripcion")
+    val itemDescripcion: String = "",
+    @SerialName("item_codigo")
+    val itemCodigo: String = "",
 ) {
     val resolvedTaxPercent: Double get() = impuestoPromocionDetalle.takeIf { it > 0.0 } ?: impuestoPorcentaje
 }

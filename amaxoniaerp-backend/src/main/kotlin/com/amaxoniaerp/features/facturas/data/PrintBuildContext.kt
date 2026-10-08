@@ -101,7 +101,9 @@ internal fun printProductos(facturaId: String): List<com.amaxoniaerp.features.fa
             _item_piva,
             _item_totalsiniva,
             _item_totalconiva,
-            _item_unidad_empaque
+            _item_unidad_empaque,
+            promocion_nombre,
+            promocion_codigo
         FROM factura_detalle
         WHERE id_factura = '${facturaId.sqlLiteral()}'
         ORDER BY fecha_creacion ASC
@@ -120,6 +122,8 @@ internal fun printProductos(facturaId: String): List<com.amaxoniaerp.features.fa
             total = row.decimal("_item_totalconiva").toMoneyString(),
             codigo = row.stringOrNull("_item_codigo"),
             tasaImpuesto = taxRate.toMoneyString(trimZeros = true),
+            promocionNombre = row.stringOrNull("promocion_nombre")?.trim()?.ifBlank { null },
+            promocionCodigo = row.stringOrNull("promocion_codigo")?.trim()?.ifBlank { null },
         )
     }
 

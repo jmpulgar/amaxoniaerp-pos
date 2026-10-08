@@ -167,6 +167,7 @@ object FEFacturaDetalleReadTable : Table("factura_detalle") {
     val importeIsc = decimal("importe_isc", S.DECIMAL_PRECISION_20, 2).nullable()
     val idOti = integer("id_oti").nullable()
     val importeOti = decimal("importe_oti", S.DECIMAL_PRECISION_20, 2).nullable()
+    val promocionNombre = varchar("promocion_nombre", S.VARCHAR_LENGTH_200).nullable()
 
     override val primaryKey = PrimaryKey(idDetalleFactura)
 }

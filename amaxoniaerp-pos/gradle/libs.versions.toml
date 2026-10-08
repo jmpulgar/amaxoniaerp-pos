@@ -27,6 +27,7 @@ kover = "0.8.3"
 detekt = "1.23.8"
 ktlintGradle = "12.1.2"
 coil = "2.5.0"
+zxing = "3.5.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -69,6 +70,7 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 sunmi-printer = { group = "com.sunmi", name = "printerlibrary", version.ref = "sunmiPrinter" }
 imin-printer = { group = "com.github.iminsoftware", name = "IminPrinterLibrary", version.ref = "iminPrinter" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

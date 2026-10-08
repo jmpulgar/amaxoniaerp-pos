@@ -82,6 +82,8 @@ data class ProductoPrintResponse(
     val total: String,
     val codigo: String? = null,
     val tasaImpuesto: String? = null,
+    val promocionNombre: String? = null,
+    val promocionCodigo: String? = null,
 )
 
 @Serializable
