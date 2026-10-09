@@ -10,6 +10,10 @@ import com.amaxonia.erp.data.remote.getCajas
 import com.amaxonia.erp.data.remote.getNextSecuenciaCodigo
 import com.amaxonia.erp.data.remote.openCaja
 import com.amaxonia.erp.data.remote.updateCaja
+import com.amaxonia.erp.data.local.db.CajaSesionDao
+import com.amaxonia.erp.data.local.db.CajaSesionEntity
+import com.amaxonia.erp.data.remote.AppJson
+import com.amaxonia.erp.data.remote.NetworkMonitor
 import com.amaxonia.erp.domain.model.AperturaRequest
 import com.amaxonia.erp.domain.model.Caja
 import com.amaxonia.erp.domain.model.CajaSecuencia
@@ -25,10 +29,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.encodeToString
+import java.util.UUID
 
 class CajaRepositoryImpl(
     private val apiService: ApiService,
     private val localStore: LocalStore,
+    private val cajaSesionDao: CajaSesionDao? = null,
+    private val networkMonitor: NetworkMonitor? = null,
 ) : CajaRepository {
 
     private val _activeCaja = MutableStateFlow<Caja?>(null)
@@ -43,6 +51,62 @@ class CajaRepositoryImpl(
     private val _sessionStatus = MutableStateFlow(CajaSessionStatus.SIN_CAJA)
     override val sessionStatus: StateFlow<CajaSessionStatus> = _sessionStatus.asStateFlow()
 
+    private suspend fun tenantId(): String {
+        val session = localStore.readCompanySession()
+        return session?.company?.id?.toString() ?: "default"
+    }
+
+    private suspend fun persistSesionAbierta(
+        cajaId: String,
+        cajaSecuencia: CajaSecuencia?,
+    ) {
+        val dao = cajaSesionDao ?: return
+        val tId = tenantId()
+        val abierta = dao.getAbiertaPorCaja(tId, cajaId)
+        val secJson = cajaSecuencia?.let {
+            runCatching { AppJson.encodeToString(it) }.getOrNull()
+        }.orEmpty()
+        dao.upsert(
+            CajaSesionEntity(
+                localId = abierta?.localId ?: UUID.randomUUID().toString(),
+                cajaId = cajaId,
+                serverSecuenciaId = cajaSecuencia?.idCajaSecuencia ?: abierta?.serverSecuenciaId,
+                estado = "ABIERTA",
+                openedAt = abierta?.openedAt ?: System.currentTimeMillis(),
+                userId = abierta?.userId.orEmpty(),
+                tenantId = tId,
+                secuenciaJson = if (secJson.isNotBlank()) secJson else (abierta?.secuenciaJson.orEmpty()),
+            )
+        )
+    }
+
+    private suspend fun markSesionCerrada(cajaId: String? = null) {
+        val dao = cajaSesionDao ?: return
+        val tId = tenantId()
+        val now = System.currentTimeMillis()
+        if (cajaId != null) {
+            dao.markCerradaPorCaja(tId, cajaId, now)
+        } else {
+            dao.getAbierta(tId)?.let { sesion ->
+                dao.upsert(sesion.copy(estado = "CERRADA", closedAt = now))
+            }
+        }
+    }
+
+    private suspend fun restorePersistedSesion(cajaId: String? = null): CajaSecuencia? {
+        val dao = cajaSesionDao ?: return null
+        val tId = tenantId()
+        val sesion = if (cajaId != null) {
+            dao.getAbiertaPorCaja(tId, cajaId)
+        } else {
+            dao.getAbierta(tId)
+        } ?: return null
+
+        return runCatching {
+            AppJson.decodeFromString<CajaSecuencia>(sesion.secuenciaJson)
+        }.getOrNull()
+    }
+
     private suspend fun getContext(): Pair<String, String> {
         val session = localStore.readCompanySession()
             ?: error("No hay sesión de empresa activa")
@@ -50,11 +114,35 @@ class CajaRepositoryImpl(
         return Pair(session.token, adminDb)
     }
 
-    override suspend fun getCajas(): Result<List<Caja>> =
-        runCatching {
-            val (token, adminDb) = getContext()
-            apiService.getCajas(token, adminDb, all = true)
+    override suspend fun getCajas(): Result<List<Caja>> {
+        val isOnline = networkMonitor?.isOnline() ?: true
+        val cached = localStore.readCajas()
+
+        if (!isOnline) {
+            return if (cached.isNotEmpty()) {
+                Result.success(cached)
+            } else {
+                val active = localStore.readActiveCajaSnapshot()
+                if (active != null) Result.success(listOf(active)) else Result.success(emptyList())
+            }
         }
+
+        return runCatching {
+            val (token, adminDb) = getContext()
+            val response = apiService.getCajas(token, adminDb, all = true)
+            if (response.isNotEmpty()) {
+                localStore.saveCajas(response)
+            }
+            response
+        }.recoverCatching { error ->
+            if (cached.isNotEmpty()) {
+                cached
+            } else {
+                val active = localStore.readActiveCajaSnapshot()
+                if (active != null) listOf(active) else throw error
+            }
+        }
+    }
 
     override suspend fun createCaja(request: SaveCajaRequest): Result<Caja> =
         runCatching {
@@ -81,8 +169,18 @@ class CajaRepositoryImpl(
         if (caja != null && caja.idCaja.isNotBlank()) {
             _activeCajaName.update { caja.displayName }
             _activeCaja.update { caja }
-            _sessionStatus.update { CajaSessionStatus.VERIFICANDO }
-            checkCajaStatus(caja.idCaja)
+            val persistedSecuencia = restorePersistedSesion(caja.idCaja)
+            if (persistedSecuencia != null) {
+                _activeCajaSecuencia.update { persistedSecuencia }
+                _sessionStatus.update { CajaSessionStatus.ABIERTA }
+            } else {
+                _sessionStatus.update { CajaSessionStatus.PENDIENTE_APERTURA }
+            }
+
+            val isOnline = networkMonitor?.isOnline() ?: true
+            if (isOnline) {
+                checkCajaStatus(caja.idCaja)
+            }
         } else {
             _activeCajaName.update { "Caja no seleccionada" }
             _activeCaja.update { null }
@@ -93,6 +191,18 @@ class CajaRepositoryImpl(
 
     override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> =
         runCatching {
+            val isOnline = networkMonitor?.isOnline() ?: true
+            if (!isOnline) {
+                val persisted = restorePersistedSesion(cajaId)
+                if (persisted != null) {
+                    _activeCajaSecuencia.update { persisted }
+                    _sessionStatus.update { CajaSessionStatus.ABIERTA }
+                    return@runCatching CajaStatusResponse(isOpen = true, cajaSecuencia = persisted)
+                } else {
+                    return@runCatching CajaStatusResponse(isOpen = false, cajaSecuencia = null)
+                }
+            }
+
             val (token, adminDb) = getContext()
             val response = apiService.checkCajaStatus(token, adminDb, cajaId)
             val trimmedCajaId = cajaId.trim()
@@ -103,12 +213,25 @@ class CajaRepositoryImpl(
                 if (response.isOpen && matchesSecCaja) {
                     _activeCajaSecuencia.update { sec }
                     _sessionStatus.update { CajaSessionStatus.ABIERTA }
+                    persistSesionAbierta(trimmedCajaId, sec)
                 } else if (_activeCaja.value != null && activeId == trimmedCajaId) {
                     _activeCajaSecuencia.update { null }
                     _sessionStatus.update { CajaSessionStatus.PENDIENTE_APERTURA }
+                    markSesionCerrada(trimmedCajaId)
                 }
             }
             response
+        }.recoverCatching { error ->
+            val persisted = restorePersistedSesion(cajaId)
+            if (persisted != null) {
+                _activeCajaSecuencia.update { persisted }
+                _sessionStatus.update { CajaSessionStatus.ABIERTA }
+                CajaStatusResponse(isOpen = true, cajaSecuencia = persisted)
+            } else if (cajaSesionDao != null) {
+                CajaStatusResponse(isOpen = false, cajaSecuencia = null)
+            } else {
+                throw error
+            }
         }
 
     override suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse> =
@@ -118,6 +241,7 @@ class CajaRepositoryImpl(
             if (response.isOpen && response.cajaSecuencia != null) {
                 _activeCajaSecuencia.update { response.cajaSecuencia }
                 _sessionStatus.update { CajaSessionStatus.ABIERTA }
+                persistSesionAbierta(request.idCaja, response.cajaSecuencia)
             }
             response
         }
@@ -125,12 +249,14 @@ class CajaRepositoryImpl(
     override suspend fun closeCaja(request: CierreCajaRequest): Result<CierreCajaResponse> =
         runCatching {
             val (token, adminDb) = getContext()
+            val activeCajaId = _activeCaja.value?.idCaja
             val response = apiService.closeCaja(token, adminDb, request)
             if (response.success) {
                 _activeCajaSecuencia.update { null }
                 _sessionStatus.update {
                     if (_activeCaja.value != null) CajaSessionStatus.PENDIENTE_APERTURA else CajaSessionStatus.SIN_CAJA
                 }
+                markSesionCerrada(activeCajaId)
             }
             response
         }
@@ -233,7 +359,8 @@ class CajaRepositoryImpl(
     override suspend fun setActiveCaja(caja: Caja) {
         val currentCaja = _activeCaja.value
         if (currentCaja?.idCaja != caja.idCaja) {
-            _activeCajaSecuencia.update { null }
+            val restored = restorePersistedSesion(caja.idCaja)
+            _activeCajaSecuencia.update { restored }
         }
         _activeCaja.update { caja }
         _activeCajaName.update { caja.displayName }
@@ -247,7 +374,8 @@ class CajaRepositoryImpl(
         val currentCaja = _activeCaja.value
         val newCaja = Caja(idCaja = id, caja = name, descripcion = name)
         if (currentCaja?.idCaja != id) {
-            _activeCajaSecuencia.update { null }
+            val restored = restorePersistedSesion(id)
+            _activeCajaSecuencia.update { restored }
             _activeCaja.update { newCaja }
         }
         _activeCajaName.update { name }
@@ -266,10 +394,12 @@ class CajaRepositoryImpl(
     }
 
     override suspend fun markSequenceClosed() {
+        val activeCajaId = _activeCaja.value?.idCaja
         _activeCajaSecuencia.update { null }
         _sessionStatus.update {
             if (_activeCaja.value != null) CajaSessionStatus.PENDIENTE_APERTURA else CajaSessionStatus.SIN_CAJA
         }
+        markSesionCerrada(activeCajaId)
     }
 
     override suspend fun getActiveCaja(): Pair<String, String>? =

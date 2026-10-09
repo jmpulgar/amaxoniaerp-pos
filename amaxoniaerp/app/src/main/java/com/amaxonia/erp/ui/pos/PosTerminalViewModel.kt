@@ -3,6 +3,7 @@ package com.amaxonia.erp.ui.pos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amaxonia.erp.data.local.LocalStore
+import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.data.remote.dto.ProcessSaleRequestDto
 import com.amaxonia.erp.data.remote.dto.SaleInvoiceDto
@@ -14,6 +15,7 @@ import com.amaxonia.erp.domain.model.Client
 import com.amaxonia.erp.domain.model.Product
 import com.amaxonia.erp.domain.repository.CajaRepository
 import com.amaxonia.erp.domain.repository.ClientRepository
+import com.amaxonia.erp.domain.repository.PagedProducts
 import com.amaxonia.erp.domain.repository.ProductRepository
 import com.amaxonia.erp.domain.repository.SalesRepository
 import com.amaxonia.erp.domain.util.CajaDateParser
@@ -21,12 +23,14 @@ import com.amaxonia.erp.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.SellerSummary
 import com.amaxonia.erp.ui.customerdisplay.CustomerDisplayManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.amaxonia.erp.BuildConfig
@@ -77,16 +81,27 @@ class PosTerminalViewModel(
 
     private fun observeCustomerDisplaySync() {
         viewModelScope.launch {
-            _uiState.collect { state ->
-                customerDisplayManager?.updateCart(
-                    cart = state.cart,
-                    summary = state.summary,
-                    client = state.selectedClient,
-                    isProcessingSale = state.isProcessingSale,
-                    completedSaleInfo = state.completedSaleInfo,
-                    branchName = state.sucursalNombre.orEmpty(),
-                )
-            }
+            _uiState
+                .distinctUntilChangedBy {
+                    listOf(
+                        it.cart,
+                        it.selectedClient?.id,
+                        it.isProcessingSale,
+                        it.completedSaleInfo,
+                        it.sucursalNombre,
+                        it.globalDiscountPercent,
+                    )
+                }
+                .collect { state ->
+                    customerDisplayManager?.updateCart(
+                        cart = state.cart,
+                        summary = state.summary,
+                        client = state.selectedClient,
+                        isProcessingSale = state.isProcessingSale,
+                        completedSaleInfo = state.completedSaleInfo,
+                        branchName = state.sucursalNombre.orEmpty(),
+                    )
+                }
         }
     }
 
@@ -118,15 +133,18 @@ class PosTerminalViewModel(
                     lastPromptedSecuenciaId = null
                 }
 
-                val sellers = caja?.availableSellers.orEmpty()
+                val sellers = caja?.availableSellers.orEmpty().ifEmpty {
+                    listOf(SellerSummary(1, "Vendedor 1"))
+                }
                 val defaultSeller = caja?.defaultSellerId?.let { id ->
                     sellers.firstOrNull { it.id == id } ?: SellerSummary(id, caja.defaultSellerName ?: "Vendedor $id")
-                } ?: sellers.firstOrNull()
+                } ?: sellers.firstOrNull() ?: SellerSummary(1, "Vendedor 1")
 
                 _uiState.update { current ->
                     current.copy(
                         activeCajaId = caja?.idCaja ?: current.activeCajaId,
                         activeCajaName = caja?.displayName ?: current.activeCajaName,
+                        activeCajaSecuenciaId = seqId ?: current.activeCajaSecuenciaId,
                         sucursalNombre = branchName,
                         almacenNombre = warehouseName,
                         isCajaOpen = isOpen,
@@ -142,94 +160,196 @@ class PosTerminalViewModel(
         }
     }
 
+    companion object {
+        const val CATALOG_PAGE_SIZE = 12
+    }
+
+    private var catalogLoadJob: Job? = null
+
     fun loadInitialData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-            // 1. Load active caja & status
-            var activeCaja = cajaRepository.activeCaja.value
-            var cajaId = activeCaja?.idCaja ?: cajaRepository.getActiveCaja()?.first
+            coroutineScope {
+                // 1. Tarea Caja & Pagos en paralelo
+                val cajaAndPaymentsDeferred = async {
+                    var activeCaja = cajaRepository.activeCaja.value
+                    var cajaId = activeCaja?.idCaja ?: cajaRepository.getActiveCaja()?.first
 
-            if (cajaId == null) {
-                cajaRepository.getCajas().onSuccess { cajas ->
-                    val openCaja = findFirstOpenCaja(cajas) ?: cajas.singleOrNull() ?: cajas.firstOrNull()
-                    if (openCaja != null) {
-                        cajaRepository.setActiveCaja(openCaja)
-                        activeCaja = openCaja
-                        cajaId = openCaja.idCaja
+                    if (cajaId == null) {
+                        cajaRepository.getCajas().onSuccess { cajas ->
+                            val openCaja = findFirstOpenCaja(cajas) ?: cajas.singleOrNull() ?: cajas.firstOrNull()
+                            if (openCaja != null) {
+                                cajaRepository.setActiveCaja(openCaja)
+                                activeCaja = openCaja
+                                cajaId = openCaja.idCaja
+                            }
+                        }
+                    }
+
+                    var isCajaOpen = false
+                    var isDiaAnterior = false
+                    var formattedFecha: String? = null
+                    var usuarioApertura: String? = null
+                    var activeCajaSecuenciaId: String? = null
+                    if (cajaId != null) {
+                        val statusResult = cajaRepository.checkCajaStatus(cajaId!!)
+                        val status = statusResult.getOrNull()
+                        isCajaOpen = status?.isOpen == true
+                        val rawFecha = status?.cajaSecuencia?.fechaApertura
+                        formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
+                        isDiaAnterior = status?.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                        usuarioApertura = status?.cajaSecuencia?.usuarioApertura
+                        activeCajaSecuenciaId = status?.cajaSecuencia?.idCajaSecuencia
+                    }
+                    val branchName = activeCaja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
+                    val warehouseName =
+                        activeCaja?.almacenNombre?.takeIf(String::isNotBlank)
+                            ?: activeCaja?.defaultWarehouseId?.let { "Almacén $it" }
+                            ?: activeCaja?.codAlmacen?.takeIf { it > 0 }?.let { "Almacén $it" }
+                            ?: "Almacén Principal"
+
+                    val sellers = activeCaja?.availableSellers.orEmpty().ifEmpty {
+                        listOf(SellerSummary(1, "Vendedor 1"))
+                    }
+                    val defaultSeller = activeCaja?.defaultSellerId?.let { id ->
+                        sellers.firstOrNull { it.id == id } ?: SellerSummary(id, activeCaja.defaultSellerName ?: "Vendedor $id")
+                    } ?: sellers.firstOrNull() ?: SellerSummary(1, "Vendedor 1")
+
+                    val paymentMethods = salesRepository.getFormasPago(cajaId).getOrElse {
+                        listOf(
+                            FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
+                            FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta"),
+                            FormaPagoDto(idFormaPago = 3, siglas = "TRANS", codigo = "TRANSFERENCIA", descripcion = "Transferencia"),
+                        )
+                    }
+
+                    CajaInitBundle(
+                        activeCaja = activeCaja,
+                        cajaId = cajaId,
+                        isCajaOpen = isCajaOpen,
+                        isDiaAnterior = isDiaAnterior,
+                        formattedFecha = formattedFecha,
+                        usuarioApertura = usuarioApertura,
+                        activeCajaSecuenciaId = activeCajaSecuenciaId,
+                        branchName = branchName,
+                        warehouseName = warehouseName,
+                        sellers = sellers,
+                        defaultSeller = defaultSeller,
+                        paymentMethods = paymentMethods,
+                    )
+                }
+
+                // 2. Departamentos en paralelo
+                val departmentsDeferred = async {
+                    productRepository.getDepartments().getOrElse { emptyList() }
+                }
+
+                // 3. Productos (Página 1: 12 ítems compactos) en paralelo
+                val productsDeferred = async {
+                    val paged = productRepository.getPagedProducts(page = 1, pageSize = CATALOG_PAGE_SIZE).getOrNull()
+                    if (paged != null) {
+                        paged
+                    } else {
+                        val fallback = productRepository.getAllProducts(page = 1, pageSize = CATALOG_PAGE_SIZE).getOrElse { emptyList() }
+                        PagedProducts(items = fallback, totalCount = fallback.size, page = 1, pageSize = CATALOG_PAGE_SIZE)
                     }
                 }
+
+                // 4. Promociones en paralelo
+                val promotionsDeferred = async {
+                    promotionRepository?.getPromotions()?.getOrElse { emptyList() } ?: emptyList()
+                }
+
+                val cajaBundle = cajaAndPaymentsDeferred.await()
+                val departments = departmentsDeferred.await()
+                val pagedProducts = productsDeferred.await()
+                val promotions = promotionsDeferred.await()
+
+                val defaultClient = Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF")
+                val totalPages = pagedProducts.totalPages.coerceAtLeast(1)
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        products = pagedProducts.items,
+                        filteredProducts = pagedProducts.items,
+                        catalogCurrentPage = 1,
+                        catalogTotalPages = totalPages,
+                        isCatalogLoading = false,
+                        departments = departments,
+                        allPromotions = promotions,
+                        activeCajaId = cajaBundle.cajaId,
+                        activeCajaName = cajaBundle.activeCaja?.displayName ?: cajaRepository.activeCajaName.value,
+                        activeCajaSecuenciaId = cajaBundle.activeCajaSecuenciaId,
+                        sucursalNombre = cajaBundle.branchName,
+                        almacenNombre = cajaBundle.warehouseName,
+                        usuarioApertura = cajaBundle.usuarioApertura,
+                        isCajaOpen = cajaBundle.isCajaOpen,
+                        isCajaDiaAnterior = cajaBundle.isDiaAnterior,
+                        showAvisoCajaAnterior = cajaBundle.isDiaAnterior,
+                        cajaFechaApertura = cajaBundle.formattedFecha,
+                        paymentMethods = cajaBundle.paymentMethods,
+                        selectedPaymentMethod = cajaBundle.paymentMethods.firstOrNull(),
+                        selectedClient = defaultClient,
+                        availableSellers = cajaBundle.sellers,
+                        selectedSeller = it.selectedSeller ?: cajaBundle.defaultSeller,
+                    )
+                }
             }
+        }
+    }
 
-            var isCajaOpen = false
-            var isDiaAnterior = false
-            var formattedFecha: String? = null
-            var usuarioApertura: String? = null
-            if (cajaId != null) {
-                val statusResult = cajaRepository.checkCajaStatus(cajaId!!)
-                val status = statusResult.getOrNull()
-                isCajaOpen = status?.isOpen == true
-                val rawFecha = status?.cajaSecuencia?.fechaApertura
-                formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
-                isDiaAnterior = status?.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
-                usuarioApertura = status?.cajaSecuencia?.usuarioApertura
-            }
-            val branchName = activeCaja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
-            val warehouseName =
-                activeCaja?.almacenNombre?.takeIf(String::isNotBlank)
-                    ?: activeCaja?.defaultWarehouseId?.let { "Almacén $it" }
-                    ?: activeCaja?.codAlmacen?.takeIf { it > 0 }?.let { "Almacén $it" }
-                    ?: "Almacén Principal"
+    fun onCatalogNextPage() {
+        val current = _uiState.value.catalogCurrentPage
+        val total = _uiState.value.catalogTotalPages
+        if (current < total) {
+            loadCatalogPage(current + 1)
+        }
+    }
 
-            val sellers = activeCaja?.availableSellers.orEmpty()
-            val defaultSeller = activeCaja?.defaultSellerId?.let { id ->
-                sellers.firstOrNull { it.id == id } ?: SellerSummary(id, activeCaja.defaultSellerName ?: "Vendedor $id")
-            } ?: sellers.firstOrNull()
+    fun onCatalogPrevPage() {
+        val current = _uiState.value.catalogCurrentPage
+        if (current > 1) {
+            loadCatalogPage(current - 1)
+        }
+    }
 
-            // 2. Load payment methods
-            val paymentMethods = salesRepository.getFormasPago(cajaId).getOrElse {
-                listOf(
-                    FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
-                    FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta"),
-                    FormaPagoDto(idFormaPago = 3, siglas = "TRANS", codigo = "TRANSFERENCIA", descripcion = "Transferencia"),
-                )
-            }
+    fun onCatalogPageChange(page: Int) {
+        val total = _uiState.value.catalogTotalPages
+        if (page in 1..total) {
+            loadCatalogPage(page)
+        }
+    }
 
-            // 3. Load default client
-            val defaultClient = Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF")
+    fun loadCatalogPage(
+        page: Int,
+        deptId: Int? = _uiState.value.selectedDepartmentId,
+        query: String = _uiState.value.searchQuery,
+    ) {
+        catalogLoadJob?.cancel()
+        catalogLoadJob = viewModelScope.launch {
+            _uiState.update { it.copy(isCatalogLoading = true) }
+            val result = productRepository.getPagedProducts(
+                page = page,
+                pageSize = CATALOG_PAGE_SIZE,
+                departmentId = deptId,
+                search = query.takeIf { it.isNotBlank() },
+            ).getOrNull()
 
-            // 4. Load departments
-            val departments = productRepository.getDepartments().getOrElse { emptyList() }
-
-            // 5. Load products
-            val productsResult = productRepository.getAllProducts(page = 1, pageSize = 50)
-            val products = productsResult.getOrElse { emptyList() }
-
-            // 6. Load promotions
-            val promotions = promotionRepository?.getPromotions()?.getOrElse { emptyList() } ?: emptyList()
-
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    products = products,
-                    filteredProducts = products,
-                    departments = departments,
-                    allPromotions = promotions,
-                    activeCajaId = cajaId,
-                    activeCajaName = activeCaja?.displayName ?: cajaRepository.activeCajaName.value,
-                    sucursalNombre = branchName,
-                    almacenNombre = warehouseName,
-                    usuarioApertura = usuarioApertura,
-                    isCajaOpen = isCajaOpen,
-                    isCajaDiaAnterior = isDiaAnterior,
-                    showAvisoCajaAnterior = isDiaAnterior,
-                    cajaFechaApertura = formattedFecha,
-                    paymentMethods = paymentMethods,
-                    selectedPaymentMethod = paymentMethods.firstOrNull(),
-                    selectedClient = defaultClient,
-                    availableSellers = sellers,
-                    selectedSeller = it.selectedSeller ?: defaultSeller,
-                )
+            if (result != null) {
+                val filtered = filterProducts(result.items, query, deptId)
+                _uiState.update {
+                    it.copy(
+                        isCatalogLoading = false,
+                        catalogCurrentPage = page,
+                        catalogTotalPages = result.totalPages.coerceAtLeast(1),
+                        products = if (query.isBlank() && deptId == null && page == 1) result.items else it.products,
+                        filteredProducts = filtered,
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isCatalogLoading = false) }
             }
         }
     }
@@ -237,27 +357,48 @@ class PosTerminalViewModel(
     fun onSearchQueryChange(query: String) {
         _uiState.update { state ->
             val filtered = filterProducts(state.products, query, state.selectedDepartmentId)
-            state.copy(searchQuery = query, filteredProducts = filtered)
+            state.copy(
+                searchQuery = query,
+                catalogCurrentPage = 1,
+                filteredProducts = filtered,
+            )
         }
+        loadCatalogPage(1, deptId = _uiState.value.selectedDepartmentId, query = query)
     }
 
     fun onDepartmentSelected(deptId: Int?) {
+        val newDeptId = if (_uiState.value.selectedDepartmentId == deptId) null else deptId
         _uiState.update { state ->
-            val newDeptId = if (state.selectedDepartmentId == deptId) null else deptId
             val filtered = filterProducts(state.products, state.searchQuery, newDeptId)
-            state.copy(selectedDepartmentId = newDeptId, filteredProducts = filtered)
+            state.copy(
+                selectedDepartmentId = newDeptId,
+                catalogCurrentPage = 1,
+                filteredProducts = filtered,
+            )
         }
+        loadCatalogPage(1, deptId = newDeptId, query = _uiState.value.searchQuery)
+    }
+
+    private fun matchesDepartment(product: Product, deptId: Int?, departments: List<DepartmentDto>): Boolean {
+        if (deptId == null) return true
+        val deptIdStr = deptId.toString()
+        if (product.department == deptIdStr || product.department.toIntOrNull() == deptId) return true
+        val dept = departments.firstOrNull { it.id == deptId } ?: return false
+        return product.department.equals(dept.displayName, ignoreCase = true) ||
+            product.department.equals(dept.name, ignoreCase = true)
     }
 
     private fun filterProducts(products: List<Product>, query: String, deptId: Int?): List<Product> {
         val q = query.trim().lowercase()
+        val departments = _uiState.value.departments
         return products.filter { p ->
             val matchesQuery = q.isEmpty() ||
                 p.description.lowercase().contains(q) ||
                 p.code.lowercase().contains(q) ||
                 p.barcode1.lowercase().contains(q) ||
                 p.reference.lowercase().contains(q)
-            matchesQuery
+            val matchesDept = matchesDepartment(p, deptId, departments)
+            matchesQuery && matchesDept
         }
     }
 
@@ -567,6 +708,14 @@ class PosTerminalViewModel(
         _uiState.update { it.copy(showClientDialog = false) }
     }
 
+    fun openProductDialog(initialQuery: String = "") {
+        _uiState.update { it.copy(showProductDialog = true, productDialogQuery = initialQuery) }
+    }
+
+    fun dismissProductDialog() {
+        _uiState.update { it.copy(showProductDialog = false, productDialogQuery = "") }
+    }
+
     fun selectSeller(seller: SellerSummary) {
         _uiState.update { it.copy(selectedSeller = seller, showSellerSheet = false) }
     }
@@ -577,6 +726,201 @@ class PosTerminalViewModel(
 
     fun dismissSellerSheet() {
         _uiState.update { it.copy(showSellerSheet = false) }
+    }
+
+    fun searchSellerByCode(code: String) {
+        val trimmed = code.trim()
+        if (trimmed.isEmpty()) return
+        val codeInt = trimmed.toIntOrNull()
+        val found = _uiState.value.availableSellers.firstOrNull {
+            it.id == codeInt || it.id.toString().padStart(3, '0') == trimmed || it.nombre.contains(trimmed, ignoreCase = true)
+        }
+        if (found != null) {
+            _uiState.update { it.copy(selectedSeller = found, errorMessage = null) }
+        } else {
+            _uiState.update { it.copy(errorMessage = "Vendedor '$trimmed' no encontrado") }
+        }
+    }
+
+    fun setCustomClientName(name: String) {
+        _uiState.update { it.copy(customClientName = name.trim(), showCustomClientNameDialog = false) }
+    }
+
+    fun openCustomClientNameDialog() {
+        _uiState.update { it.copy(showCustomClientNameDialog = true) }
+    }
+
+    fun dismissCustomClientNameDialog() {
+        _uiState.update { it.copy(showCustomClientNameDialog = false) }
+    }
+
+    fun setGlobalDiscount(percent: Double) {
+        _uiState.update { it.copy(globalDiscountPercent = percent.coerceIn(0.0, 100.0), showGlobalDiscountDialog = false) }
+    }
+
+    fun openGlobalDiscountDialog() {
+        _uiState.update { it.copy(showGlobalDiscountDialog = true) }
+    }
+
+    fun dismissGlobalDiscountDialog() {
+        _uiState.update { it.copy(showGlobalDiscountDialog = false) }
+    }
+
+    fun setPaymentMethodAmount(methodId: Int, amount: Double) {
+        val formatted = if (amount > 0.0) String.format(Locale.US, "%.2f", amount) else ""
+        onPaymentMethodTextChange(methodId, formatted)
+    }
+
+    fun setActivePaymentInputMethod(methodId: Int) {
+        val method = _uiState.value.paymentMethods.firstOrNull { it.idFormaPago == methodId }
+        _uiState.update {
+            it.copy(
+                activePaymentInputMethodId = methodId,
+                selectedPaymentMethod = method ?: it.selectedPaymentMethod,
+            )
+        }
+    }
+
+    fun onPaymentMethodBadgeClick(method: FormaPagoDto) {
+        val state = _uiState.value
+        val total = state.summary.total
+        val currentAmount = state.paymentsMap[method.idFormaPago] ?: 0.0
+
+        val otherSum = state.paymentsMap.filter { it.key != method.idFormaPago }.values.sum()
+        val difference = (total - otherSum).coerceAtLeast(0.0)
+
+        val updatedMap = state.paymentsMap.toMutableMap()
+        val updatedTexts = state.paymentInputTexts.toMutableMap()
+
+        if (currentAmount <= 0.0 && difference > 0.0) {
+            updatedMap[method.idFormaPago] = difference
+            val formatted = String.format(Locale.US, "%.2f", difference)
+            updatedTexts[method.idFormaPago] = formatted
+            if (isCashPaymentMethod(method)) {
+                _uiState.update { it.copy(receivedAmountText = formatted) }
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                selectedPaymentMethod = method,
+                activePaymentInputMethodId = method.idFormaPago,
+                paymentsMap = updatedMap,
+                paymentInputTexts = updatedTexts,
+            )
+        }
+    }
+
+    fun onPaymentMethodTextChange(methodId: Int, newText: String) {
+        val filtered = newText.filter { it.isDigit() || it == '.' }
+        if (filtered.count { it == '.' } > 1) return
+
+        val state = _uiState.value
+        val updatedTexts = state.paymentInputTexts.toMutableMap()
+        val updatedMap = state.paymentsMap.toMutableMap()
+
+        if (filtered.isBlank()) {
+            updatedTexts.remove(methodId)
+            updatedMap.remove(methodId)
+        } else {
+            updatedTexts[methodId] = filtered
+            val parsed = filtered.toDoubleOrNull() ?: 0.0
+            if (parsed > 0.0) {
+                updatedMap[methodId] = parsed
+            } else {
+                updatedMap.remove(methodId)
+            }
+        }
+
+        val method = state.paymentMethods.firstOrNull { it.idFormaPago == methodId }
+        val isCash = isCashPaymentMethod(method)
+
+        _uiState.update { current ->
+            current.copy(
+                paymentInputTexts = updatedTexts,
+                paymentsMap = updatedMap,
+                activePaymentInputMethodId = methodId,
+                selectedPaymentMethod = method ?: current.selectedPaymentMethod,
+                receivedAmountText = if (isCash) filtered else current.receivedAmountText,
+            )
+        }
+    }
+
+    fun onClearSinglePaymentMethod(methodId: Int) {
+        val state = _uiState.value
+        val updatedTexts = state.paymentInputTexts.toMutableMap()
+        val updatedMap = state.paymentsMap.toMutableMap()
+        updatedTexts.remove(methodId)
+        updatedMap.remove(methodId)
+
+        val method = state.paymentMethods.firstOrNull { it.idFormaPago == methodId }
+        val isCash = isCashPaymentMethod(method)
+
+        _uiState.update {
+            it.copy(
+                paymentInputTexts = updatedTexts,
+                paymentsMap = updatedMap,
+                receivedAmountText = if (isCash) "" else it.receivedAmountText,
+            )
+        }
+    }
+
+    fun clearPayments() {
+        _uiState.update {
+            it.copy(
+                paymentsMap = emptyMap(),
+                paymentInputTexts = emptyMap(),
+                receivedAmountText = "",
+            )
+        }
+    }
+
+    fun onKeypadInput(key: String) {
+        val state = _uiState.value
+        val targetId = state.activePaymentInputMethodId
+            ?: state.paymentMethods.firstOrNull { isCashPaymentMethod(it) }?.idFormaPago
+            ?: state.paymentMethods.firstOrNull()?.idFormaPago
+            ?: return
+
+        val currentText = state.paymentInputTexts[targetId].orEmpty()
+        val total = state.summary.total
+
+        val newText = when (key) {
+            "C", "Clear" -> ""
+            "Backspace", "⌫" -> if (currentText.isNotEmpty()) currentText.dropLast(1) else ""
+            "." -> {
+                if (!currentText.contains('.')) {
+                    if (currentText.isEmpty()) "0." else "$currentText."
+                } else currentText
+            }
+            "Saldo", "Exacto" -> {
+                val otherSum = state.paymentsMap.filter { it.key != targetId }.values.sum()
+                val diff = (total - otherSum).coerceAtLeast(0.0)
+                if (diff > 0.0) String.format(Locale.US, "%.2f", diff) else ""
+            }
+            "Enter", "↵" -> currentText
+            else -> {
+                if (key.length == 1 && key[0].isDigit()) {
+                    if (currentText == "0") key
+                    else if (currentText.contains('.') && currentText.substringAfter('.').length >= 2) currentText
+                    else currentText + key
+                } else currentText
+            }
+        }
+        onPaymentMethodTextChange(targetId, newText)
+    }
+
+    fun toggleCashDenominations() {
+        _uiState.update { it.copy(expandedCashDenominations = !it.expandedCashDenominations) }
+    }
+
+    fun onAddCashDenomination(billValue: Double) {
+        val state = _uiState.value
+        val cashMethod = state.paymentMethods.firstOrNull { isCashPaymentMethod(it) } ?: return
+        val currentCash = state.paymentsMap[cashMethod.idFormaPago] ?: 0.0
+        val newCash = currentCash + billValue
+        val formatted = String.format(Locale.US, "%.2f", newCash)
+        onPaymentMethodTextChange(cashMethod.idFormaPago, formatted)
     }
 
     fun openPaymentDialog() {
@@ -599,10 +943,28 @@ class PosTerminalViewModel(
         }
 
         val total = state.summary.total
+        val defaultMethod = state.paymentMethods.firstOrNull { isCashPaymentMethod(it) }
+            ?: state.paymentMethods.firstOrNull()
+        val defaultId = defaultMethod?.idFormaPago
+        val formattedTotal = if (total > 0.0) String.format(Locale.US, "%.2f", total) else "0.00"
+
+        val initialPayments = if (defaultId != null && total > 0.0) {
+            mapOf(defaultId to total)
+        } else emptyMap()
+
+        val initialTexts = if (defaultId != null && total > 0.0) {
+            mapOf(defaultId to formattedTotal)
+        } else emptyMap()
+
         _uiState.update {
             it.copy(
                 showPaymentDialog = true,
-                receivedAmountText = if (total > 0.0) String.format(Locale.US, "%.2f", total) else "0.00",
+                selectedPaymentMethod = defaultMethod,
+                activePaymentInputMethodId = defaultId,
+                paymentsMap = initialPayments,
+                paymentInputTexts = initialTexts,
+                receivedAmountText = formattedTotal,
+                expandedCashDenominations = false,
                 errorMessage = null,
             )
         }
@@ -755,8 +1117,24 @@ class PosTerminalViewModel(
             val sucursal = localStore.readActiveSucursal()
             val sucursalId = sucursal?.first?.toIntOrNull() ?: 1
             val summary = state.summary
-            val received = state.receivedAmountText.toDoubleOrNull() ?: summary.total
-            val change = (received - summary.total).coerceAtLeast(0.0)
+            val cashMethod = state.paymentMethods.firstOrNull { isCashPaymentMethod(it) }
+            val cashMethodId = cashMethod?.idFormaPago
+            val cashEntered = if (cashMethodId != null) (state.paymentsMap[cashMethodId] ?: 0.0) else 0.0
+            val nonCashSum = state.paymentsMap.filter { it.key != cashMethodId }.values.sum()
+            val cashNeeded = (summary.total - nonCashSum).coerceAtLeast(0.0)
+            val cashChange = if (cashEntered > cashNeeded) (cashEntered - cashNeeded) else 0.0
+            val actualCashPaid = if (cashEntered > cashNeeded) cashNeeded else cashEntered
+            val totalReceived = if (state.paymentsMap.isNotEmpty()) (nonCashSum + cashEntered) else (state.receivedAmountText.toDoubleOrNull() ?: summary.total)
+            val change = if (state.paymentsMap.isNotEmpty()) cashChange else (totalReceived - summary.total).coerceAtLeast(0.0)
+
+            val invoiceClientName = if (state.selectedClient?.code == "CF" && state.customClientName.isNotBlank()) {
+                state.customClientName
+            } else {
+                state.selectedClient?.name ?: "CONSUMIDOR FINAL"
+            }
+
+            val primaryPaymentMethod = state.selectedPaymentMethod ?: state.paymentMethods.firstOrNull()
+            val isSplitPayment = state.paymentsMap.size > 1
 
             val invoice = SaleInvoiceDto(
                 idCliente = state.selectedClient?.id ?: "0",
@@ -765,20 +1143,26 @@ class PosTerminalViewModel(
                 idSucursal = sucursalId,
                 idCaja = state.activeCajaId ?: "1",
                 codigoCaja = state.activeCajaName ?: "01",
+                idCajaSecuencia = state.activeCajaSecuenciaId ?: "0",
                 subtotal = summary.subtotal,
+                descuentosItemFactura = summary.itemDiscounts,
                 ivaTotalFactura = summary.tax,
                 totalTotalFactura = summary.total,
                 montoItemsFactura = summary.subtotal,
+                totalizarSubTotal = summary.subtotal,
+                totalizarPDescuentoGlobal = state.globalDiscountPercent,
+                totalizarDescuentoGlobal = summary.globalDiscountAmount,
                 totalizarBaseImponible = summary.subtotal,
                 totalizarMontoIva = summary.tax,
                 totalizarTotalGeneral = summary.total,
                 usuarioCreacion = session?.user?.username ?: "admin",
-                facturarA = state.selectedClient?.name ?: "CONSUMIDOR FINAL",
+                facturarA = invoiceClientName,
                 facturarARuc = state.selectedClient?.identification ?: "CF",
                 facturarADireccion = state.selectedClientBranch?.direccion?.takeIf(String::isNotBlank) ?: state.selectedClient?.address ?: "",
                 facturarATelefono = state.selectedClientBranch?.telefonoContacto?.takeIf(String::isNotBlank) ?: state.selectedClient?.phone ?: "",
                 clienteSucursalId = state.selectedClientBranch?.sucursalId,
-                formaPago = state.selectedPaymentMethod?.codigo ?: "EFECTIVO",
+                formaPago = primaryPaymentMethod?.codigo ?: "EFECTIVO",
+                observacion = state.observationText,
             )
 
             val saleItems = state.cart.map { item ->
@@ -806,23 +1190,53 @@ class PosTerminalViewModel(
                 )
             }
 
+            val payments = if (state.paymentsMap.isNotEmpty()) {
+                state.paymentsMap.mapNotNull { (methodId, amount) ->
+                    val method = state.paymentMethods.firstOrNull { it.idFormaPago == methodId }
+                    val isCash = method != null && isCashPaymentMethod(method)
+                    val paid = if (isCash) actualCashPaid else amount
+                    val rec = if (isCash) cashEntered else amount
+                    val chg = if (isCash) cashChange else 0.0
+                    if (paid > 0.0 || rec > 0.0) {
+                        SalePaymentDto(
+                            idFormaPago = methodId,
+                            monto = paid,
+                            montoRecibido = rec,
+                            efectivoCambio = chg,
+                            siglas = method?.siglas,
+                        )
+                    } else null
+                }
+            } else {
+                listOf(
+                    SalePaymentDto(
+                        idFormaPago = primaryPaymentMethod?.idFormaPago ?: 1,
+                        monto = summary.total,
+                        montoRecibido = totalReceived.coerceAtLeast(summary.total),
+                        efectivoCambio = change,
+                        siglas = primaryPaymentMethod?.siglas,
+                    )
+                )
+            }
+
+            val montosPorTipo = if (state.paymentsMap.isNotEmpty()) {
+                state.paymentsMap.mapNotNull { (methodId, amount) ->
+                    val method = state.paymentMethods.firstOrNull { it.idFormaPago == methodId }
+                    val isCash = method != null && isCashPaymentMethod(method)
+                    val code = method?.codigo ?: method?.descripcion ?: "PAGO_$methodId"
+                    val paid = if (isCash) actualCashPaid else amount
+                    code to paid
+                }.toMap()
+            } else {
+                mapOf((primaryPaymentMethod?.codigo ?: "EFECTIVO") to summary.total)
+            }
+
             val paymentSummary = SalePaymentSummaryDto(
                 totalizarMontoCancelar = summary.total,
-                totalizarMontoEfectivo = received,
+                totalizarMontoEfectivo = actualCashPaid,
                 totalizarCambio = change,
-                montosPorTipo = mapOf(
-                    (state.selectedPaymentMethod?.codigo ?: "EFECTIVO") to summary.total,
-                ),
-            )
-
-            val payments = listOf(
-                SalePaymentDto(
-                    idFormaPago = state.selectedPaymentMethod?.idFormaPago ?: 1,
-                    monto = summary.total,
-                    montoRecibido = received,
-                    efectivoCambio = change,
-                    siglas = state.selectedPaymentMethod?.siglas,
-                )
+                totalizarSaldoPendiente = 0.0,
+                montosPorTipo = montosPorTipo,
             )
 
             val request = ProcessSaleRequestDto(
@@ -838,6 +1252,12 @@ class PosTerminalViewModel(
                 ?: runCatching { localStore.readSelectedCountry()?.code }.getOrNull()
                 ?: BuildConfig.DEFAULT_COUNTRY_CODE
 
+            val paymentMethodDescription = if (isSplitPayment && state.paymentsMap.size > 1) {
+                "Mixto (${state.paymentsMap.size} formas)"
+            } else {
+                primaryPaymentMethod?.descripcion ?: primaryPaymentMethod?.codigo ?: "Efectivo"
+            }
+
             // Ruta offline directa si no hay conexión a internet
             if (!isOnline && pendingInvoiceDao != null) {
                 val now = System.currentTimeMillis()
@@ -845,7 +1265,6 @@ class PosTerminalViewModel(
                 val localNumber = "OFF-$now"
                 val offlineRequest = request.copy(idFactura = localId, codFactura = localNumber)
                 val total = summary.total
-                val clientName = state.selectedClient?.name ?: "CONSUMIDOR FINAL"
 
                 val pendingEntity = PendingInvoiceEntity(
                     id = localId,
@@ -855,7 +1274,7 @@ class PosTerminalViewModel(
                         offlineRequest,
                     ),
                     localInvoiceNumber = localNumber,
-                    clientName = clientName,
+                    clientName = invoiceClientName,
                     tenantId = tenantId,
                     total = total,
                     createdAt = now,
@@ -867,17 +1286,25 @@ class PosTerminalViewModel(
                 val completedInfo = CompletedSaleInfo(
                     facturaId = localId,
                     numeroFactura = localNumber,
-                    clientName = clientName,
+                    clientName = invoiceClientName,
                     total = total,
-                    receivedAmount = received,
+                    receivedAmount = totalReceived,
                     changeAmount = change,
-                    paymentMethodName = state.selectedPaymentMethod?.descripcion ?: state.selectedPaymentMethod?.codigo ?: "Efectivo",
+                    paymentMethodName = paymentMethodDescription,
                 )
                 _uiState.update {
                     it.copy(
                         isProcessingSale = false,
                         showPaymentDialog = false,
                         cart = emptyList(),
+                        paymentsMap = emptyMap(),
+                        paymentInputTexts = emptyMap(),
+                        activePaymentInputMethodId = null,
+                        expandedCashDenominations = false,
+                        receivedAmountText = "",
+                        customClientName = "",
+                        observationText = "",
+                        globalDiscountPercent = 0.0,
                         completedSaleInvoice = localNumber,
                         completedSaleInfo = completedInfo,
                         printFeedbackMessage = null,
@@ -896,17 +1323,25 @@ class PosTerminalViewModel(
                 val completedInfo = CompletedSaleInfo(
                     facturaId = targetFacturaId,
                     numeroFactura = invoiceNumber,
-                    clientName = state.selectedClient?.name ?: "CONSUMIDOR FINAL",
+                    clientName = invoiceClientName,
                     total = summary.total,
-                    receivedAmount = received,
+                    receivedAmount = totalReceived,
                     changeAmount = change,
-                    paymentMethodName = state.selectedPaymentMethod?.descripcion ?: state.selectedPaymentMethod?.codigo ?: "Efectivo",
+                    paymentMethodName = paymentMethodDescription,
                 )
                 _uiState.update {
                     it.copy(
                         isProcessingSale = false,
                         showPaymentDialog = false,
                         cart = emptyList(),
+                        paymentsMap = emptyMap(),
+                        paymentInputTexts = emptyMap(),
+                        activePaymentInputMethodId = null,
+                        expandedCashDenominations = false,
+                        receivedAmountText = "",
+                        customClientName = "",
+                        observationText = "",
+                        globalDiscountPercent = 0.0,
                         completedSaleInvoice = invoiceNumber,
                         completedSaleInfo = completedInfo,
                         printFeedbackMessage = null,
@@ -934,7 +1369,6 @@ class PosTerminalViewModel(
                     val localNumber = "OFF-$now"
                     val offlineRequest = request.copy(idFactura = localId, codFactura = localNumber)
                     val total = summary.total
-                    val clientName = state.selectedClient?.name ?: "CONSUMIDOR FINAL"
 
                     val pendingEntity = PendingInvoiceEntity(
                         id = localId,
@@ -944,7 +1378,7 @@ class PosTerminalViewModel(
                             offlineRequest,
                         ),
                         localInvoiceNumber = localNumber,
-                        clientName = clientName,
+                        clientName = invoiceClientName,
                         tenantId = tenantId,
                         total = total,
                         createdAt = now,
@@ -956,17 +1390,25 @@ class PosTerminalViewModel(
                     val completedInfo = CompletedSaleInfo(
                         facturaId = localId,
                         numeroFactura = localNumber,
-                        clientName = clientName,
+                        clientName = invoiceClientName,
                         total = total,
-                        receivedAmount = received,
+                        receivedAmount = totalReceived,
                         changeAmount = change,
-                        paymentMethodName = state.selectedPaymentMethod?.descripcion ?: state.selectedPaymentMethod?.codigo ?: "Efectivo",
+                        paymentMethodName = paymentMethodDescription,
                     )
                     _uiState.update {
                         it.copy(
                             isProcessingSale = false,
                             showPaymentDialog = false,
                             cart = emptyList(),
+                            paymentsMap = emptyMap(),
+                            paymentInputTexts = emptyMap(),
+                            activePaymentInputMethodId = null,
+                            expandedCashDenominations = false,
+                            receivedAmountText = "",
+                            customClientName = "",
+                            observationText = "",
+                            globalDiscountPercent = 0.0,
                             completedSaleInvoice = localNumber,
                             completedSaleInfo = completedInfo,
                             printFeedbackMessage = null,
@@ -985,4 +1427,80 @@ class PosTerminalViewModel(
             }
         }
     }
+
+    fun toggleCatalogDrawer() {
+        _uiState.update { it.copy(isCatalogDrawerOpen = !it.isCatalogDrawerOpen) }
+    }
+
+    fun setCatalogDrawerOpen(isOpen: Boolean) {
+        _uiState.update { it.copy(isCatalogDrawerOpen = isOpen) }
+    }
+
+    fun onObservationChange(text: String) {
+        _uiState.update { it.copy(observationText = text) }
+    }
+
+    fun onDocumentTypeSelected(type: String) {
+        _uiState.update { it.copy(activeDocumentType = type) }
+    }
+
+    fun onGlobalDiscountChange(percent: Double) {
+        _uiState.update { it.copy(globalDiscountPercent = percent.coerceIn(0.0, 100.0)) }
+    }
+
+    fun setShowPrintOptions(show: Boolean) {
+        _uiState.update { it.copy(showPrintOptionsDialog = show) }
+    }
+
+    fun addProductByCode(code: String): Boolean {
+        val trimmed = code.trim()
+        if (trimmed.isEmpty()) {
+            openProductDialog("")
+            return true
+        }
+        val product = _uiState.value.products.firstOrNull { p ->
+            p.code.equals(trimmed, ignoreCase = true) ||
+            p.barcode1.equals(trimmed, ignoreCase = true) ||
+            p.reference.equals(trimmed, ignoreCase = true)
+        }
+        if (product != null) {
+            addToCart(product)
+            _uiState.update { it.copy(errorMessage = null) }
+            return true
+        }
+
+        viewModelScope.launch {
+            val results = productRepository.searchProducts(query = trimmed, page = 1, pageSize = 10).getOrElse { emptyList() }
+            val match = results.firstOrNull { p ->
+                p.code.equals(trimmed, ignoreCase = true) ||
+                p.barcode1.equals(trimmed, ignoreCase = true) ||
+                p.reference.equals(trimmed, ignoreCase = true)
+            }
+            if (match != null) {
+                addToCart(match)
+                _uiState.update { it.copy(errorMessage = null) }
+            } else if (results.size == 1) {
+                addToCart(results.first())
+                _uiState.update { it.copy(errorMessage = null) }
+            } else {
+                openProductDialog(trimmed)
+            }
+        }
+        return true
+    }
 }
+
+private data class CajaInitBundle(
+    val activeCaja: com.amaxonia.erp.domain.model.Caja?,
+    val cajaId: String?,
+    val isCajaOpen: Boolean,
+    val isDiaAnterior: Boolean,
+    val formattedFecha: String?,
+    val usuarioApertura: String?,
+    val activeCajaSecuenciaId: String?,
+    val branchName: String,
+    val warehouseName: String,
+    val sellers: List<SellerSummary>,
+    val defaultSeller: SellerSummary,
+    val paymentMethods: List<FormaPagoDto>,
+)

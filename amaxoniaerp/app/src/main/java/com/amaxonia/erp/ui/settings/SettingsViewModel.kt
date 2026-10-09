@@ -48,7 +48,7 @@ class SettingsViewModel(
     private val _autoPrintReceipt = MutableStateFlow(true)
     val autoPrintReceipt = _autoPrintReceipt.asStateFlow()
 
-    private val _customerDisplayEnabled = MutableStateFlow(true)
+    private val _customerDisplayEnabled = MutableStateFlow(false)
     val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
 
     val isSecondaryDisplayAvailable = customerDisplayManager?.isSecondaryDisplayAvailable

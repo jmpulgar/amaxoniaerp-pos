@@ -21,6 +21,7 @@ import com.amaxonia.erp.data.sync.OfflineSyncSettingsStore
 import com.amaxonia.erp.data.sync.toDomain
 import com.amaxonia.erp.domain.model.PriceLevel
 import com.amaxonia.erp.domain.model.Product
+import com.amaxonia.erp.domain.repository.PagedProducts
 import com.amaxonia.erp.domain.repository.ProductRepository
 
 class ProductRepositoryImpl(
@@ -95,6 +96,109 @@ class ProductRepositoryImpl(
                 }
                 if (entities.isNotEmpty()) {
                     entities.map { it.toDomain(baseUrl, countryCode, companyDb) }
+                } else {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+
+    override suspend fun getPagedProducts(
+        page: Int,
+        pageSize: Int,
+        departmentId: Int?,
+        search: String?,
+    ): Result<PagedProducts> {
+        val scope = currentScope()
+        val isOnline = networkMonitor?.isOnline() ?: true
+        val offset = (page - 1).coerceAtLeast(0) * pageSize
+        val (baseUrl, countryCode, companyDb) = resolveImageContext()
+        val query = search?.trim().orEmpty()
+
+        if (!isOnline && productDao != null) {
+            val entities = when {
+                query.isNotEmpty() && departmentId != null ->
+                    productDao.searchPagedByDepartment(query, departmentId, pageSize, offset)
+                query.isNotEmpty() ->
+                    productDao.searchPaged(query, pageSize, offset)
+                departmentId != null ->
+                    productDao.getPagedByDepartment(departmentId, pageSize, offset)
+                !scope.allProducts && scope.departmentIds.isNotEmpty() ->
+                    productDao.getPagedByDepartments(scope.departmentIds.toList(), pageSize, offset)
+                else ->
+                    productDao.getPaged(pageSize, offset)
+            }
+            val total = when {
+                query.isNotEmpty() && departmentId != null -> productDao.countSearchByDepartment(query, departmentId)
+                query.isNotEmpty() -> productDao.countSearch(query)
+                departmentId != null -> productDao.countByDepartment(departmentId)
+                else -> productDao.count()
+            }
+            return Result.success(
+                PagedProducts(
+                    items = entities.map { it.toDomain(baseUrl, countryCode, companyDb) },
+                    totalCount = total,
+                    page = page,
+                    pageSize = pageSize,
+                ),
+            )
+        }
+
+        return runCatching {
+            val token = requireToken()
+            val response = apiService.getProducts(
+                token = token,
+                limit = pageSize,
+                offset = offset,
+                search = query.takeIf { it.isNotBlank() },
+                departmentId = departmentId,
+            )
+            if (scope.enabled && productDao != null) {
+                val entities = response.data.map { it.toEntity() }
+                val toCache = if (!scope.allProducts && scope.departmentIds.isNotEmpty()) {
+                    entities.filter { it.department in scope.departmentIds }
+                } else {
+                    entities
+                }
+                if (toCache.isNotEmpty()) {
+                    runCatching { productDao?.insertAll(toCache) }
+                }
+            }
+            PagedProducts(
+                items = response.data.map { it.toDomain(baseUrl, countryCode, companyDb) },
+                totalCount = response.total.toInt(),
+                page = page,
+                pageSize = pageSize,
+            )
+        }.recoverCatching { error ->
+            if (productDao != null) {
+                val entities = when {
+                    query.isNotEmpty() && departmentId != null ->
+                        productDao.searchPagedByDepartment(query, departmentId, pageSize, offset)
+                    query.isNotEmpty() ->
+                        productDao.searchPaged(query, pageSize, offset)
+                    departmentId != null ->
+                        productDao.getPagedByDepartment(departmentId, pageSize, offset)
+                    !scope.allProducts && scope.departmentIds.isNotEmpty() ->
+                        productDao.getPagedByDepartments(scope.departmentIds.toList(), pageSize, offset)
+                    else ->
+                        productDao.getPaged(pageSize, offset)
+                }
+                val total = when {
+                    query.isNotEmpty() && departmentId != null -> productDao.countSearchByDepartment(query, departmentId)
+                    query.isNotEmpty() -> productDao.countSearch(query)
+                    departmentId != null -> productDao.countByDepartment(departmentId)
+                    else -> productDao.count()
+                }
+                if (entities.isNotEmpty() || total > 0) {
+                    PagedProducts(
+                        items = entities.map { it.toDomain(baseUrl, countryCode, companyDb) },
+                        totalCount = total,
+                        page = page,
+                        pageSize = pageSize,
+                    )
                 } else {
                     throw error
                 }

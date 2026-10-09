@@ -10,6 +10,8 @@ import com.amaxonia.erp.domain.model.Promocion
 import com.amaxonia.erp.domain.model.SellerSummary
 import java.math.BigDecimal
 import java.math.RoundingMode
+import kotlin.math.ceil
+import kotlin.math.floor
 
 data class CartItem(
     val product: Product,
@@ -85,12 +87,17 @@ data class PosCartSummary(
     val itemCount: Int = 0,
     val grossSubtotal: Double = 0.0,
     val discountTotal: Double = 0.0,
+    val itemDiscounts: Double = 0.0,
+    val globalDiscountAmount: Double = 0.0,
 )
 
 data class PosUiState(
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val products: List<Product> = emptyList(),
     val filteredProducts: List<Product> = emptyList(),
+    val catalogCurrentPage: Int = 1,
+    val catalogTotalPages: Int = 1,
+    val isCatalogLoading: Boolean = false,
     val departments: List<DepartmentDto> = emptyList(),
     val selectedDepartmentId: Int? = null,
     val searchQuery: String = "",
@@ -133,6 +140,21 @@ data class PosUiState(
     val quantityPickerProduct: Product? = null,
     val allowEditPrices: Boolean = true,
     val allowDiscounts: Boolean = true,
+    val isCatalogDrawerOpen: Boolean = true,
+    val observationText: String = "",
+    val activeDocumentType: String = "Factura",
+    val globalDiscountPercent: Double = 0.0,
+    val activeCajaSecuenciaId: String? = null,
+    val customClientName: String = "",
+    val showCustomClientNameDialog: Boolean = false,
+    val showGlobalDiscountDialog: Boolean = false,
+    val showPrintOptionsDialog: Boolean = false,
+    val paymentsMap: Map<Int, Double> = emptyMap(),
+    val paymentInputTexts: Map<Int, String> = emptyMap(),
+    val activePaymentInputMethodId: Int? = null,
+    val expandedCashDenominations: Boolean = false,
+    val showProductDialog: Boolean = false,
+    val productDialogQuery: String = "",
 ) {
 
     val summary: PosCartSummary
@@ -149,11 +171,19 @@ data class PosUiState(
                 tx += item.taxAmount
                 cnt += item.quantity.toInt().coerceAtLeast(1)
             }
-            val tot = BigDecimal.valueOf(sub + tx).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalSub = BigDecimal.valueOf(sub).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val globalDiscountAmount = if (globalDiscountPercent > 0.0) {
+                BigDecimal.valueOf(sub * (globalDiscountPercent / 100.0))
+                    .setScale(2, RoundingMode.HALF_UP)
+                    .toDouble()
+            } else 0.0
+            val subAfterGlobalDiscount = (sub - globalDiscountAmount).coerceAtLeast(0.0)
+            val txFactor = if (sub > 0.0) subAfterGlobalDiscount / sub else 1.0
+            val adjustedTx = BigDecimal.valueOf(tx * txFactor).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val tot = BigDecimal.valueOf(subAfterGlobalDiscount + adjustedTx).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val finalSub = BigDecimal.valueOf(subAfterGlobalDiscount).setScale(2, RoundingMode.HALF_UP).toDouble()
             val finalGrossSub = BigDecimal.valueOf(grossSub).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalDiscounts = BigDecimal.valueOf(discounts).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalTx = BigDecimal.valueOf(tx).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val finalDiscounts = BigDecimal.valueOf(discounts + globalDiscountAmount).setScale(2, RoundingMode.HALF_UP).toDouble()
+            val finalTx = adjustedTx
             return PosCartSummary(
                 subtotal = finalSub,
                 tax = finalTx,
@@ -161,6 +191,8 @@ data class PosUiState(
                 itemCount = cnt,
                 grossSubtotal = finalGrossSub,
                 discountTotal = finalDiscounts,
+                itemDiscounts = discounts,
+                globalDiscountAmount = globalDiscountAmount,
             )
         }
 
@@ -207,5 +239,31 @@ fun isCashPaymentMethod(method: FormaPagoDto?): Boolean {
         sig.equals("EF", ignoreCase = true) ||
         sig.equals("EFEC", ignoreCase = true) ||
         sig.equals("CASH", ignoreCase = true)
+}
+
+internal fun calculateSuggestedBills(total: Double): List<Double> {
+    if (total <= 0.0) return emptyList()
+    val suggestions = sortedSetOf<Double>()
+
+    val ceilVal = ceil(total)
+    if (ceilVal > total) {
+        suggestions.add(ceilVal)
+    }
+
+    val standardDenominations = listOf(1.0, 5.0, 10.0, 20.0, 50.0, 100.0)
+    for (bill in standardDenominations) {
+        if (bill > total) {
+            suggestions.add(bill)
+        }
+    }
+
+    if (total > 10.0) {
+        val next5 = (floor(total / 5.0) + 1) * 5.0
+        if (next5 > total) suggestions.add(next5)
+        val next10 = (floor(total / 10.0) + 1) * 10.0
+        if (next10 > total) suggestions.add(next10)
+    }
+
+    return suggestions.toList().take(5)
 }
 

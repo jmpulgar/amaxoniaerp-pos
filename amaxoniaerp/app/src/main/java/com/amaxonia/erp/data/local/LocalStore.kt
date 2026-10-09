@@ -38,6 +38,7 @@ open class LocalStore(
     private val activeCajaNameKey = stringPreferencesKey("active_caja_name")
     private val activeSucursalIdKey = stringPreferencesKey("active_sucursal_id")
     private val activeSucursalNameKey = stringPreferencesKey("active_sucursal_name")
+    private val cachedCajasKey = stringPreferencesKey("cached_cajas_catalog")
 
     private val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
     private val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
@@ -181,6 +182,18 @@ open class LocalStore(
         return Pair(id, name)
     }
 
+    open suspend fun saveCajas(cajas: List<Caja>) {
+        val json = AppJson.encodeToString(cajas)
+        dataStore.edit { prefs ->
+            prefs[cachedCajasKey] = json
+        }
+    }
+
+    open suspend fun readCajas(): List<Caja> {
+        val json = dataStore.data.first()[cachedCajasKey] ?: return emptyList()
+        return runCatching { AppJson.decodeFromString<List<Caja>>(json) }.getOrDefault(emptyList())
+    }
+
     suspend fun saveActiveSucursal(id: String, name: String) {
         dataStore.edit { prefs ->
             prefs[activeSucursalIdKey] = id
@@ -286,7 +299,7 @@ open class LocalStore(
     }
 
     open fun customerDisplayEnabledFlow(): Flow<Boolean> =
-        dataStore.data.map { prefs -> prefs[customerDisplayEnabledKey] ?: true }
+        dataStore.data.map { prefs -> prefs[customerDisplayEnabledKey] ?: false }
 
     open suspend fun readCustomerDisplayEnabled(): Boolean = customerDisplayEnabledFlow().first()
 

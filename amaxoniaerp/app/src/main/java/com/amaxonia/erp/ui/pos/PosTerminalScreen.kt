@@ -35,8 +35,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Payments
@@ -94,7 +96,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.domain.model.Client
@@ -130,15 +131,32 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ModalBottomSheet
-import coil.compose.SubcomposeAsyncImageContent
 import com.amaxonia.erp.domain.model.ItemCarrito
 import com.amaxonia.erp.domain.model.Promocion
+import com.amaxonia.erp.ui.pos.components.PosCartWebTable
+import com.amaxonia.erp.ui.pos.components.PosInvoiceFormControls
+import com.amaxonia.erp.ui.pos.components.PosProductCatalogDrawer
+import com.amaxonia.erp.ui.pos.components.PosTopControlsSection
+import com.amaxonia.erp.ui.pos.components.PosTotalsActionCards
+import com.amaxonia.erp.ui.pos.components.PosWebFooterBar
+import com.amaxonia.erp.ui.pos.components.PosWebHeaderBar
+import com.amaxonia.erp.ui.pos.components.ProductSelectionDialog
+import com.amaxonia.erp.ui.pos.components.ClientSelectionDialog
+import com.amaxonia.erp.ui.pos.components.SellerSelectionDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.amaxonia.erp.data.remote.dto.DepartmentDto
+import com.amaxonia.erp.ui.theme.FlowBrandBlue
+import com.amaxonia.erp.ui.theme.FlowBrandGradient
+import com.amaxonia.erp.ui.theme.FlowHeaderGradient
+import com.amaxonia.erp.ui.theme.FlowTableBorder
 import java.util.Locale
 
 @Composable
 fun PosTerminalScreen(
     viewModel: PosTerminalViewModel,
     onNavigateToCajas: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -156,7 +174,7 @@ fun PosTerminalScreen(
                 .background(MaterialTheme.colorScheme.background),
     ) {
         if (isLandscape) {
-            // Diseño Master-Detail para Modo Horizontal (Landscape)
+            // Diseño Master-Detail 1:1 Web POS para Modo Horizontal (Landscape)
             PosTerminalLandscapeLayout(
                 state = state,
                 onSearchQueryChange = viewModel::onSearchQueryChange,
@@ -166,6 +184,11 @@ fun PosTerminalScreen(
                 onIncrement = viewModel::incrementQuantity,
                 onDecrement = viewModel::decrementQuantity,
                 onRemove = viewModel::removeFromCart,
+                onEditQuantity = { item ->
+                    editingItem = item
+                    editTarget = CartEditTarget.QUANTITY
+                    editValueText = if (item.quantity % 1.0 == 0.0) String.format(Locale.US, "%.0f", item.quantity) else String.format(Locale.US, "%.2f", item.quantity)
+                },
                 onEditPrice = { item ->
                     editingItem = item
                     editTarget = CartEditTarget.PRICE
@@ -184,13 +207,26 @@ fun PosTerminalScreen(
                 onSelectClient = { viewModel.openClientDialog() },
                 onRemoveClient = { viewModel.removeSelectedClient() },
                 onChangeSeller = { viewModel.openSellerSheet() },
+                onSearchSellerByCode = viewModel::searchSellerByCode,
+                onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
+                onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
                 onSelectBranch = viewModel::selectClientBranch,
                 onNavigateToCajas = onNavigateToCajas,
                 onRenovarCaja = viewModel::renovarCajaDiaAnterior,
+                onToggleCatalog = viewModel::toggleCatalogDrawer,
+                onCloseCatalog = { viewModel.setCatalogDrawerOpen(false) },
+                onAddProductByCode = { code -> viewModel.addProductByCode(code) },
+                onOpenProductDialog = viewModel::openProductDialog,
+                onObservationChange = viewModel::onObservationChange,
+                onDocumentTypeSelected = viewModel::onDocumentTypeSelected,
+                onPrintReceipt = { viewModel.printReceipt() },
+                onOpenDrawer = onOpenDrawer,
+                onNextPage = viewModel::onCatalogNextPage,
+                onPrevPage = viewModel::onCatalogPrevPage,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            // Diseño Monocolumna con Pestañas para Modo Vertical (Portrait)
+            // Diseño Adaptado Web POS para Modo Vertical (Portrait)
             PosTerminalPortraitLayout(
                 state = state,
                 selectedTab = selectedTab,
@@ -202,6 +238,11 @@ fun PosTerminalScreen(
                 onIncrement = viewModel::incrementQuantity,
                 onDecrement = viewModel::decrementQuantity,
                 onRemove = viewModel::removeFromCart,
+                onEditQuantity = { item ->
+                    editingItem = item
+                    editTarget = CartEditTarget.QUANTITY
+                    editValueText = if (item.quantity % 1.0 == 0.0) String.format(Locale.US, "%.0f", item.quantity) else String.format(Locale.US, "%.2f", item.quantity)
+                },
                 onEditPrice = { item ->
                     editingItem = item
                     editTarget = CartEditTarget.PRICE
@@ -220,9 +261,22 @@ fun PosTerminalScreen(
                 onSelectClient = { viewModel.openClientDialog() },
                 onRemoveClient = { viewModel.removeSelectedClient() },
                 onChangeSeller = { viewModel.openSellerSheet() },
+                onSearchSellerByCode = viewModel::searchSellerByCode,
+                onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
+                onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
                 onSelectBranch = viewModel::selectClientBranch,
                 onNavigateToCajas = onNavigateToCajas,
                 onRenovarCaja = viewModel::renovarCajaDiaAnterior,
+                onToggleCatalog = viewModel::toggleCatalogDrawer,
+                onCloseCatalog = { viewModel.setCatalogDrawerOpen(false) },
+                onAddProductByCode = { code -> viewModel.addProductByCode(code) },
+                onOpenProductDialog = viewModel::openProductDialog,
+                onObservationChange = viewModel::onObservationChange,
+                onDocumentTypeSelected = viewModel::onDocumentTypeSelected,
+                onPrintReceipt = { viewModel.printReceipt() },
+                onOpenDrawer = onOpenDrawer,
+                onNextPage = viewModel::onCatalogNextPage,
+                onPrevPage = viewModel::onCatalogPrevPage,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -234,8 +288,33 @@ fun PosTerminalScreen(
             state = state,
             onReceivedAmountChange = viewModel::onReceivedAmountChange,
             onSelectPaymentMethod = viewModel::selectPaymentMethod,
+            onSetPaymentMethodAmount = viewModel::setPaymentMethodAmount,
+            onClearPayments = viewModel::clearPayments,
+            onSelectActiveInput = viewModel::setActivePaymentInputMethod,
+            onPaymentMethodBadgeClick = viewModel::onPaymentMethodBadgeClick,
+            onPaymentMethodTextChange = viewModel::onPaymentMethodTextChange,
+            onClearSinglePaymentMethod = viewModel::onClearSinglePaymentMethod,
+            onKeypadInput = viewModel::onKeypadInput,
+            onToggleCashDenominations = viewModel::toggleCashDenominations,
+            onAddCashDenomination = viewModel::onAddCashDenomination,
             onConfirmPayment = viewModel::processSale,
             onDismiss = viewModel::dismissPaymentDialog,
+        )
+    }
+
+    if (state.showCustomClientNameDialog) {
+        CustomClientNameDialog(
+            initialName = state.customClientName,
+            onConfirm = viewModel::setCustomClientName,
+            onDismiss = viewModel::dismissCustomClientNameDialog,
+        )
+    }
+
+    if (state.showGlobalDiscountDialog) {
+        GlobalDiscountDialog(
+            currentPercent = state.globalDiscountPercent,
+            onConfirm = viewModel::setGlobalDiscount,
+            onDismiss = viewModel::dismissGlobalDiscountDialog,
         )
     }
 
@@ -282,8 +361,22 @@ fun PosTerminalScreen(
         )
     }
 
+    if (state.showProductDialog) {
+        ProductSelectionDialog(
+            initialQuery = state.productDialogQuery,
+            products = state.products,
+            departments = state.departments,
+            isLoading = state.isLoading,
+            onAddToCart = { product ->
+                viewModel.addToCart(product)
+                viewModel.dismissProductDialog()
+            },
+            onDismiss = viewModel::dismissProductDialog,
+        )
+    }
+
     if (state.showSellerSheet) {
-        SellerSelectorBottomSheet(
+        SellerSelectionDialog(
             sellers = state.availableSellers,
             selectedSellerId = state.selectedSeller?.id,
             onSelect = viewModel::selectSeller,
@@ -320,6 +413,7 @@ fun PosTerminalScreen(
                 val item = editingItem
                 if (target != null && item != null) {
                     when (target) {
+                        CartEditTarget.QUANTITY -> viewModel.setItemQuantity(item.product.id, parsed)
                         CartEditTarget.PRICE -> viewModel.updateItemPrice(item.product.id, parsed)
                         CartEditTarget.DISCOUNT -> viewModel.updateItemDiscount(item.product.id, parsed)
                     }
@@ -336,9 +430,11 @@ fun PosTerminalScreen(
 }
 
 /**
- * Layout Master-Detail de Alto Rendimiento para Terminal POS en Modo Horizontal.
- * Catálogo a la izquierda (~58% de ancho) y Carrito con Cobro a la derecha (~42% de ancho).
- * Elimina la necesidad de pestañas y maximiza el área vertical de desplazamiento.
+ * Layout 1:1 Web POS de Alto Rendimiento para Terminal POS en Modo Horizontal.
+ * Cabecera Web azul con correlativo y herramientas rápidas.
+ * Barra de controles superiores (Cliente, Vendedor, Código Barra, Observación, Descuento y Cobro directo).
+ * Tabla contable oficial Web POS a la izquierda y Catálogo de Productos en Cajón lateral derecho deslizable.
+ * Footer inferior Web con estados de caja, vendedor y selector de tipo de documento (Factura, Pre-Orden, etc.).
  */
 @Composable
 private fun PosTerminalLandscapeLayout(
@@ -352,6 +448,7 @@ private fun PosTerminalLandscapeLayout(
     onRemove: (String) -> Unit,
     onEditPrice: (CartItem) -> Unit,
     onEditDiscount: (CartItem) -> Unit,
+    onEditQuantity: (CartItem) -> Unit = {},
     onPriceLevelChange: (String, String) -> Unit,
     onUpdatePromotionQuantity: (String, Int) -> Unit,
     onRemovePromotion: (String) -> Unit,
@@ -360,323 +457,146 @@ private fun PosTerminalLandscapeLayout(
     onSelectClient: () -> Unit,
     onRemoveClient: () -> Unit,
     onChangeSeller: () -> Unit,
+    onSearchSellerByCode: (String) -> Unit = {},
+    onOpenCustomClientNameDialog: () -> Unit = {},
+    onOpenGlobalDiscountDialog: () -> Unit = {},
     onSelectBranch: (ClientBranch) -> Unit,
     onNavigateToCajas: () -> Unit,
     onRenovarCaja: () -> Unit = {},
+    onToggleCatalog: () -> Unit,
+    onCloseCatalog: () -> Unit,
+    onAddProductByCode: (String) -> Unit,
+    onOpenProductDialog: (String) -> Unit = {},
+    onObservationChange: (String) -> Unit,
+    onDocumentTypeSelected: (String) -> Unit,
+    onPrintReceipt: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
+    onNextPage: () -> Unit = {},
+    onPrevPage: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        PosHeaderBar(
-            cajaName = state.activeCajaName,
-            isCajaOpen = state.isCajaOpen,
-            isDiaAnterior = state.isCajaDiaAnterior,
-            fechaApertura = state.cajaFechaApertura,
-            sucursalNombre = state.sucursalNombre,
-            almacenNombre = state.almacenNombre,
-            usuarioApertura = state.usuarioApertura,
-            client = state.selectedClient,
-            onClientClick = onSelectClient,
-            onCajaClick = onNavigateToCajas,
-            onRenovar = onRenovarCaja,
-            isRenovando = state.isRenovandoCaja,
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF1F5F9)),
+    ) {
+        // Cabecera Web azul Flow ERP (44dp compacta)
+        PosWebHeaderBar(
+            correlativo = state.completedSaleInvoice ?: "#001-00112",
+            cartItemCount = state.summary.itemCount,
+            isCatalogOpen = state.isCatalogDrawerOpen,
+            onOpenDrawer = onOpenDrawer,
+            onClearCart = onClearCart,
+            onSaveDraft = { /* Guardar borrador */ },
+            onSearchInvoices = { /* Buscar documento */ },
+            onPrintReceipt = onPrintReceipt,
+            onToggleCatalog = onToggleCatalog,
         )
 
+        // Área Central de Trabajo: 2 Columnas Maestras 1:1 Web POS
         Row(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-        // --- Panel Izquierdo: Catálogo de Productos ---
-        Column(
-            modifier =
-                Modifier
-                    .weight(1.35f)
+            // Columna Izquierda: Facturación y Tabla contable
+            Column(
+                modifier = Modifier
+                    .weight(1.25f)
                     .fillMaxHeight(),
-        ) {
-            // Buscador compacto de 46dp
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = onSearchQueryChange,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .forceShowKeyboardOnTouch(),
-                placeholder = { Text("Buscar producto...", fontSize = 13.sp) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = "Buscar",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                trailingIcon = {
-                    if (state.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Limpiar", modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = PosExtraShapes.InputRadius,
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-            )
-
-            // Chips de filtro por departamento compactos
-            if (state.departments.isNotEmpty()) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    FilterChip(
-                        selected = state.selectedDepartmentId == null,
-                        onClick = { onDepartmentSelected(null) },
-                        label = { Text("Todos", fontSize = 12.sp) },
-                        shape = RoundedCornerShape(8.dp),
-                        colors =
-                            FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = PosPalette.FixedWhite,
-                            ),
-                    )
-                    state.departments.forEach { dept ->
-                        FilterChip(
-                            selected = state.selectedDepartmentId == dept.id,
-                            onClick = { onDepartmentSelected(dept.id) },
-                            label = { Text(dept.name, fontSize = 12.sp) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors =
-                                FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = PosPalette.FixedWhite,
-                                ),
-                        )
-                    }
-                }
-            }
-
-            // Cuadrícula de productos aprovechando toda la altura
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (state.isLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                } else if (state.filteredProducts.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        PosEmptyState(
-                            icon = Icons.Default.ShoppingCart,
-                            title = "Sin productos",
-                            message = "No se encontraron productos disponibles.",
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 135.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        items(state.filteredProducts, key = { it.id }) { product ->
-                            ProductGridItem(
-                                product = product,
-                                onAddToCart = { onAddToCart(product) },
-                                onQuantityClick = { onQuantityPicker(product) },
-                            )
-                        }
-                    }
+                PosInvoiceFormControls(
+                    client = state.selectedClient,
+                    seller = state.selectedSeller,
+                    observationText = state.observationText,
+                    customClientName = state.customClientName,
+                    onSelectClient = onSelectClient,
+                    onSelectSeller = onChangeSeller,
+                    onSearchSellerByCode = onSearchSellerByCode,
+                    onOpenCustomClientNameDialog = onOpenCustomClientNameDialog,
+                    onAddProductByCode = onAddProductByCode,
+                    onOpenProductDialog = onOpenProductDialog,
+                    onObservationChange = onObservationChange,
+                )
+
+                if (state.clientBranches.isNotEmpty()) {
+                    ClientSucursalSelectorCard(
+                        sucursales = state.clientBranches,
+                        selectedSucursal = state.selectedClientBranch,
+                        isRequiredMissing = state.branchSelectionRequiredError,
+                        onSelect = onSelectBranch,
+                    )
                 }
-            }
-        }
 
-        // Divisor vertical sutil
-        VerticalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxHeight().width(1.dp),
-        )
-
-        // --- Panel Derecho: Carrito de Compras y Cobro Inmediato ---
-        Column(
-            modifier =
-                Modifier
-                    .weight(0.95f)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            // Panel superior consolidado: Cliente + Vendedor
-            CartClientVendorPanel(
-                state = state,
-                onSelectClient = onSelectClient,
-                onRemoveClient = onRemoveClient,
-                onChangeSeller = onChangeSeller,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-
-            // Selector de Sucursal del Cliente (cuando tiene sucursales disponibles)
-            if (state.clientBranches.isNotEmpty()) {
-                ClientSucursalSelectorCard(
-                    sucursales = state.clientBranches,
-                    selectedSucursal = state.selectedClientBranch,
-                    isRequiredMissing = state.branchSelectionRequiredError,
-                    onSelect = onSelectBranch,
-                    modifier = Modifier.padding(bottom = 6.dp),
+                PosCartWebTable(
+                    cart = state.cart,
+                    summary = state.summary,
+                    branchName = state.sucursalNombre.orEmpty().ifEmpty { "Principal" },
+                    onIncrement = onIncrement,
+                    onDecrement = onDecrement,
+                    onRemove = onRemove,
+                    onEditPrice = onEditPrice,
+                    onEditDiscount = onEditDiscount,
+                    onEditQuantity = onEditQuantity,
+                    onPriceLevelChange = onPriceLevelChange,
+                    modifier = Modifier.weight(1f),
                 )
             }
 
-            // Lista de renglones del carrito
-            if (state.cart.isEmpty()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PosEmptyState(
-                        icon = Icons.Default.ShoppingCart,
-                        title = "Carrito vacío",
-                        message = "Toca productos del catálogo para agregarlos.",
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    items(state.displayItems, key = { it.id }) { displayItem ->
-                        when (displayItem) {
-                            is ItemCarrito.ProductoIndividual -> {
-                                CartItemRow(
-                                    item = displayItem.item,
-                                    onIncrement = { onIncrement(displayItem.item.product.id) },
-                                    onDecrement = { onDecrement(displayItem.item.product.id) },
-                                    onRemove = { onRemove(displayItem.item.product.id) },
-                                    onEditPrice = { onEditPrice(displayItem.item) },
-                                    onEditDiscount = { onEditDiscount(displayItem.item) },
-                                    onPriceLevelChange = { level -> onPriceLevelChange(displayItem.item.product.id, level) },
-                                    allowEditPrice = state.allowEditPrices,
-                                    allowDiscount = state.allowDiscounts,
-                                )
-                            }
-                            is ItemCarrito.PromocionAgrupada -> {
-                                PromotionCartGroup(
-                                    group = displayItem,
-                                    onRemove = { onRemovePromotion(displayItem.promocionId) },
-                                    onQuantityChange = { times -> onUpdatePromotionQuantity(displayItem.promocionId, times) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Resumen de Totales y Botones de Cobro
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                modifier = Modifier.fillMaxWidth(),
+            // Columna Derecha: Tarjetas de Descuento / Pagar + Catálogo de Productos Web (Siempre visible)
+            Column(
+                modifier = Modifier
+                    .weight(0.95f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("Subtotal", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        AdaptiveAmountText(
-                            text = "$${String.format(Locale.US, "%.2f", state.summary.subtotal)}",
-                            baseStyle = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("IVA", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        AdaptiveAmountText(
-                            text = "$${String.format(Locale.US, "%.2f", state.summary.tax)}",
-                            baseStyle = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Total General",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        AdaptiveAmountText(
-                            text = "$${String.format(Locale.US, "%.2f", state.summary.total)}",
-                            baseStyle = PosTextStyles.totalDisplay.copy(fontSize = 20.sp),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                PosTotalsActionCards(
+                    summary = state.summary,
+                    globalDiscountPercent = state.globalDiscountPercent,
+                    onOpenPayment = onOpenPayment,
+                    onOpenGlobalDiscountDialog = onOpenGlobalDiscountDialog,
+                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (state.cart.isNotEmpty()) {
-                            OutlinedButton(
-                                onClick = onClearCart,
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = PosExtraShapes.InputRadius,
-                                contentPadding = PaddingValues(horizontal = 6.dp),
-                            ) {
-                                Text("Vaciar", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-
-                        PosGradientButton(
-                            text = "Cobrar ($${String.format(Locale.US, "%.2f", state.summary.total)})",
-                            onClick = onOpenPayment,
-                            enabled = state.cart.isNotEmpty(),
-                            shape = PosExtraShapes.InputRadius,
-                            modifier = Modifier.weight(2f).height(44.dp),
-                        )
-                    }
-                }
+                PosProductCatalogDrawer(
+                    isOpen = true,
+                    products = state.filteredProducts,
+                    departments = state.departments,
+                    selectedDepartmentId = state.selectedDepartmentId,
+                    searchQuery = state.searchQuery,
+                    isLoading = state.isLoading || state.isCatalogLoading,
+                    currentPage = state.catalogCurrentPage,
+                    totalPages = state.catalogTotalPages,
+                    onNextPage = onNextPage,
+                    onPrevPage = onPrevPage,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onDepartmentSelected = onDepartmentSelected,
+                    onAddToCart = onAddToCart,
+                    onOpenOptions = onQuantityPicker,
+                    onClose = {},
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
+
+        // Barra Inferior de Estado y Pestañas de Documentos (32dp compacta)
+        PosWebFooterBar(
+            isOnline = true,
+            cajaName = state.activeCajaName,
+            sellerName = state.selectedSeller?.nombre,
+            sucursalName = state.sucursalNombre,
+            activeDocumentType = state.activeDocumentType,
+            onDocumentTypeSelected = onDocumentTypeSelected,
+            onNavigateToCajas = onNavigateToCajas,
+            onChangeSeller = onChangeSeller,
+        )
     }
-}
 }
 
 /**
- * Layout Monocolumna con Pestañas para Teléfonos y Pantallas en Modo Vertical.
+ * Layout Adaptado Web POS para Pantallas en Modo Vertical (Teléfonos / Portrait).
  */
 @Composable
 private fun PosTerminalPortraitLayout(
@@ -692,6 +612,7 @@ private fun PosTerminalPortraitLayout(
     onRemove: (String) -> Unit,
     onEditPrice: (CartItem) -> Unit,
     onEditDiscount: (CartItem) -> Unit,
+    onEditQuantity: (CartItem) -> Unit = {},
     onPriceLevelChange: (String, String) -> Unit,
     onUpdatePromotionQuantity: (String, Int) -> Unit,
     onRemovePromotion: (String) -> Unit,
@@ -700,39 +621,55 @@ private fun PosTerminalPortraitLayout(
     onSelectClient: () -> Unit,
     onRemoveClient: () -> Unit,
     onChangeSeller: () -> Unit,
+    onSearchSellerByCode: (String) -> Unit = {},
+    onOpenCustomClientNameDialog: () -> Unit = {},
+    onOpenGlobalDiscountDialog: () -> Unit = {},
     onSelectBranch: (ClientBranch) -> Unit,
     onNavigateToCajas: () -> Unit,
     onRenovarCaja: () -> Unit = {},
+    onToggleCatalog: () -> Unit,
+    onCloseCatalog: () -> Unit,
+    onAddProductByCode: (String) -> Unit,
+    onOpenProductDialog: (String) -> Unit = {},
+    onObservationChange: (String) -> Unit,
+    onDocumentTypeSelected: (String) -> Unit,
+    onPrintReceipt: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
+    onNextPage: () -> Unit = {},
+    onPrevPage: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        // --- Barra Superior: Estado de Caja y Cliente ---
-        PosHeaderBar(
-            cajaName = state.activeCajaName,
-            isCajaOpen = state.isCajaOpen,
-            isDiaAnterior = state.isCajaDiaAnterior,
-            fechaApertura = state.cajaFechaApertura,
-            sucursalNombre = state.sucursalNombre,
-            almacenNombre = state.almacenNombre,
-            usuarioApertura = state.usuarioApertura,
-            client = state.selectedClient,
-            onClientClick = onSelectClient,
-            onCajaClick = onNavigateToCajas,
-            onRenovar = onRenovarCaja,
-            isRenovando = state.isRenovandoCaja,
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFF1F5F9)),
+    ) {
+        // Cabecera Web azul Flow ERP
+        PosWebHeaderBar(
+            correlativo = state.completedSaleInvoice ?: "#001-00112",
+            cartItemCount = state.summary.itemCount,
+            isCatalogOpen = selectedTab == 0,
+            onOpenDrawer = onOpenDrawer,
+            onClearCart = onClearCart,
+            onSaveDraft = { },
+            onSearchInvoices = { },
+            onPrintReceipt = onPrintReceipt,
+            onToggleCatalog = {
+                onTabSelected(if (selectedTab == 0) 1 else 0)
+            },
         )
 
-        // --- Pestañas estilizadas ---
+        // Pestañas estilizadas: Catálogo (0) vs Factura (1)
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
+            containerColor = Color.White,
+            contentColor = FlowBrandBlue,
             indicator = { tabPositions ->
                 if (selectedTab < tabPositions.size) {
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = MaterialTheme.colorScheme.primary,
-                        height = 3.dp,
+                        color = FlowBrandBlue,
+                        height = 2.5.dp,
                     )
                 }
             },
@@ -744,6 +681,7 @@ private fun PosTerminalPortraitLayout(
                     Text(
                         "Catálogo (${state.filteredProducts.size})",
                         fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp,
                     )
                 },
             )
@@ -754,53 +692,139 @@ private fun PosTerminalPortraitLayout(
                     BadgedBox(
                         badge = {
                             if (state.summary.itemCount > 0) {
-                                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                    Text("${state.summary.itemCount}", color = PosPalette.FixedWhite)
+                                Badge(containerColor = FlowBrandBlue) {
+                                    Text("${state.summary.itemCount}", color = PosPalette.FixedWhite, fontSize = 10.sp)
                                 }
                             }
                         },
                     ) {
                         Text(
-                            "Carrito $${String.format(Locale.US, "%.2f", state.summary.total)}",
+                            "Factura ($${String.format(Locale.US, "%.2f", state.summary.total)})",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp),
                         )
                     }
                 },
             )
         }
 
-        // --- Contenido de la pestaña activa ---
+        // Contenido según pestaña seleccionada
         Box(modifier = Modifier.weight(1f)) {
             if (selectedTab == 0) {
-                CatalogTab(
-                    state = state,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onDepartmentSelected = onDepartmentSelected,
-                    onAddToCart = onAddToCart,
-                    onQuantityPicker = onQuantityPicker,
-                    onViewCart = { onTabSelected(1) },
-                )
+                // Catálogo compacto Web
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PosProductCatalogDrawer(
+                        isOpen = true,
+                        products = state.filteredProducts,
+                        departments = state.departments,
+                        selectedDepartmentId = state.selectedDepartmentId,
+                        searchQuery = state.searchQuery,
+                        isLoading = state.isLoading || state.isCatalogLoading,
+                        currentPage = state.catalogCurrentPage,
+                        totalPages = state.catalogTotalPages,
+                        onNextPage = onNextPage,
+                        onPrevPage = onPrevPage,
+                        onSearchQueryChange = onSearchQueryChange,
+                        onDepartmentSelected = onDepartmentSelected,
+                        onAddToCart = onAddToCart,
+                        onOpenOptions = onQuantityPicker,
+                        onClose = { onTabSelected(1) },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(6.dp),
+                    )
+
+                    // Botón flotante para ver factura si hay items en el carrito
+                    if (state.summary.itemCount > 0) {
+                        ExtendedFloatingActionButton(
+                            onClick = { onTabSelected(1) },
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                            Text("${state.summary.itemCount}", fontSize = 10.sp)
+                                        }
+                                    },
+                                ) {
+                                    Icon(Icons.Default.ShoppingCart, contentDescription = "Factura")
+                                }
+                            },
+                            text = { Text("Ver Factura ($${String.format(Locale.US, "%.2f", state.summary.total)})") },
+                            containerColor = FlowBrandBlue,
+                            contentColor = PosPalette.FixedWhite,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp),
+                        )
+                    }
+                }
             } else {
-                CartTab(
-                    state = state,
-                    onIncrement = onIncrement,
-                    onDecrement = onDecrement,
-                    onRemove = onRemove,
-                    onEditPrice = onEditPrice,
-                    onEditDiscount = onEditDiscount,
-                    onPriceLevelChange = onPriceLevelChange,
-                    onUpdatePromotionQuantity = onUpdatePromotionQuantity,
-                    onRemovePromotion = onRemovePromotion,
-                    onClearCart = onClearCart,
-                    onOpenPayment = onOpenPayment,
-                    onSelectClient = onSelectClient,
-                    onRemoveClient = onRemoveClient,
-                    onChangeSeller = onChangeSeller,
-                    onSelectBranch = onSelectBranch,
-                )
+                // Factura completa: Totales + Controles + Tabla contable
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    PosTotalsActionCards(
+                        summary = state.summary,
+                        globalDiscountPercent = state.globalDiscountPercent,
+                        onOpenPayment = onOpenPayment,
+                        onOpenGlobalDiscountDialog = onOpenGlobalDiscountDialog,
+                    )
+
+                    PosInvoiceFormControls(
+                        client = state.selectedClient,
+                        seller = state.selectedSeller,
+                        observationText = state.observationText,
+                        customClientName = state.customClientName,
+                        onSelectClient = onSelectClient,
+                        onSelectSeller = onChangeSeller,
+                        onSearchSellerByCode = onSearchSellerByCode,
+                        onOpenCustomClientNameDialog = onOpenCustomClientNameDialog,
+                        onAddProductByCode = onAddProductByCode,
+                        onOpenProductDialog = onOpenProductDialog,
+                        onObservationChange = onObservationChange,
+                    )
+
+                    if (state.clientBranches.isNotEmpty()) {
+                        ClientSucursalSelectorCard(
+                            sucursales = state.clientBranches,
+                            selectedSucursal = state.selectedClientBranch,
+                            isRequiredMissing = state.branchSelectionRequiredError,
+                            onSelect = onSelectBranch,
+                        )
+                    }
+
+                    PosCartWebTable(
+                        cart = state.cart,
+                        summary = state.summary,
+                        branchName = state.sucursalNombre.orEmpty().ifEmpty { "Principal" },
+                        onIncrement = onIncrement,
+                        onDecrement = onDecrement,
+                        onRemove = onRemove,
+                        onEditPrice = onEditPrice,
+                        onEditDiscount = onEditDiscount,
+                        onEditQuantity = onEditQuantity,
+                        onPriceLevelChange = onPriceLevelChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
+
+        // Footer Web
+        PosWebFooterBar(
+            isOnline = true,
+            cajaName = state.activeCajaName,
+            sellerName = state.selectedSeller?.nombre,
+            sucursalName = state.sucursalNombre,
+            activeDocumentType = state.activeDocumentType,
+            onDocumentTypeSelected = onDocumentTypeSelected,
+            onNavigateToCajas = onNavigateToCajas,
+            onChangeSeller = onChangeSeller,
+        )
     }
 }
 
@@ -1170,7 +1194,7 @@ private fun ProductGridItem(
                 contentAlignment = Alignment.Center,
             ) {
                 if (product.photoUrl.isNotBlank()) {
-                    SubcomposeAsyncImage(
+                    AsyncImage(
                         model =
                             ImageRequest.Builder(LocalContext.current)
                                 .data(product.photoUrl)
@@ -1179,26 +1203,6 @@ private fun ProductGridItem(
                         contentDescription = product.description,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,
-                        loading = {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                )
-                            }
-                        },
-                        error = {
-                            Icon(
-                                imageVector = Icons.Default.ShoppingCart,
-                                contentDescription = null,
-                                modifier = Modifier.size(36.dp),
-                                tint = MaterialTheme.colorScheme.outline,
-                            )
-                        },
                     )
                 } else {
                     Icon(
@@ -1465,6 +1469,7 @@ private fun CartTab(
                             text = "Cobrar ($${String.format(Locale.US, "%.2f", state.summary.total)})",
                             onClick = onOpenPayment,
                             shape = PosExtraShapes.InputRadius,
+                            gradient = FlowBrandGradient,
                             modifier = Modifier.weight(2f).height(48.dp),
                         )
                     }
@@ -1486,7 +1491,7 @@ private fun ProductThumbnail(
         modifier = modifier.clip(RoundedCornerShape(8.dp)),
     ) {
         if (imageUrl.isNotBlank()) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model =
                     ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
@@ -1494,32 +1499,7 @@ private fun ProductThumbnail(
                         .build(),
                 contentDescription = description,
                 modifier = Modifier.fillMaxSize(),
-                loading = {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-                error = {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-                success = {
-                    SubcomposeAsyncImageContent(
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                },
+                contentScale = ContentScale.Crop,
             )
         } else {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -2354,7 +2334,7 @@ private fun PromotionChoiceSheet(
     }
 }
 
-private enum class CartEditTarget { PRICE, DISCOUNT }
+private enum class CartEditTarget { QUANTITY, PRICE, DISCOUNT }
 
 @Composable
 private fun EditItemValueDialog(
@@ -2366,10 +2346,12 @@ private fun EditItemValueDialog(
     onDismiss: () -> Unit,
 ) {
     val title = when (target) {
+        CartEditTarget.QUANTITY -> "Editar cantidad"
         CartEditTarget.PRICE -> "Editar precio unitario"
         CartEditTarget.DISCOUNT -> "Aplicar descuento"
     }
     val label = when (target) {
+        CartEditTarget.QUANTITY -> "Cantidad (${item.product.unitPackage.ifBlank { "UND" }})"
         CartEditTarget.PRICE -> "Precio unitario con IVA"
         CartEditTarget.DISCOUNT -> "Descuento (%)"
     }
@@ -2378,7 +2360,7 @@ private fun EditItemValueDialog(
         confirmButton = {
             Button(onClick = {
                 val parsed = value.toDoubleOrNull()
-                if (parsed != null) {
+                if (parsed != null && (target != CartEditTarget.QUANTITY || parsed > 0.0)) {
                     onConfirm(parsed)
                 }
             }) {
@@ -2403,6 +2385,103 @@ private fun EditItemValueDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth().forceShowKeyboardOnTouch(),
                 )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CustomClientNameDialog(
+    initialName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Facturar a Nombre de (CF)", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text(
+                    "Ingrese el nombre de la persona o razón social para emitir la factura a Consumidor Final:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre o Razón Social") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().forceShowKeyboardOnTouch(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name) }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        },
+    )
+}
+
+@Composable
+private fun GlobalDiscountDialog(
+    currentPercent: Double,
+    onConfirm: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var discountText by remember { mutableStateOf(if (currentPercent > 0.0) String.format(Locale.US, "%.0f", currentPercent) else "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Descuento Global de la Venta", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Seleccione o ingrese el porcentaje de descuento global aplicable a toda la factura:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf(0, 5, 10, 15, 20).forEach { pct ->
+                        OutlinedButton(
+                            onClick = { discountText = pct.toString() },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+                        ) {
+                            Text("$pct%", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = discountText,
+                    onValueChange = { discountText = it },
+                    label = { Text("Porcentaje (%)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth().forceShowKeyboardOnTouch(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val parsed = discountText.toDoubleOrNull() ?: 0.0
+                onConfirm(parsed)
+            }) {
+                Text("Aplicar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
             }
         },
     )
@@ -2685,264 +2764,6 @@ private fun SaleSuccessDialog(
 }
 
 
-@Composable
-private fun ClientSelectionDialog(
-    currentClient: Client?,
-    onSearch: suspend (String) -> List<Client>,
-    onClientSelected: (Client) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<Client>>(emptyList()) }
-    var isSearching by remember { mutableStateOf(false) }
-
-    LaunchedEffect(searchQuery) {
-        isSearching = true
-        searchResults = onSearch(searchQuery)
-        isSearching = false
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = PosExtraShapes.DialogRadius,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Seleccionar Cliente",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Clear, contentDescription = "Cerrar")
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp),
-            ) {
-                // Buscador
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar por nombre, RUC, cédula o código...") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Limpiar")
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = PosExtraShapes.InputRadius,
-                    modifier = Modifier.fillMaxWidth().forceShowKeyboardOnTouch(),
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Opción Rápida: Consumidor Final (CF)
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (currentClient?.code == "CF" || currentClient == null) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
-                    ),
-                    shape = PosExtraShapes.CardRadius,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onClientSelected(
-                                Client(id = "0", code = "CF", name = "CONSUMIDOR FINAL", identification = "CF")
-                            )
-                        },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "CONSUMIDOR FINAL",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                "Venta al público general (CF)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (currentClient?.code == "CF" || currentClient == null) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (isSearching) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                } else if (searchResults.isEmpty() && searchQuery.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "No se encontraron clientes para '$searchQuery'",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(searchResults.filter { it.code != "CF" && it.id != "0" }, key = { it.id.ifBlank { it.code } }) { client ->
-                            val isSelected = currentClient?.id == client.id || (currentClient?.code == client.code && client.code.isNotBlank())
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSelected) {
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surface
-                                    },
-                                ),
-                                shape = PosExtraShapes.CardRadius,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onClientSelected(client) },
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        modifier = Modifier.size(34.dp),
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                Icons.Default.Person,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.secondary,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            client.fullName.ifBlank { client.name },
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        ) {
-                                            if (client.identification.isNotBlank()) {
-                                                Text(
-                                                    "ID: ${client.identification}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                            if (client.code.isNotBlank()) {
-                                                Text(
-                                                    "Cód: ${client.code}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        }
-                                        if (client.address.isNotBlank()) {
-                                            Text(
-                                                client.address,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-                                    if (isSelected) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
-        },
-    )
-}
 
 @Composable
 internal fun CartClientVendorPanel(

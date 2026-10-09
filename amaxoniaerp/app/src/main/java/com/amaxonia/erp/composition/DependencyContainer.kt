@@ -46,6 +46,7 @@ object DependencyContainer {
             productRepository = productRepository,
             scopeStore = offlineSyncSettingsStore,
             sucursalRepository = sucursalRepository,
+            cajaRepository = cajaRepository,
             bootstrapEnqueuer = {
                 appContext?.let { ctx ->
                     SyncScheduler.enqueueBootstrap(ctx)
@@ -101,15 +102,41 @@ object DependencyContainer {
     }
 
     val cajaRepository: com.amaxonia.erp.domain.repository.CajaRepository by lazy {
-        com.amaxonia.erp.data.repository.CajaRepositoryImpl(apiService, localStore)
+        com.amaxonia.erp.data.repository.CajaRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            cajaSesionDao = database.cajaSesionDao(),
+            networkMonitor = networkMonitor,
+        )
     }
 
     val salesRepository: com.amaxonia.erp.domain.repository.SalesRepository by lazy {
-        com.amaxonia.erp.data.repository.SalesRepositoryImpl(apiService, localStore)
+        com.amaxonia.erp.data.repository.SalesRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            paymentMethodDao = database.paymentMethodDao(),
+            networkMonitor = networkMonitor,
+        )
+    }
+
+    val invoiceHistoryRepository: com.amaxonia.erp.domain.repository.InvoiceHistoryRepository by lazy {
+        com.amaxonia.erp.data.repository.InvoiceHistoryRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            pendingInvoiceDao = database.pendingInvoiceDao(),
+            networkMonitor = networkMonitor,
+        )
     }
 
     val promotionRepository: com.amaxonia.erp.domain.repository.PromotionRepository by lazy {
-        com.amaxonia.erp.data.repository.PromotionRepositoryImpl(apiService, localStore, productRepository)
+        com.amaxonia.erp.data.repository.PromotionRepositoryImpl(
+            apiService = apiService,
+            localStore = localStore,
+            productRepository = productRepository,
+            promocionDao = database.promocionDao(),
+            productDao = database.productDao(),
+            networkMonitor = networkMonitor,
+        )
     }
 
     val printerProvider: com.amaxonia.erp.domain.repository.PrinterProvider by lazy {
@@ -199,5 +226,16 @@ object DependencyContainer {
                     SyncScheduler.enqueuePendingInvoices(ctx)
                 }
             },
+        )
+
+    fun createHistoryViewModel(companySession: com.amaxonia.erp.domain.model.CompanySession? = null): com.amaxonia.erp.ui.history.HistoryViewModel =
+        com.amaxonia.erp.ui.history.HistoryViewModel(
+            transactionRepository = invoiceHistoryRepository,
+            cajaRepository = cajaRepository,
+            printGateway = defaultInvoicePrintGateway,
+            countryCodeProvider = {
+                companySession?.company?.countryCode?.takeIf { it.isNotBlank() } ?: "PA"
+            },
+            networkMonitor = networkMonitor,
         )
 }

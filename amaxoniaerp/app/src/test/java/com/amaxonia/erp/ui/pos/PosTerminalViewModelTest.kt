@@ -45,6 +45,7 @@ import org.junit.Test
 import com.amaxonia.erp.domain.model.ItemCarrito
 import com.amaxonia.erp.domain.model.Promocion
 import com.amaxonia.erp.domain.model.PromocionDetalle
+import com.amaxonia.erp.domain.repository.PagedProducts
 import com.amaxonia.erp.domain.repository.PromotionRepository
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -53,19 +54,39 @@ import java.time.LocalDate
 class PosTerminalViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
-    private class FakeProductRepository : ProductRepository {
+    private class FakeProductRepository(
+        private val productsList: List<Product> = listOf(
+            Product(
+                id = "1",
+                code = "P01",
+                description = "Test Product",
+                department = "1",
+                prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
+                taxRate = 16.0,
+            ),
+        ),
+        private val departmentsList: List<DepartmentDto> = emptyList(),
+    ) : ProductRepository {
         override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
-            Result.success(
-                listOf(
-                    Product(
-                        id = "1",
-                        code = "P01",
-                        description = "Test Product",
-                        prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
-                        taxRate = 16.0,
-                    ),
-                )
+            Result.success(productsList)
+
+        override suspend fun getPagedProducts(
+            page: Int,
+            pageSize: Int,
+            departmentId: Int?,
+            search: String?,
+        ): Result<PagedProducts> {
+            val offset = (page - 1) * pageSize
+            val paged = productsList.drop(offset).take(pageSize)
+            return Result.success(
+                PagedProducts(
+                    items = paged,
+                    totalCount = productsList.size,
+                    page = page,
+                    pageSize = pageSize,
+                ),
             )
+        }
 
         override suspend fun searchProducts(query: String, page: Int, pageSize: Int): Result<List<Product>> =
             Result.success(emptyList())
@@ -76,7 +97,7 @@ class PosTerminalViewModelTest {
         override suspend fun updateProduct(id: String, product: Product, departmentId: Int): Result<Product> =
             Result.success(product)
 
-        override suspend fun getDepartments(): Result<List<DepartmentDto>> = Result.success(emptyList())
+        override suspend fun getDepartments(): Result<List<DepartmentDto>> = Result.success(departmentsList)
     }
 
     private class FakeClientRepository : ClientRepository {
@@ -98,15 +119,15 @@ class PosTerminalViewModelTest {
             clientBranchesResult
     }
 
-    private class FakeSalesRepository : SalesRepository {
+    private class FakeSalesRepository(
+        var formasPagoList: List<FormaPagoDto> = listOf(
+            FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
+        )
+    ) : SalesRepository {
         var lastSaleRequest: ProcessSaleRequestDto? = null
 
         override suspend fun getFormasPago(cajaId: String?): Result<List<FormaPagoDto>> =
-            Result.success(
-                listOf(
-                    FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
-                )
-            )
+            Result.success(formasPagoList)
 
         override suspend fun processSale(request: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> {
             lastSaleRequest = request
@@ -915,12 +936,285 @@ class PosTerminalViewModelTest {
         assertTrue(isCashPaymentMethod(cash2))
         assertFalse(isCashPaymentMethod(card))
         assertFalse(isCashPaymentMethod(trans))
+    }
 
-        val bills = calculateSuggestedBills(13.50)
-        assertTrue(bills.contains(14.0))
-        assertTrue(bills.contains(15.0))
-        assertTrue(bills.contains(20.0))
-        assertTrue(bills.all { it >= 13.50 })
+    @Test
+    fun paymentDialog_webAlignedBehavior_prefill_badges_and_keypad() = runTest {
+        val today = LocalDate.now().toString()
+        val todaySec = CajaSecuencia(
+            idCajaSecuencia = "sec-today",
+            idCaja = "1",
+            fechaApertura = "$today 09:00:00",
+            montoApertura = 100.0,
+        )
+        fakeCajaRepo.statusResponse = CajaStatusResponse(
+            isOpen = true,
+            cajaSecuencia = todaySec,
+        )
+        val salesRepo = FakeSalesRepository(
+            formasPagoList = listOf(
+                FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo"),
+                FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta"),
+            )
+        )
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = salesRepo,
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(
+            Product(
+                id = "1",
+                code = "P1",
+                description = "Item",
+                prices = listOf(PriceLevel(label = "General", price = 50.0, pricePlusTax = 50.0)),
+                isExempt = true,
+                taxRate = 0.0,
+            )
+        )
+
+        // 1. Abrir diálogo de pago: Efectivo debe precargarse al 100% ($50.00)
+        vm.openPaymentDialog()
+        val state1 = vm.uiState.value
+        assertTrue(state1.showPaymentDialog)
+        assertEquals(50.0, state1.paymentsMap[1] ?: 0.0, 0.001)
+        assertEquals("50.00", state1.paymentInputTexts[1])
+        assertEquals(1, state1.activePaymentInputMethodId)
+
+        // 2. Limpiar fila de efectivo
+        vm.onClearSinglePaymentMethod(1)
+        val state2 = vm.uiState.value
+        assertNull(state2.paymentsMap[1])
+        assertNull(state2.paymentInputTexts[1])
+
+        // 3. Clic en badge de Tarjeta (id 2): debe absorber la diferencia completa ($50.00)
+        val cardMethod = FormaPagoDto(idFormaPago = 2, siglas = "TARJ", codigo = "TARJETA", descripcion = "Tarjeta")
+        vm.onPaymentMethodBadgeClick(cardMethod)
+        val state3 = vm.uiState.value
+        assertEquals(50.0, state3.paymentsMap[2] ?: 0.0, 0.001)
+        assertEquals(2, state3.activePaymentInputMethodId)
+
+        // 4. Teclear en keypad: cambiar Tarjeta a $20
+        vm.onKeypadInput("C")
+        vm.onKeypadInput("2")
+        vm.onKeypadInput("0")
+        val state4 = vm.uiState.value
+        assertEquals(20.0, state4.paymentsMap[2] ?: 0.0, 0.001)
+        assertEquals("20", state4.paymentInputTexts[2])
+
+        // 5. Clic en badge de Efectivo (id 1): debe absorber el restante ($30.00)
+        val cashMethod = FormaPagoDto(idFormaPago = 1, siglas = "EF", codigo = "EFECTIVO", descripcion = "Efectivo")
+        vm.onPaymentMethodBadgeClick(cashMethod)
+        val state5 = vm.uiState.value
+        assertEquals(30.0, state5.paymentsMap[1] ?: 0.0, 0.001)
+        assertEquals("30.00", state5.paymentInputTexts[1])
+
+        // 6. Limpiar todo
+        vm.clearPayments()
+        val state6 = vm.uiState.value
+        assertTrue(state6.paymentsMap.isEmpty())
+        assertTrue(state6.paymentInputTexts.isEmpty())
+
+        // 7. Sumar billete de $50 al efectivo
+        vm.onAddCashDenomination(50.0)
+        val state7 = vm.uiState.value
+        assertEquals(50.0, state7.paymentsMap[1] ?: 0.0, 0.001)
+        assertEquals("50.00", state7.paymentInputTexts[1])
+    }
+
+    @Test
+    fun openProductDialog_and_dismissProductDialog_updatesState() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.showProductDialog)
+        assertEquals("", vm.uiState.value.productDialogQuery)
+
+        vm.openProductDialog("arroz")
+        assertTrue(vm.uiState.value.showProductDialog)
+        assertEquals("arroz", vm.uiState.value.productDialogQuery)
+
+        vm.dismissProductDialog()
+        assertFalse(vm.uiState.value.showProductDialog)
+        assertEquals("", vm.uiState.value.productDialogQuery)
+    }
+
+    @Test
+    fun addProductByCode_blankCode_opensProductDialogWithEmptyQuery() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val handled = vm.addProductByCode("   ")
+        assertTrue(handled)
+        assertTrue(vm.uiState.value.showProductDialog)
+        assertEquals("", vm.uiState.value.productDialogQuery)
+    }
+
+    @Test
+    fun addProductByCode_exactMatch_addsDirectlyToCartWithoutOpeningDialog() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val handled = vm.addProductByCode("P01")
+        assertTrue(handled)
+        assertFalse(vm.uiState.value.showProductDialog)
+        assertEquals(1, vm.uiState.value.cart.size)
+        assertEquals("P01", vm.uiState.value.cart.first().product.code)
+    }
+
+    @Test
+    fun addProductByCode_noMatch_opensProductDialogWithQuery() = runTest {
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        vm.addProductByCode("desconocido")
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.showProductDialog)
+        assertEquals("desconocido", vm.uiState.value.productDialogQuery)
+    }
+
+    @Test
+    fun onDepartmentSelected_filtersProductsCorrectly() = runTest {
+        val prod1 = Product(id = "1", code = "P01", description = "Coca Cola", department = "1")
+        val prod2 = Product(id = "2", code = "P02", description = "Pepsi", department = "1")
+        val prod3 = Product(id = "3", code = "P03", description = "Papas Lays", department = "2")
+        val dept1 = DepartmentDto(id = 1, name = "Bebidas")
+        val dept2 = DepartmentDto(id = 2, name = "Snacks")
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(prod1, prod2, prod3),
+                departmentsList = listOf(dept1, dept2),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Inicial: 3 productos sin filtro
+        assertEquals(3, vm.uiState.value.filteredProducts.size)
+        assertNull(vm.uiState.value.selectedDepartmentId)
+
+        // Seleccionar Departamento 1 (Bebidas) -> 2 productos
+        vm.onDepartmentSelected(1)
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.selectedDepartmentId)
+        assertEquals(2, vm.uiState.value.filteredProducts.size)
+        assertTrue(vm.uiState.value.filteredProducts.all { it.department == "1" })
+
+        // Seleccionar Departamento 2 (Snacks) -> 1 producto
+        vm.onDepartmentSelected(2)
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.selectedDepartmentId)
+        assertEquals(1, vm.uiState.value.filteredProducts.size)
+        assertEquals("P03", vm.uiState.value.filteredProducts.first().code)
+
+        // Volver a pulsar Departamento 2 -> Deselecciona (toggle a null) y muestra todos
+        vm.onDepartmentSelected(2)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.selectedDepartmentId)
+        assertEquals(3, vm.uiState.value.filteredProducts.size)
+    }
+
+    @Test
+    fun onDepartmentSelected_withSearchQuery_combinesBothFilters() = runTest {
+        val prod1 = Product(id = "1", code = "P01", description = "Coca Cola", department = "1")
+        val prod2 = Product(id = "2", code = "P02", description = "Pepsi", department = "1")
+        val prod3 = Product(id = "3", code = "P03", description = "Papas Lays", department = "2")
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(prod1, prod2, prod3),
+                departmentsList = listOf(DepartmentDto(id = 1, name = "Bebidas")),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Filtrar por Departamento 1 (Bebidas)
+        vm.onDepartmentSelected(1)
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.filteredProducts.size)
+
+        // Filtrar además por búsqueda "Pepsi"
+        vm.onSearchQueryChange("Pepsi")
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.filteredProducts.size)
+        assertEquals("P02", vm.uiState.value.filteredProducts.first().code)
+
+        // Búsqueda que no coincide en departamento 1
+        vm.onSearchQueryChange("Papas")
+        advanceUntilIdle()
+        assertEquals(0, vm.uiState.value.filteredProducts.size)
+    }
+
+    @Test
+    fun catalogPagination_navigatesBetweenPages() = runTest {
+        val manyProducts = (1..25).map { i ->
+            Product(id = "$i", code = "P$i", description = "Product $i", department = "1")
+        }
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = manyProducts),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Página 1 inicial
+        assertEquals(1, vm.uiState.value.catalogCurrentPage)
+        assertTrue(vm.uiState.value.catalogTotalPages >= 2)
+
+        // Navegar a siguiente página
+        vm.onCatalogNextPage()
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.catalogCurrentPage)
+
+        // Navegar a página anterior
+        vm.onCatalogPrevPage()
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.catalogCurrentPage)
+
+        // Intentar ir a página previa en página 1 no debe cambiar
+        vm.onCatalogPrevPage()
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.catalogCurrentPage)
     }
 }
+
 

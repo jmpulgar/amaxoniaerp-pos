@@ -58,6 +58,11 @@ class CustomerDisplayPresentation(
             addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            decorView.let { decor ->
+                decor.setViewTreeLifecycleOwner(this@CustomerDisplayPresentation)
+                decor.setViewTreeSavedStateRegistryOwner(this@CustomerDisplayPresentation)
+                decor.setViewTreeViewModelStoreOwner(this@CustomerDisplayPresentation)
+            }
         }
 
         val composeView = ComposeView(context).apply {
@@ -95,7 +100,9 @@ class CustomerDisplayPresentation(
     }
 
     override fun dismiss() {
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.INITIALIZED)) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        }
         customViewModelStore.clear()
         super.dismiss()
     }

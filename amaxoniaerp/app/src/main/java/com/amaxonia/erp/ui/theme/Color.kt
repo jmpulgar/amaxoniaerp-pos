@@ -128,3 +128,39 @@ fun paymentMethodColor(sigla: String?): Color {
     val index = (sigla?.hashCode() ?: 0).let { if (it < 0) -it else it } % palette.size
     return palette[index]
 }
+
+// --- Flow ERP / Selectra POS Web Colors (1:1 con la versión web) ---
+val FlowNavyHeader = Color(0xFF1E42A8)
+val FlowNavyHeaderDark = Color(0xFF18358A)
+val FlowBrandBlue = Color(0xFF2065F6)
+val FlowDiscountCoral = Color(0xFFE74C65)
+val FlowDiscountCoralBg = Color(0xFFFDE8EC)
+val FlowTableBorder = Color(0xFFE2E8F0)
+val FlowTableBgHeader = Color(0xFFF8FAFC)
+val FlowTableTextDark = Color(0xFF1E293B)
+val FlowTableTextMuted = Color(0xFF64748B)
+val FlowCardBorder = Color(0xFFE2E8F0)
+val FlowSurfaceBg = Color(0xFFF1F5F9)
+val FlowActionBg = Color(0xFFFFFFFF)
+val FlowSuccessButton = Color(0xFF10B981)
+val FlowQuickPreorden = Color(0xFF2563EB)
+val FlowQuickApartado = Color(0xFF9333EA)
+val FlowQuickPresupuesto = Color(0xFF7E22CE)
+val FlowQuickAnticipo = Color(0xFFD97706)
+val FlowQuickCertificado = Color(0xFF4C1D95)
+val FlowQuickPuntos = Color(0xFF4338CA)
+val FlowQuickPromo = Color(0xFFE11D48)
+
+// --- Degradados Oficiales Flow UI (1:1 Web POS) ---
+val FlowBrandGradient = Brush.horizontalGradient(
+    listOf(Color(0xFF2488FA), Color(0xFF1E5FE0), Color(0xFF201B82))
+)
+val FlowDiscountGradient = Brush.horizontalGradient(
+    listOf(Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFBE123C))
+)
+val FlowHeaderGradient = Brush.horizontalGradient(
+    listOf(Color(0xFF2488FA), Color(0xFF1E5FE0), Color(0xFF201B82))
+)
+val FlowSuccessGradient = Brush.horizontalGradient(
+    listOf(Color(0xFF10B981), Color(0xFF059669), Color(0xFF047857))
+)

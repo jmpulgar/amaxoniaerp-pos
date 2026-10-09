@@ -8,6 +8,7 @@ import com.amaxonia.erp.data.local.db.AppDatabase
 import com.amaxonia.erp.data.remote.ApiClient
 import com.amaxonia.erp.data.remote.ApiService
 import com.amaxonia.erp.data.remote.SyncApi
+import com.amaxonia.erp.data.remote.getCajas
 
 class OfflineSyncWorker(
     context: Context,
@@ -46,6 +47,14 @@ class OfflineSyncWorker(
                 forceBootstrap -> engine.runBootstrap()
                 else -> engine.runIncremental()
             }
+
+        if (outcome is SyncEngine.Outcome.Success) {
+            runCatching {
+                val adminDb = session.company.adminDb.ifBlank { "default" }
+                val cajas = apiService.getCajas(token, adminDb, all = true)
+                localStore.saveCajas(cajas)
+            }
+        }
 
         return when (outcome) {
             is SyncEngine.Outcome.Success -> Result.success()

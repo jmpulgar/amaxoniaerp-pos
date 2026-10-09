@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,6 +78,7 @@ enum class ErpModule(
     val icon: ImageVector,
 ) {
     POS("POS", Icons.Default.PointOfSale),
+    INVOICES("Historial de Facturas", Icons.Rounded.Receipt),
     CLIENTS("Clientes", Icons.Default.People),
     PRODUCTS("Productos", Icons.Default.ShoppingBag),
     SUCURSALES("Sucursales", Icons.Default.Storefront),
@@ -100,7 +102,8 @@ fun MainShellScreen(
     usuarioApertura: String? = null,
     isOnline: Boolean = true,
     onSyncManual: () -> Unit = {},
-    posContent: @Composable (onNavigateToCajas: () -> Unit) -> Unit,
+    posContent: @Composable (onNavigateToCajas: () -> Unit, onOpenDrawer: () -> Unit) -> Unit,
+    historyContent: @Composable () -> Unit = {},
     clientsContent: @Composable () -> Unit,
     productsContent: @Composable () -> Unit,
     sucursalesContent: @Composable () -> Unit,
@@ -244,7 +247,8 @@ fun MainShellScreen(
     ) {
         Scaffold(
             topBar = {
-                TopAppBar(
+                if (currentModule != ErpModule.POS) {
+                    TopAppBar(
                     title = {
                         Column {
                             Text(
@@ -316,6 +320,7 @@ fun MainShellScreen(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
                 )
+                }
             },
             containerColor = MaterialTheme.colorScheme.background,
         ) { paddingValues ->
@@ -326,7 +331,11 @@ fun MainShellScreen(
                         .padding(paddingValues),
             ) {
                 when (currentModule) {
-                    ErpModule.POS -> posContent { currentModule = ErpModule.CAJAS }
+                    ErpModule.POS -> posContent(
+                        { currentModule = ErpModule.CAJAS },
+                        { scope.launch { drawerState.open() } },
+                    )
+                    ErpModule.INVOICES -> historyContent()
                     ErpModule.CLIENTS -> clientsContent()
                     ErpModule.PRODUCTS -> productsContent()
                     ErpModule.SUCURSALES -> sucursalesContent()

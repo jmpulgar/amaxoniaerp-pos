@@ -4,6 +4,7 @@ import com.amaxonia.erp.data.local.LocalStore
 import com.amaxonia.erp.data.local.db.AppDatabase
 import com.amaxonia.erp.data.remote.SyncApi
 import com.amaxonia.erp.data.remote.SyncScopeQuery
+import com.amaxonia.erp.domain.repository.CajaRepository
 import com.amaxonia.erp.domain.repository.OfflineCatalogEntry
 import com.amaxonia.erp.domain.repository.OfflineSettingsStatus
 import com.amaxonia.erp.domain.repository.OfflineSettingsUiModel
@@ -25,6 +26,7 @@ class OfflineSyncSettingsRepositoryImpl(
     private val productRepository: ProductRepository,
     private val scopeStore: OfflineSyncSettingsStore,
     private val sucursalRepository: SucursalRepository? = null,
+    private val cajaRepository: CajaRepository? = null,
     private val bootstrapEnqueuer: () -> Unit = {},
 ) : OfflineSyncSettingsRepository {
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -85,6 +87,9 @@ class OfflineSyncSettingsRepositoryImpl(
                     departments = departments,
                     sucursales = sucursales,
                 )
+            }
+            if (saved.enabled && localStore.readCajas().isEmpty()) {
+                runCatching { cajaRepository?.getCajas() }
             }
         }
     }
@@ -253,6 +258,9 @@ class OfflineSyncSettingsRepositoryImpl(
                     it.copy(message = "Sincronizando catálogo offline...")
                 }
                 val syncResult = syncEngine.runBootstrap()
+                if (syncResult is SyncEngine.Outcome.Success) {
+                    runCatching { cajaRepository?.getCajas() }
+                }
                 bootstrapEnqueuer()
                 _uiState.update {
                     it.copy(

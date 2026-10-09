@@ -64,13 +64,20 @@ class CustomerDisplayManager(
         override fun onDisplayRemoved(displayId: Int) {
             Log.d(TAG, "Display removed: $displayId")
             updateDisplayAvailability()
-            refreshPresentation()
+            if (currentPresentation?.display?.displayId == displayId) {
+                dismissPresentation()
+            }
         }
 
         override fun onDisplayChanged(displayId: Int) {
             Log.d(TAG, "Display changed: $displayId")
             updateDisplayAvailability()
-            refreshPresentation()
+            val secondary = findSecondaryDisplay()
+            if (secondary == null) {
+                dismissPresentation()
+            } else if (currentPresentation?.display?.displayId != secondary.displayId) {
+                refreshPresentation()
+            }
         }
     }
 
@@ -148,10 +155,20 @@ class CustomerDisplayManager(
 
     fun findSecondaryDisplay(): Display? {
         val presentationDisplays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-        if (presentationDisplays.isNotEmpty()) {
-            return presentationDisplays[0]
+        val validPresentationDisplay = presentationDisplays.firstOrNull { display ->
+            display.isValid && display.state != Display.STATE_OFF
         }
-        return displayManager.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+        if (validPresentationDisplay != null) {
+            return validPresentationDisplay
+        }
+        // Fallback: only select a non-default display if it is valid, powered on, and explicitly has FLAG_PRESENTATION.
+        // Never select unconfigured/unconnected HDMI or virtual display ports on Rockchip RK3568 devices.
+        return displayManager.displays.firstOrNull { display ->
+            display.displayId != Display.DEFAULT_DISPLAY &&
+                display.isValid &&
+                display.state != Display.STATE_OFF &&
+                (display.flags and Display.FLAG_PRESENTATION != 0)
+        }
     }
 
     private fun updateDisplayAvailability() {

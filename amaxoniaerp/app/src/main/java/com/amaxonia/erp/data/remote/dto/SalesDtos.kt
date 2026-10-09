@@ -73,6 +73,7 @@ data class SaleInvoiceDto(
     val codFacturaFiscal: String = "",
     val nroz: String = "0000",
     val impresoraSerial: String = "",
+    val observacion: String = "",
 )
 
 @Serializable
@@ -176,3 +177,77 @@ data class FormaPagoDto(
     @SerialName("tipo_moneda")
     val tipoMoneda: String = "",
 )
+
+@Serializable
+data class FacturaSummaryDto(
+    val id: String,
+    val codigo: String,
+    val codigoFiscal: String = "",
+    val numeroDocumentoFiscal: String = "",
+    val fecha: String = "",
+    val fechaCreacion: String = "",
+    val fechaDgi: String = "",
+    val clienteNombre: String = "",
+    val clienteIdentificacion: String = "",
+    val total: Double = 0.0,
+    val estatus: String = "",
+    val formaPago: String = "",
+    val moneda: String = "USD",
+    val items: Int = 0,
+    val totalRef: Double? = null,
+    val tasa: Float? = null,
+    val abrMonedaSecundaria: String? = null,
+)
+
+@Serializable
+data class FacturasListResponseDto(
+    val data: List<FacturaSummaryDto> = emptyList(),
+    val total: Long = 0L,
+)
+
+@Serializable
+data class FacturasResumenDto(
+    val ventasBrutas: Double = 0.0,
+    val ventasNetas: Double = 0.0,
+    val descuentos: Double = 0.0,
+    val cancelaciones: Double = 0.0,
+    val totalFacturas: Int = 0,
+    val totalFacturasPagadas: Int = 0,
+    val totalFacturasAnuladas: Int = 0,
+    val ticketPromedio: Double = 0.0,
+    val moneda: String = "USD",
+    val ventasBrutasRef: Double? = null,
+    val ventasNetasRef: Double? = null,
+    val cancelacionesRef: Double? = null,
+    val ticketPromedioRef: Double? = null,
+    val abrMonedaSecundaria: String? = null,
+)
+
+@Serializable
+data class FacturaDetalleItemDto(
+    val id: String = "",
+    val descripcion: String = "",
+    val cantidad: Double = 1.0,
+    val precioUnitario: Double = 0.0,
+    val totalConIva: Double = 0.0,
+    val codigo: String = "",
+    val referencia: String = "",
+)
+
+@Serializable
+data class FacturaDetalleResponseDto(
+    val idFactura: String,
+    val codFactura: String,
+    val items: List<FacturaDetalleItemDto> = emptyList(),
+)
+
+@Serializable
+data class ElectronicInvoiceResultDto(
+    val success: Boolean = false,
+    val cufe: String? = null,
+    val qr: String? = null,
+    val message: String? = null,
+    val alreadyIssued: Boolean = false,
+    val numeroDocumentoFiscal: String? = null,
+)
+

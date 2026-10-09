@@ -13,11 +13,18 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 open class NetworkMonitor(
     context: Context,
 ) {
-    private val connectivityManager =
-        context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager: ConnectivityManager? = runCatching {
+        context.applicationContext?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    }.getOrNull()
 
     val isOnlineFlow: Flow<Boolean> =
         callbackFlow {
+            val cm = connectivityManager
+            if (cm == null) {
+                trySend(false)
+                awaitClose { }
+                return@callbackFlow
+            }
             val callback =
                 object : ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: Network) {
@@ -36,19 +43,20 @@ open class NetworkMonitor(
                     }
                 }
             trySend(isOnline())
-            connectivityManager.registerNetworkCallback(
+            cm.registerNetworkCallback(
                 NetworkRequest
                     .Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build(),
                 callback,
             )
-            awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+            awaitClose { cm.unregisterNetworkCallback(callback) }
         }.distinctUntilChanged()
 
     open fun isOnline(): Boolean {
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        val cm = connectivityManager ?: return false
+        val network = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }

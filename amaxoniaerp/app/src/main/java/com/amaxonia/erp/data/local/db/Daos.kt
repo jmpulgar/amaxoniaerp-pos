@@ -241,6 +241,33 @@ interface ProductDao {
     @Query("SELECT COUNT(*) FROM products WHERE estatus = 'A'")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM products WHERE department = :departmentId AND estatus = 'A'")
+    suspend fun countByDepartment(departmentId: Int): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM products " +
+            "WHERE estatus = 'A' AND (" +
+            "code LIKE :query COLLATE NOCASE " +
+            "OR description LIKE :query COLLATE NOCASE " +
+            "OR reference LIKE :query COLLATE NOCASE " +
+            "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE)",
+    )
+    suspend fun countSearch(query: String): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM products " +
+            "WHERE department = :departmentId AND estatus = 'A' AND (" +
+            "code LIKE :query COLLATE NOCASE " +
+            "OR description LIKE :query COLLATE NOCASE " +
+            "OR reference LIKE :query COLLATE NOCASE " +
+            "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE)",
+    )
+    suspend fun countSearchByDepartment(query: String, departmentId: Int): Int
+
     @Query("SELECT DISTINCT department FROM products WHERE department IS NOT NULL")
     suspend fun getDistinctDepartmentIds(): List<Int>
 }
@@ -264,6 +291,12 @@ interface PromocionDao {
 
     @Query("DELETE FROM promocion_detalles")
     suspend fun clearDetalles()
+
+    @Query("SELECT * FROM promociones WHERE activo = 1 ORDER BY nombre")
+    suspend fun getAllActive(): List<PromocionEntity>
+
+    @Query("SELECT * FROM promocion_detalles WHERE promocionId = :promocionId")
+    suspend fun getDetallesForPromocion(promocionId: String): List<PromocionDetalleEntity>
 }
 
 @Dao

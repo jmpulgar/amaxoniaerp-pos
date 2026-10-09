@@ -50,7 +50,7 @@ android {
 
     defaultConfig {
         applicationId = "com.amaxonia.pos"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 36
         versionCode = 8
         versionName = "1.1.6"

@@ -27,6 +27,7 @@ import com.amaxonia.erp.domain.model.CompanySession
 import com.amaxonia.erp.ui.caja.CajasOverviewScreen
 import com.amaxonia.erp.ui.clients.ClientListScreen
 import com.amaxonia.erp.ui.company.CompanySelectionScreen
+import com.amaxonia.erp.ui.history.HistoryScreen
 import com.amaxonia.erp.ui.login.LoginScreen
 import com.amaxonia.erp.ui.pos.PosTerminalScreen
 import com.amaxonia.erp.ui.products.ProductListScreen
@@ -47,9 +48,12 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG) CrashLogger.setup(this)
         DependencyContainer.initialize(applicationContext)
-        SyncScheduler.schedulePeriodic(applicationContext)
-        SyncScheduler.scheduleWeeklyReconcile(applicationContext)
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            SyncScheduler.schedulePeriodic(applicationContext)
+            SyncScheduler.scheduleWeeklyReconcile(applicationContext)
+        }
         enableEdgeToEdge()
 
         setContent {
@@ -180,6 +184,9 @@ private fun PosAppContent() {
             val offlineSettingsViewModel = remember(currentSession) {
                 DependencyContainer.createOfflineSettingsViewModel()
             }
+            val historyViewModel = remember(currentSession) {
+                DependencyContainer.createHistoryViewModel(currentSession)
+            }
 
             val isOnline by DependencyContainer.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
                 initialValue = DependencyContainer.networkMonitor.isOnline(),
@@ -221,11 +228,15 @@ private fun PosAppContent() {
                         pendingSelectionSession = auth
                     }
                 },
-                posContent = { onNavigateToCajas ->
+                posContent = { onNavigateToCajas, onOpenDrawer ->
                     PosTerminalScreen(
                         viewModel = posViewModel,
                         onNavigateToCajas = onNavigateToCajas,
+                        onOpenDrawer = onOpenDrawer,
                     )
+                },
+                historyContent = {
+                    HistoryScreen(viewModel = historyViewModel)
                 },
                 clientsContent = {
                     ClientListScreen(viewModel = clientListViewModel)

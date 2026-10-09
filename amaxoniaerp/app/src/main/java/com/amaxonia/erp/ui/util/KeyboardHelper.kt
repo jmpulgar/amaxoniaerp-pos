@@ -39,19 +39,16 @@ object KeyboardHelper {
         val context = view.context
         val activity = findActivity(context)
 
-        // 1. Enfoque moderno con WindowInsetsControllerCompat (Android 11 / API 30+)
-        activity?.window?.let { window ->
-            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            insetsController.show(WindowInsetsCompat.Type.ime())
-        }
-
-        // 2. InputMethodManager con SHOW_FORCED para dispositivos POS con lectores HID
-        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.let { manager ->
-            val shown = manager.showSoftInput(view, InputMethodManager.SHOW_FORCED)
-            if (!shown) {
-                manager.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY)
+        runCatching {
+            // 1. Enfoque moderno con WindowInsetsControllerCompat (Android 11 / API 30+)
+            activity?.window?.let { window ->
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                insetsController.show(WindowInsetsCompat.Type.ime())
             }
+
+            // 2. InputMethodManager seguro
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
         }
     }
 
