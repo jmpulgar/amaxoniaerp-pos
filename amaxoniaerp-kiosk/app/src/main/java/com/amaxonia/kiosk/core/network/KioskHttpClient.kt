@@ -5,6 +5,7 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.DefaultRequest
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.header
@@ -57,6 +58,16 @@ class KioskConnectivityException(cause: Throwable) : KioskApiException(cause.mes
     }
 }
 
+/** Default HTTP timeouts; OkHttp alone would cut every call at 10 s. */
+const val HTTP_CONNECT_TIMEOUT_MS = 15_000L
+const val HTTP_SOCKET_TIMEOUT_MS = 30_000L
+
+/**
+ * `POST /pay` closes/opens the caja session, saves the sale and waits for the PAC to sign the
+ * electronic invoice (20+ s is normal). Cutting it earlier loses the fiscal ticket.
+ */
+const val HTTP_PAY_TIMEOUT_MS = 120_000L
+
 /** Kiosk request headers (backend contract for every kiosk endpoint under api/v1/kiosk). */
 object KioskHeaders {
     const val CAJA = "X-Kiosk-Caja"
@@ -93,6 +104,11 @@ object KioskHttpClientFactory {
     private fun HttpClientConfig<*>.configureClient(tokenStorage: KioskTokenStorage) {
         install(ContentNegotiation) {
             json(jsonConfig)
+        }
+
+        install(HttpTimeout) {
+            connectTimeoutMillis = HTTP_CONNECT_TIMEOUT_MS
+            socketTimeoutMillis = HTTP_SOCKET_TIMEOUT_MS
         }
 
         install(DefaultRequest) {

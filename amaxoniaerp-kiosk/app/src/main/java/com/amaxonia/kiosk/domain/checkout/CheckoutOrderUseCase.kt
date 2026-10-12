@@ -2,7 +2,9 @@ package com.amaxonia.kiosk.domain.checkout
 
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskApiClient
+import com.amaxonia.kiosk.core.network.KioskApiException
 import com.amaxonia.kiosk.core.network.KioskCardOption
+import com.amaxonia.kiosk.core.network.KioskConflictException
 import com.amaxonia.kiosk.core.network.KioskPaymentRequest
 import com.amaxonia.kiosk.core.network.KioskPaymentResponse
 import com.amaxonia.kiosk.core.network.KioskQuoteLineRequest
@@ -42,6 +44,15 @@ sealed interface CheckoutResult {
 
     data class PaymentTerminalError(
         val message: String,
+    ) : CheckoutResult
+
+    /**
+     * Nothing was charged ("sin pasarela") and the backend did not register the sale / invoice.
+     * [quoteExpired]: the order can no longer be paid and must be quoted again.
+     */
+    data class RegistrationFailed(
+        val message: String,
+        val quoteExpired: Boolean,
     ) : CheckoutResult
 }
 
@@ -93,25 +104,38 @@ class CheckoutOrderUseCase(
      * one (the cashier collects it) and the order is invoiced with the chosen card method.
      * SAFETY: nothing is charged here. This path exists for testing while no certified terminal is
      * integrated; a production kiosk that must not give orders away needs a real terminal adapter.
+     *
+     * No money moved, so it skips the outbox: a failure is reported ([CheckoutResult.RegistrationFailed])
+     * instead of completing the order without its electronic invoice. Retrying with the same quote is
+     * safe — the backend answers an already invoiced order with its existing invoice.
      */
     suspend fun registerManualCardPayment(
         quote: KioskQuoteResponse,
         option: KioskCardOption,
-    ): CheckoutResult =
-        registerPayment(
-            quote = quote,
-            payment =
-                PaymentResult.Success(
-                    transactionId = "$MANUAL_TRANSACTION_PREFIX${UUID.randomUUID()}",
-                    authCode = MANUAL_AUTH_CODE,
-                    reference = MANUAL_REFERENCE,
-                    last4 = "",
-                    brand = option.siglas.ifBlank { option.name }.take(MAX_BRAND_LENGTH),
-                    amount = Money.fromString(quote.total),
-                ),
-            method = PaymentMethod.CARD,
-            paymentMethodId = option.id,
-        )
+    ): CheckoutResult {
+        val payment =
+            PaymentResult.Success(
+                transactionId = "$MANUAL_TRANSACTION_PREFIX${UUID.randomUUID()}",
+                authCode = MANUAL_AUTH_CODE,
+                reference = MANUAL_REFERENCE,
+                last4 = "",
+                brand = option.name.ifBlank { option.siglas }.take(MAX_BRAND_LENGTH),
+                amount = Money.fromString(quote.total),
+            )
+        val request =
+            createPendingPayment(quote, payment, PaymentMethod.CARD, option.id).toRequest()
+        return withContext(NonCancellable) {
+            apiClient.payOrder(quote.orderId, request).fold(
+                onSuccess = { response -> CheckoutResult.Success(quote = quote, payment = payment, paymentResponse = response) },
+                onFailure = { error ->
+                    CheckoutResult.RegistrationFailed(
+                        message = (error as? KioskApiException)?.serverMessage ?: error.message.orEmpty(),
+                        quoteExpired = error is KioskConflictException,
+                    )
+                },
+            )
+        }
+    }
 
     /**
      * Persists the approved payment to the outbox and registers it with the backend. Runs

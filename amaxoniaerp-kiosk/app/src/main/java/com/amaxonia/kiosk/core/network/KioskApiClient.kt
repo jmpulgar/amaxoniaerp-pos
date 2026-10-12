@@ -3,6 +3,7 @@ package com.amaxonia.kiosk.core.network
 import com.amaxonia.kiosk.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -166,6 +167,10 @@ class KioskApiClient(
             val response =
                 httpClient.post(endpoint) {
                     contentType(ContentType.Application.Json)
+                    timeout {
+                        requestTimeoutMillis = HTTP_PAY_TIMEOUT_MS
+                        socketTimeoutMillis = HTTP_PAY_TIMEOUT_MS
+                    }
                     setBody(request)
                 }
             // Accepts 200 OK (Fiscal Success) and 202 Accepted (Paid Pending Invoice)

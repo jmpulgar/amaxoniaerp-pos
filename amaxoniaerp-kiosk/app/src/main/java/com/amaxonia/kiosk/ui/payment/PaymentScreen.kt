@@ -445,4 +445,5 @@ private fun PaymentFailure.bodyRes(): Int =
         PaymentFailure.TIMEOUT -> R.string.payflow_card_timeout_body
         PaymentFailure.CANCELLED -> R.string.payflow_card_cancelled_body
         PaymentFailure.TERMINAL_ERROR -> R.string.payflow_card_terminal_error_body
+        PaymentFailure.REGISTRATION_FAILED -> R.string.payflow_manual_registration_failed_body
     }

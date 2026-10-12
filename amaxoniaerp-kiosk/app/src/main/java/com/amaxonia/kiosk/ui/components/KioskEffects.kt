@@ -57,9 +57,9 @@ enum class Depth(
     val offsetY: Dp,
     val alpha: Float,
 ) {
-    Low(blur = 8.dp, offsetY = 2.dp, alpha = 0.04f),
-    Medium(blur = 16.dp, offsetY = 4.dp, alpha = 0.06f),
-    High(blur = 28.dp, offsetY = 8.dp, alpha = 0.10f),
+    Low(blur = 10.dp, offsetY = 3.dp, alpha = 0.06f),
+    Medium(blur = 22.dp, offsetY = 6.dp, alpha = 0.09f),
+    High(blur = 36.dp, offsetY = 12.dp, alpha = 0.14f),
 }
 
 /**
@@ -149,6 +149,22 @@ fun foodGlyphFor(vararg names: String?): ImageVector {
         GlyphRules.firstOrNull { (keys, _) -> keys.any { lower.contains(it) } }?.let { return it.second }
     }
     return Icons.Rounded.Restaurant
+}
+
+private val SortPrefix = Regex("""^\s*\d+\s*[.)\-]\s*""")
+
+/**
+ * Category name as shown to customers: drops the ERP sort prefix ("1. COMIDA RAPIDA" → "Comida rapida")
+ * and turns all-caps names into sentence case so they read calmly in titles.
+ */
+fun displayName(name: String): String = sentenceCase(name.replace(SortPrefix, "").trim())
+
+/** "ACOMPAÑANTE" → "Acompañante"; names that already mix cases are kept as typed. */
+fun sentenceCase(text: String): String {
+    val trimmed = text.trim()
+    val letters = trimmed.filter { it.isLetter() }
+    if (letters.isEmpty() || letters.any { it.isLowerCase() }) return trimmed
+    return trimmed.lowercase().replaceFirstChar { it.titlecase() }
 }
 
 /**

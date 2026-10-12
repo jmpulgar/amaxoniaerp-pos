@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.amaxonia.kiosk.core.money.Money
 import com.amaxonia.kiosk.core.network.KioskCardOption
 import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
+import com.amaxonia.kiosk.core.network.KioskQuoteResponse
 import com.amaxonia.kiosk.domain.cart.OrderGraph
 import com.amaxonia.kiosk.domain.checkout.CheckoutOrderUseCase
 import com.amaxonia.kiosk.domain.checkout.CheckoutResult
@@ -27,6 +28,9 @@ enum class PaymentFailure {
     TIMEOUT,
     CANCELLED,
     TERMINAL_ERROR,
+
+    /** "Sin pasarela": nothing was charged, but the sale / electronic invoice was not registered. */
+    REGISTRATION_FAILED,
 }
 
 sealed interface PaymentStep {
@@ -92,6 +96,8 @@ class PaymentViewModel(
         get() = !paymentTerminal.isAvailable && cardOption != null
     val uiState: StateFlow<PaymentUiState> = _uiState.asStateFlow()
 
+    /** Quote shown on the manual confirmation; confirming and retrying reuse it (one order, one invoice). */
+    private var manualQuote: KioskQuoteResponse? = null
     private var countdownJob: Job? = null
     private var checkoutJob: Job? = null
     private var timedOut = false
@@ -104,6 +110,7 @@ class PaymentViewModel(
         countdownJob?.cancel()
         checkoutJob?.cancel()
         timedOut = false
+        manualQuote = null
         _uiState.update { it.copy(step = PaymentStep.Quoting, currency = orderGraph.currencyConfig.value) }
 
         checkoutJob =
@@ -114,6 +121,7 @@ class PaymentViewModel(
                         return@launch
                     }
                 if (isManual) {
+                    manualQuote = quote
                     _uiState.update {
                         it.copy(totalAmount = Money.fromString(quote.total), step = PaymentStep.AwaitingManualConfirmation)
                     }
@@ -143,18 +151,26 @@ class PaymentViewModel(
             }
     }
 
-    /** "Confirmar pago" on the manual (no terminal) step: registers the payment and the invoice. */
+    /**
+     * "Confirmar pago" on the manual (no terminal) step: registers the payment and the electronic
+     * invoice. Also the retry after a failed registration, with the same order when still payable.
+     */
     fun confirmManualPayment() {
         val option = cardOption ?: return
-        if (_uiState.value.step != PaymentStep.AwaitingManualConfirmation) return
+        val step = _uiState.value.step
+        val canConfirm =
+            step == PaymentStep.AwaitingManualConfirmation ||
+                (step is PaymentStep.Failed && step.reason == PaymentFailure.REGISTRATION_FAILED)
+        if (!canConfirm) return
         _uiState.update { it.copy(step = PaymentStep.Processing) }
         checkoutJob =
             viewModelScope.launch {
                 val quote =
-                    quoteOrder(orderGraph).getOrElse { error ->
+                    manualQuote ?: quoteOrder(orderGraph).getOrElse { error ->
                         _uiState.update { it.copy(step = PaymentStep.Failed(PaymentFailure.QUOTE_FAILED, error.message.orEmpty())) }
                         return@launch
                     }
+                manualQuote = quote
                 handleCheckoutResult(checkoutUseCase.registerManualCardPayment(quote, option))
             }
     }
@@ -168,6 +184,10 @@ class PaymentViewModel(
                 is CheckoutResult.PaymentDeclined -> PaymentStep.Declined(result.reason)
                 is CheckoutResult.PaymentCancelled -> PaymentStep.Failed(PaymentFailure.CANCELLED)
                 is CheckoutResult.PaymentTerminalError -> PaymentStep.Failed(PaymentFailure.TERMINAL_ERROR, result.message)
+                is CheckoutResult.RegistrationFailed -> {
+                    if (result.quoteExpired) manualQuote = null
+                    PaymentStep.Failed(PaymentFailure.REGISTRATION_FAILED, result.message)
+                }
             }
         _uiState.update { it.copy(step = step) }
     }
@@ -205,8 +225,14 @@ class PaymentViewModel(
         }
     }
 
+    /** A failed manual registration is re-sent for the same order; anything else starts over. */
     fun retry() {
-        startCheckout()
+        val step = _uiState.value.step
+        if (step is PaymentStep.Failed && step.reason == PaymentFailure.REGISTRATION_FAILED && manualQuote != null) {
+            confirmManualPayment()
+        } else {
+            startCheckout()
+        }
     }
 
     override fun onCleared() {

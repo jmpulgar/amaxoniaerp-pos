@@ -17,6 +17,52 @@ _Nada todavía._
 
 ---
 
+## [0.0.11] — 2026-10-12
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 11 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.11.apk` |
+| SHA-256 | `B662C693C9378069F8792343ADFF19EBCA2C77F79A90A52952D1C4A811C8BC0D` |
+
+### Requisitos
+- Sin cambios de backend ni migraciones (incluye los cambios de la 0.0.10: el backend con `/pay` no cancelable sigue siendo necesario).
+
+### Cambiado — rediseño visual (mismo flujo tipo McDonald's, paleta Flow ERP)
+- Fondo gris suave con tarjetas blancas elevadas por sombra (sin bordes grises), esquinas más redondeadas y botones con profundidad.
+- **Menú**: banner de bienvenida "¿Qué se te antoja hoy?" con foto destacada; categorías con imagen grande; hasta 6 productos recomendados (sin huecos en blanco); tarjeta de producto con foto grande, precio en índigo y botón "+"; menú lateral con filas redondeadas y la categoría activa resaltada; barra "Tu orden" elevada.
+- Las categorías se muestran sin el prefijo de orden del ERP y sin mayúsculas forzadas ("1. COMIDA RAPIDA" → "Comida rapida").
+- **Personalizador**: encabezado elevado con barra de progreso de marca, pasos numerados, requisito como etiqueta ("Obligatorio · Elige 1"). Las opciones usan la foto del producto del catálogo con el mismo nombre (Coca Cola, Agua, Patacones…); los grupos sin fotos (término de la carne, quitar ingredientes) se muestran como tarjetas de texto con selector, en vez de repetir un ícono de cubiertos.
+- **Revisa tu orden**: cada producto en su tarjeta y resumen de totales elevado.
+- **Factura**: la pregunta "¿Necesitas personalizar tu factura?" va en una tarjeta centrada.
+
+### Corregido
+- El título de los pasos con nombres en mayúsculas salía mal escrito ("Selecciona aCOMPAÑANTE" → "Selecciona acompañante").
+
+---
+
+## [0.0.10] — 2026-10-07
+
+| Dato | Valor |
+|---|---|
+| `versionCode` | 10 |
+| Variante | `flowerpProdRelease` |
+| APK | `app/build/outputs/apk/flowerpProd/release/app-flow-kiosko-v0.0.10.apk` |
+| SHA-256 | `9D3985409DDF43571BD2BC699B1D30EE7100B8836683364507873E20E2110488` |
+
+### Requisitos
+- **Backend nuevo**: `POST /orders/{id}/pay` ya no se cancela si el kiosko corta la conexión; la venta y la factura electrónica terminan siempre y el reintento recibe la misma factura.
+- Sin migraciones.
+
+### Corregido
+- **No salía la factura electrónica al pagar con tarjeta (sin pasarela):** registrar el pago tarda 20 s o más (caja, venta, firma del PAC y correo), y el kiosko cortaba la llamada a los 10 s (timeout por defecto de OkHttp). El servidor deshacía la venta y el kiosko mostraba el pedido como pagado, sin factura. Ahora `/pay` espera hasta 120 s y el resto de las llamadas 30 s.
+- **Pago manual que falla:** ya no se da por pagado. Se muestra el error y "Reintentar pago" reenvía el mismo pedido, sin crear otro ni duplicar la factura. Si la cotización venció, se vuelve a cotizar.
+- Confirmar el pago manual ya no crea un segundo pedido: usa la cotización mostrada en pantalla.
+- El ticket muestra el nombre de la tarjeta elegida (VISA, MASTERCARD…) en vez de "TDC".
+
+---
+
 ## [0.0.9] — 2026-10-07
 
 | Dato | Valor |

@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckBox
+import androidx.compose.material.icons.rounded.CheckBoxOutlineBlank
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
@@ -49,6 +53,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,9 +86,8 @@ import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskImage
 import com.amaxonia.kiosk.ui.components.QuantityStepper
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
-import com.amaxonia.kiosk.ui.components.rightHairline
 import com.amaxonia.kiosk.ui.components.secondaryText
-import com.amaxonia.kiosk.ui.components.topHairline
+import com.amaxonia.kiosk.ui.components.sentenceCase
 import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
@@ -98,8 +102,10 @@ private const val OPTION_COLUMNS = 3
 private const val LANDSCAPE_OPTION_COLUMNS = 5
 private const val UNREACHABLE_STEP_ALPHA = 0.5f
 private const val CHANGE_BORDER_ALPHA = 0.35f
-private val StepsPanelWidth = 260.dp
+private val StepsPanelWidth = 270.dp
 private val WizardButtonHeight = 104.dp
+private val StepMarkerSize = 44.dp
+private val ChoiceTileHeight = 180.dp
 
 /**
  * Product customizer as a step-by-step wizard, the way fast-food self-order kiosks build a combo:
@@ -113,6 +119,7 @@ fun CustomizerScreen(
     viewModel: ProductCustomizerViewModel,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    optionImageUrl: (KioskModifierOptionDto) -> String? = { null },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val item = uiState.item
@@ -161,6 +168,7 @@ fun CustomizerScreen(
                         GroupStep(
                             group = group,
                             selectedOptions = uiState.selectedOptions[group.id].orEmpty(),
+                            optionImageUrl = optionImageUrl,
                             showError = uiState.showStepError && !uiState.isGroupSatisfied(group),
                             onOptionToggled = { option ->
                                 val wasSelected = uiState.selectedOptions[group.id].orEmpty().any { it.id == option.id }
@@ -215,46 +223,65 @@ private fun ProductHeader(
         animationSpec = tween(STEP_SWAP_MS),
         label = "step_progress",
     )
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            KioskImage(
-                url = item.imageUrl,
-                contentDescription = item.name,
-                contentScale = ContentScale.Fit,
-                placeholderIcon = glyph,
-                placeholderIconSize = 64.dp,
-                modifier = Modifier.size(128.dp).clip(RoundedCornerShape(10.dp)),
-            )
-            Spacer(Modifier.width(28.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = colors.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+    Surface(modifier = Modifier.fillMaxWidth(), color = colors.surface, shadowElevation = 12.dp) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                KioskImage(
+                    url = item.imageUrl,
+                    contentDescription = item.name,
+                    contentScale = ContentScale.Fit,
+                    placeholderIcon = glyph,
+                    placeholderIconSize = 72.dp,
+                    modifier =
+                        Modifier
+                            .size(140.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(colors.background)
+                            .padding(10.dp),
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(text = unitPrice.toDisplayString(), style = MaterialTheme.typography.titleLarge, color = colors.onSurfaceVariant)
+                Spacer(Modifier.width(24.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = unitPrice.toDisplayString(),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                            color = colors.primary,
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = stringResource(R.string.customizer_step_progress, stepNumber, stepCount),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSecondaryContainer,
+                            maxLines = 1,
+                            modifier =
+                                Modifier
+                                    .background(colors.secondaryContainer, RoundedCornerShape(percent = 50))
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.width(20.dp))
-            Text(
-                text = stringResource(R.string.customizer_step_progress, stepNumber, stepCount),
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.primary,
-                maxLines = 1,
-                modifier =
-                    Modifier
-                        .background(colors.primaryContainer, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 22.dp, vertical = 10.dp),
-            )
-        }
-        // Thin progress bar doubling as the header's bottom border.
-        Box(modifier = Modifier.fillMaxWidth().height(6.dp).background(colors.outlineVariant)) {
-            Box(modifier = Modifier.fillMaxWidth(progress).fillMaxHeight().background(colors.primary))
+            // Brand progress bar along the header's bottom edge.
+            Box(modifier = Modifier.fillMaxWidth().height(8.dp).background(colors.surfaceVariant)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .background(KioskColors.heroBrush, RoundedCornerShape(topEndPercent = 50, bottomEndPercent = 50)),
+                )
+            }
         }
     }
 }
@@ -272,10 +299,11 @@ private fun StepsPanel(
     val colors = MaterialTheme.colorScheme
     val groups = uiState.item.modifierGroups
     val reviewLabel = stringResource(R.string.customizer_step_review)
-    val labels = remember(groups, reviewLabel) { groups.map { it.name } + reviewLabel }
+    val labels = remember(groups, reviewLabel) { groups.map { sentenceCase(it.name) } + reviewLabel }
     LazyColumn(
-        modifier = modifier.rightHairline(colors.outlineVariant),
-        contentPadding = PaddingValues(vertical = 12.dp),
+        modifier = modifier.background(colors.surface),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         itemsIndexed(labels) { index, label ->
             val current = index == uiState.currentStep
@@ -290,34 +318,23 @@ private fun StepsPanel(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 104.dp)
+                        .heightIn(min = 96.dp)
+                        .clip(MaterialTheme.shapes.medium)
                         .background(if (current) colors.primaryContainer else Color.Transparent)
                         .clickable(enabled = reachable && !current) { onStepSelected(index) }
                         .graphicsLayer { alpha = if (reachable || current) 1f else UNREACHABLE_STEP_ALPHA }
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector =
-                        when {
-                            done -> Icons.Rounded.CheckCircle
-                            current -> Icons.Rounded.RadioButtonChecked
-                            else -> Icons.Rounded.RadioButtonUnchecked
-                        },
-                    contentDescription = null,
-                    tint =
-                        when {
-                            done -> KioskColors.success
-                            current -> colors.primary
-                            else -> colors.outline
-                        },
-                    modifier = Modifier.size(36.dp),
-                )
+                StepMarker(number = index + 1, done = done, current = current)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (current) FontWeight.Black else FontWeight.Medium),
+                        style =
+                            MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = if (current) FontWeight.Black else FontWeight.SemiBold,
+                            ),
                         color =
                             when {
                                 current -> colors.primary
@@ -342,20 +359,58 @@ private fun StepsPanel(
     }
 }
 
+/** Step number in a circle: green check when done, filled indigo when current, outlined otherwise. */
+@Composable
+private fun StepMarker(
+    number: Int,
+    done: Boolean,
+    current: Boolean,
+) {
+    val colors = MaterialTheme.colorScheme
+    val background =
+        when {
+            done -> KioskColors.success
+            current -> colors.primary
+            else -> colors.surface
+        }
+    Box(
+        modifier =
+            Modifier
+                .size(StepMarkerSize)
+                .background(background, CircleShape)
+                .then(if (!done && !current) Modifier.border(2.dp, colors.outline, CircleShape) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (done) {
+            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+        } else {
+            Text(
+                text = number.toString(),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
+                color = if (current) colors.onPrimary else colors.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /** One modifier group: "Selecciona …", its rule and the option tiles. */
 @Composable
 private fun GroupStep(
     group: KioskModifierGroupDto,
     selectedOptions: List<KioskModifierOptionDto>,
+    optionImageUrl: (KioskModifierOptionDto) -> String?,
     showError: Boolean,
     onOptionToggled: (KioskModifierOptionDto) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val columns = if (LocalKioskCanvas.current.isLandscape) LANDSCAPE_OPTION_COLUMNS else OPTION_COLUMNS
+    val imageUrls = remember(group, optionImageUrl) { group.options.associate { it.id to optionImageUrl(it) } }
+    // Photo tiles only when the group has photos; otherwise clean text tiles (no repeated glyphs).
+    val withPhotos = imageUrls.values.any { it != null }
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
         contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 32.dp, bottom = 32.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -366,8 +421,19 @@ private fun GroupStep(
                     style = MaterialTheme.typography.headlineLarge,
                     color = colors.onBackground,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(text = requirementText(group), style = MaterialTheme.typography.titleSmall, color = colors.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = requirementText(group),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (group.min > 0) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                    modifier =
+                        Modifier
+                            .background(
+                                if (group.min > 0) colors.secondaryContainer else colors.surfaceVariant,
+                                RoundedCornerShape(percent = 50),
+                            )
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                )
                 AnimatedVisibility(visible = showError) {
                     Row(modifier = Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = colors.error, modifier = Modifier.size(32.dp))
@@ -387,24 +453,39 @@ private fun GroupStep(
             }
         }
         items(group.options, key = { it.id }) { option ->
-            OptionTile(
-                option = option,
-                isSelected = selectedOptions.any { it.id == option.id },
-                groupName = group.name,
-                onClick = { onOptionToggled(option) },
-            )
+            val selected = selectedOptions.any { it.id == option.id }
+            if (withPhotos) {
+                OptionTile(
+                    option = option,
+                    imageUrl = imageUrls[option.id],
+                    isSelected = selected,
+                    groupName = group.name,
+                    onClick = { onOptionToggled(option) },
+                )
+            } else {
+                ChoiceTile(
+                    option = option,
+                    isSelected = selected,
+                    multiple = group.max != 1,
+                    onClick = { onOptionToggled(option) },
+                )
+            }
         }
     }
 }
 
-/** "Selecciona bebida"; group names already phrased as a request ("Elige tu bebida") are kept. */
+/**
+ * "Selecciona bebida"; group names already phrased as a request ("Elige tu bebida") are kept.
+ * All-caps ERP names are lowered first ("ACOMPAÑANTE" → "Selecciona acompañante").
+ */
 @Composable
 private fun stepTitle(groupName: String): String {
-    val lower = groupName.trim().lowercase()
+    val name = sentenceCase(groupName)
+    val lower = name.lowercase()
     return if (ImperativePrefixes.any { lower.startsWith(it) }) {
-        groupName
+        name
     } else {
-        stringResource(R.string.customizer_select_group, groupName.trim().replaceFirstChar { it.lowercase() })
+        stringResource(R.string.customizer_select_group, name.replaceFirstChar { it.lowercase() })
     }
 }
 
@@ -421,30 +502,37 @@ private fun requirementText(group: KioskModifierGroupDto): String {
     }
 }
 
-/** Square option tile: illustration, name and extra cost; a check marks the chosen ones. */
+/** Photo option tile: product photo, name and extra cost; a check marks the chosen ones. */
 @Composable
 private fun OptionTile(
     option: KioskModifierOptionDto,
+    imageUrl: String?,
     isSelected: Boolean,
     groupName: String,
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    val extra = remember(option.extraPrice) { Money.fromString(option.extraPrice) }
     val glyph = remember(option.name, groupName) { foodGlyphFor(option.name, groupName) }
     KioskCard(
         modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (option.soldOut) SOLD_OUT_ALPHA else 1f },
         selected = isSelected,
         onClick = if (option.soldOut) null else onClick,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             KioskImage(
-                url = null,
+                url = imageUrl,
                 contentDescription = null,
+                contentScale = ContentScale.Fit,
                 placeholderIcon = glyph,
-                placeholderIconSize = 80.dp,
+                placeholderIconSize = 72.dp,
                 grayscale = option.soldOut,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1.25f).clip(RoundedCornerShape(8.dp)),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(colors.background)
+                        .padding(12.dp),
             )
             Spacer(Modifier.height(12.dp))
             Text(
@@ -456,26 +544,94 @@ private fun OptionTile(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text =
-                    when {
-                        option.soldOut -> stringResource(R.string.menu_sold_out)
-                        extra.amount > BigDecimal.ZERO -> stringResource(R.string.customizer_extra_price, extra.toDisplayString())
-                        else -> " "
-                    },
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-                color = if (option.soldOut) colors.error else colors.onSurfaceVariant,
-            )
+            OptionPrice(option)
         }
-        if (isSelected) {
+        if (isSelected) SelectedCheck()
+    }
+}
+
+/**
+ * Text-first option tile for groups without photos (meat doneness, "sin tomate"…): the name large
+ * and centered with a radio/check indicator, so the grid reads cleanly instead of repeating glyphs.
+ */
+@Composable
+private fun ChoiceTile(
+    option: KioskModifierOptionDto,
+    isSelected: Boolean,
+    multiple: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    KioskCard(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = ChoiceTileHeight)
+                .graphicsLayer { alpha = if (option.soldOut) SOLD_OUT_ALPHA else 1f },
+        selected = isSelected,
+        onClick = if (option.soldOut) null else onClick,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(min = ChoiceTileHeight).padding(horizontal = 16.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
             Icon(
-                imageVector = Icons.Rounded.CheckCircle,
+                imageVector =
+                    when {
+                        multiple && isSelected -> Icons.Rounded.CheckBox
+                        multiple -> Icons.Rounded.CheckBoxOutlineBlank
+                        isSelected -> Icons.Rounded.RadioButtonChecked
+                        else -> Icons.Rounded.RadioButtonUnchecked
+                    },
                 contentDescription = null,
-                tint = colors.secondary,
-                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(48.dp).background(colors.surface, CircleShape),
+                tint = if (isSelected) colors.secondary else colors.outline,
+                modifier = Modifier.size(40.dp),
             )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = option.name,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                color = if (isSelected) colors.primary else colors.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            OptionPrice(option)
         }
     }
+}
+
+/** "+$0.47", "Agotado" or nothing, under the option name. */
+@Composable
+private fun OptionPrice(option: KioskModifierOptionDto) {
+    val colors = MaterialTheme.colorScheme
+    val extra = remember(option.extraPrice) { Money.fromString(option.extraPrice) }
+    val text =
+        when {
+            option.soldOut -> stringResource(R.string.menu_sold_out)
+            extra.amount > BigDecimal.ZERO -> stringResource(R.string.customizer_extra_price, extra.toDisplayString())
+            else -> null
+        }
+    if (text != null) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+            color = if (option.soldOut) colors.error else colors.primary,
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.SelectedCheck() {
+    val colors = MaterialTheme.colorScheme
+    Icon(
+        imageVector = Icons.Rounded.CheckCircle,
+        contentDescription = null,
+        tint = colors.secondary,
+        modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(48.dp).background(colors.surface, CircleShape),
+    )
 }
 
 /** "Revisar orden": each chosen group with a "Cambiar" link, the kitchen note and the quantity. */
@@ -534,8 +690,14 @@ private fun ReviewStep(
             placeholder = { Text(stringResource(R.string.customizer_note_placeholder), style = MaterialTheme.typography.bodyLarge) },
             textStyle = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
-            shape = MaterialTheme.shapes.small,
+            shape = MaterialTheme.shapes.medium,
             singleLine = true,
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = colors.surface,
+                    unfocusedContainerColor = colors.surface,
+                    unfocusedBorderColor = colors.outlineVariant,
+                ),
         )
         Spacer(Modifier.height(32.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -588,7 +750,7 @@ private fun ChoiceSummaryRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = group.name, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
+            Text(text = sentenceCase(group.name), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
             Spacer(Modifier.height(2.dp))
             Text(
                 text = chosen.joinToString(" · ") { it.name }.ifEmpty { stringResource(R.string.customizer_no_selection) },
@@ -638,8 +800,12 @@ private fun WizardBottomBar(
     onAdd: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    Box(modifier = Modifier.fillMaxWidth().topHairline(colors.outlineVariant).padding(horizontal = 28.dp, vertical = 20.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = colors.surface, shadowElevation = 24.dp) {
+        Row(
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             KioskButton(
                 text = stringResource(R.string.btn_cancel),
                 onClick = onCancel,

@@ -327,6 +327,7 @@ fun BrandWordmark(
 /**
  * Remote image with crossfade. Until (or unless) the photo loads, an illustrated [FoodArt]
  * placeholder with [placeholderIcon] is shown. [grayscale] desaturates the photo (sold-out items).
+ * [photoPadding] insets only the photo (ERP photos come on white), the placeholder fills the box.
  */
 @Composable
 fun KioskImage(
@@ -337,6 +338,7 @@ fun KioskImage(
     grayscale: Boolean = false,
     placeholderIcon: ImageVector = Icons.Rounded.Restaurant,
     placeholderIconSize: Dp = 72.dp,
+    photoPadding: Dp = 0.dp,
 ) {
     var loaded by remember(url) { mutableStateOf(false) }
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -357,7 +359,7 @@ fun KioskImage(
                 contentScale = contentScale,
                 colorFilter = if (grayscale) GrayscaleFilter else null,
                 onSuccess = { loaded = true },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(photoPadding),
             )
         }
     }

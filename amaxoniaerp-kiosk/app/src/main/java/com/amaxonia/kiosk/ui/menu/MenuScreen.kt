@@ -37,8 +37,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Fastfood
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
@@ -57,8 +60,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
 import com.amaxonia.kiosk.core.money.Money
@@ -76,18 +78,21 @@ import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.core.network.KioskItemDto
 import com.amaxonia.kiosk.ui.components.BrandWordmark
 import com.amaxonia.kiosk.ui.components.CountBadge
+import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskConfirmDialog
 import com.amaxonia.kiosk.ui.components.KioskImage
 import com.amaxonia.kiosk.ui.components.KioskToast
+import com.amaxonia.kiosk.ui.components.displayName
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
 import com.amaxonia.kiosk.ui.components.outline
-import com.amaxonia.kiosk.ui.components.rightHairline
 import com.amaxonia.kiosk.ui.components.secondaryText
+import com.amaxonia.kiosk.ui.components.softShadow
 import com.amaxonia.kiosk.ui.components.topHairline
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
+import com.amaxonia.kiosk.ui.theme.KioskColors
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 import kotlinx.coroutines.delay
@@ -98,13 +103,19 @@ private const val CATEGORY_SWAP_OUT_MS = 80
 private const val SOLD_OUT_CONTENT_ALPHA = 0.5f
 private const val PRODUCT_COLUMNS = 3
 private const val LANDSCAPE_PRODUCT_COLUMNS = 5
-private const val HOME_TILE_COLUMNS = 2
-private const val LANDSCAPE_HOME_TILE_COLUMNS = 4
-private const val RECOMMENDED_COUNT = 3
-private const val LANDSCAPE_RECOMMENDED_COUNT = 5
+private const val RECOMMENDED_ROWS = 2
+private const val CATEGORY_IMAGE_ASPECT = 1.25f
+private const val HERO_RING_ALPHA = 0.10f
+private const val HERO_SUBTITLE_ALPHA = 0.88f
 private const val SUGGESTION_COUNT = 6
 private const val SCRIM_ALPHA = 0.55f
-private val SideMenuWidth = 280.dp
+private val SideMenuWidth = 300.dp
+private val SideIconSize = 76.dp
+private val SideIconRadius = 16.dp
+private val SideItemRadius = 20.dp
+private val HeroHeight = 260.dp
+private val HeroImageSize = 200.dp
+private val AddBadgeSize = 60.dp
 private val SoldOutVeil = Color(0x99FFFFFF)
 
 /** Category names that make good "También te sugerimos" add-ons (sides, drinks, desserts, coffee). */
@@ -306,19 +317,20 @@ private fun SideMenu(
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = modifier.rightHairline(colors.outlineVariant),
+        modifier = modifier.softShadow(0.dp, Depth.Low),
         color = colors.surface,
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item(key = "logo") {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 28.dp, bottom = 16.dp),
                 ) {
                     BrandWordmark(height = 64.dp)
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(18.dp))
                     DiningModeTag(isTakeaway = isTakeaway)
                 }
             }
@@ -327,21 +339,36 @@ private fun SideMenu(
                     label = stringResource(R.string.menu_home),
                     selected = selectedCategoryId == null,
                     onClick = onHome,
-                ) { tint -> Icon(Icons.Rounded.Home, contentDescription = null, tint = tint, modifier = Modifier.size(44.dp)) }
+                ) { selected ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(if (selected) colors.primary else colors.surfaceVariant, RoundedCornerShape(SideIconRadius)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Home,
+                            contentDescription = null,
+                            tint = if (selected) colors.onPrimary else colors.primary,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
+                }
             }
             item(key = "menu_label") {
                 Text(
-                    text = stringResource(R.string.menu_title),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
-                    color = colors.onSurface,
-                    modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp),
+                    text = stringResource(R.string.menu_title).uppercase(),
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 2.sp),
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 6.dp),
                 )
             }
             items(categories, key = { it.id }) { category ->
                 val imageUrl = remember(category, items) { categoryImageUrl(category, items) }
                 val glyph = remember(category.name) { foodGlyphFor(category.name) }
                 SideMenuItem(
-                    label = category.name,
+                    label = displayName(category.name),
                     selected = category.id == selectedCategoryId,
                     onClick = { onCategorySelected(category.id) },
                 ) { _ ->
@@ -350,8 +377,12 @@ private fun SideMenu(
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         placeholderIcon = glyph,
-                        placeholderIconSize = 32.dp,
-                        modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
+                        placeholderIconSize = 40.dp,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(SideIconRadius)),
+                        photoPadding = 6.dp,
                     )
                 }
             }
@@ -359,56 +390,64 @@ private fun SideMenu(
     }
 }
 
-/** Dine in / takeaway reminder under the logo. */
+/** Dine in / takeaway reminder under the logo, as a soft brand chip. */
 @Composable
 private fun DiningModeTag(isTakeaway: Boolean) {
     val colors = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier =
+            Modifier
+                .background(colors.secondaryContainer, RoundedCornerShape(percent = 50))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Icon(
             imageVector = if (isTakeaway) Icons.Rounded.ShoppingBag else Icons.Rounded.Restaurant,
             contentDescription = null,
-            tint = colors.secondary,
-            modifier = Modifier.size(28.dp),
+            tint = colors.onSecondaryContainer,
+            modifier = Modifier.size(26.dp),
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = stringResource(if (isTakeaway) R.string.dining_mode_takeaway_title else R.string.dining_mode_dine_in_title),
             style = MaterialTheme.typography.labelMedium,
-            color = colors.onSurfaceVariant,
+            color = colors.onSecondaryContainer,
+            maxLines = 1,
         )
     }
 }
 
+/** Rounded menu entry; the selected one is filled with the soft brand indigo. */
 @Composable
 private fun SideMenuItem(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
-    leading: @Composable (tint: Color) -> Unit,
+    leading: @Composable (selected: Boolean) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    val accent = colors.secondary
+    val highContrast = LocalHighContrast.current
+    val shape = RoundedCornerShape(SideItemRadius)
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 104.dp)
-                .background(if (selected) colors.surfaceVariant else Color.Transparent)
-                .drawBehind {
-                    if (selected) drawRect(color = accent, size = Size(8.dp.toPx(), size.height))
-                }
+                .clip(shape)
+                .background(if (selected) colors.primaryContainer else Color.Transparent)
+                .outline(if (selected && highContrast) 3.dp else 0.dp, colors.onSurface, shape)
                 .clickable(onClick = onClick)
-                .padding(start = 20.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-            leading(if (selected) colors.primary else colors.onSurfaceVariant)
+        Box(modifier = Modifier.size(SideIconSize), contentAlignment = Alignment.Center) {
+            leading(selected)
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(14.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Black else FontWeight.Medium),
-            color = if (selected) colors.onSurface else colors.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Black else FontWeight.SemiBold),
+            color = if (selected) colors.primary else colors.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -445,22 +484,40 @@ private fun MenuHome(
     onProductClicked: (KioskItemDto) -> Unit,
 ) {
     val landscape = LocalKioskCanvas.current.isLandscape
-    val recommendedCount = if (landscape) LANDSCAPE_RECOMMENDED_COUNT else RECOMMENDED_COUNT
+    val columns = if (landscape) LANDSCAPE_PRODUCT_COLUMNS else PRODUCT_COLUMNS
     val recommended =
-        remember(uiState.items, recommendedCount) {
-            // One available product per category, so the row shows variety.
-            uiState.items.filterNot { it.soldOut }.distinctBy { it.categoryId }.take(recommendedCount)
+        remember(uiState.items, columns) {
+            // Round-robin across categories so the rows show variety, two full rows at most.
+            uiState.items
+                .filterNot { it.soldOut }
+                .groupBy { it.categoryId }
+                .values
+                .let { groups -> (0 until (groups.maxOfOrNull { it.size } ?: 0)).flatMap { i -> groups.mapNotNull { it.getOrNull(i) } } }
+                .take(columns * RECOMMENDED_ROWS)
         }
-    val columns = if (landscape) LANDSCAPE_HOME_TILE_COLUMNS else HOME_TILE_COLUMNS
     LazyVerticalGrid(
-        columns = GridCells.Fixed(columns * recommendedCount),
+        columns = GridCells.Fixed(columns),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
-        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 32.dp, bottom = 32.dp),
+        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 40.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "title", span = { GridItemSpan(maxLineSpan) }) { SectionTitle(stringResource(R.string.menu_discover)) }
-        items(uiState.categories, key = { "cat_${it.id}" }, span = { GridItemSpan(recommendedCount) }) { category ->
+        item(key = "hero", span = { GridItemSpan(maxLineSpan) }) {
+            // Featured photo: the first available product of the first category (usually the mains).
+            val heroImage =
+                remember(uiState.items, uiState.categories) {
+                    uiState.categories.firstNotNullOfOrNull { category ->
+                        uiState.items
+                            .firstOrNull { it.categoryId == category.id && !it.soldOut && !it.imageUrl.isNullOrBlank() }
+                            ?.imageUrl
+                    }
+                }
+            MenuHero(imageUrl = heroImage)
+        }
+        item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+            SectionTitle(stringResource(R.string.menu_discover), modifier = Modifier.padding(top = 12.dp))
+        }
+        items(uiState.categories, key = { "cat_${it.id}" }) { category ->
             CategoryTile(
                 category = category,
                 imageUrl = remember(category, uiState.items) { categoryImageUrl(category, uiState.items) },
@@ -469,13 +526,77 @@ private fun MenuHome(
         }
         if (recommended.isNotEmpty()) {
             item(key = "recommended_title", span = { GridItemSpan(maxLineSpan) }) {
-                SectionTitle(stringResource(R.string.menu_recommended), modifier = Modifier.padding(top = 20.dp))
+                SectionTitle(stringResource(R.string.menu_recommended), modifier = Modifier.padding(top = 16.dp))
             }
-            items(recommended, key = { "rec_${it.id}" }, span = { GridItemSpan(columns) }) { item ->
+            items(recommended, key = { "rec_${it.id}" }) { item ->
                 ProductCard(item = item, categoryName = categoryName(uiState, item), currency = uiState.currency, onClick = {
                     onProductClicked(item)
                 })
             }
+        }
+    }
+}
+
+/**
+ * Welcome banner on the brand gradient: the big question on the left and a featured product photo
+ * on a white disc on the right (a food glyph while the catalog has no photos).
+ */
+@Composable
+private fun MenuHero(imageUrl: String?) {
+    val shape = MaterialTheme.shapes.large
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(HeroHeight)
+                .softShadow(24.dp, Depth.High)
+                .clip(shape)
+                .background(KioskColors.heroBrush, shape),
+    ) {
+        // Decorative rings for depth on the gradient.
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 120.dp, y = (-140).dp)
+                    .size(420.dp)
+                    .background(Color.White.copy(alpha = HERO_RING_ALPHA), CircleShape),
+        )
+        Row(
+            modifier = Modifier.fillMaxSize().padding(start = 36.dp, end = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.menu_hero_title),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = stringResource(R.string.menu_hero_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = HERO_SUBTITLE_ALPHA),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(20.dp))
+            KioskImage(
+                url = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                placeholderIcon = Icons.Rounded.Fastfood,
+                placeholderIconSize = 96.dp,
+                modifier =
+                    Modifier
+                        .size(HeroImageSize)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                photoPadding = 26.dp,
+            )
         }
     }
 }
@@ -487,7 +608,7 @@ private fun SectionTitle(
 ) {
     Text(
         text = text,
-        style = MaterialTheme.typography.headlineLarge,
+        style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.onBackground,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
@@ -495,34 +616,52 @@ private fun SectionTitle(
     )
 }
 
-/** Home tile: category name on top, its picture in the lower right. */
+/** Home tile: the category picture large on a soft plate, its name below with an arrow. */
 @Composable
 private fun CategoryTile(
     category: KioskCategoryDto,
     imageUrl: String?,
     onClick: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
     val glyph = remember(category.name) { foodGlyphFor(category.name) }
-    KioskCard(modifier = Modifier.fillMaxWidth().height(220.dp), onClick = onClick) {
-        Text(
-            text = category.name,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 22.dp, end = 20.dp),
-        )
-        KioskImage(
-            url = imageUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            placeholderIcon = glyph,
-            placeholderIconSize = 72.dp,
-            modifier =
-                Modifier.align(
-                    Alignment.BottomEnd,
-                ).padding(end = 16.dp, bottom = 16.dp).size(110.dp).clip(RoundedCornerShape(10.dp)),
-        )
+    KioskCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            KioskImage(
+                url = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                placeholderIcon = glyph,
+                placeholderIconSize = 80.dp,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(CATEGORY_IMAGE_ASPECT)
+                        .clip(MaterialTheme.shapes.small),
+                photoPadding = 14.dp,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 14.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = displayName(category.name),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                    color = colors.onSurface,
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
     }
 }
 
@@ -538,12 +677,30 @@ private fun CategoryProducts(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 32.dp, bottom = 40.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { SectionTitle(categoryName, Modifier.padding(bottom = 8.dp)) }
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
+            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                Text(
+                    text = displayName(categoryName),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(10.dp))
+                // Short brand accent under the category title.
+                Box(
+                    modifier =
+                        Modifier
+                            .size(width = 72.dp, height = 8.dp)
+                            .background(KioskColors.heroBrush, RoundedCornerShape(percent = 50)),
+                )
+            }
+        }
         if (items.isEmpty()) {
             item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
@@ -560,7 +717,10 @@ private fun CategoryProducts(
     }
 }
 
-/** Square product tile: photo, name and price, the whole tile is the touch target. */
+/**
+ * Product tile: big photo on a soft plate, name, and the price next to a round "+" — the whole
+ * tile is the touch target.
+ */
 @Composable
 private fun ProductCard(
     item: KioskItemDto,
@@ -582,8 +742,7 @@ private fun ProductCard(
         onClick = if (item.soldOut) null else onClick,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp).graphicsLayer { alpha = contentAlpha },
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth().padding(12.dp).graphicsLayer { alpha = contentAlpha },
         ) {
             KioskImage(
                 url = item.imageUrl,
@@ -592,27 +751,52 @@ private fun ProductCard(
                 grayscale = item.soldOut,
                 placeholderIcon = glyph,
                 placeholderIconSize = 96.dp,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp)),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(MaterialTheme.shapes.small),
+                photoPadding = 12.dp,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = item.name,
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.onSurface,
-                textAlign = TextAlign.Center,
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 6.dp),
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = money.toDisplayString(),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                color = colors.onSurface,
-                maxLines = 1,
-            )
-            if (secondaryText.isNotBlank()) {
-                Text(text = secondaryText, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = money.toDisplayString(),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
+                        color = colors.primary,
+                        maxLines = 1,
+                    )
+                    if (secondaryText.isNotBlank()) {
+                        Text(
+                            text = secondaryText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                if (!item.soldOut) {
+                    Box(
+                        modifier = Modifier.size(AddBadgeSize).background(colors.primary, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(34.dp))
+                    }
+                }
             }
         }
         if (item.soldOut) SoldOutOverlay()
@@ -657,24 +841,38 @@ private fun OrderBar(
 ) {
     val colors = MaterialTheme.colorScheme
     val secondaryTotal = remember(total, currency) { total.secondaryText(currency) }
-    Surface(modifier = modifier.fillMaxWidth().topHairline(colors.outlineVariant), color = colors.surface) {
+    Surface(
+        modifier = modifier.fillMaxWidth().topHairline(if (LocalHighContrast.current) colors.onSurface else Color.Transparent),
+        color = colors.surface,
+        shadowElevation = 24.dp,
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.size(104.dp)) {
-                Icon(
-                    imageVector = Icons.Rounded.ShoppingBag,
-                    contentDescription = stringResource(R.string.cd_cart),
-                    tint = colors.primary,
-                    modifier = Modifier.size(84.dp).align(Alignment.BottomStart),
-                )
+            Box(modifier = Modifier.size(112.dp)) {
+                Box(
+                    modifier = Modifier.size(96.dp).align(Alignment.BottomStart).background(colors.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ShoppingBag,
+                        contentDescription = stringResource(R.string.cd_cart),
+                        tint = colors.primary,
+                        modifier = Modifier.size(56.dp),
+                    )
+                }
                 if (itemCount > 0) {
-                    CountBadge(count = itemCount, size = 48.dp, modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp))
+                    CountBadge(count = itemCount, size = 48.dp, modifier = Modifier.align(Alignment.TopEnd))
                 }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(20.dp))
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.menu_your_order),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                )
                 AnimatedContent(targetState = total.toDisplayString(), label = "cart_total") { value ->
                     Text(text = value, style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
                 }
@@ -694,7 +892,8 @@ private fun OrderBar(
                 KioskButton(
                     text = stringResource(R.string.menu_cancel_order),
                     onClick = onCancel,
-                    style = KioskButtonStyle.Secondary,
+                    style = KioskButtonStyle.Ghost,
+                    contentColor = colors.onSurfaceVariant,
                     height = 72.dp,
                     textStyle = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.fillMaxWidth(),

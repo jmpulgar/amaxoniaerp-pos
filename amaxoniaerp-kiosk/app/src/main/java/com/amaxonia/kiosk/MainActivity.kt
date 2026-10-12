@@ -55,6 +55,7 @@ import com.amaxonia.kiosk.ui.customer.CustomerIdScreen
 import com.amaxonia.kiosk.ui.customer.CustomerIdViewModel
 import com.amaxonia.kiosk.ui.customizer.CustomizerScreen
 import com.amaxonia.kiosk.ui.customizer.ProductCustomizerViewModel
+import com.amaxonia.kiosk.ui.customizer.optionImageResolver
 import com.amaxonia.kiosk.ui.diningmode.DiningModeScreen
 import com.amaxonia.kiosk.ui.idle.IdleWarningDialog
 import com.amaxonia.kiosk.ui.login.LoginScreen
@@ -459,9 +460,12 @@ fun KioskNavHost(
                             orderGraph = appGraph.orderGraph,
                         )
                     }
+                val catalogItems = catalog?.items.orEmpty()
+                val optionImageUrl = remember(catalogItems) { optionImageResolver(catalogItems) }
                 CustomizerScreen(
                     viewModel = customizerViewModel,
                     onDismiss = { navController.popBackStack() },
+                    optionImageUrl = optionImageUrl,
                 )
             } else {
                 LaunchedEffect(Unit) {

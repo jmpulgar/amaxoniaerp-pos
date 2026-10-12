@@ -67,4 +67,5 @@
     <string name="payflow_manual_notice_title">No payment terminal connected</string>
     <string name="payflow_manual_notice_body">The payment will be recorded manually with this method and the invoice will be issued. Nothing is charged on this device.</string>
     <string name="payflow_manual_confirm">Confirm payment</string>
+    <string name="payflow_manual_registration_failed_body">The payment and the electronic invoice could not be registered. Nothing was charged: please try again.</string>
 </resources>

@@ -148,7 +148,29 @@ class CheckoutOrderUseCaseTest {
             assertEquals(50, body["paymentMethodId"]?.jsonPrimitive?.int)
             assertEquals(CheckoutOrderUseCase.MANUAL_REFERENCE, body["reference"]?.jsonPrimitive?.content)
             assertTrue(body["transactionId"]?.jsonPrimitive?.content.orEmpty().startsWith(CheckoutOrderUseCase.MANUAL_TRANSACTION_PREFIX))
-            assertEquals(50, fakeDao.getByOrderId("ord-uuid-1234")?.paymentMethodId)
+            assertEquals("MASTERCARD", body["brand"]?.jsonPrimitive?.content)
+            assertEquals("nothing was charged: no outbox entry", null, fakeDao.getByOrderId("ord-uuid-1234"))
+        }
+
+    @Test
+    fun `manual card payment the backend rejects is reported, never completed without invoice`() =
+        runTest {
+            val api =
+                RecordingApi { request ->
+                    if (request.url.encodedPath.endsWith("/pay")) {
+                        respond("""{"error":"La cotización del pedido ha expirado"}""", HttpStatusCode.Conflict)
+                    } else {
+                        respond("Not Found", HttpStatusCode.NotFound)
+                    }
+                }
+            val useCase = CheckoutOrderUseCase(api.client, FakePaymentTerminal(isAvailable = false), fakeDao)
+
+            val result = useCase.registerManualCardPayment(quote, KioskCardOption(id = 49, name = "VISA", siglas = "TDC"))
+
+            val failed = result as CheckoutResult.RegistrationFailed
+            assertTrue(failed.quoteExpired)
+            assertEquals("La cotización del pedido ha expirado", failed.message)
+            assertEquals(null, fakeDao.getByOrderId("ord-uuid-1234"))
         }
 
     @Test

@@ -70,9 +70,9 @@ fun Modifier.centeredMaxWidth(max: Dp = KioskContentMaxWidth): Modifier =
         .fillMaxWidth()
 
 private const val BADGE_POP_SCALE = 1.45f
-private val BUTTON_RADIUS = 10.dp
+private val BUTTON_RADIUS = 18.dp
 private const val BUTTON_PRESSED_SCALE = 0.98f
-private val CARD_BORDER = 2.dp
+private val CARD_RADIUS = 20.dp
 private val SELECTED_BORDER = 4.dp
 private val HC_BORDER = 3.dp
 private const val DISABLED_ALPHA = 0.4f
@@ -143,7 +143,7 @@ fun KioskButton(
             KioskButtonStyle.Ghost -> Color.Transparent to colors.onSurface
         }
     val content = if (contentColor != Color.Unspecified) contentColor else defaultContent
-    // Self-order kiosk buttons: flat rectangles with softly rounded corners, no gradients or shadows.
+    // Solid brand colors with generous rounding; filled buttons float on a soft tinted shadow.
     val shape = RoundedCornerShape(BUTTON_RADIUS)
     val border =
         when {
@@ -158,12 +158,21 @@ fun KioskButton(
         }
     val active = enabled && !dimmed
     val alpha = if (active) 1f else DISABLED_ALPHA
+    val shadow =
+        when {
+            !active -> Modifier
+            style == KioskButtonStyle.Primary || style == KioskButtonStyle.Accent ->
+                Modifier.softShadow(BUTTON_RADIUS, Depth.Medium, tint = container)
+            style == KioskButtonStyle.Secondary || style == KioskButtonStyle.Light -> Modifier.softShadow(BUTTON_RADIUS, Depth.Low)
+            else -> Modifier
+        }
 
     Surface(
         modifier =
             modifier
                 .defaultMinSize(minHeight = height)
-                .kioskPressable(enabled = enabled, pressedScale = BUTTON_PRESSED_SCALE, onClick = onClick),
+                .kioskPressable(enabled = enabled, pressedScale = BUTTON_PRESSED_SCALE, onClick = onClick)
+                .then(shadow),
         shape = shape,
         color = if (container == Color.Transparent) Color.Transparent else container.copy(alpha = alpha),
         contentColor = content.copy(alpha = alpha),
@@ -196,12 +205,16 @@ fun KioskButton(
     }
 }
 
-/** Flat white tile with a thin grey border — the base for products, options and choices. */
+/**
+ * White tile lifted off the grey canvas by a soft indigo-tinted shadow (no grey border) — the base
+ * for products, options and choices. Selected tiles get a thick brand-blue ring.
+ */
 @Composable
 fun KioskCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     onClick: (() -> Unit)? = null,
+    depth: Depth = Depth.Medium,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -210,19 +223,19 @@ fun KioskCard(
     val borderColor =
         when {
             selected -> if (highContrast) colors.primary else colors.secondary
-            highContrast -> colors.onSurface
-            else -> colors.outlineVariant
+            else -> colors.onSurface
         }
     val borderWidth =
         when {
             selected -> SELECTED_BORDER
             highContrast -> HC_BORDER
-            else -> CARD_BORDER
+            else -> 0.dp
         }
     Box(
         modifier =
             modifier
                 .then(if (onClick != null) Modifier.kioskPressable(pressedScale = BUTTON_PRESSED_SCALE, onClick = onClick) else Modifier)
+                .softShadow(CARD_RADIUS, depth)
                 .clip(shape)
                 .background(colors.surface, shape)
                 .outline(width = borderWidth, color = borderColor, shape = shape),

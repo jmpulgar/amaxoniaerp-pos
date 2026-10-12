@@ -117,6 +117,9 @@
     <string name="menu_home">Inicio</string>
     <string name="menu_discover">Descubre nuestro menú</string>
     <string name="menu_recommended">Productos recomendados</string>
+    <string name="menu_hero_title">¿Qué se te antoja hoy?</string>
+    <string name="menu_hero_subtitle">Elige una categoría o toca un producto para empezar tu orden.</string>
+    <string name="menu_your_order">Tu orden</string>
     <string name="menu_view_cart">Ver mi orden</string>
     <string name="menu_cancel_order">Cancelar orden</string>
     <string name="menu_sold_out">Agotado</string>

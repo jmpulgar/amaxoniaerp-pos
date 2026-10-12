@@ -67,4 +67,5 @@
     <string name="payflow_manual_notice_title">Sin terminal de pago conectado</string>
     <string name="payflow_manual_notice_body">El pago se registrará manualmente con esta forma de pago y se emitirá la factura. No se realizará ningún cobro en este equipo.</string>
     <string name="payflow_manual_confirm">Confirmar pago</string>
+    <string name="payflow_manual_registration_failed_body">No se pudo registrar el pago ni emitir la factura electrónica. No se realizó ningún cobro: intenta de nuevo.</string>
 </resources>

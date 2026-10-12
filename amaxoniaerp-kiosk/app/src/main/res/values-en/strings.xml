@@ -113,6 +113,9 @@
     <string name="menu_home">Home</string>
     <string name="menu_discover">Discover our menu</string>
     <string name="menu_recommended">Recommended for you</string>
+    <string name="menu_hero_title">What are you craving today?</string>
+    <string name="menu_hero_subtitle">Pick a category or tap a product to start your order.</string>
+    <string name="menu_your_order">Your order</string>
     <string name="menu_view_cart">View my order</string>
     <string name="menu_cancel_order">Cancel order</string>
     <string name="menu_sold_out">Sold out</string>

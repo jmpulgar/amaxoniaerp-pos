@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,7 +32,6 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingBag
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
@@ -61,20 +61,19 @@ import com.amaxonia.kiosk.core.network.KioskCurrencyConfig
 import com.amaxonia.kiosk.domain.cart.CartLine
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
+import com.amaxonia.kiosk.ui.components.KioskCard
 import com.amaxonia.kiosk.ui.components.KioskConfirmDialog
 import com.amaxonia.kiosk.ui.components.KioskIconButton
 import com.amaxonia.kiosk.ui.components.KioskImage
-import com.amaxonia.kiosk.ui.components.bottomHairline
 import com.amaxonia.kiosk.ui.components.foodGlyphFor
 import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.components.secondaryText
-import com.amaxonia.kiosk.ui.components.topHairline
 import com.amaxonia.kiosk.ui.diningmode.MODE_DINE_IN
 import com.amaxonia.kiosk.ui.diningmode.MODE_TAKEAWAY
 import com.amaxonia.kiosk.ui.theme.LocalHighContrast
 import com.amaxonia.kiosk.ui.theme.LocalKioskCanvas
 
-private val LineImageSize = 96.dp
+private val LineImageSize = 112.dp
 private val LineMinHeight = 128.dp
 private val SidePanelWidth = 640.dp
 private val StepperButtonSize = 64.dp
@@ -165,9 +164,10 @@ private fun ReviewHeader(
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = Modifier.fillMaxWidth().bottomHairline(colors.outlineVariant),
+        modifier = Modifier.fillMaxWidth(),
         color = colors.surface,
         border = if (LocalHighContrast.current) BorderStroke(2.dp, colors.onSurface) else null,
+        shadowElevation = 12.dp,
     ) {
         Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -271,16 +271,13 @@ private fun CartLinesList(
     viewModel: ReviewViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val colors = MaterialTheme.colorScheme
     LazyColumn(
-        modifier = modifier.background(colors.surface),
-        contentPadding = PaddingValues(vertical = 4.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        itemsIndexed(items = uiState.lines, key = { _, line -> line.id }) { index, line ->
-            Column(modifier = Modifier.animateItem()) {
-                if (index > 0) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), thickness = 1.dp, color = colors.outlineVariant)
-                }
+        items(items = uiState.lines, key = { line -> line.id }) { line ->
+            KioskCard(modifier = Modifier.fillMaxWidth().animateItem()) {
                 CartLineRow(
                     line = line,
                     currency = uiState.currency,
@@ -311,15 +308,20 @@ private fun CartLineRow(
     val choices = remember(line.selectedModifiers) { line.selectedModifiers.joinToString(" · ") { it.optionName } }
 
     Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = LineMinHeight).padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = LineMinHeight).padding(horizontal = 18.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         KioskImage(
             url = line.item.imageUrl,
             contentDescription = line.item.name,
+            contentScale = ContentScale.Fit,
             placeholderIcon = glyph,
-            placeholderIconSize = 48.dp,
-            modifier = Modifier.size(LineImageSize).clip(RoundedCornerShape(16.dp)).background(colors.surfaceVariant),
+            placeholderIconSize = 56.dp,
+            modifier =
+                Modifier
+                    .size(LineImageSize)
+                    .clip(MaterialTheme.shapes.small),
+            photoPadding = 8.dp,
         )
         Spacer(modifier = Modifier.width(20.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -468,15 +470,11 @@ private fun ReviewBottomBar(
     val secondaryTotal = remember(total, uiState.currency) { total.secondaryText(uiState.currency) }
 
     Surface(
-        modifier = if (sidePanel) modifier.fillMaxWidth() else modifier.fillMaxWidth().topHairline(colors.outlineVariant),
+        modifier = modifier.fillMaxWidth(),
         color = colors.surface,
-        shape = if (sidePanel) MaterialTheme.shapes.large else RoundedCornerShape(0.dp),
-        border =
-            when {
-                LocalHighContrast.current -> BorderStroke(3.dp, colors.onSurface)
-                sidePanel -> BorderStroke(2.dp, colors.outlineVariant)
-                else -> null
-            },
+        shape = if (sidePanel) MaterialTheme.shapes.large else RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        border = if (LocalHighContrast.current) BorderStroke(3.dp, colors.onSurface) else null,
+        shadowElevation = 24.dp,
     ) {
         Column(modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp)) {
             // Subtotal and tax sit in a soft grey block; the total stands out beneath it.

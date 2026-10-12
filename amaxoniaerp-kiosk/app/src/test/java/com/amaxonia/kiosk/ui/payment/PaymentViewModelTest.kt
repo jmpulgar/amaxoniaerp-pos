@@ -225,6 +225,52 @@ class PaymentViewModelTest {
         }
 
     @Test
+    fun `a failed manual registration shows the error and retries the same order`() =
+        runTest(dispatcher) {
+            val visa = KioskCardOption(id = 49, name = "VISA", siglas = "TDC")
+            terminal = FakePaymentTerminal(isAvailable = false)
+            coEvery { checkoutUseCase.registerManualCardPayment(quote, visa) } returnsMany
+                listOf(
+                    CheckoutResult.RegistrationFailed("timeout", quoteExpired = false),
+                    CheckoutResult.Success(quote, approvedCard(), paymentResponse),
+                )
+            val vm = PaymentViewModel(checkoutUseCase, quoteOrder, terminal, session(), orderGraph, "RETIRO_MOSTRADOR", visa)
+            advanceUntilIdle()
+
+            vm.confirmManualPayment()
+            advanceUntilIdle()
+            val failed = vm.uiState.value.step as PaymentStep.Failed
+            assertEquals(PaymentFailure.REGISTRATION_FAILED, failed.reason)
+            assertEquals("timeout", failed.message)
+
+            vm.retry()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.step is PaymentStep.Completed)
+            coVerify(exactly = 1) { quoteOrder(any()) }
+            coVerify(exactly = 2) { checkoutUseCase.registerManualCardPayment(quote, visa) }
+        }
+
+    @Test
+    fun `an expired manual order is quoted again on retry`() =
+        runTest(dispatcher) {
+            val visa = KioskCardOption(id = 49, name = "VISA", siglas = "TDC")
+            terminal = FakePaymentTerminal(isAvailable = false)
+            coEvery { checkoutUseCase.registerManualCardPayment(quote, visa) } returns
+                CheckoutResult.RegistrationFailed("expirada", quoteExpired = true)
+            val vm = PaymentViewModel(checkoutUseCase, quoteOrder, terminal, session(), orderGraph, "RETIRO_MOSTRADOR", visa)
+            advanceUntilIdle()
+            vm.confirmManualPayment()
+            advanceUntilIdle()
+
+            vm.retry()
+            advanceUntilIdle()
+
+            assertEquals(PaymentStep.AwaitingManualConfirmation, vm.uiState.value.step)
+            coVerify(exactly = 2) { quoteOrder(any()) }
+        }
+
+    @Test
     fun `with a terminal the chosen card method id is sent with the card payment`() =
         runTest(dispatcher) {
             val visa = KioskCardOption(id = 49, name = "VISA", siglas = "TDC")

@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amaxonia.kiosk.R
+import com.amaxonia.kiosk.ui.components.Depth
 import com.amaxonia.kiosk.ui.components.KioskButton
 import com.amaxonia.kiosk.ui.components.KioskButtonStyle
 import com.amaxonia.kiosk.ui.components.KioskCard
@@ -64,6 +65,7 @@ import com.amaxonia.kiosk.ui.components.KioskHeader
 import com.amaxonia.kiosk.ui.components.KioskSegmentedControl
 import com.amaxonia.kiosk.ui.components.NumericKeypad
 import com.amaxonia.kiosk.ui.components.ScrollableFillColumn
+import com.amaxonia.kiosk.ui.components.brushTint
 import com.amaxonia.kiosk.ui.components.centeredMaxWidth
 import com.amaxonia.kiosk.ui.components.kioskPressable
 import com.amaxonia.kiosk.ui.theme.KioskColors
@@ -303,45 +305,61 @@ private fun InvoiceQuestion(
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 48.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier.size(180.dp).background(colors.surfaceVariant, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Rounded.ReceiptLong, contentDescription = null, tint = colors.primary, modifier = Modifier.size(100.dp))
-        }
-        Spacer(modifier = Modifier.height(40.dp))
-        Text(
-            text = stringResource(R.string.customer_question),
-            style = MaterialTheme.typography.displaySmall,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.customer_question_hint),
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(56.dp))
-        Row(
-            modifier = Modifier.centeredMaxWidth(QuestionButtonsMaxWidth),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            KioskButton(
-                text = stringResource(R.string.customer_no_thanks),
-                onClick = onNoThanks,
-                style = KioskButtonStyle.Secondary,
-                modifier = Modifier.weight(1f),
-            )
-            KioskButton(
-                text = stringResource(R.string.customer_yes),
-                onClick = onYes,
-                modifier = Modifier.weight(1f),
-            )
+        // The whole question sits on one white card so it reads as a single, calm decision.
+        KioskCard(modifier = Modifier.centeredMaxWidth(QuestionButtonsMaxWidth), depth = Depth.High) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 56.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier.size(200.dp).background(colors.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.ReceiptLong,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier =
+                            Modifier
+                                .size(110.dp)
+                                .then(if (LocalHighContrast.current) Modifier else Modifier.brushTint(KioskColors.heroBrush)),
+                    )
+                }
+                Spacer(modifier = Modifier.height(40.dp))
+                Text(
+                    text = stringResource(R.string.customer_question),
+                    style = MaterialTheme.typography.displaySmall,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.customer_question_hint),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(48.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    KioskButton(
+                        text = stringResource(R.string.customer_no_thanks),
+                        onClick = onNoThanks,
+                        style = KioskButtonStyle.Secondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    KioskButton(
+                        text = stringResource(R.string.customer_yes),
+                        onClick = onYes,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
