@@ -20,6 +20,8 @@ import com.amaxoniaerp.features.kiosk.domain.KioskRequestContext
 import com.amaxoniaerp.features.kiosk.domain.KioskUnlockRequest
 import com.amaxoniaerp.features.kiosk.domain.KioskYappyQrResponse
 import com.amaxoniaerp.features.kiosk.domain.KioskYappyStatusResponse
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
 import org.mindrot.jbcrypt.BCrypt
@@ -213,12 +215,16 @@ class KioskService(
                 throw IllegalArgumentException("orderId no puede estar vacío")
             }
             val database = requireKioskOrderTables(kioskContext)
-            placeKioskOrderService.payOrder(
-                database = database,
-                kioskContext = kioskContext,
-                orderId = orderId,
-                request = request,
-            )
+            // El cliente ya pagó: si el kiosco corta la conexión (timeout), la venta y la factura
+            // electrónica deben terminar igual; el reintento del kiosco recibe la respuesta idempotente.
+            withContext(NonCancellable) {
+                placeKioskOrderService.payOrder(
+                    database = database,
+                    kioskContext = kioskContext,
+                    orderId = orderId,
+                    request = request,
+                )
+            }
         }
 
     suspend fun createYappyQr(
