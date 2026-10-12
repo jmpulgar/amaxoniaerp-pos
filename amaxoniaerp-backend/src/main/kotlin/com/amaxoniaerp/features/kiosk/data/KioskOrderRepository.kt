@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.kiosk.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.caja.data.CajaTableFactory
 import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.clients.data.ClientsTable
@@ -152,7 +153,7 @@ class KioskOrderRepository(
             subtotal = subtotal.toPlainString(),
             tax = tax.toPlainString(),
             total = total.toPlainString(),
-            expiresAt = orderRow[KioskOrderTable.quoteExpiraEn].toInstantString(),
+            expiresAt = orderRow[KioskOrderTable.quoteExpiraEn].storedToInstantString(countryCode),
             diningMode = orderRow[KioskOrderTable.modalidad],
             tableTent = orderRow[KioskOrderTable.portamesa],
             customerId = orderRow[KioskOrderTable.idCliente].trim(),
@@ -714,8 +715,16 @@ private fun CalculatedLine.toResponse(): KioskQuoteLineResponse =
     )
 
 /**
- * `quote_expira_en` se guarda en hora local del servidor (`LocalDateTime.now()`). Se envía como
- * instante UTC ISO-8601 (`2026-10-07T15:04:05Z`) para que el kiosco lo interprete sin ambigüedad
- * de zona horaria y sepa cuándo debe volver a cotizar.
+ * `quote_expira_en` se envía como instante UTC ISO-8601 (`2026-10-07T15:04:05Z`) para que el kiosco
+ * lo interprete sin ambigüedad de zona horaria y sepa cuándo debe volver a cotizar.
+ *
+ * Al escribir, Exposed interpreta el [LocalDateTime] en la zona de la JVM y el driver MySQL lo
+ * convierte a `serverTimezone` (la del país); al leer, `DATETIME` vuelve sin convertir, en hora de
+ * pared del país. Por eso un valor recién generado con `LocalDateTime.now()` usa la zona de la JVM
+ * ([toInstantString]) y uno leído de la base usa la del país ([storedToInstantString]); en un
+ * servidor con otra zona (p. ej. -04) mezclarlas desplaza la hora y da cotizaciones ya vencidas.
  */
 internal fun LocalDateTime.toInstantString(): String = atZone(ZoneId.systemDefault()).toInstant().toString()
+
+internal fun LocalDateTime.storedToInstantString(countryCode: String): String =
+    atZone(BusinessClock.zoneForCountry(countryCode)).toInstant().toString()

@@ -127,7 +127,8 @@ class PlaceKioskOrderService(
         // Yappy: el cliente ya pagó el QR generado con la cotización vigente; una expiración
         // posterior de la cotización no puede impedir confirmar un pago ya cobrado.
         if (method == KioskPaymentMethod.CARD) {
-            check(!LocalDateTime.now().isAfter(order.quoteExpiraEn)) { "La cotización del pedido ha expirado" }
+            val now = BusinessClock.nowForCountry(kioskContext.countryCode)
+            check(!now.isAfter(order.quoteExpiraEn)) { "La cotización del pedido ha expirado" }
             // pago_marca = 'YAPPY' identifica los pedidos Yappy: una tarjeta no puede usar esa marca.
             require(!request.brand.trim().equals(KioskPaymentMethod.YAPPY, ignoreCase = true)) {
                 "Marca de tarjeta inválida: ${request.brand}"

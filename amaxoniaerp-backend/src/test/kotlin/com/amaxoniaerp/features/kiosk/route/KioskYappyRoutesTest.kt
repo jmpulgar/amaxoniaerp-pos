@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.kiosk.route
 
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.data.CajaDetalleAperturaTable
 import com.amaxoniaerp.features.caja.data.CajaDetalleCierreFormaPagoTable
@@ -299,7 +300,7 @@ class KioskYappyRoutesTest {
     private fun insertOrder(
         orderId: String,
         estado: String = "COTIZADO",
-        expiresAt: LocalDateTime = LocalDateTime.now().plusMinutes(10),
+        expiresAt: LocalDateTime = BusinessClock.nowForCountry("PA").plusMinutes(10),
         yappyTransactionId: String? = null,
     ) {
         transaction(database) {
@@ -476,10 +477,26 @@ class KioskYappyRoutesTest {
             val expiredOrder = UUID.randomUUID().toString()
             transaction(database) { exec("DELETE FROM kiosco_pedido_item") }
             transaction(database) { exec("DELETE FROM kiosco_pedido") }
-            insertOrder(expiredOrder, expiresAt = LocalDateTime.now().minusMinutes(1))
+            insertOrder(expiredOrder, expiresAt = BusinessClock.nowForCountry("PA").minusMinutes(1))
             val expired = client.createQr(expiredOrder)
             assertEquals(HttpStatusCode.Conflict, expired.status)
             assertTrue(expired.bodyAsText().contains("ha expirado"))
+        }
+
+    @Test
+    fun `POST yappy accepts a valid quote when the server runs in another time zone`() =
+        testApplication {
+            // Producción corre a -04 y la base guarda la hora de Panamá: la vigencia se compara con
+            // la hora de Panamá, no con LocalDateTime.now() de la JVM (antes daba "ha expirado").
+            withDefaultTimeZone("America/Caracas") {
+                val client = kioskClient()
+                val orderId = UUID.randomUUID().toString()
+                insertOrder(orderId, expiresAt = BusinessClock.nowForCountry("PA").plusMinutes(5))
+
+                val response = client.createQr(orderId)
+
+                assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            }
         }
 
     @Test

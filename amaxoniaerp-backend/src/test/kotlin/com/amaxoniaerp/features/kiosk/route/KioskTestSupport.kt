@@ -34,6 +34,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.TimeZone
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
 /**
@@ -232,5 +233,19 @@ internal object KioskTestSupport {
         header(HttpHeaders.Authorization, "Bearer $token")
         if (caja != null) header(KIOSK_CAJA_HEADER, caja)
         if (prefix != null) header(KIOSK_PREFIX_HEADER, prefix)
+    }
+}
+
+/** Ejecuta [block] con la zona horaria por defecto de la JVM en [zoneId] (simula un servidor en otra zona). */
+internal inline fun <T> withDefaultTimeZone(
+    zoneId: String,
+    block: () -> T,
+): T {
+    val original = TimeZone.getDefault()
+    TimeZone.setDefault(TimeZone.getTimeZone(zoneId))
+    try {
+        return block()
+    } finally {
+        TimeZone.setDefault(original)
     }
 }

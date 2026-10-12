@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.kiosk.application
 
+import com.amaxoniaerp.core.time.BusinessClock
 import com.amaxoniaerp.features.kiosk.data.KioskOrderRepository
 import com.amaxoniaerp.features.kiosk.data.KioskYappyConfigRepository
 import com.amaxoniaerp.features.kiosk.domain.KioskOrderCharge
@@ -49,7 +50,8 @@ class KioskYappyService(
     private val sessionManager: YappySessionManager,
     /** Respaldo (`YAPPY_QR_TYPE`) cuando `parametros_generales.yappy_tipo_qr` no existe o está vacío. */
     private val defaultQrType: YappyQrType = YappyQrType.DEFAULT,
-    private val clock: () -> LocalDateTime = LocalDateTime::now,
+    /** Hora de pared del país: así se leen las fechas `DATETIME` (ver [BusinessClock]). */
+    private val clock: (String) -> LocalDateTime = BusinessClock::nowForCountry,
 ) : KioskYappyPaymentVerifier {
     private val logger = LoggerFactory.getLogger(KioskYappyService::class.java)
 
@@ -65,7 +67,7 @@ class KioskYappyService(
     ): KioskYappyQrResponse {
         val order = loadOwnedOrder(database, kioskContext, orderId)
         check(order.estado == ESTADO_COTIZADO) { "El pedido se encuentra en estado ${order.estado}" }
-        check(!clock().isAfter(order.quoteExpiraEn)) { "La cotización del pedido ha expirado" }
+        check(!clock(kioskContext.countryCode).isAfter(order.quoteExpiraEn)) { "La cotización del pedido ha expirado" }
 
         val config = requireConfig(database, kioskContext)
         order.yappyTransactionId?.let { previous -> releasePreviousTransaction(kioskContext, config, order, previous) }
