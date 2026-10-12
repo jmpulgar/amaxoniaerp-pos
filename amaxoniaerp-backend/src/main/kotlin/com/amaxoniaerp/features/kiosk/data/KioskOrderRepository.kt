@@ -175,7 +175,7 @@ class KioskOrderRepository(
 
             // 1. Validaciones básicas de solicitud
             val diningMode = validateQuoteRequest(request)
-            val customerId = request.customerId?.trim()?.takeIf { it.isNotBlank() } ?: kioskContext.idClienteGenerico
+            val customerId = resolveCustomerId(request.customerId) ?: kioskContext.idClienteGenerico
             val tableTent = request.tableTent?.trim()?.takeIf { it.isNotBlank() }
 
             // 2. Parámetros generales
@@ -232,6 +232,25 @@ class KioskOrderRepository(
                 customerId = customerId,
                 lines = calculatedLines.map { it.toResponse() },
             )
+        }
+    }
+
+    /**
+     * `clientes.id_cliente` del cliente que envió el kiosco (por id, código o RIF). El kiosco manda
+     * "CF" para Consumidor Final: eso, un valor vacío o un cliente que no existe devuelven null para
+     * usar el cliente por defecto de `parametros_generales.default_cod_cliente_factura`, igual que el
+     * POS, en vez de guardar en la venta un `id_cliente` que no corresponde a ningún cliente.
+     */
+    private fun resolveCustomerId(requested: String?): String? {
+        val value = requested?.trim()?.takeIf { it.isNotBlank() && !it.equals(CONSUMIDOR_FINAL_CODE, ignoreCase = true) }
+        return value?.let {
+            ClientsTable
+                .select(ClientsTable.idCliente)
+                .where { (ClientsTable.idCliente eq it) or (ClientsTable.codCliente eq it) or (ClientsTable.rif eq it) }
+                .limit(1)
+                .singleOrNull()
+                ?.get(ClientsTable.idCliente)
+                ?.trim()
         }
     }
 
@@ -644,6 +663,7 @@ class KioskOrderRepository(
 private const val ESTADO_COTIZADO = "COTIZADO"
 private const val STORAGE_SCALE = 4
 private const val MODIFIER_NAME_MAX_LENGTH = 80
+private const val CONSUMIDOR_FINAL_CODE = "CF"
 
 private data class QuotePricingContext(
     val itemsTable: BaseItemsTable,

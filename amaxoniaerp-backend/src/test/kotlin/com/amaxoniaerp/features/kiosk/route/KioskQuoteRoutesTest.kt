@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.kiosk.route
 
+import com.amaxoniaerp.features.clients.data.ClientsTable
 import com.amaxoniaerp.features.items.data.ItemsTablePA
 import com.amaxoniaerp.features.kiosk.application.KioskService
 import com.amaxoniaerp.features.kiosk.application.UnlockRateLimiter
@@ -223,6 +224,48 @@ class KioskQuoteRoutesTest {
             val other = client.quote(request, prefix = "k7")
             assertEquals("K7-003", json.decodeFromString<KioskQuoteResponse>(other.bodyAsText()).formattedOrderNumber)
         }
+
+    @Test
+    fun `POST quote stores the default client of parametros_generales unless the kiosk sends a registered one`() =
+        testApplication {
+            transaction(database) {
+                exec("UPDATE parametros_generales SET default_cod_cliente_factura = '0001'")
+                client("UUID-CLIENTE-GENERICO", cod = "1", rif = "CF")
+                client("UUID-CLIENTE-RUC", cod = "57", rif = "8-123-456")
+            }
+            val client = kioskClient(newService())
+            val drink = listOf(111)
+
+            suspend fun storedClientFor(customerId: String?): String {
+                val key = UUID.randomUUID().toString()
+                val response = client.quote(burger(drink).copy(customerId = customerId), key)
+                assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+                val order = transaction(database) { KioskOrderTable.selectAll().where { KioskOrderTable.id eq key }.single() }
+                return order[KioskOrderTable.idCliente].trim()
+            }
+
+            // Consumidor Final ("CF"), sin cliente o un RUC que no está en clientes → cliente por defecto.
+            assertEquals("UUID-CLIENTE-GENERICO", storedClientFor("CF"))
+            assertEquals("UUID-CLIENTE-GENERICO", storedClientFor(null))
+            assertEquals("UUID-CLIENTE-GENERICO", storedClientFor("9-999-999"))
+            // RUC de un cliente registrado → ese cliente.
+            assertEquals("UUID-CLIENTE-RUC", storedClientFor("8-123-456"))
+        }
+
+    private fun client(
+        id: String,
+        cod: String,
+        rif: String,
+    ) {
+        ClientsTable.insert {
+            it[idCliente] = id
+            it[codCliente] = cod
+            it[ClientsTable.rif] = rif
+            it[dv] = "0"
+            it[nombre] = "CLIENTE $cod"
+            it[direccion] = "Panamá"
+        }
+    }
 
     @Test
     fun `POST quote rejects when a mandatory group is omitted`() =
