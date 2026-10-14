@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
@@ -582,6 +583,86 @@ fun ProductSelectionDialog(
                                                     modifier = Modifier.size(26.dp),
                                                 )
                                             }
+
+                                            // Badge flotante superpuesto en la esquina superior izquierda
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(4.dp),
+                                            ) {
+                                                when {
+                                                    product.hasVariants -> {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(999.dp),
+                                                            color = Color(0xFFF4F0FD),
+                                                            border = BorderStroke(0.5.dp, Color(0xFFDDD6FE)),
+                                                            shadowElevation = 1.dp,
+                                                        ) {
+                                                            Text(
+                                                                text = "${product.variantsTotal} var.",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = Color(0xFF6D28D9),
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                            )
+                                                        }
+                                                    }
+                                                    product.isComboArticle -> {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(999.dp),
+                                                            color = Color(0xFFFFF8EB),
+                                                            border = BorderStroke(0.5.dp, Color(0xFFFDE7B8)),
+                                                            shadowElevation = 1.dp,
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Fastfood,
+                                                                    contentDescription = null,
+                                                                    tint = Color(0xFF92400E),
+                                                                    modifier = Modifier.size(10.dp),
+                                                                )
+                                                                Text(
+                                                                    text = "Combo",
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.ExtraBold,
+                                                                    color = Color(0xFF92400E),
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                    product.hasOptions -> {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(999.dp),
+                                                            color = Color(0xFFEEF5FF),
+                                                            border = BorderStroke(0.5.dp, Color(0xFFDCEBFF)),
+                                                            shadowElevation = 1.dp,
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Tune,
+                                                                    contentDescription = null,
+                                                                    tint = Color(0xFF201B82),
+                                                                    modifier = Modifier.size(10.dp),
+                                                                )
+                                                                Text(
+                                                                    text = "Opciones",
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.ExtraBold,
+                                                                    color = Color(0xFF201B82),
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         Spacer(modifier = Modifier.height(4.dp))
@@ -611,35 +692,6 @@ fun ProductSelectionDialog(
                                             lineHeight = 13.sp,
                                             modifier = Modifier.height(28.dp),
                                         )
-
-                                        if (product.hasOptions) {
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(Color(0xFFEEF5FF))
-                                                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Tune,
-                                                        contentDescription = null,
-                                                        tint = Color(0xFF201B82),
-                                                        modifier = Modifier.size(10.dp),
-                                                    )
-                                                    Text(
-                                                        text = "Opciones",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color(0xFF201B82),
-                                                    )
-                                                }
-                                            }
-                                        }
 
                                         Spacer(modifier = Modifier.height(2.dp))
 
@@ -736,18 +788,70 @@ fun ProductSelectionDialog(
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.weight(1f, fill = false),
                                             )
-                                            if (product.hasOptions) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(999.dp),
-                                                    color = Color(0xFFEEF5FF),
-                                                ) {
-                                                    Text(
-                                                        text = "Opciones",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color(0xFF201B82),
-                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                                                    )
+                                            when {
+                                                product.hasVariants -> {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(999.dp),
+                                                        color = Color(0xFFF4F0FD),
+                                                    ) {
+                                                        Text(
+                                                            text = "${product.variantsTotal} var.",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = Color(0xFF6D28D9),
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                        )
+                                                    }
+                                                }
+                                                product.isComboArticle -> {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(999.dp),
+                                                        color = Color(0xFFFFF8EB),
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Fastfood,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF92400E),
+                                                                modifier = Modifier.size(9.dp),
+                                                            )
+                                                            Text(
+                                                                text = "Combo",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = Color(0xFF92400E),
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                product.hasOptions -> {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(999.dp),
+                                                        color = Color(0xFFEEF5FF),
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Tune,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF201B82),
+                                                                modifier = Modifier.size(9.dp),
+                                                            )
+                                                            Text(
+                                                                text = "Opciones",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = Color(0xFF201B82),
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }

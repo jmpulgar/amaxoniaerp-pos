@@ -201,29 +201,62 @@ fun PosCartWebTable(
                                         .clipToBounds(),
                                     verticalArrangement = Arrangement.Center,
                                 ) {
-                                    Text(
-                                        text = item.product.description,
-                                        fontSize = 11.sp,
-                                        lineHeight = 12.sp,
-                                        style = LocalTextStyle.current.copy(
-                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                        ),
-                                        fontWeight = FontWeight.Medium,
-                                        color = FlowTableTextDark,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            text = item.product.description,
+                                            fontSize = 11.sp,
+                                            lineHeight = 12.sp,
+                                            style = LocalTextStyle.current.copy(
+                                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                            ),
+                                            fontWeight = FontWeight.Medium,
+                                            color = FlowTableTextDark,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                        if (item.product.isComboArticle) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(Color(0xFFFFF8EB))
+                                                    .padding(horizontal = 4.dp, vertical = 0.5.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Text(
+                                                    text = "Combo",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color(0xFF92400E),
+                                                )
+                                            }
+                                        }
+                                    }
                                     if (item.hasOptions) {
-                                        val optionsSummary = item.selectedOptions.joinToString(", ") { opt ->
-                                            (if (opt.veces > 1) "${opt.veces}× " else "") + opt.nombre +
-                                                (if (opt.precio > 0) " (+$$${String.format(Locale.US, "%.2f", opt.precio)})" else "")
+                                        val incluidos = item.selectedOptions.filter { it.tipo.equals("INCLUIDO", ignoreCase = true) }
+                                        val extras = item.selectedOptions.filter { !it.tipo.equals("INCLUIDO", ignoreCase = true) }
+
+                                        val summaryParts = mutableListOf<String>()
+                                        if (incluidos.isNotEmpty()) {
+                                            summaryParts.add("Incluye: " + incluidos.joinToString(", ") { opt ->
+                                                (if (opt.cantidad > 1) "${opt.cantidad.toInt()}× " else "") + opt.nombre
+                                            })
+                                        }
+                                        if (extras.isNotEmpty()) {
+                                            summaryParts.add(extras.joinToString(", ") { opt ->
+                                                (if (opt.veces > 1) "${opt.veces}× " else "") + opt.nombre +
+                                                    (if (opt.precio > 0) " (+$$${String.format(Locale.US, "%.2f", opt.precio)})" else "")
+                                            })
                                         }
                                         Text(
-                                            text = optionsSummary,
+                                            text = summaryParts.joinToString(" · "),
                                             fontSize = 8.5.sp,
                                             lineHeight = 10.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF201B82),
+                                            color = if (extras.isNotEmpty()) Color(0xFF201B82) else Color(0xFF047857),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )

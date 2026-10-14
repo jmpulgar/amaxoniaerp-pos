@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -388,69 +390,77 @@ private fun RestCatChip(
 @Composable
 private fun ProductCardTag(product: Product) {
     when {
-        product.hasOptions -> {
-            // .fcp-tarjeta-tag de flow-app.css: bg #EEF5FF, color #201B82, radius 999px, font 10.5sp 800
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFEEF5FF))
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                contentAlignment = Alignment.Center,
+        product.hasVariants -> {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color(0xFFF4F0FD),
+                border = BorderStroke(0.5.dp, Color(0xFFDDD6FE)),
+                shadowElevation = 1.dp,
+            ) {
+                Text(
+                    text = "${product.variantsTotal} var.",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF6D28D9),
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+        }
+        product.isComboArticle -> {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color(0xFFFFF8EB),
+                border = BorderStroke(0.5.dp, Color(0xFFFDE7B8)),
+                shadowElevation = 1.dp,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                 ) {
                     Icon(
-                        Icons.Default.Tune,
+                        imageVector = Icons.Default.Fastfood,
                         contentDescription = null,
-                        tint = Color(0xFF201B82),
-                        modifier = Modifier.size(11.dp),
+                        tint = Color(0xFF92400E),
+                        modifier = Modifier.size(10.dp),
                     )
                     Text(
-                        text = "Opciones",
-                        fontSize = 10.sp,
+                        text = "Combo",
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF201B82),
+                        color = Color(0xFF92400E),
                         maxLines = 1,
                     )
                 }
             }
         }
-        product.isComboArticle -> {
-            // .fcp-tarjeta-tag--combo de flow-app.css: bg #FFF8EB, color #92400E
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFFFF8EB))
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                contentAlignment = Alignment.Center,
+        product.hasOptions -> {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color(0xFFEEF5FF),
+                border = BorderStroke(0.5.dp, Color(0xFFDCEBFF)),
+                shadowElevation = 1.dp,
             ) {
-                Text(
-                    text = "Combo",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF92400E),
-                    maxLines = 1,
-                )
-            }
-        }
-        product.hasVariants -> {
-            // .fcp-tarjeta-tag--variantes de flow-app.css: bg #F4F0FD, color #6D28D9
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFF4F0FD))
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "${product.variantsTotal} variantes",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF6D28D9),
-                    maxLines = 1,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = Color(0xFF201B82),
+                        modifier = Modifier.size(10.dp),
+                    )
+                    Text(
+                        text = "Opciones",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF201B82),
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
@@ -462,8 +472,9 @@ private fun ProductCardTag(product: Product) {
  * - Cabecera de 64dp teñida con el fondo suave de la categoría (--c-suave).
  * - Letra inicial grande como marca de agua en el centro con opacidad .55.
  * - Si tiene imagen, se monta sobre el fondo.
- * - Nombre de producto con máximo 2 líneas en color Ink.
- * - Precio en color de acento de la categoría (--c) con font-weight 800.
+ * - Badge flotante en la esquina superior izquierda de la imagen (Combo, Opciones, Variantes).
+ * - Nombre de producto con altura fija de 2 líneas (28dp) en color Ink.
+ * - Precio en color de acento de la categoría (--c) a ancho completo, sin partirse.
  */
 @Composable
 private fun ProductGridCard(
@@ -510,6 +521,15 @@ private fun ProductGridCard(
                         contentScale = ContentScale.Crop,
                     )
                 }
+
+                // Badge flotante superpuesto en la esquina superior izquierda
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                ) {
+                    ProductCardTag(product = product)
+                }
             }
 
             Column(
@@ -526,28 +546,24 @@ private fun ProductGridCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 14.sp,
-                    modifier = Modifier.height(28.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp),
                 )
 
                 Spacer(modifier = Modifier.height(3.dp))
 
-                // Fila Inferior: Tag Informativo (si aplica) + Precio (.rest-prod__precio)
-                Row(
+                // Precio a ancho completo (sin competir con etiquetas) (.rest-prod__precio)
+                Text(
+                    text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = catColor.accent,
+                    textAlign = TextAlign.End,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ProductCardTag(product = product)
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Text(
-                        text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = catColor.accent,
-                    )
-                }
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }

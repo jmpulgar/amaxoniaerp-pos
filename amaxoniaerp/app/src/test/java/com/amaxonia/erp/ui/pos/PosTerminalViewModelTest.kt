@@ -1722,6 +1722,63 @@ class PosTerminalViewModelTest {
         assertTrue(saleItem.composicion!!.contains("Coca Cola"))
         assertEquals("no", saleItem.poseeProductoCombo)
     }
+
+    @Test
+    fun addToCart_withComboArticle_opensProductOptionsDialogEvenWhenHasOptionsIsFalse() = runTest {
+        val comboGroup = ProductOptionGroup(
+            id = "1",
+            type = "INCLUIDO",
+            name = "INCLUYE",
+            min = 1,
+            max = 1,
+            options = listOf(
+                ProductOptionItem(
+                    id = "op1",
+                    productId = "101",
+                    productCode = "PAPAS",
+                    name = "Papas Fritas",
+                    extraPrice = 0.0,
+                    isDefault = true,
+                ),
+            ),
+        )
+        // Un combo tiene tipo_articulo = "C", isComboArticle = true, hasOptions = false
+        val comboProduct = Product(
+            id = "200",
+            code = "COMBO-ESPECIAL",
+            description = "Combo Especial Cuarto de Libra",
+            department = "1",
+            prices = listOf(PriceLevel(label = "General", price = 8.50, pricePlusTax = 8.50)),
+            hasOptions = false,
+            itemType = "C",
+            idCombo = "15",
+        )
+
+        assertTrue("El producto debe ser reconocido como combo", comboProduct.isComboArticle)
+        assertTrue("El combo debe requerir selección de composición", comboProduct.requiresCompositionSelection)
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(comboProduct),
+                optionsMap = mapOf("200" to listOf(comboGroup)),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Al tocar un combo, debe abrir el selector de opciones/composición y no agregarse directamente
+        vm.addToCart(comboProduct)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(comboProduct, state.optionsProduct)
+        assertEquals(1, state.optionsGroups.size)
+        assertEquals("INCLUYE", state.optionsGroups.first().name)
+        assertTrue(state.cart.isEmpty())
+    }
 }
 
 

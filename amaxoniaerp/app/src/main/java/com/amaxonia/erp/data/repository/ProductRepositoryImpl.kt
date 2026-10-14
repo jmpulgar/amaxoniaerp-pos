@@ -458,9 +458,9 @@ private fun ProductDto.toDomain(
                 pricePlusTax = it.pricePlusTax,
             )
         },
-        hasOptions = poseeProductoCombo?.lowercase() in listOf("si", "1", "true") ||
-            !idCombo.isNullOrBlank() ||
-            tipoArticulo.equals("C", ignoreCase = true),
+        hasOptions = (poseeProductoCombo?.lowercase() in listOf("si", "1", "true") || !idCombo.isNullOrBlank()) &&
+            !tipoArticulo.equals("C", ignoreCase = true) &&
+            !tipoArticulo.equals("K", ignoreCase = true),
         idCombo = idCombo,
         itemType = tipoArticulo.orEmpty(),
         hasVariants = poseeVariantes?.lowercase() in listOf("si", "1", "true") || (variantesTotal ?: 0) > 0,
@@ -497,9 +497,9 @@ private fun ProductDto.toEntity(): ProductEntity {
                 pricePlusTax = it.pricePlusTax,
             )
         },
-        hasOptions = poseeProductoCombo?.lowercase() in listOf("si", "1", "true") ||
-            !idCombo.isNullOrBlank() ||
-            tipoArticulo.equals("C", ignoreCase = true),
+        hasOptions = (poseeProductoCombo?.lowercase() in listOf("si", "1", "true") || !idCombo.isNullOrBlank()) &&
+            !tipoArticulo.equals("C", ignoreCase = true) &&
+            !tipoArticulo.equals("K", ignoreCase = true),
         idCombo = idCombo,
         itemType = tipoArticulo.orEmpty(),
         hasVariants = poseeVariantes?.lowercase() in listOf("si", "1", "true") || (variantesTotal ?: 0) > 0,

@@ -28,7 +28,10 @@ data class Product(
     val variantsTotal: Int = 0,
 ) {
     val isComboArticle: Boolean
-        get() = itemType.equals("C", ignoreCase = true)
+        get() = itemType.equals("C", ignoreCase = true) || itemType.equals("K", ignoreCase = true)
+
+    val requiresCompositionSelection: Boolean
+        get() = isComboArticle || hasOptions
 
     val mainPrice: Double
         get() = prices.firstOrNull()?.pricePlusTax

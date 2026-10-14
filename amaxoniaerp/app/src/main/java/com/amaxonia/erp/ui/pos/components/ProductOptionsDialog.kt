@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Tune
@@ -180,7 +181,7 @@ fun ProductOptionsDialog(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Tune,
+                                    imageVector = if (product.isComboArticle) Icons.Default.Fastfood else Icons.Default.Tune,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(26.dp),
@@ -190,14 +191,35 @@ fun ProductOptionsDialog(
 
                         // Textos (.fcp-head__text)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = product.description,
-                                color = Color.White,
-                                fontSize = 16.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = product.description,
+                                    color = Color.White,
+                                    fontSize = 16.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                val badgeText = if (product.isComboArticle) "Combo" else "Opciones"
+                                val badgeBg = if (product.isComboArticle) Color(0xFFFFF8EB) else Color(0xFFEEF5FF)
+                                val badgeColor = if (product.isComboArticle) Color(0xFF92400E) else Color(0xFF201B82)
+                                Surface(
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = badgeBg,
+                                ) {
+                                    Text(
+                                        text = badgeText,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = badgeColor,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp),
+                                    )
+                                }
+                            }
                             val priceDesc = if (product.isExempt || product.taxRate <= 0.0) {
                                 "Precio $${String.format(Locale.US, "%.2f", product.mainPrice)}"
                             } else {
@@ -252,8 +274,9 @@ fun ProductOptionsDialog(
                                     strokeWidth = 3.dp,
                                     modifier = Modifier.size(32.dp),
                                 )
+                                val loadingMsg = if (product.isComboArticle) "Cargando opciones del combo..." else "Cargando opciones del producto..."
                                 Text(
-                                    text = "Cargando opciones del producto...",
+                                    text = loadingMsg,
                                     color = Color(0xFF64748B),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
@@ -272,8 +295,9 @@ fun ProductOptionsDialog(
                         }
                     } else if (groups.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            val emptyMsg = if (product.isComboArticle) "Este combo no posee opciones configuradas." else "Este producto no posee opciones configuradas."
                             Text(
-                                text = "Este producto no posee opciones configuradas.",
+                                text = emptyMsg,
                                 color = Color(0xFF94A3B8),
                                 fontSize = 13.5.sp,
                             )
@@ -443,173 +467,190 @@ fun ProductOptionsDialog(
 
                                             Spacer(modifier = Modifier.height(10.dp))
 
-                                            // Lista de Opciones (.fcp-opcion)
-                                            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                                group.options.forEach { opt ->
-                                                    val optTimes = timesMap[opt.id] ?: 0
-                                                    val isSelected = optTimes > 0
-
-                                                    Surface(
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        color = if (isSelected) Color(0xFFEEF5FF) else Color.White,
-                                                        border = BorderStroke(
-                                                            width = if (isSelected) 1.5.dp else 1.dp,
-                                                            color = if (isSelected) Color(0xFF2488FA) else Color(0xFFE4E9F0),
-                                                        ),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clip(RoundedCornerShape(12.dp))
-                                                            .clickable(enabled = !opt.isOutOfStock) {
-                                                                val currentGroupCount = group.options.sumOf { timesMap[it.id] ?: 0 }
-                                                                if (group.max == 1) {
-                                                                    // Reemplazar o desmarcar
-                                                                    val next = timesMap.toMutableMap()
-                                                                    group.options.forEach { next.remove(it.id) }
-                                                                    if (optTimes == 0) {
-                                                                        next[opt.id] = 1
-                                                                    }
-                                                                    timesMap = next
-                                                                } else {
-                                                                    // Repetible o múltiple
-                                                                    if (currentGroupCount < group.max) {
-                                                                        timesMap = timesMap + (opt.id to (optTimes + 1))
-                                                                    } else if (optTimes > 0) {
-                                                                        timesMap = timesMap - opt.id
-                                                                    }
-                                                                }
-                                                            },
+                                            // Lista de Opciones (.fcp-opcion en Grid de 4 columnas)
+                                            val columnsCount = 4
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                group.options.chunked(columnsCount).forEach { rowOptions ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     ) {
-                                                        Row(
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .padding(horizontal = 10.dp, vertical = 9.dp),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        ) {
-                                                            // Miniatura de Imagen (.fcp-opcion__img) o Indicador Selección (.fcp-opcion__marca)
-                                                            if (opt.photoUrl.isNotBlank()) {
-                                                                Box(
+                                                        rowOptions.forEach { opt ->
+                                                            Box(modifier = Modifier.weight(1f)) {
+                                                                val optTimes = timesMap[opt.id] ?: 0
+                                                                val isSelected = optTimes > 0
+
+                                                                Surface(
+                                                                    shape = RoundedCornerShape(12.dp),
+                                                                    color = if (isSelected) Color(0xFFEEF5FF) else Color.White,
+                                                                    border = BorderStroke(
+                                                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                                                        color = if (isSelected) Color(0xFF2488FA) else Color(0xFFE4E9F0),
+                                                                    ),
                                                                     modifier = Modifier
-                                                                        .size(44.dp)
-                                                                        .clip(RoundedCornerShape(10.dp))
-                                                                        .background(Color(0xFFF4F5F8)),
-                                                                    contentAlignment = Alignment.Center,
+                                                                        .fillMaxWidth()
+                                                                        .clip(RoundedCornerShape(12.dp))
+                                                                        .clickable(enabled = !opt.isOutOfStock) {
+                                                                            val currentGroupCount = group.options.sumOf { timesMap[it.id] ?: 0 }
+                                                                            if (group.max == 1) {
+                                                                                // Reemplazar o desmarcar
+                                                                                val next = timesMap.toMutableMap()
+                                                                                group.options.forEach { next.remove(it.id) }
+                                                                                if (optTimes == 0) {
+                                                                                    next[opt.id] = 1
+                                                                                }
+                                                                                timesMap = next
+                                                                            } else {
+                                                                                // Repetible o múltiple
+                                                                                if (currentGroupCount < group.max) {
+                                                                                    timesMap = timesMap + (opt.id to (optTimes + 1))
+                                                                                } else if (optTimes > 0) {
+                                                                                    timesMap = timesMap - opt.id
+                                                                                }
+                                                                            }
+                                                                        },
                                                                 ) {
-                                                                    AsyncImage(
-                                                                        model = opt.photoUrl,
-                                                                        contentDescription = opt.name,
-                                                                        modifier = Modifier.fillMaxSize(),
-                                                                        contentScale = ContentScale.Crop,
-                                                                    )
-                                                                    if (isSelected) {
-                                                                        Box(
-                                                                            modifier = Modifier
-                                                                                .align(Alignment.BottomEnd)
-                                                                                .padding(2.dp)
-                                                                                .size(16.dp)
-                                                                                .clip(CircleShape)
-                                                                                .background(Color(0xFF2488FA))
-                                                                                .border(1.dp, Color.White, CircleShape),
-                                                                            contentAlignment = Alignment.Center,
-                                                                        ) {
-                                                                            Icon(
-                                                                                imageVector = Icons.Default.Check,
-                                                                                contentDescription = null,
-                                                                                tint = Color.White,
-                                                                                modifier = Modifier.size(10.dp),
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .fillMaxWidth()
+                                                                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                                                    ) {
+                                                                        // Miniatura de Imagen (.fcp-opcion__img) o Indicador Selección (.fcp-opcion__marca)
+                                                                        if (opt.photoUrl.isNotBlank()) {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .size(38.dp)
+                                                                                    .clip(RoundedCornerShape(8.dp))
+                                                                                    .background(Color(0xFFF4F5F8)),
+                                                                                contentAlignment = Alignment.Center,
+                                                                            ) {
+                                                                                AsyncImage(
+                                                                                    model = opt.photoUrl,
+                                                                                    contentDescription = opt.name,
+                                                                                    modifier = Modifier.fillMaxSize(),
+                                                                                    contentScale = ContentScale.Crop,
+                                                                                )
+                                                                                if (isSelected) {
+                                                                                    Box(
+                                                                                        modifier = Modifier
+                                                                                            .align(Alignment.BottomEnd)
+                                                                                            .padding(1.dp)
+                                                                                            .size(14.dp)
+                                                                                            .clip(CircleShape)
+                                                                                            .background(Color(0xFF2488FA))
+                                                                                            .border(1.dp, Color.White, CircleShape),
+                                                                                        contentAlignment = Alignment.Center,
+                                                                                    ) {
+                                                                                        Icon(
+                                                                                            imageVector = Icons.Default.Check,
+                                                                                            contentDescription = null,
+                                                                                            tint = Color.White,
+                                                                                            modifier = Modifier.size(9.dp),
+                                                                                        )
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        } else {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .size(20.dp)
+                                                                                    .clip(if (group.max == 1) CircleShape else RoundedCornerShape(5.dp))
+                                                                                    .background(if (isSelected) Color(0xFF2488FA) else Color(0xFFF4F5F8))
+                                                                                    .border(
+                                                                                        1.dp,
+                                                                                        if (isSelected) Color(0xFF2488FA) else Color(0xFFCBD5E1),
+                                                                                        if (group.max == 1) CircleShape else RoundedCornerShape(5.dp),
+                                                                                    ),
+                                                                                contentAlignment = Alignment.Center,
+                                                                            ) {
+                                                                                if (isSelected) {
+                                                                                    Icon(
+                                                                                        imageVector = Icons.Default.Check,
+                                                                                        contentDescription = null,
+                                                                                        tint = Color.White,
+                                                                                        modifier = Modifier.size(12.dp),
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        // Textos de opción
+                                                                        Column(modifier = Modifier.weight(1f)) {
+                                                                            Text(
+                                                                                text = opt.name,
+                                                                                fontSize = 11.5.sp,
+                                                                                fontWeight = FontWeight.Bold,
+                                                                                color = if (opt.isOutOfStock) Color(0xFF94A3B8) else Color(0xFF0F0C3D),
+                                                                                maxLines = 2,
+                                                                                overflow = TextOverflow.Ellipsis,
+                                                                                lineHeight = 13.5.sp,
                                                                             )
+                                                                            val subLabel = when {
+                                                                                opt.isOutOfStock -> "Agotado"
+                                                                                opt.extraPrice > 0 -> "+ $${String.format(Locale.US, "%.2f", opt.extraPrice)}"
+                                                                                group.isCombo -> "Incluido"
+                                                                                else -> ""
+                                                                            }
+                                                                            if (subLabel.isNotBlank()) {
+                                                                                Text(
+                                                                                    text = subLabel,
+                                                                                    fontSize = 10.5.sp,
+                                                                                    fontWeight = FontWeight.SemiBold,
+                                                                                    color = if (opt.isOutOfStock) Color(0xFFE11D48) else if (isSelected) Color(0xFF201B82) else Color(0xFF64748B),
+                                                                                )
+                                                                            }
+                                                                        }
+
+                                                                        // Contador multiplicador si > 1
+                                                                        if (optTimes > 1) {
+                                                                            Surface(
+                                                                                shape = RoundedCornerShape(999.dp),
+                                                                                color = Color(0xFF2488FA),
+                                                                            ) {
+                                                                                Text(
+                                                                                    text = "×$optTimes",
+                                                                                    color = Color.White,
+                                                                                    fontSize = 10.sp,
+                                                                                    fontWeight = FontWeight.ExtraBold,
+                                                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                                                )
+                                                                            }
+                                                                        }
+
+                                                                        // Botón de restar si repetible y seleccionado
+                                                                        if (isSelected && group.max > 1) {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .size(22.dp)
+                                                                                    .clip(CircleShape)
+                                                                                    .background(Color.White)
+                                                                                    .border(1.dp, Color(0xFFDCEBFF), CircleShape)
+                                                                                    .clickable {
+                                                                                        if (optTimes > 1) {
+                                                                                            timesMap = timesMap + (opt.id to (optTimes - 1))
+                                                                                        } else {
+                                                                                            timesMap = timesMap - opt.id
+                                                                                        }
+                                                                                    },
+                                                                                contentAlignment = Alignment.Center,
+                                                                            ) {
+                                                                                Icon(
+                                                                                    imageVector = Icons.Default.Remove,
+                                                                                    contentDescription = "Quitar uno",
+                                                                                    tint = Color(0xFF201B82),
+                                                                                    modifier = Modifier.size(12.dp),
+                                                                                )
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
-                                                            } else {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(22.dp)
-                                                                        .clip(if (group.max == 1) CircleShape else RoundedCornerShape(6.dp))
-                                                                        .background(if (isSelected) Color(0xFF2488FA) else Color(0xFFF4F5F8))
-                                                                        .border(
-                                                                            1.dp,
-                                                                            if (isSelected) Color(0xFF2488FA) else Color(0xFFCBD5E1),
-                                                                            if (group.max == 1) CircleShape else RoundedCornerShape(6.dp),
-                                                                        ),
-                                                                    contentAlignment = Alignment.Center,
-                                                                ) {
-                                                                    if (isSelected) {
-                                                                        Icon(
-                                                                            imageVector = Icons.Default.Check,
-                                                                            contentDescription = null,
-                                                                            tint = Color.White,
-                                                                            modifier = Modifier.size(13.dp),
-                                                                        )
-                                                                    }
-                                                                }
                                                             }
-
-                                                            // Textos de opción
-                                                            Column(modifier = Modifier.weight(1f)) {
-                                                                Text(
-                                                                    text = opt.name,
-                                                                    fontSize = 13.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = if (opt.isOutOfStock) Color(0xFF94A3B8) else Color(0xFF0F0C3D),
-                                                                )
-                                                                val subLabel = when {
-                                                                    opt.isOutOfStock -> "Agotado"
-                                                                    opt.extraPrice > 0 -> "+ $${String.format(Locale.US, "%.2f", opt.extraPrice)}"
-                                                                    group.isCombo -> "Incluido"
-                                                                    else -> ""
-                                                                }
-                                                                if (subLabel.isNotBlank()) {
-                                                                    Text(
-                                                                        text = subLabel,
-                                                                        fontSize = 11.5.sp,
-                                                                        fontWeight = FontWeight.SemiBold,
-                                                                        color = if (opt.isOutOfStock) Color(0xFFE11D48) else if (isSelected) Color(0xFF201B82) else Color(0xFF64748B),
-                                                                    )
-                                                                }
-                                                            }
-
-                                                            // Contador multiplicador si > 1
-                                                            if (optTimes > 1) {
-                                                                Surface(
-                                                                    shape = RoundedCornerShape(999.dp),
-                                                                    color = Color(0xFF2488FA),
-                                                                ) {
-                                                                    Text(
-                                                                        text = "×$optTimes",
-                                                                        color = Color.White,
-                                                                        fontSize = 11.sp,
-                                                                        fontWeight = FontWeight.ExtraBold,
-                                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                                                    )
-                                                                }
-                                                            }
-
-                                                            // Botón de restar si repetible y seleccionado
-                                                            if (isSelected && group.max > 1) {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .size(24.dp)
-                                                                        .clip(CircleShape)
-                                                                        .background(Color.White)
-                                                                        .border(1.dp, Color(0xFFDCEBFF), CircleShape)
-                                                                        .clickable {
-                                                                            if (optTimes > 1) {
-                                                                                timesMap = timesMap + (opt.id to (optTimes - 1))
-                                                                            } else {
-                                                                                timesMap = timesMap - opt.id
-                                                                            }
-                                                                        },
-                                                                    contentAlignment = Alignment.Center,
-                                                                ) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.Remove,
-                                                                        contentDescription = "Quitar uno",
-                                                                        tint = Color(0xFF201B82),
-                                                                        modifier = Modifier.size(13.dp),
-                                                                    )
-                                                                }
-                                                            }
+                                                        }
+                                                        // Rellenar espacios vacíos en la última fila para mantener el ancho uniforme de 4 columnas
+                                                        repeat(columnsCount - rowOptions.size) {
+                                                            Spacer(modifier = Modifier.weight(1f))
                                                         }
                                                     }
                                                 }

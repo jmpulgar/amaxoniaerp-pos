@@ -452,7 +452,7 @@ class PosTerminalViewModel(
     }
 
     fun addToCart(product: Product) {
-        if (product.hasOptions) {
+        if (product.requiresCompositionSelection) {
             openProductOptions(product)
             return
         }

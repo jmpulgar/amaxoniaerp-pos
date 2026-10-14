@@ -2,6 +2,8 @@ package com.amaxonia.erp.data.remote.dto
 
 import com.amaxonia.erp.data.remote.AppJson
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProductDtosTest {
@@ -174,5 +176,65 @@ class ProductDtosTest {
         assertEquals("3762", dto.resolvedGroups[0].opciones[0].idItem)
         assertEquals("PATACONES", dto.resolvedGroups[0].opciones[0].nombre)
         assertEquals(1.60, dto.resolvedGroups[0].opciones[0].precio, 0.001)
+    }
+
+    @Test
+    fun `distinguishes between combo and product with options based on tipo_articulo and posee_producto_combo`() {
+        // Caso 1: Combo de productos (tipo_articulo = 'C', posee_producto_combo = 'si')
+        val comboJson = """
+            {
+                "id": "100",
+                "code": "COMBO-BURGER",
+                "description": "Combo Hamburguesa",
+                "posee_producto_combo": "si",
+                "id_combo": "10",
+                "tipo_articulo": "C"
+            }
+        """.trimIndent()
+        val comboDto = AppJson.decodeFromString<ProductDto>(comboJson)
+        val isCombo = comboDto.tipoArticulo.equals("C", ignoreCase = true) || comboDto.tipoArticulo.equals("K", ignoreCase = true)
+        val hasComboConfig = comboDto.poseeProductoCombo?.lowercase() in listOf("si", "1", "true") || !comboDto.idCombo.isNullOrBlank()
+        val comboHasOptions = hasComboConfig && !isCombo
+
+        assertTrue(isCombo)
+        assertFalse("Un combo NO debe marcarse como hasOptions", comboHasOptions)
+
+        // Caso 2: Producto con opciones/modificadores (tipo_articulo = '', posee_producto_combo = 'si')
+        val optionsProductJson = """
+            {
+                "id": "101",
+                "code": "BURGER-SIMPLE",
+                "description": "Hamburguesa Sencilla",
+                "posee_producto_combo": "si",
+                "id_combo": "11",
+                "tipo_articulo": ""
+            }
+        """.trimIndent()
+        val optionsDto = AppJson.decodeFromString<ProductDto>(optionsProductJson)
+        val isCombo2 = optionsDto.tipoArticulo.equals("C", ignoreCase = true) || optionsDto.tipoArticulo.equals("K", ignoreCase = true)
+        val hasComboConfig2 = optionsDto.poseeProductoCombo?.lowercase() in listOf("si", "1", "true") || !optionsDto.idCombo.isNullOrBlank()
+        val optionsHasOptions = hasComboConfig2 && !isCombo2
+
+        assertFalse(isCombo2)
+        assertTrue("Un producto con opciones debe tener hasOptions = true", optionsHasOptions)
+
+        // Caso 3: Producto regular sin opciones ni combo
+        val regularJson = """
+            {
+                "id": "102",
+                "code": "REFRESCO",
+                "description": "Refresco de Lata",
+                "posee_producto_combo": "no",
+                "id_combo": null,
+                "tipo_articulo": ""
+            }
+        """.trimIndent()
+        val regularDto = AppJson.decodeFromString<ProductDto>(regularJson)
+        val isCombo3 = regularDto.tipoArticulo.equals("C", ignoreCase = true) || regularDto.tipoArticulo.equals("K", ignoreCase = true)
+        val hasComboConfig3 = regularDto.poseeProductoCombo?.lowercase() in listOf("si", "1", "true") || !regularDto.idCombo.isNullOrBlank()
+        val regularHasOptions = hasComboConfig3 && !isCombo3
+
+        assertFalse(isCombo3)
+        assertFalse(regularHasOptions)
     }
 }
