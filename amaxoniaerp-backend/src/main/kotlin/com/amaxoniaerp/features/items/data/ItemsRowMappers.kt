@@ -93,6 +93,7 @@ internal fun mapRowToProduct(
         portionUnit = row.getOrNull(table.unidadPorcion),
         unitOrPackage = row.getOrNull(table.unidadOEmpaque).orEmpty().ifBlank { "UNIDAD" },
         isService = (row.getOrNull(table.tipoProd) == 1) || (row.getOrNull(table.codItemForma) == 2),
+        tipoArticulo = row.getOrNull(table.tipoArticulo),
         prices = createPriceLevels(row, table),
         gobSegment = "",
         gobFamily = "",

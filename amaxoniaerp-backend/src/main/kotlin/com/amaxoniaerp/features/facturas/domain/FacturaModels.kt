@@ -49,6 +49,10 @@ data class FacturaDetalleItem(
     val totalConIva: Double,
     val codigo: String = "",
     val referencia: String = "",
+    val idItem: Int = 0,
+    val impuestoTasa: Double = 0.0,
+    val descuento: Double = 0.0,
+    val unidad: String = "UNIDAD",
 )
 
 @Serializable
@@ -56,6 +60,10 @@ data class FacturaDetalleResponse(
     val idFactura: String,
     val codFactura: String,
     val items: List<FacturaDetalleItem>,
+    val idCliente: String? = null,
+    val clienteNombre: String? = null,
+    val clienteIdentificacion: String? = null,
+    val codVendedor: Int? = null,
 )
 
 @Serializable

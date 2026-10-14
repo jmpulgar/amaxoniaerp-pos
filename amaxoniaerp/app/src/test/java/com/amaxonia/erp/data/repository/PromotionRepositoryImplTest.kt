@@ -114,8 +114,10 @@ class PromotionRepositoryImplTest {
         override suspend fun searchPagedByDepartments(query: String, departmentIds: List<Int>, limit: Int, offset: Int, isService: Int?): List<ProductEntity> = emptyList()
         override suspend fun count(): Int = products.size
         override suspend fun countByDepartment(departmentId: Int): Int = 0
+        override suspend fun countByDepartments(departmentIds: List<Int>): Int = 0
         override suspend fun countSearch(query: String): Int = 0
         override suspend fun countSearchByDepartment(query: String, departmentId: Int): Int = 0
+        override suspend fun countSearchByDepartments(query: String, departmentIds: List<Int>): Int = 0
         override suspend fun getDistinctDepartmentIds(): List<Int> = emptyList()
     }
 

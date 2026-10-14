@@ -24,6 +24,7 @@ data class Caja(
     val sucursalCodigo: String? = null,
     val codigoSucursalEmisor: String? = null,
     @SerialName("almacen_nombre") val almacenNombre: String? = null,
+    @SerialName("fondo_apertura") val fondoApertura: Double? = null,
 ) {
     val displayName: String
         get() = caja?.takeIf { it.isNotBlank() } ?: descripcion?.takeIf { it.isNotBlank() } ?: "Caja $idCaja"

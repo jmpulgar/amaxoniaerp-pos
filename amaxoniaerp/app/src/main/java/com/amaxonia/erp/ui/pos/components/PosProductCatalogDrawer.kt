@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,21 +28,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -61,9 +57,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.domain.model.Product
-import com.amaxonia.erp.ui.theme.FlowBrandBlue
-import com.amaxonia.erp.ui.theme.FlowTableBorder
-import com.amaxonia.erp.ui.theme.FlowTableTextDark
 import java.util.Locale
 
 @Composable
@@ -95,56 +88,57 @@ fun PosProductCatalogDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, FlowTableBorder, RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, FlowCatalogTokens.Line, RoundedCornerShape(12.dp))
                 .background(Color.White)
-                .padding(6.dp),
+                .padding(8.dp),
         ) {
-            // --- 1. Cabecera del Catálogo: Título (24dp) ---
+            // --- 1. Cabecera del Catálogo Flow ERP ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .padding(horizontal = 2.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(FlowBrandBlue)
+                        .background(FlowCatalogTokens.Brand),
                 )
                 Text(
                     text = "Catálogo de Productos",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = FlowTableTextDark,
+                    color = FlowCatalogTokens.Ink,
                 )
                 Text(
                     text = "(${products.size})",
-                    fontSize = 10.5.sp,
-                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    color = FlowCatalogTokens.Text2,
                 )
             }
 
-            // --- 2. Buscador de Productos Compacto (30dp) ---
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // --- 2. Buscador (.rest-catalogo__buscar: 40dp, fondo #F4F5F8, radio 10dp) ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(30.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, FlowTableBorder, RoundedCornerShape(6.dp))
-                    .background(Color(0xFFF8FAFC))
-                    .padding(horizontal = 6.dp),
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(FlowCatalogTokens.Canvas)
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Buscar",
-                    tint = Color(0xFF94A3B8),
-                    modifier = Modifier.size(13.dp),
+                    tint = FlowCatalogTokens.Text3,
+                    modifier = Modifier.size(17.dp),
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.CenterStart,
@@ -152,8 +146,8 @@ fun PosProductCatalogDrawer(
                     if (searchQuery.isEmpty()) {
                         Text(
                             text = "Buscar en catálogo...",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 11.sp,
+                            color = FlowCatalogTokens.Text3,
+                            fontSize = 12.5.sp,
                         )
                     }
                     BasicTextField(
@@ -161,71 +155,61 @@ fun PosProductCatalogDrawer(
                         onValueChange = onSearchQueryChange,
                         singleLine = true,
                         textStyle = TextStyle(
-                            color = Color(0xFF1E293B),
-                            fontSize = 11.sp,
+                            color = FlowCatalogTokens.Ink,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
                         ),
-                        cursorBrush = SolidColor(FlowBrandBlue),
+                        cursorBrush = SolidColor(FlowCatalogTokens.Brand),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 if (searchQuery.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(9.dp))
                             .clickable { onSearchQueryChange("") },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Default.Clear,
                             contentDescription = "Limpiar",
-                            tint = Color(0xFF64748B),
-                            modifier = Modifier.size(11.dp),
+                            tint = FlowCatalogTokens.Text2,
+                            modifier = Modifier.size(13.dp),
                         )
                     }
                 }
             }
 
-            // --- 3. Carrusel de Categorías / Departamentos (26dp) ---
+            // --- 3. Carrusel de Categorías (.rest-cat con borde lateral de 4dp y paleta de 6 colores) ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                FilterChip(
-                    selected = selectedDepartmentId == null,
+                // Chip "Todos"
+                RestCatChip(
+                    text = "Todos",
+                    isSelected = selectedDepartmentId == null,
+                    color = FlowCatalogTokens.ColorTodos,
                     onClick = { onDepartmentSelected(null) },
-                    label = { Text("Todos", fontSize = 10.sp) },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(24.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = FlowBrandBlue,
-                        selectedLabelColor = Color.White,
-                        containerColor = Color(0xFFF1F5F9),
-                        labelColor = Color(0xFF334155),
-                    ),
                 )
 
+                // Chips dinámicos por departamento visible
                 departments.forEach { dept ->
-                    FilterChip(
-                        selected = selectedDepartmentId == dept.id,
+                    val color = FlowCatalogTokens.getColorForDepartment(dept.id, departments)
+                    RestCatChip(
+                        text = dept.displayName,
+                        isSelected = selectedDepartmentId == dept.id,
+                        color = color,
                         onClick = { onDepartmentSelected(dept.id) },
-                        label = { Text(dept.name, fontSize = 10.sp) },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(24.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FlowBrandBlue,
-                            selectedLabelColor = Color.White,
-                            containerColor = Color(0xFFF1F5F9),
-                            labelColor = Color(0xFF334155),
-                        ),
                     )
                 }
             }
 
-            // --- 4. Grid de Productos de Alta Densidad (Adaptive 88dp) ---
+            // --- 4. Grid de Productos (.rest-prod: tarjeta con cabecera de color suave + letra marca de agua) ---
             if (isLoading) {
                 Box(
                     modifier = Modifier
@@ -238,14 +222,14 @@ fun PosProductCatalogDrawer(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         CircularProgressIndicator(
-                            color = FlowBrandBlue,
+                            color = FlowCatalogTokens.Brand,
                             strokeWidth = 2.5.dp,
                             modifier = Modifier.size(24.dp),
                         )
                         Text(
                             text = "Cargando productos...",
-                            fontSize = 11.sp,
-                            color = Color(0xFF64748B),
+                            fontSize = 11.5.sp,
+                            color = FlowCatalogTokens.Text2,
                         )
                     }
                 }
@@ -257,32 +241,33 @@ fun PosProductCatalogDrawer(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No se encontraron productos",
-                        fontSize = 11.5.sp,
-                        color = Color(0xFF94A3B8),
+                        text = "Sin productos para mostrar.",
+                        fontSize = 12.sp,
+                        color = FlowCatalogTokens.Text3,
                     )
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 88.dp),
+                    columns = GridCells.Adaptive(minSize = 92.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                     contentPadding = PaddingValues(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(products, key = { it.id }) { product ->
+                        val catColor = FlowCatalogTokens.getColorForProduct(product.department, departments)
                         ProductGridCard(
                             product = product,
+                            catColor = catColor,
                             onClick = { onAddToCart(product) },
-                            onOpenOptions = { onOpenOptions(product) },
                         )
                     }
                 }
             }
 
-            // --- 5. Barra de Paginación en Píldora (estilo modal) ---
+            // --- 5. Barra de Paginación en Píldora ---
             if (totalPages > 1 || currentPage > 1) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
@@ -292,7 +277,7 @@ fun PosProductCatalogDrawer(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                        border = BorderStroke(1.dp, FlowCatalogTokens.Line),
                         color = Color.White,
                     ) {
                         Row(
@@ -308,7 +293,7 @@ fun PosProductCatalogDrawer(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Página previa",
-                                    tint = if (currentPage > 1) Color(0xFF334155) else Color(0xFFCBD5E1),
+                                    tint = if (currentPage > 1) FlowCatalogTokens.Ink else FlowCatalogTokens.Text3,
                                     modifier = Modifier.size(13.dp),
                                 )
                             }
@@ -317,7 +302,7 @@ fun PosProductCatalogDrawer(
                                 text = "Página $currentPage de $totalPages",
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF475569),
+                                color = FlowCatalogTokens.Text2,
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             )
 
@@ -329,7 +314,7 @@ fun PosProductCatalogDrawer(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = "Página siguiente",
-                                    tint = if (currentPage < totalPages) Color(0xFF334155) else Color(0xFFCBD5E1),
+                                    tint = if (currentPage < totalPages) FlowCatalogTokens.Ink else FlowCatalogTokens.Text3,
                                     modifier = Modifier.size(13.dp),
                                 )
                             }
@@ -341,98 +326,228 @@ fun PosProductCatalogDrawer(
     }
 }
 
+/**
+ * Botón de categoría (.rest-cat de POS/main.css):
+ * - Borde 1dp solid #E4E9F0, con barra lateral izquierda de 4dp del color de la categoría.
+ * - Radio: 10dp.
+ * - Inactivo: Fondo blanco, texto Ink (#0F0C3D).
+ * - Activo: Fondo sólido de la categoría, texto blanco.
+ */
+@Composable
+private fun RestCatChip(
+    text: String,
+    isSelected: Boolean,
+    color: FlowCatalogTokens.CategoryColor,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier
+            .height(34.dp)
+            .clip(shape)
+            .then(
+                if (isSelected) {
+                    Modifier
+                        .background(color.accent)
+                        .border(1.dp, color.accent, shape)
+                } else {
+                    Modifier
+                        .background(Color.White)
+                        .border(1.dp, FlowCatalogTokens.Line, shape)
+                },
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Barra indicadora izquierda de 4dp cuando no está seleccionada
+            if (!isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 4.dp, height = 14.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(color.accent),
+                )
+            }
+            Text(
+                text = text,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isSelected) Color.White else FlowCatalogTokens.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductCardTag(product: Product) {
+    when {
+        product.hasOptions -> {
+            // .fcp-tarjeta-tag de flow-app.css: bg #EEF5FF, color #201B82, radius 999px, font 10.5sp 800
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFEEF5FF))
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = Color(0xFF201B82),
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Text(
+                        text = "Opciones",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF201B82),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        product.isComboArticle -> {
+            // .fcp-tarjeta-tag--combo de flow-app.css: bg #FFF8EB, color #92400E
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFFFF8EB))
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Combo",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF92400E),
+                    maxLines = 1,
+                )
+            }
+        }
+        product.hasVariants -> {
+            // .fcp-tarjeta-tag--variantes de flow-app.css: bg #F4F0FD, color #6D28D9
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFF4F0FD))
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "${product.variantsTotal} variantes",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF6D28D9),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tarjeta de producto (.rest-prod de POS/main.css):
+ * - Borde 1dp #E4E9F0, radio 12dp, fondo blanco.
+ * - Cabecera de 64dp teñida con el fondo suave de la categoría (--c-suave).
+ * - Letra inicial grande como marca de agua en el centro con opacidad .55.
+ * - Si tiene imagen, se monta sobre el fondo.
+ * - Nombre de producto con máximo 2 líneas en color Ink.
+ * - Precio en color de acento de la categoría (--c) con font-weight 800.
+ */
 @Composable
 private fun ProductGridCard(
     product: Product,
+    catColor: FlowCatalogTokens.CategoryColor,
     onClick: () -> Unit,
-    onOpenOptions: () -> Unit,
 ) {
+    val initialLetter = product.description.trim().firstOrNull()?.uppercase() ?: "P"
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, FlowTableBorder),
+        border = BorderStroke(1.dp, FlowCatalogTokens.Line),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(4.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            // Imagen del Producto Compacta (52dp)
+            // Imagen del Producto (.rest-prod__img: 64dp, fondo suave + marca de agua)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFF8FAFC)),
+                    .height(64.dp)
+                    .background(catColor.softBg),
                 contentAlignment = Alignment.Center,
             ) {
+                // Letra inicial centrada (marca de agua en color categoría)
+                Text(
+                    text = initialLetter,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = catColor.accent.copy(alpha = 0.55f),
+                )
+
                 if (product.photoUrl.isNotBlank()) {
                     AsyncImage(
                         model = product.photoUrl,
                         contentDescription = product.description,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = null,
-                        tint = Color(0xFFCBD5E1),
-                        modifier = Modifier.size(22.dp),
+                        contentScale = ContentScale.Crop,
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
-
-            // Nombre / Descripción del Producto (2 líneas, 10.5sp)
-            Text(
-                text = product.description,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = FlowTableTextDark,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 13.sp,
-                modifier = Modifier.height(26.dp),
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Fila Inferior: Botón Opciones + Precio Destacado
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 5.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(3.dp))
-                        .border(0.5.dp, Color(0xFFCBD5E1), RoundedCornerShape(3.dp))
-                        .clickable { onOpenOptions() }
-                        .padding(horizontal = 3.dp, vertical = 1.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(1.dp),
-                    ) {
-                        Icon(Icons.Default.Tune, contentDescription = "Opciones", tint = Color(0xFF64748B), modifier = Modifier.size(9.dp))
-                        Text(text = "Opc", fontSize = 8.5.sp, color = Color(0xFF64748B))
-                    }
-                }
-
+                // Nombre / Descripción del Producto (.rest-prod__nombre: 2 líneas, 11.5sp, peso 600)
                 Text(
-                    text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
+                    text = product.description,
                     fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FlowBrandBlue,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FlowCatalogTokens.Ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.height(28.dp),
                 )
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                // Fila Inferior: Tag Informativo (si aplica) + Precio (.rest-prod__precio)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ProductCardTag(product = product)
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Text(
+                        text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = catColor.accent,
+                    )
+                }
             }
         }
     }

@@ -213,7 +213,21 @@ fun PosCartWebTable(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    if (item.product.code.isNotBlank()) {
+                                    if (item.hasOptions) {
+                                        val optionsSummary = item.selectedOptions.joinToString(", ") { opt ->
+                                            (if (opt.veces > 1) "${opt.veces}× " else "") + opt.nombre +
+                                                (if (opt.precio > 0) " (+$$${String.format(Locale.US, "%.2f", opt.precio)})" else "")
+                                        }
+                                        Text(
+                                            text = optionsSummary,
+                                            fontSize = 8.5.sp,
+                                            lineHeight = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF201B82),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    } else if (item.product.code.isNotBlank()) {
                                         Text(
                                             text = item.product.code,
                                             fontSize = 9.sp,

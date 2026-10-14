@@ -142,6 +142,38 @@ class ProcessSaleCreditTest {
     }
 
     @Test
+    fun `venta en espera con procesar cero se guarda con estatus 1 sin exigir credito`() {
+        database = createDatabase("PA")
+        setClientCredit(permiteCredito = false, dias = 0)
+
+        val invoiceId = UUID.randomUUID().toString()
+        val pendingRequest =
+            request(
+                formaPago = "contado",
+                payments = emptyList(),
+                saldoPendiente = 0.0,
+                idFactura = invoiceId,
+                procesar = 0,
+            )
+
+        val response =
+            transaction(database) {
+                repository.process("PA", pendingRequest)
+            }
+
+        assertEquals(1, response.codEstatus)
+        val savedStatus =
+            transaction(database) {
+                SalesFacturaTablePA
+                    .select(SalesFacturaTablePA.codEstatus)
+                    .single()[SalesFacturaTablePA.codEstatus]
+            }
+        assertEquals(1, savedStatus)
+        val cajaCount = transaction(database) { SalesCajaNuevaTablePA.selectAll().count() }
+        assertEquals(0L, cajaCount)
+    }
+
+    @Test
     fun `dias cero vence hoy`() {
         database = createDatabase("PA")
         setClientCredit(permiteCredito = true, dias = 0)
@@ -397,6 +429,8 @@ class ProcessSaleCreditTest {
         payments: List<SalePaymentInput>,
         saldoPendiente: Double = 0.0,
         idFactura: String = UUID.randomUUID().toString(),
+        procesar: Int = 1,
+        codEstatus: Int = 2,
     ): ProcessSaleRequest {
         val cashAmount =
             payments
@@ -404,6 +438,7 @@ class ProcessSaleCreditTest {
                 .sumOf { it.monto }
         return ProcessSaleRequest(
             idFactura = idFactura,
+            procesar = procesar,
             factura =
                 SaleInvoiceInput(
                     idCliente = "client-1",
@@ -416,6 +451,7 @@ class ProcessSaleCreditTest {
                     idCajaSecuencia = "seq-1",
                     serieSucursal = "S01",
                     formaPago = formaPago,
+                    codEstatus = codEstatus,
                     subtotal = 100.0,
                     ivaTotalFactura = 0.0,
                     totalTotalFactura = 100.0,

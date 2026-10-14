@@ -15,6 +15,11 @@ internal fun resolveInvoiceCode(
     countryCode: String,
     request: com.amaxoniaerp.features.sales.domain.ProcessSaleRequest,
 ): String {
+    val existingCode = request.codFactura?.trim()?.takeIf { it.isNotBlank() }
+    if (existingCode != null) {
+        return existingCode
+    }
+
     val idCaja = request.factura.idCaja.trim()
     if (idCaja.isBlank()) {
         throw InvalidSaleRequestException("idCaja es obligatorio para generar cod_factura desde caja")

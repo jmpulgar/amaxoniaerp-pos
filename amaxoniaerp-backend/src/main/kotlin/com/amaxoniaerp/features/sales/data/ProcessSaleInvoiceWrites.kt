@@ -4,6 +4,7 @@ import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -41,9 +42,9 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.ivaTotalFactura] = v.ivaTotalBase
         it[facturaTable.totalTotalFactura] = v.totalGeneralBase
         it[facturaTable.cantidadItems] = ctx.request.items.size
-        insertFacturaTotalizarFields(it, facturaTable, ctx)
+        applyFacturaTotalizarFields(it, facturaTable, ctx)
         it[facturaTable.formaPago] = ctx.creditDecision.formaPago
-        it[facturaTable.codEstatus] = f.codEstatus
+        it[facturaTable.codEstatus] = if (ctx.request.procesar == 0) 1 else f.codEstatus
         it[facturaTable.totalBultos] =
             ctx.request.items
                 .sumOf { it.itemCantidadTotal }
@@ -78,12 +79,47 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.idCaja] = f.idCaja
         it[facturaTable.codigoCaja] = f.codigoCaja
         it[facturaTable.codCliente] = f.codCliente
-        insertFacturaCountryFields(it, facturaTable, f, ctx)
+        applyFacturaCountryFields(it, facturaTable, f, ctx)
     }
 }
 
-private fun insertFacturaTotalizarFields(
-    stmt: org.jetbrains.exposed.sql.statements.InsertStatement<Number>,
+internal fun updateFactura(ctx: SaleWriteContext) {
+    val f = ctx.request.factura
+    val v = resolveFacturaInsertValues(ctx)
+
+    val facturaTable = SalesFacturaTableFactory.forCountry(ctx.monetaryContext.countryCode)
+    facturaTable.update({ facturaTable.idFactura eq ctx.invoiceId }) {
+        it[facturaTable.codFacturaFiscal] = f.codFacturaFiscal
+        it[facturaTable.idCliente] = f.idCliente
+        it[facturaTable.codVendedor] = f.codVendedor
+        it[facturaTable.subtotal] = v.subtotalBase
+        it[facturaTable.descuentosItemFactura] = v.descuentosItemsBase
+        it[facturaTable.montoItemsFactura] = v.montoItemsBase
+        it[facturaTable.ivaTotalFactura] = v.ivaTotalBase
+        it[facturaTable.totalTotalFactura] = v.totalGeneralBase
+        it[facturaTable.cantidadItems] = ctx.request.items.size
+        applyFacturaTotalizarFields(it, facturaTable, ctx)
+        it[facturaTable.formaPago] = ctx.creditDecision.formaPago
+        it[facturaTable.codEstatus] = if (ctx.request.procesar == 0) 1 else f.codEstatus
+        it[facturaTable.totalBultos] =
+            ctx.request.items
+                .sumOf { it.itemCantidadTotal }
+                .toMoney()
+        it[facturaTable.facturarA] = f.facturarA
+        it[facturaTable.facturarARuc] = f.facturarARuc
+        it[facturaTable.facturarADireccion] = f.facturarADireccion
+        it[facturaTable.facturarATelefono] = f.facturarATelefono
+        it[facturaTable.fechaVencimiento] = v.fechaVencimientoFactura
+        it[facturaTable.idSucursal] = f.idSucursal
+        it[facturaTable.idCaja] = f.idCaja
+        it[facturaTable.codigoCaja] = f.codigoCaja
+        it[facturaTable.codCliente] = f.codCliente
+        applyFacturaCountryFields(it, facturaTable, f, ctx)
+    }
+}
+
+private fun applyFacturaTotalizarFields(
+    stmt: org.jetbrains.exposed.sql.statements.UpdateBuilder<*>,
     facturaTable: BaseSalesFacturaTable,
     ctx: SaleWriteContext,
 ) {
@@ -130,8 +166,8 @@ private fun resolveFacturaInsertValues(ctx: SaleWriteContext): FacturaInsertValu
     )
 }
 
-private fun insertFacturaCountryFields(
-    stmt: org.jetbrains.exposed.sql.statements.InsertStatement<Number>,
+private fun applyFacturaCountryFields(
+    stmt: org.jetbrains.exposed.sql.statements.UpdateBuilder<*>,
     facturaTable: BaseSalesFacturaTable,
     f: com.amaxoniaerp.features.sales.domain.SaleInvoiceInput,
     ctx: SaleWriteContext,

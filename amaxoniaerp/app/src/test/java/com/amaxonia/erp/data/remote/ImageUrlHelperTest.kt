@@ -75,4 +75,43 @@ class ImageUrlHelperTest {
         assertEquals("", ImageUrlHelper.clientPhotoUrl("http://base", "PA", "db", "1", ""))
         assertEquals("", ImageUrlHelper.clientPhotoUrl("http://base", "PA", "db", "", "foto.jpg"))
     }
+
+    @Test
+    fun `paymentMethodImageUrl returns direct image for data URI, full url or raw base64`() {
+        val dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        val fullUrl = "https://example.com/visa.png"
+        val rawBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+        assertEquals(dataUri, ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, dataUri))
+        assertEquals(fullUrl, ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, fullUrl))
+        assertEquals(rawBase64, ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, rawBase64))
+    }
+
+    @Test
+    fun `paymentMethodImageUrl builds canonical backend url when imageValue is a filename or path`() {
+        val expected = "http://10.0.2.2:8080/api/data/PA/testdb/forma_pago/2"
+        val resultWithFilename = ImageUrlHelper.paymentMethodImageUrl(
+            baseUrl = "http://10.0.2.2:8080/",
+            countryCode = "PA",
+            companyDb = "testdb",
+            idFormaPago = 2,
+            imageValue = "forma_2.png",
+        )
+        assertEquals(expected, resultWithFilename)
+    }
+
+    @Test
+    fun `paymentMethodImageUrl returns empty when imageValue is null or blank`() {
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, null))
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, ""))
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 1, "   "))
+    }
+
+    @Test
+    fun `paymentMethodImageUrl returns empty when required params are missing and image is not direct`() {
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("", "PA", "db", 1, "forma.png"))
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "", "db", 1, "forma.png"))
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "", 1, "forma.png"))
+        assertEquals("", ImageUrlHelper.paymentMethodImageUrl("http://base", "PA", "db", 0, "forma.png"))
+    }
 }

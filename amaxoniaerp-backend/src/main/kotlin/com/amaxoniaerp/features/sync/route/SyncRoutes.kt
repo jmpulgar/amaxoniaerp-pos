@@ -151,8 +151,12 @@ fun Route.syncRoutes(
                 run {
                     val ctx = call.resolveCompanyRequestContext() ?: return@run
                     val companyDb = ctx.connectDatabase()
+                    val onlyVisiblePos =
+                        call.request.queryParameters["visible_pos"]?.let {
+                            it == "1" || it.equals("true", ignoreCase = true)
+                        } ?: call.request.queryParameters["visiblePos"]?.toBooleanStrictOrNull() ?: false
                     val items =
-                        itemsRepository.listDepartments(companyDb).map { (id, nombre) ->
+                        itemsRepository.listDepartments(companyDb, onlyVisiblePos = onlyVisiblePos).map { (id, nombre) ->
                             SimpleCatalogItemDto(id = id.toString(), nombre = nombre)
                         }
                     call.respond(items)

@@ -184,7 +184,12 @@ object CajaDetalleCierreFormaPagoTable : Table("caja_detalle_cierre_formapago") 
 
 object MonedaDenominacionTable : Table("moneda_denominacion") {
     val id = integer("id")
+    val idDivisa = integer("id_divisa").nullable()
     val denominacion = varchar("denominacion", S.VARCHAR_LENGTH_80).nullable()
+    val valor = decimal("valor", S.DECIMAL_PRECISION_10, 2).default(java.math.BigDecimal.ZERO)
+    val rollo = integer("rollo").default(0)
+    val imagen = text("imagen").nullable()
+    val activo = integer("activo").default(1)
 
     override val primaryKey = PrimaryKey(id)
 }

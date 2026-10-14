@@ -3,6 +3,7 @@ package com.amaxoniaerp.features.pos
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.tenant.resolveCompanyRequestContext
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
+import com.amaxoniaerp.features.pos.domain.DenominacionesResponse
 import com.amaxoniaerp.features.pos.domain.FormaPagoResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -18,8 +19,22 @@ fun Route.posRouting(formasPagoRepository: FormasPagoRepository) {
     authenticate {
         route("/api/pos") {
             get("/formas-pago") { listarFormasPago(call, formasPagoRepository) }
+            get("/denominaciones") { listarDenominaciones(call, formasPagoRepository) }
         }
     }
+}
+
+private suspend fun listarDenominaciones(
+    call: ApplicationCall,
+    formasPagoRepository: FormasPagoRepository,
+) = run {
+    val ctx = call.resolveCompanyRequestContext() ?: return@run
+    val companyDb = DatabaseManager.connectToCompanyDb(ctx.countryCode, ctx.adminDb)
+    val denominaciones = formasPagoRepository.listDenominaciones(companyDb)
+    call.respond(
+        HttpStatusCode.OK,
+        DenominacionesResponse(success = true, data = denominaciones),
+    )
 }
 
 private suspend fun listarFormasPago(

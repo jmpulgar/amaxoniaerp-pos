@@ -19,6 +19,22 @@ import com.amaxonia.erp.domain.model.SellerSummary
 import com.amaxonia.erp.domain.model.PriceLevel
 import com.amaxonia.erp.domain.model.Product
 import com.amaxonia.erp.domain.model.SaveCajaRequest
+import com.amaxonia.erp.data.local.db.DraftInvoiceDao
+import com.amaxonia.erp.data.local.db.DraftInvoiceEntity
+import com.amaxonia.erp.data.remote.NetworkMonitor
+import com.amaxonia.erp.data.remote.dto.FacturaDetalleItemDto
+import com.amaxonia.erp.data.remote.dto.FacturaDetalleResponseDto
+import com.amaxonia.erp.domain.model.InvoiceHistoryFilter
+import com.amaxonia.erp.domain.model.InvoiceHistoryPage
+import com.amaxonia.erp.domain.model.InvoiceHistorySummary
+import com.amaxonia.erp.domain.model.ProductOptionGroup
+import com.amaxonia.erp.domain.model.ProductOptionItem
+import com.amaxonia.erp.domain.model.SavedInvoiceFilterTab
+import com.amaxonia.erp.domain.model.SavedInvoiceOrigin
+import com.amaxonia.erp.domain.model.SavedInvoiceSummary
+import com.amaxonia.erp.domain.model.SelectedOption
+import com.amaxonia.erp.domain.model.Transaction
+import com.amaxonia.erp.domain.repository.InvoiceHistoryRepository
 import com.amaxonia.erp.domain.repository.CajaRepository
 import com.amaxonia.erp.domain.repository.ClientRepository
 import com.amaxonia.erp.domain.repository.ProductRepository
@@ -66,22 +82,35 @@ class PosTerminalViewModelTest {
             ),
         ),
         private val departmentsList: List<DepartmentDto> = emptyList(),
+        private val optionsMap: Map<String, List<com.amaxonia.erp.domain.model.ProductOptionGroup>> = emptyMap(),
     ) : ProductRepository {
         override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
             Result.success(productsList)
+
+        override suspend fun getProductOptions(
+            productId: String,
+            almacenId: Int?,
+        ): Result<List<com.amaxonia.erp.domain.model.ProductOptionGroup>> =
+            Result.success(optionsMap[productId].orEmpty())
 
         override suspend fun getPagedProducts(
             page: Int,
             pageSize: Int,
             departmentId: Int?,
+            departmentIds: List<Int>?,
             search: String?,
         ): Result<PagedProducts> {
+            val filtered = when {
+                departmentId != null -> productsList.filter { it.department == departmentId.toString() }
+                !departmentIds.isNullOrEmpty() -> productsList.filter { it.department in departmentIds.map { id -> id.toString() } }
+                else -> productsList
+            }
             val offset = (page - 1) * pageSize
-            val paged = productsList.drop(offset).take(pageSize)
+            val paged = filtered.drop(offset).take(pageSize)
             return Result.success(
                 PagedProducts(
                     items = paged,
-                    totalCount = productsList.size,
+                    totalCount = filtered.size,
                     page = page,
                     pageSize = pageSize,
                 ),
@@ -136,6 +165,62 @@ class PosTerminalViewModelTest {
 
         override suspend fun getPrintPayload(facturaId: String): Result<com.amaxonia.erp.data.remote.dto.FacturaPrintPayloadDto> =
             Result.failure(UnsupportedOperationException("Not implemented in test"))
+
+        override suspend fun anularFacturaPendiente(facturaId: String): Result<Unit> =
+            Result.success(Unit)
+    }
+
+    private class FakeInvoiceHistoryRepository : InvoiceHistoryRepository {
+        var transactionsList: List<Transaction> = emptyList()
+        var detailResult: Result<FacturaDetalleResponseDto> = Result.success(FacturaDetalleResponseDto(idFactura = "101", codFactura = "FAC-101"))
+
+        override suspend fun getTransactions(
+            filter: InvoiceHistoryFilter,
+            limit: Int,
+            offset: Long,
+        ): Result<InvoiceHistoryPage> = Result.success(InvoiceHistoryPage(transactions = transactionsList, total = transactionsList.size.toLong()))
+
+        override suspend fun getSummary(filter: InvoiceHistoryFilter): Result<InvoiceHistorySummary> =
+            Result.success(InvoiceHistorySummary())
+
+        override suspend fun getTransactionById(id: String): Result<Transaction> =
+            Result.failure(UnsupportedOperationException())
+
+        override suspend fun getInvoiceDetail(invoiceId: String): Result<FacturaDetalleResponseDto> =
+            detailResult
+
+        override suspend fun getInvoicePdf(invoiceId: String): Result<ByteArray> =
+            Result.failure(UnsupportedOperationException())
+
+        override suspend fun resendElectronicInvoice(invoiceId: String): Result<com.amaxonia.erp.data.remote.dto.ElectronicInvoiceResultDto> =
+            Result.failure(UnsupportedOperationException())
+    }
+
+    private class FakeDraftInvoiceDao : DraftInvoiceDao {
+        val drafts = mutableListOf<DraftInvoiceEntity>()
+
+        override suspend fun insert(draft: DraftInvoiceEntity) {
+            drafts.removeAll { it.id == draft.id }
+            drafts.add(draft)
+        }
+
+        override suspend fun getById(id: String): DraftInvoiceEntity? = drafts.firstOrNull { it.id == id }
+
+        override suspend fun getByTenant(tenantId: String): List<DraftInvoiceEntity> = drafts
+
+        override suspend fun getAll(): List<DraftInvoiceEntity> = drafts
+
+        override suspend fun deleteById(id: String) {
+            drafts.removeAll { it.id == id }
+        }
+
+        override suspend fun clearAll() {
+            drafts.clear()
+        }
+    }
+
+    private class FakeNetworkMonitor(var online: Boolean = true) : NetworkMonitor(android.content.ContextWrapper(null)) {
+        override fun isOnline(): Boolean = online
     }
 
     private class FakeLocalStore : LocalStore(android.content.ContextWrapper(null)) {
@@ -1214,6 +1299,428 @@ class PosTerminalViewModelTest {
         vm.onCatalogPrevPage()
         advanceUntilIdle()
         assertEquals(1, vm.uiState.value.catalogCurrentPage)
+    }
+
+    @Test
+    fun savePendingInvoiceOnline_savesWithCodEstatus1AndClearsCart() = runTest {
+        val salesRepo = FakeSalesRepository()
+        val prod = Product(id = "1", code = "P1", description = "Prod 1", prices = listOf(PriceLevel(label = "A", price = 10.0, pricePlusTax = 10.0)))
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = listOf(prod)),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = salesRepo,
+            localStore = fakeLocalStore,
+            networkMonitor = FakeNetworkMonitor(online = true),
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(prod)
+        assertEquals(1, vm.uiState.value.cart.size)
+
+        vm.savePendingInvoice()
+        advanceUntilIdle()
+
+        assertNotNull(salesRepo.lastSaleRequest)
+        assertEquals(0, salesRepo.lastSaleRequest?.procesar)
+        assertEquals(1, salesRepo.lastSaleRequest?.factura?.codEstatus)
+        assertTrue(vm.uiState.value.cart.isEmpty())
+        assertNull(vm.uiState.value.heldInvoiceId)
+    }
+
+    @Test
+    fun savePendingInvoiceOffline_savesToDraftDao() = runTest {
+        val draftDao = FakeDraftInvoiceDao()
+        val prod = Product(id = "1", code = "P1", description = "Prod 1", prices = listOf(PriceLevel(label = "A", price = 10.0, pricePlusTax = 10.0)))
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = listOf(prod)),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+            networkMonitor = FakeNetworkMonitor(online = false),
+            draftInvoiceDao = draftDao,
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(prod)
+        assertEquals(1, vm.uiState.value.cart.size)
+
+        vm.savePendingInvoice()
+        advanceUntilIdle()
+
+        assertEquals(1, draftDao.drafts.size)
+        assertTrue(vm.uiState.value.cart.isEmpty())
+    }
+
+    @Test
+    fun openSearchInvoicesModal_loadsBothOnlineAndOfflineInvoices() = runTest {
+        val historyRepo = FakeInvoiceHistoryRepository().apply {
+            transactionsList = listOf(
+                Transaction(
+                    id = "tx-1",
+                    invoiceNumber = "FAC-001",
+                    time = "10:00",
+                    amount = 50.0,
+                    dateHeader = "Hoy",
+                    clienteNombre = "Cliente Remoto",
+                )
+            )
+        }
+        val draftDao = FakeDraftInvoiceDao().apply {
+            insert(
+                DraftInvoiceEntity(
+                    id = "draft-1",
+                    localInvoiceNumber = "BORR-1",
+                    clientName = "Cliente Local",
+                    total = 25.0,
+                    itemCount = 1,
+                    payloadJson = "{}",
+                )
+            )
+        }
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+            networkMonitor = FakeNetworkMonitor(online = true),
+            invoiceHistoryRepository = historyRepo,
+            draftInvoiceDao = draftDao,
+        )
+        advanceUntilIdle()
+
+        vm.openSearchInvoicesModal()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.showSearchInvoicesModal)
+        assertEquals(2, vm.uiState.value.savedInvoices.size)
+
+        val remoteInv = vm.uiState.value.savedInvoices.first { it.id == "tx-1" }
+        assertEquals("Cliente Remoto", remoteInv.clientName)
+        assertEquals("FAC-001", remoteInv.code)
+        assertEquals("Contado", remoteInv.formaPago)
+
+        val localInv = vm.uiState.value.savedInvoices.first { it.id == "draft-1" }
+        assertEquals("Cliente Local", localInv.clientName)
+        assertEquals("Local", localInv.sucursal)
+        assertEquals("POS", localInv.caja)
+    }
+
+    @Test
+    fun restoreSavedInvoice_promptsIfCartNotEmpty_andLoadsItemsOnConfirm() = runTest {
+        val prod = Product(id = "1", code = "P1", description = "Prod 1", prices = listOf(PriceLevel(label = "A", price = 10.0, pricePlusTax = 10.0)))
+        val historyRepo = FakeInvoiceHistoryRepository().apply {
+            detailResult = Result.success(
+                FacturaDetalleResponseDto(
+                    idFactura = "101",
+                    codFactura = "FAC-101",
+                    idCliente = "1",
+                    clienteNombre = "Consumidor Final",
+                    items = listOf(
+                        FacturaDetalleItemDto(
+                            id = "d-1",
+                            idItem = 1,
+                            codigo = "P1",
+                            descripcion = "Prod 1",
+                            cantidad = 3.0,
+                            precioUnitario = 10.0,
+                            totalConIva = 30.0,
+                        )
+                    )
+                )
+            )
+        }
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = listOf(prod)),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+            networkMonitor = FakeNetworkMonitor(online = true),
+            invoiceHistoryRepository = historyRepo,
+        )
+        advanceUntilIdle()
+
+        vm.addToCart(prod)
+        assertEquals(1, vm.uiState.value.cart.size)
+
+        val targetInvoice = SavedInvoiceSummary(
+            id = "101",
+            code = "FAC-101",
+            clientName = "Consumidor Final",
+            total = 30.0,
+            itemCount = 1,
+            origin = SavedInvoiceOrigin.ONLINE,
+        )
+
+        vm.onSelectSavedInvoiceToRestore(targetInvoice)
+        assertTrue(vm.uiState.value.showConfirmRestoreDialog)
+
+        vm.confirmRestoreInvoice()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.showConfirmRestoreDialog)
+        assertFalse(vm.uiState.value.showSearchInvoicesModal)
+        assertEquals(1, vm.uiState.value.cart.size)
+        assertEquals(3.0, vm.uiState.value.cart.first().quantity, 0.001)
+        assertEquals("101", vm.uiState.value.heldInvoiceId)
+        assertEquals("FAC-101", vm.uiState.value.heldInvoiceCode)
+    }
+
+    @Test
+    fun anularSavedInvoice_removesFromDraftDaoOrCallsSalesRepo() = runTest {
+        val draftDao = FakeDraftInvoiceDao().apply {
+            insert(
+                DraftInvoiceEntity(
+                    id = "draft-1",
+                    localInvoiceNumber = "BORR-1",
+                    clientName = "Cliente Local",
+                    total = 25.0,
+                    itemCount = 1,
+                    payloadJson = "{}",
+                )
+            )
+        }
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+            draftInvoiceDao = draftDao,
+        )
+        advanceUntilIdle()
+
+        val draftItem = SavedInvoiceSummary(
+            id = "draft-1",
+            code = "BORR-1",
+            clientName = "Cliente Local",
+            total = 25.0,
+            origin = SavedInvoiceOrigin.OFFLINE_DRAFT,
+        )
+
+        vm.onSelectSavedInvoiceToAnular(draftItem)
+        assertTrue(vm.uiState.value.showConfirmAnularDialog)
+
+        vm.confirmAnularInvoice()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.showConfirmAnularDialog)
+        assertTrue(draftDao.drafts.isEmpty())
+    }
+
+    @Test
+    fun loadInitialData_filtersCatalogByVisibleDepartmentsOnly() = runTest {
+        val prodVisible1 = Product(id = "1", code = "P1", description = "Visible Bebida", department = "1")
+        val prodVisible2 = Product(id = "2", code = "P2", description = "Visible Snack", department = "2")
+        val prodHidden = Product(id = "3", code = "P3", description = "Insumo Oculto", department = "99")
+
+        val dept1 = DepartmentDto(id = 1, name = "Bebidas")
+        val dept2 = DepartmentDto(id = 2, name = "Snacks")
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(prodVisible1, prodVisible2, prodHidden),
+                departmentsList = listOf(dept1, dept2),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        // Los departamentos expuestos en el POS solo son los visibles
+        assertEquals(2, state.departments.size)
+        assertEquals(listOf(1, 2), state.departments.map { it.id })
+
+        // Catálogo inicial: solo debe contener productos de departamentos visibles (excluye departamento 99)
+        assertEquals(2, state.filteredProducts.size)
+        assertTrue(state.filteredProducts.none { it.department == "99" })
+        assertEquals(setOf("1", "2"), state.filteredProducts.map { it.department }.toSet())
+
+        // Cuando se selecciona un departamento específico (ej. Bebidas = 1)
+        vm.onDepartmentSelected(1)
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.filteredProducts.size)
+        assertEquals("P1", vm.uiState.value.filteredProducts.first().code)
+
+        // Cuando se deselecciona para volver a "Todos" (deptId == null)
+        vm.onDepartmentSelected(1)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.selectedDepartmentId)
+        assertEquals(2, vm.uiState.value.filteredProducts.size)
+        assertTrue(vm.uiState.value.filteredProducts.none { it.department == "99" })
+    }
+
+    @Test
+    fun addToCart_withOptionsProduct_opensOptionsDialogAndLoadsGroups() = runTest {
+        val optionGroup = ProductOptionGroup(
+            id = "g1",
+            type = "COMBO",
+            name = "BEBIDA",
+            min = 1,
+            max = 1,
+            options = listOf(
+                ProductOptionItem(
+                    id = "op1",
+                    productId = "101",
+                    productCode = "COCA",
+                    name = "Coca Cola 355ml",
+                    extraPrice = 0.0,
+                    isDefault = true,
+                ),
+            ),
+        )
+        val productWithOptions = Product(
+            id = "10",
+            code = "COMBO-BURGER",
+            description = "Combo Hamburguesa",
+            department = "1",
+            prices = listOf(PriceLevel(label = "General", price = 12.0, pricePlusTax = 12.0)),
+            hasOptions = true,
+            idCombo = "5",
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(productWithOptions),
+                optionsMap = mapOf("10" to listOf(optionGroup)),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Al tocar un producto con hasOptions == true, NO se agrega directo al carrito
+        vm.addToCart(productWithOptions)
+        advanceUntilIdle()
+
+        // Se abre el diálogo de opciones con sus grupos cargados
+        val state = vm.uiState.value
+        assertEquals(productWithOptions, state.optionsProduct)
+        assertEquals(1, state.optionsGroups.size)
+        assertEquals("BEBIDA", state.optionsGroups.first().name)
+        assertTrue(state.cart.isEmpty())
+    }
+
+    @Test
+    fun confirmProductOptions_addsItemToCartWithCalculatedExtraPriceAndOptions() = runTest {
+        val productWithOptions = Product(
+            id = "10",
+            code = "COMBO-BURGER",
+            description = "Combo Hamburguesa",
+            department = "1",
+            prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
+            hasOptions = true,
+            idCombo = "5",
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = listOf(productWithOptions)),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val selectedOptions = listOf(
+            SelectedOption(
+                idGrupo = "g1",
+                grupo = "BEBIDA",
+                tipo = "COMBO",
+                idGrupoItem = "op1",
+                idItem = "101",
+                codItem = "COCA",
+                nombre = "Coca Cola",
+                precio = 0.0,
+                cantidad = 1.0,
+                veces = 1,
+            ),
+            SelectedOption(
+                idGrupo = "g2",
+                grupo = "EXTRAS",
+                tipo = "MODIFICADOR",
+                idGrupoItem = "op2",
+                idItem = "102",
+                codItem = "QUESO",
+                nombre = "Queso Extra",
+                precio = 1.50,
+                cantidad = 1.0,
+                veces = 1,
+            ),
+        )
+
+        // Confirmar opciones con cantidad 2
+        vm.confirmProductOptions(productWithOptions, selectedOptions, quantity = 2.0)
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertNull(state.optionsProduct)
+        assertEquals(1, state.cart.size)
+
+        val cartItem = state.cart.first()
+        assertEquals(2.0, cartItem.quantity, 0.001)
+        // Precio unitario = 10.0 base + 1.50 extra = 11.50
+        assertEquals(11.50, cartItem.unitPriceWithTax, 0.001)
+        assertEquals(2, cartItem.selectedOptions.size)
+        assertTrue(cartItem.hasOptions)
+    }
+
+    @Test
+    fun processSale_withItemWithOptions_includesComposicionJsonAndNoPoseeCombo() = runTest {
+        val fakeSalesRepo = FakeSalesRepository()
+        val productWithOptions = Product(
+            id = "10",
+            code = "COMBO-BURGER",
+            description = "Combo Hamburguesa",
+            department = "1",
+            prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
+            hasOptions = true,
+            idCombo = "5",
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(productsList = listOf(productWithOptions)),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = fakeSalesRepo,
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val selectedOptions = listOf(
+            SelectedOption(
+                idGrupo = "g1",
+                grupo = "BEBIDA",
+                tipo = "COMBO",
+                idGrupoItem = "op1",
+                nombre = "Coca Cola",
+                precio = 0.0,
+                veces = 1,
+            ),
+        )
+
+        vm.confirmProductOptions(productWithOptions, selectedOptions, quantity = 1.0)
+        advanceUntilIdle()
+
+        vm.processSale()
+        advanceUntilIdle()
+
+        val lastRequest = fakeSalesRepo.lastSaleRequest
+        assertNotNull(lastRequest)
+        assertEquals(1, lastRequest!!.items.size)
+
+        val saleItem = lastRequest.items.first()
+        assertNotNull(saleItem.composicion)
+        assertTrue(saleItem.composicion!!.contains("Coca Cola"))
+        assertEquals("no", saleItem.poseeProductoCombo)
     }
 }
 

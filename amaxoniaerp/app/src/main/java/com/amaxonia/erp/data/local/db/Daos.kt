@@ -244,6 +244,9 @@ interface ProductDao {
     @Query("SELECT COUNT(*) FROM products WHERE department = :departmentId AND estatus = 'A'")
     suspend fun countByDepartment(departmentId: Int): Int
 
+    @Query("SELECT COUNT(*) FROM products WHERE department IN (:departmentIds) AND estatus = 'A'")
+    suspend fun countByDepartments(departmentIds: List<Int>): Int
+
     @Query(
         "SELECT COUNT(*) FROM products " +
             "WHERE estatus = 'A' AND (" +
@@ -267,6 +270,18 @@ interface ProductDao {
             "OR barcode3 LIKE :query COLLATE NOCASE)",
     )
     suspend fun countSearchByDepartment(query: String, departmentId: Int): Int
+
+    @Query(
+        "SELECT COUNT(*) FROM products " +
+            "WHERE department IN (:departmentIds) AND estatus = 'A' AND (" +
+            "code LIKE :query COLLATE NOCASE " +
+            "OR description LIKE :query COLLATE NOCASE " +
+            "OR reference LIKE :query COLLATE NOCASE " +
+            "OR barcode1 LIKE :query COLLATE NOCASE " +
+            "OR barcode2 LIKE :query COLLATE NOCASE " +
+            "OR barcode3 LIKE :query COLLATE NOCASE)",
+    )
+    suspend fun countSearchByDepartments(query: String, departmentIds: List<Int>): Int
 
     @Query("SELECT DISTINCT department FROM products WHERE department IS NOT NULL")
     suspend fun getDistinctDepartmentIds(): List<Int>

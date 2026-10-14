@@ -179,6 +179,11 @@ fun ProductEntity.toDomain(
         unitOrPackage = unitOrPackage,
         isService = isService,
         prices = prices,
+        hasOptions = hasOptions,
+        idCombo = idCombo,
+        itemType = itemType,
+        hasVariants = hasVariants,
+        variantsTotal = variantsTotal,
     )
 }
 
@@ -221,4 +226,6 @@ fun PaymentMethodEntity.toDto(): FormaPagoDto =
         activo = activo,
         pos = pos,
         tipoMoneda = tipoMoneda.orEmpty(),
+        imagen = imagen.takeIf { it.isNotBlank() },
+        grupo = grupo,
     )

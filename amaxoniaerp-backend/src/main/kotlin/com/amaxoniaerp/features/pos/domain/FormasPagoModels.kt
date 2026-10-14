@@ -38,3 +38,20 @@ data class FormaPagoItem(
     @SerialName("id_caja")
     val idCaja: String? = null,
 )
+
+@Serializable
+data class MonedaDenominacionDto(
+    val id: Int,
+    @SerialName("id_divisa") val idDivisa: Int? = null,
+    val denominacion: String,
+    val valor: Double,
+    val rollo: Int = 0,
+    @SerialName("es_moneda") val esMoneda: Boolean = false,
+    val imagen: String? = null,
+)
+
+@Serializable
+data class DenominacionesResponse(
+    val success: Boolean,
+    val data: List<MonedaDenominacionDto>,
+)

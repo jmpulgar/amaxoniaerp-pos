@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.items.domain
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -37,6 +38,16 @@ data class Product(
     val unitOrPackage: String = "UNIDAD",
     val isService: Boolean = false,
     val prices: List<PriceLevel> = emptyList(),
+    @SerialName("posee_producto_combo")
+    val poseeProductoCombo: String = "no",
+    @SerialName("id_combo")
+    val idCombo: String? = null,
+    @SerialName("tipo_articulo")
+    val tipoArticulo: String? = null,
+    @SerialName("posee_variantes")
+    val poseeVariantes: String = "no",
+    @SerialName("variantes_total")
+    val variantesTotal: Int = 0,
 )
 
 @Serializable

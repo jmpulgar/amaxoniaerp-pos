@@ -119,13 +119,24 @@ fun ProductSelectionDialog(
                 p.reference.lowercase(Locale.ROOT).contains(query) ||
                 p.department.lowercase(Locale.ROOT).contains(query)
 
-            val matchesDept = selectedDeptId == null ||
+            val matchesDept = if (selectedDeptId != null) {
                 p.department == selectedDeptId.toString() ||
-                p.department.toIntOrNull() == selectedDeptId ||
-                departments.firstOrNull { it.id == selectedDeptId }?.let {
-                    it.displayName.equals(p.department, ignoreCase = true) ||
-                    it.name.equals(p.department, ignoreCase = true)
-                } == true
+                    p.department.toIntOrNull() == selectedDeptId ||
+                    departments.firstOrNull { it.id == selectedDeptId }?.let {
+                        it.displayName.equals(p.department, ignoreCase = true) ||
+                            it.name.equals(p.department, ignoreCase = true)
+                    } == true
+            } else if (departments.isNotEmpty()) {
+                val deptIds = departments.map { it.id.toString() }
+                p.department in deptIds ||
+                    p.department.toIntOrNull()?.let { id -> departments.any { it.id == id } } == true ||
+                    departments.any {
+                        it.displayName.equals(p.department, ignoreCase = true) ||
+                            it.name.equals(p.department, ignoreCase = true)
+                    }
+            } else {
+                true
+            }
 
             val matchesType = when (selectedTypeFilter) {
                 "PRODUCTO" -> !p.isService
@@ -370,7 +381,7 @@ fun ProductSelectionDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text(text = "Tipo:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF424242))
+                            Text(text = "Tipo:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = FlowCatalogTokens.Text2)
                             listOf("TODOS", "PRODUCTO", "SERVICIO").forEach { tipo ->
                                 FilterChip(
                                     selected = selectedTypeFilter == tipo,
@@ -378,10 +389,10 @@ fun ProductSelectionDialog(
                                     label = { Text(tipo, fontSize = 10.sp) },
                                     modifier = Modifier.height(26.dp),
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF00C5DC),
+                                        selectedContainerColor = FlowCatalogTokens.Brand,
                                         selectedLabelColor = Color.White,
                                         containerColor = Color.White,
-                                        labelColor = Color(0xFF424242),
+                                        labelColor = FlowCatalogTokens.Ink,
                                     ),
                                 )
                             }
@@ -397,20 +408,21 @@ fun ProductSelectionDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                Text(text = "Depto:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF424242))
+                                Text(text = "Depto:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = FlowCatalogTokens.Text2)
                                 FilterChip(
                                     selected = selectedDeptId == null,
                                     onClick = { selectedDeptId = null },
                                     label = { Text("TODOS", fontSize = 10.sp) },
                                     modifier = Modifier.height(26.dp),
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF00C5DC),
+                                        selectedContainerColor = FlowCatalogTokens.Brand,
                                         selectedLabelColor = Color.White,
                                         containerColor = Color.White,
-                                        labelColor = Color(0xFF424242),
+                                        labelColor = FlowCatalogTokens.Ink,
                                     ),
                                 )
                                 departments.forEach { dept ->
+                                    val catColor = FlowCatalogTokens.getColorForDepartment(dept.id, departments)
                                     FilterChip(
                                         selected = selectedDeptId == dept.id,
                                         onClick = {
@@ -419,10 +431,10 @@ fun ProductSelectionDialog(
                                         label = { Text(dept.displayName.uppercase(), fontSize = 10.sp) },
                                         modifier = Modifier.height(26.dp),
                                         colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Color(0xFF00C5DC),
+                                            selectedContainerColor = catColor.accent,
                                             selectedLabelColor = Color.White,
                                             containerColor = Color.White,
-                                            labelColor = Color(0xFF424242),
+                                            labelColor = FlowCatalogTokens.Ink,
                                         ),
                                     )
                                 }
@@ -600,6 +612,35 @@ fun ProductSelectionDialog(
                                             modifier = Modifier.height(28.dp),
                                         )
 
+                                        if (product.hasOptions) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(999.dp))
+                                                    .background(Color(0xFFEEF5FF))
+                                                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Tune,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF201B82),
+                                                        modifier = Modifier.size(10.dp),
+                                                    )
+                                                    Text(
+                                                        text = "Opciones",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color(0xFF201B82),
+                                                    )
+                                                }
+                                            }
+                                        }
+
                                         Spacer(modifier = Modifier.height(2.dp))
 
                                         // Precio prominente en cian var(--flx-00bcd4, #00bcd4)
@@ -681,15 +722,35 @@ fun ProductSelectionDialog(
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.width(95.dp),
                                         )
-                                        Text(
-                                            text = product.description.uppercase(),
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF212529),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                        Row(
                                             modifier = Modifier.weight(1f),
-                                        )
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Text(
+                                                text = product.description.uppercase(),
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF212529),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            if (product.hasOptions) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(999.dp),
+                                                    color = Color(0xFFEEF5FF),
+                                                ) {
+                                                    Text(
+                                                        text = "Opciones",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color(0xFF201B82),
+                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                    )
+                                                }
+                                            }
+                                        }
                                         Text(
                                             text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
                                             fontSize = 14.sp,

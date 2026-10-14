@@ -48,21 +48,25 @@ internal fun resolveCreditDecision(
     request: ProcessSaleRequest,
     today: LocalDate,
 ): CreditDecision {
+    val isPending = request.procesar == 0 || request.factura.codEstatus == 1
     val amounts = computeCreditAmounts(request)
     validateSaleAmounts(amounts)
-    validatePaymentCoherence(request, amounts)
-    if (amounts.isCredit) validateCreditRules(amounts) else validateCashRules(amounts)
+    if (!isPending) {
+        validatePaymentCoherence(request, amounts)
+        if (amounts.isCredit) validateCreditRules(amounts) else validateCashRules(amounts)
+    }
 
-    val diasCredito = if (amounts.isCredit) resolveDiasCredito(request) else null
+    val isCredit = if (isPending) false else amounts.isCredit
+    val diasCredito = if (isCredit) resolveDiasCredito(request) else null
 
     return CreditDecision(
-        formaPago = if (amounts.isCredit) "credito" else "contado",
+        formaPago = if (isCredit) "credito" else (request.factura.formaPago.ifBlank { "contado" }),
         totalGeneral = amounts.totalGeneral,
         totalPagos = amounts.totalPagos,
         totalCxc = amounts.totalCxc,
         totalPagadoReal = amounts.totalPagadoReal,
         saldoEsperado = amounts.saldoEsperado,
-        isCredit = amounts.isCredit,
+        isCredit = isCredit,
         fechaVencimiento = diasCredito?.let { today.plusDays(it.toLong()) },
     )
 }

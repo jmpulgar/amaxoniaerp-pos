@@ -1,7 +1,9 @@
 package com.amaxoniaerp.features.pos.data
 
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.caja.data.MonedaDenominacionTable
 import com.amaxoniaerp.features.pos.domain.FormaPagoItem
+import com.amaxoniaerp.features.pos.domain.MonedaDenominacionDto
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
@@ -89,4 +91,25 @@ class FormasPagoRepository {
             tipoMoneda = row.getOrNull(CajaFormaPagoTable.tipoMoneda).orEmpty(),
             idCaja = idCaja,
         )
+
+    suspend fun listDenominaciones(database: Database): List<MonedaDenominacionDto> =
+        dbQuery(database) {
+            MonedaDenominacionTable
+                .selectAll()
+                .where { MonedaDenominacionTable.activo eq 1 }
+                .orderBy(MonedaDenominacionTable.valor to SortOrder.DESC, MonedaDenominacionTable.id to SortOrder.ASC)
+                .map { row ->
+                    val valor = row[MonedaDenominacionTable.valor].toDouble()
+                    val rollo = row[MonedaDenominacionTable.rollo]
+                    MonedaDenominacionDto(
+                        id = row[MonedaDenominacionTable.id],
+                        idDivisa = row[MonedaDenominacionTable.idDivisa],
+                        denominacion = row[MonedaDenominacionTable.denominacion].orEmpty(),
+                        valor = valor,
+                        rollo = rollo,
+                        esMoneda = rollo > 0 || valor < 1.0,
+                        imagen = row[MonedaDenominacionTable.imagen]?.takeIf { it.isNotBlank() },
+                    )
+                }
+        }
 }

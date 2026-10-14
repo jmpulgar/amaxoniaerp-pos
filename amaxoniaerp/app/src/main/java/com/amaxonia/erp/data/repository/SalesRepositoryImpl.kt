@@ -9,6 +9,7 @@ import com.amaxonia.erp.data.remote.dto.FacturaPrintPayloadDto
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.data.remote.dto.ProcessSaleRequestDto
 import com.amaxonia.erp.data.remote.dto.ProcessSaleResponseDto
+import com.amaxonia.erp.data.remote.anularFacturaPendiente
 import com.amaxonia.erp.data.remote.getFacturaPrintPayload
 import com.amaxonia.erp.data.remote.getFormasPago
 import com.amaxonia.erp.data.remote.processSale
@@ -72,12 +73,20 @@ class SalesRepositoryImpl(
             activo = activo,
             pos = pos,
             tipoMoneda = tipoMoneda.orEmpty(),
+            imagen = imagen.takeIf { it.isNotBlank() },
+            grupo = grupo,
         )
 
     override suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto> =
         runCatching {
             val (token, adminDb) = getContext()
             apiService.getFacturaPrintPayload(token, adminDb, facturaId)
+        }
+
+    override suspend fun anularFacturaPendiente(facturaId: String): Result<Unit> =
+        runCatching {
+            val (token, adminDb) = getContext()
+            apiService.anularFacturaPendiente(token, adminDb, facturaId)
         }
 }
 

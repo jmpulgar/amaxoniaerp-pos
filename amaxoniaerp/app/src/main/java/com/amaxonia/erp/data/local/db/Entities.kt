@@ -34,6 +34,11 @@ data class ProductEntity(
     val estatus: String = "A",
     val isService: Boolean = false,
     val prices: List<PriceLevel>,
+    val hasOptions: Boolean = false,
+    val idCombo: String? = null,
+    val itemType: String = "",
+    val hasVariants: Boolean = false,
+    val variantsTotal: Int = 0,
 )
 
 @Entity(tableName = "clients")

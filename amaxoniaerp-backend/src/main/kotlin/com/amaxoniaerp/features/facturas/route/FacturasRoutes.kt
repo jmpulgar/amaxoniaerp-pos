@@ -44,6 +44,8 @@ fun Route.facturasRoutes(
             get("/{id}/print-payload") { handlers.printPayload(call) }
             get("/{id}/pdf") { handlers.descargarPdf(call) }
             patch("/{id}/confirmacion-fiscal") { handlers.confirmarFiscal(call) }
+            patch("/{id}/anular-pendiente") { handlers.anularPendiente(call) }
+            post("/{id}/anular-pendiente") { handlers.anularPendiente(call) }
             post("/{id}/enviar-correo") { handlers.enviarCorreo(call) }
         }
     }
@@ -178,6 +180,27 @@ internal class FacturasHandlers(
             }
         }
 
+    suspend fun anularPendiente(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val facturaId = call.requireParameter("id", "Missing factura ID") ?: return@run
+
+            val companyDb = ctx.connectDatabase()
+            runCatching {
+                facturasRepository.anularPendiente(companyDb, ctx.countryCode, facturaId)
+            }.fold(
+                onSuccess = {
+                    call.respond(mapOf("success" to true, "message" to "Factura pendiente anulada correctamente"))
+                },
+                onFailure = { error ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to (error.message ?: "No se pudo anular la factura pendiente")),
+                    )
+                },
+            )
+        }
+
     suspend fun enviarCorreo(call: ApplicationCall) =
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run
@@ -267,6 +290,9 @@ private fun Parameters.toFacturasFilter(): Result<FacturasFilter> =
             this["caja_id"]?.takeIf(String::isNotBlank)
                 ?: this["id_caja"]?.takeIf(String::isNotBlank)
                 ?: this["cajaId"]?.takeIf(String::isNotBlank)
+        val estatus =
+            this["estatus"]?.takeIf(String::isNotBlank)?.toIntOrNull()
+                ?: this["cod_estatus"]?.takeIf(String::isNotBlank)?.toIntOrNull()
 
         if (fechaInicio != null && fechaFin != null) {
             if (fechaFin.isBefore(fechaInicio)) {
@@ -283,6 +309,7 @@ private fun Parameters.toFacturasFilter(): Result<FacturasFilter> =
             cajaId = cajaId,
             fechaInicio = fechaInicio,
             fechaFin = fechaFin,
+            estatus = estatus,
         )
     }
 

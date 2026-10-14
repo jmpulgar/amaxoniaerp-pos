@@ -92,6 +92,11 @@ fun Route.itemsRoutes(itemsRepository: ItemsRepository) {
              * GET /items/{id}/stock - Inventario por almacen con precompromisos.
              */
             get("/{id}/stock") { handlers.stock(call) }
+
+            /**
+             * GET /items/{id}/options - Opciones, grupos y modificadores del combo.
+             */
+            get("/{id}/options") { handlers.opciones(call) }
         }
     }
 }
@@ -106,7 +111,11 @@ internal class ItemsTaxonomyHandlers(
     suspend fun departamentos(call: ApplicationCall) =
         run {
             val database = call.resolveDatabase() ?: return@run
-            val list = itemsRepository.listDepartments(database = database)
+            val onlyVisiblePos =
+                call.request.queryParameters["visible_pos"]?.let {
+                    it == "1" || it.equals("true", ignoreCase = true)
+                } ?: call.request.queryParameters["visiblePos"]?.toBooleanStrictOrNull() ?: false
+            val list = itemsRepository.listDepartments(database = database, onlyVisiblePos = onlyVisiblePos)
             call.respondDepartments(list)
         }
 
@@ -306,6 +315,27 @@ internal class ItemsHandlers(
             val companyDb = ctx.connectDatabase()
             val stock = itemsRepository.getItemStockByWarehouse(companyDb, id)
             call.respond(stock)
+        }
+
+    suspend fun opciones(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val rawId = call.parameters["id"].orEmpty()
+            if (rawId.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to ERR_INVALID_PRODUCT_ID))
+                return@run
+            }
+            val almacenId = call.request.queryParameters["almacen"]?.toIntOrNull()
+
+            val companyDb = ctx.connectDatabase()
+            val resolvedId = rawId.toIntOrNull() ?: itemsRepository.resolveItemIdByCode(companyDb, rawId)
+            if (resolvedId == null) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to ERR_PRODUCT_NOT_FOUND))
+                return@run
+            }
+
+            val result = itemsRepository.getItemOptions(companyDb, resolvedId, almacenId)
+            call.respond(result)
         }
 }
 

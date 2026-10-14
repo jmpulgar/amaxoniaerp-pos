@@ -21,7 +21,15 @@ data class Product(
     val unitOrPackage: String = "UNIDAD",
     val isService: Boolean = false,
     val prices: List<PriceLevel> = emptyList(),
+    val hasOptions: Boolean = false,
+    val idCombo: String? = null,
+    val itemType: String = "",
+    val hasVariants: Boolean = false,
+    val variantsTotal: Int = 0,
 ) {
+    val isComboArticle: Boolean
+        get() = itemType.equals("C", ignoreCase = true)
+
     val mainPrice: Double
         get() = prices.firstOrNull()?.pricePlusTax
             ?: prices.firstOrNull()?.price

@@ -20,12 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MonetizationOn
@@ -40,19 +37,28 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.SubcomposeAsyncImage
+import com.amaxonia.erp.composition.DependencyContainer
+import com.amaxonia.erp.data.remote.ImageUrlHelper
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
+import com.amaxonia.erp.domain.model.DenominacionesCatalogo
+import com.amaxonia.erp.domain.model.MonedaDenominacion
+import com.amaxonia.erp.ui.components.AdaptiveImage
 import com.amaxonia.erp.ui.components.isLandscape
 import java.util.Locale
 
@@ -398,6 +404,9 @@ private fun PaymentMethodsList(
                 isActive = isActive,
                 amountText = textVal,
                 isDenominationsExpanded = isCash && state.expandedCashDenominations,
+                baseUrl = state.apiBaseUrl,
+                countryCode = state.countryCode,
+                companyDb = state.companyDb,
                 onBadgeClick = { onPaymentMethodBadgeClick(method) },
                 onInputClick = { onSelectActiveInput(method.idFormaPago) },
                 onClearClick = { onClearSinglePaymentMethod(method.idFormaPago) },
@@ -415,6 +424,9 @@ private fun PaymentMethodRow(
     isActive: Boolean,
     amountText: String,
     isDenominationsExpanded: Boolean,
+    baseUrl: String,
+    countryCode: String,
+    companyDb: String,
     onBadgeClick: () -> Unit,
     onInputClick: () -> Unit,
     onClearClick: () -> Unit,
@@ -441,10 +453,20 @@ private fun PaymentMethodRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            val imageUrl = remember(method.idFormaPago, method.imagen, baseUrl, countryCode, companyDb) {
+                ImageUrlHelper.paymentMethodImageUrl(
+                    baseUrl = baseUrl,
+                    countryCode = countryCode,
+                    companyDb = companyDb,
+                    idFormaPago = method.idFormaPago,
+                    imageValue = method.imagen,
+                )
+            }
+
             // 1. Botón Badge de la Forma de Pago (.btn-formapago)
             Box(
                 modifier = Modifier
-                    .width(150.dp)
+                    .width(160.dp)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFFE0F7FA))
@@ -457,18 +479,24 @@ private fun PaymentMethodRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(
-                        imageVector = getPaymentIcon(method),
-                        contentDescription = null,
-                        tint = WebTealText,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    if (imageUrl.isNotBlank()) {
+                        AdaptiveImage(
+                            source = imageUrl,
+                            contentDescription = method.descripcion,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Fit,
+                            fallback = {},
+                        )
+                    }
                     Text(
                         text = method.descripcion ?: method.codigo ?: "Método",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = WebTealText,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -547,6 +575,8 @@ private fun PaymentMethodRow(
 
         // 3. Desplegable de Denominaciones / Billetes (#moneda_denominacion)
         AnimatedVisibility(visible = isDenominationsExpanded) {
+            val denominations = remember { DenominacionesCatalogo.getDenominacionesPanama() }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -561,26 +591,90 @@ private fun PaymentMethodRow(
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF475569),
                 )
+
+                // Billetes
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    listOf(1.0, 5.0, 10.0, 20.0, 50.0, 100.0).forEach { bill ->
+                    val bills = denominations.filter { !it.esMoneda }
+                    for (item in bills) {
+                        val itemImageUrl = remember(item.id, baseUrl, countryCode, companyDb) {
+                            if (companyDb.isNotBlank()) {
+                                ImageUrlHelper.denominationImageUrl(baseUrl, countryCode, companyDb, item.id)
+                            } else {
+                                ""
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFD1FAE5))
+                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(6.dp))
+                                .clickable { onAddDenomination(item.valor) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AdaptiveImage(
+                                source = itemImageUrl,
+                                contentDescription = item.denominacion,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(5.dp)),
+                                contentScale = ContentScale.Crop,
+                                fallback = {
+                                    Text(
+                                        text = "$${item.valor.toInt()}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF065F46),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+
+                // Monedas
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val coins = denominations.filter { it.esMoneda }
+                    for (item in coins) {
+                        val itemImageUrl = remember(item.id, baseUrl, countryCode, companyDb) {
+                            if (companyDb.isNotBlank()) {
+                                ImageUrlHelper.denominationImageUrl(baseUrl, countryCode, companyDb, item.id)
+                            } else {
+                                ""
+                            }
+                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(32.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFD1FAE5))
-                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(6.dp))
-                                .clickable { onAddDenomination(bill) },
+                                .background(Color(0xFFE2E8F0))
+                                .border(1.dp, Color(0xFF94A3B8), RoundedCornerShape(6.dp))
+                                .clickable { onAddDenomination(item.valor) },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = "$${bill.toInt()}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF065F46),
+                            AdaptiveImage(
+                                source = itemImageUrl,
+                                contentDescription = item.denominacion,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(5.dp)),
+                                contentScale = ContentScale.Fit,
+                                fallback = {
+                                    Text(
+                                        text = "$${String.format(Locale.US, "%.2f", item.valor)}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF334155),
+                                    )
+                                },
                             )
                         }
                     }
@@ -873,19 +967,5 @@ private fun KeypadButton(
             color = textColor,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-private fun getPaymentIcon(method: FormaPagoDto): ImageVector {
-    val sig = method.siglas.orEmpty().uppercase()
-    val cod = method.codigo.orEmpty().uppercase()
-    val desc = method.descripcion.orEmpty().uppercase()
-
-    return when {
-        sig == "CASH" || sig == "EF" || cod == "EFECTIVO" || desc.contains("EFECTIVO") -> Icons.Default.Payments
-        sig == "TDC" || sig == "TDD" || cod.contains("TARJ") || desc.contains("TARJETA") -> Icons.Default.CreditCard
-        sig == "TR" || cod.contains("TRANS") || desc.contains("TRANSFERENCIA") -> Icons.Default.AccountBalance
-        sig == "CK" || cod.contains("CHEQUE") || desc.contains("CHEQUE") -> Icons.Default.Receipt
-        else -> Icons.Default.MonetizationOn
     }
 }

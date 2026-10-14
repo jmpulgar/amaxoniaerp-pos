@@ -119,6 +119,9 @@ data class SaleItemDto(
     val promocionCantidad: Double = 0.0,
     val promocionCodigo: String = "",
     val promocionNombre: String = "",
+    val composicion: String? = null,
+    @SerialName("_posee_producto_combo")
+    val poseeProductoCombo: String? = null,
 )
 
 @Serializable
@@ -176,6 +179,25 @@ data class FormaPagoDto(
     val pos: Int = 1,
     @SerialName("tipo_moneda")
     val tipoMoneda: String = "",
+    val imagen: String? = null,
+    val grupo: Int? = null,
+)
+
+@Serializable
+data class DenominacionDto(
+    val id: Int,
+    @SerialName("id_divisa") val idDivisa: Int? = null,
+    val denominacion: String,
+    val valor: Double,
+    val rollo: Int = 0,
+    @SerialName("es_moneda") val esMoneda: Boolean = false,
+    val imagen: String? = null,
+)
+
+@Serializable
+data class DenominacionesResponseDto(
+    val success: Boolean = true,
+    val data: List<DenominacionDto> = emptyList(),
 )
 
 @Serializable
@@ -197,6 +219,11 @@ data class FacturaSummaryDto(
     val totalRef: Double? = null,
     val tasa: Float? = null,
     val abrMonedaSecundaria: String? = null,
+    val sucursal: String = "",
+    val caja: String = "",
+    val vendedor: String = "",
+    val codVendedor: String = "",
+    val codEstatus: Int = 1,
 )
 
 @Serializable
@@ -232,6 +259,10 @@ data class FacturaDetalleItemDto(
     val totalConIva: Double = 0.0,
     val codigo: String = "",
     val referencia: String = "",
+    val idItem: Int? = null,
+    val impuestoTasa: Double? = null,
+    val descuento: Double? = null,
+    val unidad: String? = null,
 )
 
 @Serializable
@@ -239,6 +270,10 @@ data class FacturaDetalleResponseDto(
     val idFactura: String,
     val codFactura: String,
     val items: List<FacturaDetalleItemDto> = emptyList(),
+    val idCliente: String? = null,
+    val clienteNombre: String? = null,
+    val clienteIdentificacion: String? = null,
+    val codVendedor: Int? = null,
 )
 
 @Serializable

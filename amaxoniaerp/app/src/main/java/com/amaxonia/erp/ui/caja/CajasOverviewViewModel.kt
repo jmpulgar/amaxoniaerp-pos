@@ -2,6 +2,9 @@ package com.amaxonia.erp.ui.caja
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.erp.composition.DependencyContainer
+import com.amaxonia.erp.data.local.LocalStore
+import com.amaxonia.erp.data.remote.dto.FormaPagoDto
 import com.amaxonia.erp.domain.model.AperturaRequest
 import com.amaxonia.erp.domain.model.Caja
 import com.amaxonia.erp.domain.model.CajaSecuencia
@@ -11,6 +14,7 @@ import com.amaxonia.erp.domain.model.CierreCajaSummary
 import com.amaxonia.erp.domain.model.SaveCajaRequest
 import com.amaxonia.erp.domain.model.Sucursal
 import com.amaxonia.erp.domain.repository.CajaRepository
+import com.amaxonia.erp.domain.repository.SalesRepository
 import com.amaxonia.erp.domain.repository.SucursalRepository
 import com.amaxonia.erp.domain.util.CajaDateParser
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,11 +49,17 @@ data class CajasOverviewState(
     val cajaFormError: String? = null,
     val sucursales: List<Sucursal> = emptyList(),
     val cajasStatusMap: Map<String, CajaStatusBadgeInfo> = emptyMap(),
+    val paymentMethods: List<FormaPagoDto> = emptyList(),
+    val baseUrl: String = "",
+    val countryCode: String = "PA",
+    val companyDb: String = "",
 )
 
 class CajasOverviewViewModel(
     private val cajaRepository: CajaRepository,
     private val sucursalRepository: SucursalRepository? = null,
+    private val salesRepository: SalesRepository? = null,
+    private val localStore: LocalStore? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CajasOverviewState())
     val state: StateFlow<CajasOverviewState> = _state.asStateFlow()
@@ -62,6 +72,10 @@ class CajasOverviewViewModel(
     fun loadCajas() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
+            val session = localStore?.readCompanySession()
+            val baseUrl = try { DependencyContainer.apiService.baseUrl.trimEnd('/') } catch (_: Exception) { "" }
+            val countryCode = session?.company?.countryCode?.ifBlank { "PA" } ?: "PA"
+            val companyDb = session?.company?.adminDb.orEmpty()
             val savedActive = cajaRepository.getActiveCaja()
             cajaRepository.getCajas().fold(
                 onSuccess = { list ->
@@ -89,6 +103,9 @@ class CajasOverviewViewModel(
                             cajas = list,
                             activeCaja = chosen,
                             cajasStatusMap = statusMap,
+                            baseUrl = baseUrl,
+                            countryCode = countryCode,
+                            companyDb = companyDb,
                         )
                     }
                     if (chosen != null) {
@@ -200,12 +217,14 @@ class CajasOverviewViewModel(
     fun openCierreDialog() {
         _state.update { it.copy(isCierreDialogOpen = true, isLoadingSummary = true, cierreSummary = null) }
         viewModelScope.launch {
+            val paymentMethods = salesRepository?.getFormasPago(_state.value.activeCaja?.idCaja)?.getOrNull().orEmpty()
             cajaRepository.getCierreSummary().fold(
                 onSuccess = { summary ->
                     _state.update {
                         it.copy(
                             isLoadingSummary = false,
                             cierreSummary = summary,
+                            paymentMethods = paymentMethods.ifEmpty { it.paymentMethods },
                         )
                     }
                 },
@@ -223,6 +242,35 @@ class CajasOverviewViewModel(
 
     fun closeCierreDialog() {
         _state.update { it.copy(isCierreDialogOpen = false, cierreSummary = null) }
+    }
+
+    fun aperturarCaja(request: AperturaRequest) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            cajaRepository.openCaja(request).fold(
+                onSuccess = { res ->
+                    closeAperturaDialog()
+                    val rawFecha = res.cajaSecuencia?.fechaApertura
+                    val formattedFecha = rawFecha?.let(CajaDateParser::formatDisplayDate)
+                    val isDiaAnterior = res.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            isCajaOpen = res.isOpen,
+                            activeSecuencia = res.cajaSecuencia,
+                            cajaFechaApertura = formattedFecha,
+                            isCajaDiaAnterior = isDiaAnterior,
+                            showAvisoCajaAnterior = isDiaAnterior,
+                            error = null,
+                        )
+                    }
+                    loadCajas()
+                },
+                onFailure = { err ->
+                    _state.update { it.copy(isLoading = false, error = err.message ?: "Error al aperturar caja") }
+                },
+            )
+        }
     }
 
     fun aperturarCaja(monto: Double) {
@@ -305,6 +353,34 @@ class CajasOverviewViewModel(
                             error = "Error al renovar caja: ${err.message}",
                         )
                     }
+                },
+            )
+        }
+    }
+
+    fun cerrarCaja(request: CierreCajaRequest) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            cajaRepository.closeCaja(request).fold(
+                onSuccess = {
+                    cajaRepository.markSequenceClosed()
+                    closeCierreDialog()
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            isCajaOpen = false,
+                            activeSecuencia = null,
+                            cajaFechaApertura = null,
+                            isCajaDiaAnterior = false,
+                            showAvisoCajaAnterior = false,
+                            cierreSummary = null,
+                            error = null,
+                        )
+                    }
+                    loadCajas()
+                },
+                onFailure = { err ->
+                    _state.update { it.copy(isLoading = false, error = err.message ?: "Error al cerrar caja") }
                 },
             )
         }

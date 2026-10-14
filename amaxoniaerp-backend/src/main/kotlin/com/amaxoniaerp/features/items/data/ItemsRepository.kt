@@ -7,6 +7,9 @@ import com.amaxoniaerp.features.items.domain.ItemLotsResponse
 import com.amaxoniaerp.features.items.domain.ItemStockByWarehouse
 import com.amaxoniaerp.features.items.domain.ItemStockResponse
 import com.amaxoniaerp.features.items.domain.Product
+import com.amaxoniaerp.features.items.domain.ProductOptionGroupResponse
+import com.amaxoniaerp.features.items.domain.ProductOptionItemResponse
+import com.amaxoniaerp.features.items.domain.ProductOptionsResponse
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
@@ -104,7 +107,7 @@ class ItemsRepository {
                     .offset(query.offset)
                     .map { row -> mapRowToProduct(row, countryCode) }
 
-            data to total
+            enrichWithCombos(data) to total
         }
 
     suspend fun getItemsByIds(
@@ -117,10 +120,12 @@ class ItemsRepository {
         } else {
             dbQuery(database) {
                 val table = ItemsTableFactory.getTableForCountry(countryCode)
-                table
-                    .selectAll()
-                    .andWhere { table.idItem inList ids }
-                    .map { row -> mapRowToProduct(row, countryCode) }
+                val items =
+                    table
+                        .selectAll()
+                        .andWhere { table.idItem inList ids }
+                        .map { row -> mapRowToProduct(row, countryCode) }
+                enrichWithCombos(items)
             }
         }
 
@@ -132,12 +137,52 @@ class ItemsRepository {
         dbQuery(database) {
             val table = ItemsTableFactory.getTableForCountry(countryCode)
 
-            table
-                .selectAll()
-                .andWhere { table.idItem eq id }
-                .map { row -> mapRowToProduct(row, countryCode) }
-                .singleOrNull()
+            val items =
+                table
+                    .selectAll()
+                    .andWhere { table.idItem eq id }
+                    .map { row -> mapRowToProduct(row, countryCode) }
+            enrichWithCombos(items).singleOrNull()
         }
+
+    private fun enrichWithCombos(products: List<Product>): List<Product> {
+        if (products.isEmpty()) return products
+        val itemIds = products.mapNotNull { it.id.toIntOrNull() }
+        val combosByItemId =
+            if (itemIds.isNotEmpty()) {
+                runCatching {
+                    val idsClause = itemIds.joinToString(",")
+                    TransactionManager.current().exec(
+                        "SELECT id_item, id_combo FROM item_combos WHERE id_item IN ($idsClause)",
+                    ) { rs ->
+                        val map = mutableMapOf<Int, Int>()
+                        while (rs.next()) {
+                            map[rs.getInt("id_item")] = rs.getInt("id_combo")
+                        }
+                        map
+                    } ?: emptyMap()
+                }.getOrElse { emptyMap() }
+            } else {
+                emptyMap()
+            }
+
+        return products.map { prod ->
+            val intId = prod.id.toIntOrNull()
+            val comboId = intId?.let { combosByItemId[it] }
+            if (comboId != null) {
+                prod.copy(
+                    poseeProductoCombo = "si",
+                    idCombo = comboId.toString(),
+                )
+            } else if (prod.tipoArticulo.equals("C", ignoreCase = true)) {
+                prod.copy(
+                    poseeProductoCombo = "si",
+                )
+            } else {
+                prod
+            }
+        }
+    }
 
     suspend fun createItem(
         database: Database,
@@ -241,6 +286,313 @@ class ItemsRepository {
                 poseeConfiguracionLote = true,
                 lotes = lots,
             )
+        }
+
+    suspend fun resolveItemIdByCode(
+        database: Database,
+        code: String,
+    ): Int? =
+        dbQuery(database) {
+            runCatching {
+                val escaped = code.replace("'", "''")
+                TransactionManager.current().exec(
+                    "SELECT id_item FROM item WHERE cod_item = '$escaped' LIMIT 1",
+                ) { rs ->
+                    if (rs.next()) rs.getInt("id_item") else null
+                }
+            }.getOrNull()
+        }
+
+    suspend fun getItemOptions(
+        database: Database,
+        itemId: Int,
+        almacenId: Int? = null,
+    ): ProductOptionsResponse =
+        dbQuery(database) {
+            val idCombo = resolveComboId(itemId)
+            if (idCombo == null) {
+                return@dbQuery ProductOptionsResponse(
+                    success = true,
+                    idCombo = null,
+                    grupos = emptyList(),
+                )
+            }
+
+            val groupCols = getTableColumns("grupos")
+            val itemCols = getTableColumns("grupo_items")
+            if (groupCols.isEmpty() || itemCols.isEmpty()) {
+                return@dbQuery ProductOptionsResponse(
+                    success = true,
+                    idCombo = idCombo.toString(),
+                    grupos = emptyList(),
+                )
+            }
+
+            val grupos = queryComboGroups(idCombo, groupCols)
+            val adicionaByGroup = grupos.associate { (it["id_grupo"] as String) to (it["_adiciona"] as? Int ?: 0) }
+            val stockByItem = queryStockByItem(almacenId)
+            val itemsByGrupo = queryGroupOptions(idCombo, itemCols, adicionaByGroup, stockByItem, almacenId)
+
+            val gruposConOpciones =
+                grupos
+                    .map { g ->
+                        val idGrp = g["id_grupo"] as String
+                        val optionsList = itemsByGrupo[idGrp] ?: emptyList()
+                        val nombreVal = g["nombre"] as? String ?: ""
+                        ProductOptionGroupResponse(
+                            idGrupo = idGrp,
+                            tipo = g["tipo"] as? String ?: "COMBO",
+                            nombre = nombreVal,
+                            nombreGrupo = nombreVal,
+                            minimo = g["minimo"] as? Int ?: 0,
+                            maximo = g["maximo"] as? Int ?: 1,
+                            maximoVeces = g["maximo"] as? Int ?: 1,
+                            adiciona = g["_adiciona"] as? Int ?: 0,
+                            opciones = optionsList,
+                            items = optionsList,
+                        )
+                    }.filter { it.opciones.isNotEmpty() }
+
+            ProductOptionsResponse(
+                success = true,
+                idCombo = idCombo.toString(),
+                grupos = gruposConOpciones,
+            )
+        }
+
+    private fun resolveComboId(itemId: Int): Int? =
+        runCatching {
+            TransactionManager.current().exec(
+                "SELECT id_combo FROM item_combos WHERE id_item = $itemId ORDER BY id_item_combo LIMIT 1",
+            ) { rs ->
+                if (rs.next()) rs.getInt("id_combo") else null
+            }
+        }.getOrNull() ?: runCatching {
+            val idPadre =
+                TransactionManager.current().exec(
+                    "SELECT id_item_padre FROM item WHERE id_item = $itemId",
+                ) { rs ->
+                    if (rs.next()) rs.getInt("id_item_padre").takeIf { !rs.wasNull() && it > 0 } else null
+                }
+            if (idPadre != null) {
+                TransactionManager.current().exec(
+                    "SELECT id_combo FROM item_combos WHERE id_item = $idPadre ORDER BY id_item_combo LIMIT 1",
+                ) { rs ->
+                    if (rs.next()) rs.getInt("id_combo") else null
+                }
+            } else {
+                null
+            }
+        }.getOrNull()
+
+    private fun getTableColumns(tableName: String): Set<String> =
+        runCatching {
+            TransactionManager.current().exec("SELECT * FROM $tableName WHERE 1 = 0") { rs ->
+                val md = rs.metaData
+                (1..md.columnCount).map { md.getColumnLabel(it).lowercase() }.toSet()
+            }
+        }.getOrNull() ?: emptySet()
+
+    private fun queryComboGroups(
+        idCombo: Int,
+        groupCols: Set<String>,
+    ): List<MutableMap<String, Any?>> {
+        val hasTipo = "tipo" in groupCols
+        val hasMinimo = "minimo" in groupCols
+        val hasOrden = "orden" in groupCols
+        val hasAdiciona = "adiciona" in groupCols
+        val hasMaximo = "maximo_veces" in groupCols
+
+        val grupoFields =
+            buildList {
+                add("id_grupo")
+                add("nombre_grupo")
+                if (hasMaximo) add("maximo_veces")
+                if (hasAdiciona) add("adiciona")
+                if (hasTipo) add("tipo")
+                if (hasMinimo) add("minimo")
+                if (hasOrden) add("orden")
+            }
+        val orderBy = if (hasOrden) "ORDER BY orden, id_grupo" else "ORDER BY id_grupo"
+        val sqlGrupos = "SELECT ${grupoFields.joinToString(", ")} FROM grupos WHERE id_combo = $idCombo $orderBy"
+
+        return runCatching {
+            TransactionManager.current().exec(sqlGrupos) { rs ->
+                val list = mutableListOf<MutableMap<String, Any?>>()
+                while (rs.next()) {
+                    val tipoVal =
+                        if (hasTipo) {
+                            rs
+                                .getString("tipo")
+                                ?.trim()
+                                ?.uppercase()
+                                ?.takeIf { it.isNotEmpty() } ?: "COMBO"
+                        } else {
+                            "COMBO"
+                        }
+                    val maxVal = if (hasMaximo) rs.getInt("maximo_veces").coerceAtLeast(1) else 1
+                    val minVal = if (hasMinimo) rs.getInt("minimo") else (if (tipoVal == "COMBO") 1 else 0)
+                    val adicionaVal = if (hasAdiciona) rs.getInt("adiciona") else 0
+
+                    list.add(
+                        mutableMapOf(
+                            "id_grupo" to rs.getInt("id_grupo").toString(),
+                            "tipo" to tipoVal,
+                            "nombre" to (rs.getString("nombre_grupo") ?: "").trim(),
+                            "minimo" to minVal,
+                            "maximo" to maxVal,
+                            "_adiciona" to adicionaVal,
+                        ),
+                    )
+                }
+                list
+            }
+        }.getOrNull() ?: emptyList()
+    }
+
+    private fun queryStockByItem(almacenId: Int?): Map<Int, Double> {
+        if (almacenId == null || almacenId <= 0) return emptyMap()
+        return runCatching {
+            TransactionManager.current().exec(
+                "SELECT id_item, SUM(cantidad) AS stock FROM item_existencia_almacen " +
+                    "WHERE cod_almacen = $almacenId GROUP BY id_item",
+            ) { rs ->
+                val map = mutableMapOf<Int, Double>()
+                while (rs.next()) {
+                    map[rs.getInt("id_item")] = rs.getDouble("stock")
+                }
+                map
+            } ?: emptyMap()
+        }.getOrElse { emptyMap() }
+    }
+
+    private fun queryGroupOptions(
+        idCombo: Int,
+        itemCols: Set<String>,
+        adicionaByGroup: Map<String, Int>,
+        stockByItem: Map<Int, Double>,
+        almacenId: Int?,
+    ): Map<String, List<ProductOptionItemResponse>> {
+        val hasNombre = "nombre" in itemCols
+        val hasPrecio = "precio" in itemCols
+        val hasCantidad = "cantidad" in itemCols
+        val hasPorDefecto = "por_defecto" in itemCols
+        val hasItemOrden = "orden" in itemCols
+        val hasIdItem = "id_item" in itemCols
+
+        val itemFields =
+            buildList {
+                add("gi.id_grupo_item")
+                add("gi.id_grupo")
+                if (hasIdItem) add("gi.id_item")
+                if (hasNombre) add("gi.nombre")
+                if (hasPrecio) add("gi.precio")
+                if (hasCantidad) add("gi.cantidad")
+                if (hasPorDefecto) add("gi.por_defecto")
+                if (hasItemOrden) add("gi.orden")
+                add("i.descripcion1")
+                add("i.cod_item")
+                add("i.coniva1")
+                add("i.precio1")
+                add("i.estatus")
+                add("i.foto")
+                add("i.foto1")
+            }
+        val itemOrderBy = if (hasItemOrden) "ORDER BY gi.orden, gi.id_grupo_item" else "ORDER BY gi.id_grupo_item"
+        val sqlItems =
+            """
+            SELECT ${itemFields.joinToString(", ")}
+            FROM grupo_items gi
+            JOIN grupos g ON g.id_grupo = gi.id_grupo
+            LEFT JOIN item i ON i.id_item = gi.id_item
+            WHERE g.id_combo = $idCombo $itemOrderBy
+            """.trimIndent()
+
+        return runCatching {
+            TransactionManager.current().exec(sqlItems) { rs ->
+                val map = mutableMapOf<String, MutableList<ProductOptionItemResponse>>()
+                while (rs.next()) {
+                    val entry = mapOptionRow(rs, itemCols, adicionaByGroup, stockByItem, almacenId)
+                    if (entry != null) {
+                        map.getOrPut(entry.first) { mutableListOf() }.add(entry.second)
+                    }
+                }
+                map
+            }
+        }.getOrNull() ?: emptyMap()
+    }
+
+    private fun mapOptionRow(
+        rs: java.sql.ResultSet,
+        itemCols: Set<String>,
+        adicionaByGroup: Map<String, Int>,
+        stockByItem: Map<Int, Double>,
+        almacenId: Int?,
+    ): Pair<String, ProductOptionItemResponse>? {
+        val idGrp = rs.getInt("id_grupo").toString()
+        val optIdItem = if ("id_item" in itemCols) rs.getInt("id_item").takeIf { !rs.wasNull() && it > 0 } else null
+
+        val name = if ("nombre" in itemCols) rs.getString("nombre")?.trim()?.takeIf { it.isNotEmpty() } else null
+        val resolvedName = name ?: rs.getString("descripcion1").orEmpty().trim()
+        if (resolvedName.isEmpty() && optIdItem == null) return null
+
+        val rawPrice = if ("precio" in itemCols) rs.getObject("precio") else null
+        val optAdiciona = adicionaByGroup[idGrp] ?: 0
+        val resolvedPrice = resolveOptionPrice(rawPrice, optAdiciona, rs)
+
+        val qty =
+            if ("cantidad" in itemCols) {
+                val q = rs.getObject("cantidad")
+                if (q != null) (q as? Number)?.toDouble() ?: 1.0 else 1.0
+            } else {
+                1.0
+            }
+
+        val defaultVal = if ("por_defecto" in itemCols) rs.getInt("por_defecto") else 0
+        val agotado =
+            if (almacenId != null && almacenId > 0 && optIdItem != null) {
+                val stock = stockByItem[optIdItem] ?: 0.0
+                if (stock <= 0.0) 1 else 0
+            } else {
+                0
+            }
+
+        val fotoPath =
+            rs.getString("foto")?.takeIf { it.isNotBlank() }
+                ?: rs.getString("foto1")?.takeIf { it.isNotBlank() }
+
+        val opt =
+            ProductOptionItemResponse(
+                idGrupoItem = rs.getInt("id_grupo_item").toString(),
+                idItem = optIdItem?.toString(),
+                codItem = rs.getString("cod_item").orEmpty(),
+                nombre = resolvedName,
+                nombreOpcion = resolvedName,
+                descripcion1 = rs.getString("descripcion1"),
+                precio = resolvedPrice,
+                precioExtra = resolvedPrice,
+                coniva1 = rs.getDouble("coniva1"),
+                cantidad = qty,
+                porDefecto = defaultVal,
+                agotado = agotado,
+                foto = fotoPath,
+                foto1 = rs.getString("foto1"),
+            )
+        return idGrp to opt
+    }
+
+    private fun resolveOptionPrice(
+        rawPrice: Any?,
+        optAdiciona: Int,
+        rs: java.sql.ResultSet,
+    ): Double =
+        if (rawPrice != null) {
+            (rawPrice as? Number)?.toDouble() ?: rs.getDouble("precio")
+        } else if (optAdiciona == 1) {
+            val coniva = rs.getDouble("coniva1")
+            if (coniva > 0.0) coniva else rs.getDouble("precio1")
+        } else {
+            0.0
         }
 }
 

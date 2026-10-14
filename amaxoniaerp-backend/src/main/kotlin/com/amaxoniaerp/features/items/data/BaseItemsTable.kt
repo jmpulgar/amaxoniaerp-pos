@@ -138,6 +138,7 @@ abstract class BaseItemsTable(
     val unidadOEmpaque = varchar("unidad_o_empaque", S.VARCHAR_LENGTH_40).nullable()
     val cantidad = integer("cantidad").default(0)
     val tipoItem = varchar("tipo_item", S.VARCHAR_LENGTH_50).nullable()
+    val tipoArticulo = varchar("tipo_articulo", 1).nullable()
     val ubicacion1 = varchar("ubicacion1", S.VARCHAR_LENGTH_50).nullable()
     val ubicacion2 = varchar("ubicacion2", S.VARCHAR_LENGTH_50).nullable()
     val ubicacion3 = varchar("ubicacion3", S.VARCHAR_LENGTH_50).nullable()

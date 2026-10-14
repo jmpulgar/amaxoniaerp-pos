@@ -50,6 +50,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Warning
+import com.amaxonia.erp.ui.caja.CajaAperturaModal
+import com.amaxonia.erp.ui.caja.CajaCierreModal
+import com.amaxonia.erp.ui.caja.CajaOptionsModal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -140,9 +143,13 @@ import com.amaxonia.erp.ui.pos.components.PosTopControlsSection
 import com.amaxonia.erp.ui.pos.components.PosTotalsActionCards
 import com.amaxonia.erp.ui.pos.components.PosWebFooterBar
 import com.amaxonia.erp.ui.pos.components.PosWebHeaderBar
+import com.amaxonia.erp.ui.pos.components.ProductOptionsDialog
 import com.amaxonia.erp.ui.pos.components.ProductSelectionDialog
+import com.amaxonia.erp.ui.pos.components.BuscarFacturasModal
 import com.amaxonia.erp.ui.pos.components.ClientSelectionDialog
 import com.amaxonia.erp.ui.pos.components.SellerSelectionDialog
+import com.amaxonia.erp.ui.pos.components.FlowCatalogTokens
+import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
@@ -166,6 +173,24 @@ fun PosTerminalScreen(
     var editTarget by remember { mutableStateOf<CartEditTarget?>(null) }
     var editingItem by remember { mutableStateOf<CartItem?>(null) }
     var editValueText by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+
+    LaunchedEffect(state.printFeedbackMessage) {
+        val msg = state.printFeedbackMessage
+        if (!msg.isNullOrBlank() && state.completedSaleInvoice == null) {
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearPrintFeedback()
+        }
+    }
+
+    LaunchedEffect(state.errorMessage) {
+        val err = state.errorMessage
+        if (!err.isNullOrBlank()) {
+            android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearErrorMessage()
+        }
+    }
 
     Box(
         modifier =
@@ -211,8 +236,8 @@ fun PosTerminalScreen(
                 onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
                 onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
                 onSelectBranch = viewModel::selectClientBranch,
-                onNavigateToCajas = onNavigateToCajas,
-                onRenovarCaja = viewModel::renovarCajaDiaAnterior,
+                onNavigateToCajas = { viewModel.openCajaOptions() },
+                onRenovarCaja = viewModel::openCajaCierre,
                 onToggleCatalog = viewModel::toggleCatalogDrawer,
                 onCloseCatalog = { viewModel.setCatalogDrawerOpen(false) },
                 onAddProductByCode = { code -> viewModel.addProductByCode(code) },
@@ -221,6 +246,8 @@ fun PosTerminalScreen(
                 onDocumentTypeSelected = viewModel::onDocumentTypeSelected,
                 onPrintReceipt = { viewModel.printReceipt() },
                 onOpenDrawer = onOpenDrawer,
+                onSaveDraft = viewModel::savePendingInvoice,
+                onSearchInvoices = viewModel::openSearchInvoicesModal,
                 onNextPage = viewModel::onCatalogNextPage,
                 onPrevPage = viewModel::onCatalogPrevPage,
                 modifier = Modifier.fillMaxSize(),
@@ -265,8 +292,8 @@ fun PosTerminalScreen(
                 onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
                 onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
                 onSelectBranch = viewModel::selectClientBranch,
-                onNavigateToCajas = onNavigateToCajas,
-                onRenovarCaja = viewModel::renovarCajaDiaAnterior,
+                onNavigateToCajas = { viewModel.openCajaOptions() },
+                onRenovarCaja = viewModel::openCajaCierre,
                 onToggleCatalog = viewModel::toggleCatalogDrawer,
                 onCloseCatalog = { viewModel.setCatalogDrawerOpen(false) },
                 onAddProductByCode = { code -> viewModel.addProductByCode(code) },
@@ -275,6 +302,8 @@ fun PosTerminalScreen(
                 onDocumentTypeSelected = viewModel::onDocumentTypeSelected,
                 onPrintReceipt = { viewModel.printReceipt() },
                 onOpenDrawer = onOpenDrawer,
+                onSaveDraft = viewModel::savePendingInvoice,
+                onSearchInvoices = viewModel::openSearchInvoicesModal,
                 onNextPage = viewModel::onCatalogNextPage,
                 onPrevPage = viewModel::onCatalogPrevPage,
                 modifier = Modifier.fillMaxSize(),
@@ -321,9 +350,49 @@ fun PosTerminalScreen(
     if (state.showAvisoCajaAnterior) {
         com.amaxonia.erp.ui.caja.AvisoCajaAnteriorDialog(
             fechaApertura = state.cajaFechaApertura,
-            isRenovando = state.isRenovandoCaja,
+            isRenovando = state.isLoadingCierreSummary || state.isSubmittingCajaOperation,
             onDismiss = viewModel::dismissAvisoCajaAnterior,
-            onRenovar = viewModel::renovarCajaDiaAnterior,
+            onRenovar = viewModel::openCajaCierre,
+        )
+    }
+
+    if (state.showCajaOptionsModal) {
+        CajaOptionsModal(
+            onDismiss = viewModel::dismissCajaOptions,
+            onSelectApertura = viewModel::openCajaApertura,
+            onSelectCierre = viewModel::openCajaCierre,
+            isCajaOpen = state.isCajaOpen,
+        )
+    }
+
+    if (state.showCajaAperturaModal) {
+        CajaAperturaModal(
+            activeCaja = state.activeCajaObj,
+            availableSellers = state.availableSellers,
+            currentSeller = state.selectedSeller,
+            isLoading = state.isSubmittingCajaOperation,
+            errorMessage = state.cajaOperationError,
+            baseUrl = state.apiBaseUrl,
+            countryCode = state.countryCode,
+            companyDb = state.companyDb,
+            onDismiss = viewModel::dismissCajaApertura,
+            onConfirmApertura = viewModel::confirmApertura,
+        )
+    }
+
+    if (state.showCajaCierreModal) {
+        CajaCierreModal(
+            activeCaja = state.activeCajaObj,
+            summary = state.cierreSummary,
+            isLoadingSummary = state.isLoadingCierreSummary,
+            isSubmitting = state.isSubmittingCajaOperation,
+            errorMessage = state.cajaOperationError,
+            baseUrl = state.apiBaseUrl,
+            countryCode = state.countryCode,
+            companyDb = state.companyDb,
+            paymentMethods = state.paymentMethods,
+            onDismiss = viewModel::dismissCajaCierre,
+            onConfirmCierre = viewModel::confirmCierre,
         )
     }
 
@@ -392,6 +461,19 @@ fun PosTerminalScreen(
         )
     }
 
+    state.optionsProduct?.let { product ->
+        ProductOptionsDialog(
+            product = product,
+            groups = state.optionsGroups,
+            isLoading = state.isLoadingOptions,
+            errorMessage = state.optionsErrorMessage,
+            onDismiss = viewModel::dismissProductOptions,
+            onConfirm = { options, qty ->
+                viewModel.confirmProductOptions(product, options, qty)
+            },
+        )
+    }
+
     if (state.showPromotionChoice && state.pendingPromotionProduct != null) {
         PromotionChoiceSheet(
             product = state.pendingPromotionProduct!!,
@@ -427,6 +509,23 @@ fun PosTerminalScreen(
             },
         )
     }
+
+    BuscarFacturasModal(
+        isOpen = state.showSearchInvoicesModal,
+        onDismiss = viewModel::closeSearchInvoicesModal,
+        invoices = state.savedInvoices,
+        isLoading = state.isLoadingSavedInvoices,
+        searchQuery = state.savedInvoicesSearchQuery,
+        onSearchQueryChange = viewModel::setSavedInvoicesSearchQuery,
+        selectedFilter = state.savedInvoicesFilter,
+        onFilterChange = viewModel::setSavedInvoicesFilter,
+        onRefresh = viewModel::loadSavedInvoices,
+        onSelectRestore = viewModel::onSelectSavedInvoiceToRestore,
+        showConfirmRestoreDialog = state.showConfirmRestoreDialog,
+        invoicePendingRestore = state.invoicePendingRestore,
+        onConfirmRestore = viewModel::confirmRestoreInvoice,
+        onDismissConfirmRestore = viewModel::dismissConfirmRestoreDialog,
+    )
 }
 
 /**
@@ -471,6 +570,8 @@ private fun PosTerminalLandscapeLayout(
     onDocumentTypeSelected: (String) -> Unit,
     onPrintReceipt: () -> Unit,
     onOpenDrawer: () -> Unit = {},
+    onSaveDraft: () -> Unit = {},
+    onSearchInvoices: () -> Unit = {},
     onNextPage: () -> Unit = {},
     onPrevPage: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -482,13 +583,13 @@ private fun PosTerminalLandscapeLayout(
     ) {
         // Cabecera Web azul Flow ERP (44dp compacta)
         PosWebHeaderBar(
-            correlativo = state.completedSaleInvoice ?: "#001-00112",
+            correlativo = state.heldInvoiceCode ?: state.completedSaleInvoice ?: "#001-00112",
             cartItemCount = state.summary.itemCount,
             isCatalogOpen = state.isCatalogDrawerOpen,
             onOpenDrawer = onOpenDrawer,
             onClearCart = onClearCart,
-            onSaveDraft = { /* Guardar borrador */ },
-            onSearchInvoices = { /* Buscar documento */ },
+            onSaveDraft = onSaveDraft,
+            onSearchInvoices = onSearchInvoices,
             onPrintReceipt = onPrintReceipt,
             onToggleCatalog = onToggleCatalog,
         )
@@ -635,6 +736,8 @@ private fun PosTerminalPortraitLayout(
     onDocumentTypeSelected: (String) -> Unit,
     onPrintReceipt: () -> Unit,
     onOpenDrawer: () -> Unit = {},
+    onSaveDraft: () -> Unit = {},
+    onSearchInvoices: () -> Unit = {},
     onNextPage: () -> Unit = {},
     onPrevPage: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -646,13 +749,13 @@ private fun PosTerminalPortraitLayout(
     ) {
         // Cabecera Web azul Flow ERP
         PosWebHeaderBar(
-            correlativo = state.completedSaleInvoice ?: "#001-00112",
+            correlativo = state.heldInvoiceCode ?: state.completedSaleInvoice ?: "#001-00112",
             cartItemCount = state.summary.itemCount,
             isCatalogOpen = selectedTab == 0,
             onOpenDrawer = onOpenDrawer,
             onClearCart = onClearCart,
-            onSaveDraft = { },
-            onSearchInvoices = { },
+            onSaveDraft = onSaveDraft,
+            onSearchInvoices = onSearchInvoices,
             onPrintReceipt = onPrintReceipt,
             onToggleCatalog = {
                 onTabSelected(if (selectedTab == 0) 1 else 0)
@@ -1072,37 +1175,99 @@ private fun CatalogTab(
                     ),
             )
 
-            // Chips de filtro por departamento
+            // Chips de filtro por departamento (.rest-cat)
             if (state.departments.isNotEmpty()) {
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    FilterChip(
-                        selected = state.selectedDepartmentId == null,
-                        onClick = { onDepartmentSelected(null) },
-                        label = { Text("Todos") },
-                        colors =
-                            FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = PosPalette.FixedWhite,
-                            ),
-                    )
+                    val todosColor = FlowCatalogTokens.ColorTodos
+                    Box(
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .then(
+                                if (state.selectedDepartmentId == null) {
+                                    Modifier
+                                        .background(todosColor.accent)
+                                        .border(1.dp, todosColor.accent, RoundedCornerShape(10.dp))
+                                } else {
+                                    Modifier
+                                        .background(Color.White)
+                                        .border(1.dp, FlowCatalogTokens.Line, RoundedCornerShape(10.dp))
+                                },
+                            )
+                            .clickable { onDepartmentSelected(null) }
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (state.selectedDepartmentId != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 4.dp, height = 14.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(todosColor.accent),
+                                )
+                            }
+                            Text(
+                                text = "Todos",
+                                fontSize = 12.sp,
+                                fontWeight = if (state.selectedDepartmentId == null) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (state.selectedDepartmentId == null) Color.White else FlowCatalogTokens.Ink,
+                            )
+                        }
+                    }
+
                     state.departments.forEach { dept ->
-                        FilterChip(
-                            selected = state.selectedDepartmentId == dept.id,
-                            onClick = { onDepartmentSelected(dept.id) },
-                            label = { Text(dept.name) },
-                            colors =
-                                FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = PosPalette.FixedWhite,
-                                ),
-                        )
+                        val catColor = FlowCatalogTokens.getColorForDepartment(dept.id, state.departments)
+                        val isSelected = state.selectedDepartmentId == dept.id
+                        Box(
+                            modifier = Modifier
+                                .height(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .then(
+                                    if (isSelected) {
+                                        Modifier
+                                            .background(catColor.accent)
+                                            .border(1.dp, catColor.accent, RoundedCornerShape(10.dp))
+                                    } else {
+                                        Modifier
+                                            .background(Color.White)
+                                            .border(1.dp, FlowCatalogTokens.Line, RoundedCornerShape(10.dp))
+                                    },
+                                )
+                                .clickable { onDepartmentSelected(dept.id) }
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                if (!isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 4.dp, height = 14.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(catColor.accent),
+                                    )
+                                }
+                                Text(
+                                    text = dept.displayName,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (isSelected) Color.White else FlowCatalogTokens.Ink,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1110,7 +1275,7 @@ private fun CatalogTab(
             // Cuadrícula de productos
             if (state.isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    CircularProgressIndicator(color = FlowCatalogTokens.Brand)
                 }
             } else if (state.filteredProducts.isEmpty()) {
                 Box(
@@ -1135,8 +1300,10 @@ private fun CatalogTab(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(state.filteredProducts, key = { it.id }) { product ->
+                        val catColor = FlowCatalogTokens.getColorForProduct(product.department, state.departments)
                         ProductGridItem(
                             product = product,
+                            catColor = catColor,
                             onAddToCart = { onAddToCart(product) },
                             onQuantityClick = { onQuantityPicker(product) },
                         )
@@ -1169,30 +1336,41 @@ private fun CatalogTab(
 @Composable
 private fun ProductGridItem(
     product: Product,
+    catColor: FlowCatalogTokens.CategoryColor = FlowCatalogTokens.ColorTodos,
     onAddToCart: () -> Unit,
     onQuantityClick: () -> Unit,
 ) {
+    val initialLetter = product.description.trim().firstOrNull()?.uppercase() ?: "P"
+
     Card(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .height(240.dp),
-        shape = PosExtraShapes.CardRadius,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, FlowCatalogTokens.Line),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
-            // Contenedor de Imagen o Icono flexible (weight 1f)
+        Column(modifier = Modifier.padding(10.dp).fillMaxSize()) {
+            // Contenedor de Imagen o Icono flexible (weight 1f) teñido con el fondo suave de la categoría
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(catColor.softBg),
                 contentAlignment = Alignment.Center,
             ) {
+                // Letra inicial grande como marca de agua (.rest-prod__img::before)
+                Text(
+                    text = initialLetter,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = catColor.accent.copy(alpha = 0.55f),
+                )
+
                 if (product.photoUrl.isNotBlank()) {
                     AsyncImage(
                         model =
@@ -1202,14 +1380,7 @@ private fun ProductGridItem(
                                 .build(),
                         contentDescription = product.description,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = MaterialTheme.colorScheme.outline,
+                        contentScale = ContentScale.Crop,
                     )
                 }
 
@@ -1233,12 +1404,12 @@ private fun ProductGridItem(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = product.description,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = FlowCatalogTokens.Ink,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1246,7 +1417,7 @@ private fun ProductGridItem(
                 Text(
                     text = "Ref: ${product.code}",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = FlowCatalogTokens.Text2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp),
@@ -1260,7 +1431,7 @@ private fun ProductGridItem(
             AdaptiveAmountText(
                 text = "$${String.format(Locale.US, "%.2f", product.mainPrice)}",
                 baseStyle = PosTextStyles.priceTileLarge.copy(fontSize = 15.sp),
-                color = MaterialTheme.colorScheme.primary,
+                color = catColor.accent,
                 modifier = Modifier.fillMaxWidth(),
                 options = AdaptiveAmountOptions(minFontSizeSp = 12f, maxLines = 1),
             )
@@ -1277,12 +1448,12 @@ private fun ProductGridItem(
                     modifier =
                         Modifier
                             .size(36.dp)
-                            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp)),
+                            .background(catColor.softBg, RoundedCornerShape(8.dp)),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Elegir cantidad",
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = catColor.accent,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -1294,7 +1465,7 @@ private fun ProductGridItem(
                     modifier =
                         Modifier
                             .size(36.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)),
+                            .background(catColor.accent, RoundedCornerShape(8.dp)),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,

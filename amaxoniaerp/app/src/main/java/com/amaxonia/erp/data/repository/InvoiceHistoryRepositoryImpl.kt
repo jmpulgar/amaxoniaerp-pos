@@ -278,6 +278,11 @@ class InvoiceHistoryRepositoryImpl(
             formaPago = formaPago,
             totalRef = totalRef,
             abrMonedaSecundaria = abrMonedaSecundaria,
+            sucursal = sucursal,
+            caja = caja,
+            vendedor = vendedor,
+            codVendedor = codVendedor,
+            codEstatus = codEstatus,
         )
     }
 

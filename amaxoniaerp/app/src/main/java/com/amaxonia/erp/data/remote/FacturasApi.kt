@@ -34,6 +34,7 @@ suspend fun ApiService.getFacturas(
         filter.fechaInicio?.takeIf(String::isNotBlank)?.let { parameter("fecha_inicio", it) }
         filter.fechaFin?.takeIf(String::isNotBlank)?.let { parameter("fecha_fin", it) }
         filter.cajaId?.takeIf(String::isNotBlank)?.let { parameter("caja_id", it) }
+        filter.estatus?.takeIf(String::isNotBlank)?.let { parameter("estatus", it) }
     }.body()
 
 suspend fun ApiService.getFacturasResumen(
@@ -49,6 +50,7 @@ suspend fun ApiService.getFacturasResumen(
         filter.fechaInicio?.takeIf(String::isNotBlank)?.let { parameter("fecha_inicio", it) }
         filter.fechaFin?.takeIf(String::isNotBlank)?.let { parameter("fecha_fin", it) }
         filter.cajaId?.takeIf(String::isNotBlank)?.let { parameter("caja_id", it) }
+        filter.estatus?.takeIf(String::isNotBlank)?.let { parameter("estatus", it) }
     }.body()
 
 suspend fun ApiService.getFacturaDetalle(
@@ -103,4 +105,24 @@ suspend fun ApiService.resendElectronicInvoice(
         ?: (json as? JsonObject)?.get("message")?.jsonPrimitive?.content
         ?: "Error al reenviar factura electrónica"
     error(errorMsg)
+}
+
+suspend fun ApiService.anularFacturaPendiente(
+    token: String,
+    companyDb: String,
+    facturaId: String,
+) {
+    val response = client.post("facturas/$facturaId/anular-pendiente") {
+        header("Authorization", "Bearer $token")
+        header("Company-DB", companyDb)
+    }
+    if (response.status.value !in 200..299) {
+        val errorText = runCatching { response.bodyAsText() }.getOrNull()
+        val json = runCatching { AppJson.decodeFromString<JsonElement>(errorText.orEmpty()) }.getOrNull()
+        val errorMsg = (json as? JsonObject)?.get("error")?.jsonPrimitive?.content
+            ?: (json as? JsonObject)?.get("message")?.jsonPrimitive?.content
+            ?: errorText?.takeIf(String::isNotBlank)
+            ?: "Error al anular la factura pendiente"
+        error(errorMsg)
+    }
 }

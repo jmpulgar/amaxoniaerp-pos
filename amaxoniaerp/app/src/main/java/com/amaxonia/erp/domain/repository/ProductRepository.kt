@@ -22,11 +22,14 @@ interface ProductRepository {
     suspend fun createProduct(product: Product, departmentId: Int): Result<Product>
     suspend fun updateProduct(id: String, product: Product, departmentId: Int): Result<Product>
     suspend fun getDepartments(): Result<List<DepartmentDto>>
+    suspend fun getProductOptions(productId: String, almacenId: Int? = null): Result<List<com.amaxonia.erp.domain.model.ProductOptionGroup>> =
+        Result.success(emptyList())
 
     suspend fun getPagedProducts(
         page: Int = 1,
         pageSize: Int = 12,
         departmentId: Int? = null,
+        departmentIds: List<Int>? = null,
         search: String? = null,
     ): Result<PagedProducts> = runCatching {
         val trimmed = search?.trim().orEmpty()

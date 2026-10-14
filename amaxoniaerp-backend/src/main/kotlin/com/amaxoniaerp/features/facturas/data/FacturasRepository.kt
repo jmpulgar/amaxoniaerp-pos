@@ -36,6 +36,7 @@ data class FacturasFilter(
     val cajaId: String? = null,
     val fechaInicio: LocalDate? = null,
     val fechaFin: LocalDate? = null,
+    val estatus: Int? = null,
 )
 
 private val FACTURA_DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -123,6 +124,17 @@ class FacturasRepository {
                     ?: return@dbQuery null
 
             val codFactura = factura[tabla.codFactura]
+            val idCliente = factura[tabla.idCliente]
+            val codVendedor = factura[tabla.codVendedor]
+
+            val cliente =
+                FacturasClientesTable
+                    .selectAll()
+                    .where { FacturasClientesTable.idCliente eq idCliente }
+                    .limit(1)
+                    .firstOrNull()
+            val clienteNombre = cliente?.get(FacturasClientesTable.nombre) ?: factura[tabla.facturarA]
+            val clienteIdentificacion = cliente?.get(FacturasClientesTable.rif) ?: factura[tabla.facturarARuc]
 
             val items =
                 SalesFacturaDetalleTable
@@ -137,6 +149,10 @@ class FacturasRepository {
                             totalConIva = row[SalesFacturaDetalleTable.itemTotalConIva].toDouble(),
                             codigo = row[SalesFacturaDetalleTable.itemCodigo],
                             referencia = row[SalesFacturaDetalleTable.itemReferencia],
+                            idItem = row[SalesFacturaDetalleTable.idItem],
+                            impuestoTasa = row[SalesFacturaDetalleTable.itemPiva].toDouble(),
+                            descuento = row[SalesFacturaDetalleTable.itemDescuento].toDouble(),
+                            unidad = row[SalesFacturaDetalleTable.itemUnidadEmpaque],
                         )
                     }
 
@@ -144,6 +160,10 @@ class FacturasRepository {
                 idFactura = facturaId,
                 codFactura = codFactura,
                 items = items,
+                idCliente = idCliente,
+                clienteNombre = clienteNombre,
+                clienteIdentificacion = clienteIdentificacion,
+                codVendedor = codVendedor,
             )
         }
 
@@ -186,6 +206,9 @@ class FacturasRepository {
                     .format(FACTURA_DATE_TIME_FORMAT)
             andWhere { tabla.fechaCreacion less endExclusive }
         }
+        filter.estatus?.let { estatus ->
+            andWhere { tabla.codEstatus eq estatus }
+        }
         filter.search?.takeIf(String::isNotBlank)?.let { search ->
             val term = "%$search%"
             andWhere {
@@ -198,6 +221,31 @@ class FacturasRepository {
             }
         }
     }
+
+    suspend fun anularPendiente(
+        database: Database,
+        countryCode: String,
+        facturaId: String,
+    ): Boolean =
+        dbQuery(database) {
+            val tabla = FacturasTableFactory.forCountry(countryCode)
+            val factura =
+                tabla
+                    .selectAll()
+                    .where { tabla.idFactura eq facturaId }
+                    .limit(1)
+                    .firstOrNull()
+                    ?: throw NoSuchElementException("Factura no encontrada")
+
+            val status = factura[tabla.codEstatus] ?: 0
+            if (status != 1) {
+                throw IllegalStateException("Solo se pueden anular facturas en estado pendiente (estatus 1)")
+            }
+
+            tabla.update({ tabla.idFactura eq facturaId }) {
+                it[codEstatus] = 3
+            } > 0
+        }
 
     suspend fun confirmFiscal(
         database: Database,

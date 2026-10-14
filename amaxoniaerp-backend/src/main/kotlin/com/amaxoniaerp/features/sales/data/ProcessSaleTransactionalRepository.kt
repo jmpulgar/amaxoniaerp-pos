@@ -16,6 +16,7 @@ import com.amaxoniaerp.features.sales.domain.ProcessSaleResponse
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -57,9 +58,10 @@ open class ProcessSaleTransactionalRepository(
         val preparedRequest = prepareRequestWithWarehouses(countryCode, request)
         val monetaryContext = resolveMonetaryContext(countryCode, preparedRequest)
 
+        val isPending = preparedRequest.procesar == 0 || preparedRequest.factura.codEstatus == 1
         validateDuplicateInvoice(monetaryContext.countryCode, preparedRequest)
         validateClientSucursalIfRequired(monetaryContext.countryCode, preparedRequest)
-        if (monetaryContext.shouldValidateStock()) {
+        if (!isPending && monetaryContext.shouldValidateStock()) {
             validateStock(preparedRequest)
         }
 
@@ -108,15 +110,34 @@ open class ProcessSaleTransactionalRepository(
     }
 
     private fun persistSale(writeContext: SaleWriteContext) {
-        insertFactura(writeContext)
+        val idFactura = writeContext.invoiceId
+        val countryCode = writeContext.monetaryContext.countryCode
+        val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
+        val isExistingPending =
+            facturaTable
+                .select(facturaTable.idFactura)
+                .where { (facturaTable.idFactura eq idFactura) and (facturaTable.codEstatus eq 1) }
+                .limit(1)
+                .any()
+
+        if (isExistingPending) {
+            SalesFacturaDetalleTable.deleteWhere { SalesFacturaDetalleTable.idFactura eq idFactura }
+            SalesFacturaImpuestosTable.deleteWhere { SalesFacturaImpuestosTable.idFactura eq idFactura }
+            val fpgTable = SalesFacturaDetalleFormaPagoTableFactory.forCountry(countryCode)
+            fpgTable.deleteWhere { fpgTable.idFactura eq idFactura }
+            updateFactura(writeContext)
+        } else {
+            insertFactura(writeContext)
+        }
+
         val detalleIds = insertFacturaDetalle(writeContext)
         processLotTracking(writeContext, detalleIds)
         insertFacturaImpuestos(writeContext)
         insertFacturaDetalleFormaPago(writeContext)
 
+        val isPending = writeContext.request.procesar == 0 || writeContext.request.factura.codEstatus == 1
         val shouldAffectInventory =
-            (writeContext.request.procesar == 1 || writeContext.request.factura.codEstatus == 2) &&
-                !writeContext.request.esCobroCreditoPrevio
+            !isPending && !writeContext.request.esCobroCreditoPrevio
         if (shouldAffectInventory) {
             updateInventoryAndKardex(writeContext)
             insertCajaEntries(writeContext)
@@ -148,8 +169,10 @@ open class ProcessSaleTransactionalRepository(
                 item.copy(itemAlmacen = resolvedWarehouse)
             }
 
+        val resolvedCodEstatus = if (request.procesar == 0) 1 else request.factura.codEstatus
         val normalizedFactura =
             request.factura.copy(
+                codEstatus = resolvedCodEstatus,
                 idSucursal = context.idSucursal ?: request.factura.idSucursal,
                 serieSucursal =
                     context.serieSucursal
@@ -218,7 +241,9 @@ open class ProcessSaleTransactionalRepository(
         if (status == 2) {
             throw DuplicateInvoiceException("La factura ya existe y está procesada (cod_estatus=2)")
         }
-        throw DuplicateInvoiceException("La factura ya existe con estado pendiente, no se puede reprocesar")
+        if (status == 3) {
+            throw DuplicateInvoiceException("La factura ya existe y está anulada (cod_estatus=3)")
+        }
     }
 
     private fun validateStock(request: ProcessSaleRequest) {

@@ -2,11 +2,17 @@ package com.amaxonia.erp.ui.pos
 
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.data.remote.dto.FormaPagoDto
+import com.amaxonia.erp.domain.model.Caja
+import com.amaxonia.erp.domain.model.CierreCajaSummary
 import com.amaxonia.erp.domain.model.Client
 import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.ItemCarrito
 import com.amaxonia.erp.domain.model.Product
+import com.amaxonia.erp.domain.model.ProductOptionGroup
 import com.amaxonia.erp.domain.model.Promocion
+import com.amaxonia.erp.domain.model.SavedInvoiceFilterTab
+import com.amaxonia.erp.domain.model.SavedInvoiceSummary
+import com.amaxonia.erp.domain.model.SelectedOption
 import com.amaxonia.erp.domain.model.SellerSummary
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -27,8 +33,11 @@ data class CartItem(
     val promocionGrupo: String = "",
     val promocionDetalleId: String = "",
     val promocionVeces: Int = 1,
+    val selectedOptions: List<SelectedOption> = emptyList(),
+    val idCombo: String? = null,
 ) {
     val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
+    val hasOptions: Boolean get() = selectedOptions.isNotEmpty()
 
     val taxRate: Double
         get() = if (product.isExempt) 0.0 else product.taxRate
@@ -138,6 +147,10 @@ data class PosUiState(
     val promotionOptions: List<Promocion> = emptyList(),
     val showPromotionChoice: Boolean = false,
     val quantityPickerProduct: Product? = null,
+    val optionsProduct: Product? = null,
+    val optionsGroups: List<ProductOptionGroup> = emptyList(),
+    val isLoadingOptions: Boolean = false,
+    val optionsErrorMessage: String? = null,
     val allowEditPrices: Boolean = true,
     val allowDiscounts: Boolean = true,
     val isCatalogDrawerOpen: Boolean = true,
@@ -155,6 +168,30 @@ data class PosUiState(
     val expandedCashDenominations: Boolean = false,
     val showProductDialog: Boolean = false,
     val productDialogQuery: String = "",
+    val heldInvoiceId: String? = null,
+    val heldInvoiceCode: String? = null,
+    val showSearchInvoicesModal: Boolean = false,
+    val savedInvoices: List<SavedInvoiceSummary> = emptyList(),
+    val isLoadingSavedInvoices: Boolean = false,
+    val savedInvoicesSearchQuery: String = "",
+    val savedInvoicesFilter: SavedInvoiceFilterTab = SavedInvoiceFilterTab.ALL,
+    val invoicePendingRestore: SavedInvoiceSummary? = null,
+    val showConfirmRestoreDialog: Boolean = false,
+    val invoicePendingAnular: SavedInvoiceSummary? = null,
+    val showConfirmAnularDialog: Boolean = false,
+    val isSavingDraft: Boolean = false,
+    val isAnulandoInvoice: Boolean = false,
+    val showCajaOptionsModal: Boolean = false,
+    val showCajaAperturaModal: Boolean = false,
+    val showCajaCierreModal: Boolean = false,
+    val cierreSummary: CierreCajaSummary? = null,
+    val isLoadingCierreSummary: Boolean = false,
+    val isSubmittingCajaOperation: Boolean = false,
+    val cajaOperationError: String? = null,
+    val activeCajaObj: Caja? = null,
+    val countryCode: String = "PA",
+    val companyDb: String = "",
+    val apiBaseUrl: String = "",
 ) {
 
     val summary: PosCartSummary

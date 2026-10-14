@@ -31,6 +31,14 @@ class AssetsRoutesTest {
             File(bannersDir, "sample.mp4").apply {
                 writeBytes(fileContent)
             }
+        val formaPagoDir = File(tempDir, "testdb/administrativo/caja/forma_pago").apply { mkdirs() }
+        File(formaPagoDir, "1.image").apply {
+            writeText("data:image/png;base64,iVBORw0KGgo=")
+        }
+        val denominacionDir = File(tempDir, "testdb/administrativo/moneda/denominacion").apply { mkdirs() }
+        File(denominacionDir, "5.image").apply {
+            writeText("data:image/png;base64,iVBORw0KGgo=")
+        }
     }
 
     @AfterTest
@@ -118,6 +126,65 @@ class AssetsRoutesTest {
             }
 
             val response = client.get("/api/data/INVALID/testdb/banners/sample.mp4")
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+    @Test
+    fun `forma pago from disk returns 200 OK`() =
+        testApplication {
+            routing {
+                assetsRoutes(
+                    assetsBaseUrls = emptyMap(),
+                    dataBasePath = tempDir.absolutePath,
+                )
+            }
+
+            val response = client.get("/api/data/PA/testdb/forma_pago/1")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsBytes().isNotEmpty())
+        }
+
+    @Test
+    fun `moneda denominacion from disk returns 200 OK`() =
+        testApplication {
+            routing {
+                assetsRoutes(
+                    assetsBaseUrls = emptyMap(),
+                    dataBasePath = tempDir.absolutePath,
+                )
+            }
+
+            val response = client.get("/api/data/PA/testdb/moneda_denominacion/5")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsBytes().isNotEmpty())
+        }
+
+    @Test
+    fun `legacy action from query returns 200 OK`() =
+        testApplication {
+            routing {
+                assetsRoutes(
+                    assetsBaseUrls = emptyMap(),
+                    dataBasePath = tempDir.absolutePath,
+                )
+            }
+
+            val response = client.get("/api?action=moneda/denominacion/get(imagen)&id=5&companyDb=testdb&countryCode=PA")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsBytes().isNotEmpty())
+        }
+
+    @Test
+    fun `invalid id returns 400 bad request`() =
+        testApplication {
+            routing {
+                assetsRoutes(
+                    assetsBaseUrls = emptyMap(),
+                    dataBasePath = tempDir.absolutePath,
+                )
+            }
+
+            val response = client.get("/api/data/PA/testdb/forma_pago/abc")
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
 }

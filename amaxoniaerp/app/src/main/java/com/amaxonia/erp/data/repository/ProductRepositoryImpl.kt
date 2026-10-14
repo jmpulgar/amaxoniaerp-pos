@@ -14,6 +14,7 @@ import com.amaxonia.erp.data.remote.dto.CreateProductRequest
 import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.data.remote.dto.ProductDto
 import com.amaxonia.erp.data.remote.getDepartments
+import com.amaxonia.erp.data.remote.getProductOptions
 import com.amaxonia.erp.data.remote.getProducts
 import com.amaxonia.erp.data.remote.updateProduct
 import com.amaxonia.erp.data.sync.OfflineSyncScope
@@ -21,6 +22,8 @@ import com.amaxonia.erp.data.sync.OfflineSyncSettingsStore
 import com.amaxonia.erp.data.sync.toDomain
 import com.amaxonia.erp.domain.model.PriceLevel
 import com.amaxonia.erp.domain.model.Product
+import com.amaxonia.erp.domain.model.ProductOptionGroup
+import com.amaxonia.erp.domain.model.ProductOptionItem
 import com.amaxonia.erp.domain.repository.PagedProducts
 import com.amaxonia.erp.domain.repository.ProductRepository
 
@@ -109,6 +112,7 @@ class ProductRepositoryImpl(
         page: Int,
         pageSize: Int,
         departmentId: Int?,
+        departmentIds: List<Int>?,
         search: String?,
     ): Result<PagedProducts> {
         val scope = currentScope()
@@ -117,23 +121,45 @@ class ProductRepositoryImpl(
         val (baseUrl, countryCode, companyDb) = resolveImageContext()
         val query = search?.trim().orEmpty()
 
+        if (departmentId == null && departmentIds != null && departmentIds.isEmpty()) {
+            return Result.success(
+                PagedProducts(
+                    items = emptyList(),
+                    totalCount = 0,
+                    page = page,
+                    pageSize = pageSize,
+                ),
+            )
+        }
+
+        val effectiveDeptIds = when {
+            departmentId != null -> null
+            !departmentIds.isNullOrEmpty() -> departmentIds
+            !scope.allProducts && scope.departmentIds.isNotEmpty() -> scope.departmentIds.toList()
+            else -> null
+        }
+
         if (!isOnline && productDao != null) {
             val entities = when {
                 query.isNotEmpty() && departmentId != null ->
                     productDao.searchPagedByDepartment(query, departmentId, pageSize, offset)
+                query.isNotEmpty() && effectiveDeptIds != null ->
+                    productDao.searchPagedByDepartments(query, effectiveDeptIds, pageSize, offset)
                 query.isNotEmpty() ->
                     productDao.searchPaged(query, pageSize, offset)
                 departmentId != null ->
                     productDao.getPagedByDepartment(departmentId, pageSize, offset)
-                !scope.allProducts && scope.departmentIds.isNotEmpty() ->
-                    productDao.getPagedByDepartments(scope.departmentIds.toList(), pageSize, offset)
+                effectiveDeptIds != null ->
+                    productDao.getPagedByDepartments(effectiveDeptIds, pageSize, offset)
                 else ->
                     productDao.getPaged(pageSize, offset)
             }
             val total = when {
                 query.isNotEmpty() && departmentId != null -> productDao.countSearchByDepartment(query, departmentId)
+                query.isNotEmpty() && effectiveDeptIds != null -> productDao.countSearchByDepartments(query, effectiveDeptIds)
                 query.isNotEmpty() -> productDao.countSearch(query)
                 departmentId != null -> productDao.countByDepartment(departmentId)
+                effectiveDeptIds != null -> productDao.countByDepartments(effectiveDeptIds)
                 else -> productDao.count()
             }
             return Result.success(
@@ -154,6 +180,7 @@ class ProductRepositoryImpl(
                 offset = offset,
                 search = query.takeIf { it.isNotBlank() },
                 departmentId = departmentId,
+                departmentIds = departmentIds,
             )
             if (scope.enabled && productDao != null) {
                 val entities = response.data.map { it.toEntity() }
@@ -177,19 +204,23 @@ class ProductRepositoryImpl(
                 val entities = when {
                     query.isNotEmpty() && departmentId != null ->
                         productDao.searchPagedByDepartment(query, departmentId, pageSize, offset)
+                    query.isNotEmpty() && effectiveDeptIds != null ->
+                        productDao.searchPagedByDepartments(query, effectiveDeptIds, pageSize, offset)
                     query.isNotEmpty() ->
                         productDao.searchPaged(query, pageSize, offset)
                     departmentId != null ->
                         productDao.getPagedByDepartment(departmentId, pageSize, offset)
-                    !scope.allProducts && scope.departmentIds.isNotEmpty() ->
-                        productDao.getPagedByDepartments(scope.departmentIds.toList(), pageSize, offset)
+                    effectiveDeptIds != null ->
+                        productDao.getPagedByDepartments(effectiveDeptIds, pageSize, offset)
                     else ->
                         productDao.getPaged(pageSize, offset)
                 }
                 val total = when {
                     query.isNotEmpty() && departmentId != null -> productDao.countSearchByDepartment(query, departmentId)
+                    query.isNotEmpty() && effectiveDeptIds != null -> productDao.countSearchByDepartments(query, effectiveDeptIds)
                     query.isNotEmpty() -> productDao.countSearch(query)
                     departmentId != null -> productDao.countByDepartment(departmentId)
+                    effectiveDeptIds != null -> productDao.countByDepartments(effectiveDeptIds)
                     else -> productDao.count()
                 }
                 if (entities.isNotEmpty() || total > 0) {
@@ -315,8 +346,9 @@ class ProductRepositoryImpl(
             val isOnline = networkMonitor?.isOnline() ?: true
             if (isOnline) {
                 val token = requireToken()
-                val remote = apiService.getDepartments(token)
+                val remote = apiService.getDepartments(token, onlyVisiblePos = true)
                 if (remote.isNotEmpty()) {
+                    departmentDao?.clearAll()
                     departmentDao?.insertAll(remote.map { DepartmentEntity(it.id, it.displayName) })
                     return@runCatching remote
                 }
@@ -324,7 +356,9 @@ class ProductRepositoryImpl(
             // Modo offline o API vacía: leer de Room
             val local = departmentDao?.getAll().orEmpty()
             if (local.isNotEmpty()) {
-                local.map { DepartmentDto(id = it.id, name = it.name) }
+                val distinct = productDao?.getDistinctDepartmentIds().orEmpty().toSet()
+                val filtered = if (distinct.isNotEmpty()) local.filter { it.id in distinct } else local
+                filtered.map { DepartmentDto(id = it.id, name = it.name) }
             } else {
                 val distinct = productDao?.getDistinctDepartmentIds().orEmpty()
                 distinct.map { DepartmentDto(id = it, name = "Departamento $it") }
@@ -332,7 +366,9 @@ class ProductRepositoryImpl(
         }.recoverCatching { error ->
             val local = departmentDao?.getAll().orEmpty()
             if (local.isNotEmpty()) {
-                local.map { DepartmentDto(id = it.id, name = it.name) }
+                val distinct = productDao?.getDistinctDepartmentIds().orEmpty().toSet()
+                val filtered = if (distinct.isNotEmpty()) local.filter { it.id in distinct } else local
+                filtered.map { DepartmentDto(id = it.id, name = it.name) }
             } else {
                 val distinct = productDao?.getDistinctDepartmentIds().orEmpty()
                 if (distinct.isNotEmpty()) {
@@ -342,6 +378,50 @@ class ProductRepositoryImpl(
                 }
             }
         }
+
+    override suspend fun getProductOptions(
+        productId: String,
+        almacenId: Int?,
+    ): Result<List<ProductOptionGroup>> = runCatching {
+        val token = requireToken()
+        val session = localStore.readCompanySession()
+        val companyDb = session?.company?.adminDb.orEmpty()
+        val (baseUrl, countryCode, _) = resolveImageContext()
+        val response = apiService.getProductOptions(
+            token = token,
+            companyDb = companyDb.takeIf { it.isNotBlank() },
+            productId = productId,
+            almacenId = almacenId,
+        )
+        response.resolvedGroups.map { g ->
+            ProductOptionGroup(
+                id = g.idGrupo,
+                type = g.tipo.ifBlank { "COMBO" },
+                name = g.displayName,
+                min = g.effectiveMin,
+                max = g.effectiveMax,
+                options = g.resolvedOptions.map { op ->
+                    val photo = ImageUrlHelper.productImageUrl(
+                        baseUrl = baseUrl,
+                        countryCode = countryCode,
+                        companyDb = companyDb,
+                        photoPath = op.rawPhoto,
+                    )
+                    ProductOptionItem(
+                        id = op.resolvedId,
+                        productId = op.idItem,
+                        productCode = op.codItem,
+                        name = op.displayName,
+                        extraPrice = op.resolvePrice(g.adiciona),
+                        quantity = op.cantidad,
+                        isDefault = op.porDefecto == 1,
+                        isOutOfStock = op.agotado == 1,
+                        photoUrl = photo,
+                    )
+                },
+            )
+        }
+    }
 }
 
 private fun ProductDto.toDomain(
@@ -378,6 +458,13 @@ private fun ProductDto.toDomain(
                 pricePlusTax = it.pricePlusTax,
             )
         },
+        hasOptions = poseeProductoCombo?.lowercase() in listOf("si", "1", "true") ||
+            !idCombo.isNullOrBlank() ||
+            tipoArticulo.equals("C", ignoreCase = true),
+        idCombo = idCombo,
+        itemType = tipoArticulo.orEmpty(),
+        hasVariants = poseeVariantes?.lowercase() in listOf("si", "1", "true") || (variantesTotal ?: 0) > 0,
+        variantsTotal = variantesTotal ?: 0,
     )
 }
 
@@ -410,5 +497,12 @@ private fun ProductDto.toEntity(): ProductEntity {
                 pricePlusTax = it.pricePlusTax,
             )
         },
+        hasOptions = poseeProductoCombo?.lowercase() in listOf("si", "1", "true") ||
+            !idCombo.isNullOrBlank() ||
+            tipoArticulo.equals("C", ignoreCase = true),
+        idCombo = idCombo,
+        itemType = tipoArticulo.orEmpty(),
+        hasVariants = poseeVariantes?.lowercase() in listOf("si", "1", "true") || (variantesTotal ?: 0) > 0,
+        variantsTotal = variantesTotal ?: 0,
     )
 }

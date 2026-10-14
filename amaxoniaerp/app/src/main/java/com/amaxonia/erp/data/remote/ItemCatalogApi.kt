@@ -5,6 +5,7 @@ import com.amaxonia.erp.data.remote.dto.DepartmentDto
 import com.amaxonia.erp.data.remote.dto.DepartmentsResponse
 import com.amaxonia.erp.data.remote.dto.PagedResponse
 import com.amaxonia.erp.data.remote.dto.ProductDto
+import com.amaxonia.erp.data.remote.dto.ProductOptionsResponseDto
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -25,6 +26,7 @@ suspend fun ApiService.getProducts(
     offset: Int = 0,
     search: String? = null,
     departmentId: Int? = null,
+    departmentIds: List<Int>? = null,
 ): PagedResponse<ProductDto> =
     client.get("items") {
         header("Authorization", "Bearer $token")
@@ -36,6 +38,8 @@ suspend fun ApiService.getProducts(
             }
             if (departmentId != null && departmentId > 0) {
                 parameters.append("departmentId", departmentId.toString())
+            } else if (!departmentIds.isNullOrEmpty()) {
+                parameters.append("departmentIds", departmentIds.joinToString(","))
             }
         }
     }.body()
@@ -61,12 +65,18 @@ suspend fun ApiService.updateProduct(
 
 suspend fun ApiService.getDepartments(
     token: String,
+    onlyVisiblePos: Boolean = true,
 ): List<DepartmentDto> =
     runCatching {
         // Endpoint principal coincidente con amaxoniaerp-pos: items/departments
         val response = client.get("items/departments") {
             header("Authorization", "Bearer $token")
             header("Accept-Charset", "utf-8")
+            if (onlyVisiblePos) {
+                url {
+                    parameters.append("visible_pos", "true")
+                }
+            }
         }.body<DepartmentsResponse>()
         response.data
     }.recoverCatching {
@@ -74,6 +84,11 @@ suspend fun ApiService.getDepartments(
         val responseText = client.get("items/departments") {
             header("Authorization", "Bearer $token")
             header("Accept-Charset", "utf-8")
+            if (onlyVisiblePos) {
+                url {
+                    parameters.append("visible_pos", "true")
+                }
+            }
         }.bodyAsText()
         parseDepartmentsFlexible(responseText)
     }.recoverCatching {
@@ -81,6 +96,11 @@ suspend fun ApiService.getDepartments(
         val responseText = client.get("sync/departamentos") {
             header("Authorization", "Bearer $token")
             header("Accept-Charset", "utf-8")
+            if (onlyVisiblePos) {
+                url {
+                    parameters.append("visible_pos", "true")
+                }
+            }
         }.bodyAsText()
         parseDepartmentsFlexible(responseText)
     }.getOrElse { emptyList() }
@@ -112,4 +132,61 @@ suspend fun ApiService.getPromotions(
         }
         AppJson.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(com.amaxonia.erp.data.remote.dto.PromocionDto.serializer()), array)
     }.getOrElse { emptyList() }
+
+suspend fun ApiService.getProductOptions(
+    token: String,
+    companyDb: String? = null,
+    productId: String,
+    almacenId: Int? = null,
+): ProductOptionsResponseDto =
+    runCatching {
+        val responseText = client.get("items/$productId/options") {
+            header("Authorization", "Bearer $token")
+            if (!companyDb.isNullOrBlank()) {
+                header("Company-DB", companyDb)
+            }
+            if (almacenId != null && almacenId > 0) {
+                url.parameters.append("almacen", almacenId.toString())
+            }
+        }.body<String>()
+        AppJson.decodeFromString(ProductOptionsResponseDto.serializer(), responseText)
+    }.recoverCatching {
+        val responseText = client.get("composicion/opciones") {
+            header("Authorization", "Bearer $token")
+            if (!companyDb.isNullOrBlank()) {
+                header("Company-DB", companyDb)
+            }
+            url.parameters.append("id_item", productId)
+            if (almacenId != null && almacenId > 0) {
+                url.parameters.append("almacen", almacenId.toString())
+            }
+        }.body<String>()
+        AppJson.decodeFromString(ProductOptionsResponseDto.serializer(), responseText)
+    }.recoverCatching {
+        val responseText = client.get("") {
+            header("Authorization", "Bearer $token")
+            if (!companyDb.isNullOrBlank()) {
+                header("Company-DB", companyDb)
+            }
+            url.parameters.append("action", "composicion/opciones")
+            url.parameters.append("id_item", productId)
+            if (almacenId != null && almacenId > 0) {
+                url.parameters.append("almacen", almacenId.toString())
+            }
+        }.body<String>()
+        AppJson.decodeFromString(ProductOptionsResponseDto.serializer(), responseText)
+    }.recoverCatching {
+        val responseText = client.get("") {
+            header("Authorization", "Bearer $token")
+            if (!companyDb.isNullOrBlank()) {
+                header("Company-DB", companyDb)
+            }
+            url.parameters.append("action", "combos/getByid_item")
+            url.parameters.append("id_item", productId)
+        }.body<String>()
+        AppJson.decodeFromString(ProductOptionsResponseDto.serializer(), responseText)
+    }.getOrElse { error ->
+        ProductOptionsResponseDto(success = false, message = error.message)
+    }
+
 

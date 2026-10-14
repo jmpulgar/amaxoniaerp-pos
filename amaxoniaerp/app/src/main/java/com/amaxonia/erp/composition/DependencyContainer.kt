@@ -196,7 +196,7 @@ object DependencyContainer {
         com.amaxonia.erp.ui.sucursales.SucursalesViewModel(sucursalRepository)
 
     fun createCajasOverviewViewModel(): com.amaxonia.erp.ui.caja.CajasOverviewViewModel =
-        com.amaxonia.erp.ui.caja.CajasOverviewViewModel(cajaRepository, sucursalRepository)
+        com.amaxonia.erp.ui.caja.CajasOverviewViewModel(cajaRepository, sucursalRepository, salesRepository, localStore)
 
     fun createSettingsViewModel(): com.amaxonia.erp.ui.settings.SettingsViewModel =
         com.amaxonia.erp.ui.settings.SettingsViewModel(
@@ -226,6 +226,8 @@ object DependencyContainer {
                     SyncScheduler.enqueuePendingInvoices(ctx)
                 }
             },
+            invoiceHistoryRepository = invoiceHistoryRepository,
+            draftInvoiceDao = database.draftInvoiceDao(),
         )
 
     fun createHistoryViewModel(companySession: com.amaxonia.erp.domain.model.CompanySession? = null): com.amaxonia.erp.ui.history.HistoryViewModel =

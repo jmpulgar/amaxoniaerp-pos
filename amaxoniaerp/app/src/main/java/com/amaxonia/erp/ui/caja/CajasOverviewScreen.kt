@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -318,27 +319,35 @@ fun CajasOverviewScreen(
             fechaApertura = state.cajaFechaApertura,
             isRenovando = state.isRenovandoCaja,
             onDismiss = viewModel::dismissAvisoCajaAnterior,
-            onRenovar = viewModel::renovarCajaDiaAnterior,
+            onRenovar = viewModel::openCierreDialog,
         )
     }
 
     if (state.isAperturaDialogOpen) {
-        AperturaCajaDialog(
-            cajaName = state.activeCaja?.displayName ?: "",
+        CajaAperturaModal(
+            activeCaja = state.activeCaja,
+            availableSellers = state.activeCaja?.availableSellers.orEmpty(),
+            currentSeller = null,
             isLoading = state.isLoading,
+            errorMessage = state.error,
+            baseUrl = state.baseUrl,
+            countryCode = state.countryCode,
+            companyDb = state.companyDb,
             onDismiss = viewModel::closeAperturaDialog,
-            onConfirm = viewModel::aperturarCaja,
+            onConfirmApertura = viewModel::aperturarCaja,
         )
     }
 
     if (state.isCierreDialogOpen) {
-        CierreCajaDialog(
-            cajaName = state.activeCaja?.displayName ?: "",
-            isLoadingSummary = state.isLoadingSummary,
+        CajaCierreModal(
+            activeCaja = state.activeCaja,
             summary = state.cierreSummary,
-            isLoading = state.isLoading,
+            isLoadingSummary = state.isLoadingSummary,
+            isSubmitting = state.isLoading,
+            errorMessage = state.error,
+            paymentMethods = state.paymentMethods,
             onDismiss = viewModel::closeCierreDialog,
-            onConfirm = viewModel::cerrarCaja,
+            onConfirmCierre = viewModel::cerrarCaja,
         )
     }
 
@@ -761,67 +770,56 @@ fun AvisoCajaAnteriorDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!isRenovando) onDismiss() },
-        shape = PosExtraShapes.DialogRadius,
-        icon = {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-            }
-        },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
         title = {
             Text(
-                text = "Caja Vencida (Jornada anterior)",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Cierre de caja",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = Color(0xFF2C3E50),
             )
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "La caja actual está abierta desde el ${fechaApertura ?: "un día anterior"} y corresponde a una jornada anterior (Vencida).",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = "Posee una caja de día anterior abierta, ¿Desea cerrarla?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF64748B),
+                    lineHeight = 28.sp,
                 )
-                Text(
-                    text = "Para registrar las ventas en la jornada correspondiente y mantener los reportes al día, puedes realizar el cierre y renovación de la caja ahora, o continuar operando.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (!fechaApertura.isNullOrBlank()) {
+                    Text(
+                        text = "Abierta desde: $fechaApertura",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF94A3B8),
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = onRenovar,
                 enabled = !isRenovando,
-                shape = PosExtraShapes.InputRadius,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00BCD4)),
             ) {
                 if (isRenovando) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Renovando…")
+                    Text("Cargando…")
                 } else {
-                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Cerrar y abrir hoy")
+                    Text("Sí, Cerrar Caja", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         },
@@ -829,7 +827,7 @@ fun AvisoCajaAnteriorDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 enabled = !isRenovando,
-                shape = PosExtraShapes.InputRadius,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
             ) {
                 Text("Continuar")
             }

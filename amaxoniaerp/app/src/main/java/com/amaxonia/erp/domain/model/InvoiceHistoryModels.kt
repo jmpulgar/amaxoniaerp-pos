@@ -6,6 +6,7 @@ data class InvoiceHistoryFilter(
     val fechaInicio: String? = null,
     val fechaFin: String? = null,
     val cajaId: String? = null,
+    val estatus: String? = null,
 )
 
 data class InvoiceHistoryPage(

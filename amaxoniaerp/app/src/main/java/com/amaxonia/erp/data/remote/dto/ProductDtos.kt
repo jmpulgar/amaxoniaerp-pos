@@ -1,7 +1,64 @@
 package com.amaxonia.erp.data.remote.dto
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+
+@OptIn(ExperimentalSerializationApi::class)
+object LenientStringSerializer : KSerializer<String?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LenientString", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: String?) {
+        if (value != null) encoder.encodeString(value)
+        else encoder.encodeNull()
+    }
+
+    override fun deserialize(decoder: Decoder): String? {
+        val jsonInput = decoder as? JsonDecoder
+        if (jsonInput != null) {
+            val element = jsonInput.decodeJsonElement()
+            return when (element) {
+                is JsonNull -> null
+                is JsonPrimitive -> element.content
+                else -> element.toString()
+            }
+        }
+        return decoder.decodeString()
+    }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+object LenientNonNullStringSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LenientNonNullString", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+
+    override fun deserialize(decoder: Decoder): String {
+        val jsonInput = decoder as? JsonDecoder
+        if (jsonInput != null) {
+            val element = jsonInput.decodeJsonElement()
+            return when (element) {
+                is JsonNull -> ""
+                is JsonPrimitive -> element.content
+                else -> element.toString()
+            }
+        }
+        return runCatching { decoder.decodeString() }.getOrDefault("")
+    }
+}
 
 @Serializable
 data class ProductDto(
@@ -25,6 +82,19 @@ data class ProductDto(
     val costActual: Double? = null,
     val unitPackage: String? = null,
     val prices: List<PriceDto> = emptyList(),
+    @SerialName("posee_producto_combo")
+    @Serializable(with = LenientStringSerializer::class)
+    val poseeProductoCombo: String? = null,
+    @SerialName("id_combo")
+    @Serializable(with = LenientStringSerializer::class)
+    val idCombo: String? = null,
+    @SerialName("tipo_articulo")
+    val tipoArticulo: String? = null,
+    @SerialName("posee_variantes")
+    @Serializable(with = LenientStringSerializer::class)
+    val poseeVariantes: String? = null,
+    @SerialName("variantes_total")
+    val variantesTotal: Int? = null,
 ) {
     val rawPhoto: String
         get() = photoUrl?.takeIf { it.isNotBlank() }
