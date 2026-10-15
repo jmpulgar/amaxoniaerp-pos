@@ -228,6 +228,7 @@ fun BuscarFacturasModal(
 
         Surface(
             modifier = Modifier
+                .widthIn(max = 1200.dp)
                 .fillMaxWidth(if (isLandscape) 0.96f else 0.99f)
                 .fillMaxHeight(if (isLandscape) 0.94f else 0.98f)
                 .clip(RoundedCornerShape(16.dp)),

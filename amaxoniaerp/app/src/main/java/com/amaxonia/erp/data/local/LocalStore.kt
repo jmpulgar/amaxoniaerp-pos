@@ -52,6 +52,14 @@ open class LocalStore(
     private val customerDisplayEnabledKey = booleanPreferencesKey("customer_display_enabled")
     private val autoPrintReceiptKey = booleanPreferencesKey("auto_print_receipt")
 
+    // In-memory hot cache to avoid constant disk I/O and JSON decoding on Main thread
+    @Volatile private var cachedCompanySession: com.amaxonia.erp.domain.model.CompanySession? = null
+    @Volatile private var cachedActiveCaja: Caja? = null
+    @Volatile private var cachedActiveSucursal: Pair<String, String>? = null
+    @Volatile private var cachedSelectedCountry: ServerCountry? = null
+    @Volatile private var cachedAutoPrintReceipt: Boolean? = null
+    @Volatile private var cachedCajasList: List<Caja>? = null
+
     suspend fun saveAuthSession(response: LoginResponse) {
         val json = AppJson.encodeToString(response)
         dataStore.edit { prefs ->
@@ -65,6 +73,10 @@ open class LocalStore(
     }
 
     suspend fun clearAuthSession() {
+        cachedCompanySession = null
+        cachedActiveCaja = null
+        cachedActiveSucursal = null
+        cachedCajasList = null
         dataStore.edit { prefs ->
             prefs.remove(authSessionKey)
             prefs.remove(companySessionKey)
@@ -73,10 +85,12 @@ open class LocalStore(
             prefs.remove(activeCajaNameKey)
             prefs.remove(activeSucursalIdKey)
             prefs.remove(activeSucursalNameKey)
+            prefs.remove(cachedCajasKey)
         }
     }
 
     suspend fun saveCompanySession(session: com.amaxonia.erp.domain.model.CompanySession) {
+        cachedCompanySession = session
         val snapshot = CompanySessionSnapshot(
             token = session.token,
             companyId = session.company.id,
@@ -97,9 +111,10 @@ open class LocalStore(
     }
 
     open suspend fun readCompanySession(): com.amaxonia.erp.domain.model.CompanySession? {
+        cachedCompanySession?.let { return it }
         val json = dataStore.data.first()[companySessionKey] ?: return null
         val snapshot = runCatching { AppJson.decodeFromString<CompanySessionSnapshot>(json) }.getOrNull() ?: return null
-        return com.amaxonia.erp.domain.model.CompanySession(
+        val session = com.amaxonia.erp.domain.model.CompanySession(
             token = snapshot.token,
             company = com.amaxonia.erp.domain.model.SelectedCompany(
                 id = snapshot.companyId,
@@ -116,9 +131,15 @@ open class LocalStore(
                 role = snapshot.userRole,
             ),
         )
+        cachedCompanySession = session
+        return session
     }
 
     suspend fun clearCompanySession() {
+        cachedCompanySession = null
+        cachedActiveCaja = null
+        cachedActiveSucursal = null
+        cachedCajasList = null
         dataStore.edit { prefs ->
             prefs.remove(companySessionKey)
             prefs.remove(activeCajaSnapshotKey)
@@ -126,10 +147,12 @@ open class LocalStore(
             prefs.remove(activeCajaNameKey)
             prefs.remove(activeSucursalIdKey)
             prefs.remove(activeSucursalNameKey)
+            prefs.remove(cachedCajasKey)
         }
     }
 
     open suspend fun saveActiveCaja(caja: Caja) {
+        cachedActiveCaja = caja
         val session = readCompanySession()
         val snapshot = ActiveCajaSnapshot(
             companyDb = session?.company?.adminDb.orEmpty(),
@@ -145,11 +168,13 @@ open class LocalStore(
     }
 
     open suspend fun readActiveCajaSnapshot(): Caja? {
+        cachedActiveCaja?.let { return it }
         val json = dataStore.data.first()[activeCajaSnapshotKey] ?: return null
         val snapshot = runCatching { AppJson.decodeFromString<ActiveCajaSnapshot>(json) }.getOrNull() ?: return null
         val session = readCompanySession()
         val isSameCompany = session?.company?.adminDb.orEmpty() == snapshot.companyDb
         return if (isSameCompany) {
+            cachedActiveCaja = snapshot.caja
             snapshot.caja
         } else {
             clearActiveCaja()
@@ -160,6 +185,7 @@ open class LocalStore(
     open suspend fun readActiveCajaForToday(): Caja? = readActiveCajaSnapshot()
 
     open suspend fun clearActiveCaja() {
+        cachedActiveCaja = null
         dataStore.edit { prefs ->
             prefs.remove(activeCajaSnapshotKey)
             prefs.remove(activeCajaIdKey)
@@ -183,6 +209,7 @@ open class LocalStore(
     }
 
     open suspend fun saveCajas(cajas: List<Caja>) {
+        cachedCajasList = cajas
         val json = AppJson.encodeToString(cajas)
         dataStore.edit { prefs ->
             prefs[cachedCajasKey] = json
@@ -190,11 +217,15 @@ open class LocalStore(
     }
 
     open suspend fun readCajas(): List<Caja> {
+        cachedCajasList?.let { return it }
         val json = dataStore.data.first()[cachedCajasKey] ?: return emptyList()
-        return runCatching { AppJson.decodeFromString<List<Caja>>(json) }.getOrDefault(emptyList())
+        val list = runCatching { AppJson.decodeFromString<List<Caja>>(json) }.getOrDefault(emptyList())
+        cachedCajasList = list
+        return list
     }
 
     suspend fun saveActiveSucursal(id: String, name: String) {
+        cachedActiveSucursal = Pair(id, name)
         dataStore.edit { prefs ->
             prefs[activeSucursalIdKey] = id
             prefs[activeSucursalNameKey] = name
@@ -202,21 +233,28 @@ open class LocalStore(
     }
 
     open suspend fun readActiveSucursal(): Pair<String, String>? {
+        cachedActiveSucursal?.let { return it }
         val prefs = dataStore.data.first()
         val id = prefs[activeSucursalIdKey] ?: return null
         val name = prefs[activeSucursalNameKey] ?: ""
-        return Pair(id, name)
+        val pair = Pair(id, name)
+        cachedActiveSucursal = pair
+        return pair
     }
 
     override suspend fun saveSelectedCountry(country: ServerCountry) {
+        cachedSelectedCountry = country
         dataStore.edit { prefs ->
             prefs[selectedCountryKey] = country.code
         }
     }
 
     override suspend fun readSelectedCountry(): ServerCountry? {
+        cachedSelectedCountry?.let { return it }
         val code = dataStore.data.first()[selectedCountryKey] ?: return null
-        return ServerCountries.fromCode(code)
+        val country = ServerCountries.fromCode(code)
+        cachedSelectedCountry = country
+        return country
     }
 
     fun selectedCountryFlow(): Flow<ServerCountry?> =
@@ -304,13 +342,19 @@ open class LocalStore(
     open suspend fun readCustomerDisplayEnabled(): Boolean = customerDisplayEnabledFlow().first()
 
     suspend fun saveAutoPrintReceipt(enabled: Boolean) {
+        cachedAutoPrintReceipt = enabled
         dataStore.edit { prefs -> prefs[autoPrintReceiptKey] = enabled }
     }
 
     open fun autoPrintReceiptFlow(): Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[autoPrintReceiptKey] ?: true }
 
-    open suspend fun readAutoPrintReceipt(): Boolean = autoPrintReceiptFlow().first()
+    open suspend fun readAutoPrintReceipt(): Boolean {
+        cachedAutoPrintReceipt?.let { return it }
+        val value = autoPrintReceiptFlow().first()
+        cachedAutoPrintReceipt = value
+        return value
+    }
 }
 
 @kotlinx.serialization.Serializable

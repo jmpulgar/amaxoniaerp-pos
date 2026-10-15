@@ -321,4 +321,22 @@ class CajasOverviewViewModelTest {
         assertFalse(map["2"]!!.isOpen)
         assertFalse(map["2"]!!.isDiaAnterior)
     }
+
+    @Test
+    fun loadCajas_whenSavedActiveNotBelongsToUser_clearsActiveAndPicksUserCaja() = runTest {
+        // User only has Caja 2 assigned
+        fakeRepo.cajasList = listOf(
+            Caja(idCaja = "2", codCaja = "02", caja = "Caja Asignada Usuario", descripcion = "Caja 2", estatus = 1, serieCaja = "C02")
+        )
+        // Saved active caja was from previous user (Caja 99)
+        fakeRepo._activeCaja.value = Caja(idCaja = "99", codCaja = "99", caja = "Caja Ajena", descripcion = "Otra", estatus = 1, serieCaja = "C99")
+
+        viewModel = CajasOverviewViewModel(fakeRepo)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals(1, state.cajas.size)
+        assertEquals("2", state.activeCaja?.idCaja)
+        assertEquals("Caja Asignada Usuario", state.activeCaja?.caja)
+    }
 }

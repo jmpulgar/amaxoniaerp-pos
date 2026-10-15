@@ -51,7 +51,7 @@ class OfflineSyncWorker(
         if (outcome is SyncEngine.Outcome.Success) {
             runCatching {
                 val adminDb = session.company.adminDb.ifBlank { "default" }
-                val cajas = apiService.getCajas(token, adminDb, all = true)
+                val cajas = apiService.getCajas(token, adminDb, all = false)
                 localStore.saveCajas(cajas)
             }
         }

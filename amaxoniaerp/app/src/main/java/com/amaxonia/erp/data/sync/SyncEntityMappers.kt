@@ -203,6 +203,8 @@ fun ClientEntity.toDomain(): Client =
         clientTypeId = clientTypeId,
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
+        codTipoPrecio = codTipoPrecio,
+        aplicaItbms = aplicaItbms,
     )
 
 fun ClientSucursalEntity.toDomain(): ClientBranch =

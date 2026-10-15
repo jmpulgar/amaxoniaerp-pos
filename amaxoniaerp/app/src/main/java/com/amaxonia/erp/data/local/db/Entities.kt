@@ -62,6 +62,7 @@ data class ClientEntity(
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
     val codTipoPrecio: Int = 2,
+    val aplicaItbms: Boolean = true,
     val idSucursal: Int? = null,
 )
 

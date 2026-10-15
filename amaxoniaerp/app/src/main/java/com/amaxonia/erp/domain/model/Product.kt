@@ -42,6 +42,7 @@ data class Product(
 @Serializable
 data class PriceLevel(
     val label: String,
+    val name: String = "",
     val price: Double = 0.0,
     val utilityPercent: Double = 0.0,
     val pricePlusUtility: Double = 0.0,
@@ -49,4 +50,18 @@ data class PriceLevel(
     val unitPrice: Double = 0.0,
     val unitPricePlusTax: Double = 0.0,
     val discountPercent: Double = 0.0,
-)
+) {
+    val displayName: String
+        get() = name.ifBlank { defaultPriceName(label) }
+}
+
+fun defaultPriceName(label: String): String = when (label.trim().uppercase()) {
+    "A", "1", "PRECIO_A", "PRECIO 1" -> "Detal"
+    "B", "2", "PRECIO_B", "PRECIO 2" -> "Mayor"
+    "C", "3", "PRECIO_C", "PRECIO 3" -> "Distribuidor"
+    "D", "4", "PRECIO_D", "PRECIO 4" -> "Especial"
+    "E", "5", "PRECIO_E", "PRECIO 5" -> "Mínimo"
+    "F", "6", "PRECIO_F", "PRECIO 6" -> "Precio 6"
+    "LIBRE", "PRECIO LIBRE", "8" -> "Precio Libre"
+    else -> if (label.isNotBlank()) "Lista $label" else "Detal"
+}

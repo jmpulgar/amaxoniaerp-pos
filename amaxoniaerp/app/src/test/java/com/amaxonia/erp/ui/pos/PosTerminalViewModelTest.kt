@@ -258,8 +258,10 @@ class PosTerminalViewModelTest {
         override val sessionStatus: StateFlow<CajaSessionStatus> = _sessionStatus.asStateFlow()
 
         var statusResponse = CajaStatusResponse(isOpen = true, cajaSecuencia = null)
+        var cajasList: List<Caja>? = null
+        var savedActiveCajaPair: Pair<String, String>? = null
 
-        override suspend fun getCajas(): Result<List<Caja>> = Result.success(listOf(_activeCaja.value!!))
+        override suspend fun getCajas(): Result<List<Caja>> = Result.success(cajasList ?: listOfNotNull(_activeCaja.value))
 
         override suspend fun createCaja(request: SaveCajaRequest): Result<Caja> = Result.success(_activeCaja.value!!)
 
@@ -309,11 +311,13 @@ class PosTerminalViewModelTest {
 
         override suspend fun setActiveCaja(id: String, name: String) {}
 
-        override suspend fun clearActiveCaja() {}
+        override suspend fun clearActiveCaja() {
+            _activeCaja.value = null
+        }
 
         override suspend fun markSequenceClosed() {}
 
-        override suspend fun getActiveCaja(): Pair<String, String>? = Pair("1", "Caja Principal")
+        override suspend fun getActiveCaja(): Pair<String, String>? = savedActiveCajaPair ?: Pair("1", "Caja Principal")
     }
 
     private lateinit var fakeCajaRepo: FakeCajaRepository
@@ -758,7 +762,134 @@ class PosTerminalViewModelTest {
         item = vm.uiState.value.cart.first()
         assertEquals(9.28, item.unitPriceWithTax, 0.001)
         assertEquals("B", item.selectedPriceLabel)
+        assertEquals("Mayor", item.priceDisplayName)
         assertFalse(item.isManualPrice)
+    }
+
+    @Test
+    fun priceLevel_namedLevels_and_fallbackToPriceA() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first().copy(
+            prices = listOf(
+                PriceLevel(label = "A", name = "Detal", price = 10.0, pricePlusTax = 10.70),
+                PriceLevel(label = "B", name = "Mayor", price = 8.0, pricePlusTax = 8.56),
+                PriceLevel(label = "C", name = "Distribuidor", price = 0.0, pricePlusTax = 0.0), // No configurado
+            ),
+        )
+        vm.addToCart(product)
+        var item = vm.uiState.value.cart.first()
+        assertEquals("A", item.selectedPriceLabel)
+        assertEquals("Detal", item.priceDisplayName)
+        assertEquals(10.70, item.unitPriceWithTax, 0.001)
+
+        // Cambiar a Mayor
+        vm.updateItemPriceLevel(product.id, "B")
+        item = vm.uiState.value.cart.first()
+        assertEquals("B", item.selectedPriceLabel)
+        assertEquals("Mayor", item.priceDisplayName)
+        assertEquals(8.56, item.unitPriceWithTax, 0.001)
+
+        // Cambiar a Distribuidor (está en 0.00 -> fallback a Precio 1 / A como en la web)
+        vm.updateItemPriceLevel(product.id, "C")
+        item = vm.uiState.value.cart.first()
+        assertEquals("C", item.selectedPriceLabel)
+        assertEquals("Distribuidor", item.priceDisplayName)
+        assertEquals(10.70, item.unitPriceWithTax, 0.001)
+    }
+
+    @Test
+    fun client_codTipoPrecio_autoUpdatesCartPrices() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first().copy(
+            prices = listOf(
+                PriceLevel(label = "A", name = "Detal", price = 10.0, pricePlusTax = 10.70),
+                PriceLevel(label = "B", name = "Mayor", price = 8.0, pricePlusTax = 8.56),
+            ),
+        )
+        vm.addToCart(product)
+        var item = vm.uiState.value.cart.first()
+        assertEquals("A", item.selectedPriceLabel)
+        assertEquals(10.70, item.unitPriceWithTax, 0.001)
+
+        // Seleccionar cliente con codTipoPrecio = 3 (Precio 2 / B / Mayor)
+        val mayoristaClient = Client(
+            id = "CLI-MAYOR",
+            code = "CLI-MAYOR",
+            name = "Mayorista S.A.",
+            codTipoPrecio = 3, // 3 -> Lista B (Mayor)
+            aplicaItbms = true,
+        )
+        vm.selectClient(mayoristaClient)
+
+        item = vm.uiState.value.cart.first()
+        assertEquals("B", item.selectedPriceLabel)
+        assertEquals("Mayor", item.priceDisplayName)
+        assertEquals(8.56, item.unitPriceWithTax, 0.001)
+    }
+
+    @Test
+    fun itbms_calculation_and_clientExemption() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Producto gravable con ITBMS al 7%: Base 10.00, con ITBMS 10.70
+        val taxableProduct = productRepo.getAllProducts(1, 1).getOrThrow().first().copy(
+            id = "PROD-TAX",
+            isExempt = false,
+            taxRate = 7.0,
+            prices = listOf(PriceLevel(label = "A", name = "Detal", price = 10.0, pricePlusTax = 10.70)),
+        )
+
+        vm.addToCart(taxableProduct)
+        var item = vm.uiState.value.cart.first()
+        // Verificaciones de cálculo del ITBMS
+        assertEquals(7.0, item.taxRate, 0.001)
+        assertEquals(10.00, item.unitPriceWithoutTax, 0.01)
+        assertEquals(10.00, item.totalWithoutTax, 0.01)
+        assertEquals(0.70, item.taxAmount, 0.01)
+        assertEquals(10.70, item.totalWithTax, 0.01)
+        assertEquals(0.70, vm.uiState.value.summary.tax, 0.01)
+        assertEquals(10.70, vm.uiState.value.summary.total, 0.01)
+
+        // Seleccionar cliente exento de ITBMS (aplicaItbms = false)
+        val exemptClient = Client(
+            id = "CLI-EXEMPT",
+            code = "CLI-EXEMPT",
+            name = "Embajada / Zona Libre",
+            aplicaItbms = false,
+        )
+        vm.selectClient(exemptClient)
+
+        item = vm.uiState.value.cart.first()
+        // Cuando el cliente no aplica ITBMS, el impuesto debe ser 0.00 como en el ERP
+        assertEquals(0.0, item.taxRate, 0.001)
+        assertEquals(0.00, item.taxAmount, 0.001)
+        assertEquals(0.00, vm.uiState.value.summary.tax, 0.001)
     }
 
     @Test
@@ -1778,6 +1909,130 @@ class PosTerminalViewModelTest {
         assertEquals(1, state.optionsGroups.size)
         assertEquals("INCLUYE", state.optionsGroups.first().name)
         assertTrue(state.cart.isEmpty())
+    }
+
+    @Test
+    fun loadInitialData_whenStoredCajaNotBelongsToUser_clearsAndPicksUserCaja() = runTest {
+        // User only has Caja 2 assigned
+        val userCaja = Caja(idCaja = "2", codCaja = "C02", caja = "Caja del Usuario", descripcion = "Caja 2", estatus = 1, serieCaja = "C02")
+        fakeCajaRepo._activeCaja.value = Caja(idCaja = "99", codCaja = "C99", caja = "Caja Ajena", descripcion = "Caja 99", estatus = 1, serieCaja = "C99")
+        fakeCajaRepo.cajasList = listOf(userCaja)
+        fakeCajaRepo.savedActiveCajaPair = Pair("99", "Caja Ajena")
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        assertEquals("2", vm.uiState.value.activeCajaId)
+        assertEquals("Caja del Usuario", vm.uiState.value.activeCajaName)
+    }
+
+    @Test
+    fun kitchenNote_dialog_and_update_lifecycle() = runTest {
+        val productRepo = FakeProductRepository()
+        val vm = PosTerminalViewModel(
+            productRepository = productRepo,
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val product = productRepo.getAllProducts(1, 1).getOrThrow().first()
+        vm.addToCart(product)
+        advanceUntilIdle()
+
+        val item = vm.uiState.value.cart.first()
+        assertEquals("", item.kitchenNote)
+
+        // Abrir diálogo de nota
+        vm.openKitchenNoteDialog(item)
+        assertEquals(item, vm.uiState.value.kitchenNoteItem)
+
+        // Guardar nota
+        vm.updateKitchenNote(item.cartItemId, "Sin cebolla, Término medio")
+        val updatedItem = vm.uiState.value.cart.first()
+        assertEquals("Sin cebolla, Término medio", updatedItem.kitchenNote)
+        assertEquals(null, vm.uiState.value.kitchenNoteItem)
+
+        // Descartar/cerrar diálogo
+        vm.openKitchenNoteDialog(updatedItem)
+        assertEquals(updatedItem, vm.uiState.value.kitchenNoteItem)
+        vm.dismissKitchenNoteDialog()
+        assertEquals(null, vm.uiState.value.kitchenNoteItem)
+    }
+
+    @Test
+    fun editProductOptions_updates_existing_item_in_place() = runTest {
+        val comboProduct = Product(
+            id = "200",
+            code = "COMBO-ESPECIAL",
+            description = "Combo Especial Cuarto de Libra",
+            department = "1",
+            prices = listOf(PriceLevel(label = "General", price = 10.0, pricePlusTax = 10.0)),
+            hasOptions = true,
+            itemType = "C",
+            idCombo = "15",
+        )
+        val initialOption = SelectedOption(
+            idGrupo = "grp_1",
+            grupo = "Bebida",
+            idGrupoItem = "opt_1",
+            nombre = "Soda",
+            precio = 0.0,
+            veces = 1,
+        )
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(
+                productsList = listOf(comboProduct),
+            ),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        // Agregar el ítem inicial al carrito
+        vm.confirmProductOptions(comboProduct, listOf(initialOption), 1.0)
+        assertEquals(1, vm.uiState.value.cart.size)
+        assertEquals(10.0, vm.uiState.value.cart.first().unitPriceWithTax, 0.01)
+
+        val cartItem = vm.uiState.value.cart.first()
+
+        // Iniciar edición de opciones para el ítem existente
+        vm.openEditProductOptions(cartItem)
+        assertEquals(cartItem, vm.uiState.value.editingCartItemForOptions)
+        assertEquals(comboProduct, vm.uiState.value.optionsProduct)
+
+        // Confirmar modificación: cambiar opción por un extra con costo de $2.50 y cantidad 2
+        val modifiedOption = SelectedOption(
+            idGrupo = "grp_1",
+            grupo = "Bebida",
+            idGrupoItem = "opt_2",
+            nombre = "Malteada Extra",
+            precio = 2.50,
+            veces = 1,
+        )
+        vm.confirmProductOptions(comboProduct, listOf(modifiedOption), 2.0)
+
+        // Comprobar que no se duplicó el producto, sino que se actualizó en su lugar
+        val state = vm.uiState.value
+        assertEquals(1, state.cart.size)
+        val editedItem = state.cart.first()
+        assertEquals(cartItem.cartItemId, editedItem.cartItemId)
+        assertEquals(2.0, editedItem.quantity, 0.001)
+        assertEquals(12.50, editedItem.unitPriceWithTax, 0.01) // 10.0 base + 2.50 extra
+        assertEquals(1, editedItem.selectedOptions.size)
+        assertEquals("Malteada Extra", editedItem.selectedOptions.first().nombre)
+        assertEquals(null, state.editingCartItemForOptions)
     }
 }
 

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -95,6 +96,7 @@ fun ProductSelectionDialog(
     products: List<Product>,
     departments: List<DepartmentDto>,
     isLoading: Boolean = false,
+    onSearch: (suspend (String) -> List<Product>)? = null,
     onAddToCart: (Product) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -106,12 +108,26 @@ fun ProductSelectionDialog(
     var currentPage by remember { mutableIntStateOf(1) }
     var selectedProductForAccept by remember { mutableStateOf<Product?>(null) }
 
+    var searchedProducts by remember(products) { mutableStateOf(products) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        if (onSearch != null) {
+            isSearching = true
+            kotlinx.coroutines.delay(250)
+            searchedProducts = onSearch(searchQuery)
+            isSearching = false
+        } else {
+            searchedProducts = products
+        }
+    }
+
     val pageSize = 12 // Exactamente igual a limit: 12 en Web POS (producto/listado/main.js)
 
     // Filtrado de productos
-    val filteredProducts = remember(searchQuery, selectedDeptId, selectedTypeFilter, products) {
+    val filteredProducts = remember(searchQuery, selectedDeptId, selectedTypeFilter, searchedProducts, departments) {
         val query = searchQuery.trim().lowercase(Locale.ROOT)
-        products.filter { p ->
+        searchedProducts.filter { p ->
             val matchesQuery = query.isEmpty() ||
                 p.description.lowercase(Locale.ROOT).contains(query) ||
                 p.code.lowercase(Locale.ROOT).contains(query) ||
@@ -167,6 +183,7 @@ fun ProductSelectionDialog(
         val isLandscape = isLandscape()
         Surface(
             modifier = Modifier
+                .widthIn(max = 1150.dp)
                 .fillMaxWidth(if (isLandscape) 0.88f else 0.98f)
                 .fillMaxHeight(if (isLandscape) 0.92f else 0.96f)
                 .clip(RoundedCornerShape(8.dp)),
@@ -454,7 +471,7 @@ fun ProductSelectionDialog(
                         .fillMaxWidth()
                         .weight(1f),
                 ) {
-                    if (isLoading) {
+                    if (isLoading || isSearching) {
                         // Estado de Carga Oficial Web: amaxonia.loading({ message: "Cargando..." })
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -496,10 +513,13 @@ fun ProductSelectionDialog(
                         // ==========================================
                         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                             val columnsCount = when {
-                                maxWidth >= 840.dp -> 6
-                                maxWidth >= 540.dp -> 4
-                                else -> 3
+                                maxWidth >= 950.dp -> 5
+                                maxWidth >= 700.dp -> 4
+                                maxWidth >= 450.dp -> 3
+                                else -> 2
                             }
+                            val imageHeight = if (maxWidth >= 700.dp) 96.dp else 80.dp
+
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(columnsCount),
                                 modifier = Modifier.fillMaxSize(),
@@ -559,11 +579,11 @@ fun ProductSelectionDialog(
 
                                         Spacer(modifier = Modifier.height(2.dp))
 
-                                        // Imagen del producto (height 80dp)
+                                        // Imagen del producto (adaptable en pantallas amplias)
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(80.dp)
+                                                .height(imageHeight)
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(Color(0xFFF8FAFC)),
                                             contentAlignment = Alignment.Center,

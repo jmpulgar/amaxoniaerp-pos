@@ -26,6 +26,8 @@ data class CartItem(
     val discountPercent: Double = 0.0,
     val isManualPrice: Boolean = false,
     val selectedPriceLabel: String = "A",
+    val selectedPriceName: String = "",
+    val clientAplicaItbms: Boolean = true,
     val promocionId: String? = null,
     val promocionCodigo: String = "",
     val promocionNombre: String = "",
@@ -35,48 +37,40 @@ data class CartItem(
     val promocionVeces: Int = 1,
     val selectedOptions: List<SelectedOption> = emptyList(),
     val idCombo: String? = null,
+    val kitchenNote: String = "",
+    val cartItemId: String = java.util.UUID.randomUUID().toString(),
 ) {
-    val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
-    val hasOptions: Boolean get() = selectedOptions.isNotEmpty()
+    val isPromotionLine: Boolean = !promocionId.isNullOrBlank()
+    val hasOptions: Boolean = selectedOptions.isNotEmpty()
 
-    val taxRate: Double
-        get() = if (product.isExempt) 0.0 else product.taxRate
+    val priceDisplayName: String = selectedPriceName.ifBlank {
+        product.prices.firstOrNull { it.label.equals(selectedPriceLabel, ignoreCase = true) }?.displayName
+            ?: com.amaxonia.erp.domain.model.defaultPriceName(selectedPriceLabel)
+    }
 
-    val unitPriceWithoutTax: Double
-        get() {
-            if (taxRate <= 0.0) return unitPriceWithTax
-            val divisor = 1.0 + (taxRate / 100.0)
-            return unitPriceWithTax / divisor
-        }
+    val taxRate: Double = if (product.isExempt || !clientAplicaItbms) 0.0 else product.taxRate
 
-    val subtotalWithoutTax: Double
-        get() = BigDecimal.valueOf(unitPriceWithoutTax * quantity)
-            .setScale(2, RoundingMode.HALF_UP)
-            .toDouble()
+    val unitPriceWithoutTax: Double = if (taxRate <= 0.0) unitPriceWithTax else (unitPriceWithTax / (1.0 + (taxRate / 100.0)))
 
-    val discountAmountWithoutTax: Double
-        get() = BigDecimal.valueOf(subtotalWithoutTax * (discountPercent.coerceIn(0.0, 100.0) / 100.0))
-            .setScale(2, RoundingMode.HALF_UP)
-            .toDouble()
+    val subtotalWithoutTax: Double = BigDecimal.valueOf(unitPriceWithoutTax * quantity)
+        .setScale(2, RoundingMode.HALF_UP)
+        .toDouble()
 
-    val totalWithoutTax: Double
-        get() = (subtotalWithoutTax - discountAmountWithoutTax).coerceAtLeast(0.0)
+    val discountAmountWithoutTax: Double = BigDecimal.valueOf(subtotalWithoutTax * (discountPercent.coerceIn(0.0, 100.0) / 100.0))
+        .setScale(2, RoundingMode.HALF_UP)
+        .toDouble()
 
-    val taxAmount: Double
-        get() {
-            if (taxRate <= 0.0) return 0.0
-            return BigDecimal.valueOf(totalWithoutTax * (taxRate / 100.0))
-                .setScale(2, RoundingMode.HALF_UP)
-                .toDouble()
-        }
+    val totalWithoutTax: Double = (subtotalWithoutTax - discountAmountWithoutTax).coerceAtLeast(0.0)
 
-    val totalWithTax: Double
-        get() = BigDecimal.valueOf(totalWithoutTax + taxAmount)
-            .setScale(2, RoundingMode.HALF_UP)
-            .toDouble()
+    val taxAmount: Double = if (taxRate <= 0.0) 0.0 else BigDecimal.valueOf(totalWithoutTax * (taxRate / 100.0))
+        .setScale(2, RoundingMode.HALF_UP)
+        .toDouble()
 
-    val total: Double
-        get() = totalWithTax
+    val totalWithTax: Double = BigDecimal.valueOf(totalWithoutTax + taxAmount)
+        .setScale(2, RoundingMode.HALF_UP)
+        .toDouble()
+
+    val total: Double get() = totalWithTax
 }
 
 data class CompletedSaleInfo(
@@ -99,6 +93,43 @@ data class PosCartSummary(
     val itemDiscounts: Double = 0.0,
     val globalDiscountAmount: Double = 0.0,
 )
+
+fun calculateCartSummary(cart: List<CartItem>, globalDiscountPercent: Double = 0.0): PosCartSummary {
+    var grossSub = 0.0
+    var discounts = 0.0
+    var sub = 0.0
+    var tx = 0.0
+    var cnt = 0
+    cart.forEach { item ->
+        grossSub += item.subtotalWithoutTax
+        discounts += item.discountAmountWithoutTax
+        sub += item.totalWithoutTax
+        tx += item.taxAmount
+        cnt += item.quantity.toInt().coerceAtLeast(1)
+    }
+    val globalDiscountAmount = if (globalDiscountPercent > 0.0) {
+        BigDecimal.valueOf(sub * (globalDiscountPercent / 100.0))
+            .setScale(2, RoundingMode.HALF_UP)
+            .toDouble()
+    } else 0.0
+    val subAfterGlobalDiscount = (sub - globalDiscountAmount).coerceAtLeast(0.0)
+    val txFactor = if (sub > 0.0) subAfterGlobalDiscount / sub else 1.0
+    val adjustedTx = BigDecimal.valueOf(tx * txFactor).setScale(2, RoundingMode.HALF_UP).toDouble()
+    val tot = BigDecimal.valueOf(subAfterGlobalDiscount + adjustedTx).setScale(2, RoundingMode.HALF_UP).toDouble()
+    val finalSub = BigDecimal.valueOf(subAfterGlobalDiscount).setScale(2, RoundingMode.HALF_UP).toDouble()
+    val finalGrossSub = BigDecimal.valueOf(grossSub).setScale(2, RoundingMode.HALF_UP).toDouble()
+    val finalDiscounts = BigDecimal.valueOf(discounts + globalDiscountAmount).setScale(2, RoundingMode.HALF_UP).toDouble()
+    return PosCartSummary(
+        subtotal = finalSub,
+        tax = adjustedTx,
+        total = tot,
+        itemCount = cnt,
+        grossSubtotal = finalGrossSub,
+        discountTotal = finalDiscounts,
+        itemDiscounts = discounts,
+        globalDiscountAmount = globalDiscountAmount,
+    )
+}
 
 data class PosUiState(
     val isLoading: Boolean = true,
@@ -141,6 +172,7 @@ data class PosUiState(
     val errorMessage: String? = null,
     val showPaymentDialog: Boolean = false,
     val showClientDialog: Boolean = false,
+    val showClientBranchDialog: Boolean = false,
     val showCajaWarningDialog: Boolean = false,
     val allPromotions: List<Promocion> = emptyList(),
     val pendingPromotionProduct: Product? = null,
@@ -151,6 +183,8 @@ data class PosUiState(
     val optionsGroups: List<ProductOptionGroup> = emptyList(),
     val isLoadingOptions: Boolean = false,
     val optionsErrorMessage: String? = null,
+    val kitchenNoteItem: CartItem? = null,
+    val editingCartItemForOptions: CartItem? = null,
     val allowEditPrices: Boolean = true,
     val allowDiscounts: Boolean = true,
     val isCatalogDrawerOpen: Boolean = true,
@@ -192,46 +226,11 @@ data class PosUiState(
     val countryCode: String = "PA",
     val companyDb: String = "",
     val apiBaseUrl: String = "",
+    val cachedSummary: PosCartSummary? = null,
 ) {
 
     val summary: PosCartSummary
-        get() {
-            var grossSub = 0.0
-            var discounts = 0.0
-            var sub = 0.0
-            var tx = 0.0
-            var cnt = 0
-            cart.forEach { item ->
-                grossSub += item.subtotalWithoutTax
-                discounts += item.discountAmountWithoutTax
-                sub += item.totalWithoutTax
-                tx += item.taxAmount
-                cnt += item.quantity.toInt().coerceAtLeast(1)
-            }
-            val globalDiscountAmount = if (globalDiscountPercent > 0.0) {
-                BigDecimal.valueOf(sub * (globalDiscountPercent / 100.0))
-                    .setScale(2, RoundingMode.HALF_UP)
-                    .toDouble()
-            } else 0.0
-            val subAfterGlobalDiscount = (sub - globalDiscountAmount).coerceAtLeast(0.0)
-            val txFactor = if (sub > 0.0) subAfterGlobalDiscount / sub else 1.0
-            val adjustedTx = BigDecimal.valueOf(tx * txFactor).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val tot = BigDecimal.valueOf(subAfterGlobalDiscount + adjustedTx).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalSub = BigDecimal.valueOf(subAfterGlobalDiscount).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalGrossSub = BigDecimal.valueOf(grossSub).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalDiscounts = BigDecimal.valueOf(discounts + globalDiscountAmount).setScale(2, RoundingMode.HALF_UP).toDouble()
-            val finalTx = adjustedTx
-            return PosCartSummary(
-                subtotal = finalSub,
-                tax = finalTx,
-                total = tot,
-                itemCount = cnt,
-                grossSubtotal = finalGrossSub,
-                discountTotal = finalDiscounts,
-                itemDiscounts = discounts,
-                globalDiscountAmount = globalDiscountAmount,
-            )
-        }
+        get() = cachedSummary ?: calculateCartSummary(cart, globalDiscountPercent)
 
     val displayItems: List<ItemCarrito>
         get() {

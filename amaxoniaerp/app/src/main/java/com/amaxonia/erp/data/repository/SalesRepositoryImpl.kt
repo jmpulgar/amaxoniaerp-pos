@@ -14,6 +14,8 @@ import com.amaxonia.erp.data.remote.getFacturaPrintPayload
 import com.amaxonia.erp.data.remote.getFormasPago
 import com.amaxonia.erp.data.remote.processSale
 import com.amaxonia.erp.domain.repository.SalesRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class SalesRepositoryImpl(
     private val apiService: ApiService,
@@ -30,26 +32,30 @@ class SalesRepositoryImpl(
     }
 
     override suspend fun processSale(request: ProcessSaleRequestDto): Result<ProcessSaleResponseDto> =
-        runCatching {
-            val (token, adminDb) = getContext()
-            apiService.processSale(token, adminDb, request)
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val (token, adminDb) = getContext()
+                apiService.processSale(token, adminDb, request)
+            }
         }
 
     override suspend fun getFormasPago(cajaId: String?): Result<List<FormaPagoDto>> =
-        runCatching {
-            val isOnline = networkMonitor?.isOnline() ?: true
-            if (!isOnline) {
-                return@runCatching readFromRoom(cajaId)
-            }
-            val (token, adminDb) = getContext()
-            val response = apiService.getFormasPago(token, adminDb, cajaId)
-            response.data
-        }.recoverCatching { error ->
-            val fromRoom = readFromRoom(cajaId)
-            if (fromRoom.isNotEmpty()) {
-                fromRoom
-            } else {
-                throw error
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val isOnline = networkMonitor?.isOnline() ?: true
+                if (!isOnline) {
+                    return@runCatching readFromRoom(cajaId)
+                }
+                val (token, adminDb) = getContext()
+                val response = apiService.getFormasPago(token, adminDb, cajaId)
+                response.data
+            }.recoverCatching { error ->
+                val fromRoom = readFromRoom(cajaId)
+                if (fromRoom.isNotEmpty()) {
+                    fromRoom
+                } else {
+                    throw error
+                }
             }
         }
 
@@ -78,15 +84,19 @@ class SalesRepositoryImpl(
         )
 
     override suspend fun getPrintPayload(facturaId: String): Result<FacturaPrintPayloadDto> =
-        runCatching {
-            val (token, adminDb) = getContext()
-            apiService.getFacturaPrintPayload(token, adminDb, facturaId)
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val (token, adminDb) = getContext()
+                apiService.getFacturaPrintPayload(token, adminDb, facturaId)
+            }
         }
 
     override suspend fun anularFacturaPendiente(facturaId: String): Result<Unit> =
-        runCatching {
-            val (token, adminDb) = getContext()
-            apiService.anularFacturaPendiente(token, adminDb, facturaId)
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val (token, adminDb) = getContext()
+                apiService.anularFacturaPendiente(token, adminDb, facturaId)
+            }
         }
 }
 

@@ -25,10 +25,12 @@ import com.amaxonia.erp.domain.model.CierreCajaResponse
 import com.amaxonia.erp.domain.model.CierreCajaSummary
 import com.amaxonia.erp.domain.model.SaveCajaRequest
 import com.amaxonia.erp.domain.repository.CajaRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import java.util.UUID
 
@@ -50,6 +52,8 @@ class CajaRepositoryImpl(
 
     private val _sessionStatus = MutableStateFlow(CajaSessionStatus.SIN_CAJA)
     override val sessionStatus: StateFlow<CajaSessionStatus> = _sessionStatus.asStateFlow()
+
+    @Volatile private var lastStatusCheckTime: Long = 0L
 
     private suspend fun tenantId(): String {
         val session = localStore.readCompanySession()
@@ -114,12 +118,12 @@ class CajaRepositoryImpl(
         return Pair(session.token, adminDb)
     }
 
-    override suspend fun getCajas(): Result<List<Caja>> {
+    override suspend fun getCajas(): Result<List<Caja>> = withContext(Dispatchers.IO) {
         val isOnline = networkMonitor?.isOnline() ?: true
         val cached = localStore.readCajas()
 
         if (!isOnline) {
-            return if (cached.isNotEmpty()) {
+            return@withContext if (cached.isNotEmpty()) {
                 Result.success(cached)
             } else {
                 val active = localStore.readActiveCajaSnapshot()
@@ -127,9 +131,9 @@ class CajaRepositoryImpl(
             }
         }
 
-        return runCatching {
+        runCatching {
             val (token, adminDb) = getContext()
-            val response = apiService.getCajas(token, adminDb, all = true)
+            val response = apiService.getCajas(token, adminDb, all = false)
             if (response.isNotEmpty()) {
                 localStore.saveCajas(response)
             }
@@ -144,52 +148,59 @@ class CajaRepositoryImpl(
         }
     }
 
-    override suspend fun createCaja(request: SaveCajaRequest): Result<Caja> =
+    override suspend fun createCaja(request: SaveCajaRequest): Result<Caja> = withContext(Dispatchers.IO) {
         runCatching {
             val (token, adminDb) = getContext()
             apiService.createCaja(token, adminDb, request)
         }
+    }
 
-    override suspend fun updateCaja(id: String, request: SaveCajaRequest): Result<Caja> =
+    override suspend fun updateCaja(id: String, request: SaveCajaRequest): Result<Caja> = withContext(Dispatchers.IO) {
         runCatching {
             val (token, adminDb) = getContext()
             apiService.updateCaja(token, adminDb, id, request)
         }
+    }
 
-    override suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String> =
+    override suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val (token, adminDb) = getContext()
             val response = apiService.getNextSecuenciaCodigo(token, adminDb, idCaja)
             response.codigo
         }
+    }
 
     override suspend fun restoreActiveCajaIfValid() {
-        val caja = localStore.readActiveCajaSnapshot()
-            ?: localStore.readActiveCaja()?.let { (id, name) -> Caja(idCaja = id, caja = name, descripcion = name) }
-        if (caja != null && caja.idCaja.isNotBlank()) {
-            _activeCajaName.update { caja.displayName }
-            _activeCaja.update { caja }
-            val persistedSecuencia = restorePersistedSesion(caja.idCaja)
-            if (persistedSecuencia != null) {
-                _activeCajaSecuencia.update { persistedSecuencia }
-                _sessionStatus.update { CajaSessionStatus.ABIERTA }
-            } else {
-                _sessionStatus.update { CajaSessionStatus.PENDIENTE_APERTURA }
-            }
+        withContext(Dispatchers.IO) {
+            val caja = localStore.readActiveCajaSnapshot()
+                ?: localStore.readActiveCaja()?.let { (id, name) -> Caja(idCaja = id, caja = name, descripcion = name) }
+            if (caja != null && caja.idCaja.isNotBlank()) {
+                _activeCajaName.update { caja.displayName }
+                _activeCaja.update { caja }
+                val persistedSecuencia = restorePersistedSesion(caja.idCaja)
+                if (persistedSecuencia != null) {
+                    _activeCajaSecuencia.update { persistedSecuencia }
+                    _sessionStatus.update { CajaSessionStatus.ABIERTA }
+                } else {
+                    _sessionStatus.update { CajaSessionStatus.PENDIENTE_APERTURA }
+                }
 
-            val isOnline = networkMonitor?.isOnline() ?: true
-            if (isOnline) {
-                checkCajaStatus(caja.idCaja)
+                val now = System.currentTimeMillis()
+                val isOnline = networkMonitor?.isOnline() ?: true
+                if (isOnline && (now - lastStatusCheckTime > 30_000L)) {
+                    lastStatusCheckTime = now
+                    checkCajaStatus(caja.idCaja)
+                }
+            } else {
+                _activeCajaName.update { "Caja no seleccionada" }
+                _activeCaja.update { null }
+                _activeCajaSecuencia.update { null }
+                _sessionStatus.update { CajaSessionStatus.SIN_CAJA }
             }
-        } else {
-            _activeCajaName.update { "Caja no seleccionada" }
-            _activeCaja.update { null }
-            _activeCajaSecuencia.update { null }
-            _sessionStatus.update { CajaSessionStatus.SIN_CAJA }
         }
     }
 
-    override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> =
+    override suspend fun checkCajaStatus(cajaId: String): Result<CajaStatusResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val isOnline = networkMonitor?.isOnline() ?: true
             if (!isOnline) {
@@ -233,6 +244,7 @@ class CajaRepositoryImpl(
                 throw error
             }
         }
+    }
 
     override suspend fun openCaja(request: AperturaRequest): Result<CajaStatusResponse> =
         runCatching {

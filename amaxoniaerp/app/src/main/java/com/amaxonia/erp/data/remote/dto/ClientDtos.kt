@@ -1,5 +1,6 @@
 package com.amaxonia.erp.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -22,7 +23,13 @@ data class ClientDto(
     val photoFilename: String? = null,
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
-)
+    @SerialName("aplica_itbms")
+    @Serializable(with = LenientStringSerializer::class)
+    val aplicaItbms: String? = null,
+) {
+    val resolvedAplicaItbms: Boolean
+        get() = aplicaItbms == null || aplicaItbms == "1" || aplicaItbms.equals("true", ignoreCase = true) || aplicaItbms.equals("si", ignoreCase = true)
+}
 
 @Serializable
 data class CreateClientRequest(

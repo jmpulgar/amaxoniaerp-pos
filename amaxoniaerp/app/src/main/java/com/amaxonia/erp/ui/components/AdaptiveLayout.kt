@@ -37,6 +37,20 @@ fun isTabletLandscape(): Boolean =
     isLandscape() && isWideScreen()
 
 /**
+ * Determina si la pantalla es de tamaño mediano/grande de laptop o tablet POS (ancho >= 900dp).
+ */
+@Composable
+fun isLargeScreen(): Boolean =
+    LocalConfiguration.current.screenWidthDp >= 900
+
+/**
+ * Determina si la pantalla es de tamaño grande (laptops y pantallas de mostrador de 14", 15", 16" o más, ancho >= 1150dp).
+ */
+@Composable
+fun isExtraLargeScreen(): Boolean =
+    LocalConfiguration.current.screenWidthDp >= 1150
+
+/**
  * Provee la altura actual de la pantalla en dp.
  */
 @Composable

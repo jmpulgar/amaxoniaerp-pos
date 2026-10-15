@@ -14,13 +14,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,6 +46,7 @@ fun CajaOptionsModal(
     onDismiss: () -> Unit,
     onSelectApertura: () -> Unit,
     onSelectCierre: () -> Unit,
+    onNavigateToCajas: (() -> Unit)? = null,
     isCajaOpen: Boolean = false,
 ) {
     Dialog(
@@ -120,6 +124,36 @@ fun CajaOptionsModal(
                             onSelectCierre()
                         },
                     )
+                }
+
+                if (onNavigateToCajas != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onNavigateToCajas()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF2C3E50),
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = Color(0xFF2C3E50),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Cambiar / Administrar Cajas",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))

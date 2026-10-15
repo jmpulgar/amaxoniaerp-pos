@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,7 +38,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -60,9 +65,11 @@ import com.amaxonia.erp.domain.model.DenominacionesCatalogo
 import com.amaxonia.erp.domain.model.MonedaDenominacion
 import com.amaxonia.erp.ui.components.AdaptiveImage
 import com.amaxonia.erp.ui.components.isLandscape
+import com.amaxonia.erp.ui.components.isLargeScreen
 import java.util.Locale
 
 import com.amaxonia.erp.ui.theme.FlowHeaderGradient
+import com.amaxonia.erp.ui.theme.FlowTableTextMuted
 
 private val WebMintBg = Color(0xFFECFFFB)
 private val WebMintBorder = Color(0xFFCCF9EF)
@@ -109,6 +116,17 @@ fun PaymentDialog(
 
     val canProcess = !state.isProcessingSale && total > 0.0 && remainingBalance <= 0.001
     val isLandscape = isLandscape()
+    val isLarge = isLargeScreen()
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+
+    val isSmallHeight = screenHeight < 560
+    val isSmallDevice = screenWidth < 900 || screenHeight < 560
+    val isExtraLarge = screenWidth >= 1150 && screenHeight >= 700
+
+    val rightColumnWidth = if (isExtraLarge) 440.dp else if (isLarge) 380.dp else 330.dp
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -116,8 +134,9 @@ fun PaymentDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(if (isLandscape) 0.90f else 0.98f)
-                .fillMaxHeight(if (isLandscape) 0.94f else 0.98f)
+                .widthIn(max = if (isExtraLarge) 1240.dp else if (isLarge) 1100.dp else 980.dp)
+                .fillMaxWidth(if (isLandscape) (if (isSmallDevice) 0.98f else 0.94f) else 0.98f)
+                .fillMaxHeight(if (isLandscape) (if (isSmallHeight) 0.98f else 0.94f) else 0.98f)
                 .clip(RoundedCornerShape(14.dp)),
             color = Color.White,
             shadowElevation = 16.dp,
@@ -129,7 +148,7 @@ fun PaymentDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height(if (isSmallHeight) 46.dp else if (isLarge) 60.dp else 52.dp)
                         .background(FlowHeaderGradient)
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -143,25 +162,25 @@ fun PaymentDialog(
                             imageVector = Icons.Default.MonetizationOn,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(if (isLarge) 28.dp else 24.dp),
                         )
                         Text(
                             text = "Métodos de Pago",
                             color = Color.White,
-                            fontSize = 18.sp,
+                            fontSize = if (isLarge) 20.sp else 18.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         // Botón Limpiar Todo (#btnLimpiar)
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(if (isLarge) 40.dp else 34.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(WebAmberBroom)
                                 .clickable { onClearPayments() },
                             contentAlignment = Alignment.Center,
@@ -170,15 +189,15 @@ fun PaymentDialog(
                                 imageVector = Icons.Default.AutoFixHigh,
                                 contentDescription = "Limpiar Todo",
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(if (isLarge) 22.dp else 18.dp),
                             )
                         }
 
                         // Botón Cerrar (#btnCerrar)
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(if (isLarge) 40.dp else 34.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(WebDangerRed)
                                 .clickable { onDismiss() },
                             contentAlignment = Alignment.Center,
@@ -187,7 +206,7 @@ fun PaymentDialog(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cerrar",
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(if (isLarge) 24.dp else 20.dp),
                             )
                         }
                     }
@@ -215,6 +234,9 @@ fun PaymentDialog(
                         ) {
                             PaymentMethodsList(
                                 state = state,
+                                isLarge = isLarge,
+                                isSmallDevice = isSmallDevice,
+                                isSmallHeight = isSmallHeight,
                                 onPaymentMethodBadgeClick = onPaymentMethodBadgeClick,
                                 onSelectActiveInput = onSelectActiveInput,
                                 onClearSinglePaymentMethod = onClearSinglePaymentMethod,
@@ -226,9 +248,10 @@ fun PaymentDialog(
                         // Columna Derecha: Totales contables (.formapago-right) y Teclado
                         Column(
                             modifier = Modifier
-                                .width(430.dp)
-                                .fillMaxHeight(),
-                            verticalArrangement = Arrangement.SpaceBetween,
+                                .width(rightColumnWidth)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(if (isSmallHeight) 4.dp else 8.dp),
                         ) {
                             PaymentTotalsPanel(
                                 subtotal = subtotal,
@@ -240,54 +263,73 @@ fun PaymentDialog(
                                 remainingBalance = remainingBalance,
                                 cashEntered = cashEntered,
                                 changeAmount = changeAmount,
+                                isLarge = isLarge,
+                                isSmallHeight = isSmallHeight,
                             )
 
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            // Botón Procesar (#btnAceptar)
-                            Button(
-                                onClick = onConfirmPayment,
-                                enabled = canProcess,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (canProcess) WebSuccessGreen else Color(0xFF94A3B8),
-                                    disabledContainerColor = Color(0xFFCBD5E1),
-                                ),
+                            // Bloque Calculadora + Botón Procesar directamente encima
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(if (isSmallHeight) 4.dp else 6.dp),
                             ) {
-                                if (state.isProcessingSale) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                                } else {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(28.dp),
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = "Procesar",
-                                            color = Color.White,
-                                            fontSize = 22.sp,
-                                            fontWeight = FontWeight.Bold,
-                                        )
+                                // Botón Procesar (#btnAceptar) directamente encima del teclado
+                                Button(
+                                    onClick = onConfirmPayment,
+                                    enabled = canProcess,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(if (isSmallHeight) 42.dp else if (isLarge) 54.dp else 48.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (canProcess) WebSuccessGreen else Color(0xFF94A3B8),
+                                        disabledContainerColor = Color(0xFFCBD5E1),
+                                    ),
+                                ) {
+                                    if (state.isProcessingSale) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(if (isSmallHeight) 20.dp else if (isLarge) 26.dp else 22.dp),
+                                                )
+                                                Text(
+                                                    text = "Procesar",
+                                                    color = Color.White,
+                                                    fontSize = if (isSmallHeight) 16.sp else if (isLarge) 20.sp else 18.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                            Text(
+                                                text = "$ ${String.format(Locale.US, "%.2f", total)}",
+                                                color = Color.White,
+                                                fontSize = if (isSmallHeight) 18.sp else if (isLarge) 22.sp else 19.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                            )
+                                        }
                                     }
                                 }
+
+                                // Teclado Numérico (#formapago-keyboard)
+                                WebNumericKeypad(
+                                    onKeypadInput = onKeypadInput,
+                                    isLarge = isLarge,
+                                    isSmallHeight = isSmallHeight,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                             }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            // Teclado Numérico (#formapago-keyboard)
-                            WebNumericKeypad(
-                                onKeypadInput = onKeypadInput,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
                         }
                     }
                 } else {
@@ -309,6 +351,8 @@ fun PaymentDialog(
                             remainingBalance = remainingBalance,
                             cashEntered = cashEntered,
                             changeAmount = changeAmount,
+                            isLarge = isLarge,
+                            isSmallHeight = isSmallHeight,
                         )
 
                         Box(
@@ -321,6 +365,9 @@ fun PaymentDialog(
                         ) {
                             PaymentMethodsList(
                                 state = state,
+                                isLarge = isLarge,
+                                isSmallDevice = isSmallDevice,
+                                isSmallHeight = isSmallHeight,
                                 onPaymentMethodBadgeClick = onPaymentMethodBadgeClick,
                                 onSelectActiveInput = onSelectActiveInput,
                                 onClearSinglePaymentMethod = onClearSinglePaymentMethod,
@@ -334,7 +381,7 @@ fun PaymentDialog(
                             enabled = canProcess,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp),
+                                .height(if (isSmallHeight) 44.dp else if (isLarge) 54.dp else 48.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (canProcess) WebSuccessGreen else Color(0xFF94A3B8),
@@ -345,21 +392,34 @@ fun PaymentDialog(
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                             } else {
                                 Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(28.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(if (isLarge) 26.dp else 22.dp),
+                                        )
+                                        Text(
+                                            text = "Procesar",
+                                            color = Color.White,
+                                            fontSize = if (isLarge) 20.sp else 18.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
                                     Text(
-                                        text = "Procesar",
+                                        text = "$ ${String.format(Locale.US, "%.2f", total)}",
                                         color = Color.White,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontSize = if (isLarge) 22.sp else 19.sp,
+                                        fontWeight = FontWeight.ExtraBold,
                                     )
                                 }
                             }
@@ -367,6 +427,8 @@ fun PaymentDialog(
 
                         WebNumericKeypad(
                             onKeypadInput = onKeypadInput,
+                            isLarge = isLarge,
+                            isSmallHeight = isSmallHeight,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -379,6 +441,9 @@ fun PaymentDialog(
 @Composable
 private fun PaymentMethodsList(
     state: PosUiState,
+    isLarge: Boolean = false,
+    isSmallDevice: Boolean = false,
+    isSmallHeight: Boolean = false,
     onPaymentMethodBadgeClick: (FormaPagoDto) -> Unit,
     onSelectActiveInput: (Int) -> Unit,
     onClearSinglePaymentMethod: (Int) -> Unit,
@@ -389,7 +454,7 @@ private fun PaymentMethodsList(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isSmallHeight) 6.dp else 8.dp),
     ) {
         state.paymentMethods.forEach { method ->
             val isCash = isCashPaymentMethod(method)
@@ -404,6 +469,9 @@ private fun PaymentMethodsList(
                 isActive = isActive,
                 amountText = textVal,
                 isDenominationsExpanded = isCash && state.expandedCashDenominations,
+                isLarge = isLarge,
+                isSmallDevice = isSmallDevice,
+                isSmallHeight = isSmallHeight,
                 baseUrl = state.apiBaseUrl,
                 countryCode = state.countryCode,
                 companyDb = state.companyDb,
@@ -424,6 +492,9 @@ private fun PaymentMethodRow(
     isActive: Boolean,
     amountText: String,
     isDenominationsExpanded: Boolean,
+    isLarge: Boolean = false,
+    isSmallDevice: Boolean = false,
+    isSmallHeight: Boolean = false,
     baseUrl: String,
     countryCode: String,
     companyDb: String,
@@ -433,6 +504,11 @@ private fun PaymentMethodRow(
     onToggleDenominations: () -> Unit,
     onAddDenomination: (Double) -> Unit,
 ) {
+    val rowHeight = if (isSmallHeight) 42.dp else if (isLarge) 56.dp else 48.dp
+    val badgeWidth = if (isLarge) 190.dp else if (isSmallDevice) 125.dp else 150.dp
+    val actionBtnSize = if (isSmallHeight) 34.dp else if (isLarge) 44.dp else 38.dp
+    val amountFontSize = if (isSmallHeight) 18.sp else if (isLarge) 24.sp else 20.sp
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -443,15 +519,15 @@ private fun PaymentMethodRow(
                 color = if (isActive) WebBrandBlue else WebMintBorder,
                 shape = RoundedCornerShape(10.dp),
             )
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(if (isSmallHeight) 5.dp else if (isLarge) 8.dp else 6.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isSmallHeight) 4.dp else 6.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .height(rowHeight),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isSmallDevice) 6.dp else 8.dp),
         ) {
             val imageUrl = remember(method.idFormaPago, method.imagen, baseUrl, countryCode, companyDb) {
                 ImageUrlHelper.paymentMethodImageUrl(
@@ -466,25 +542,25 @@ private fun PaymentMethodRow(
             // 1. Botón Badge de la Forma de Pago (.btn-formapago)
             Box(
                 modifier = Modifier
-                    .width(160.dp)
+                    .width(badgeWidth)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFFE0F7FA))
                     .border(1.dp, Color(0xFFB2EBF2), RoundedCornerShape(8.dp))
                     .clickable { onBadgeClick() }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = if (isSmallDevice) 6.dp else 8.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (isSmallDevice) 4.dp else 8.dp),
                 ) {
                     if (imageUrl.isNotBlank()) {
                         AdaptiveImage(
                             source = imageUrl,
                             contentDescription = method.descripcion,
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(if (isSmallHeight) 20.dp else if (isLarge) 30.dp else 24.dp)
                                 .clip(RoundedCornerShape(4.dp)),
                             contentScale = ContentScale.Fit,
                             fallback = {},
@@ -492,7 +568,7 @@ private fun PaymentMethodRow(
                     }
                     Text(
                         text = method.descripcion ?: method.codigo ?: "Método",
-                        fontSize = 12.sp,
+                        fontSize = if (isSmallDevice) 11.sp else if (isLarge) 14.sp else 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = WebTealText,
                         maxLines = 1,
@@ -505,7 +581,7 @@ private fun PaymentMethodRow(
             // Botón Limpiar Fila (.btn-warning / escoba)
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(actionBtnSize)
                     .clip(RoundedCornerShape(8.dp))
                     .background(WebAmberBroomLight)
                     .border(1.dp, Color(0xFFFFE082), RoundedCornerShape(8.dp))
@@ -516,7 +592,7 @@ private fun PaymentMethodRow(
                     imageVector = Icons.Default.AutoFixHigh,
                     contentDescription = "Limpiar fila",
                     tint = WebAmberBroomIcon,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(if (isSmallHeight) 16.dp else if (isLarge) 20.dp else 18.dp),
                 )
             }
 
@@ -533,20 +609,20 @@ private fun PaymentMethodRow(
                         shape = RoundedCornerShape(8.dp),
                     )
                     .clickable { onInputClick() }
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = if (isSmallDevice) 8.dp else 12.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 if (amountText.isBlank()) {
                     Text(
                         text = "0.00",
-                        fontSize = 20.sp,
+                        fontSize = amountFontSize,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFCBD5E1),
                     )
                 } else {
                     Text(
                         text = amountText,
-                        fontSize = 20.sp,
+                        fontSize = amountFontSize,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A),
                     )
@@ -557,7 +633,7 @@ private fun PaymentMethodRow(
             if (isCash) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(actionBtnSize)
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isDenominationsExpanded) Color(0xFF1E5FE0) else WebBrandBlue)
                         .clickable { onToggleDenominations() },
@@ -567,7 +643,7 @@ private fun PaymentMethodRow(
                         imageVector = if (isDenominationsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = "Desplegar billetes",
                         tint = Color.White,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(if (isSmallHeight) 20.dp else if (isLarge) 24.dp else 22.dp),
                     )
                 }
             }
@@ -582,12 +658,12 @@ private fun PaymentMethodRow(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFFF1F5F9))
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(if (isLarge) 10.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = "Billetes y Monedas (toca para sumar al efectivo):",
-                    fontSize = 11.sp,
+                    fontSize = if (isLarge) 13.sp else 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF475569),
                 )
@@ -595,7 +671,7 @@ private fun PaymentMethodRow(
                 // Billetes
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val bills = denominations.filter { !it.esMoneda }
                     for (item in bills) {
@@ -609,7 +685,7 @@ private fun PaymentMethodRow(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp)
+                                .height(if (isLarge) 48.dp else 38.dp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFFD1FAE5))
                                 .border(1.dp, Color(0xFF10B981), RoundedCornerShape(6.dp))
@@ -626,7 +702,7 @@ private fun PaymentMethodRow(
                                 fallback = {
                                     Text(
                                         text = "$${item.valor.toInt()}",
-                                        fontSize = 12.sp,
+                                        fontSize = if (isLarge) 14.sp else 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF065F46),
                                     )
@@ -639,7 +715,7 @@ private fun PaymentMethodRow(
                 // Monedas
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val coins = denominations.filter { it.esMoneda }
                     for (item in coins) {
@@ -653,7 +729,7 @@ private fun PaymentMethodRow(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(32.dp)
+                                .height(if (isLarge) 38.dp else 32.dp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFFE2E8F0))
                                 .border(1.dp, Color(0xFF94A3B8), RoundedCornerShape(6.dp))
@@ -670,7 +746,7 @@ private fun PaymentMethodRow(
                                 fallback = {
                                     Text(
                                         text = "$${String.format(Locale.US, "%.2f", item.valor)}",
-                                        fontSize = 10.sp,
+                                        fontSize = if (isLarge) 12.sp else 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF334155),
                                     )
@@ -695,51 +771,27 @@ private fun PaymentTotalsPanel(
     remainingBalance: Double,
     cashEntered: Double,
     changeAmount: Double,
+    isLarge: Boolean = false,
+    isSmallHeight: Boolean = false,
 ) {
+    var isDesgloseExpanded by remember { mutableStateOf(!isSmallHeight) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isLarge) 6.dp else 4.dp),
     ) {
-        // Subtotal
-        TotalRowCard(
-            label = "Subtotal",
-            icon = Icons.Default.PointOfSale,
-            value = String.format(Locale.US, "%.2f", subtotal),
-        )
-
-        // Fila dual: Impuesto y Descuento
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                TotalRowCard(
-                    label = "Impuesto",
-                    icon = null,
-                    value = String.format(Locale.US, "%.2f", tax),
-                )
-            }
-            Box(modifier = Modifier.weight(1f)) {
-                TotalRowCard(
-                    label = if (discountPercent > 0.0) "${String.format(Locale.US, "%.0f", discountPercent)}% Desc." else "Descuento",
-                    icon = null,
-                    value = String.format(Locale.US, "%.2f", discount),
-                    bgColor = if (discount > 0.0) Color(0xFFDC2626) else WebNavyTotalBg,
-                )
-            }
-        }
-
-        // Total a Cancelar (Destacado en gradiente azul)
+        // Total a Cancelar (Destacado en gradiente azul) con botón para colapsar/desplegar el desglose
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(if (isLarge) 54.dp else 46.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF2488FA), Color(0xFF1E5FE0), Color(0xFF201B82))
                     )
                 )
+                .clickable { isDesgloseExpanded = !isDesgloseExpanded }
                 .padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -756,54 +808,118 @@ private fun PaymentTotalsPanel(
                         imageVector = Icons.Default.PointOfSale,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(if (isLarge) 24.dp else 20.dp),
                     )
                     Text(
-                        text = "Total",
+                        text = "Total a Cancelar",
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = if (isLarge) 17.sp else 15.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                Text(
-                    text = "$ ${String.format(Locale.US, "%.2f", total)}",
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "$ ${String.format(Locale.US, "%.2f", total)}",
+                        color = Color.White,
+                        fontSize = if (isLarge) 24.sp else 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(if (isLarge) 28.dp else 24.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isDesgloseExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isDesgloseExpanded) "Ocultar desglose" else "Ver desglose",
+                            tint = Color.White,
+                            modifier = Modifier.size(if (isLarge) 20.dp else 16.dp),
+                        )
+                    }
+                }
             }
         }
 
-        // Acumulado
-        TotalRowCard(
-            label = "Acumulado",
-            icon = Icons.Default.SyncAlt,
-            value = String.format(Locale.US, "%.2f", totalAccumulated),
-        )
+        // DESGLOSE ORIGINAL COMPLETO (Se oculta/muestra con animación)
+        AnimatedVisibility(visible = isDesgloseExpanded) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(if (isLarge) 6.dp else 4.dp),
+            ) {
+                // Subtotal
+                TotalRowCard(
+                    label = "Subtotal",
+                    icon = Icons.Default.PointOfSale,
+                    value = String.format(Locale.US, "%.2f", subtotal),
+                    isLarge = isLarge,
+                )
 
-        // Saldo (Verde si es 0, rojo si hay pendiente)
-        TotalRowCard(
-            label = "Saldo",
-            icon = Icons.Default.MonetizationOn,
-            value = String.format(Locale.US, "%.2f", remainingBalance),
-            valueColor = if (remainingBalance > 0.001) Color(0xFFFCA5A5) else Color(0xFF86EFAC),
-        )
+                // Fila dual: Impuesto y Descuento
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        TotalRowCard(
+                            label = "Impuesto",
+                            icon = null,
+                            value = String.format(Locale.US, "%.2f", tax),
+                            isLarge = isLarge,
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        TotalRowCard(
+                            label = if (discountPercent > 0.0) "${String.format(Locale.US, "%.0f", discountPercent)}% Desc." else "Descuento",
+                            icon = null,
+                            value = String.format(Locale.US, "%.2f", discount),
+                            isLarge = isLarge,
+                            bgColor = if (discount > 0.0) Color(0xFFDC2626) else WebNavyTotalBg,
+                        )
+                    }
+                }
 
-        // Efectivo Recibido
-        TotalRowCard(
-            label = "Efectivo",
-            icon = Icons.Default.Payments,
-            value = String.format(Locale.US, "%.2f", cashEntered),
-        )
+                // Acumulado
+                TotalRowCard(
+                    label = "Acumulado",
+                    icon = Icons.Default.SyncAlt,
+                    value = String.format(Locale.US, "%.2f", totalAccumulated),
+                    isLarge = isLarge,
+                )
 
-        // Cambio / Vuelto
-        TotalRowCard(
-            label = "Cambio",
-            icon = Icons.Default.Receipt,
-            value = String.format(Locale.US, "%.2f", changeAmount),
-            bgColor = if (changeAmount > 0.001) Color(0xFF166534) else WebNavyTotalBg,
-            valueColor = if (changeAmount > 0.001) Color(0xFFBBF7D0) else Color.White,
-        )
+                // Saldo (Verde si es 0, rojo si hay pendiente)
+                TotalRowCard(
+                    label = "Saldo",
+                    icon = Icons.Default.MonetizationOn,
+                    value = String.format(Locale.US, "%.2f", remainingBalance),
+                    isLarge = isLarge,
+                    valueColor = if (remainingBalance > 0.001) Color(0xFFFCA5A5) else Color(0xFF86EFAC),
+                )
+
+                // Efectivo Recibido
+                TotalRowCard(
+                    label = "Efectivo",
+                    icon = Icons.Default.Payments,
+                    value = String.format(Locale.US, "%.2f", cashEntered),
+                    isLarge = isLarge,
+                )
+
+                // Cambio / Vuelto
+                TotalRowCard(
+                    label = "Cambio",
+                    icon = Icons.Default.Receipt,
+                    value = String.format(Locale.US, "%.2f", changeAmount),
+                    isLarge = isLarge,
+                    bgColor = if (changeAmount > 0.001) Color(0xFF166534) else WebNavyTotalBg,
+                    valueColor = if (changeAmount > 0.001) Color(0xFFBBF7D0) else Color.White,
+                )
+            }
+        }
     }
 }
 
@@ -812,16 +928,17 @@ private fun TotalRowCard(
     label: String,
     icon: ImageVector?,
     value: String,
+    isLarge: Boolean = false,
     bgColor: Color = WebNavyTotalBg,
     valueColor: Color = Color.White,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
+            .height(if (isLarge) 45.dp else 38.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = if (isLarge) 14.dp else 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -838,20 +955,20 @@ private fun TotalRowCard(
                         imageVector = icon,
                         contentDescription = null,
                         tint = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(if (isLarge) 18.dp else 16.dp),
                     )
                 }
                 Text(
                     text = label,
                     color = Color.White,
-                    fontSize = 13.sp,
+                    fontSize = if (isLarge) 14.sp else 13.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             Text(
                 text = "$ $value",
                 color = valueColor,
-                fontSize = 16.sp,
+                fontSize = if (isLarge) 18.sp else 16.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -861,26 +978,34 @@ private fun TotalRowCard(
 @Composable
 private fun WebNumericKeypad(
     onKeypadInput: (String) -> Unit,
+    isLarge: Boolean = false,
+    isSmallHeight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val buttonHeight = if (isSmallHeight) 36.dp else if (isLarge) 48.dp else 40.dp
+    val keypadFontSize = if (isSmallHeight) 16.sp else if (isLarge) 21.sp else 18.sp
+    val rowGap = if (isSmallHeight) 4.dp else if (isLarge) 6.dp else 5.dp
+
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFFF8FAFC))
             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+            .padding(if (isSmallHeight) 5.dp else if (isLarge) 8.dp else 6.dp),
+        verticalArrangement = Arrangement.spacedBy(rowGap),
     ) {
         // Fila 1: 7, 8, 9, ⌫
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowGap),
         ) {
-            KeypadButton(text = "7", onClick = { onKeypadInput("7") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "8", onClick = { onKeypadInput("8") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "9", onClick = { onKeypadInput("9") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "7", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("7") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "8", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("8") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "9", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("9") }, modifier = Modifier.weight(1f))
             KeypadButton(
                 text = "⌫",
+                height = buttonHeight,
+                fontSize = keypadFontSize,
                 onClick = { onKeypadInput("Backspace") },
                 modifier = Modifier.weight(1f),
                 bgColor = Color(0xFFFEE2E2),
@@ -891,13 +1016,15 @@ private fun WebNumericKeypad(
         // Fila 2: 4, 5, 6, C
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowGap),
         ) {
-            KeypadButton(text = "4", onClick = { onKeypadInput("4") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "5", onClick = { onKeypadInput("5") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "6", onClick = { onKeypadInput("6") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "4", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("4") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "5", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("5") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "6", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("6") }, modifier = Modifier.weight(1f))
             KeypadButton(
                 text = "C",
+                height = buttonHeight,
+                fontSize = keypadFontSize,
                 onClick = { onKeypadInput("C") },
                 modifier = Modifier.weight(1f),
                 bgColor = Color(0xFFFEE2E2),
@@ -908,35 +1035,37 @@ private fun WebNumericKeypad(
         // Fila 3: 1, 2, 3, Saldo
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowGap),
         ) {
-            KeypadButton(text = "1", onClick = { onKeypadInput("1") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "2", onClick = { onKeypadInput("2") }, modifier = Modifier.weight(1f))
-            KeypadButton(text = "3", onClick = { onKeypadInput("3") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "1", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("1") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "2", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("2") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "3", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("3") }, modifier = Modifier.weight(1f))
             KeypadButton(
                 text = "Saldo",
+                height = buttonHeight,
+                fontSize = if (isSmallHeight) 12.sp else if (isLarge) 15.sp else 13.sp,
                 onClick = { onKeypadInput("Saldo") },
                 modifier = Modifier.weight(1f),
                 bgColor = Color(0xFFEFF6FF),
                 textColor = WebBrandBlue,
-                fontSize = 13.sp,
             )
         }
 
         // Fila 4: 0 (span 2), . , OK
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowGap),
         ) {
-            KeypadButton(text = "0", onClick = { onKeypadInput("0") }, modifier = Modifier.weight(2f))
-            KeypadButton(text = ".", onClick = { onKeypadInput(".") }, modifier = Modifier.weight(1f))
+            KeypadButton(text = "0", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput("0") }, modifier = Modifier.weight(2f))
+            KeypadButton(text = ".", height = buttonHeight, fontSize = keypadFontSize, onClick = { onKeypadInput(".") }, modifier = Modifier.weight(1f))
             KeypadButton(
                 text = "↵ OK",
+                height = buttonHeight,
+                fontSize = if (isSmallHeight) 12.sp else if (isLarge) 15.sp else 13.sp,
                 onClick = { onKeypadInput("Enter") },
                 modifier = Modifier.weight(1f),
                 bgColor = Color(0xFFDCFCE7),
                 textColor = Color(0xFF16A34A),
-                fontSize = 13.sp,
             )
         }
     }
@@ -947,13 +1076,14 @@ private fun KeypadButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 42.dp,
     bgColor: Color = Color.White,
     textColor: Color = Color(0xFF1E293B),
     fontSize: androidx.compose.ui.unit.TextUnit = 18.sp,
 ) {
     Box(
         modifier = modifier
-            .height(42.dp)
+            .height(height)
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
             .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp))

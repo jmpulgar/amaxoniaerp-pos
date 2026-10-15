@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,7 +59,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amaxonia.erp.domain.model.Client
+import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.SellerSummary
+import com.amaxonia.erp.ui.components.isLargeScreen
 import com.amaxonia.erp.ui.pos.PosCartSummary
 import com.amaxonia.erp.ui.theme.FlowBrandBlue
 import com.amaxonia.erp.ui.theme.FlowBrandGradient
@@ -85,21 +89,26 @@ fun PosInvoiceFormControls(
     seller: SellerSummary?,
     observationText: String,
     customClientName: String = "",
+    clientBranches: List<ClientBranch> = emptyList(),
+    selectedClientBranch: ClientBranch? = null,
     onSelectClient: () -> Unit,
     onSelectSeller: () -> Unit,
     onSearchSellerByCode: (String) -> Unit = {},
     onOpenCustomClientNameDialog: () -> Unit = {},
+    onOpenBranchDialog: () -> Unit = {},
     onAddProductByCode: (String) -> Unit,
     onObservationChange: (String) -> Unit,
     onQuickActionClick: (String) -> Unit = {},
     onOpenProductDialog: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val isLarge = isLargeScreen()
     var productInput by remember { mutableStateOf("") }
 
+    val branchSuffix = selectedClientBranch?.nombreSucursal?.let { " • $it" }.orEmpty()
     val clientText = when {
         client?.code == "CF" && customClientName.isNotBlank() -> "${client.identification} - $customClientName"
-        client != null -> "${client.identification} - ${client.name}"
+        client != null -> "${client.identification} - ${client.name}$branchSuffix"
         else -> "CF - CONSUMIDOR FINAL"
     }
 
@@ -117,11 +126,16 @@ fun PosInvoiceFormControls(
                 icon = Icons.Default.Person,
                 badgeLabel = "Cliente",
                 text = clientText,
+                isLarge = isLarge,
                 modifier = Modifier.weight(1.2f),
                 onBadgeClick = onSelectClient,
                 actionButtons = {
-                    PosPillButton(icon = Icons.Default.Search, tooltip = "Buscar Cliente", onClick = onSelectClient)
-                    PosPillButton(icon = Icons.Default.Edit, tooltip = "Facturar a nombre de", onClick = onOpenCustomClientNameDialog)
+                    PosPillButton(icon = Icons.Default.Search, tooltip = "Buscar Cliente", isLarge = isLarge, onClick = onSelectClient)
+                    PosPillButton(icon = Icons.Default.Edit, tooltip = "Facturar a nombre de", isLarge = isLarge, onClick = onOpenCustomClientNameDialog)
+                    if (clientBranches.size > 1) {
+                        val tooltipBranch = if (selectedClientBranch != null) "Sucursal: ${selectedClientBranch.nombreSucursal}" else "Seleccionar Sucursal"
+                        PosPillButton(icon = Icons.Default.Storefront, tooltip = tooltipBranch, isLarge = isLarge, onClick = onOpenBranchDialog)
+                    }
                 }
             )
 
@@ -131,10 +145,11 @@ fun PosInvoiceFormControls(
                 badgeLabel = "Vendedor",
                 prefixCode = seller?.id?.toString()?.padStart(3, '0') ?: "---",
                 text = seller?.nombre ?: "Sin Asignar",
+                isLarge = isLarge,
                 modifier = Modifier.weight(1f),
                 onBadgeClick = onSelectSeller,
                 actionButtons = {
-                    PosPillButton(icon = Icons.Default.Search, tooltip = "Buscar Vendedor", onClick = onSelectSeller)
+                    PosPillButton(icon = Icons.Default.Search, tooltip = "Buscar Vendedor", isLarge = isLarge, onClick = onSelectSeller)
                 }
             )
         }
@@ -151,6 +166,7 @@ fun PosInvoiceFormControls(
                 badgeLabel = "Producto",
                 placeholder = "Código o lector...",
                 value = productInput,
+                isLarge = isLarge,
                 onValueChange = { productInput = it },
                 onBadgeClick = { onOpenProductDialog(productInput) },
                 onSubmit = {
@@ -166,6 +182,7 @@ fun PosInvoiceFormControls(
                     PosPillButton(
                         icon = Icons.Default.Search,
                         tooltip = "Buscar Productos",
+                        isLarge = isLarge,
                         onClick = {
                             onOpenProductDialog(productInput)
                         }
@@ -185,42 +202,49 @@ fun PosInvoiceFormControls(
                     label = "Pre-Orden",
                     icon = Icons.AutoMirrored.Filled.ListAlt,
                     tint = FlowQuickPreorden,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Pre-Orden") }
                 )
                 QuickActionButton(
                     label = "Apartado",
                     icon = Icons.Default.WorkOutline,
                     tint = FlowQuickApartado,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Apartado") }
                 )
                 QuickActionButton(
                     label = "Presupuesto",
                     icon = Icons.Default.Description,
                     tint = FlowQuickPresupuesto,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Presupuesto") }
                 )
                 QuickActionButton(
                     label = "Anticipo",
                     icon = Icons.Default.BusinessCenter,
                     tint = FlowQuickAnticipo,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Anticipo") }
                 )
                 QuickActionButton(
                     label = "Certificado",
                     icon = Icons.Default.ConfirmationNumber,
                     tint = FlowQuickCertificado,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Certificado") }
                 )
                 QuickActionButton(
                     label = "Puntos",
                     icon = Icons.Default.Stars,
                     tint = FlowQuickPuntos,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Puntos") }
                 )
                 QuickActionButton(
                     label = "Promoción",
                     icon = Icons.Default.CardGiftcard,
                     tint = FlowQuickPromo,
+                    isLarge = isLarge,
                     onClick = { onQuickActionClick("Promoción") }
                 )
             }
@@ -232,6 +256,7 @@ fun PosInvoiceFormControls(
             badgeLabel = "Observación",
             placeholder = "Observación o nota adicional...",
             value = observationText,
+            isLarge = isLarge,
             onValueChange = onObservationChange,
             onSubmit = {},
             modifier = Modifier.fillMaxWidth(),
@@ -242,7 +267,7 @@ fun PosInvoiceFormControls(
 /**
  * Tarjetas de Acción de Totales de la Columna Derecha (Compactas 1:1 Web):
  * - Tarjeta Coral: Descuento acumulado
- * - Tarjeta Azul Real: Botón grande Pagar
+ * - Tarjeta Azul Real: Botón Pagar (compacto)
  */
 @Composable
 fun PosTotalsActionCards(
@@ -252,15 +277,18 @@ fun PosTotalsActionCards(
     onOpenGlobalDiscountDialog: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val isLarge = isLargeScreen()
+
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         // --- Tarjeta 1: Descuento (Roja / Coral con Degradado Flow) ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp)
+                .weight(0.40f)
+                .heightIn(min = 34.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(FlowDiscountGradient)
                 .clickable { onOpenGlobalDiscountDialog() }
@@ -281,7 +309,7 @@ fun PosTotalsActionCards(
                     Text(
                         text = "DESC. ${String.format(Locale.US, "%.0f", globalDiscountPercent)}%",
                         color = Color.White,
-                        fontSize = 10.sp,
+                        fontSize = if (isLarge) 11.sp else 10.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -293,7 +321,7 @@ fun PosTotalsActionCards(
                     Text(
                         text = "$${String.format(Locale.US, "%.2f", summary.discountTotal)}",
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = if (isLarge) 15.sp else 13.5.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -304,7 +332,8 @@ fun PosTotalsActionCards(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(44.dp)
+                .weight(0.60f)
+                .heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(FlowBrandGradient)
                 .clickable { onOpenPayment() }
@@ -319,14 +348,14 @@ fun PosTotalsActionCards(
                 Text(
                     text = "Pagar",
                     color = Color.White,
-                    fontSize = 18.sp,
+                    fontSize = if (isLarge) 18.sp else 16.sp,
                     fontWeight = FontWeight.ExtraBold,
                 )
 
                 Text(
                     text = "$${String.format(Locale.US, "%.2f", summary.total)}",
                     color = Color.White,
-                    fontSize = 20.sp,
+                    fontSize = if (isLarge) 20.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -357,6 +386,8 @@ fun PosTopControlsSection(
     onOpenProductDialog: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val isLarge = isLargeScreen()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -385,13 +416,13 @@ fun PosTopControlsSection(
             globalDiscountPercent = globalDiscountPercent,
             onOpenPayment = onOpenPayment,
             onOpenGlobalDiscountDialog = onOpenGlobalDiscountDialog,
-            modifier = Modifier.width(220.dp),
+            modifier = Modifier.width(if (isLarge) 240.dp else 220.dp),
         )
     }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPONENTES AUXILIARES COMPACTOS (30-32dp)
+// COMPONENTES AUXILIARES ADAPTABLES
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
@@ -400,15 +431,16 @@ private fun PosInputPill(
     badgeLabel: String,
     text: String,
     prefixCode: String? = null,
+    isLarge: Boolean = false,
     onBadgeClick: () -> Unit = {},
     actionButtons: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
-            .height(32.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, FlowTableBorder, RoundedCornerShape(6.dp))
+            .height(if (isLarge) 46.dp else 34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, FlowTableBorder, RoundedCornerShape(8.dp))
             .background(Color.White),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -418,21 +450,21 @@ private fun PosInputPill(
                 .fillMaxHeight()
                 .background(Color(0xFFEFF3F8))
                 .clickable { onBadgeClick() }
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (isLarge) 12.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = badgeLabel,
                 tint = FlowBrandBlue,
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(if (isLarge) 18.dp else 14.dp),
             )
             Text(
                 text = badgeLabel,
                 color = Color(0xFF334155),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = if (isLarge) 13.sp else 10.5.sp,
+                fontWeight = FontWeight.Bold,
             )
         }
 
@@ -441,14 +473,14 @@ private fun PosInputPill(
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(horizontal = 5.dp),
+                    .padding(horizontal = if (isLarge) 8.dp else 5.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = prefixCode,
                     color = Color(0xFF475569),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = if (isLarge) 13.5.sp else 11.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
             Box(
@@ -463,12 +495,13 @@ private fun PosInputPill(
         Text(
             text = text,
             color = Color(0xFF1E293B),
-            fontSize = 11.sp,
+            fontSize = if (isLarge) 14.5.sp else 11.5.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (isLarge) 10.dp else 6.dp),
         )
 
         // Botones de acción anexados
@@ -487,6 +520,7 @@ private fun PosEditableInputPill(
     badgeLabel: String,
     placeholder: String,
     value: String,
+    isLarge: Boolean = false,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onBadgeClick: () -> Unit = {},
@@ -495,9 +529,9 @@ private fun PosEditableInputPill(
 ) {
     Row(
         modifier = modifier
-            .height(32.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, FlowTableBorder, RoundedCornerShape(6.dp))
+            .height(if (isLarge) 46.dp else 34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(1.dp, FlowTableBorder, RoundedCornerShape(8.dp))
             .background(Color.White),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -507,21 +541,21 @@ private fun PosEditableInputPill(
                 .fillMaxHeight()
                 .background(Color(0xFFEFF3F8))
                 .clickable { onBadgeClick() }
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (isLarge) 12.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = badgeLabel,
                 tint = FlowBrandBlue,
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(if (isLarge) 18.dp else 14.dp),
             )
             Text(
                 text = badgeLabel,
                 color = Color(0xFF334155),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = if (isLarge) 13.sp else 10.5.sp,
+                fontWeight = FontWeight.Bold,
             )
         }
 
@@ -529,14 +563,14 @@ private fun PosEditableInputPill(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (isLarge) 10.dp else 6.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (value.isEmpty()) {
                 Text(
                     text = placeholder,
                     color = Color(0xFF94A3B8),
-                    fontSize = 11.sp,
+                    fontSize = if (isLarge) 14.5.sp else 11.5.sp,
                 )
             }
             BasicTextField(
@@ -545,8 +579,8 @@ private fun PosEditableInputPill(
                 singleLine = true,
                 textStyle = TextStyle(
                     color = Color(0xFF1E293B),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal,
+                    fontSize = if (isLarge) 14.5.sp else 11.5.sp,
+                    fontWeight = FontWeight.Medium,
                 ),
                 cursorBrush = SolidColor(FlowBrandBlue),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -568,12 +602,13 @@ private fun PosEditableInputPill(
 private fun PosPillButton(
     icon: ImageVector,
     tooltip: String,
+    isLarge: Boolean = false,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxHeight()
-            .width(28.dp)
+            .width(if (isLarge) 42.dp else 30.dp)
             .background(FlowBrandBlue)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
@@ -582,7 +617,7 @@ private fun PosPillButton(
             imageVector = icon,
             contentDescription = tooltip,
             tint = Color.White,
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(if (isLarge) 19.dp else 14.dp),
         )
     }
 }
@@ -592,15 +627,16 @@ private fun QuickActionButton(
     label: String,
     icon: ImageVector,
     tint: Color,
+    isLarge: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(5.dp))
+            .height(if (isLarge) 42.dp else 30.dp)
+            .clip(RoundedCornerShape(8.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(5.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, FlowTableBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -608,21 +644,21 @@ private fun QuickActionButton(
         Row(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (isLarge) 12.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = tint,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(if (isLarge) 17.dp else 13.dp),
             )
             Text(
                 text = label,
                 color = Color(0xFF334155),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = if (isLarge) 13.sp else 10.5.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
         }

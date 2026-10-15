@@ -53,6 +53,7 @@ data class Product(
 @Serializable
 data class PriceLevel(
     val label: String,
+    val name: String = label,
     val price: Double = 0.0,
     val utilityPercent: Double = 0.0,
     val pricePlusUtility: Double = 0.0,

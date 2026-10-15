@@ -424,9 +424,14 @@ private fun ActiveCajaFeaturedCard(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        caja.sucursalNombre?.let { suc ->
+                        val metaParts = listOfNotNull(
+                            caja.codCaja?.takeIf { it.isNotBlank() }?.let { "Cód: $it" },
+                            caja.sucursalNombre?.takeIf { it.isNotBlank() }?.let { "Sucursal: $it" },
+                            caja.almacenNombre?.takeIf { it.isNotBlank() }?.let { "Almacén: $it" },
+                        )
+                        if (metaParts.isNotEmpty()) {
                             Text(
-                                text = "Sucursal: $suc",
+                                text = metaParts.joinToString(" • "),
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -638,8 +643,13 @@ private fun CajaListItemCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                val subtitleParts = listOfNotNull(
+                    caja.codCaja?.takeIf { it.isNotBlank() }?.let { "Cód: $it" },
+                    caja.sucursalNombre?.takeIf { it.isNotBlank() },
+                    caja.almacenNombre?.takeIf { it.isNotBlank() },
+                ).ifEmpty { listOf("ID: ${caja.idCaja.take(8)}") }
                 Text(
-                    text = "ID: ${caja.idCaja}${if (caja.sucursalNombre != null) " • ${caja.sucursalNombre}" else ""}",
+                    text = subtitleParts.joinToString(" • "),
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

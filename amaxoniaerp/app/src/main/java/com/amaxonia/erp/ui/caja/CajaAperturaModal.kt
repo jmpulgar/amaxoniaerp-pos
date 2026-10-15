@@ -47,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,7 @@ import com.amaxonia.erp.domain.model.DenominacionesCatalogo
 import com.amaxonia.erp.domain.model.MonedaDenominacion
 import com.amaxonia.erp.domain.model.SellerSummary
 import com.amaxonia.erp.ui.components.AdaptiveImage
+import com.amaxonia.erp.ui.components.isLargeScreen
 import com.amaxonia.erp.ui.theme.FlowHeaderGradient
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -116,7 +118,18 @@ fun CajaAperturaModal(
     var selectedSeller by remember {
         mutableStateOf(currentSeller ?: availableSellers.firstOrNull() ?: SellerSummary(1, "001 VENDEDOR/SALONERO #1"))
     }
-    var secuenciaText by remember { mutableStateOf("000009") }
+    var secuenciaText by remember { mutableStateOf("000001") }
+
+    LaunchedEffect(activeCaja?.idCaja) {
+        val id = activeCaja?.idCaja
+        if (!id.isNullOrBlank()) {
+            val next = runCatching { DependencyContainer.cajaRepository.getNextSecuenciaCodigo(id).getOrNull() }.getOrNull()
+            if (!next.isNullOrBlank()) {
+                secuenciaText = next
+            }
+        }
+    }
+
     var observacion by remember { mutableStateOf("") }
     val baseFondoApertura = activeCaja?.fondoApertura ?: 100.0
 
@@ -130,6 +143,7 @@ fun CajaAperturaModal(
     var showWarningLowAmount by remember { mutableStateOf(false) }
 
     val totalCalculado = denominaciones.sumOf { it.monto }
+    val isLarge = isLargeScreen()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -141,7 +155,7 @@ fun CajaAperturaModal(
         Card(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(if (isLarge) 12.dp else 8.dp),
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F3F8)),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
@@ -157,20 +171,20 @@ fun CajaAperturaModal(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(if (isLarge) 52.dp else 44.dp)
                         .background(FlowHeaderGradient)
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = if (isLarge) 14.dp else 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Lado izquierdo: Ícono cuadrado monitor + Título
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(if (isLarge) 34.dp else 28.dp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color.White.copy(alpha = 0.15f))
                                 .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
@@ -180,12 +194,12 @@ fun CajaAperturaModal(
                                 imageVector = Icons.Default.DesktopWindows,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(if (isLarge) 20.dp else 18.dp),
                             )
                         }
                         Text(
                             text = "Apertura de Caja",
-                            fontSize = 15.sp,
+                            fontSize = if (isLarge) 18.sp else 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                         )
@@ -194,12 +208,13 @@ fun CajaAperturaModal(
                     // Lado derecho: Botones de Acción Superiores con estilo idéntico a Facturación
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         // Limpiar
                         HeaderActionModalButton(
                             icon = Icons.Default.AutoFixHigh,
                             label = "Limpiar",
+                            isLarge = isLarge,
                             onClick = {
                                 denominaciones = DenominacionesCatalogo.getDenominacionesPanama()
                                 observacion = ""
@@ -211,6 +226,7 @@ fun CajaAperturaModal(
                             icon = Icons.Default.Save,
                             label = if (isLoading) "Guardando…" else "Guardar",
                             isLoading = isLoading,
+                            isLarge = isLarge,
                             onClick = {
                                 if (totalCalculado < baseFondoApertura && baseFondoApertura > 0.0) {
                                     showWarningLowAmount = true
@@ -231,6 +247,7 @@ fun CajaAperturaModal(
                         HeaderActionModalButton(
                             icon = Icons.AutoMirrored.Filled.Reply,
                             label = "Regresar",
+                            isLarge = isLarge,
                             onClick = onDismiss,
                         )
                     }
@@ -379,7 +396,7 @@ fun CajaAperturaModal(
                                     .fillMaxWidth()
                                     .border(width = 1.dp, color = Color(0xFF1E88E5))
                                     .background(Color.White)
-                                    .padding(vertical = 5.dp, horizontal = 8.dp),
+                                    .padding(vertical = if (isLarge) 8.dp else 5.dp, horizontal = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
@@ -387,14 +404,14 @@ fun CajaAperturaModal(
                                     modifier = Modifier.weight(1.8f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp,
+                                    fontSize = if (isLarge) 13.sp else 11.5.sp,
                                 )
                                 Text(
                                     text = "VALOR",
                                     modifier = Modifier.weight(1.1f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp,
+                                    fontSize = if (isLarge) 13.sp else 11.5.sp,
                                     textAlign = TextAlign.Center,
                                 )
                                 Text(
@@ -402,34 +419,34 @@ fun CajaAperturaModal(
                                     modifier = Modifier.weight(1.1f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 9.5.sp,
+                                    fontSize = if (isLarge) 11.sp else 9.5.sp,
                                     textAlign = TextAlign.Center,
-                                    lineHeight = 11.sp,
+                                    lineHeight = if (isLarge) 13.sp else 11.sp,
                                 )
                                 Text(
                                     text = "CANTIDAD\nSUELTA",
                                     modifier = Modifier.weight(1.1f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 9.5.sp,
+                                    fontSize = if (isLarge) 11.sp else 9.5.sp,
                                     textAlign = TextAlign.Center,
-                                    lineHeight = 11.sp,
+                                    lineHeight = if (isLarge) 13.sp else 11.sp,
                                 )
                                 Text(
                                     text = "CANTIDAD\nTOTAL",
                                     modifier = Modifier.weight(1.1f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 9.5.sp,
+                                    fontSize = if (isLarge) 11.sp else 9.5.sp,
                                     textAlign = TextAlign.Center,
-                                    lineHeight = 11.sp,
+                                    lineHeight = if (isLarge) 13.sp else 11.sp,
                                 )
                                 Text(
                                     text = "MONTO",
                                     modifier = Modifier.weight(1.2f),
                                     color = Color(0xFF1E88E5),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp,
+                                    fontSize = if (isLarge) 13.sp else 11.5.sp,
                                     textAlign = TextAlign.End,
                                 )
                             }
@@ -447,7 +464,7 @@ fun CajaAperturaModal(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(46.dp)
+                                            .height(if (isLarge) 58.dp else 46.dp)
                                             .background(if (index % 2 == 0) Color.White else Color(0xFFFAFAFA))
                                             .border(width = 0.5.dp, color = Color(0xFFF1F5F9))
                                             .padding(horizontal = 8.dp),
@@ -473,13 +490,13 @@ fun CajaAperturaModal(
                                         ) {
                                             Text(
                                                 text = String.format(Locale.US, "%.2f", item.valor),
-                                                fontSize = 13.5.sp,
+                                                fontSize = if (isLarge) 15.sp else 13.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFF1E293B),
                                             )
                                             Text(
                                                 text = "Rollo de ${if (item.rollo > 0) item.rollo else 100} Unidad(es)",
-                                                fontSize = 8.5.sp,
+                                                fontSize = if (isLarge) 10.sp else 8.5.sp,
                                                 color = Color(0xFF94A3B8),
                                             )
                                         }
@@ -533,7 +550,7 @@ fun CajaAperturaModal(
                                             text = if (item.cantidadTotal > 0) item.cantidadTotal.toString() else "",
                                             modifier = Modifier.weight(1.1f),
                                             textAlign = TextAlign.Center,
-                                            fontSize = 13.5.sp,
+                                            fontSize = if (isLarge) 15.sp else 13.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFF1E293B),
                                         )
@@ -543,7 +560,7 @@ fun CajaAperturaModal(
                                             text = String.format(Locale.US, "%.2f", item.monto),
                                             modifier = Modifier.weight(1.2f),
                                             textAlign = TextAlign.End,
-                                            fontSize = 13.5.sp,
+                                            fontSize = if (isLarge) 15.5.sp else 13.5.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color(0xFF334155),
                                         )
@@ -565,7 +582,7 @@ fun CajaAperturaModal(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(46.dp)
+                                    .height(if (isLarge) 58.dp else 46.dp)
                                     .shadow(elevation = 4.dp, shape = RoundedCornerShape(12.dp))
                                     .background(
                                         brush = Brush.horizontalGradient(
@@ -579,7 +596,7 @@ fun CajaAperturaModal(
                                 Text(
                                     text = String.format(Locale.US, "$%.2f", totalCalculado),
                                     color = Color.White,
-                                    fontSize = 24.sp,
+                                    fontSize = if (isLarge) 28.sp else 24.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.5.sp,
                                 )
@@ -589,7 +606,7 @@ fun CajaAperturaModal(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(34.dp)
+                                    .height(if (isLarge) 42.dp else 34.dp)
                                     .border(width = 1.dp, color = Color(0xFFE2E8F0), shape = RoundedCornerShape(8.dp))
                                     .background(Color.White, shape = RoundedCornerShape(8.dp))
                                     .padding(horizontal = 10.dp),
@@ -602,7 +619,7 @@ fun CajaAperturaModal(
                                 Text(
                                     text = activeStr,
                                     color = Color(0xFF475569),
-                                    fontSize = 15.sp,
+                                    fontSize = if (isLarge) 18.sp else 15.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
@@ -701,6 +718,7 @@ fun CajaAperturaModal(
 fun HeaderActionModalButton(
     icon: ImageVector,
     label: String,
+    isLarge: Boolean = false,
     onClick: () -> Unit,
     isLoading: Boolean = false,
 ) {
@@ -710,13 +728,13 @@ fun HeaderActionModalButton(
             .background(Color.White.copy(alpha = 0.15f))
             .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = if (isLarge) 12.dp else 8.dp, vertical = if (isLarge) 6.dp else 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isLarge) 6.dp else 4.dp),
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(15.dp),
+                modifier = Modifier.size(if (isLarge) 18.dp else 15.dp),
                 color = Color.White,
                 strokeWidth = 2.dp,
             )
@@ -725,13 +743,13 @@ fun HeaderActionModalButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = Color.White,
-                modifier = Modifier.size(15.dp),
+                modifier = Modifier.size(if (isLarge) 18.dp else 15.dp),
             )
         }
         Text(
             text = label,
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = if (isLarge) 12.5.sp else 11.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
@@ -752,31 +770,33 @@ fun WebInputPrepend(
     textAlign: TextAlign = TextAlign.Start,
     onValueChange: (String) -> Unit = {},
 ) {
+    val isLarge = isLargeScreen()
+
     Row(
         modifier = modifier
-            .height(34.dp)
-            .border(width = 1.dp, color = Color(0xFFCBD5E1), shape = RoundedCornerShape(4.dp))
-            .background(if (readOnly) Color(0xFFF8FAFC) else Color.White, shape = RoundedCornerShape(4.dp)),
+            .height(if (isLarge) 45.dp else 34.dp)
+            .border(width = 1.dp, color = Color(0xFFCBD5E1), shape = RoundedCornerShape(6.dp))
+            .background(if (readOnly) Color(0xFFF8FAFC) else Color.White, shape = RoundedCornerShape(6.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Bloque prepend azul
         Row(
             modifier = Modifier
-                .background(Color(0xFF1E88E5), shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp))
+                .background(Color(0xFF1E88E5), shape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp))
                 .fillMaxHeight()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = if (isLarge) 12.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = Color.White,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(if (isLarge) 18.dp else 14.dp),
             )
             Text(
                 text = label,
-                fontSize = 11.sp,
+                fontSize = if (isLarge) 13.5.sp else 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
@@ -789,14 +809,14 @@ fun WebInputPrepend(
             readOnly = readOnly,
             singleLine = true,
             textStyle = TextStyle(
-                fontSize = 12.5.sp,
+                fontSize = if (isLarge) 14.5.sp else 12.5.sp,
                 color = Color(0xFF1E293B),
                 fontWeight = FontWeight.SemiBold,
                 textAlign = textAlign,
             ),
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = if (isLarge) 10.dp else 8.dp),
         )
 
         if (isDropdown) {
@@ -804,7 +824,7 @@ fun WebInputPrepend(
                 imageVector = Icons.Default.ArrowDropDown,
                 contentDescription = null,
                 tint = Color(0xFF64748B),
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(if (isLarge) 24.dp else 20.dp),
             )
         }
     }
@@ -820,6 +840,7 @@ fun CurrencyThumbnail(
     countryCode: String = "PA",
     companyDb: String = "",
 ) {
+    val isLarge = isLargeScreen()
     val imageUrl = remember(item.id, item.imagen, baseUrl, countryCode, companyDb) {
         if (!item.imagen.isNullOrBlank()) {
             item.imagen
@@ -830,8 +851,8 @@ fun CurrencyThumbnail(
 
     Box(
         modifier = Modifier
-            .width(62.dp)
-            .height(34.dp),
+            .width(if (isLarge) 76.dp else 62.dp)
+            .height(if (isLarge) 42.dp else 34.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         AdaptiveImage(
@@ -839,7 +860,7 @@ fun CurrencyThumbnail(
             contentDescription = item.denominacion,
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(2.dp)),
+                .clip(RoundedCornerShape(4.dp)),
             contentScale = ContentScale.Fit,
         )
     }
@@ -855,15 +876,17 @@ fun WebTableCellInput(
     onFocus: () -> Unit,
     onValueChange: (String) -> Unit,
 ) {
+    val isLarge = isLargeScreen()
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(30.dp)
+            .height(if (isLarge) 42.dp else 30.dp)
             .background(if (isFocused) Color(0xFFEBF3FE) else Color.Transparent)
             .border(
-                width = if (isFocused) 1.dp else 0.5.dp,
+                width = if (isFocused) 1.5.dp else 0.5.dp,
                 color = if (isFocused) Color(0xFF93C5FD) else Color(0xFFE2E8F0),
-                shape = RoundedCornerShape(2.dp),
+                shape = RoundedCornerShape(4.dp),
             )
             .clickable { onFocus() },
         contentAlignment = Alignment.Center,
@@ -875,7 +898,7 @@ fun WebTableCellInput(
             singleLine = true,
             textStyle = TextStyle(
                 textAlign = TextAlign.Center,
-                fontSize = 13.5.sp,
+                fontSize = if (isLarge) 15.5.sp else 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF1E293B),
             ),
@@ -993,6 +1016,8 @@ fun WebKeypadButton(
     textColor: Color = Color(0xFF1E293B),
     onClick: () -> Unit,
 ) {
+    val isLarge = isLargeScreen()
+
     Box(
         modifier = modifier
             .fillMaxHeight()
@@ -1004,7 +1029,7 @@ fun WebKeypadButton(
     ) {
         Text(
             text = label,
-            fontSize = 17.sp,
+            fontSize = if (isLarge) 20.sp else 17.sp,
             fontWeight = FontWeight.Bold,
             color = textColor,
         )
@@ -1019,6 +1044,8 @@ fun WebKeypadIconButton(
     tint: Color = Color(0xFF475569),
     onClick: () -> Unit,
 ) {
+    val isLarge = isLargeScreen()
+
     Box(
         modifier = modifier
             .fillMaxHeight()
@@ -1032,7 +1059,7 @@ fun WebKeypadIconButton(
             imageVector = icon,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(if (isLarge) 22.dp else 18.dp),
         )
     }
 }

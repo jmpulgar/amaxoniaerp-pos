@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -97,6 +98,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -143,9 +145,11 @@ import com.amaxonia.erp.ui.pos.components.PosTopControlsSection
 import com.amaxonia.erp.ui.pos.components.PosTotalsActionCards
 import com.amaxonia.erp.ui.pos.components.PosWebFooterBar
 import com.amaxonia.erp.ui.pos.components.PosWebHeaderBar
+import com.amaxonia.erp.ui.pos.components.PosKitchenNoteDialog
 import com.amaxonia.erp.ui.pos.components.ProductOptionsDialog
 import com.amaxonia.erp.ui.pos.components.ProductSelectionDialog
 import com.amaxonia.erp.ui.pos.components.BuscarFacturasModal
+import com.amaxonia.erp.ui.pos.components.ClientBranchSelectionDialog
 import com.amaxonia.erp.ui.pos.components.ClientSelectionDialog
 import com.amaxonia.erp.ui.pos.components.SellerSelectionDialog
 import com.amaxonia.erp.ui.pos.components.FlowCatalogTokens
@@ -225,6 +229,8 @@ fun PosTerminalScreen(
                     editValueText = if (item.discountPercent > 0.0) String.format(Locale.US, "%.0f", item.discountPercent) else ""
                 },
                 onPriceLevelChange = viewModel::updateItemPriceLevel,
+                onEditKitchenNote = viewModel::openKitchenNoteDialog,
+                onEditOptions = viewModel::openEditProductOptions,
                 onUpdatePromotionQuantity = viewModel::updatePromotionQuantity,
                 onRemovePromotion = viewModel::removePromotion,
                 onClearCart = viewModel::clearCart,
@@ -235,6 +241,7 @@ fun PosTerminalScreen(
                 onSearchSellerByCode = viewModel::searchSellerByCode,
                 onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
                 onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
+                onOpenBranchDialog = viewModel::openClientBranchDialog,
                 onSelectBranch = viewModel::selectClientBranch,
                 onNavigateToCajas = { viewModel.openCajaOptions() },
                 onRenovarCaja = viewModel::openCajaCierre,
@@ -281,6 +288,8 @@ fun PosTerminalScreen(
                     editValueText = if (item.discountPercent > 0.0) String.format(Locale.US, "%.0f", item.discountPercent) else ""
                 },
                 onPriceLevelChange = viewModel::updateItemPriceLevel,
+                onEditKitchenNote = viewModel::openKitchenNoteDialog,
+                onEditOptions = viewModel::openEditProductOptions,
                 onUpdatePromotionQuantity = viewModel::updatePromotionQuantity,
                 onRemovePromotion = viewModel::removePromotion,
                 onClearCart = viewModel::clearCart,
@@ -291,6 +300,7 @@ fun PosTerminalScreen(
                 onSearchSellerByCode = viewModel::searchSellerByCode,
                 onOpenCustomClientNameDialog = viewModel::openCustomClientNameDialog,
                 onOpenGlobalDiscountDialog = viewModel::openGlobalDiscountDialog,
+                onOpenBranchDialog = viewModel::openClientBranchDialog,
                 onSelectBranch = viewModel::selectClientBranch,
                 onNavigateToCajas = { viewModel.openCajaOptions() },
                 onRenovarCaja = viewModel::openCajaCierre,
@@ -361,6 +371,7 @@ fun PosTerminalScreen(
             onDismiss = viewModel::dismissCajaOptions,
             onSelectApertura = viewModel::openCajaApertura,
             onSelectCierre = viewModel::openCajaCierre,
+            onNavigateToCajas = onNavigateToCajas,
             isCajaOpen = state.isCajaOpen,
         )
     }
@@ -436,6 +447,7 @@ fun PosTerminalScreen(
             products = state.products,
             departments = state.departments,
             isLoading = state.isLoading,
+            onSearch = viewModel::searchProductsModal,
             onAddToCart = { product ->
                 viewModel.addToCart(product)
                 viewModel.dismissProductDialog()
@@ -467,10 +479,30 @@ fun PosTerminalScreen(
             groups = state.optionsGroups,
             isLoading = state.isLoadingOptions,
             errorMessage = state.optionsErrorMessage,
+            initialSelections = state.editingCartItemForOptions?.selectedOptions.orEmpty(),
+            initialQuantity = state.editingCartItemForOptions?.quantity ?: 1.0,
             onDismiss = viewModel::dismissProductOptions,
             onConfirm = { options, qty ->
                 viewModel.confirmProductOptions(product, options, qty)
             },
+        )
+    }
+
+    state.kitchenNoteItem?.let { item ->
+        PosKitchenNoteDialog(
+            item = item,
+            onDismiss = viewModel::dismissKitchenNoteDialog,
+            onSave = { note -> viewModel.updateKitchenNote(item.cartItemId, note) },
+        )
+    }
+
+    if (state.showClientBranchDialog) {
+        ClientBranchSelectionDialog(
+            client = state.selectedClient,
+            branches = state.clientBranches,
+            selectedBranch = state.selectedClientBranch,
+            onSelectBranch = viewModel::selectClientBranch,
+            onDismiss = viewModel::dismissClientBranchDialog,
         )
     }
 
@@ -549,6 +581,8 @@ private fun PosTerminalLandscapeLayout(
     onEditDiscount: (CartItem) -> Unit,
     onEditQuantity: (CartItem) -> Unit = {},
     onPriceLevelChange: (String, String) -> Unit,
+    onEditKitchenNote: (CartItem) -> Unit = {},
+    onEditOptions: (CartItem) -> Unit = {},
     onUpdatePromotionQuantity: (String, Int) -> Unit,
     onRemovePromotion: (String) -> Unit,
     onClearCart: () -> Unit,
@@ -559,6 +593,7 @@ private fun PosTerminalLandscapeLayout(
     onSearchSellerByCode: (String) -> Unit = {},
     onOpenCustomClientNameDialog: () -> Unit = {},
     onOpenGlobalDiscountDialog: () -> Unit = {},
+    onOpenBranchDialog: () -> Unit = {},
     onSelectBranch: (ClientBranch) -> Unit,
     onNavigateToCajas: () -> Unit,
     onRenovarCaja: () -> Unit = {},
@@ -594,7 +629,61 @@ private fun PosTerminalLandscapeLayout(
             onToggleCatalog = onToggleCatalog,
         )
 
-        // Área Central de Trabajo: 2 Columnas Maestras 1:1 Web POS
+        val configuration = LocalConfiguration.current
+        val screenWidth = configuration.screenWidthDp
+        val isLarge = screenWidth >= 950
+
+        // =========================================================================
+        // ESTRUCTURA DE 4 SECCIONES (OPCIÓN A):
+        // 1. FRANJA SUPERIOR:
+        //    - SECCIÓN 1 (Izquierda ~75-80%): Controles de Facturación
+        //      (Cliente, Vendedor, Producto + 7 Opciones de acción, Observación)
+        //    - SECCIÓN 2 (Derecha compacta ~210-240dp): Botones Descuento y Pagar
+        // =========================================================================
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            // SECCIÓN 1: Controles de Facturación (con amplio espacio horizontal)
+            PosInvoiceFormControls(
+                client = state.selectedClient,
+                seller = state.selectedSeller,
+                observationText = state.observationText,
+                customClientName = state.customClientName,
+                clientBranches = state.clientBranches,
+                selectedClientBranch = state.selectedClientBranch,
+                onSelectClient = onSelectClient,
+                onSelectSeller = onChangeSeller,
+                onSearchSellerByCode = onSearchSellerByCode,
+                onOpenCustomClientNameDialog = onOpenCustomClientNameDialog,
+                onOpenBranchDialog = onOpenBranchDialog,
+                onAddProductByCode = onAddProductByCode,
+                onOpenProductDialog = onOpenProductDialog,
+                onObservationChange = onObservationChange,
+                modifier = Modifier.weight(1f),
+            )
+
+            // SECCIÓN 2: Botones Descuento y Pagar (Ocupan toda la altura del formulario)
+            PosTotalsActionCards(
+                summary = state.summary,
+                globalDiscountPercent = state.globalDiscountPercent,
+                onOpenPayment = onOpenPayment,
+                onOpenGlobalDiscountDialog = onOpenGlobalDiscountDialog,
+                modifier = Modifier
+                    .width(if (isLarge) 240.dp else 210.dp)
+                    .fillMaxHeight(),
+            )
+        }
+
+        // =========================================================================
+        // 2. ÁREA DE TRABAJO INFERIOR (100% DE ALTURA DISPONIBLE):
+        //    - SECCIÓN 3 (Izquierda): Tabla contable de productos del carrito
+        //    - SECCIÓN 4 (Derecha): Catálogo de productos con tarjetas amplias
+        // =========================================================================
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -602,84 +691,46 @@ private fun PosTerminalLandscapeLayout(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Columna Izquierda: Facturación y Tabla contable
-            Column(
+            // SECCIÓN 3: Tabla contable de productos del carrito (espaciosa, producto legible)
+            PosCartWebTable(
+                cart = state.cart,
+                summary = state.summary,
+                branchName = state.sucursalNombre.orEmpty().ifEmpty { "Principal" },
+                onIncrement = onIncrement,
+                onDecrement = onDecrement,
+                onRemove = onRemove,
+                onEditPrice = onEditPrice,
+                onEditDiscount = onEditDiscount,
+                onEditQuantity = onEditQuantity,
+                onPriceLevelChange = onPriceLevelChange,
+                onEditKitchenNote = onEditKitchenNote,
+                onEditOptions = onEditOptions,
                 modifier = Modifier
-                    .weight(1.25f)
+                    .weight(if (isLarge) 1.05f else 1.15f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                PosInvoiceFormControls(
-                    client = state.selectedClient,
-                    seller = state.selectedSeller,
-                    observationText = state.observationText,
-                    customClientName = state.customClientName,
-                    onSelectClient = onSelectClient,
-                    onSelectSeller = onChangeSeller,
-                    onSearchSellerByCode = onSearchSellerByCode,
-                    onOpenCustomClientNameDialog = onOpenCustomClientNameDialog,
-                    onAddProductByCode = onAddProductByCode,
-                    onOpenProductDialog = onOpenProductDialog,
-                    onObservationChange = onObservationChange,
-                )
+            )
 
-                if (state.clientBranches.isNotEmpty()) {
-                    ClientSucursalSelectorCard(
-                        sucursales = state.clientBranches,
-                        selectedSucursal = state.selectedClientBranch,
-                        isRequiredMissing = state.branchSelectionRequiredError,
-                        onSelect = onSelectBranch,
-                    )
-                }
-
-                PosCartWebTable(
-                    cart = state.cart,
-                    summary = state.summary,
-                    branchName = state.sucursalNombre.orEmpty().ifEmpty { "Principal" },
-                    onIncrement = onIncrement,
-                    onDecrement = onDecrement,
-                    onRemove = onRemove,
-                    onEditPrice = onEditPrice,
-                    onEditDiscount = onEditDiscount,
-                    onEditQuantity = onEditQuantity,
-                    onPriceLevelChange = onPriceLevelChange,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            // Columna Derecha: Tarjetas de Descuento / Pagar + Catálogo de Productos Web (Siempre visible)
-            Column(
+            // SECCIÓN 4: Catálogo de Productos Web (Aprovecha toda la altura vertical)
+            PosProductCatalogDrawer(
+                isOpen = true,
+                products = state.filteredProducts,
+                departments = state.departments,
+                selectedDepartmentId = state.selectedDepartmentId,
+                searchQuery = state.searchQuery,
+                isLoading = state.isLoading || state.isCatalogLoading,
+                currentPage = state.catalogCurrentPage,
+                totalPages = state.catalogTotalPages,
+                onNextPage = onNextPage,
+                onPrevPage = onPrevPage,
+                onSearchQueryChange = onSearchQueryChange,
+                onDepartmentSelected = onDepartmentSelected,
+                onAddToCart = onAddToCart,
+                onOpenOptions = onQuantityPicker,
+                onClose = {},
                 modifier = Modifier
-                    .weight(0.95f)
+                    .weight(if (isLarge) 1.15f else 1.05f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                PosTotalsActionCards(
-                    summary = state.summary,
-                    globalDiscountPercent = state.globalDiscountPercent,
-                    onOpenPayment = onOpenPayment,
-                    onOpenGlobalDiscountDialog = onOpenGlobalDiscountDialog,
-                )
-
-                PosProductCatalogDrawer(
-                    isOpen = true,
-                    products = state.filteredProducts,
-                    departments = state.departments,
-                    selectedDepartmentId = state.selectedDepartmentId,
-                    searchQuery = state.searchQuery,
-                    isLoading = state.isLoading || state.isCatalogLoading,
-                    currentPage = state.catalogCurrentPage,
-                    totalPages = state.catalogTotalPages,
-                    onNextPage = onNextPage,
-                    onPrevPage = onPrevPage,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onDepartmentSelected = onDepartmentSelected,
-                    onAddToCart = onAddToCart,
-                    onOpenOptions = onQuantityPicker,
-                    onClose = {},
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            )
         }
 
         // Barra Inferior de Estado y Pestañas de Documentos (32dp compacta)
@@ -715,6 +766,8 @@ private fun PosTerminalPortraitLayout(
     onEditDiscount: (CartItem) -> Unit,
     onEditQuantity: (CartItem) -> Unit = {},
     onPriceLevelChange: (String, String) -> Unit,
+    onEditKitchenNote: (CartItem) -> Unit = {},
+    onEditOptions: (CartItem) -> Unit = {},
     onUpdatePromotionQuantity: (String, Int) -> Unit,
     onRemovePromotion: (String) -> Unit,
     onClearCart: () -> Unit,
@@ -725,6 +778,7 @@ private fun PosTerminalPortraitLayout(
     onSearchSellerByCode: (String) -> Unit = {},
     onOpenCustomClientNameDialog: () -> Unit = {},
     onOpenGlobalDiscountDialog: () -> Unit = {},
+    onOpenBranchDialog: () -> Unit = {},
     onSelectBranch: (ClientBranch) -> Unit,
     onNavigateToCajas: () -> Unit,
     onRenovarCaja: () -> Unit = {},
@@ -882,23 +936,17 @@ private fun PosTerminalPortraitLayout(
                         seller = state.selectedSeller,
                         observationText = state.observationText,
                         customClientName = state.customClientName,
+                        clientBranches = state.clientBranches,
+                        selectedClientBranch = state.selectedClientBranch,
                         onSelectClient = onSelectClient,
                         onSelectSeller = onChangeSeller,
                         onSearchSellerByCode = onSearchSellerByCode,
                         onOpenCustomClientNameDialog = onOpenCustomClientNameDialog,
+                        onOpenBranchDialog = onOpenBranchDialog,
                         onAddProductByCode = onAddProductByCode,
                         onOpenProductDialog = onOpenProductDialog,
                         onObservationChange = onObservationChange,
                     )
-
-                    if (state.clientBranches.isNotEmpty()) {
-                        ClientSucursalSelectorCard(
-                            sucursales = state.clientBranches,
-                            selectedSucursal = state.selectedClientBranch,
-                            isRequiredMissing = state.branchSelectionRequiredError,
-                            onSelect = onSelectBranch,
-                        )
-                    }
 
                     PosCartWebTable(
                         cart = state.cart,
@@ -911,6 +959,8 @@ private fun PosTerminalPortraitLayout(
                         onEditDiscount = onEditDiscount,
                         onEditQuantity = onEditQuantity,
                         onPriceLevelChange = onPriceLevelChange,
+                        onEditKitchenNote = onEditKitchenNote,
+                        onEditOptions = onEditOptions,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -1694,7 +1744,7 @@ private fun CompactPriceLevelChip(
     val availableLevels = remember(item.product.prices) {
         item.product.prices.filter { it.pricePlusTax > 0.0 || it.price > 0.0 }.ifEmpty { item.product.prices }
     }
-    val currentLabel = if (item.isManualPrice) "Manual" else "Lista ${item.selectedPriceLabel}"
+    val currentLabel = if (item.isManualPrice) "Manual" else item.priceDisplayName
 
     Box {
         Surface(
@@ -1742,7 +1792,7 @@ private fun CompactPriceLevelChip(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "Lista ${level.label}",
+                                level.displayName,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             )

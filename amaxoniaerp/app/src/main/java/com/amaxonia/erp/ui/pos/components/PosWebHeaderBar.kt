@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amaxonia.erp.ui.components.isLargeScreen
 import com.amaxonia.erp.ui.theme.FlowBrandBlue
 import com.amaxonia.erp.ui.theme.FlowHeaderGradient
 
@@ -50,23 +51,25 @@ fun PosWebHeaderBar(
     onToggleCatalog: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isLarge = isLargeScreen()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(if (isLarge) 48.dp else 44.dp)
             .background(FlowHeaderGradient)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = if (isLarge) 12.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         // --- Izquierda: Hamburguesa + Título + Correlativo ---
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isLarge) 10.dp else 8.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(if (isLarge) 32.dp else 28.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Color.White.copy(alpha = 0.15f))
                     .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
@@ -77,21 +80,21 @@ fun PosWebHeaderBar(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menú principal",
                     tint = Color.White,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(if (isLarge) 20.dp else 18.dp),
                 )
             }
 
             Text(
                 text = "Facturación",
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = if (isLarge) 16.5.sp else 15.sp,
                 fontWeight = FontWeight.Bold,
             )
 
             Text(
                 text = correlativo,
                 color = Color.White.copy(alpha = 0.9f),
-                fontSize = 13.sp,
+                fontSize = if (isLarge) 14.sp else 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -100,30 +103,34 @@ fun PosWebHeaderBar(
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isLarge) 8.dp else 6.dp),
         ) {
             HeaderActionItem(
                 icon = Icons.Default.AutoFixHigh,
                 label = "Limpiar",
                 badgeCount = if (cartItemCount > 0) cartItemCount else null,
+                isLarge = isLarge,
                 onClick = onClearCart,
             )
 
             HeaderActionItem(
                 icon = Icons.Default.Save,
                 label = "Guardar",
+                isLarge = isLarge,
                 onClick = onSaveDraft,
             )
 
             HeaderActionItem(
                 icon = Icons.Default.Search,
                 label = "Buscar",
+                isLarge = isLarge,
                 onClick = onSearchInvoices,
             )
 
             HeaderActionItem(
                 icon = Icons.Default.Print,
                 label = "Imprimir",
+                isLarge = isLarge,
                 onClick = onPrintReceipt,
             )
         }
@@ -135,6 +142,7 @@ private fun HeaderActionItem(
     icon: ImageVector,
     label: String,
     badgeCount: Int? = null,
+    isLarge: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -143,9 +151,9 @@ private fun HeaderActionItem(
             .background(Color.White.copy(alpha = 0.15f))
             .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = if (isLarge) 10.dp else 8.dp, vertical = if (isLarge) 6.dp else 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isLarge) 5.dp else 4.dp),
     ) {
         if (badgeCount != null) {
             BadgedBox(
@@ -154,7 +162,7 @@ private fun HeaderActionItem(
                         containerColor = Color(0xFFEF4444),
                         contentColor = Color.White,
                     ) {
-                        Text(text = badgeCount.toString(), fontSize = 8.sp)
+                        Text(text = badgeCount.toString(), fontSize = if (isLarge) 9.sp else 8.sp)
                     }
                 }
             ) {
@@ -162,7 +170,7 @@ private fun HeaderActionItem(
                     imageVector = icon,
                     contentDescription = label,
                     tint = Color.White,
-                    modifier = Modifier.size(15.dp),
+                    modifier = Modifier.size(if (isLarge) 17.dp else 15.dp),
                 )
             }
         } else {
@@ -170,13 +178,13 @@ private fun HeaderActionItem(
                 imageVector = icon,
                 contentDescription = label,
                 tint = Color.White,
-                modifier = Modifier.size(15.dp),
+                modifier = Modifier.size(if (isLarge) 17.dp else 15.dp),
             )
         }
         Text(
             text = label,
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = if (isLarge) 12.5.sp else 11.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )

@@ -18,6 +18,7 @@ class OfflineSyncSettingsStore(
     context: Context,
 ) {
     private val dataStore = LocalStore(context).dataStore
+    @Volatile private var cachedScope: OfflineSyncScope? = null
 
     val scopeFlow: Flow<OfflineSyncScope> =
         dataStore.data.map { prefs ->
@@ -29,15 +30,19 @@ class OfflineSyncSettingsStore(
         }.distinctUntilChanged()
 
     suspend fun load(): OfflineSyncScope {
+        cachedScope?.let { return it }
         val prefs = dataStore.data.first()
-        return OfflineSyncScope(
+        val scope = OfflineSyncScope(
             enabled = prefs[KEY_ENABLED] ?: false,
             departmentIds = parseIds(prefs[KEY_DEPT_IDS]),
             branchIds = parseIds(prefs[KEY_BRANCH_IDS]),
         )
+        cachedScope = scope
+        return scope
     }
 
     suspend fun save(scope: OfflineSyncScope) {
+        cachedScope = scope
         dataStore.edit { prefs ->
             prefs[KEY_ENABLED] = scope.enabled
             if (scope.allProducts) {
@@ -54,6 +59,7 @@ class OfflineSyncSettingsStore(
     }
 
     suspend fun reset() {
+        cachedScope = null
         dataStore.edit { prefs ->
             prefs.remove(KEY_ENABLED)
             prefs.remove(KEY_DEPT_IDS)

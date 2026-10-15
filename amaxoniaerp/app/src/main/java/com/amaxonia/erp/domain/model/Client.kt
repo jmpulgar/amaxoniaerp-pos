@@ -20,6 +20,8 @@ data class Client(
     val clientTypeId: Int = 1,
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
+    val codTipoPrecio: Int = 2,
+    val aplicaItbms: Boolean = true,
 ) {
     val fullName: String
         get() = if (lastName.isBlank()) name else "$name $lastName"

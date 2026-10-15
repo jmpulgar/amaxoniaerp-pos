@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -115,6 +116,7 @@ fun SellerSelectionDialog(
         val isLandscape = isLandscape()
         Surface(
             modifier = Modifier
+                .widthIn(max = 950.dp)
                 .fillMaxWidth(if (isLandscape) 0.70f else 0.95f)
                 .fillMaxHeight(if (isLandscape) 0.85f else 0.90f)
                 .clip(RoundedCornerShape(8.dp)),

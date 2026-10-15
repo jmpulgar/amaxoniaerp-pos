@@ -17,6 +17,10 @@ import com.amaxonia.erp.domain.repository.OfflineSyncSettingsRepository
 import com.amaxonia.erp.domain.usecase.AuthenticateUserUseCase
 import com.amaxonia.erp.ui.login.LoginViewModel
 import com.amaxonia.erp.ui.offlinesettings.OfflineSettingsViewModel
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 
 @SuppressLint("StaticFieldLeak")
 object DependencyContainer {
@@ -169,7 +173,29 @@ object DependencyContainer {
 
     fun initialize(context: Context) {
         if (appContext == null) {
-            appContext = context.applicationContext
+            val appCtx = context.applicationContext
+            appContext = appCtx
+
+            // Configurar ImageLoader global de Coil con caché de memoria del 25% y disco de 50MB
+            // Desactiva animaciones de crossfade para máxima fluidez en terminales POS (Sunmi/iMin/Android)
+            runCatching {
+                val imageLoader = ImageLoader.Builder(appCtx)
+                    .memoryCache {
+                        MemoryCache.Builder(appCtx)
+                            .maxSizePercent(0.25)
+                            .build()
+                    }
+                    .diskCache {
+                        DiskCache.Builder()
+                            .directory(appCtx.cacheDir.resolve("image_cache"))
+                            .maxSizeBytes(50L * 1024 * 1024)
+                            .build()
+                    }
+                    .crossfade(false)
+                    .respectCacheHeaders(false)
+                    .build()
+                Coil.setImageLoader(imageLoader)
+            }
         }
     }
 

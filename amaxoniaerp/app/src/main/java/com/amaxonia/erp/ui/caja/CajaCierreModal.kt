@@ -69,6 +69,7 @@ import com.amaxonia.erp.domain.model.CierreCajaRequest
 import com.amaxonia.erp.domain.model.CierreCajaSummary
 import com.amaxonia.erp.domain.model.DenominacionesCatalogo
 import com.amaxonia.erp.ui.components.AdaptiveImage
+import com.amaxonia.erp.ui.components.isLargeScreen
 import com.amaxonia.erp.ui.pos.isCashPaymentMethod
 import com.amaxonia.erp.ui.theme.FlowHeaderGradient
 import java.text.SimpleDateFormat
@@ -148,6 +149,7 @@ fun CajaCierreModal(
     val totalCierreDeclarado = efCierreDeclarado + totalOtrasContadas
     val totalSistema = summary?.montoTotal ?: (efTotalSistema + otrasLineasPago.sumOf { it.amount })
     val diferenciaTotal = totalCierreDeclarado - totalSistema
+    val isLarge = isLargeScreen()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -159,7 +161,7 @@ fun CajaCierreModal(
         Card(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(if (isLarge) 12.dp else 8.dp),
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F3F8)),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
@@ -175,19 +177,19 @@ fun CajaCierreModal(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(if (isLarge) 52.dp else 44.dp)
                         .background(FlowHeaderGradient)
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = if (isLarge) 14.dp else 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(if (isLarge) 34.dp else 28.dp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color.White.copy(alpha = 0.15f))
                                 .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
@@ -197,18 +199,18 @@ fun CajaCierreModal(
                                 imageVector = Icons.Default.DesktopWindows,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(if (isLarge) 20.dp else 18.dp),
                             )
                         }
                         Text(
                             text = "Cierre de Caja",
-                            fontSize = 15.sp,
+                            fontSize = if (isLarge) 18.sp else 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                         )
                         Text(
                             text = "#${activeCaja?.codCaja ?: "CJ-01"}-${summary?.idCajaSecuencia?.takeLast(4) ?: "0001"}",
-                            fontSize = 13.sp,
+                            fontSize = if (isLarge) 14.5.sp else 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White.copy(alpha = 0.9f),
                         )
@@ -217,11 +219,12 @@ fun CajaCierreModal(
                     // Botones superiores idénticos a Facturación (Limpiar, Guardar, Regresar)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         HeaderActionModalButton(
                             icon = Icons.Default.AutoFixHigh,
                             label = "Limpiar",
+                            isLarge = isLarge,
                             onClick = {
                                 montosFormasPago.clear()
                                 observacionCierre = ""
@@ -232,6 +235,7 @@ fun CajaCierreModal(
                             icon = Icons.Default.Save,
                             label = if (isSubmitting) "Guardando…" else "Guardar",
                             isLoading = isSubmitting,
+                            isLarge = isLarge,
                             onClick = {
                                 if (totalCierreDeclarado <= 0.0) {
                                     showConfirmZeroAmount = true
@@ -257,6 +261,7 @@ fun CajaCierreModal(
                         HeaderActionModalButton(
                             icon = Icons.AutoMirrored.Filled.Reply,
                             label = "Regresar",
+                            isLarge = isLarge,
                             onClick = onDismiss,
                         )
                     }
@@ -446,13 +451,13 @@ fun CajaCierreModal(
                                             .fillMaxWidth()
                                             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
                                             .background(Color.White, RoundedCornerShape(12.dp))
-                                            .padding(6.dp),
+                                            .padding(if (isLarge) 8.dp else 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         // Nombre e ícono a la izquierda
                                         Row(
                                             modifier = Modifier
-                                                .width(150.dp)
+                                                .width(if (isLarge) 190.dp else 150.dp)
                                                 .padding(horizontal = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -471,7 +476,7 @@ fun CajaCierreModal(
                                                     source = cashImageUrl,
                                                     contentDescription = "EFECTIVO",
                                                     modifier = Modifier
-                                                        .size(24.dp)
+                                                        .size(if (isLarge) 30.dp else 24.dp)
                                                         .clip(RoundedCornerShape(4.dp)),
                                                     contentScale = ContentScale.Fit,
                                                     fallback = {},
@@ -480,7 +485,7 @@ fun CajaCierreModal(
                                             Text(
                                                 text = "EFECTIVO",
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 12.5.sp,
+                                                fontSize = if (isLarge) 14.sp else 12.5.sp,
                                                 color = Color(0xFF1E293B),
                                             )
                                         }
@@ -500,6 +505,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", efApertura),
                                                 headerBg = Color(0xFFF1F5F9),
                                                 textCol = Color(0xFF2488FA),
+                                                isLarge = isLarge,
                                             )
                                             // VENTAS
                                             FlowColCell(
@@ -508,6 +514,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", efVentas),
                                                 headerBg = Color(0xFFF1F5F9),
                                                 textCol = Color(0xFF2488FA),
+                                                isLarge = isLarge,
                                             )
                                             // MOV. ENTRADA
                                             FlowColCell(
@@ -516,6 +523,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", efEntrada),
                                                 headerBg = Color(0xFFF1F5F9),
                                                 textCol = Color(0xFF2488FA),
+                                                isLarge = isLarge,
                                             )
                                             // MOV. SALIDA
                                             FlowColCell(
@@ -524,16 +532,17 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", efSalida),
                                                 headerBg = Color(0xFFFDE8EF),
                                                 textCol = Color(0xFFE11D48),
+                                                isLarge = isLarge,
                                             )
                                             // Símbolo =
                                             Box(
                                                 modifier = Modifier
                                                     .width(22.dp)
-                                                    .height(46.dp)
+                                                    .height(if (isLarge) 58.dp else 46.dp)
                                                     .background(Color(0xFFF8FAFC)),
                                                 contentAlignment = Alignment.Center,
                                             ) {
-                                                Text(text = "=", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                                                Text(text = "=", fontSize = if (isLarge) 18.sp else 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
                                             }
                                             // TOTAL
                                             FlowColCell(
@@ -542,6 +551,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", efTotalSistema),
                                                 headerBg = Color(0xFFEDE7F6),
                                                 textCol = Color(0xFF201B82),
+                                                isLarge = isLarge,
                                             )
                                             // CIERRE (Editable input)
                                             FlowEditableInputCell(
@@ -553,6 +563,7 @@ fun CajaCierreModal(
                                                 onValueChange = { newVal ->
                                                     montosFormasPago[0] = newVal.toDoubleOrNull() ?: 0.0
                                                 },
+                                                isLarge = isLarge,
                                             )
                                             // SOBRANTE / DIFERENCIA
                                             val difCol = if (abs(efDiferencia) < 0.005) Color(0xFF16A34A) else (if (efDiferencia > 0) Color(0xFF1565C0) else Color(0xFFE11D48))
@@ -562,6 +573,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", abs(efDiferencia)),
                                                 headerBg = Color(0xFFF1F5F9),
                                                 textCol = difCol,
+                                                isLarge = isLarge,
                                             )
                                         }
                                     }
@@ -580,13 +592,13 @@ fun CajaCierreModal(
                                             .fillMaxWidth()
                                             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
                                             .background(Color.White, RoundedCornerShape(12.dp))
-                                            .padding(6.dp),
+                                            .padding(if (isLarge) 8.dp else 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         // Logo/Icono y Nombre de la Forma de Pago
                                         Row(
                                             modifier = Modifier
-                                                .width(150.dp)
+                                                .width(if (isLarge) 190.dp else 150.dp)
                                                 .padding(horizontal = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -606,7 +618,7 @@ fun CajaCierreModal(
                                                     source = fpImageUrl,
                                                     contentDescription = fp.label,
                                                     modifier = Modifier
-                                                        .size(24.dp)
+                                                        .size(if (isLarge) 30.dp else 24.dp)
                                                         .clip(RoundedCornerShape(4.dp)),
                                                     contentScale = ContentScale.Fit,
                                                     fallback = {},
@@ -615,9 +627,9 @@ fun CajaCierreModal(
                                             Text(
                                                 text = fp.label.uppercase(Locale.ROOT),
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 11.5.sp,
+                                                fontSize = if (isLarge) 13.5.sp else 11.5.sp,
                                                 color = Color(0xFF1E293B),
-                                                lineHeight = 14.sp,
+                                                lineHeight = if (isLarge) 16.sp else 14.sp,
                                             )
                                         }
 
@@ -636,6 +648,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", fp.amount),
                                                 headerBg = Color(0xFFEDE7F6),
                                                 textCol = Color(0xFF201B82),
+                                                isLarge = isLarge,
                                             )
 
                                             // CIERRE (Editable input - se ilumina morado #8E24AA al enfocar)
@@ -648,6 +661,7 @@ fun CajaCierreModal(
                                                 onValueChange = { newVal ->
                                                     montosFormasPago[fp.idFormaPago] = newVal.toDoubleOrNull() ?: 0.0
                                                 },
+                                                isLarge = isLarge,
                                             )
 
                                             // DIFERENCIA
@@ -658,6 +672,7 @@ fun CajaCierreModal(
                                                 value = String.format(Locale.US, "%.2f", abs(difFp)),
                                                 headerBg = Color(0xFFF1F5F9),
                                                 textCol = difColor,
+                                                isLarge = isLarge,
                                             )
                                         }
                                     }
@@ -677,7 +692,7 @@ fun CajaCierreModal(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(38.dp)
+                                        .height(if (isLarge) 46.dp else 38.dp)
                                         .border(width = 1.dp, color = Color(0xFFCBD5E1), shape = RoundedCornerShape(8.dp))
                                         .background(Color.White, shape = RoundedCornerShape(8.dp))
                                         .padding(horizontal = 12.dp),
@@ -688,7 +703,7 @@ fun CajaCierreModal(
                                     Text(
                                         text = displayStr,
                                         color = Color(0xFF1E293B),
-                                        fontSize = 17.sp,
+                                        fontSize = if (isLarge) 20.sp else 17.sp,
                                         fontWeight = FontWeight.Bold,
                                     )
                                 }
@@ -790,8 +805,10 @@ private fun FlowBalanceCard(
     valueCol: Color,
     modifier: Modifier = Modifier,
 ) {
+    val isLarge = isLargeScreen()
+
     Card(
-        modifier = modifier.height(72.dp),
+        modifier = modifier.height(if (isLarge) 76.dp else 60.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -802,13 +819,13 @@ private fun FlowBalanceCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(headerBg)
-                    .padding(vertical = 4.dp, horizontal = 6.dp),
+                    .padding(vertical = if (isLarge) 6.dp else 4.dp, horizontal = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = title,
                     color = headerTextCol,
-                    fontSize = 10.5.sp,
+                    fontSize = if (isLarge) 12.5.sp else 10.5.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
                 )
@@ -821,7 +838,7 @@ private fun FlowBalanceCard(
             ) {
                 Text(
                     text = value,
-                    fontSize = 20.sp,
+                    fontSize = if (isLarge) 24.sp else 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = valueCol,
                 )
@@ -839,6 +856,7 @@ private fun FlowColCell(
     value: String,
     headerBg: Color,
     textCol: Color,
+    isLarge: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -850,12 +868,12 @@ private fun FlowColCell(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(headerBg)
-                .padding(vertical = 3.dp, horizontal = 4.dp),
+                .padding(vertical = if (isLarge) 4.dp else 3.dp, horizontal = 4.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = title,
-                fontSize = 9.5.sp,
+                fontSize = if (isLarge) 11.5.sp else 9.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF64748B),
                 maxLines = 1,
@@ -864,12 +882,12 @@ private fun FlowColCell(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp),
+                .height(if (isLarge) 40.dp else 30.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = value,
-                fontSize = 13.5.sp,
+                fontSize = if (isLarge) 15.5.sp else 13.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = textCol,
             )
@@ -885,6 +903,7 @@ private fun FlowEditableInputCell(
     title: String,
     value: String,
     isFocused: Boolean,
+    isLarge: Boolean = false,
     onFocus: () -> Unit,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -898,12 +917,12 @@ private fun FlowEditableInputCell(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFF3E5F5))
-                .padding(vertical = 3.dp, horizontal = 4.dp),
+                .padding(vertical = if (isLarge) 4.dp else 3.dp, horizontal = 4.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = title,
-                fontSize = 9.5.sp,
+                fontSize = if (isLarge) 11.5.sp else 9.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF7C3AED),
             )
@@ -912,7 +931,7 @@ private fun FlowEditableInputCell(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
+                .height(if (isLarge) 40.dp else 30.dp)
                 .background(if (isFocused) Color(0xFF8E24AA) else Color(0xFFFFFBEB))
                 .clickable { onFocus() }
                 .padding(horizontal = 6.dp),
@@ -925,7 +944,7 @@ private fun FlowEditableInputCell(
                 singleLine = true,
                 textStyle = TextStyle(
                     textAlign = TextAlign.Center,
-                    fontSize = 14.sp,
+                    fontSize = if (isLarge) 16.sp else 14.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isFocused) Color.White else Color(0xFF7C3AED),
                 ),

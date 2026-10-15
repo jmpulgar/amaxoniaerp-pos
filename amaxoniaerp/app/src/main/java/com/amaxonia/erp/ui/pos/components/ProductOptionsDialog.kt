@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,6 +72,7 @@ import com.amaxonia.erp.domain.model.Product
 import com.amaxonia.erp.domain.model.ProductOptionGroup
 import com.amaxonia.erp.domain.model.ProductOptionItem
 import com.amaxonia.erp.domain.model.SelectedOption
+import com.amaxonia.erp.ui.components.isLargeScreen
 import java.util.Locale
 
 /**
@@ -84,27 +86,36 @@ fun ProductOptionsDialog(
     groups: List<ProductOptionGroup>,
     isLoading: Boolean,
     errorMessage: String? = null,
+    initialSelections: List<SelectedOption> = emptyList(),
+    initialQuantity: Double = 1.0,
     onDismiss: () -> Unit,
     onConfirm: (List<SelectedOption>, Double) -> Unit,
 ) {
     // Mapa: optionId -> veces seleccionada
     var timesMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    var quantity by remember { mutableDoubleStateOf(1.0) }
+    var quantity by remember { mutableDoubleStateOf(initialQuantity.coerceAtLeast(1.0)) }
 
-    // Inicializar con las opciones por defecto que no estén agotadas
-    LaunchedEffect(groups) {
+    // Inicializar con las opciones previas o por defecto que no estén agotadas
+    LaunchedEffect(groups, initialSelections) {
         if (groups.isNotEmpty() && timesMap.isEmpty()) {
             val initial = mutableMapOf<String, Int>()
-            groups.forEach { group ->
-                if (!group.isIncluded) {
-                    group.options.forEach { option ->
-                        if (option.isDefault && !option.isOutOfStock) {
-                            initial[option.id] = 1
+            if (initialSelections.isNotEmpty()) {
+                initialSelections.forEach { opt ->
+                    initial[opt.idGrupoItem] = opt.veces.coerceAtLeast(1)
+                }
+            } else {
+                groups.forEach { group ->
+                    if (!group.isIncluded) {
+                        group.options.forEach { option ->
+                            if (option.isDefault && !option.isOutOfStock) {
+                                initial[option.id] = 1
+                            }
                         }
                     }
                 }
             }
             timesMap = initial
+            quantity = initialQuantity.coerceAtLeast(1.0)
         }
     }
 
@@ -127,6 +138,7 @@ fun ProductOptionsDialog(
         }
     }
 
+    val isLarge = isLargeScreen()
     val missingGroups = getMissingMandatoryGroups()
     val isReadyToAdd = missingGroups.isEmpty() && !isLoading
     val totalPrice = (product.mainPrice + extraUnitPrice) * quantity
@@ -137,8 +149,9 @@ fun ProductOptionsDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.88f),
+                .widthIn(max = if (isLarge) 1020.dp else 900.dp)
+                .fillMaxWidth(if (isLarge) 0.94f else 0.92f)
+                .fillMaxHeight(if (isLarge) 0.90f else 0.88f),
             shape = RoundedCornerShape(22.dp),
             color = Color.White,
             shadowElevation = 16.dp,
@@ -156,17 +169,17 @@ fun ProductOptionsDialog(
                                 colors = listOf(Color(0xFF2488FA), Color(0xFF201B82)),
                             ),
                         )
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = if (isLarge) 18.dp else 16.dp, vertical = if (isLarge) 16.dp else 14.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isLarge) 14.dp else 12.dp),
                     ) {
                         // Imagen o Ícono (.fcp-head__img / .fcp-head__icon)
                         Box(
                             modifier = Modifier
-                                .size(52.dp)
+                                .size(if (isLarge) 60.dp else 52.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White.copy(alpha = 0.20f))
                                 .border(1.5.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp)),
@@ -184,7 +197,7 @@ fun ProductOptionsDialog(
                                     imageVector = if (product.isComboArticle) Icons.Default.Fastfood else Icons.Default.Tune,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(26.dp),
+                                    modifier = Modifier.size(if (isLarge) 30.dp else 26.dp),
                                 )
                             }
                         }
@@ -198,7 +211,7 @@ fun ProductOptionsDialog(
                                 Text(
                                     text = product.description,
                                     color = Color.White,
-                                    fontSize = 16.5.sp,
+                                    fontSize = if (isLarge) 18.5.sp else 16.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -213,10 +226,10 @@ fun ProductOptionsDialog(
                                 ) {
                                     Text(
                                         text = badgeText,
-                                        fontSize = 9.5.sp,
+                                        fontSize = if (isLarge) 10.5.sp else 9.5.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = badgeColor,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp),
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                                     )
                                 }
                             }
@@ -229,7 +242,7 @@ fun ProductOptionsDialog(
                             Text(
                                 text = priceDesc,
                                 color = Color.White.copy(alpha = 0.85f),
-                                fontSize = 12.5.sp,
+                                fontSize = if (isLarge) 13.5.sp else 12.5.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
@@ -237,8 +250,8 @@ fun ProductOptionsDialog(
                         // Botón de cerrar (.fcp-icon-btn)
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(11.dp))
+                                .size(if (isLarge) 40.dp else 36.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(Color.White.copy(alpha = 0.16f))
                                 .clickable { onDismiss() },
                             contentAlignment = Alignment.Center,
@@ -247,7 +260,7 @@ fun ProductOptionsDialog(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Cerrar",
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(if (isLarge) 20.dp else 18.dp),
                             )
                         }
                     }
@@ -319,29 +332,29 @@ fun ProductOptionsDialog(
                                         border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
                                         modifier = Modifier.fillMaxWidth(),
                                     ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
+                                        Column(modifier = Modifier.padding(if (isLarge) 16.dp else 12.dp)) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.CheckCircle,
                                                     contentDescription = null,
                                                     tint = Color(0xFF047857),
-                                                    modifier = Modifier.size(15.dp),
+                                                    modifier = Modifier.size(if (isLarge) 18.dp else 15.dp),
                                                 )
                                                 Text(
                                                     text = "INCLUYE",
                                                     color = Color(0xFF047857),
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = if (isLarge) 13.sp else 11.5.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     letterSpacing = 0.5.sp,
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Spacer(modifier = Modifier.height(if (isLarge) 10.dp else 8.dp))
                                             FlowRow(
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp),
                                             ) {
                                                 group.options.forEach { opt ->
                                                     Surface(
@@ -351,18 +364,18 @@ fun ProductOptionsDialog(
                                                     ) {
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                             modifier = Modifier.padding(
-                                                                start = if (opt.photoUrl.isNotBlank()) 3.dp else 10.dp,
-                                                                end = 10.dp,
-                                                                top = 3.dp,
-                                                                bottom = 3.dp,
+                                                                start = if (opt.photoUrl.isNotBlank()) 4.dp else (if (isLarge) 12.dp else 10.dp),
+                                                                end = if (isLarge) 12.dp else 10.dp,
+                                                                top = if (isLarge) 4.dp else 3.dp,
+                                                                bottom = if (isLarge) 4.dp else 3.dp,
                                                             ),
                                                         ) {
                                                             if (opt.photoUrl.isNotBlank()) {
                                                                 Box(
                                                                     modifier = Modifier
-                                                                        .size(26.dp)
+                                                                        .size(if (isLarge) 32.dp else 26.dp)
                                                                         .clip(CircleShape)
                                                                         .background(Color(0xFFF4F5F8)),
                                                                     contentAlignment = Alignment.Center,
@@ -377,7 +390,7 @@ fun ProductOptionsDialog(
                                                             }
                                                             Text(
                                                                 text = (if (opt.quantity > 1) "${opt.quantity.toInt()}× " else "") + opt.name,
-                                                                fontSize = 12.sp,
+                                                                fontSize = if (isLarge) 13.5.sp else 12.sp,
                                                                 fontWeight = FontWeight.SemiBold,
                                                                 color = Color(0xFF0F0C3D),
                                                             )
@@ -408,7 +421,7 @@ fun ProductOptionsDialog(
                                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                                         modifier = Modifier.fillMaxWidth(),
                                     ) {
-                                        Column(modifier = Modifier.padding(14.dp)) {
+                                        Column(modifier = Modifier.padding(if (isLarge) 16.dp else 14.dp)) {
                                             // Encabezado del grupo (.fcp-grupo__head)
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -418,7 +431,7 @@ fun ProductOptionsDialog(
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
                                                         text = group.name,
-                                                        fontSize = 15.sp,
+                                                        fontSize = if (isLarge) 17.sp else 15.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         color = Color(0xFF0F0C3D),
                                                     )
@@ -431,7 +444,7 @@ fun ProductOptionsDialog(
                                                     }
                                                     Text(
                                                         text = ruleText,
-                                                        fontSize = 11.5.sp,
+                                                        fontSize = if (isLarge) 13.sp else 11.5.sp,
                                                         fontWeight = if (isPending) FontWeight.Bold else FontWeight.Normal,
                                                         color = if (isPending) Color(0xFFDB8F14) else Color(0xFF64748B),
                                                     )
@@ -444,20 +457,20 @@ fun ProductOptionsDialog(
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                        modifier = Modifier.padding(horizontal = if (isLarge) 10.dp else 8.dp, vertical = if (isLarge) 4.dp else 3.dp),
                                                     ) {
                                                         if (isComplete) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Check,
                                                                 contentDescription = null,
                                                                 tint = Color(0xFF047857),
-                                                                modifier = Modifier.size(11.dp),
+                                                                modifier = Modifier.size(if (isLarge) 13.dp else 11.dp),
                                                             )
                                                         }
                                                         Text(
                                                             text = "$currentCount/${group.max}",
-                                                            fontSize = 11.sp,
+                                                            fontSize = if (isLarge) 12.5.sp else 11.sp,
                                                             fontWeight = FontWeight.ExtraBold,
                                                             color = if (isComplete) Color(0xFF047857) else Color(0xFF64748B),
                                                         )
@@ -465,15 +478,15 @@ fun ProductOptionsDialog(
                                                 }
                                             }
 
-                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Spacer(modifier = Modifier.height(if (isLarge) 12.dp else 10.dp))
 
-                                            // Lista de Opciones (.fcp-opcion en Grid de 4 columnas)
-                                            val columnsCount = 4
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            // Lista de Opciones (Adaptable: 3 columnas amplias en pantallas grandes, 2 en medianas)
+                                            val columnsCount = if (isLarge) 3 else 2
+                                            Column(verticalArrangement = Arrangement.spacedBy(if (isLarge) 10.dp else 8.dp)) {
                                                 group.options.chunked(columnsCount).forEach { rowOptions ->
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        horizontalArrangement = Arrangement.spacedBy(if (isLarge) 10.dp else 8.dp),
                                                     ) {
                                                         rowOptions.forEach { opt ->
                                                             Box(modifier = Modifier.weight(1f)) {
@@ -513,15 +526,15 @@ fun ProductOptionsDialog(
                                                                     Row(
                                                                         modifier = Modifier
                                                                             .fillMaxWidth()
-                                                                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                                                                            .padding(horizontal = if (isLarge) 10.dp else 8.dp, vertical = if (isLarge) 10.dp else 8.dp),
                                                                         verticalAlignment = Alignment.CenterVertically,
-                                                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                                                        horizontalArrangement = Arrangement.spacedBy(if (isLarge) 9.dp else 7.dp),
                                                                     ) {
                                                                         // Miniatura de Imagen (.fcp-opcion__img) o Indicador Selección (.fcp-opcion__marca)
                                                                         if (opt.photoUrl.isNotBlank()) {
                                                                             Box(
                                                                                 modifier = Modifier
-                                                                                    .size(38.dp)
+                                                                                    .size(if (isLarge) 46.dp else 38.dp)
                                                                                     .clip(RoundedCornerShape(8.dp))
                                                                                     .background(Color(0xFFF4F5F8)),
                                                                                 contentAlignment = Alignment.Center,
@@ -537,7 +550,7 @@ fun ProductOptionsDialog(
                                                                                         modifier = Modifier
                                                                                             .align(Alignment.BottomEnd)
                                                                                             .padding(1.dp)
-                                                                                            .size(14.dp)
+                                                                                            .size(if (isLarge) 16.dp else 14.dp)
                                                                                             .clip(CircleShape)
                                                                                             .background(Color(0xFF2488FA))
                                                                                             .border(1.dp, Color.White, CircleShape),
@@ -547,7 +560,7 @@ fun ProductOptionsDialog(
                                                                                             imageVector = Icons.Default.Check,
                                                                                             contentDescription = null,
                                                                                             tint = Color.White,
-                                                                                            modifier = Modifier.size(9.dp),
+                                                                                            modifier = Modifier.size(if (isLarge) 11.dp else 9.dp),
                                                                                         )
                                                                                     }
                                                                                 }
@@ -555,13 +568,13 @@ fun ProductOptionsDialog(
                                                                         } else {
                                                                             Box(
                                                                                 modifier = Modifier
-                                                                                    .size(20.dp)
-                                                                                    .clip(if (group.max == 1) CircleShape else RoundedCornerShape(5.dp))
+                                                                                    .size(if (isLarge) 24.dp else 20.dp)
+                                                                                    .clip(if (group.max == 1) CircleShape else RoundedCornerShape(6.dp))
                                                                                     .background(if (isSelected) Color(0xFF2488FA) else Color(0xFFF4F5F8))
                                                                                     .border(
                                                                                         1.dp,
                                                                                         if (isSelected) Color(0xFF2488FA) else Color(0xFFCBD5E1),
-                                                                                        if (group.max == 1) CircleShape else RoundedCornerShape(5.dp),
+                                                                                        if (group.max == 1) CircleShape else RoundedCornerShape(6.dp),
                                                                                     ),
                                                                                 contentAlignment = Alignment.Center,
                                                                             ) {
@@ -570,7 +583,7 @@ fun ProductOptionsDialog(
                                                                                         imageVector = Icons.Default.Check,
                                                                                         contentDescription = null,
                                                                                         tint = Color.White,
-                                                                                        modifier = Modifier.size(12.dp),
+                                                                                        modifier = Modifier.size(if (isLarge) 14.dp else 12.dp),
                                                                                     )
                                                                                 }
                                                                             }
@@ -580,12 +593,12 @@ fun ProductOptionsDialog(
                                                                         Column(modifier = Modifier.weight(1f)) {
                                                                             Text(
                                                                                 text = opt.name,
-                                                                                fontSize = 11.5.sp,
+                                                                                fontSize = if (isLarge) 14.sp else 11.5.sp,
                                                                                 fontWeight = FontWeight.Bold,
                                                                                 color = if (opt.isOutOfStock) Color(0xFF94A3B8) else Color(0xFF0F0C3D),
                                                                                 maxLines = 2,
                                                                                 overflow = TextOverflow.Ellipsis,
-                                                                                lineHeight = 13.5.sp,
+                                                                                lineHeight = if (isLarge) 17.sp else 13.5.sp,
                                                                             )
                                                                             val subLabel = when {
                                                                                 opt.isOutOfStock -> "Agotado"
@@ -596,7 +609,7 @@ fun ProductOptionsDialog(
                                                                             if (subLabel.isNotBlank()) {
                                                                                 Text(
                                                                                     text = subLabel,
-                                                                                    fontSize = 10.5.sp,
+                                                                                    fontSize = if (isLarge) 12.sp else 10.5.sp,
                                                                                     fontWeight = FontWeight.SemiBold,
                                                                                     color = if (opt.isOutOfStock) Color(0xFFE11D48) else if (isSelected) Color(0xFF201B82) else Color(0xFF64748B),
                                                                                 )
@@ -612,9 +625,9 @@ fun ProductOptionsDialog(
                                                                                 Text(
                                                                                     text = "×$optTimes",
                                                                                     color = Color.White,
-                                                                                    fontSize = 10.sp,
+                                                                                    fontSize = if (isLarge) 11.sp else 10.sp,
                                                                                     fontWeight = FontWeight.ExtraBold,
-                                                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                                                 )
                                                                             }
                                                                         }
@@ -623,7 +636,7 @@ fun ProductOptionsDialog(
                                                                         if (isSelected && group.max > 1) {
                                                                             Box(
                                                                                 modifier = Modifier
-                                                                                    .size(22.dp)
+                                                                                    .size(if (isLarge) 26.dp else 22.dp)
                                                                                     .clip(CircleShape)
                                                                                     .background(Color.White)
                                                                                     .border(1.dp, Color(0xFFDCEBFF), CircleShape)
@@ -640,7 +653,7 @@ fun ProductOptionsDialog(
                                                                                     imageVector = Icons.Default.Remove,
                                                                                     contentDescription = "Quitar uno",
                                                                                     tint = Color(0xFF201B82),
-                                                                                    modifier = Modifier.size(12.dp),
+                                                                                    modifier = Modifier.size(if (isLarge) 14.dp else 12.dp),
                                                                                 )
                                                                             }
                                                                         }
@@ -648,7 +661,7 @@ fun ProductOptionsDialog(
                                                                 }
                                                             }
                                                         }
-                                                        // Rellenar espacios vacíos en la última fila para mantener el ancho uniforme de 4 columnas
+                                                        // Rellenar espacios vacíos en la última fila para mantener el ancho uniforme de columnas
                                                         repeat(columnsCount - rowOptions.size) {
                                                             Spacer(modifier = Modifier.weight(1f))
                                                         }
@@ -676,7 +689,7 @@ fun ProductOptionsDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = if (isLarge) 18.dp else 14.dp, vertical = if (isLarge) 12.dp else 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -691,7 +704,7 @@ fun ProductOptionsDialog(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(if (isLarge) 42.dp else 34.dp)
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(Color.White)
                                         .clickable {
@@ -703,21 +716,21 @@ fun ProductOptionsDialog(
                                         imageVector = Icons.Default.Remove,
                                         contentDescription = "Menos",
                                         tint = Color(0xFF0F0C3D),
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(if (isLarge) 18.dp else 16.dp),
                                     )
                                 }
 
                                 Text(
                                     text = "${quantity.toInt()}",
-                                    fontSize = 15.sp,
+                                    fontSize = if (isLarge) 17.sp else 15.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = Color(0xFF0F0C3D),
-                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    modifier = Modifier.padding(horizontal = if (isLarge) 14.dp else 12.dp),
                                 )
 
                                 Box(
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(if (isLarge) 42.dp else 34.dp)
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(Color.White)
                                         .clickable { quantity += 1.0 },
@@ -727,7 +740,7 @@ fun ProductOptionsDialog(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = "Más",
                                         tint = Color(0xFF0F0C3D),
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(if (isLarge) 18.dp else 16.dp),
                                     )
                                 }
                             }
@@ -773,8 +786,8 @@ fun ProductOptionsDialog(
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp),
+                                .height(if (isLarge) 52.dp else 44.dp),
+                            contentPadding = PaddingValues(horizontal = if (isLarge) 18.dp else 14.dp),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -783,12 +796,12 @@ fun ProductOptionsDialog(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ShoppingCart,
                                         contentDescription = null,
-                                        modifier = Modifier.size(17.dp),
+                                        modifier = Modifier.size(if (isLarge) 20.dp else 17.dp),
                                     )
                                     val label = if (missingGroups.isNotEmpty()) {
                                         "Elige ${missingGroups.first().name.lowercase()}"
@@ -797,7 +810,7 @@ fun ProductOptionsDialog(
                                     }
                                     Text(
                                         text = label,
-                                        fontSize = 13.5.sp,
+                                        fontSize = if (isLarge) 15.5.sp else 13.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -807,7 +820,7 @@ fun ProductOptionsDialog(
                                 if (isReadyToAdd) {
                                     Text(
                                         text = "$${String.format(Locale.US, "%.2f", totalPrice)}",
-                                        fontSize = 14.sp,
+                                        fontSize = if (isLarge) 17.sp else 14.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                     )
                                 }

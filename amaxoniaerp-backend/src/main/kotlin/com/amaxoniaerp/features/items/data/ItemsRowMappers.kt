@@ -110,15 +110,65 @@ internal fun mapRowToProduct(
     }
 }
 
+private const val PRICE_TITLES_CACHE_TTL_MS = 60_000L
+
+private data class PriceTitles(
+    val titleA: String = "Detal",
+    val titleB: String = "Mayor",
+    val titleC: String = "Distribuidor",
+    val titleD: String = "Especial",
+    val titleE: String = "Mínimo",
+)
+
+private val priceTitlesCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, PriceTitles>>()
+
+private fun resolvePriceTitles(): PriceTitles {
+    val tx = runCatching { TransactionManager.current() }.getOrNull() ?: return PriceTitles()
+    val key =
+        runCatching {
+            (tx.connection.connection as? java.sql.Connection)?.catalog
+        }.getOrNull() ?: "default"
+    val now = System.currentTimeMillis()
+    val cached = priceTitlesCache[key]
+    if (cached != null && (now - cached.first < PRICE_TITLES_CACHE_TTL_MS)) {
+        return cached.second
+    }
+
+    val resolved =
+        runCatching {
+            val sql =
+                "SELECT titulo_precio1, titulo_precio2, titulo_precio3, titulo_precio4, titulo_precio5 " +
+                    "FROM parametros_generales LIMIT 1"
+            tx.exec(sql) { rs ->
+                if (rs.next()) {
+                    PriceTitles(
+                        titleA = rs.getString("titulo_precio1")?.takeIf { it.isNotBlank() } ?: "Detal",
+                        titleB = rs.getString("titulo_precio2")?.takeIf { it.isNotBlank() } ?: "Mayor",
+                        titleC = rs.getString("titulo_precio3")?.takeIf { it.isNotBlank() } ?: "Distribuidor",
+                        titleD = rs.getString("titulo_precio4")?.takeIf { it.isNotBlank() } ?: "Especial",
+                        titleE = rs.getString("titulo_precio5")?.takeIf { it.isNotBlank() } ?: "Mínimo",
+                    )
+                } else {
+                    null
+                }
+            }
+        }.getOrNull() ?: PriceTitles()
+
+    priceTitlesCache[key] = Pair(now, resolved)
+    return resolved
+}
+
 private fun createPriceLevels(
     row: ResultRow,
     table: BaseItemsTable,
 ): List<PriceLevel> {
     val storedTaxRate = row[table.iva].toDouble()
     val isExempt = isExemptRow(row, table, storedTaxRate)
+    val titles = resolvePriceTitles()
 
     fun level(
         label: String,
+        name: String,
         price: Double,
         utilityPercent: Double,
         priceWithTax: Double,
@@ -126,6 +176,7 @@ private fun createPriceLevels(
         discountPercent: Double,
     ) = PriceLevel(
         label = label,
+        name = name,
         price = price,
         utilityPercent = utilityPercent,
         pricePlusUtility = price,
@@ -143,6 +194,7 @@ private fun createPriceLevels(
     return listOf(
         level(
             "A",
+            titles.titleA,
             row[table.precio1].toDouble(),
             row[table.utilidad1].toDouble(),
             row[table.coniva1].toDouble(),
@@ -151,6 +203,7 @@ private fun createPriceLevels(
         ),
         level(
             "B",
+            titles.titleB,
             row[table.precio2].toDouble(),
             row[table.utilidad2].toDouble(),
             row[table.coniva2].toDouble(),
@@ -159,6 +212,7 @@ private fun createPriceLevels(
         ),
         level(
             "C",
+            titles.titleC,
             row[table.precio3].toDouble(),
             row[table.utilidad3].toDouble(),
             row[table.coniva3].toDouble(),
@@ -167,6 +221,7 @@ private fun createPriceLevels(
         ),
         level(
             "D",
+            titles.titleD,
             row[table.precio4].toDouble(),
             row[table.utilidad4].toDouble(),
             row[table.coniva4].toDouble(),
@@ -175,6 +230,7 @@ private fun createPriceLevels(
         ),
         level(
             "E",
+            titles.titleE,
             row[table.precio5].toDouble(),
             row[table.utilidad5].toDouble(),
             row[table.coniva5].toDouble(),

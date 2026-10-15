@@ -20,7 +20,7 @@ import io.ktor.client.request.setBody
 suspend fun ApiService.getCajas(
     token: String,
     companyDb: String,
-    all: Boolean = true,
+    all: Boolean = false,
 ): List<Caja> =
     client.get("api/cajas") {
         header("Authorization", "Bearer $token")

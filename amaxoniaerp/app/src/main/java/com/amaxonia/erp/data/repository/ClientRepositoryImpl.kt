@@ -219,6 +219,8 @@ private fun ClientDto.toDomain(): Client =
         clientTypeId = clientTypeId ?: 1,
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
+        codTipoPrecio = codTipoPrecio ?: 2,
+        aplicaItbms = resolvedAplicaItbms,
     )
 
 private fun ClientDto.toEntity(): ClientEntity =
@@ -242,6 +244,7 @@ private fun ClientDto.toEntity(): ClientEntity =
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
         codTipoPrecio = codTipoPrecio ?: 2,
+        aplicaItbms = resolvedAplicaItbms,
         idSucursal = null,
     )
 

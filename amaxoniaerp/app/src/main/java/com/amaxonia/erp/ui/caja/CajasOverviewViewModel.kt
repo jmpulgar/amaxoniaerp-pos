@@ -17,6 +17,9 @@ import com.amaxonia.erp.domain.repository.CajaRepository
 import com.amaxonia.erp.domain.repository.SalesRepository
 import com.amaxonia.erp.domain.repository.SucursalRepository
 import com.amaxonia.erp.domain.util.CajaDateParser
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,22 +82,31 @@ class CajasOverviewViewModel(
             val savedActive = cajaRepository.getActiveCaja()
             cajaRepository.getCajas().fold(
                 onSuccess = { list ->
-                    val statusMap = mutableMapOf<String, CajaStatusBadgeInfo>()
-                    for (caja in list) {
-                        val status = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()
-                        if (status != null) {
-                            val rawFecha = status.cajaSecuencia?.fechaApertura
-                            val isDiaAnterior = status.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
-                            statusMap[caja.idCaja] = CajaStatusBadgeInfo(
-                                isOpen = status.isOpen,
-                                isDiaAnterior = isDiaAnterior,
-                            )
-                        }
+                    val statusMap = coroutineScope {
+                        list.map { caja ->
+                            async {
+                                val status = cajaRepository.checkCajaStatus(caja.idCaja).getOrNull()
+                                val badgeInfo = if (status != null) {
+                                    val rawFecha = status.cajaSecuencia?.fechaApertura
+                                    val isDiaAnterior = status.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
+                                    CajaStatusBadgeInfo(
+                                        isOpen = status.isOpen,
+                                        isDiaAnterior = isDiaAnterior,
+                                    )
+                                } else null
+                                caja.idCaja to badgeInfo
+                            }
+                        }.awaitAll()
+                    }.filter { it.second != null }.associate { it.first to it.second!! }
+
+                    val isCurrentActiveValid = savedActive != null && list.any { it.idCaja == savedActive.first }
+                    if (savedActive != null && !isCurrentActiveValid) {
+                        cajaRepository.clearActiveCaja()
                     }
 
-                    var chosen = list.firstOrNull { it.idCaja == savedActive?.first }
+                    var chosen = if (isCurrentActiveValid) list.firstOrNull { it.idCaja == savedActive?.first } else null
                     if (chosen == null) {
-                        chosen = list.firstOrNull { statusMap[it.idCaja]?.isOpen == true } ?: list.firstOrNull()
+                        chosen = list.firstOrNull { statusMap[it.idCaja]?.isOpen == true } ?: list.singleOrNull() ?: list.firstOrNull()
                     }
 
                     _state.update {

@@ -122,6 +122,8 @@ data class SaleItemDto(
     val composicion: String? = null,
     @SerialName("_posee_producto_combo")
     val poseeProductoCombo: String? = null,
+    @SerialName("nota_cocina")
+    val notaCocina: String = "",
 )
 
 @Serializable

@@ -27,7 +27,10 @@ data class Caja(
     @SerialName("fondo_apertura") val fondoApertura: Double? = null,
 ) {
     val displayName: String
-        get() = caja?.takeIf { it.isNotBlank() } ?: descripcion?.takeIf { it.isNotBlank() } ?: "Caja $idCaja"
+        get() = caja?.takeIf { it.isNotBlank() }
+            ?: descripcion?.takeIf { it.isNotBlank() }
+            ?: codCaja?.takeIf { it.isNotBlank() }?.let { "Caja $it" }
+            ?: "Caja $idCaja"
 }
 
 @Serializable
