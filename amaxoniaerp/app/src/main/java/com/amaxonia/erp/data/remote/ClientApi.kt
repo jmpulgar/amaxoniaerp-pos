@@ -1,5 +1,6 @@
 package com.amaxonia.erp.data.remote
 
+import com.amaxonia.erp.data.remote.dto.AccountStatementDto
 import com.amaxonia.erp.data.remote.dto.ClientDto
 import com.amaxonia.erp.data.remote.dto.ClientSucursalDto
 import com.amaxonia.erp.data.remote.dto.CreateClientRequest
@@ -59,4 +60,19 @@ suspend fun ApiService.getClientSucursales(
     client.get("clients/$clientId/sucursales") {
         header("Authorization", "Bearer $token")
     }.body()
+
+suspend fun ApiService.getAccountStatement(
+    token: String,
+    clientId: String,
+): AccountStatementDto {
+    val response = client.get("clients/$clientId/account-statement") {
+        header("Authorization", "Bearer $token")
+    }
+    return if (response.status == io.ktor.http.HttpStatusCode.OK) {
+        response.body()
+    } else {
+        AccountStatementDto(clientId = clientId)
+    }
+}
+
 

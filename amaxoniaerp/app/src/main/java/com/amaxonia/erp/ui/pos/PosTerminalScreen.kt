@@ -617,8 +617,16 @@ private fun PosTerminalLandscapeLayout(
             .background(Color(0xFFF1F5F9)),
     ) {
         // Cabecera Web azul Flow ERP (44dp compacta)
+        val siguienteCodigo = state.activeCajaObj?.siguienteCorrelativoFactura
+            ?: "${state.activeCajaObj?.codCaja ?: state.activeCajaId?.padStart(3, '0') ?: "001"}-00001"
+        val headerCorrelativo = when {
+            !state.heldInvoiceCode.isNullOrBlank() -> state.heldInvoiceCode
+            !state.completedSaleInvoice.isNullOrBlank() -> state.completedSaleInvoice
+            else -> "#$siguienteCodigo"
+        }.let { if (it.startsWith("#")) it else "#$it" }
+
         PosWebHeaderBar(
-            correlativo = state.heldInvoiceCode ?: state.completedSaleInvoice ?: "#001-00112",
+            correlativo = headerCorrelativo,
             cartItemCount = state.summary.itemCount,
             isCatalogOpen = state.isCatalogDrawerOpen,
             onOpenDrawer = onOpenDrawer,
@@ -802,8 +810,16 @@ private fun PosTerminalPortraitLayout(
             .background(Color(0xFFF1F5F9)),
     ) {
         // Cabecera Web azul Flow ERP
+        val siguienteCodigo = state.activeCajaObj?.siguienteCorrelativoFactura
+            ?: "${state.activeCajaObj?.codCaja ?: state.activeCajaId?.padStart(3, '0') ?: "001"}-00001"
+        val headerCorrelativo = when {
+            !state.heldInvoiceCode.isNullOrBlank() -> state.heldInvoiceCode
+            !state.completedSaleInvoice.isNullOrBlank() -> state.completedSaleInvoice
+            else -> "#$siguienteCodigo"
+        }.let { if (it.startsWith("#")) it else "#$it" }
+
         PosWebHeaderBar(
-            correlativo = state.heldInvoiceCode ?: state.completedSaleInvoice ?: "#001-00112",
+            correlativo = headerCorrelativo,
             cartItemCount = state.summary.itemCount,
             isCatalogOpen = selectedTab == 0,
             onOpenDrawer = onOpenDrawer,

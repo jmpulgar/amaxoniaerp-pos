@@ -221,6 +221,14 @@ class CajaRepositoryImpl(
             val sec = response.cajaSecuencia
             val matchesSecCaja = sec != null && (sec.idCaja.isBlank() || sec.idCaja.trim() == trimmedCajaId)
             if (activeId == null || activeId == trimmedCajaId) {
+                if (response.facturaCorrelativo != null && response.facturaCorrelativo > 0) {
+                    val current = _activeCaja.value
+                    if (current != null && current.idCaja.trim() == trimmedCajaId && current.facturaCorrelativo != response.facturaCorrelativo) {
+                        val updated = current.copy(facturaCorrelativo = response.facturaCorrelativo)
+                        _activeCaja.update { updated }
+                        localStore.saveActiveCaja(updated)
+                    }
+                }
                 if (response.isOpen && matchesSecCaja) {
                     _activeCajaSecuencia.update { sec }
                     _sessionStatus.update { CajaSessionStatus.ABIERTA }

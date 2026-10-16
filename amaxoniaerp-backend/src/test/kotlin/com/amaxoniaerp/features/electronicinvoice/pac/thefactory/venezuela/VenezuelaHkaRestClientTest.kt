@@ -84,6 +84,60 @@ class VenezuelaHkaRestClientTest {
             assertEquals("jwt-firma-123", res.resultado?.token)
         }
 
+    @Test
+    fun `autenticacion reutiliza token en cache si aun es valido`() =
+        runBlocking {
+            var networkCalls = 0
+            val client =
+                cliente { req ->
+                    if (req.url.encodedPath.endsWith("/api/Autenticacion")) {
+                        networkCalls++
+                        respond(
+                            content = """{"token":"jwt-ve-cached-$networkCalls","mensaje":"OK"}""",
+                            status = HttpStatusCode.OK,
+                            headers = jsonHeaders,
+                        )
+                    } else {
+                        respond("Not Found", HttpStatusCode.NotFound)
+                    }
+                }
+            val res1 = client.authenticate(credentials)
+            val res2 = client.authenticate(credentials)
+
+            assertTrue(res1.businessOk)
+            assertTrue(res2.businessOk)
+            assertEquals("jwt-ve-cached-1", res1.resultado?.token)
+            assertEquals("jwt-ve-cached-1", res2.resultado?.token)
+            assertEquals(1, networkCalls, "Segunda llamada a authenticate debe reutilizar token en cache")
+        }
+
+    @Test
+    fun `invalidateToken fuerza nueva llamada de red en siguiente autenticacion`() =
+        runBlocking {
+            var networkCalls = 0
+            val client =
+                cliente { req ->
+                    if (req.url.encodedPath.endsWith("/api/Autenticacion")) {
+                        networkCalls++
+                        respond(
+                            content = """{"token":"jwt-ve-$networkCalls","mensaje":"OK"}""",
+                            status = HttpStatusCode.OK,
+                            headers = jsonHeaders,
+                        )
+                    } else {
+                        respond("Not Found", HttpStatusCode.NotFound)
+                    }
+                }
+            val res1 = client.authenticate(credentials)
+            assertEquals("jwt-ve-1", res1.resultado?.token)
+
+            client.invalidateToken(credentials)
+
+            val res2 = client.authenticate(credentials)
+            assertEquals("jwt-ve-2", res2.resultado?.token)
+            assertEquals(2, networkCalls)
+        }
+
     // ─── 5. Autenticación rechazada ───────────────────────────────────────
 
     @Test

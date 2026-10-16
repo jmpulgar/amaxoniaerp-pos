@@ -33,15 +33,21 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,9 +134,31 @@ fun PaymentDialog(
 
     val rightColumnWidth = if (isExtraLarge) 440.dp else if (isLarge) 380.dp else 330.dp
 
+    var processingSeconds by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(state.isProcessingSale) {
+        if (!state.isProcessingSale) {
+            processingSeconds = 0
+            return@LaunchedEffect
+        }
+        processingSeconds = 0
+        while (true) {
+            delay(1_000)
+            processingSeconds += 1
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        onDismissRequest = {
+            if (!state.isProcessingSale) {
+                onDismiss()
+            }
+        },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = !state.isProcessingSale,
+            dismissOnClickOutside = !state.isProcessingSale,
+        ),
     ) {
         Surface(
             modifier = Modifier
@@ -141,7 +169,8 @@ fun PaymentDialog(
             color = Color.White,
             shadowElevation = 16.dp,
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
                 // ══════════════════════════════════════════════════════════════
                 // 1. ENCABEZADO (1:1 Web: .kt-portlet__head amaxonia_module__head)
                 // ══════════════════════════════════════════════════════════════
@@ -182,7 +211,7 @@ fun PaymentDialog(
                                 .size(if (isLarge) 40.dp else 34.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(WebAmberBroom)
-                                .clickable { onClearPayments() },
+                                .clickable(enabled = !state.isProcessingSale) { onClearPayments() },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -199,7 +228,7 @@ fun PaymentDialog(
                                 .size(if (isLarge) 40.dp else 34.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(WebDangerRed)
-                                .clickable { onDismiss() },
+                                .clickable(enabled = !state.isProcessingSale) { onDismiss() },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -434,8 +463,13 @@ fun PaymentDialog(
                     }
                 }
             }
+
+            if (state.isProcessingSale) {
+                ProcessingPaymentOverlay(elapsedSeconds = processingSeconds)
+            }
         }
     }
+}
 }
 
 @Composable
@@ -1097,5 +1131,121 @@ private fun KeypadButton(
             color = textColor,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun ProcessingPaymentOverlay(
+    elapsedSeconds: Int,
+) {
+    val estimatedSeconds = 15
+    val progress = (elapsedSeconds / estimatedSeconds.toFloat()).coerceIn(0.10f, 0.95f)
+    val secondsLeft = (estimatedSeconds - elapsedSeconds).coerceAtLeast(2)
+
+    val stageTitle = when {
+        elapsedSeconds < 3 -> "Preparando la factura"
+        elapsedSeconds < 8 -> "Conectando con facturación electrónica"
+        elapsedSeconds < 18 -> "Esperando autorización fiscal"
+        else -> "Finalizando validación"
+    }
+
+    val stageSubtitle = when {
+        elapsedSeconds < 3 -> "Validando pago, caja e inventario local..."
+        elapsedSeconds < 8 -> "Transmitiendo documento al PAC The Factory HKA..."
+        elapsedSeconds < 18 -> "The Factory está procesando CUFE, número de control y código QR..."
+        else -> "La respuesta está tardando un poco más de lo normal, por favor no cierres la pantalla."
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        ElevatedCard(
+            modifier = Modifier
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 14.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(Color(0xFFE8F1FF), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(60.dp),
+                        strokeWidth = 6.dp,
+                        color = WebBrandBlue,
+                        trackColor = WebBrandBlue.copy(alpha = 0.16f),
+                    )
+                    Text(
+                        text = "${elapsedSeconds}s",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WebBrandBlue,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Procesando cobro",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B),
+                )
+                Text(
+                    text = stageTitle,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = WebBrandBlue,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Text(
+                    text = stageSubtitle,
+                    fontSize = 13.sp,
+                    color = Color(0xFF64748B),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = WebBrandBlue,
+                    trackColor = Color(0xFFE2E8F0),
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = if (elapsedSeconds < estimatedSeconds) {
+                        "Tiempo estimado restante: ~${secondsLeft}s"
+                    } else {
+                        "Está tomando más de lo habitual, seguimos procesando."
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF94A3B8),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }

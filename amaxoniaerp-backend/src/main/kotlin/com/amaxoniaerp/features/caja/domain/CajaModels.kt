@@ -33,6 +33,8 @@ data class Caja(
     val codigoSucursalEmisor: String? = null,
     @SerialName("almacen_nombre")
     val almacenNombre: String? = null,
+    @SerialName("factura_correlativo")
+    val facturaCorrelativo: Int = 0,
 )
 
 @Serializable
@@ -96,6 +98,8 @@ data class CajaSecuenciaCodigoResponse(
 data class CajaStatusResponse(
     val isOpen: Boolean,
     val cajaSecuencia: CajaSecuencia? = null,
+    @SerialName("factura_correlativo")
+    val facturaCorrelativo: Int? = null,
 )
 
 @Serializable

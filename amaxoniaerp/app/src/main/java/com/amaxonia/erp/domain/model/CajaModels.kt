@@ -25,12 +25,20 @@ data class Caja(
     val codigoSucursalEmisor: String? = null,
     @SerialName("almacen_nombre") val almacenNombre: String? = null,
     @SerialName("fondo_apertura") val fondoApertura: Double? = null,
+    @SerialName("factura_correlativo") val facturaCorrelativo: Int = 0,
 ) {
     val displayName: String
         get() = caja?.takeIf { it.isNotBlank() }
             ?: descripcion?.takeIf { it.isNotBlank() }
             ?: codCaja?.takeIf { it.isNotBlank() }?.let { "Caja $it" }
             ?: "Caja $idCaja"
+
+    val siguienteCorrelativoFactura: String
+        get() {
+            val codigo = codCaja?.trim()?.takeIf { it.isNotBlank() } ?: idCaja.padStart(3, '0')
+            val siguienteNumero = (facturaCorrelativo + 1).toString().padStart(5, '0')
+            return "$codigo-$siguienteNumero"
+        }
 }
 
 @Serializable
@@ -62,6 +70,7 @@ data class CajaSecuenciaCodigoResponse(
 data class CajaStatusResponse(
     val isOpen: Boolean = false,
     val cajaSecuencia: CajaSecuencia? = null,
+    @SerialName("factura_correlativo") val facturaCorrelativo: Int? = null,
 )
 
 @Serializable

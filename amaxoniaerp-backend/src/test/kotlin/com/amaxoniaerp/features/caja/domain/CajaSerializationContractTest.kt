@@ -37,4 +37,18 @@ class CajaSerializationContractTest {
             encoded,
         )
     }
+
+    @Test
+    fun `caja status response serializa factura correlativo snake case`() {
+        val encoded =
+            json.encodeToString(
+                CajaStatusResponse(
+                    isOpen = true,
+                    cajaSecuencia = null,
+                    facturaCorrelativo = 222,
+                ),
+            )
+
+        assertTrue("\"factura_correlativo\":222" in encoded)
+    }
 }

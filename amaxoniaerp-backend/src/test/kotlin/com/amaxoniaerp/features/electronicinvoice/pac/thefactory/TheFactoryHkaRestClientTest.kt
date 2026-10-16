@@ -86,6 +86,58 @@ class TheFactoryHkaRestClientTest {
     }
 
     @Test
+    fun `autenticacion reutiliza token en cache si aun es valido`() {
+        var networkCalls = 0
+        val client =
+            cliente { req ->
+                if (req.url.encodedPath.endsWith("/api/Autenticacion")) {
+                    networkCalls++
+                    respond(
+                        content = """{"token":"jwt-pa-cached-$networkCalls","mensaje":"OK"}""",
+                        status = HttpStatusCode.OK,
+                        headers = jsonHeaders,
+                    )
+                } else {
+                    respond("Not Found", HttpStatusCode.NotFound)
+                }
+            }
+        val res1 = runBlocking { client.authenticate(credentials) }
+        val res2 = runBlocking { client.authenticate(credentials) }
+
+        assertTrue(res1.isSuccess)
+        assertTrue(res2.isSuccess)
+        assertEquals("jwt-pa-cached-1", res1.getOrThrow().token)
+        assertEquals("jwt-pa-cached-1", res2.getOrThrow().token)
+        assertEquals(1, networkCalls, "La segunda llamada debe reutilizar el token en cache sin peticion de red")
+    }
+
+    @Test
+    fun `invalidateToken fuerza nueva autenticacion en siguiente llamada`() {
+        var networkCalls = 0
+        val client =
+            cliente { req ->
+                if (req.url.encodedPath.endsWith("/api/Autenticacion")) {
+                    networkCalls++
+                    respond(
+                        content = """{"token":"jwt-pa-$networkCalls","mensaje":"OK"}""",
+                        status = HttpStatusCode.OK,
+                        headers = jsonHeaders,
+                    )
+                } else {
+                    respond("Not Found", HttpStatusCode.NotFound)
+                }
+            }
+        val res1 = runBlocking { client.authenticate(credentials) }
+        assertEquals("jwt-pa-1", res1.getOrThrow().token)
+
+        client.invalidateToken(credentials)
+
+        val res2 = runBlocking { client.authenticate(credentials) }
+        assertEquals("jwt-pa-2", res2.getOrThrow().token)
+        assertEquals(2, networkCalls)
+    }
+
+    @Test
     fun `autenticacion con credenciales rechazadas falla con PacCommunicationException`() {
         val client =
             cliente {

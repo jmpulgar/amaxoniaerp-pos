@@ -238,8 +238,11 @@ private fun PosAppContent() {
                 historyContent = {
                     HistoryScreen(viewModel = historyViewModel)
                 },
-                clientsContent = {
-                    ClientListScreen(viewModel = clientListViewModel)
+                clientsContent = { onOpenDrawer ->
+                    ClientListScreen(
+                        viewModel = clientListViewModel,
+                        onOpenDrawer = onOpenDrawer,
+                    )
                 },
                 productsContent = {
                     ProductListScreen(viewModel = productListViewModel)

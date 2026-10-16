@@ -349,5 +349,6 @@ private fun buildCajaFromRow(
         sucursalCodigo = row[SucursalTable.codigo],
         codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
         almacenNombre = resolvedDefaultWarehouse?.let { warehouseNames[it] }?.takeIf { it.isNotBlank() },
+        facturaCorrelativo = row.getOrNull(CajaTable.facturaCorrelativo) ?: 0,
     )
 }

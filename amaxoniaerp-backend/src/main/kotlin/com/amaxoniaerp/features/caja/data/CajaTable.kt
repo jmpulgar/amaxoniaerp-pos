@@ -16,6 +16,7 @@ abstract class BaseCajaTable : Table("caja") {
     val impresoraModelo = varchar("impresora_modelo", S.VARCHAR_LENGTH_50).nullable()
     val codigoSucursalEmisor = varchar("CodigoSucursalEmisor", S.VARCHAR_LENGTH_20).nullable()
     val puntoFacturacionFiscal = varchar("puntoFacturacionFiscal", S.VARCHAR_LENGTH_10).nullable()
+    val facturaCorrelativo = integer("factura_correlativo").default(0)
 
     override val primaryKey = PrimaryKey(idCaja)
 }

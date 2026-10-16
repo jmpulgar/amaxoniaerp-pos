@@ -16,6 +16,7 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.venezuela.Venez
 import com.amaxoniaerp.features.electronicinvoice.storage.FileSystemPanamaCreditNotePdfStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -23,6 +24,9 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 private const val HTTP_REQUEST_TIMEOUT_MS = 30_000L
+private const val HTTP_CONNECT_TIMEOUT_MS = 5_000L
+private const val HTTP_SOCKET_TIMEOUT_MS = 30_000L
+private const val HTTP_MAX_CONNECTIONS = 100
 
 fun buildFeHttpClient(): HttpClient =
     HttpClient(CIO) {
@@ -39,8 +43,13 @@ fun buildFeHttpClient(): HttpClient =
         install(Logging) {
             level = LogLevel.INFO
         }
+        install(HttpTimeout) {
+            requestTimeoutMillis = HTTP_REQUEST_TIMEOUT_MS
+            connectTimeoutMillis = HTTP_CONNECT_TIMEOUT_MS
+            socketTimeoutMillis = HTTP_SOCKET_TIMEOUT_MS
+        }
         engine {
-            requestTimeout = HTTP_REQUEST_TIMEOUT_MS
+            maxConnectionsCount = HTTP_MAX_CONNECTIONS
         }
     }
 

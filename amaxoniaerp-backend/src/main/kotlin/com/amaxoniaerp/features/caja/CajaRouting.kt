@@ -213,15 +213,24 @@ internal class CajaHandlers(
 
             val database = DatabaseManager.connectToCompanyDb(ctx.countryCode, companyDb)
             val cajaSecuencia = cajaSession.status(database, companyDb, idCaja)
+            val facturaCorrelativo = cajaRepository.getFacturaCorrelativo(database, idCaja)
             if (cajaSecuencia != null) {
                 call.respond(
                     HttpStatusCode.OK,
-                    CajaStatusResponse(isOpen = true, cajaSecuencia = cajaSecuencia),
+                    CajaStatusResponse(
+                        isOpen = true,
+                        cajaSecuencia = cajaSecuencia,
+                        facturaCorrelativo = facturaCorrelativo,
+                    ),
                 )
             } else {
                 call.respond(
                     HttpStatusCode.OK,
-                    CajaStatusResponse(isOpen = false, cajaSecuencia = null),
+                    CajaStatusResponse(
+                        isOpen = false,
+                        cajaSecuencia = null,
+                        facturaCorrelativo = facturaCorrelativo,
+                    ),
                 )
             }
         }

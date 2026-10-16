@@ -8,15 +8,20 @@ import com.amaxonia.erp.data.local.db.ClientSucursalEntity
 import com.amaxonia.erp.data.remote.ApiService
 import com.amaxonia.erp.data.remote.NetworkMonitor
 import com.amaxonia.erp.data.remote.createClient
+import com.amaxonia.erp.data.remote.dto.AccountStatementDto
+import com.amaxonia.erp.data.remote.dto.AccountStatementItemDto
 import com.amaxonia.erp.data.remote.dto.ClientDto
 import com.amaxonia.erp.data.remote.dto.ClientSucursalDto
 import com.amaxonia.erp.data.remote.dto.CreateClientRequest
+import com.amaxonia.erp.data.remote.getAccountStatement
 import com.amaxonia.erp.data.remote.getClientSucursales
 import com.amaxonia.erp.data.remote.getClients
 import com.amaxonia.erp.data.remote.updateClient
 import com.amaxonia.erp.data.sync.OfflineSyncScope
 import com.amaxonia.erp.data.sync.OfflineSyncSettingsStore
 import com.amaxonia.erp.data.sync.toDomain
+import com.amaxonia.erp.domain.model.AccountStatement
+import com.amaxonia.erp.domain.model.AccountStatementItem
 import com.amaxonia.erp.domain.model.Client
 import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.TaxpayerType
@@ -136,16 +141,7 @@ class ClientRepositoryImpl(
     override suspend fun createClient(client: Client): Result<Client> =
         runCatching {
             val token = requireToken()
-            val request = CreateClientRequest(
-                identification = client.identification,
-                name = client.name,
-                lastName = client.lastName,
-                address = client.address,
-                phone = client.phone,
-                email = client.email,
-                clientTypeId = client.clientTypeId,
-                taxpayerTypeId = if (client.taxpayerType == TaxpayerType.JURIDICO) 2 else 1,
-            )
+            val request = client.toCreateRequest()
             val response = apiService.createClient(token, request)
             if (clientDao != null) {
                 runCatching { clientDao?.insertAll(listOf(response.toEntity())) }
@@ -156,20 +152,18 @@ class ClientRepositoryImpl(
     override suspend fun updateClient(id: String, client: Client): Result<Client> =
         runCatching {
             val token = requireToken()
-            val request = CreateClientRequest(
-                identification = client.identification,
-                name = client.name,
-                lastName = client.lastName,
-                address = client.address,
-                phone = client.phone,
-                email = client.email,
-                clientTypeId = client.clientTypeId,
-                taxpayerTypeId = if (client.taxpayerType == TaxpayerType.JURIDICO) 2 else 1,
-            )
+            val request = client.toCreateRequest()
             val response = apiService.updateClient(token, id, request)
             if (clientDao != null) {
                 runCatching { clientDao?.insertAll(listOf(response.toEntity())) }
             }
+            response.toDomain()
+        }
+
+    override suspend fun getAccountStatement(clientId: String): Result<AccountStatement> =
+        runCatching {
+            val token = requireToken()
+            val response = apiService.getAccountStatement(token, clientId)
             response.toDomain()
         }
 
@@ -203,6 +197,64 @@ class ClientRepositoryImpl(
         }
 }
 
+private fun Client.toCreateRequest(): CreateClientRequest =
+    CreateClientRequest(
+        identification = identification,
+        name = name,
+        lastName = lastName,
+        address = address,
+        phone = phone,
+        email = email,
+        clientTypeId = clientTypeId,
+        taxpayerTypeId = if (taxpayerType == TaxpayerType.JURIDICO) 2 else 1,
+        dv = dv,
+        nombreComercial = nombreComercial,
+        representante = representante,
+        phone2 = phone2,
+        web = web,
+        fax = fax,
+        codigoCrm = codigoCrm,
+        actividad = actividad,
+        empresaZonaLibre = empresaZonaLibre,
+        pedidosOnline = pedidosOnline,
+        fnacimiento = fnacimiento,
+        genero = genero,
+        permiteCredito = permiteCredito,
+        limiteCredito = limiteCredito,
+        diasCredito = diasCredito,
+        tolerancia = tolerancia,
+        porcParcial = porcParcial,
+        porcDescuentoGlobal = porcDescuentoGlobal,
+        codTipoPrecio = codTipoPrecio,
+        cuentaContable = cuentaContable,
+        codVendedor = codVendedor,
+        codZona = codZona,
+        lugarEntrega = lugarEntrega,
+        contribuyenteEspecial = contribuyenteEspecial,
+        retenidoPorCliente = retenidoPorCliente,
+        codEntidad = codEntidad,
+        aplicaItbms = if (aplicaItbms) "1" else "0",
+        clienteFidelizacion = clienteFidelizacion,
+        clienteFidelizacionSucursal = clienteFidelizacionSucursal,
+        clienteFidelizacionNivel = clienteFidelizacionNivel,
+        clienteFidelizacionFecha = clienteFidelizacionFecha,
+        addressLevel1 = addressLevel1,
+        addressLevel2 = addressLevel2,
+        addressLevel3 = addressLevel3,
+        direccionCiudad = direccionCiudad,
+        localidad = localidad,
+        direccionSector = direccionSector,
+        direccionUrbanizacion = direccionUrbanizacion,
+        direccionCalleAv = direccionCalleAv,
+        direccionEdificioCasa = direccionEdificioCasa,
+        direccionPiso = direccionPiso,
+        direccionOficina = direccionOficina,
+        direccionReferencia = direccionReferencia,
+        alterna = alterna,
+        alterna2 = alterna2,
+        status = status,
+    )
+
 private fun ClientDto.toDomain(): Client =
     Client(
         id = id ?: code ?: "",
@@ -221,6 +273,84 @@ private fun ClientDto.toDomain(): Client =
         diasCredito = diasCredito,
         codTipoPrecio = codTipoPrecio ?: 2,
         aplicaItbms = resolvedAplicaItbms,
+        saldo = saldo,
+        nombreComercial = nombreComercial ?: "",
+        representante = representante ?: "",
+        phone2 = telefono2 ?: "",
+        web = web ?: "",
+        fax = fax ?: "",
+        codigoCrm = codigoCrm ?: "",
+        actividad = actividad ?: "",
+        empresaZonaLibre = empresaZonaLibre ?: "0",
+        pedidosOnline = pedidosOnline ?: "0",
+        fnacimiento = fnacimiento ?: "",
+        genero = genero ?: "",
+        limiteCredito = limiteCredito,
+        tolerancia = tolerancia,
+        porcParcial = porcParcial,
+        porcDescuentoGlobal = porcDescuentoGlobal,
+        cuentaContable = cuentaContable ?: "",
+        codVendedor = codVendedor ?: "",
+        codZona = codZona ?: "",
+        lugarEntrega = lugarEntrega ?: "",
+        contribuyenteEspecial = contribuyenteEspecial ?: "0",
+        retenidoPorCliente = retenidoPorCliente ?: "",
+        codEntidad = codEntidad ?: "",
+        clienteFidelizacion = clienteFidelizacion,
+        clienteFidelizacionSucursal = clienteFidelizacionSucursal,
+        clienteFidelizacionNivel = clienteFidelizacionNivel,
+        clienteFidelizacionPuntos = clienteFidelizacionPuntos,
+        clienteFidelizacionFecha = clienteFidelizacionFecha ?: "",
+        addressLevel1 = addressLevel1 ?: "",
+        addressLevel2 = addressLevel2 ?: "",
+        addressLevel3 = addressLevel3 ?: "",
+        direccionCiudad = direccionCiudad ?: "",
+        localidad = localidad ?: "",
+        direccionSector = direccionSector ?: "",
+        direccionUrbanizacion = direccionUrbanizacion ?: "",
+        direccionCalleAv = direccionCalleAv ?: "",
+        direccionEdificioCasa = direccionEdificioCasa ?: "",
+        direccionPiso = direccionPiso ?: "",
+        direccionOficina = direccionOficina ?: "",
+        direccionReferencia = direccionReferencia ?: "",
+        alterna = alterna ?: "",
+        alterna2 = alterna2 ?: "",
+    )
+
+private fun AccountStatementDto.toDomain(): AccountStatement =
+    AccountStatement(
+        clientId = clientId,
+        clientCode = clientCode,
+        clientName = clientName,
+        identification = identification,
+        totalDebt = totalDebt,
+        totalCredit = totalCredit,
+        currentBalance = currentBalance,
+        totalSaldoPendiente = totalSaldoPendiente ?: items.filter { it.status.equals("Pendiente", ignoreCase = true) }.sumOf { it.montoPendiente ?: it.saldo },
+        totalAnticipos = totalAnticipos ?: items.filter { it.comprobante.equals("ANTICIPO", ignoreCase = true) || it.comprobante.equals("ABONO", ignoreCase = true) }.sumOf { it.credito },
+        totalNC = totalNC ?: items.filter { it.comprobante.equals("NC", ignoreCase = true) }.sumOf { it.credito },
+        items = items.map { it.toDomain() },
+    )
+
+private fun AccountStatementItemDto.toDomain(): AccountStatementItem =
+    AccountStatementItem(
+        id = id,
+        fecha = fecha.ifBlank { ffecha ?: "" },
+        fechaEmision = fechaEmision.ifBlank { ffecha ?: fecha },
+        fechaVencimiento = fechaVencimiento.ifBlank { ffechaVencimiento ?: "-" },
+        comprobante = comprobante,
+        comprobanteNumero = comprobanteNumero.ifBlank { compNumSnake ?: "" },
+        serieNumero = serieNumero.ifBlank { serieNumSnake ?: (compFiscalSnake ?: comprobanteFiscal) },
+        comprobanteFiscal = comprobanteFiscal.ifBlank { compFiscalSnake ?: (serieNumSnake ?: serieNumero) },
+        concepto = concepto,
+        observacionFactura = observacionFactura.ifBlank { obsFactSnake ?: "" },
+        montoOriginal = if (montoOriginal != 0.0) montoOriginal else (montoOrigSnake ?: 0.0),
+        montoPendiente = if (montoPendiente != 0.0) montoPendiente else (montoPendSnake ?: 0.0),
+        debito = if (debito != 0.0) debito else (deudaSnake ?: 0.0),
+        credito = if (credito != 0.0) credito else (abonoSnake ?: 0.0),
+        saldo = if (saldo != 0.0) saldo else (saldoSnake ?: 0.0),
+        status = status,
+        cliente = cliente,
     )
 
 private fun ClientDto.toEntity(): ClientEntity =

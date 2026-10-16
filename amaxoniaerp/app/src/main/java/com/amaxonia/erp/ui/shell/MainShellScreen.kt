@@ -104,7 +104,7 @@ fun MainShellScreen(
     onSyncManual: () -> Unit = {},
     posContent: @Composable (onNavigateToCajas: () -> Unit, onOpenDrawer: () -> Unit) -> Unit,
     historyContent: @Composable () -> Unit = {},
-    clientsContent: @Composable () -> Unit,
+    clientsContent: @Composable (onOpenDrawer: () -> Unit) -> Unit,
     productsContent: @Composable () -> Unit,
     sucursalesContent: @Composable () -> Unit,
     cajasContent: @Composable () -> Unit,
@@ -247,7 +247,7 @@ fun MainShellScreen(
     ) {
         Scaffold(
             topBar = {
-                if (currentModule != ErpModule.POS) {
+                if (currentModule != ErpModule.POS && currentModule != ErpModule.CLIENTS) {
                     TopAppBar(
                     title = {
                         Column {
@@ -336,7 +336,7 @@ fun MainShellScreen(
                         { scope.launch { drawerState.open() } },
                     )
                     ErpModule.INVOICES -> historyContent()
-                    ErpModule.CLIENTS -> clientsContent()
+                    ErpModule.CLIENTS -> clientsContent { scope.launch { drawerState.open() } }
                     ErpModule.PRODUCTS -> productsContent()
                     ErpModule.SUCURSALES -> sucursalesContent()
                     ErpModule.CAJAS -> cajasContent()

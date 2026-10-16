@@ -16,10 +16,14 @@ import io.ktor.http.contentType
 import io.ktor.serialization.JsonConvertException
 import kotlinx.serialization.json.Json
 import java.net.UnknownHostException
+import java.util.concurrent.ConcurrentHashMap
 
 private const val LOG_CREDENTIAL_PREFIX_LENGTH = 8
 private const val HTTP_SUCCESS_MIN = 200
 private const val HTTP_SUCCESS_MAX = 299
+private const val HTTP_UNAUTHORIZED = 401
+private const val TOKEN_VALIDITY_DURATION_MS = 3_600_000L // 1 hora
+private const val TOKEN_SAFETY_MARGIN_MS = 5 * 60 * 1000L // 5 minutos antes de expirar
 
 /**
  * Implementación REST concreta de [VenezuelaHkaClient] para The Factory HKA.
@@ -45,7 +49,28 @@ class VenezuelaHkaRestClient(
 ) : VenezuelaHkaClient {
     private val log = org.slf4j.LoggerFactory.getLogger(VenezuelaHkaRestClient::class.java)
 
+    private data class CachedVeAuth(
+        val response: VenezuelaHkaResponse<VenezuelaHkaAuthResponse>,
+        val expiresAt: Long,
+    )
+
+    private val authCache = ConcurrentHashMap<String, CachedVeAuth>()
+
+    private fun cacheKey(credentials: PacCredentials): String = "${credentials.baseUrl.trimEnd('/')}|${credentials.usuario.trim()}"
+
+    fun invalidateToken(credentials: PacCredentials) {
+        authCache.remove(cacheKey(credentials))
+    }
+
     override suspend fun authenticate(credentials: PacCredentials): VenezuelaHkaResponse<VenezuelaHkaAuthResponse> {
+        val key = cacheKey(credentials)
+        val cached = authCache[key]
+        val now = System.currentTimeMillis()
+        if (cached != null && cached.expiresAt > now + TOKEN_SAFETY_MARGIN_MS && cached.response.businessOk) {
+            log.debug("[VE-HKA] Reutilizando token en caché para usuario={}", credentials.usuario)
+            return cached.response
+        }
+
         val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
         log.info(
             "[VE-HKA] Autenticacion usuario={} host={}",
@@ -65,14 +90,23 @@ class VenezuelaHkaRestClient(
         // La autenticación no trae codigo de negocio; éxito = HTTP 200 + token.
         val codigo = parsed?.let { "200" } ?: raw.codigo
         val mensaje = parsed?.mensaje.orEmpty()
-        return VenezuelaHkaResponse(
-            httpStatus = raw.status,
-            rawBody = raw.text,
-            codigo = codigo,
-            mensaje = mensaje,
-            validaciones = emptyList(),
-            resultado = parsed,
-        )
+        val authResponse =
+            VenezuelaHkaResponse(
+                httpStatus = raw.status,
+                rawBody = raw.text,
+                codigo = codigo,
+                mensaje = mensaje,
+                validaciones = emptyList(),
+                resultado = parsed,
+            )
+
+        if (authResponse.httpOk && !parsed?.token.isNullOrBlank()) {
+            authCache[key] = CachedVeAuth(authResponse, now + TOKEN_VALIDITY_DURATION_MS)
+        } else {
+            authCache.remove(key)
+        }
+
+        return authResponse
     }
 
     override suspend fun fetchLastDocument(
@@ -130,6 +164,9 @@ class VenezuelaHkaRestClient(
                 }
             val status = response.status.value
             val text = response.bodyAsText()
+            if (status == HTTP_UNAUTHORIZED && token != null) {
+                authCache.values.removeIf { it.response.resultado?.token == token.token }
+            }
             RawCall(status, text)
         } catch (e: HttpRequestTimeoutException) {
             throw VenezuelaHkaClientException.Timeout(

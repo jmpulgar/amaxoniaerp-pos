@@ -22,6 +22,7 @@ import com.amaxonia.erp.domain.repository.PagedProducts
 import com.amaxonia.erp.domain.repository.ProductRepository
 import com.amaxonia.erp.domain.repository.SalesRepository
 import com.amaxonia.erp.domain.util.CajaDateParser
+import com.amaxonia.erp.domain.model.printer.PrinterType
 import com.amaxonia.erp.data.printer.DefaultInvoicePrintGateway
 import com.amaxonia.erp.domain.model.ClientBranch
 import com.amaxonia.erp.domain.model.SellerSummary
@@ -229,6 +230,12 @@ class PosTerminalViewModel(
                             activeCaja = openCaja
                             cajaId = openCaja.idCaja
                         }
+                    } else {
+                        val freshCaja = cajas.firstOrNull { it.idCaja == cajaId }
+                        if (freshCaja != null) {
+                            activeCaja = freshCaja
+                            cajaRepository.setActiveCaja(freshCaja)
+                        }
                     }
 
                     var isCajaOpen = false
@@ -245,6 +252,13 @@ class PosTerminalViewModel(
                         isDiaAnterior = status?.cajaSecuencia != null && CajaDateParser.isFromPreviousDay(rawFecha)
                         usuarioApertura = status?.cajaSecuencia?.usuarioApertura
                         activeCajaSecuenciaId = status?.cajaSecuencia?.idCajaSecuencia
+                        if (status?.facturaCorrelativo != null && status.facturaCorrelativo > 0) {
+                            val updatedWithStatus = activeCaja?.copy(facturaCorrelativo = status.facturaCorrelativo)
+                            if (updatedWithStatus != null) {
+                                activeCaja = updatedWithStatus
+                                cajaRepository.setActiveCaja(updatedWithStatus)
+                            }
+                        }
                     }
                     val branchName = activeCaja?.sucursalNombre?.takeIf(String::isNotBlank) ?: "Sucursal Principal"
                     val warehouseName =
@@ -330,6 +344,7 @@ class PosTerminalViewModel(
                         isCatalogLoading = false,
                         departments = departments,
                         allPromotions = promotions,
+                        activeCajaObj = cajaBundle.activeCaja ?: it.activeCajaObj,
                         activeCajaId = cajaBundle.cajaId,
                         activeCajaName = cajaBundle.activeCaja?.displayName ?: cajaRepository.activeCajaName.value,
                         activeCajaSecuenciaId = cajaBundle.activeCajaSecuenciaId,
@@ -1687,6 +1702,7 @@ class PosTerminalViewModel(
                     montosPorTipo = montosPorTipo,
                 )
 
+                val isHkaFiscalPrinter = localStore.readSelectedPrinterType() == PrinterType.THE_FACTORY_HKA
                 val request = ProcessSaleRequestDto(
                     idFactura = state.heldInvoiceId,
                     codFactura = state.heldInvoiceCode,
@@ -1694,6 +1710,7 @@ class PosTerminalViewModel(
                     items = saleItems,
                     pagoResumen = paymentSummary,
                     pagos = payments,
+                    useHka20 = isHkaFiscalPrinter,
                 )
 
                 val isOnline = networkMonitor?.isOnline() ?: true
@@ -1782,6 +1799,16 @@ class PosTerminalViewModel(
                         changeAmount = change,
                         paymentMethodName = paymentMethodDescription,
                     )
+                    val currentCaja = _uiState.value.activeCajaObj
+                    val updatedCaja = currentCaja?.let { c ->
+                        val parsedNum = invoiceNumber.substringAfterLast('-', "").toIntOrNull()
+                        val newCorrelativo = parsedNum ?: (c.facturaCorrelativo + 1)
+                        c.copy(facturaCorrelativo = newCorrelativo)
+                    }
+                    if (updatedCaja != null) {
+                        viewModelScope.launch { cajaRepository.setActiveCaja(updatedCaja) }
+                    }
+
                     _uiState.update {
                         it.withCart(emptyList()).copy(
                             isProcessingSale = false,
@@ -1800,6 +1827,7 @@ class PosTerminalViewModel(
                             completedSaleInfo = completedInfo,
                             printFeedbackMessage = null,
                             isPrintingReceipt = false,
+                            activeCajaObj = updatedCaja ?: it.activeCajaObj,
                         )
                     }
 

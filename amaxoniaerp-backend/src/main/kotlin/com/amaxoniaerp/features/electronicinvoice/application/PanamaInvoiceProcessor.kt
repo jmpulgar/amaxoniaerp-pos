@@ -18,6 +18,10 @@ import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnvia
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.normalizeToTwoDigits
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 
@@ -44,6 +48,7 @@ class PanamaInvoiceProcessor(
     private val repository: ElectronicInvoiceRepository,
     private val pacClient: PanamaElectronicInvoiceClient,
     private val payloadBuilder: TheFactoryHkaPayloadBuilder,
+    private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : ElectronicInvoiceStrategy {
     override val countryCode: String = "PA"
 
@@ -121,17 +126,12 @@ class PanamaInvoiceProcessor(
 
             // ── 6/7. Persistencia post-aceptación (best-effort, log crítico) ─────
             persistAcceptedInvoice(database, invoiceId, context, pacAccepted.response, pacAccepted.cufe)
-            sendInvoiceEmailIfPossible(
+            dispatchInvoiceEmailAsync(
                 context = context,
                 token = token,
                 cufe = pacAccepted.cufe,
-            ).onFailure { e ->
-                logger.warn(
-                    "FE exitosa para factura {}, pero no se pudo enviar el correo: {}",
-                    invoiceId,
-                    e.message,
-                )
-            }
+                invoiceId = invoiceId,
+            )
 
             logger.info(
                 "FE exitosa para factura {}. CUFE={}",
@@ -468,6 +468,33 @@ class PanamaInvoiceProcessor(
 
             pacClient.downloadPdf(baseUrl = context.config.apiTheFactoryHka, token = token, cufe = cufe).getOrThrow()
         }
+
+    private fun dispatchInvoiceEmailAsync(
+        context: InvoiceFEContext,
+        token: PacAuthToken,
+        cufe: String,
+        invoiceId: String,
+    ) {
+        val email =
+            context.cliente.correo
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: return
+
+        emailScope.launch {
+            sendInvoiceEmailIfPossible(
+                context = context,
+                token = token,
+                cufe = cufe,
+            ).onFailure { e ->
+                logger.warn(
+                    "FE exitosa para factura {}, pero no se pudo enviar el correo: {}",
+                    invoiceId,
+                    e.message,
+                )
+            }
+        }
+    }
 
     private suspend fun sendInvoiceEmailIfPossible(
         context: InvoiceFEContext,

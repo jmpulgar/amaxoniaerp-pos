@@ -1,5 +1,6 @@
 package com.amaxonia.erp.domain.repository
 
+import com.amaxonia.erp.domain.model.AccountStatement
 import com.amaxonia.erp.domain.model.Client
 import com.amaxonia.erp.domain.model.ClientBranch
 
@@ -9,5 +10,6 @@ interface ClientRepository {
     suspend fun createClient(client: Client): Result<Client>
     suspend fun updateClient(id: String, client: Client): Result<Client>
     suspend fun getClientSucursales(clientId: String): Result<List<ClientBranch>>
+    suspend fun getAccountStatement(clientId: String): Result<AccountStatement>
 }
 

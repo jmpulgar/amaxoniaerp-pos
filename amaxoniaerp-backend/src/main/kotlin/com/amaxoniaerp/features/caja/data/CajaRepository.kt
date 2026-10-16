@@ -48,6 +48,19 @@ class CajaRepository {
             openCajas.firstOrNull()?.let(::mapOpenSecuenciaRow)
         }
 
+    suspend fun getFacturaCorrelativo(
+        database: Database,
+        idCaja: String,
+    ): Int? =
+        dbQuery(database) {
+            CajaTable
+                .select(CajaTable.facturaCorrelativo)
+                .where { CajaTable.idCaja eq idCaja }
+                .limit(1)
+                .firstOrNull()
+                ?.get(CajaTable.facturaCorrelativo)
+        }
+
     suspend fun getNextSecuenciaCodigo(
         database: Database,
         idCaja: String,

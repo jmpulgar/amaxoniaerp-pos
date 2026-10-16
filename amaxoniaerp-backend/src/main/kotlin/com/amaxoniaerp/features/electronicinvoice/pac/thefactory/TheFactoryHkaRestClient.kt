@@ -27,9 +27,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 
 private const val CUFE_LOG_PREFIX_LENGTH = 20
 private const val RESPONSE_LOG_PREVIEW_LENGTH = 200
+private const val TOKEN_VALIDITY_DURATION_MS = 3_600_000L // 1 hora
+private const val TOKEN_SAFETY_MARGIN_MS = 5 * 60 * 1000L // 5 minutos antes de expirar
 private val PDF_MAGIC_BYTES = byteArrayOf(0x25, 0x50, 0x44, 0x46) // "%PDF"
 private val theFactoryRestClientJson =
     Json {
@@ -53,9 +56,24 @@ class TheFactoryHkaRestClient(
     private val httpClient: HttpClient,
 ) : PanamaElectronicInvoiceClient {
     private val logger = LoggerFactory.getLogger(TheFactoryHkaRestClient::class.java)
+    private val tokenCache = ConcurrentHashMap<String, PacAuthToken>()
+
+    private fun cacheKey(credentials: PacCredentials): String = "${credentials.baseUrl.trimEnd('/')}|${credentials.usuario.trim()}"
+
+    fun invalidateToken(credentials: PacCredentials) {
+        tokenCache.remove(cacheKey(credentials))
+    }
 
     override suspend fun authenticate(credentials: PacCredentials): Result<PacAuthToken> =
         runCatching {
+            val key = cacheKey(credentials)
+            val cached = tokenCache[key]
+            val now = System.currentTimeMillis()
+            if (cached != null && cached.expiresAt > now + TOKEN_SAFETY_MARGIN_MS) {
+                logger.debug("Reutilizando token PAC en caché para: {}", credentials.usuario)
+                return@runCatching cached
+            }
+
             val url = "${credentials.baseUrl.trimEnd('/')}/api/Autenticacion"
             logger.info("Autenticando con The Factory HKA en: {}", url)
 
@@ -71,6 +89,7 @@ class TheFactoryHkaRestClient(
                 }
 
             if (!response.status.isSuccess()) {
+                tokenCache.remove(key)
                 val body = runCatching { response.bodyAsText() }.getOrDefault("")
                 throw PacCommunicationException(
                     "Autenticación fallida con The Factory HKA: HTTP ${response.status}. Body: $body",
@@ -80,15 +99,21 @@ class TheFactoryHkaRestClient(
             val body = response.body<TheFactoryAuthResponse>()
             val token =
                 body.token
-                    ?: throw PacCommunicationException(
-                        "Token vacío en respuesta de autenticación: ${body.mensaje ?: "sin mensaje"}",
-                    )
+                    ?: run {
+                        tokenCache.remove(key)
+                        throw PacCommunicationException(
+                            "Token vacío en respuesta de autenticación: ${body.mensaje ?: "sin mensaje"}",
+                        )
+                    }
 
             logger.info("Autenticación exitosa con The Factory HKA")
-            PacAuthToken(
-                token = token,
-                expiresAt = System.currentTimeMillis() + 3_600_000, // 1 hora
-            )
+            val pacToken =
+                PacAuthToken(
+                    token = token,
+                    expiresAt = now + TOKEN_VALIDITY_DURATION_MS,
+                )
+            tokenCache[key] = pacToken
+            pacToken
         }.onFailure { e ->
             logger.error("Error autenticando con The Factory HKA", e)
         }
@@ -121,6 +146,9 @@ class TheFactoryHkaRestClient(
             logger.info("[FE-PAC] Respuesta recibida de The Factory HKA [HTTP {}]:\n{}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
+                if (response.status == HttpStatusCode.Unauthorized) {
+                    tokenCache.values.removeIf { it.token == token.token }
+                }
                 throw PacCommunicationException(
                     "Error HTTP ${response.status} al enviar documento a The Factory HKA. Body: $responseText",
                 )
@@ -170,6 +198,9 @@ class TheFactoryHkaRestClient(
             logger.info("[FE-PAC] EstadoDocumento [HTTP {}]: {}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
+                if (response.status == HttpStatusCode.Unauthorized) {
+                    tokenCache.values.removeIf { it.token == token.token }
+                }
                 throw PacCommunicationException(
                     "Error HTTP ${response.status} en EstadoDocumento. Body: $responseText",
                 )
@@ -339,6 +370,9 @@ class TheFactoryHkaRestClient(
             logger.debug("Respuesta EnvioCorreo The Factory HKA [HTTP {}]: {}", response.status, responseText)
 
             if (!response.status.isSuccess()) {
+                if (response.status == HttpStatusCode.Unauthorized) {
+                    tokenCache.values.removeIf { it.token == token.token }
+                }
                 throw PacCommunicationException(
                     "Error HTTP ${response.status} al enviar correo desde The Factory HKA. Body: $responseText",
                 )

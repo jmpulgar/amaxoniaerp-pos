@@ -40,7 +40,7 @@ import com.amaxonia.erp.ui.theme.FlowHeaderGradient
 
 @Composable
 fun PosWebHeaderBar(
-    correlativo: String = "#001-00112",
+    correlativo: String = "",
     cartItemCount: Int = 0,
     isCatalogOpen: Boolean = false,
     onOpenDrawer: () -> Unit = {},
@@ -91,12 +91,14 @@ fun PosWebHeaderBar(
                 fontWeight = FontWeight.Bold,
             )
 
-            Text(
-                text = correlativo,
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = if (isLarge) 14.sp else 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+            if (correlativo.isNotBlank()) {
+                Text(
+                    text = correlativo,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = if (isLarge) 14.sp else 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
 
         // --- Derecha: Acciones Rápidas Superiores (Limpiar, Guardar, Buscar, Imprimir) ---

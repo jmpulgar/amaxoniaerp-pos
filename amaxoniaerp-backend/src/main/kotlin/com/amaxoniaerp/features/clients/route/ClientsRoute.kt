@@ -27,10 +27,14 @@ fun Route.clientsRoutes(clientsRepository: ClientsRepository) {
         route("/clients") {
             get { handlers.listar(call) }
             get("/default") { handlers.clientePorDefecto(call) }
-            get("/{id}") { handlers.detalle(call) }
-            get("/{id}/sucursales") { handlers.sucursales(call) }
             post { handlers.crear(call) }
-            put("/{id}") { handlers.actualizar(call) }
+            route("/{id}") {
+                get { handlers.detalle(call) }
+                get("/sucursales") { handlers.sucursales(call) }
+                get("/account-statement") { handlers.estadoCuenta(call) }
+                get("/estado-cuenta") { handlers.estadoCuenta(call) }
+                put { handlers.actualizar(call) }
+            }
         }
     }
 }
@@ -107,6 +111,28 @@ internal class ClientsHandlers(
             val companyDb = ctx.connectDatabase()
             val sucursales = clientsRepository.listClientSucursales(companyDb, ctx.countryCode, id)
             call.respond(sucursales)
+        }
+
+    suspend fun estadoCuenta(call: ApplicationCall) =
+        run {
+            val ctx = call.resolveCompanyRequestContext() ?: return@run
+            val id = call.requireClientId() ?: return@run
+
+            val companyDb = ctx.connectDatabase()
+            val statement =
+                clientsRepository.getAccountStatement(companyDb, id)
+                    ?: com.amaxoniaerp.features.clients.domain.AccountStatementResponse(
+                        clientId = id,
+                        clientCode = id,
+                        clientName = "",
+                        identification = "",
+                        totalDebt = 0.0,
+                        totalCredit = 0.0,
+                        currentBalance = 0.0,
+                        items = emptyList(),
+                    )
+
+            call.respond(statement)
         }
 
     suspend fun crear(call: ApplicationCall) =

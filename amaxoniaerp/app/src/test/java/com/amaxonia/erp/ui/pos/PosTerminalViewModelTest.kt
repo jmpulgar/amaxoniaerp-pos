@@ -7,6 +7,7 @@ import com.amaxonia.erp.data.remote.dto.ProcessSaleRequestDto
 import com.amaxonia.erp.data.remote.dto.ProcessSaleResponseDto
 import com.amaxonia.erp.domain.model.AperturaRequest
 import com.amaxonia.erp.domain.model.Caja
+import com.amaxonia.erp.domain.model.AccountStatement
 import com.amaxonia.erp.domain.model.CajaSecuencia
 import com.amaxonia.erp.domain.model.CajaSessionStatus
 import com.amaxonia.erp.domain.model.CajaStatusResponse
@@ -146,6 +147,9 @@ class PosTerminalViewModelTest {
 
         override suspend fun getClientSucursales(clientId: String): Result<List<ClientBranch>> =
             clientBranchesResult
+
+        override suspend fun getAccountStatement(clientId: String): Result<AccountStatement> =
+            Result.success(AccountStatement(clientId = clientId))
     }
 
     private class FakeSalesRepository(
@@ -232,6 +236,9 @@ class PosTerminalViewModelTest {
         override suspend fun readAllowEditPrices(): Boolean = true
         override fun allowDiscountsFlow(): kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true)
         override suspend fun readAllowDiscounts(): Boolean = true
+        override suspend fun readSelectedPrinterType(): com.amaxonia.erp.domain.model.printer.PrinterType = com.amaxonia.erp.domain.model.printer.PrinterType.NONE
+        override fun selectedPrinterTypeFlow(): kotlinx.coroutines.flow.Flow<com.amaxonia.erp.domain.model.printer.PrinterType> =
+            kotlinx.coroutines.flow.flowOf(com.amaxonia.erp.domain.model.printer.PrinterType.NONE)
     }
 
     private class FakePromotionRepository(
@@ -2033,6 +2040,35 @@ class PosTerminalViewModelTest {
         assertEquals(1, editedItem.selectedOptions.size)
         assertEquals("Malteada Extra", editedItem.selectedOptions.first().nombre)
         assertEquals(null, state.editingCartItemForOptions)
+    }
+
+    @Test
+    fun caja_siguienteCorrelativoFactura_and_processSale_incrementsCorrelativo() = runTest {
+        val testCaja = Caja(
+            idCaja = "2",
+            codCaja = "002",
+            caja = "Caja Mostrador 2",
+            facturaCorrelativo = 111,
+        )
+        // Correlativo format: numerodecaja-consecutivosiguiente (111 + 1 = 112 -> "002-00112")
+        assertEquals("002-00112", testCaja.siguienteCorrelativoFactura)
+
+        fakeCajaRepo._activeCaja.value = testCaja
+        fakeCajaRepo.statusResponse = CajaStatusResponse(isOpen = true)
+
+        val vm = PosTerminalViewModel(
+            productRepository = FakeProductRepository(),
+            clientRepository = FakeClientRepository(),
+            cajaRepository = fakeCajaRepo,
+            salesRepository = FakeSalesRepository(),
+            localStore = fakeLocalStore,
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals("2", state.activeCajaId)
+        assertEquals(testCaja, state.activeCajaObj)
+        assertEquals("002-00112", state.activeCajaObj?.siguienteCorrelativoFactura)
     }
 }
 

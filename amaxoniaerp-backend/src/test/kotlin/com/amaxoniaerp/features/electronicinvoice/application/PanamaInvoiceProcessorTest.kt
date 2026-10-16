@@ -21,6 +21,8 @@ import com.amaxoniaerp.features.electronicinvoice.pac.PanamaElectronicInvoiceCli
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryEnviarCorreoResponse
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaDocumentoWrapper
 import com.amaxoniaerp.features.electronicinvoice.pac.thefactory.TheFactoryHkaPayloadBuilder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import java.io.IOException
@@ -157,7 +159,8 @@ class PanamaInvoiceProcessorTest {
     private fun processor(
         repository: ElectronicInvoiceRepository,
         client: PanamaElectronicInvoiceClient,
-    ) = PanamaInvoiceProcessor(repository, client, TheFactoryHkaPayloadBuilder())
+        emailScope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
+    ) = PanamaInvoiceProcessor(repository, client, TheFactoryHkaPayloadBuilder(), emailScope)
 
     @Test
     fun `tipo facturacion menor a 3 nunca contacta al PAC y escapa como excepcion cruda`() =

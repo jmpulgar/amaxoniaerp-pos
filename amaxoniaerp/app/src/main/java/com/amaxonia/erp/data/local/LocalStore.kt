@@ -271,9 +271,9 @@ open class LocalStore(
         }
     }
 
-    suspend fun readSelectedPrinterType(): PrinterType = selectedPrinterTypeFlow().first()
+    open suspend fun readSelectedPrinterType(): PrinterType = selectedPrinterTypeFlow().first()
 
-    fun selectedPrinterTypeFlow(): Flow<PrinterType> =
+    open fun selectedPrinterTypeFlow(): Flow<PrinterType> =
         dataStore.data.map { prefs ->
             val code = prefs[selectedCountryKey] ?: BuildConfig.DEFAULT_COUNTRY_CODE
             val country = ServerCountries.fromCode(code)
