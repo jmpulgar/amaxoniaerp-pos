@@ -14,6 +14,7 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
@@ -27,6 +28,20 @@ import java.util.UUID
 private const val CLIENT_PHOTO_LOG_SAMPLE_SIZE = 3
 private const val PHOTO_FILENAME_LOG_LENGTH = 80
 private const val CLIENT_CODE_LENGTH = 9
+private const val DUMMY_CLIENT_CODE_LIMIT = 999_999_999
+private const val DUMMY_CLIENT_CODE = "999999999"
+private const val DEFAULT_PANAMA_COUNTRY_ID = 170
+private const val DEFAULT_ACCOUNT_NUMBER = "1.10.11.001."
+private const val DEFAULT_VENDOR_CODE = "1"
+private const val DEFAULT_ZONE_CODE = "1"
+private const val DEFAULT_ENTITY_CODE = "1"
+private const val DEFAULT_ZERO_AMOUNT_STRING = "0.00"
+private const val DEFAULT_FOREIGN_AUTH_TYPE = "01"
+
+private fun String.fallback(
+    existing: String?,
+    default: String = "",
+): String = this.ifBlank { existing?.takeIf { it.isNotBlank() } ?: default }
 
 class ClientsRepository {
     private val log = LoggerFactory.getLogger(ClientsRepository::class.java)
@@ -88,7 +103,12 @@ class ClientsRepository {
     ): Client =
         dbQuery(database) {
             val newId = UUID.randomUUID().toString()
-            val generatedCode = getNextCode()
+            var generatedCode = getNextCode()
+            var codeInt = generatedCode.toIntOrNull() ?: 1
+            while (ClientsTable.select(ClientsTable.codCliente).where { ClientsTable.codCliente eq generatedCode }.count() > 0) {
+                codeInt++
+                generatedCode = codeInt.toString().padStart(CLIENT_CODE_LENGTH, '0')
+            }
 
             ClientsTable.insert {
                 it[idCliente] = newId
@@ -101,27 +121,27 @@ class ClientsRepository {
                 it[direccionNivel1] = request.addressLevel1
                 it[direccionNivel2] = request.addressLevel2
                 it[direccionNivel3] = request.addressLevel3
-                it[tipoIdentificacionExtranjera] = request.foreignAuthTypeId
+                it[tipoIdentificacionExtranjera] = request.foreignAuthTypeId.takeIf { !it.isNullOrBlank() } ?: "01"
                 it[telefonos] = request.phone
                 it[email] = request.email
                 it[estado] = if (request.status) "A" else "I"
-                it[pais] = request.countryId
-                it[codTipoCliente] = request.clientTypeId
-                it[tipoContribuyente] = request.taxpayerTypeId
+                it[pais] = if (request.countryId > 0) request.countryId else DEFAULT_PANAMA_COUNTRY_ID
+                it[codTipoCliente] = if (request.clientTypeId > 0) request.clientTypeId else 1
+                it[tipoContribuyente] = if (request.taxpayerTypeId > 0) request.taxpayerTypeId else 1
                 it[permiteCredito] = request.permiteCredito
                 it[limite] = request.limiteCredito
                 it[dias] = request.diasCredito
                 it[tolerancia] = request.tolerancia
                 it[porcParcial] = request.porcParcial
                 it[porcDescuentoGlobal] = request.porcDescuentoGlobal
-                it[codTipoPrecio] = request.codTipoPrecio
-                it[cuentaContable] = request.cuentaContable
-                it[codVendedor] = request.codVendedor
-                it[codZona] = request.codZona
+                it[codTipoPrecio] = if (request.codTipoPrecio > 0) request.codTipoPrecio else 2
+                it[cuentaContable] = request.cuentaContable.fallback(null, DEFAULT_ACCOUNT_NUMBER)
+                it[codVendedor] = request.codVendedor.fallback(null, DEFAULT_VENDOR_CODE)
+                it[codZona] = request.codZona.fallback(null, DEFAULT_ZONE_CODE)
                 it[lugarEntrega] = request.lugarEntrega
                 it[contribuyenteEspecial] = request.contribuyenteEspecial
-                it[retenidoPorCliente] = request.retenidoPorCliente
-                it[codEntidad] = request.codEntidad
+                it[retenidoPorCliente] = request.retenidoPorCliente.fallback(null, DEFAULT_ZERO_AMOUNT_STRING)
+                it[codEntidad] = request.codEntidad.fallback(null, DEFAULT_ENTITY_CODE)
                 it[aplicaItbms] = request.aplicaItbms
                 it[nombreComercial] = request.nombreComercial
                 it[representante] = request.representante
@@ -185,64 +205,27 @@ class ClientsRepository {
         request: CreateClientRequest,
     ): Client? =
         dbQuery(database) {
+            val existing =
+                ClientsTable
+                    .selectAll()
+                    .where { (ClientsTable.idCliente eq id) or (ClientsTable.codCliente eq id) }
+                    .firstOrNull() ?: return@dbQuery null
+
+            val targetId =
+                existing[ClientsTable.idCliente].ifBlank {
+                    val generatedId = UUID.randomUUID().toString()
+                    ClientsTable.update({ ClientsTable.codCliente eq existing[ClientsTable.codCliente] }) {
+                        it[idCliente] = generatedId
+                    }
+                    generatedId
+                }
+
             val updated =
-                ClientsTable.update({ ClientsTable.idCliente eq id }) {
-                    it[rif] = request.identification
-                    it[nombre] = request.name.uppercase()
-                    it[apellido] = request.lastName.uppercase()
-                    it[dv] = request.dv
-                    it[direccion] = request.address.uppercase()
-                    it[direccionNivel1] = request.addressLevel1
-                    it[direccionNivel2] = request.addressLevel2
-                    it[direccionNivel3] = request.addressLevel3
-                    it[tipoIdentificacionExtranjera] = request.foreignAuthTypeId
-                    it[telefonos] = request.phone
-                    it[email] = request.email
-                    it[estado] = if (request.status) "A" else "I"
-                    it[pais] = request.countryId
-                    it[codTipoCliente] = request.clientTypeId
-                    it[tipoContribuyente] = request.taxpayerTypeId
-                    it[permiteCredito] = request.permiteCredito
-                    it[limite] = request.limiteCredito
-                    it[dias] = request.diasCredito
-                    it[tolerancia] = request.tolerancia
-                    it[porcParcial] = request.porcParcial
-                    it[porcDescuentoGlobal] = request.porcDescuentoGlobal
-                    it[codTipoPrecio] = request.codTipoPrecio
-                    it[cuentaContable] = request.cuentaContable
-                    it[codVendedor] = request.codVendedor
-                    it[codZona] = request.codZona
-                    it[lugarEntrega] = request.lugarEntrega
-                    it[contribuyenteEspecial] = request.contribuyenteEspecial
-                    it[retenidoPorCliente] = request.retenidoPorCliente
-                    it[codEntidad] = request.codEntidad
-                    it[aplicaItbms] = request.aplicaItbms
-                    it[nombreComercial] = request.nombreComercial
-                    it[representante] = request.representante
-                    it[telefono2] = request.phone2
-                    it[web] = request.web
-                    it[fax] = request.fax
-                    it[codigoCrm] = request.codigoCrm
-                    it[actividad] = request.actividad
-                    it[empresaZonaLibre] = request.empresaZonaLibre
-                    it[pedidosOnline] = request.pedidosOnline
-                    it[fnacimiento] = request.fnacimiento
-                    it[genero] = request.genero
-                    it[clienteFidelizacion] = request.clienteFidelizacion
-                    it[clienteFidelizacionSucursal] = request.clienteFidelizacionSucursal
-                    it[clienteFidelizacionNivel] = request.clienteFidelizacionNivel
-                    it[clienteFidelizacionFecha] = request.clienteFidelizacionFecha
-                    it[direccionCiudad] = request.direccionCiudad
-                    it[localidad] = request.localidad
-                    it[direccionSector] = request.direccionSector
-                    it[direccionUrbanizacion] = request.direccionUrbanizacion
-                    it[direccionCalleAv] = request.direccionCalleAv
-                    it[direccionEdificioCasa] = request.direccionEdificioCasa
-                    it[direccionPiso] = request.direccionPiso
-                    it[direccionOficina] = request.direccionOficina
-                    it[direccionReferencia] = request.direccionReferencia
-                    it[alterna] = request.alterna
-                    it[alterna2] = request.alterna2
+                ClientsTable.update({
+                    (ClientsTable.idCliente eq targetId) or (ClientsTable.idCliente eq id) or
+                        (ClientsTable.codCliente eq id)
+                }) { stmt ->
+                    applyClientUpdate(stmt, request, existing)
                 }
 
             if (updated == 0) {
@@ -250,11 +233,86 @@ class ClientsRepository {
             } else {
                 ClientsTable
                     .selectAll()
-                    .andWhere { ClientsTable.idCliente eq id }
+                    .where { (ClientsTable.idCliente eq targetId) or (ClientsTable.idCliente eq id) or (ClientsTable.codCliente eq id) }
                     .map { row -> mapRowToClient(row) }
-                    .singleOrNull()
+                    .firstOrNull()
             }
         }
+
+    private fun applyClientUpdate(
+        stmt: org.jetbrains.exposed.sql.statements.UpdateBuilder<*>,
+        request: CreateClientRequest,
+        existing: ResultRow,
+    ) {
+        stmt[ClientsTable.rif] = request.identification.fallback(existing[ClientsTable.rif])
+        stmt[ClientsTable.nombre] = request.name.uppercase()
+        stmt[ClientsTable.apellido] = request.lastName.uppercase()
+        stmt[ClientsTable.dv] = request.dv
+        stmt[ClientsTable.direccion] = request.address.uppercase().fallback(existing[ClientsTable.direccion])
+        stmt[ClientsTable.direccionNivel1] = request.addressLevel1.fallback(existing[ClientsTable.direccionNivel1])
+        stmt[ClientsTable.direccionNivel2] = request.addressLevel2.fallback(existing[ClientsTable.direccionNivel2])
+        stmt[ClientsTable.direccionNivel3] = request.addressLevel3.fallback(existing[ClientsTable.direccionNivel3])
+        stmt[ClientsTable.tipoIdentificacionExtranjera] =
+            request.foreignAuthTypeId.takeIf { !it.isNullOrBlank() }
+                ?: existing[ClientsTable.tipoIdentificacionExtranjera] ?: DEFAULT_FOREIGN_AUTH_TYPE
+        stmt[ClientsTable.telefonos] = request.phone.fallback(existing[ClientsTable.telefonos])
+        stmt[ClientsTable.email] = request.email.fallback(existing[ClientsTable.email])
+        stmt[ClientsTable.estado] = if (request.status) "A" else "I"
+        stmt[ClientsTable.pais] = if (request.countryId > 0) request.countryId else existing[ClientsTable.pais]
+        stmt[ClientsTable.codTipoCliente] =
+            if (request.clientTypeId > 0) request.clientTypeId else existing[ClientsTable.codTipoCliente]
+        stmt[ClientsTable.tipoContribuyente] =
+            if (request.taxpayerTypeId > 0) request.taxpayerTypeId else existing[ClientsTable.tipoContribuyente]
+        stmt[ClientsTable.permiteCredito] = request.permiteCredito
+        stmt[ClientsTable.limite] = request.limiteCredito
+        stmt[ClientsTable.dias] = request.diasCredito
+        stmt[ClientsTable.tolerancia] = request.tolerancia
+        stmt[ClientsTable.porcParcial] = request.porcParcial
+        stmt[ClientsTable.porcDescuentoGlobal] = request.porcDescuentoGlobal
+        stmt[ClientsTable.codTipoPrecio] =
+            if (request.codTipoPrecio > 0) request.codTipoPrecio else existing[ClientsTable.codTipoPrecio]
+        stmt[ClientsTable.cuentaContable] =
+            request.cuentaContable.fallback(existing[ClientsTable.cuentaContable], DEFAULT_ACCOUNT_NUMBER)
+        stmt[ClientsTable.codVendedor] =
+            request.codVendedor.fallback(existing[ClientsTable.codVendedor], DEFAULT_VENDOR_CODE)
+        stmt[ClientsTable.codZona] = request.codZona.fallback(existing[ClientsTable.codZona], DEFAULT_ZONE_CODE)
+        stmt[ClientsTable.lugarEntrega] = request.lugarEntrega.fallback(existing[ClientsTable.lugarEntrega])
+        stmt[ClientsTable.contribuyenteEspecial] = request.contribuyenteEspecial
+        stmt[ClientsTable.retenidoPorCliente] =
+            request.retenidoPorCliente.fallback(existing[ClientsTable.retenidoPorCliente], DEFAULT_ZERO_AMOUNT_STRING)
+        stmt[ClientsTable.codEntidad] = request.codEntidad.fallback(existing[ClientsTable.codEntidad], DEFAULT_ENTITY_CODE)
+        stmt[ClientsTable.aplicaItbms] = request.aplicaItbms
+        stmt[ClientsTable.nombreComercial] = request.nombreComercial.fallback(existing[ClientsTable.nombreComercial])
+        stmt[ClientsTable.representante] = request.representante.fallback(existing[ClientsTable.representante])
+        stmt[ClientsTable.telefono2] = request.phone2.fallback(existing[ClientsTable.telefono2])
+        stmt[ClientsTable.web] = request.web.fallback(existing[ClientsTable.web])
+        stmt[ClientsTable.fax] = request.fax.fallback(existing[ClientsTable.fax])
+        stmt[ClientsTable.codigoCrm] = request.codigoCrm.fallback(existing[ClientsTable.codigoCrm])
+        stmt[ClientsTable.actividad] = request.actividad.fallback(existing[ClientsTable.actividad])
+        stmt[ClientsTable.empresaZonaLibre] = request.empresaZonaLibre
+        stmt[ClientsTable.pedidosOnline] = request.pedidosOnline
+        stmt[ClientsTable.fnacimiento] = request.fnacimiento.fallback(existing[ClientsTable.fnacimiento])
+        stmt[ClientsTable.genero] = request.genero.fallback(existing[ClientsTable.genero])
+        stmt[ClientsTable.clienteFidelizacion] = request.clienteFidelizacion
+        stmt[ClientsTable.clienteFidelizacionSucursal] = request.clienteFidelizacionSucursal
+        stmt[ClientsTable.clienteFidelizacionNivel] = request.clienteFidelizacionNivel
+        stmt[ClientsTable.clienteFidelizacionFecha] =
+            request.clienteFidelizacionFecha.fallback(existing[ClientsTable.clienteFidelizacionFecha])
+        stmt[ClientsTable.direccionCiudad] = request.direccionCiudad.fallback(existing[ClientsTable.direccionCiudad])
+        stmt[ClientsTable.localidad] = request.localidad.fallback(existing[ClientsTable.localidad])
+        stmt[ClientsTable.direccionSector] = request.direccionSector.fallback(existing[ClientsTable.direccionSector])
+        stmt[ClientsTable.direccionUrbanizacion] =
+            request.direccionUrbanizacion.fallback(existing[ClientsTable.direccionUrbanizacion])
+        stmt[ClientsTable.direccionCalleAv] = request.direccionCalleAv.fallback(existing[ClientsTable.direccionCalleAv])
+        stmt[ClientsTable.direccionEdificioCasa] =
+            request.direccionEdificioCasa.fallback(existing[ClientsTable.direccionEdificioCasa])
+        stmt[ClientsTable.direccionPiso] = request.direccionPiso.fallback(existing[ClientsTable.direccionPiso])
+        stmt[ClientsTable.direccionOficina] = request.direccionOficina.fallback(existing[ClientsTable.direccionOficina])
+        stmt[ClientsTable.direccionReferencia] =
+            request.direccionReferencia.fallback(existing[ClientsTable.direccionReferencia])
+        stmt[ClientsTable.alterna] = request.alterna.fallback(existing[ClientsTable.alterna])
+        stmt[ClientsTable.alterna2] = request.alterna2.fallback(existing[ClientsTable.alterna2])
+    }
 
     suspend fun getClientById(
         database: Database,
@@ -332,11 +390,31 @@ class ClientsRepository {
         }
 
     private fun getNextCode(): String {
-        val maxCode =
-            ClientsTable
-                .selectAll()
-                .mapNotNull { it[ClientsTable.codCliente].toIntOrNull() }
-                .maxOrNull() ?: 0
+        var maxCode = 0
+        val querySuccess =
+            runCatching {
+                val sql =
+                    "SELECT MAX(CAST(cod_cliente AS UNSIGNED)) AS max_code " +
+                        "FROM clientes WHERE cod_cliente <> '$DUMMY_CLIENT_CODE' AND cod_cliente <> ''"
+                TransactionManager.current().exec(sql) { rs ->
+                    if (rs.next()) {
+                        maxCode = rs.getInt("max_code")
+                    }
+                }
+            }.isSuccess
+
+        if (!querySuccess || maxCode == 0) {
+            val candidate =
+                ClientsTable
+                    .select(ClientsTable.codCliente)
+                    .where { ClientsTable.codCliente neq DUMMY_CLIENT_CODE }
+                    .mapNotNull { it[ClientsTable.codCliente].trim().toIntOrNull() }
+                    .filter { it < DUMMY_CLIENT_CODE_LIMIT }
+                    .maxOrNull() ?: 0
+            if (candidate > maxCode) {
+                maxCode = candidate
+            }
+        }
 
         return (maxCode + 1).toString().padStart(CLIENT_CODE_LENGTH, '0')
     }
@@ -579,93 +657,24 @@ class ClientsRepository {
                 }.isSuccess
 
             if (!querySuccess) {
-                // Fallback a consulta simple sobre caja_nueva en caso de entornos con esquemas mínimos (ej. tests)
-                val sqlSimple =
-                    """
-                    SELECT 
-                        c.caja_id AS id,
-                        COALESCE(c.fecha, '') AS fecha,
-                        COALESCE(c.comprobante, 'FACT') AS comprobante,
-                        COALESCE(c.comprobante_numero, f.cod_factura, '') AS comprobante_numero,
-                        COALESCE(f.numeroDocumentoFiscal, f.cod_factura_fiscal, '') AS comprobante_fiscal,
-                        COALESCE(c.monto, 0) AS monto_original,
-                        COALESCE(cd.monto, 0) AS monto,
-                        COALESCE(cd.id_forma_pago, 0) AS id_forma_pago,
-                        COALESCE(c.status, '') AS status,
-                        COALESCE(c.concepto, '') AS concepto
-                    FROM caja_nueva c
-                    LEFT JOIN caja_nueva_detalle cd ON cd.caja_id = c.caja_id
-                    LEFT JOIN factura f ON f.id_factura = c.id_factura
-                    WHERE (COALESCE(f.id_cliente, c.id_cliente) = '${client.id}' OR COALESCE(f.id_cliente, c.id_cliente) = '${client.code}')
-                    ORDER BY c.fecha ASC, c.caja_id ASC
-                    """.trimIndent()
-
-                runCatching {
-                    TransactionManager.current().exec(sqlSimple) { rs ->
-                        while (rs.next()) {
-                            val id = rs.getString("id") ?: ""
-                            val fecha = rs.getString("fecha") ?: ""
-                            var comprobante = rs.getString("comprobante") ?: "FACT"
-                            val compNum = rs.getString("comprobante_numero") ?: ""
-                            val compFisc = rs.getString("comprobante_fiscal") ?: ""
-                            val montoOrig = rs.getDouble("monto_original")
-                            val monto = rs.getDouble("monto")
-                            val idFormaPago = rs.getInt("id_forma_pago")
-                            val status = rs.getString("status") ?: ""
-                            val concepto = rs.getString("concepto") ?: ""
-
-                            var debito = 0.0
-                            var credito = 0.0
-
-                            if (status.equals("Anulada", ignoreCase = true)) {
-                                debito = montoOrig
-                                credito = montoOrig
-                            } else if (idFormaPago == 30 || comprobante.equals("NC", ignoreCase = true)) {
-                                credito = if (monto > 0.0) monto else montoOrig
-                                comprobante = "NOTA CREDITO"
-                            } else if (comprobante.equals("CERT", ignoreCase = true) || comprobante.equals("ABONO", ignoreCase = true)) {
-                                credito = if (monto > 0.0) monto else montoOrig
-                            } else {
-                                debito = montoOrig
-                                credito =
-                                    if (status.equals("Pagada", ignoreCase = true)) {
-                                        if (monto > 0.0) monto else montoOrig
-                                    } else {
-                                        monto
-                                    }
-                            }
-
-                            totalDebt += debito
-                            totalCredit += credito
-                            runningSaldo += (debito - credito)
-
-                            items.add(
-                                AccountStatementItem(
-                                    id = id,
-                                    fecha = fecha,
-                                    fechaEmision = fecha,
-                                    fechaVencimiento = "-",
-                                    comprobante = comprobante,
-                                    comprobanteNumero = compNum,
-                                    comprobanteFiscal = compFisc,
-                                    serieNumero = compFisc,
-                                    concepto = concepto.ifBlank { "${client.name} - $comprobante - $fecha - $compNum" },
-                                    montoOriginal = montoOrig,
-                                    montoPendiente = if (debito > 0.0 && status.equals("Pendiente", ignoreCase = true)) (debito - credito) else 0.0,
-                                    debito = debito,
-                                    credito = credito,
-                                    saldo = runningSaldo,
-                                    status = status,
-                                    cliente = "${client.code} ${client.name}",
-                                ),
-                            )
-                        }
-                    }
-                }
+                val fallback = executeStatementFallback(client, items, runningSaldo, totalDebt, totalCredit)
+                runningSaldo = fallback.first
+                totalDebt = fallback.second
+                totalCredit = fallback.third
             }
 
-            val totalSaldoPendiente = items.filter { it.status.equals("Pendiente", ignoreCase = true) || it.status.equals("Disponible", ignoreCase = true) }.sumOf { if (it.montoPendiente > 0.0) it.montoPendiente else it.saldo }
-            val totalAnticipos = items.filter { it.comprobante.equals("ANTICIPO", ignoreCase = true) || it.comprobante.equals("ABONO", ignoreCase = true) }.sumOf { it.credito }
+            val totalSaldoPendiente =
+                items
+                    .filter {
+                        it.status.equals("Pendiente", ignoreCase = true) ||
+                            it.status.equals("Disponible", ignoreCase = true)
+                    }.sumOf { if (it.montoPendiente > 0.0) it.montoPendiente else it.saldo }
+            val totalAnticipos =
+                items
+                    .filter {
+                        it.comprobante.equals("ANTICIPO", ignoreCase = true) ||
+                            it.comprobante.equals("ABONO", ignoreCase = true)
+                    }.sumOf { it.credito }
             val totalNC = items.filter { it.comprobante.equals("NC", ignoreCase = true) }.sumOf { it.credito }
 
             AccountStatementResponse(
@@ -683,6 +692,104 @@ class ClientsRepository {
             )
         }
 
+    private fun executeStatementFallback(
+        client: Client,
+        items: MutableList<AccountStatementItem>,
+        initialSaldo: Double,
+        initialDebt: Double,
+        initialCredit: Double,
+    ): Triple<Double, Double, Double> {
+        var runningSaldo = initialSaldo
+        var totalDebt = initialDebt
+        var totalCredit = initialCredit
+
+        val sqlSimple =
+            """
+            SELECT 
+                c.caja_id AS id,
+                COALESCE(c.fecha, '') AS fecha,
+                COALESCE(c.comprobante, 'FACT') AS comprobante,
+                COALESCE(c.comprobante_numero, f.cod_factura, '') AS comprobante_numero,
+                COALESCE(f.numeroDocumentoFiscal, f.cod_factura_fiscal, '') AS comprobante_fiscal,
+                COALESCE(c.monto, 0) AS monto_original,
+                COALESCE(cd.monto, 0) AS monto,
+                COALESCE(cd.id_forma_pago, 0) AS id_forma_pago,
+                COALESCE(c.status, '') AS status,
+                COALESCE(c.concepto, '') AS concepto
+            FROM caja_nueva c
+            LEFT JOIN caja_nueva_detalle cd ON cd.caja_id = c.caja_id
+            LEFT JOIN factura f ON f.id_factura = c.id_factura
+            WHERE (COALESCE(f.id_cliente, c.id_cliente) = '${client.id}' OR COALESCE(f.id_cliente, c.id_cliente) = '${client.code}')
+            ORDER BY c.fecha ASC, c.caja_id ASC
+            """.trimIndent()
+
+        runCatching {
+            TransactionManager.current().exec(sqlSimple) { rs ->
+                while (rs.next()) {
+                    val id = rs.getString("id") ?: ""
+                    val fecha = rs.getString("fecha") ?: ""
+                    var comprobante = rs.getString("comprobante") ?: "FACT"
+                    val compNum = rs.getString("comprobante_numero") ?: ""
+                    val compFisc = rs.getString("comprobante_fiscal") ?: ""
+                    val montoOrig = rs.getDouble("monto_original")
+                    val monto = rs.getDouble("monto")
+                    val idFormaPago = rs.getInt("id_forma_pago")
+                    val status = rs.getString("status") ?: ""
+                    val concepto = rs.getString("concepto") ?: ""
+
+                    var debito = 0.0
+                    var credito = 0.0
+
+                    if (status.equals("Anulada", ignoreCase = true)) {
+                        debito = montoOrig
+                        credito = montoOrig
+                    } else if (idFormaPago == 30 || comprobante.equals("NC", ignoreCase = true)) {
+                        credito = if (monto > 0.0) monto else montoOrig
+                        comprobante = "NOTA CREDITO"
+                    } else if (comprobante.equals("CERT", ignoreCase = true) || comprobante.equals("ABONO", ignoreCase = true)) {
+                        credito = if (monto > 0.0) monto else montoOrig
+                    } else {
+                        debito = montoOrig
+                        credito =
+                            if (status.equals("Pagada", ignoreCase = true)) {
+                                if (monto > 0.0) monto else montoOrig
+                            } else {
+                                monto
+                            }
+                    }
+
+                    totalDebt += debito
+                    totalCredit += credito
+                    runningSaldo += (debito - credito)
+
+                    val montoPend = if (debito > 0.0 && status.equals("Pendiente", ignoreCase = true)) (debito - credito) else 0.0
+                    items.add(
+                        AccountStatementItem(
+                            id = id,
+                            fecha = fecha,
+                            fechaEmision = fecha,
+                            fechaVencimiento = "-",
+                            comprobante = comprobante,
+                            comprobanteNumero = compNum,
+                            comprobanteFiscal = compFisc,
+                            serieNumero = compFisc,
+                            concepto = concepto.ifBlank { "${client.name} - $comprobante - $fecha - $compNum" },
+                            montoOriginal = montoOrig,
+                            montoPendiente = montoPend,
+                            debito = debito,
+                            credito = credito,
+                            saldo = runningSaldo,
+                            status = status,
+                            cliente = "${client.code} ${client.name}",
+                        ),
+                    )
+                }
+            }
+        }
+
+        return Triple(runningSaldo, totalDebt, totalCredit)
+    }
+
     private fun ResultRow.text(
         column: org.jetbrains.exposed.sql.Column<String?>,
         default: String = "",
@@ -698,10 +805,13 @@ class ClientsRepository {
         default: Double = 0.0,
     ): Double = this[column] ?: default
 
-    private fun mapRowToClient(row: ResultRow): Client =
-        Client(
-            id = row[ClientsTable.idCliente],
-            code = row[ClientsTable.codCliente],
+    private fun mapRowToClient(row: ResultRow): Client {
+        val rawId = row[ClientsTable.idCliente]
+        val rawCode = row[ClientsTable.codCliente]
+        val id = if (!rawId.isNullOrBlank()) rawId else rawCode
+        return Client(
+            id = id,
+            code = rawCode,
             identification = row[ClientsTable.rif],
             dv = row.text(ClientsTable.dv),
             name = row[ClientsTable.nombre],
@@ -712,7 +822,7 @@ class ClientsRepository {
             addressLevel3 = row.text(ClientsTable.direccionNivel3),
             phone = row[ClientsTable.telefonos],
             email = row[ClientsTable.email],
-            status = row[ClientsTable.estado] == "A",
+            status = row[ClientsTable.estado] == "A" || row[ClientsTable.estado] == "1" || row[ClientsTable.estado] == "",
             clientTypeId = row[ClientsTable.codTipoCliente],
             codTipoPrecio = row[ClientsTable.codTipoPrecio],
             taxpayerTypeId = row[ClientsTable.tipoContribuyente],
@@ -762,4 +872,5 @@ class ClientsRepository {
             alterna = row.text(ClientsTable.alterna),
             alterna2 = row.text(ClientsTable.alterna2),
         )
+    }
 }

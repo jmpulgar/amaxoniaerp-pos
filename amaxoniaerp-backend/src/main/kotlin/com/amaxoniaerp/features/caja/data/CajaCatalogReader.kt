@@ -188,6 +188,18 @@ internal fun loadDefaultWarehouseBySucursal(): Map<Int, Int?> =
             }
         }
 
+internal fun loadAllWarehousesBySucursal(): Map<Int, List<Int>> =
+    SucursalAlmacenTable
+        .select(SucursalAlmacenTable.idSucursal, SucursalAlmacenTable.idAlmacen)
+        .orderBy(SucursalAlmacenTable.idSucursal)
+        .groupBy { it[SucursalAlmacenTable.idSucursal] }
+        .mapValues { (_, rows) ->
+            rows
+                .mapNotNull { row ->
+                    row[SucursalAlmacenTable.idAlmacen].takeIf { it > 0 }
+                }.distinct()
+        }
+
 internal fun loadActiveSellers(): List<SellerRecord> =
     VendedorTable
         .select(
@@ -228,6 +240,7 @@ internal fun mapCajaRows(
     activeSellers: List<SellerRecord>,
     warehouseNames: Map<Int, String> = emptyMap(),
     all: Boolean = false,
+    allWarehousesBySucursal: Map<Int, List<Int>> = emptyMap(),
 ): List<Caja> {
     val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
     val userIdToken = userId.toString()
@@ -240,7 +253,7 @@ internal fun mapCajaRows(
     val isVE = countryCode.equals("VE", ignoreCase = true)
     val cajaColumns =
         CajaTable.columns
-            .filter { isVE || it != CajaTable.codAlmacen }
+            .filter { (isVE && it != CajaTable.idAlmacenes) || (!isVE && it != CajaTable.codAlmacen) }
 
     return CajaTable
         .join(SucursalTable, org.jetbrains.exposed.sql.JoinType.LEFT, CajaTable.idSucursal, SucursalTable.idSucursal)
@@ -255,6 +268,7 @@ internal fun mapCajaRows(
                 availableSellers = availableSellers,
                 warehouseNames = warehouseNames,
                 userIdToken = userIdToken,
+                allWarehousesBySucursal = allWarehousesBySucursal,
             )
         }.filter { caja -> all || assignedCajaIds.isEmpty() || caja.idCaja in assignedCajaIds }
 }
@@ -267,12 +281,13 @@ internal fun findCajaRowById(
     activeSellers: List<SellerRecord>,
     warehouseNames: Map<Int, String> = emptyMap(),
     userId: Int? = null,
+    allWarehousesBySucursal: Map<Int, List<Int>> = emptyMap(),
 ): Caja? {
     val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
     val isVE = countryCode.equals("VE", ignoreCase = true)
     val cajaColumns =
         CajaTable.columns
-            .filter { isVE || it != CajaTable.codAlmacen }
+            .filter { (isVE && it != CajaTable.idAlmacenes) || (!isVE && it != CajaTable.codAlmacen) }
 
     return CajaTable
         .join(SucursalTable, org.jetbrains.exposed.sql.JoinType.LEFT, CajaTable.idSucursal, SucursalTable.idSucursal)
@@ -289,6 +304,7 @@ internal fun findCajaRowById(
                 availableSellers = availableSellers,
                 warehouseNames = warehouseNames,
                 userIdToken = userId?.toString(),
+                allWarehousesBySucursal = allWarehousesBySucursal,
             )
         }
 }
@@ -302,6 +318,7 @@ private fun buildCajaFromRow(
     availableSellers: List<SellerSummary>,
     warehouseNames: Map<Int, String>,
     userIdToken: String?,
+    allWarehousesBySucursal: Map<Int, List<Int>> = emptyMap(),
 ): Caja {
     val nombreSucursal =
         row[SucursalTable.sucursal]?.takeIf { it.isNotBlank() }
@@ -315,10 +332,39 @@ private fun buildCajaFromRow(
         } else {
             null
         }
+    val idAlmacenesStr = if (!isVE) row.getOrNull(CajaTable.idAlmacenes) else null
+    val parsedAlmacenes =
+        idAlmacenesStr
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.filter { it > 0 }
+            ?: emptyList()
+
+    val sucursalDefaultWarehouse = idSucursal?.let { defaultBySucursal[it] }
+    val sucursalWarehouses = idSucursal?.let { allWarehousesBySucursal[it] } ?: emptyList()
+
     val resolvedDefaultWarehouse =
-        cajaWarehouse
-            ?: idSucursal?.let { defaultBySucursal[it] }
-            ?: params.globalDefaultWarehouse
+        when {
+            cajaWarehouse != null -> cajaWarehouse
+            parsedAlmacenes.isNotEmpty() -> {
+                if (sucursalDefaultWarehouse != null && sucursalDefaultWarehouse in parsedAlmacenes) {
+                    sucursalDefaultWarehouse
+                } else {
+                    parsedAlmacenes.first()
+                }
+            }
+            sucursalDefaultWarehouse != null -> sucursalDefaultWarehouse
+            else -> params.globalDefaultWarehouse
+        }
+
+    val resolvedAlmacenes: List<Int> =
+        when {
+            parsedAlmacenes.isNotEmpty() -> parsedAlmacenes
+            cajaWarehouse != null -> listOf(cajaWarehouse)
+            sucursalWarehouses.isNotEmpty() -> sucursalWarehouses
+            resolvedDefaultWarehouse != null -> listOf(resolvedDefaultWarehouse)
+            else -> emptyList()
+        }
 
     val sucursalToken = idSucursal?.toString()
     val defaultSeller =
@@ -350,5 +396,6 @@ private fun buildCajaFromRow(
         codigoSucursalEmisor = row[SucursalTable.codigoSucursalEmisor],
         almacenNombre = resolvedDefaultWarehouse?.let { warehouseNames[it] }?.takeIf { it.isNotBlank() },
         facturaCorrelativo = row.getOrNull(CajaTable.facturaCorrelativo) ?: 0,
+        almacenes = resolvedAlmacenes,
     )
 }

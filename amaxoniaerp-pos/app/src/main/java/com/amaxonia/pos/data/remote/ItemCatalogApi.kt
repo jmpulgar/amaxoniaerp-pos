@@ -33,9 +33,6 @@ import kotlinx.serialization.json.jsonObject
 suspend fun ApiService.getProducts(
     token: String,
     page: CatalogPage,
-    departmentId: Int? = null,
-    departmentIds: List<Int>? = null,
-    itemType: String? = null,
 ): PagedResponse<ProductDto> =
     client
         .get("items") {
@@ -49,14 +46,17 @@ suspend fun ApiService.getProducts(
                 if (page.includeTotal != null) {
                     parameters.append("includeTotal", page.includeTotal.toString())
                 }
-                if (departmentId != null && departmentId > 0) {
-                    parameters.append("departmentId", departmentId.toString())
+                if (page.departmentId != null && page.departmentId > 0) {
+                    parameters.append("departmentId", page.departmentId.toString())
                 }
-                if (!departmentIds.isNullOrEmpty()) {
-                    parameters.append("departmentIds", departmentIds.joinToString(","))
+                if (!page.departmentIds.isNullOrEmpty()) {
+                    parameters.append("departmentIds", page.departmentIds.joinToString(","))
                 }
-                if (!itemType.isNullOrBlank()) {
-                    parameters.append("itemType", itemType)
+                if (!page.itemType.isNullOrBlank()) {
+                    parameters.append("itemType", page.itemType)
+                }
+                if (!page.warehouseIds.isNullOrEmpty()) {
+                    parameters.append("warehouseIds", page.warehouseIds.joinToString(","))
                 }
             }
         }.body()

@@ -93,4 +93,8 @@ data class CatalogPage(
     val offset: Int,
     val search: String? = null,
     val includeTotal: Boolean? = null,
+    val departmentId: Int? = null,
+    val departmentIds: List<Int>? = null,
+    val itemType: String? = null,
+    val warehouseIds: List<Int>? = null,
 )

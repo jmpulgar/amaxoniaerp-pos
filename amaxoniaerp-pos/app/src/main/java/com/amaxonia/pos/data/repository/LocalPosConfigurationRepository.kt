@@ -1,11 +1,14 @@
 package com.amaxonia.pos.data.repository
 
 import com.amaxonia.pos.BuildConfig
+import com.amaxonia.pos.data.local.ActiveCajaSnapshot
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.allowDiscountsFlow
 import com.amaxonia.pos.data.local.allowEditPricesFlow
 import com.amaxonia.pos.data.local.customerDisplayEnabledFlow
 import com.amaxonia.pos.data.local.noPrinterPdfFormatFlow
+import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readLastPaymentSuccess
 import com.amaxonia.pos.data.local.readSelectedPrinterType
@@ -30,6 +33,8 @@ import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.PaymentSuccessRepository
 import com.amaxonia.pos.domain.repository.PosSettingsRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class LocalPosConfigurationRepository(
     private val localStore: LocalStore,
@@ -62,6 +67,17 @@ class LocalPosConfigurationRepository(
     override suspend fun currentCountry(): ServerCountry? =
         localStore.readSelectedCountry()
             ?: ServerCountries.fromCode(BuildConfig.DEFAULT_COUNTRY_CODE)
+
+    override suspend fun activeWarehouseIds(): List<Int>? =
+        localStore.readActiveCajaForToday()?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
+
+    override val activeWarehouseIdsFlow: Flow<List<Int>?> =
+        localStore.dataStore.data
+            .map { prefs ->
+                val json = prefs[localStore.activeCajaKey] ?: return@map null
+                val snapshot = runCatching { AppJson.decodeFromString(ActiveCajaSnapshot.serializer(), json) }.getOrNull()
+                snapshot?.caja?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
+            }.distinctUntilChanged()
 
     override suspend fun selectedPrinterType(): PrinterType = localStore.readSelectedPrinterType()
 

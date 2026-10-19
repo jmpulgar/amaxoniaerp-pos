@@ -77,7 +77,10 @@ class OfflineFirstProductRepository(
     override suspend fun getAllProducts(
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> = fetch.pageWithCacheFallback(null, null, pageSize, pageOffset(page, pageSize))
+    ): Result<List<Product>> =
+        fetch.pageWithCacheFallback(
+            ProductFetchQuery(limit = pageSize, offset = pageOffset(page, pageSize)),
+        )
 
     override suspend fun getAllProducts(): Result<List<Product>> = getAllProducts(null)
 
@@ -88,16 +91,41 @@ class OfflineFirstProductRepository(
             return if (cached.isNotEmpty()) Result.success(cached) else Result.failure(IllegalStateException(NO_COMPANY_ERROR))
         }
         return fetch
-            .pageWithCacheFallback(departmentId, null, FULL_CATALOG_PAGE_SIZE, 0)
-            .recoverCatching { error -> cache.fullCatalog(scope).ifEmpty { throw error } }
+            .pageWithCacheFallback(
+                ProductFetchQuery(limit = FULL_CATALOG_PAGE_SIZE, offset = 0, departmentId = departmentId),
+            ).recoverCatching { error -> cache.fullCatalog(scope).ifEmpty { throw error } }
     }
+
+    override suspend fun getAllProducts(
+        page: Int,
+        pageSize: Int,
+        filter: com.amaxonia.pos.domain.repository.ProductCatalogFilter?,
+    ): Result<List<Product>> =
+        fetch.pageWithCacheFallback(
+            ProductFetchQuery(
+                limit = pageSize,
+                offset = pageOffset(page, pageSize),
+                departmentId = filter?.departmentId,
+                itemType = filter?.itemType,
+                warehouseIds = filter?.warehouseIds,
+            ),
+        )
 
     override suspend fun getAllProducts(
         departmentId: Int?,
         page: Int,
         pageSize: Int,
         itemType: String?,
-    ): Result<List<Product>> = fetch.pageWithCacheFallback(departmentId, null, pageSize, pageOffset(page, pageSize), itemType)
+    ): Result<List<Product>> =
+        getAllProducts(
+            page = page,
+            pageSize = pageSize,
+            filter =
+                com.amaxonia.pos.domain.repository.ProductCatalogFilter(
+                    departmentId = departmentId,
+                    itemType = itemType,
+                ),
+        )
 
     override suspend fun getProductById(id: String): Result<Product> {
         val token = localStore.readCompanySession()?.token
@@ -127,20 +155,24 @@ class OfflineFirstProductRepository(
     }
 
     override suspend fun searchProducts(query: String): Result<List<Product>> =
-        fetch.pageWithCacheFallback(null, query, SEARCH_PAGE_SIZE, 0)
+        fetch.pageWithCacheFallback(
+            ProductFetchQuery(limit = SEARCH_PAGE_SIZE, offset = 0, query = query),
+        )
 
     override suspend fun searchProducts(
         query: String,
         page: Int,
         pageSize: Int,
-    ): Result<List<Product>> = fetch.pageWithCacheFallback(null, query, pageSize, pageOffset(page, pageSize))
+    ): Result<List<Product>> =
+        fetch.pageWithCacheFallback(
+            ProductFetchQuery(limit = pageSize, offset = pageOffset(page, pageSize), query = query),
+        )
 
     override suspend fun searchProducts(
         query: String,
-        departmentId: Int?,
         page: Int,
         pageSize: Int,
-        itemType: String?,
+        filter: com.amaxonia.pos.domain.repository.ProductCatalogFilter?,
     ): Result<List<Product>> {
         // Escaneo de código de barras (hot path): match exacto indexado
         // primero, offline y en <50ms; si no hay match, búsqueda normal.
@@ -148,13 +180,46 @@ class OfflineFirstProductRepository(
         if (trimmed.length >= MIN_BARCODE_LENGTH && trimmed.all { it.isDigit() }) {
             productDao.getByBarcode(trimmed)?.let { exact ->
                 val exactProduct = exact.toDomain()
-                if (itemType.isNullOrBlank() || (itemType.equals("SERVICE", true) && exactProduct.isService) || (itemType.equals("PRODUCT", true) && !exactProduct.isService)) {
+                val matchesType =
+                    when (filter?.itemType?.uppercase()) {
+                        "SERVICE" -> exactProduct.isService
+                        "PRODUCT" -> !exactProduct.isService
+                        else -> true
+                    }
+                if (matchesType) {
                     return Result.success(listOf(exactProduct))
                 }
             }
         }
-        return fetch.pageWithCacheFallback(departmentId, query, pageSize, pageOffset(page, pageSize), itemType)
+        return fetch.pageWithCacheFallback(
+            ProductFetchQuery(
+                limit = pageSize,
+                offset = pageOffset(page, pageSize),
+                query = query,
+                departmentId = filter?.departmentId,
+                itemType = filter?.itemType,
+                warehouseIds = filter?.warehouseIds,
+            ),
+        )
     }
+
+    override suspend fun searchProducts(
+        query: String,
+        departmentId: Int?,
+        page: Int,
+        pageSize: Int,
+        itemType: String?,
+    ): Result<List<Product>> =
+        searchProducts(
+            query = query,
+            page = page,
+            pageSize = pageSize,
+            filter =
+                com.amaxonia.pos.domain.repository.ProductCatalogFilter(
+                    departmentId = departmentId,
+                    itemType = itemType,
+                ),
+        )
 
     override suspend fun saveProduct(product: Product): Result<Unit> {
         val token =

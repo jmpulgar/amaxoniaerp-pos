@@ -34,7 +34,12 @@ data class Caja(
     val codigoSucursalEmisor: String? = null,
     @SerialName("almacen_nombre")
     val almacenNombre: String? = null,
-)
+    @SerialName("almacenes")
+    val almacenes: List<Int> = emptyList(),
+) {
+    fun getEffectiveWarehouseIds(): List<Int> =
+        almacenes.ifEmpty { defaultWarehouseId?.let { listOf(it) } ?: codAlmacen?.takeIf { it > 0 }?.let { listOf(it) } ?: emptyList() }
+}
 
 @Serializable
 data class CurrencyConfig(

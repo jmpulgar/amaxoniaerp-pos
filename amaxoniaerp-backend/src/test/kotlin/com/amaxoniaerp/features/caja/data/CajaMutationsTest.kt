@@ -211,4 +211,43 @@ class CajaMutationsTest {
             assertTrue("CJ-ASIGNADA" in ids)
             assertTrue("CJ-LIBRE" in ids)
         }
+
+    @Test
+    fun `caja con id_almacenes devuelve almacenes asignados y fallback a sucursal si vacio`() =
+        runBlocking {
+            transaction(databasePA) {
+                SucursalAlmacenTable.insert {
+                    it[idSucursal] = 1
+                    it[idAlmacen] = 101
+                    it[defaultVentas] = 1
+                }
+                SucursalAlmacenTable.insert {
+                    it[idSucursal] = 1
+                    it[idAlmacen] = 102
+                    it[defaultVentas] = 0
+                }
+                CajaTable.insert {
+                    it[idCaja] = "CJ-ALM-EXPLICITA"
+                    it[caja] = "Caja Almacenes 1 y 3"
+                    it[serieCaja] = "A"
+                    it[idSucursal] = 1
+                    it[idAlmacenes] = "1, 3, 5"
+                }
+                CajaTable.insert {
+                    it[idCaja] = "CJ-ALM-FALLBACK"
+                    it[caja] = "Caja Fallback Sucursal"
+                    it[serieCaja] = "B"
+                    it[idSucursal] = 1
+                    it[idAlmacenes] = null
+                }
+            }
+
+            val cajaExplicita = repository.getCajaById(databasePA, "PA", "CJ-ALM-EXPLICITA")
+            assertNotNull(cajaExplicita)
+            assertEquals(listOf(1, 3, 5), cajaExplicita.almacenes)
+
+            val cajaFallback = repository.getCajaById(databasePA, "PA", "CJ-ALM-FALLBACK")
+            assertNotNull(cajaFallback)
+            assertEquals(listOf(101, 102), cajaFallback.almacenes)
+        }
 }

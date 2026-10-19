@@ -12,7 +12,9 @@ import com.amaxoniaerp.features.items.domain.ProductOptionItemResponse
 import com.amaxoniaerp.features.items.domain.ProductOptionsResponse
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inSubQuery
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
@@ -96,6 +98,22 @@ class ItemsRepository {
                         (table.tipoProd.isNull() or (table.tipoProd neq 1)) and
                             (table.codItemForma.isNull() or (table.codItemForma neq 2))
                     }
+                }
+            }
+
+            if (!query.warehouseIds.isNullOrEmpty()) {
+                val stockSubQuery =
+                    ItemExistenciaAlmacenTable
+                        .select(ItemExistenciaAlmacenTable.idItem)
+                        .where {
+                            (ItemExistenciaAlmacenTable.codAlmacen inList query.warehouseIds) and
+                                (ItemExistenciaAlmacenTable.cantidad.isNotNull()) and
+                                (ItemExistenciaAlmacenTable.cantidad greater java.math.BigDecimal.ZERO)
+                        }
+                select.andWhere {
+                    (table.tipoProd eq 1) or
+                        (table.codItemForma eq 2) or
+                        (table.idItem inSubQuery stockSubQuery)
                 }
             }
 
@@ -596,7 +614,7 @@ class ItemsRepository {
         }
 }
 
-/** Filtros de listado de productos (paginacion + busqueda + departamento). */
+/** Filtros de listado de productos (paginacion + busqueda + departamento + almacenes). */
 data class ItemsListQuery(
     val limit: Int,
     val offset: Long,
@@ -605,4 +623,5 @@ data class ItemsListQuery(
     val departmentId: Int? = null,
     val departmentIds: List<Int>? = null,
     val itemType: String? = null,
+    val warehouseIds: List<Int>? = null,
 )

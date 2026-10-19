@@ -16,6 +16,7 @@ import com.amaxonia.pos.data.local.db.toLevel1Entity
 import com.amaxonia.pos.data.local.db.toLevel2Entity
 import com.amaxonia.pos.data.local.db.toLevel3Entity
 import com.amaxonia.pos.data.local.isInitialSyncCompleted
+import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.setInitialSyncCompleted
 import com.amaxonia.pos.data.remote.ApiService
@@ -113,12 +114,20 @@ class CatalogSyncer(
         pageSize: Int,
     ) {
         val scope = offlineScopeProvider()
+        val activeCaja = runCatching { localStore.readActiveCajaForToday() }.getOrNull()
+        val warehouseIds = activeCaja?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
         var offset = 0
         while (true) {
             val response =
                 apiService.getProducts(
                     token = token,
-                    page = CatalogPage(limit = pageSize, offset = offset, includeTotal = false),
+                    page =
+                        CatalogPage(
+                            limit = pageSize,
+                            offset = offset,
+                            includeTotal = false,
+                            warehouseIds = warehouseIds,
+                        ),
                 )
             if (response.data.isEmpty()) break
             val entities = response.data.map { it.toEntity() }

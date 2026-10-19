@@ -107,9 +107,19 @@ class CajaRepository {
         dbQuery(database) {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val allWarehousesBySucursal = loadAllWarehousesBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            mapCajaRows(countryCode, userId, params, defaultBySucursal, activeSellers, warehouseNames, all)
+            mapCajaRows(
+                countryCode = countryCode,
+                userId = userId,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
+                warehouseNames = warehouseNames,
+                all = all,
+                allWarehousesBySucursal = allWarehousesBySucursal,
+            )
         }
 
     /**
@@ -125,9 +135,19 @@ class CajaRepository {
         dbQuery(database) {
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val allWarehousesBySucursal = loadAllWarehousesBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames, userId)
+            findCajaRowById(
+                countryCode = countryCode,
+                id = id,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
+                warehouseNames = warehouseNames,
+                userId = userId,
+                allWarehousesBySucursal = allWarehousesBySucursal,
+            )
         }
 
     suspend fun createCaja(
@@ -159,9 +179,18 @@ class CajaRepository {
 
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val allWarehousesBySucursal = loadAllWarehousesBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            findCajaRowById(countryCode, generatedId, params, defaultBySucursal, activeSellers, warehouseNames)
+            findCajaRowById(
+                countryCode = countryCode,
+                id = generatedId,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
+                warehouseNames = warehouseNames,
+                allWarehousesBySucursal = allWarehousesBySucursal,
+            )
                 ?: error("No se pudo recuperar la caja recién creada: $generatedId")
         }
 
@@ -198,8 +227,17 @@ class CajaRepository {
 
             val params = loadCajaCatalogParams(countryCode)
             val defaultBySucursal = loadDefaultWarehouseBySucursal()
+            val allWarehousesBySucursal = loadAllWarehousesBySucursal()
             val activeSellers = loadActiveSellers()
             val warehouseNames = loadWarehouseNames()
-            findCajaRowById(countryCode, id, params, defaultBySucursal, activeSellers, warehouseNames)
+            findCajaRowById(
+                countryCode = countryCode,
+                id = id,
+                params = params,
+                defaultBySucursal = defaultBySucursal,
+                activeSellers = activeSellers,
+                warehouseNames = warehouseNames,
+                allWarehousesBySucursal = allWarehousesBySucursal,
+            )
         }
 }

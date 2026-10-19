@@ -49,7 +49,7 @@ class ProductPageCacheTest {
             seed(product("1", code = "C001", description = "Cafetera"))
             seed(product("2", code = "C002", description = "Batidora"))
 
-            val page = cache.page(departmentId = null, query = null, limit = 2, offset = 0)
+            val page = cache.page(ProductFetchQuery(limit = 2, offset = 0))
 
             // Orden alfabetico por descripcion: Batidora, Cafetera, Tostadora.
             assertEquals(listOf("2", "1"), page.map { it.id })
@@ -62,7 +62,7 @@ class ProductPageCacheTest {
             seed(product("2", code = "lic-02", description = "Licuadora", barcode1 = "cafe-02"))
             seed(product("3", code = "tost-03", description = "Tostadora"))
 
-            val page = cache.page(departmentId = null, query = "cafe", limit = 10, offset = 0)
+            val page = cache.page(ProductFetchQuery(limit = 10, offset = 0, query = "cafe"))
 
             assertEquals(setOf("1", "2"), page.map { it.id }.toSet())
         }
@@ -73,7 +73,7 @@ class ProductPageCacheTest {
             seed(product("1", code = "a", description = "Uno"))
             seed(product("2", code = "b", description = "Dos"))
 
-            val blank = cache.page(departmentId = null, query = "   ", limit = 10, offset = 0)
+            val blank = cache.page(ProductFetchQuery(limit = 10, offset = 0, query = "   "))
 
             assertEquals(2, blank.size)
         }
@@ -85,7 +85,7 @@ class ProductPageCacheTest {
             seed(product("2", code = "b", description = "Vino blanco", department = "3"))
             seed(product("3", code = "c", description = "Vino sin alcohol", department = "4"))
 
-            val page = cache.page(departmentId = 3, query = "vino", limit = 10, offset = 0)
+            val page = cache.page(ProductFetchQuery(limit = 10, offset = 0, departmentId = 3, query = "vino"))
 
             assertEquals(setOf("1", "2"), page.map { it.id }.toSet())
         }

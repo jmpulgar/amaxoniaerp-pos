@@ -29,10 +29,12 @@ object CajaTablePA : BaseCajaTable() {
     // Unidad de cobro Yappy por caja (2025-08-27-ALTER-TABLE-YAPPY.sql del administrativo PHP).
     val yappyDeviceId = varchar("yappy_device_id", S.VARCHAR_LENGTH_100).nullable()
     val yappyGroupId = varchar("yappy_group_id", S.VARCHAR_LENGTH_100).nullable()
+    val idAlmacenes = text("id_almacenes").nullable()
 }
 
 object CajaTable : BaseCajaTable() {
     val codAlmacen = integer("cod_almacen").nullable()
+    val idAlmacenes = text("id_almacenes").nullable()
 }
 
 object CajaTableFactory {

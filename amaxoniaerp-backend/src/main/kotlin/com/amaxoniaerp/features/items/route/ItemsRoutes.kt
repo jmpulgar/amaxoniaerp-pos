@@ -166,6 +166,8 @@ internal class ItemsTaxonomyHandlers(
 internal class ItemsHandlers(
     private val itemsRepository: ItemsRepository,
 ) {
+    private val log = org.slf4j.LoggerFactory.getLogger(ItemsHandlers::class.java)
+
     suspend fun listar(call: ApplicationCall) =
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run
@@ -181,6 +183,11 @@ internal class ItemsHandlers(
                     ?.mapNotNull { it.trim().toIntOrNull() }
                     ?.filter { it > 0 }
             val itemTypeParam = call.request.queryParameters["itemType"] ?: call.request.queryParameters["type"]
+            val warehouseIdsParam =
+                call.request.queryParameters["warehouseIds"]
+                    ?.split(',')
+                    ?.mapNotNull { it.trim().toIntOrNull() }
+                    ?.filter { it > 0 }
 
             if (limit <= 0 || limit > MAX_PAGE_LIMIT || offset < 0) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Parámetros de paginación inválidos"))
@@ -189,6 +196,8 @@ internal class ItemsHandlers(
 
             // Conectar a BD de empresa usando Two-Tier routing
             val companyDb = ctx.connectDatabase()
+
+            log.info("GET /items query: warehouseIds=$warehouseIdsParam, search=$search, limit=$limit, offset=$offset")
 
             val (items, total) =
                 itemsRepository.listItems(
@@ -203,6 +212,7 @@ internal class ItemsHandlers(
                             departmentId = departmentIdParam,
                             departmentIds = departmentIdsParam,
                             itemType = itemTypeParam,
+                            warehouseIds = warehouseIdsParam,
                         ),
                 )
 

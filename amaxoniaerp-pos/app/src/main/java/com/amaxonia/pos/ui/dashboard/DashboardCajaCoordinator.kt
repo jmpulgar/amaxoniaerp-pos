@@ -182,6 +182,8 @@ class DashboardCajaCoordinator(
                 val targetCaja =
                     if (!forceShowSelector && !state.value.showCajaSelector && activeCaja == null) {
                         onlyAvailableCaja ?: findFirstOpenCaja(cajas)
+                    } else if (activeCaja != null) {
+                        cajas.firstOrNull { it.idCaja == activeCaja.idCaja }
                     } else {
                         null
                     }

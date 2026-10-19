@@ -1,7 +1,9 @@
 package com.amaxonia.pos.ui.dashboard
 
+import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.offline.OfflineScopeSelection
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
+import com.amaxonia.pos.domain.repository.ProductCatalogFilter
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.ServerEnvironment
@@ -25,8 +27,10 @@ class DashboardCatalogCoordinator(
 ) {
     @Volatile
     private var adminDatabase: String = ""
+
     @Volatile
     private var currentScope: OfflineScopeSelection = OfflineScopeSelection()
+
     private var searchJob: Job? = null
     private var loadProductsJob: Job? = null
     private var scopeObserverJob: Job? = null
@@ -50,6 +54,11 @@ class DashboardCatalogCoordinator(
         } else {
             loadDepartments(scope, state)
             loadProducts(scope, state, reset = true)
+        }
+        scope.launch {
+            sessionReader.activeWarehouseIdsFlow.collect {
+                loadProducts(scope, state, reset = true)
+            }
         }
         loadBestSellers(scope, state)
     }
@@ -83,8 +92,9 @@ class DashboardCatalogCoordinator(
                             syncScope.departmentIds.first()
                         }
                     } else {
-                        if (state.value.selectedDepartmentId != null && visibleDepartments.any { it.id == state.value.selectedDepartmentId }) {
-                            state.value.selectedDepartmentId
+                        val currentId = state.value.selectedDepartmentId
+                        if (currentId != null && visibleDepartments.any { it.id == currentId }) {
+                            currentId
                         } else {
                             null
                         }
@@ -306,25 +316,23 @@ class DashboardCatalogCoordinator(
                         ItemTypeFilter.PRODUCT -> "PRODUCT"
                         ItemTypeFilter.SERVICE -> "SERVICE"
                     }
+                val activeWarehouseIds = sessionReader.activeWarehouseIds()
+                val filter =
+                    ProductCatalogFilter(
+                        departmentId = departmentId,
+                        itemType = itemTypeStr,
+                        warehouseIds = activeWarehouseIds,
+                    )
                 val result =
                     if (query.isBlank()) {
-                        productRepository.getAllProducts(departmentId, nextPage, PAGE_SIZE, itemTypeStr)
+                        productRepository.getAllProducts(nextPage, PAGE_SIZE, filter)
                     } else {
-                        productRepository.searchProducts(query, departmentId, nextPage, PAGE_SIZE, itemTypeStr)
+                        productRepository.searchProducts(query, nextPage, PAGE_SIZE, filter)
                     }
                 result.fold(
                     onSuccess = { products ->
                         if (!isActive) return@launch
-                        val dashboardProducts = products.map { productMapper.fromProduct(it, adminDatabase) }
-                        state.update {
-                            it.copy(
-                                products = if (reset) dashboardProducts else it.products + dashboardProducts,
-                                isLoading = false,
-                                isLoadingMore = false,
-                                endOfListReached = products.size < PAGE_SIZE,
-                                error = null,
-                            )
-                        }
+                        handleProductsLoaded(state, reset, products)
                     },
                     onFailure = { error ->
                         if (error is CancellationException || !isActive) return@launch
@@ -338,6 +346,23 @@ class DashboardCatalogCoordinator(
                     },
                 )
             }
+    }
+
+    private fun handleProductsLoaded(
+        state: MutableStateFlow<DashboardState>,
+        reset: Boolean,
+        products: List<Product>,
+    ) {
+        val dashboardProducts = products.map { productMapper.fromProduct(it, adminDatabase) }
+        state.update {
+            it.copy(
+                products = if (reset) dashboardProducts else it.products + dashboardProducts,
+                isLoading = false,
+                isLoadingMore = false,
+                endOfListReached = products.size < PAGE_SIZE,
+                error = null,
+            )
+        }
     }
 
     private fun loadBestSellers(

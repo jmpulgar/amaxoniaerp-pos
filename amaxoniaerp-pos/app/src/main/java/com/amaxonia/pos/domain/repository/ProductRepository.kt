@@ -8,6 +8,13 @@ data class Department(
     val name: String,
 )
 
+/** Filtros opcionales para consulta de catálogo (departamento, tipo y almacenes asignados). */
+data class ProductCatalogFilter(
+    val departmentId: Int? = null,
+    val itemType: String? = null,
+    val warehouseIds: List<Int>? = null,
+)
+
 interface ProductTaxonomyReader {
     suspend fun getDepartments(): Result<List<Department>>
 
@@ -32,6 +39,12 @@ interface ProductCatalogReader {
         page: Int,
         pageSize: Int,
     ): Result<List<Product>> = getAllProducts(departmentId, page, pageSize, null)
+
+    suspend fun getAllProducts(
+        page: Int,
+        pageSize: Int,
+        filter: ProductCatalogFilter?,
+    ): Result<List<Product>> = getAllProducts(filter?.departmentId, page, pageSize, filter?.itemType)
 
     suspend fun getAllProducts(
         departmentId: Int?,
@@ -75,6 +88,13 @@ interface ProductCatalogReader {
         page: Int,
         pageSize: Int,
     ): Result<List<Product>> = searchProducts(query, departmentId, page, pageSize, null)
+
+    suspend fun searchProducts(
+        query: String,
+        page: Int,
+        pageSize: Int,
+        filter: ProductCatalogFilter?,
+    ): Result<List<Product>> = searchProducts(query, filter?.departmentId, page, pageSize, filter?.itemType)
 
     suspend fun searchProducts(
         query: String,

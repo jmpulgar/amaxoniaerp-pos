@@ -21,6 +21,8 @@ data class ClientListState(
     val error: String? = null,
     val editingClient: Client? = null,
     val isFormOpen: Boolean = false,
+    val isSavingClient: Boolean = false,
+    val saveClientError: String? = null,
     val isAccountStatementOpen: Boolean = false,
     val selectedAccountStatement: AccountStatement? = null,
     val isLoadingAccountStatement: Boolean = false,
@@ -73,15 +75,36 @@ class ClientListViewModel(
     }
 
     fun openCreateForm() {
-        _state.update { it.copy(isFormOpen = true, editingClient = null) }
+        _state.update {
+            it.copy(
+                isFormOpen = true,
+                editingClient = null,
+                saveClientError = null,
+                isSavingClient = false,
+            )
+        }
     }
 
     fun openEditForm(client: Client) {
-        _state.update { it.copy(isFormOpen = true, editingClient = client) }
+        _state.update {
+            it.copy(
+                isFormOpen = true,
+                editingClient = client,
+                saveClientError = null,
+                isSavingClient = false,
+            )
+        }
     }
 
     fun closeForm() {
-        _state.update { it.copy(isFormOpen = false, editingClient = null) }
+        _state.update {
+            it.copy(
+                isFormOpen = false,
+                editingClient = null,
+                saveClientError = null,
+                isSavingClient = false,
+            )
+        }
     }
 
     fun openAccountStatement(client: Client) {
@@ -281,19 +304,31 @@ class ClientListViewModel(
 
     fun saveClient(client: Client) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
-            val result = if (client.id.isNotBlank()) {
-                clientRepository.updateClient(client.id, client)
-            } else {
-                clientRepository.createClient(client)
-            }
+            _state.update { it.copy(isSavingClient = true, saveClientError = null) }
+            val isEdit = _state.value.editingClient != null || client.id.isNotBlank()
+            val updateId =
+                client.id.ifBlank {
+                    _state.value.editingClient?.id?.ifBlank { _state.value.editingClient?.code } ?: client.code
+                }
+            val result =
+                if (isEdit && updateId.isNotBlank()) {
+                    clientRepository.updateClient(updateId, client)
+                } else {
+                    clientRepository.createClient(client)
+                }
             result.fold(
                 onSuccess = {
+                    _state.update { it.copy(isSavingClient = false, saveClientError = null) }
                     closeForm()
                     loadClients(reset = true)
                 },
                 onFailure = { error ->
-                    _state.update { it.copy(isLoading = false, error = error.message ?: "Error al guardar cliente") }
+                    _state.update {
+                        it.copy(
+                            isSavingClient = false,
+                            saveClientError = error.message ?: "Error al guardar cliente",
+                        )
+                    }
                 },
             )
         }

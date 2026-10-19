@@ -86,6 +86,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1897,37 +1898,38 @@ private fun ClientWebModal(
     onDismiss: () -> Unit,
     onConfirm: (Client) -> Unit,
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    key(client?.id?.ifBlank { client.code } ?: "new_client") {
+        var selectedTab by remember { mutableIntStateOf(0) }
 
-    // --- TAB 1: DATOS BÁSICOS ---
-    var codigo by remember { mutableStateOf(client?.code ?: "") }
-    var codTipoCliente by remember { mutableStateOf(client?.clientTypeId?.toString() ?: "2") }
-    var tipoContribuyente by remember { mutableStateOf(if (client?.taxpayerType == TaxpayerType.JURIDICO) "2" else "1") }
-    var tipoIdentificacionExtranjera by remember { mutableStateOf("01") }
-    var identificacion by remember { mutableStateOf(client?.identification ?: "") }
-    var dv by remember { mutableStateOf(client?.dv ?: "") }
-    var nombre by remember { mutableStateOf(client?.name ?: "") }
-    var apellido by remember { mutableStateOf(client?.lastName ?: "") }
-    var nombreComercial by remember { mutableStateOf(client?.nombreComercial ?: "") }
-    var representante by remember { mutableStateOf(client?.representante ?: "") }
-    var correo by remember { mutableStateOf(client?.email ?: "") }
-    var telefono by remember { mutableStateOf(client?.phone ?: "") }
-    var telefono2 by remember { mutableStateOf(client?.phone2 ?: "") }
-    var web by remember { mutableStateOf(client?.web ?: "") }
-    var fax by remember { mutableStateOf(client?.fax ?: "") }
-    var codigoCrm by remember { mutableStateOf(client?.codigoCrm ?: "") }
-    var empresaZonaLibre by remember { mutableStateOf(client?.empresaZonaLibre ?: "0") }
-    var actividad by remember { mutableStateOf(client?.actividad ?: "") }
-    var pedidosOnline by remember { mutableStateOf(client?.pedidosOnline ?: "0") }
-    var fnacimiento by remember { mutableStateOf(client?.fnacimiento ?: "") }
-    var genero by remember { mutableStateOf(client?.genero ?: "") }
-    var clave by remember { mutableStateOf("") }
-    var estado by remember { mutableStateOf(if (client?.status != false) "A" else "I") }
-    var fechaRegistro by remember { mutableStateOf("16/10/2026") }
+        // --- TAB 1: DATOS BÁSICOS ---
+        var codigo by remember { mutableStateOf(client?.code ?: "") }
+        var codTipoCliente by remember { mutableStateOf(client?.clientTypeId?.toString() ?: "2") }
+        var tipoContribuyente by remember { mutableStateOf(if (client?.taxpayerType == TaxpayerType.JURIDICO) "2" else "1") }
+        var tipoIdentificacionExtranjera by remember { mutableStateOf(client?.foreignAuthTypeId ?: "01") }
+        var identificacion by remember { mutableStateOf(client?.identification ?: "") }
+        var dv by remember { mutableStateOf(client?.dv ?: "") }
+        var nombre by remember { mutableStateOf(client?.name ?: "") }
+        var apellido by remember { mutableStateOf(client?.lastName ?: "") }
+        var nombreComercial by remember { mutableStateOf(client?.nombreComercial ?: "") }
+        var representante by remember { mutableStateOf(client?.representante ?: "") }
+        var correo by remember { mutableStateOf(client?.email ?: "") }
+        var telefono by remember { mutableStateOf(client?.phone ?: "") }
+        var telefono2 by remember { mutableStateOf(client?.phone2 ?: "") }
+        var web by remember { mutableStateOf(client?.web ?: "") }
+        var fax by remember { mutableStateOf(client?.fax ?: "") }
+        var codigoCrm by remember { mutableStateOf(client?.codigoCrm ?: "") }
+        var empresaZonaLibre by remember { mutableStateOf(client?.empresaZonaLibre ?: "0") }
+        var actividad by remember { mutableStateOf(client?.actividad ?: "") }
+        var pedidosOnline by remember { mutableStateOf(client?.pedidosOnline ?: "0") }
+        var fnacimiento by remember { mutableStateOf(client?.fnacimiento ?: "") }
+        var genero by remember { mutableStateOf(client?.genero ?: "") }
+        var clave by remember { mutableStateOf("") }
+        var estado by remember { mutableStateOf(if (client?.status != false) "A" else "I") }
+        var fechaRegistro by remember { mutableStateOf(client?.fnacimiento?.takeIf { it.isNotBlank() } ?: "17/10/2026") }
 
-    // --- SUB-SECCIÓN: DIRECCIÓN ---
-    var direccion by remember { mutableStateOf(client?.address ?: "") }
-    var pais by remember { mutableStateOf("170") }
+        // --- SUB-SECCIÓN: DIRECCIÓN ---
+        var direccion by remember { mutableStateOf(client?.address ?: "") }
+        var pais by remember { mutableStateOf(client?.countryId?.toString() ?: "170") }
     var paisExtranjero by remember { mutableStateOf("") }
     var direccionNivel1 by remember { mutableStateOf(client?.addressLevel1 ?: "") }
     var direccionNivel2 by remember { mutableStateOf(client?.addressLevel2 ?: "") }
@@ -1967,7 +1969,9 @@ private fun ClientWebModal(
 
     // --- TAB 5: PUNTOS ---
     var clienteFidelizacion by remember { mutableStateOf(client?.clienteFidelizacion == 1) }
+    var clienteFidelizacionSucursal by remember { mutableStateOf(client?.clienteFidelizacionSucursal?.toString() ?: "0") }
     var clienteFidelizacionNivel by remember { mutableStateOf(client?.clienteFidelizacionNivel?.toString() ?: "0") }
+    var clienteFidelizacionFecha by remember { mutableStateOf(client?.clienteFidelizacionFecha ?: "") }
     var clienteFidelizacionPuntos by remember { mutableStateOf(client?.clienteFidelizacionPuntos?.toString() ?: "0") }
 
     val tabs = listOf(
@@ -2087,9 +2091,14 @@ private fun ClientWebModal(
                                                     aplicaItbms = aplicaItbms == "1",
                                                     contribuyenteEspecial = contribuyenteEspecial,
                                                     clienteFidelizacion = if (clienteFidelizacion) 1 else 0,
+                                                    clienteFidelizacionSucursal = clienteFidelizacionSucursal.toIntOrNull() ?: 0,
                                                     clienteFidelizacionNivel = clienteFidelizacionNivel.toIntOrNull() ?: 0,
                                                     clienteFidelizacionPuntos = clienteFidelizacionPuntos.toDoubleOrNull() ?: 0.0,
+                                                    clienteFidelizacionFecha = clienteFidelizacionFecha.trim(),
                                                     taxpayerType = if (tipoContribuyente == "2") TaxpayerType.JURIDICO else TaxpayerType.NATURAL,
+                                                    clientTypeId = codTipoCliente.toIntOrNull() ?: 2,
+                                                    countryId = pais.toIntOrNull() ?: 170,
+                                                    foreignAuthTypeId = if (codTipoCliente == "4") tipoIdentificacionExtranjera else null,
                                                     saldo = client?.saldo ?: 0.0,
                                                 ),
                                             )
@@ -2438,7 +2447,11 @@ private fun ClientWebModal(
                                     }
 
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        FlowInputGroup("Sucursal", clienteFidelizacionSucursal, { clienteFidelizacionSucursal = it }, icon = Icons.Default.Business, modifier = Modifier.weight(1f))
                                         FlowInputGroup("Nivel", clienteFidelizacionNivel, { clienteFidelizacionNivel = it }, icon = Icons.Default.Star, modifier = Modifier.weight(1f))
+                                    }
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        FlowInputGroup("Fecha Fideliz.", clienteFidelizacionFecha, { clienteFidelizacionFecha = it }, icon = Icons.Default.DateRange, modifier = Modifier.weight(1f), placeholder = "DD/MM/AAAA")
                                         FlowInputGroup("Puntos", clienteFidelizacionPuntos, { clienteFidelizacionPuntos = it }, icon = Icons.Default.Receipt, modifier = Modifier.weight(1f))
                                     }
                                 }
@@ -2468,4 +2481,5 @@ private fun ClientWebModal(
             }
         }
     }
+}
 }

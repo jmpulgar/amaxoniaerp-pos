@@ -6,10 +6,11 @@ import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.SummaryStats
-import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
+import com.amaxonia.pos.domain.repository.Department
 import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
+import com.amaxonia.pos.domain.repository.ProductCatalogFilter
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.ServerEnvironment
@@ -35,6 +36,8 @@ class DashboardCatalogCoordinatorTest {
         var searchResult: Result<List<Product>> = Result.success(emptyList())
         var departmentsResult: Result<List<Department>> = Result.success(emptyList())
 
+        var lastFilter: ProductCatalogFilter? = null
+
         override suspend fun getAllProducts(): Result<List<Product>> = Result.success(emptyList())
 
         override suspend fun getAllProducts(departmentId: Int?): Result<List<Product>> = Result.success(emptyList())
@@ -46,6 +49,16 @@ class DashboardCatalogCoordinatorTest {
             itemType: String?,
         ): Result<List<Product>> {
             allProductsCalls.add(departmentId)
+            return Result.success(emptyList())
+        }
+
+        override suspend fun getAllProducts(
+            page: Int,
+            pageSize: Int,
+            filter: ProductCatalogFilter?,
+        ): Result<List<Product>> {
+            lastFilter = filter
+            allProductsCalls.add(filter?.departmentId)
             return Result.success(emptyList())
         }
 
@@ -92,9 +105,14 @@ class DashboardCatalogCoordinatorTest {
         override suspend fun getBestSellers(): Result<List<BestSellerProduct>> = Result.success(emptyList())
     }
 
-    private class FakeSessionReader : DashboardSessionReader {
+    private class FakeSessionReader(
+        private val warehouses: List<Int>? = null,
+    ) : DashboardSessionReader {
         override suspend fun currentAdminDatabase(): String = "admin_db"
+
         override suspend fun currentCountry(): ServerCountry? = null
+
+        override suspend fun activeWarehouseIds(): List<Int>? = warehouses
     }
 
     private class FakeServerEnvironment : ServerEnvironment {
@@ -296,5 +314,27 @@ class DashboardCatalogCoordinatorTest {
             assertEquals(1, state.value.departments.size)
             assertEquals(5, state.value.selectedDepartmentId)
             assertEquals("Postres", state.value.selectedCategory)
+        }
+
+    @Test
+    fun `loadProducts passes active warehouse ids from session reader to repository`() =
+        runTest {
+            val fakeRepo = FakeProductRepository()
+            val fakeSession = FakeSessionReader(warehouses = listOf(1, 3))
+
+            val coordinator =
+                DashboardCatalogCoordinator(
+                    productRepository = fakeRepo,
+                    reportRepository = FakeReportRepository(),
+                    sessionReader = fakeSession,
+                    serverEnvironment = FakeServerEnvironment(),
+                    productMapper = DashboardProductMapper(FixedImageResolver),
+                )
+
+            val state = MutableStateFlow(DashboardState())
+            coordinator.start(this, state)
+            advanceUntilIdle()
+
+            assertEquals(listOf(1, 3), fakeRepo.lastFilter?.warehouseIds)
         }
 }

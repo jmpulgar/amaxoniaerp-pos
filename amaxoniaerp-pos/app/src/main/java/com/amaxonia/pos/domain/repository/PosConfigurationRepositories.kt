@@ -18,6 +18,10 @@ interface ProductSessionReader {
 
 interface DashboardSessionReader : ProductSessionReader {
     suspend fun currentCountry(): ServerCountry?
+
+    suspend fun activeWarehouseIds(): List<Int>? = null
+
+    val activeWarehouseIdsFlow: Flow<List<Int>?> get() = kotlinx.coroutines.flow.emptyFlow()
 }
 
 interface CashCloseContextReader {

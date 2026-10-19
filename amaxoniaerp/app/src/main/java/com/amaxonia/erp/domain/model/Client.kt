@@ -17,7 +17,9 @@ data class Client(
     val address: String = "",
     val status: Boolean = true,
     val taxpayerType: TaxpayerType = TaxpayerType.NATURAL,
-    val clientTypeId: Int = 1,
+    val clientTypeId: Int = 2,
+    val countryId: Int = 170,
+    val foreignAuthTypeId: String? = null,
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
     val codTipoPrecio: Int = 2,
@@ -66,7 +68,13 @@ data class Client(
     val alterna2: String = "",
 ) {
     val fullName: String
-        get() = if (lastName.isBlank()) name else "$name $lastName"
+        get() = when {
+            name.isNotBlank() && lastName.isNotBlank() -> "$name $lastName"
+            name.isNotBlank() -> name
+            nombreComercial.isNotBlank() -> nombreComercial
+            representante.isNotBlank() -> representante
+            else -> ""
+        }
 }
 
 data class AccountStatementItem(

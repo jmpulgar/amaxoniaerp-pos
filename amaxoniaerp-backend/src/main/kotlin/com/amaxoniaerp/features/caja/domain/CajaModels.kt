@@ -35,6 +35,8 @@ data class Caja(
     val almacenNombre: String? = null,
     @SerialName("factura_correlativo")
     val facturaCorrelativo: Int = 0,
+    @SerialName("almacenes")
+    val almacenes: List<Int> = emptyList(),
 )
 
 @Serializable
