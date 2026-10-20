@@ -311,14 +311,16 @@ class PosTerminalViewModel(
                 val cajaBundle = cajaAndPaymentsDeferred.await()
                 val departments = departmentsDeferred.await()
                 val visibleDeptIds = departments.map { it.id }.takeIf { it.isNotEmpty() }
+                val activeWarehouseIds = cajaBundle.activeCaja?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
 
-                // 3. Productos (Página 1: 12 ítems compactos) filtrados por departamentos visibles
+                // 3. Productos (Página 1: 12 ítems compactos) filtrados por departamentos visibles y almacenes de caja
                 val pagedProducts = productRepository.getPagedProducts(
                     page = 1,
                     pageSize = CATALOG_PAGE_SIZE,
                     departmentIds = visibleDeptIds,
+                    warehouseIds = activeWarehouseIds,
                 ).getOrNull() ?: run {
-                    val fallback = productRepository.getAllProducts(page = 1, pageSize = CATALOG_PAGE_SIZE).getOrElse { emptyList() }
+                    val fallback = productRepository.getAllProducts(page = 1, pageSize = CATALOG_PAGE_SIZE, warehouseIds = activeWarehouseIds).getOrElse { emptyList() }
                     val filteredFallback = if (visibleDeptIds != null) {
                         fallback.filter { p ->
                             p.department in visibleDeptIds.map { it.toString() } ||
@@ -404,12 +406,14 @@ class PosTerminalViewModel(
             } else {
                 null
             }
+            val activeWarehouseIds = _uiState.value.activeCajaObj?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
             val result = productRepository.getPagedProducts(
                 page = page,
                 pageSize = CATALOG_PAGE_SIZE,
                 departmentId = deptId,
                 departmentIds = visibleDeptIds,
                 search = query.takeIf { it.isNotBlank() },
+                warehouseIds = activeWarehouseIds,
             ).getOrNull()
 
             if (result != null) {
@@ -1022,10 +1026,11 @@ class PosTerminalViewModel(
     }
 
     suspend fun searchProductsModal(query: String): List<Product> = withContext(Dispatchers.IO) {
+        val activeWarehouseIds = _uiState.value.activeCajaObj?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
         if (query.isBlank()) {
-            productRepository.getPagedProducts(page = 1, pageSize = 30).getOrNull()?.items ?: emptyList()
+            productRepository.getPagedProducts(page = 1, pageSize = 30, warehouseIds = activeWarehouseIds).getOrNull()?.items ?: emptyList()
         } else {
-            productRepository.searchProducts(query = query, page = 1, pageSize = 30).getOrElse { emptyList() }
+            productRepository.searchProducts(query = query, page = 1, pageSize = 30, warehouseIds = activeWarehouseIds).getOrElse { emptyList() }
         }
     }
 
@@ -1957,7 +1962,8 @@ class PosTerminalViewModel(
         }
 
         viewModelScope.launch {
-            val results = productRepository.searchProducts(query = trimmed, page = 1, pageSize = 10).getOrElse { emptyList() }
+            val activeWarehouseIds = _uiState.value.activeCajaObj?.getEffectiveWarehouseIds()?.takeIf { it.isNotEmpty() }
+            val results = productRepository.searchProducts(query = trimmed, page = 1, pageSize = 10, warehouseIds = activeWarehouseIds).getOrElse { emptyList() }
             val match = results.firstOrNull { p ->
                 p.code.equals(trimmed, ignoreCase = true) ||
                 p.barcode1.equals(trimmed, ignoreCase = true) ||

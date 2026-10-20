@@ -85,8 +85,12 @@ class PosTerminalViewModelTest {
         private val departmentsList: List<DepartmentDto> = emptyList(),
         private val optionsMap: Map<String, List<com.amaxonia.erp.domain.model.ProductOptionGroup>> = emptyMap(),
     ) : ProductRepository {
-        override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
-            Result.success(productsList)
+        override suspend fun getAllProducts(
+            page: Int,
+            pageSize: Int,
+            departmentId: Int?,
+            warehouseIds: List<Int>?,
+        ): Result<List<Product>> = Result.success(productsList)
 
         override suspend fun getProductOptions(
             productId: String,
@@ -100,6 +104,7 @@ class PosTerminalViewModelTest {
             departmentId: Int?,
             departmentIds: List<Int>?,
             search: String?,
+            warehouseIds: List<Int>?,
         ): Result<PagedProducts> {
             val filtered = when {
                 departmentId != null -> productsList.filter { it.department == departmentId.toString() }
@@ -118,8 +123,12 @@ class PosTerminalViewModelTest {
             )
         }
 
-        override suspend fun searchProducts(query: String, page: Int, pageSize: Int): Result<List<Product>> =
-            Result.success(emptyList())
+        override suspend fun searchProducts(
+            query: String,
+            page: Int,
+            pageSize: Int,
+            warehouseIds: List<Int>?,
+        ): Result<List<Product>> = Result.success(emptyList())
 
         override suspend fun createProduct(product: Product, departmentId: Int): Result<Product> =
             Result.success(product)

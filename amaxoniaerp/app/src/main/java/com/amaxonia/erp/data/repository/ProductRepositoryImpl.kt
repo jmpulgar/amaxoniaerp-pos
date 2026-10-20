@@ -55,7 +55,12 @@ class ProductRepositoryImpl(
     private suspend fun currentScope(): OfflineSyncScope =
         runCatching { scopeStore?.load() }.getOrNull() ?: OfflineSyncScope.ALL
 
-    override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
+    override suspend fun getAllProducts(
+        page: Int,
+        pageSize: Int,
+        departmentId: Int?,
+        warehouseIds: List<Int>?,
+    ): Result<List<Product>> =
         withContext(Dispatchers.IO) {
             val scope = currentScope()
             val isOnline = networkMonitor?.isOnline() ?: true
@@ -79,6 +84,7 @@ class ProductRepositoryImpl(
                     limit = pageSize,
                     offset = offset,
                     departmentId = departmentId,
+                    warehouseIds = warehouseIds,
                 )
                 if (scope.enabled && productDao != null) {
                     val entities = response.data.map { it.toEntity() }
@@ -117,6 +123,7 @@ class ProductRepositoryImpl(
         departmentId: Int?,
         departmentIds: List<Int>?,
         search: String?,
+        warehouseIds: List<Int>?,
     ): Result<PagedProducts> =
         withContext(Dispatchers.IO) {
             val scope = currentScope()
@@ -185,6 +192,7 @@ class ProductRepositoryImpl(
                     search = query.takeIf { it.isNotBlank() },
                     departmentId = departmentId,
                     departmentIds = departmentIds,
+                    warehouseIds = warehouseIds,
                 )
                 if (scope.enabled && productDao != null) {
                     val entities = response.data.map { it.toEntity() }
@@ -243,7 +251,12 @@ class ProductRepositoryImpl(
             }
         }
 
-    override suspend fun searchProducts(query: String, page: Int, pageSize: Int): Result<List<Product>> =
+    override suspend fun searchProducts(
+        query: String,
+        page: Int,
+        pageSize: Int,
+        warehouseIds: List<Int>?,
+    ): Result<List<Product>> =
         withContext(Dispatchers.IO) {
             val (baseUrl, countryCode, companyDb) = resolveImageContext()
             val trimmed = query.trim()
@@ -275,6 +288,7 @@ class ProductRepositoryImpl(
                     limit = pageSize,
                     offset = offset,
                     search = query,
+                    warehouseIds = warehouseIds,
                 )
                 if (scope.enabled && productDao != null) {
                     val entities = response.data.map { it.toEntity() }

@@ -27,6 +27,7 @@ suspend fun ApiService.getProducts(
     search: String? = null,
     departmentId: Int? = null,
     departmentIds: List<Int>? = null,
+    warehouseIds: List<Int>? = null,
 ): PagedResponse<ProductDto> =
     client.get("items") {
         header("Authorization", "Bearer $token")
@@ -40,6 +41,9 @@ suspend fun ApiService.getProducts(
                 parameters.append("departmentId", departmentId.toString())
             } else if (!departmentIds.isNullOrEmpty()) {
                 parameters.append("departmentIds", departmentIds.joinToString(","))
+            }
+            if (!warehouseIds.isNullOrEmpty()) {
+                parameters.append("warehouseIds", warehouseIds.joinToString(","))
             }
         }
     }.body()

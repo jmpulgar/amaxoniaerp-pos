@@ -37,11 +37,19 @@ class PromotionRepositoryImplTest {
     private class FakeProductRepository : ProductRepository {
         var products: List<Product> = emptyList()
 
-        override suspend fun getAllProducts(page: Int, pageSize: Int, departmentId: Int?): Result<List<Product>> =
-            Result.success(products)
+        override suspend fun getAllProducts(
+            page: Int,
+            pageSize: Int,
+            departmentId: Int?,
+            warehouseIds: List<Int>?,
+        ): Result<List<Product>> = Result.success(products)
 
-        override suspend fun searchProducts(query: String, page: Int, pageSize: Int): Result<List<Product>> =
-            Result.success(emptyList())
+        override suspend fun searchProducts(
+            query: String,
+            page: Int,
+            pageSize: Int,
+            warehouseIds: List<Int>?,
+        ): Result<List<Product>> = Result.success(emptyList())
 
         override suspend fun createProduct(product: Product, departmentId: Int): Result<Product> =
             Result.success(product)

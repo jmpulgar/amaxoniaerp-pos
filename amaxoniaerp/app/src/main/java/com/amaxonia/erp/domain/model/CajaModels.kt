@@ -26,7 +26,11 @@ data class Caja(
     @SerialName("almacen_nombre") val almacenNombre: String? = null,
     @SerialName("fondo_apertura") val fondoApertura: Double? = null,
     @SerialName("factura_correlativo") val facturaCorrelativo: Int = 0,
+    @SerialName("almacenes") val almacenes: List<Int> = emptyList(),
 ) {
+    fun getEffectiveWarehouseIds(): List<Int> =
+        almacenes.ifEmpty { defaultWarehouseId?.let { listOf(it) } ?: codAlmacen?.takeIf { it > 0 }?.let { listOf(it) } ?: emptyList() }
+
     val displayName: String
         get() = caja?.takeIf { it.isNotBlank() }
             ?: descripcion?.takeIf { it.isNotBlank() }

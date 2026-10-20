@@ -17,8 +17,20 @@ data class PagedProducts(
 }
 
 interface ProductRepository {
-    suspend fun getAllProducts(page: Int = 1, pageSize: Int = 20, departmentId: Int? = null): Result<List<Product>>
-    suspend fun searchProducts(query: String, page: Int = 1, pageSize: Int = 20): Result<List<Product>>
+    suspend fun getAllProducts(
+        page: Int = 1,
+        pageSize: Int = 20,
+        departmentId: Int? = null,
+        warehouseIds: List<Int>? = null,
+    ): Result<List<Product>>
+
+    suspend fun searchProducts(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 20,
+        warehouseIds: List<Int>? = null,
+    ): Result<List<Product>>
+
     suspend fun createProduct(product: Product, departmentId: Int): Result<Product>
     suspend fun updateProduct(id: String, product: Product, departmentId: Int): Result<Product>
     suspend fun getDepartments(): Result<List<DepartmentDto>>
@@ -31,14 +43,15 @@ interface ProductRepository {
         departmentId: Int? = null,
         departmentIds: List<Int>? = null,
         search: String? = null,
+        warehouseIds: List<Int>? = null,
     ): Result<PagedProducts> = runCatching {
         val trimmed = search?.trim().orEmpty()
         val list = if (trimmed.isBlank()) {
-            getAllProducts(page, pageSize, departmentId).getOrThrow()
+            getAllProducts(page, pageSize, departmentId, warehouseIds).getOrThrow()
         } else {
-            val searched = searchProducts(trimmed, page, pageSize).getOrThrow()
+            val searched = searchProducts(trimmed, page, pageSize, warehouseIds).getOrThrow()
             if (searched.isEmpty()) {
-                getAllProducts(page, pageSize, departmentId).getOrThrow().filter {
+                getAllProducts(page, pageSize, departmentId, warehouseIds).getOrThrow().filter {
                     it.description.contains(trimmed, ignoreCase = true) ||
                     it.code.contains(trimmed, ignoreCase = true) ||
                     it.barcode1.contains(trimmed, ignoreCase = true) ||

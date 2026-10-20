@@ -110,10 +110,31 @@ class ItemsRepository {
                                 (ItemExistenciaAlmacenTable.cantidad.isNotNull()) and
                                 (ItemExistenciaAlmacenTable.cantidad greater java.math.BigDecimal.ZERO)
                         }
+
+                val hasItemCombos =
+                    runCatching {
+                        TransactionManager.current().exec("SELECT 1 FROM item_combos LIMIT 0") { true } ?: false
+                    }.getOrElse { false }
+
+                val comboItemSubQuery =
+                    if (hasItemCombos) {
+                        ItemCombosTable.select(ItemCombosTable.idItem).withDistinct()
+                    } else {
+                        null
+                    }
+
                 select.andWhere {
-                    (table.tipoProd eq 1) or
-                        (table.codItemForma eq 2) or
-                        (table.idItem inSubQuery stockSubQuery)
+                    val baseCondition =
+                        (table.tipoProd eq 1) or
+                            (table.codItemForma eq 2) or
+                            (table.tipoArticulo inList listOf("C", "c", "K", "k", "R", "r")) or
+                            (table.idItem inSubQuery stockSubQuery)
+
+                    if (comboItemSubQuery != null) {
+                        baseCondition or (table.idItem inSubQuery comboItemSubQuery)
+                    } else {
+                        baseCondition
+                    }
                 }
             }
 

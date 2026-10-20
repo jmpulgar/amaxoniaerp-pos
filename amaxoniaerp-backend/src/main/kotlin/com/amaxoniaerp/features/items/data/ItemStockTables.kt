@@ -24,3 +24,8 @@ object AlmacenTable : Table("almacen") {
     val tipo = varchar("tipo", S.VARCHAR_LENGTH_40).nullable()
     val orden = integer("orden").nullable()
 }
+
+object ItemCombosTable : Table("item_combos") {
+    val idItem = integer("id_item")
+    val idCombo = integer("id_combo")
+}
