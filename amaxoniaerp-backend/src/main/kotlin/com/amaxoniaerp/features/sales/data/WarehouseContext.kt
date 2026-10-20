@@ -23,9 +23,9 @@ internal fun resolveWarehouseContext(
     val cajaTable = SalesCajaTableFactory.forCountry(countryCode)
     val columns =
         if (isVE && cajaTable is SalesCajaTableVE) {
-            listOf(cajaTable.idSucursal, cajaTable.codAlmacen)
+            listOf(cajaTable.idSucursal, cajaTable.codAlmacen, cajaTable.idAlmacenes)
         } else {
-            listOf(cajaTable.idSucursal)
+            listOf(cajaTable.idSucursal, cajaTable.idAlmacenes)
         }
     val caja =
         cajaTable
@@ -41,20 +41,40 @@ internal fun resolveWarehouseContext(
         } else {
             null
         }
+
+    val idAlmacenesStr = caja.getOrNull(cajaTable.idAlmacenes)
+    val cajaAlmacenes: List<Int> =
+        idAlmacenesStr
+            ?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.filter { it > 0 }
+            ?: emptyList()
+
     val cajaSucursalId = caja[cajaTable.idSucursal]
     val serieSucursal = cajaSucursalId?.let(::serieDeSucursal)
     val globalWarehouseId = globalWarehouse(countryCode)
 
+    val sucursalDefault = sucursalDefaultWarehouse(cajaSucursalId)
     val defaultWarehouseId =
-        cajaWarehouseId ?: sucursalDefaultWarehouse(cajaSucursalId) ?: globalWarehouseId
-            ?: throw InvalidSaleRequestException(
-                "No se pudo resolver almacén por defecto para caja=$cajaId (caja/sucursal/parámetros generales)",
-            )
+        when {
+            cajaWarehouseId != null -> cajaWarehouseId
+            cajaAlmacenes.isNotEmpty() -> {
+                if (sucursalDefault != null && sucursalDefault in cajaAlmacenes) {
+                    sucursalDefault
+                } else {
+                    cajaAlmacenes.first()
+                }
+            }
+            sucursalDefault != null -> sucursalDefault
+            else -> globalWarehouseId
+        } ?: throw InvalidSaleRequestException(
+            "No se pudo resolver almacén por defecto para caja=$cajaId (caja/sucursal/parámetros generales)",
+        )
 
     return WarehouseContext(
         defaultWarehouseId = defaultWarehouseId,
         allowedWarehouseIds =
-            allowedWarehouses(cajaWarehouseId, globalWarehouseId, cajaSucursalId, defaultWarehouseId),
+            allowedWarehouses(cajaWarehouseId, cajaAlmacenes, globalWarehouseId, cajaSucursalId, defaultWarehouseId),
         idSucursal = cajaSucursalId,
         serieSucursal = serieSucursal,
     )
@@ -96,6 +116,7 @@ private fun globalWarehouse(countryCode: String): Int? {
 
 private fun allowedWarehouses(
     cajaWarehouseId: Int?,
+    cajaAlmacenes: List<Int>,
     globalWarehouseId: Int?,
     cajaSucursalId: Int?,
     defaultWarehouseId: Int,
@@ -104,6 +125,7 @@ private fun allowedWarehouses(
     if (cajaWarehouseId != null) {
         allowed += cajaWarehouseId
     }
+    allowed.addAll(cajaAlmacenes)
     if (globalWarehouseId != null) {
         allowed += globalWarehouseId
     }
@@ -125,6 +147,7 @@ internal fun validateWarehouseOwnership(
 ) {
     val invalidWarehouses =
         normalizedItems
+            .filter { it.esProductoFisico }
             .map { it.itemAlmacen }
             .filter { it !in context.allowedWarehouseIds }
             .distinct()

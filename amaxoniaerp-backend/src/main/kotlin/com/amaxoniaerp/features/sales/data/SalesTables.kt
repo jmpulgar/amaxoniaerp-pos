@@ -236,6 +236,7 @@ abstract class BaseSalesCajaTable : Table("caja") {
     val idSucursal = integer("id_sucursal").nullable()
     val codigo = varchar("codigo", S.VARCHAR_LENGTH_50).nullable()
     val facturaCorrelativo = integer("factura_correlativo")
+    val idAlmacenes = text("id_almacenes").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }
