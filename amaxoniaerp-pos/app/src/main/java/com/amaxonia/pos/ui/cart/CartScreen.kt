@@ -116,7 +116,7 @@ fun CartScreen(
 
     CartOrderSavedOverlay(state = state, viewModel = viewModel, onBack = onBack)
     CartEditDialogs(editState = editState, viewModel = viewModel)
-    if (showSellerSheet) {
+    if (showSellerSheet && state.allowChangeSeller) {
         CartSellerSheetOverlay(
             state = state,
             viewModel = viewModel,
@@ -573,7 +573,7 @@ private fun CompactSellerSection(
     onChangeSeller: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val canChange = state.availableSellers.isNotEmpty()
+    val canChange = state.allowChangeSeller && state.availableSellers.isNotEmpty()
     Row(
         modifier =
             modifier

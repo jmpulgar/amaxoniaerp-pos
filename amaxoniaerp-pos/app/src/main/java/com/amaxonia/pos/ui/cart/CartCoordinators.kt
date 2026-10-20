@@ -208,6 +208,9 @@ class CartConfigurationCoordinator(
             settingsRepository.allowDiscounts.collect { enabled -> state.update { it.copy(allowDiscounts = enabled) } }
         }
         scope.launch {
+            settingsRepository.allowChangeSeller.collect { enabled -> state.update { it.copy(allowChangeSeller = enabled) } }
+        }
+        scope.launch {
             activeCajaReader.activeCaja.collect { caja ->
                 val currency = caja?.currency
                 val isMultiCurrency = currency?.multiMoneda.equals("SI", ignoreCase = true)
@@ -319,9 +322,11 @@ class CartActionHandler(
                 state.update { it.copy(cartActionError = null) }
             }
             is CartUiAction.SelectSeller -> {
-                cartRepository.availableSellers.value
-                    .firstOrNull { it.id == action.sellerId }
-                    ?.let(cartRepository::setCurrentSeller)
+                if (state.value.allowChangeSeller) {
+                    cartRepository.availableSellers.value
+                        .firstOrNull { it.id == action.sellerId }
+                        ?.let(cartRepository::setCurrentSeller)
+                }
             }
         }
     }

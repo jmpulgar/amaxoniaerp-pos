@@ -6,10 +6,13 @@ import com.amaxonia.pos.domain.model.ClientBranch
 import com.amaxonia.pos.domain.model.DraftInvoice
 import com.amaxonia.pos.domain.model.PriceLevel
 import com.amaxonia.pos.domain.model.Product
+import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
 import com.amaxonia.pos.domain.repository.ProductLotConfiguration
 import com.amaxonia.pos.domain.repository.ProductLotRepository
+import com.amaxonia.pos.domain.repository.setSellerContext
+import com.amaxonia.pos.domain.repository.setCurrentSeller
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 import com.amaxonia.pos.domain.usecase.cart.RefreshCartProductLotsUseCase
@@ -51,6 +54,27 @@ class CartActionHandlerTest {
                     .unitPriceWithTax,
                 0.0,
             )
+        }
+
+    @Test
+    fun `seller selection remains guarded by allowChangeSeller setting`() =
+        runTest {
+            val seller1 = Seller(1, "Seller 1")
+            val seller2 = Seller(2, "Seller 2")
+            val cart =
+                CartRepository().apply {
+                    setSellerContext(1, "Seller 1", listOf(seller1, seller2))
+                }
+            val state = MutableStateFlow(CartState(allowChangeSeller = false))
+            val handler = handler(cart)
+            val effects = MutableSharedFlow<CartUiEffect>(extraBufferCapacity = 1)
+
+            handler.onAction(CartUiAction.SelectSeller(2), this, state, effects)
+            assertEquals(1, cart.currentSeller.value?.id)
+
+            state.value = state.value.copy(allowChangeSeller = true)
+            handler.onAction(CartUiAction.SelectSeller(2), this, state, effects)
+            assertEquals(2, cart.currentSeller.value?.id)
         }
 
     @Test

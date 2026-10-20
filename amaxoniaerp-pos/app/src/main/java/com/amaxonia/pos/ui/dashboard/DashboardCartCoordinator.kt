@@ -101,17 +101,22 @@ class DashboardCartCoordinator(
         when (action) {
             is DashboardSaleUiAction.Product -> productHandler.onAction(action, scope, state)
             is DashboardSaleUiAction.Manual -> manualHandler.onAction(action, scope, state)
-            is DashboardSaleUiAction.Session -> handleSessionAction(action)
+            is DashboardSaleUiAction.Session -> handleSessionAction(action, state)
             DashboardSaleUiAction.Checkout -> Unit
         }
     }
 
-    private fun handleSessionAction(action: DashboardSaleUiAction.Session) {
+    private fun handleSessionAction(
+        action: DashboardSaleUiAction.Session,
+        state: MutableStateFlow<DashboardState>,
+    ) {
         when (action) {
             DashboardSaleUiAction.StartNewOrder -> cartRepository.clearCart()
             is DashboardSaleUiAction.SelectSeller -> {
-                val seller = cartRepository.availableSellers.value.firstOrNull { it.id == action.sellerId } ?: return
-                cartRepository.setCurrentSeller(seller)
+                if (state.value.allowChangeSeller) {
+                    val seller = cartRepository.availableSellers.value.firstOrNull { it.id == action.sellerId } ?: return
+                    cartRepository.setCurrentSeller(seller)
+                }
             }
         }
     }

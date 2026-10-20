@@ -26,6 +26,7 @@ data class CartState(
     val selectedClientPhotoUrl: String = "",
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
+    val allowChangeSeller: Boolean = false,
     val orderSuccessMessage: String? = null,
     val allowEditPrices: Boolean = true,
     val allowDiscounts: Boolean = true,
