@@ -6,6 +6,7 @@ import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.allowDiscountsFlow
 import com.amaxonia.pos.data.local.allowEditPricesFlow
+import com.amaxonia.pos.data.local.allowChangeSellerFlow
 import com.amaxonia.pos.data.local.customerDisplayEnabledFlow
 import com.amaxonia.pos.data.local.noPrinterPdfFormatFlow
 import com.amaxonia.pos.data.local.readActiveCajaForToday
@@ -14,6 +15,7 @@ import com.amaxonia.pos.data.local.readLastPaymentSuccess
 import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.saveAllowDiscounts
 import com.amaxonia.pos.data.local.saveAllowEditPrices
+import com.amaxonia.pos.data.local.saveAllowChangeSeller
 import com.amaxonia.pos.data.local.saveCustomerDisplayEnabled
 import com.amaxonia.pos.data.local.saveNoPrinterPdfFormat
 import com.amaxonia.pos.data.local.saveSelectedPrinterType
@@ -48,6 +50,8 @@ class LocalPosConfigurationRepository(
     override val factorySettings: Flow<TheFactorySettings> = localStore.theFactorySettingsFlow()
     override val allowEditPrices: Flow<Boolean> = localStore.allowEditPricesFlow()
     override val allowDiscounts: Flow<Boolean> = localStore.allowDiscountsFlow()
+    override val allowChangeSeller: Flow<Boolean> = localStore.allowChangeSellerFlow()
+    override val allowChangeSellerFlow: Flow<Boolean> = localStore.allowChangeSellerFlow()
     override val customerDisplayEnabled: Flow<Boolean> = localStore.customerDisplayEnabledFlow()
     override val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat> =
         localStore.noPrinterPdfFormatFlow()
@@ -106,6 +110,10 @@ class LocalPosConfigurationRepository(
 
     override suspend fun saveAllowDiscounts(enabled: Boolean) {
         localStore.saveAllowDiscounts(enabled)
+    }
+
+    override suspend fun saveAllowChangeSeller(enabled: Boolean) {
+        localStore.saveAllowChangeSeller(enabled)
     }
 
     override suspend fun saveCustomerDisplayEnabled(enabled: Boolean) {

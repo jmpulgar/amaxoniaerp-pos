@@ -16,7 +16,9 @@ import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.ServerEnvironment
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -107,12 +109,15 @@ class DashboardCatalogCoordinatorTest {
 
     private class FakeSessionReader(
         private val warehouses: List<Int>? = null,
+        private val allowChangeSeller: Flow<Boolean> = emptyFlow(),
     ) : DashboardSessionReader {
         override suspend fun currentAdminDatabase(): String = "admin_db"
 
         override suspend fun currentCountry(): ServerCountry? = null
 
         override suspend fun activeWarehouseIds(): List<Int>? = warehouses
+
+        override val allowChangeSellerFlow: Flow<Boolean> = allowChangeSeller
     }
 
     private class FakeServerEnvironment : ServerEnvironment {
@@ -336,5 +341,34 @@ class DashboardCatalogCoordinatorTest {
             advanceUntilIdle()
 
             assertEquals(listOf(1, 3), fakeRepo.lastFilter?.warehouseIds)
+        }
+
+    @Test
+    fun `allowChangeSellerFlow updates state allowChangeSeller`() =
+        runTest {
+            val sellerFlow = MutableStateFlow(true)
+            val fakeSession = FakeSessionReader(allowChangeSeller = sellerFlow)
+
+            val coordinator =
+                DashboardCatalogCoordinator(
+                    productRepository = FakeProductRepository(),
+                    reportRepository = FakeReportRepository(),
+                    sessionReader = fakeSession,
+                    serverEnvironment = FakeServerEnvironment(),
+                    productMapper = DashboardProductMapper(FixedImageResolver),
+                )
+
+            val state = MutableStateFlow(DashboardState())
+            coordinator.start(this, state)
+            advanceUntilIdle()
+
+            assertEquals(true, state.value.allowChangeSeller)
+
+            sellerFlow.value = false
+            advanceUntilIdle()
+
+            assertEquals(false, state.value.allowChangeSeller)
+
+            coordinator.stop()
         }
 }

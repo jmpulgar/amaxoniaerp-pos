@@ -141,11 +141,13 @@ import com.amaxonia.pos.composition.AppGraph
 import com.amaxonia.pos.core.logging.SafeLog
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
+import com.amaxonia.pos.ui.common.SellerSelectorBottomSheet
 import com.amaxonia.pos.ui.common.components.AdaptiveAmountText
 import com.amaxonia.pos.ui.common.components.PosGradientButton
 import com.amaxonia.pos.ui.common.components.PosMoneyInput
 import com.amaxonia.pos.ui.common.components.QuantityStepper
 import com.amaxonia.pos.ui.common.injectedViewModel
+import com.amaxonia.pos.ui.common.shortName
 import com.amaxonia.pos.ui.theme.ConfirmedContainer
 import com.amaxonia.pos.ui.theme.ConfirmedContent
 import com.amaxonia.pos.ui.theme.cartBrandGradient
@@ -225,6 +227,7 @@ fun DashboardScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var showSellerSheet by remember { mutableStateOf(false) }
     val productGridState = rememberLazyGridState()
     val productListState = rememberLazyListState()
     val manualSyncInfos by AppGraph.sync.manualSyncWorkInfos(context).observeAsState(emptyList())
@@ -480,6 +483,15 @@ fun DashboardScreen(
             isLoading = state.isLoadingCajas,
             onConfirm = { amount -> viewModel.onAction(DashboardCajaUiAction.ConfirmApertura(caja, amount)) },
             onDismiss = { viewModel.onAction(DashboardCajaUiAction.DismissApertura) },
+        )
+    }
+
+    if (showSellerSheet) {
+        SellerSelectorBottomSheet(
+            sellers = state.availableSellers,
+            selectedSellerId = state.currentSeller?.id,
+            onSelect = { seller -> viewModel.onAction(DashboardSaleUiAction.SelectSeller(seller.id)) },
+            onDismiss = { showSellerSheet = false },
         )
     }
 
@@ -932,6 +944,39 @@ fun DashboardScreen(
                                         activeFilterCount = state.activeFilterCount,
                                         onClick = { viewModel.onAction(DashboardCatalogUiAction.SetFilterModalOpen(true)) },
                                     )
+                                }
+
+                                if (state.allowChangeSeller) {
+                                    Surface(
+                                        modifier =
+                                            Modifier
+                                                .clickable { showSellerSheet = true },
+                                        color = MaterialTheme.colorScheme.surface,
+                                        shape = PosExtraShapes.Pill,
+                                        shadowElevation = 1.dp,
+                                    ) {
+                                        Row(
+                                            modifier =
+                                                Modifier
+                                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PosExtraShapes.Pill)
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Person,
+                                                contentDescription = "Vendedor",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Text(
+                                                text = state.currentSeller?.shortName() ?: "Vendedor",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.padding(start = 6.dp),
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

@@ -56,6 +56,7 @@ data class DashboardState(
     val selectedClientSucursal: ClientBranch? = null,
     val currentSeller: Seller? = null,
     val availableSellers: List<Seller> = emptyList(),
+    val allowChangeSeller: Boolean = false,
     val cajaPrincipalNombre: String = "Caja no seleccionada",
     val activeCajaId: String? = null,
     val sucursalNombre: String = "Sucursal",

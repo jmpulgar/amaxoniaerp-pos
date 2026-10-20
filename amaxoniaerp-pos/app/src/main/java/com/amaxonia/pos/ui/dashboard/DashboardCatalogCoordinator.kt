@@ -34,6 +34,8 @@ class DashboardCatalogCoordinator(
     private var searchJob: Job? = null
     private var loadProductsJob: Job? = null
     private var scopeObserverJob: Job? = null
+    private var warehouseIdsJob: Job? = null
+    private var allowChangeSellerJob: Job? = null
 
     fun start(
         scope: CoroutineScope,
@@ -55,11 +57,20 @@ class DashboardCatalogCoordinator(
             loadDepartments(scope, state)
             loadProducts(scope, state, reset = true)
         }
-        scope.launch {
-            sessionReader.activeWarehouseIdsFlow.collect {
-                loadProducts(scope, state, reset = true)
+        warehouseIdsJob?.cancel()
+        warehouseIdsJob =
+            scope.launch {
+                sessionReader.activeWarehouseIdsFlow.collect {
+                    loadProducts(scope, state, reset = true)
+                }
             }
-        }
+        allowChangeSellerJob?.cancel()
+        allowChangeSellerJob =
+            scope.launch {
+                sessionReader.allowChangeSellerFlow.collect { allowed ->
+                    state.update { it.copy(allowChangeSeller = allowed) }
+                }
+            }
         loadBestSellers(scope, state)
     }
 
@@ -67,6 +78,8 @@ class DashboardCatalogCoordinator(
         searchJob?.cancel()
         loadProductsJob?.cancel()
         scopeObserverJob?.cancel()
+        warehouseIdsJob?.cancel()
+        allowChangeSellerJob?.cancel()
     }
 
     private fun onScopeUpdated(

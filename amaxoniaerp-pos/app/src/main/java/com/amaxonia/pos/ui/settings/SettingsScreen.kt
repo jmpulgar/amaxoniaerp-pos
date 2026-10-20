@@ -74,6 +74,7 @@ fun SettingsScreen(
     val availablePrinterTypes by viewModel.availablePrinterTypes.collectAsStateWithLifecycle()
     val allowEditPrices by viewModel.allowEditPrices.collectAsStateWithLifecycle()
     val allowDiscounts by viewModel.allowDiscounts.collectAsStateWithLifecycle()
+    val allowChangeSeller by viewModel.allowChangeSeller.collectAsStateWithLifecycle()
     val customerDisplayEnabled by viewModel.customerDisplayEnabled.collectAsStateWithLifecycle()
     val isSecondaryDisplayAvailable by viewModel.isSecondaryDisplayAvailable.collectAsStateWithLifecycle()
     val noPrinterPdfFormat by viewModel.noPrinterPdfFormat.collectAsStateWithLifecycle()
@@ -121,8 +122,10 @@ fun SettingsScreen(
             SalesPermissionsCard(
                 allowEditPrices = allowEditPrices,
                 allowDiscounts = allowDiscounts,
+                allowChangeSeller = allowChangeSeller,
                 onAllowEditPricesChange = viewModel::onAllowEditPricesChanged,
                 onAllowDiscountsChange = viewModel::onAllowDiscountsChanged,
+                onAllowChangeSellerChange = viewModel::onAllowChangeSellerChanged,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -329,8 +332,10 @@ private fun NoPrinterPdfFormatSection(
 private fun SalesPermissionsCard(
     allowEditPrices: Boolean,
     allowDiscounts: Boolean,
+    allowChangeSeller: Boolean,
     onAllowEditPricesChange: (Boolean) -> Unit,
     onAllowDiscountsChange: (Boolean) -> Unit,
+    onAllowChangeSellerChange: (Boolean) -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -364,6 +369,15 @@ private fun SalesPermissionsCard(
                 description = "Habilita descuento porcentual por ítem en carrito",
                 checked = allowDiscounts,
                 onCheckedChange = onAllowDiscountsChange,
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            PermissionSwitchRow(
+                label = "Permite cambiar de vendedor",
+                description = "Muestra el botón para cambiar de vendedor en el catálogo",
+                checked = allowChangeSeller,
+                onCheckedChange = onAllowChangeSellerChange,
             )
         }
     }

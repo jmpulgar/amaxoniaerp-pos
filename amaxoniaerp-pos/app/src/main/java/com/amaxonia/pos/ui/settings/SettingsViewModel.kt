@@ -41,6 +41,8 @@ class SettingsViewModel(
     val allowEditPrices = _allowEditPrices.asStateFlow()
     private val _allowDiscounts = MutableStateFlow(false)
     val allowDiscounts = _allowDiscounts.asStateFlow()
+    private val _allowChangeSeller = MutableStateFlow(false)
+    val allowChangeSeller = _allowChangeSeller.asStateFlow()
     private val _customerDisplayEnabled = MutableStateFlow(false)
     val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
     private val _noPrinterPdfFormat = MutableStateFlow(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA)
@@ -94,6 +96,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.allowDiscounts.collect { enabled ->
                 _allowDiscounts.value = enabled
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.allowChangeSeller.collect { enabled ->
+                _allowChangeSeller.value = enabled
             }
         }
         viewModelScope.launch {
@@ -188,6 +195,15 @@ class SettingsViewModel(
             runCatching { settingsRepository.saveAllowDiscounts(enabled) }
                 .onFailure { throwable ->
                     _errorMessage.value = throwable.message ?: "No se pudo guardar permiso de descuentos"
+                }
+        }
+    }
+
+    fun onAllowChangeSellerChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { settingsRepository.saveAllowChangeSeller(enabled) }
+                .onFailure { throwable ->
+                    _errorMessage.value = throwable.message ?: "No se pudo guardar configuración de cambio de vendedor"
                 }
         }
     }

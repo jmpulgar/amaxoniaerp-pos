@@ -109,6 +109,12 @@ suspend fun LocalStore.saveAllowDiscounts(enabled: Boolean) {
     }
 }
 
+suspend fun LocalStore.saveAllowChangeSeller(enabled: Boolean) {
+    dataStore.edit { prefs ->
+        prefs[allowChangeSellerKey] = enabled
+    }
+}
+
 fun LocalStore.allowEditPricesFlow(): Flow<Boolean> =
     dataStore.data.map { prefs ->
         prefs[allowEditPricesKey] ?: true
@@ -119,9 +125,16 @@ fun LocalStore.allowDiscountsFlow(): Flow<Boolean> =
         prefs[allowDiscountsKey] ?: true
     }
 
+fun LocalStore.allowChangeSellerFlow(): Flow<Boolean> =
+    dataStore.data.map { prefs ->
+        prefs[allowChangeSellerKey] ?: false
+    }
+
 suspend fun LocalStore.readAllowEditPrices(): Boolean = allowEditPricesFlow().first()
 
 suspend fun LocalStore.readAllowDiscounts(): Boolean = allowDiscountsFlow().first()
+
+suspend fun LocalStore.readAllowChangeSeller(): Boolean = allowChangeSellerFlow().first()
 
 suspend fun LocalStore.saveCustomerDisplayEnabled(enabled: Boolean) {
     dataStore.edit { prefs ->

@@ -22,6 +22,8 @@ interface DashboardSessionReader : ProductSessionReader {
     suspend fun activeWarehouseIds(): List<Int>? = null
 
     val activeWarehouseIdsFlow: Flow<List<Int>?> get() = kotlinx.coroutines.flow.emptyFlow()
+
+    val allowChangeSellerFlow: Flow<Boolean> get() = kotlinx.coroutines.flow.emptyFlow()
 }
 
 interface CashCloseContextReader {
@@ -48,6 +50,7 @@ interface PosSettingsRepository {
     val factorySettings: Flow<TheFactorySettings>
     val allowEditPrices: Flow<Boolean>
     val allowDiscounts: Flow<Boolean>
+    val allowChangeSeller: Flow<Boolean>
     val customerDisplayEnabled: Flow<Boolean>
     val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat>
 
@@ -60,6 +63,8 @@ interface PosSettingsRepository {
     suspend fun saveAllowEditPrices(enabled: Boolean)
 
     suspend fun saveAllowDiscounts(enabled: Boolean)
+
+    suspend fun saveAllowChangeSeller(enabled: Boolean)
 
     suspend fun saveCustomerDisplayEnabled(enabled: Boolean)
 

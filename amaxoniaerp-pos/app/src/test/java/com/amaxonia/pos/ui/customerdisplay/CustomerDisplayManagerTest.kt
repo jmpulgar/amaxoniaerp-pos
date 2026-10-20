@@ -107,6 +107,7 @@ class CustomerDisplayManagerTest {
         override val factorySettings: Flow<TheFactorySettings> = MutableStateFlow(TheFactorySettings())
         override val allowEditPrices: Flow<Boolean> = MutableStateFlow(true)
         override val allowDiscounts: Flow<Boolean> = MutableStateFlow(true)
+        override val allowChangeSeller: Flow<Boolean> = MutableStateFlow(false)
         override val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat> =
             MutableStateFlow(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA)
 
@@ -115,6 +116,7 @@ class CustomerDisplayManagerTest {
         override suspend fun saveFactorySettings(settings: TheFactorySettings) {}
         override suspend fun saveAllowEditPrices(enabled: Boolean) {}
         override suspend fun saveAllowDiscounts(enabled: Boolean) {}
+        override suspend fun saveAllowChangeSeller(enabled: Boolean) {}
         override suspend fun saveCustomerDisplayEnabled(enabled: Boolean) {
             displayEnabledFlow.value = enabled
         }
