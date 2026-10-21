@@ -57,7 +57,7 @@ class TheFactoryHkaPayloadBuilder(
         TheFactoryHkaDocumentoWrapper(
             documento =
                 TheFactoryHkaDocumento(
-                    codigoSucursalEmisor = context.codigoSucursalEmisor,
+                    codigoSucursalEmisor = normalizeCodigoSucursal(context.codigoSucursalEmisor),
                     datosTransaccion = buildDatosTransaccion(context, documentosFiscalesReferenciados),
                     listaItems = buildItems(context.detalles, normalizeTipoClienteFE(context.cliente.tipoClienteFE)),
                     totalesSubTotales = buildTotales(context),
@@ -102,7 +102,7 @@ class TheFactoryHkaPayloadBuilder(
             tipoEmision = config.tipoEmision,
             tipoDocumento = tipoDocumento,
             numeroDocumentoFiscal = factura.numeroDocumentoFiscal,
-            puntoFacturacionFiscal = ctx.puntoFacturacionFiscal,
+            puntoFacturacionFiscal = normalizePuntoFacturacion(ctx.puntoFacturacionFiscal),
             fechaEmision = fechaEmision,
             naturalezaOperacion = factura.naturalezaOperacion,
             tipoOperacion = factura.tipoOperacion,

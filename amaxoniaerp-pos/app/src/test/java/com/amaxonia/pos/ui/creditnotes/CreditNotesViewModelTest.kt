@@ -520,6 +520,104 @@ class CreditNotesViewModelTest {
             assertEquals("Nota de crédito electrónica (NCE) confirmada", vm.state.value.successMessage)
         }
 
+    @Test
+    fun `submitCreditNote prints ticket when confirmed`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var printedDetail: CreditNoteDetailDto? = null
+            val printUseCase =
+                com.amaxonia.pos.domain.usecase.creditnote.PrintCreditNoteTicketUseCase { detail ->
+                    printedDetail = detail
+                    Result.success(Unit)
+                }
+            val repo =
+                FakeCreditNoteRepository().apply {
+                    sourceInvoiceDetail = sourceInvoice
+                    createResponse =
+                        CreateCreditNoteResponseDto(
+                            success = true,
+                            id = "nc-1",
+                            codigo = "NC-001",
+                            subtotal = 100.0,
+                            impuesto = 0.0,
+                            total = 100.0,
+                            fiscalStatus = CreditNoteFiscalStatusDto.CONFIRMADA,
+                            detail = createdDetail.copy(fiscalStatus = CreditNoteFiscalStatusDto.CONFIRMADA),
+                        )
+                }
+            val vm = viewModel(repo = repo, printCreditNoteTicket = printUseCase)
+            advanceUntilIdle()
+            vm.selectInvoice("fact-1")
+            advanceUntilIdle()
+            vm.submitCreditNote()
+            advanceUntilIdle()
+
+            assertEquals("nc-1", printedDetail?.id)
+            assertEquals("Nota de crédito NC-001 generada correctamente", vm.state.value.successMessage)
+            assertNull(vm.state.value.error)
+        }
+
+    @Test
+    fun `submitCreditNote does not print ticket and shows error when rejected`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var printedDetail: CreditNoteDetailDto? = null
+            val printUseCase =
+                com.amaxonia.pos.domain.usecase.creditnote.PrintCreditNoteTicketUseCase { detail ->
+                    printedDetail = detail
+                    Result.success(Unit)
+                }
+            val repo =
+                FakeCreditNoteRepository().apply {
+                    sourceInvoiceDetail = sourceInvoice
+                    createResponse =
+                        CreateCreditNoteResponseDto(
+                            success = false,
+                            id = "nc-1",
+                            codigo = "NC-001",
+                            subtotal = 100.0,
+                            impuesto = 0.0,
+                            total = 100.0,
+                            fiscalStatus = CreditNoteFiscalStatusDto.RECHAZADA,
+                            fiscalMessage = "PAC rechazo el documento",
+                            detail = createdDetail.copy(fiscalStatus = CreditNoteFiscalStatusDto.RECHAZADA),
+                        )
+                }
+            val vm = viewModel(repo = repo, printCreditNoteTicket = printUseCase)
+            advanceUntilIdle()
+            vm.selectInvoice("fact-1")
+            advanceUntilIdle()
+            vm.submitCreditNote()
+            advanceUntilIdle()
+
+            assertNull(printedDetail)
+            assertNull(vm.state.value.successMessage)
+            assertEquals("PAC rechazo el documento", vm.state.value.error)
+        }
+
+    @Test
+    fun `printSelectedCreditNoteTicket prints ticket successfully`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var printedDetail: CreditNoteDetailDto? = null
+            val printUseCase =
+                com.amaxonia.pos.domain.usecase.creditnote.PrintCreditNoteTicketUseCase { detail ->
+                    printedDetail = detail
+                    Result.success(Unit)
+                }
+            val repo =
+                FakeCreditNoteRepository().apply {
+                    creditNoteDetail = createdDetail.copy(fiscalStatus = CreditNoteFiscalStatusDto.CONFIRMADA)
+                }
+            val vm = viewModel(repo = repo, printCreditNoteTicket = printUseCase)
+            advanceUntilIdle()
+            vm.openCreditNoteDetail("nc-1")
+            advanceUntilIdle()
+            vm.printSelectedCreditNoteTicket()
+            advanceUntilIdle()
+
+            assertEquals("nc-1", printedDetail?.id)
+            assertEquals("Comprobante impreso correctamente", vm.state.value.successMessage)
+            assertNull(vm.state.value.error)
+        }
+
     @Suppress("LongParameterList")
     private fun viewModel(
         repo: FakeCreditNoteRepository = FakeCreditNoteRepository(),
@@ -528,6 +626,7 @@ class CreditNotesViewModelTest {
         fiscalPrinter: PrinterRepository? = null,
         confirmationRepository: FakeConfirmationRepository = FakeConfirmationRepository(),
         contextReader: CreditNoteContextReader = FakeCreditNoteContextReader,
+        printCreditNoteTicket: com.amaxonia.pos.domain.usecase.creditnote.PrintCreditNoteTicketUseCase? = null,
     ): CreditNotesViewModel {
         val processFiscal =
             ProcessCreditNoteFiscalUseCase(
@@ -541,6 +640,7 @@ class CreditNotesViewModelTest {
             formaPagoRepository = FakeFormaPagoRepository(formasPagoResult),
             processCreditNoteFiscal = processFiscal,
             contextReader = contextReader,
+            printCreditNoteTicket = printCreditNoteTicket,
         )
     }
 

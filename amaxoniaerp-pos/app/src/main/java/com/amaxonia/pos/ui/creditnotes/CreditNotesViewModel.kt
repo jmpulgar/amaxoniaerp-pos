@@ -2,12 +2,14 @@ package com.amaxonia.pos.ui.creditnotes
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.amaxonia.pos.domain.model.creditnote.CreateCreditNoteResponseDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteFiscalStatusDto
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CreditNoteContextReader
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.FormaPagoRepository
+import com.amaxonia.pos.domain.usecase.creditnote.PrintCreditNoteTicketUseCase
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
 import com.amaxonia.pos.domain.util.DateRangeValidator
 import com.amaxonia.pos.ui.payment.formatCurrencyLabel
@@ -26,6 +28,7 @@ class CreditNotesViewModel(
     private val formaPagoRepository: FormaPagoRepository,
     private val processCreditNoteFiscal: ProcessCreditNoteFiscalUseCase,
     private val contextReader: CreditNoteContextReader? = null,
+    private val printCreditNoteTicket: PrintCreditNoteTicketUseCase? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CreditNotesState())
     val state: StateFlow<CreditNotesState> = _state.asStateFlow()
@@ -257,24 +260,37 @@ class CreditNotesViewModel(
                 )
 
             creditNoteRepository.createCreditNote(payload).fold(
-                onSuccess = { response ->
-                    val processedDetail = processFiscalIfNeeded(response.detail)
-                    loadCreditNotes()
-                    _state.update {
-                        it.copy(
-                            isSubmitting = false,
-                            mode = CreditNotesMode.LIST,
-                            selectedInvoice = null,
-                            form = CreditNoteFormState(),
-                            selectedCreditNote = processedDetail,
-                            showCreditNoteDetail = true,
-                            successMessage = "Nota de crédito ${response.codigo} generada correctamente",
-                        )
-                    }
-                },
+                onSuccess = { response -> handleCreateSuccess(response) },
                 onFailure = { error ->
                     _state.update { it.copy(isSubmitting = false, error = error.message ?: "No se pudo crear la nota de crédito") }
                 },
+            )
+        }
+    }
+
+    private suspend fun handleCreateSuccess(response: CreateCreditNoteResponseDto) {
+        val processedDetail = processFiscalIfNeeded(response.detail)
+        loadCreditNotes()
+        if (response.success && processedDetail.fiscalStatus == CreditNoteFiscalStatusDto.CONFIRMADA) {
+            printCreditNoteTicket?.invoke(processedDetail)
+        }
+        val isRejected = !response.success || response.fiscalStatus == CreditNoteFiscalStatusDto.RECHAZADA
+        val displayMsg =
+            if (isRejected) {
+                response.fiscalMessage ?: "La nota de crédito fue rechazada"
+            } else {
+                "Nota de crédito ${response.codigo} generada correctamente"
+            }
+        _state.update {
+            it.copy(
+                isSubmitting = false,
+                mode = CreditNotesMode.LIST,
+                selectedInvoice = null,
+                form = CreditNoteFormState(),
+                selectedCreditNote = processedDetail,
+                showCreditNoteDetail = true,
+                successMessage = if (!isRejected) displayMsg else null,
+                error = if (isRejected) displayMsg else null,
             )
         }
     }
@@ -301,6 +317,23 @@ class CreditNotesViewModel(
                 )
             }
             loadCreditNotes()
+        }
+    }
+
+    fun printSelectedCreditNoteTicket() {
+        val detail = _state.value.selectedCreditNote ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(isSubmitting = true, error = null) }
+            printCreditNoteTicket?.invoke(detail)?.fold(
+                onSuccess = {
+                    _state.update { it.copy(isSubmitting = false, successMessage = "Comprobante impreso correctamente") }
+                },
+                onFailure = { error ->
+                    _state.update {
+                        it.copy(isSubmitting = false, error = error.message ?: "No se pudo imprimir el comprobante")
+                    }
+                },
+            ) ?: _state.update { it.copy(isSubmitting = false) }
         }
     }
 

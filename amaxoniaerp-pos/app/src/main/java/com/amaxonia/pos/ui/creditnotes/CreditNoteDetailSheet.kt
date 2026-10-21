@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.rounded.Inventory2
@@ -51,6 +52,7 @@ internal fun CreditNoteDetailSheet(
     detail: CreditNoteDetailDto,
     isSubmitting: Boolean,
     onProcessFiscal: () -> Unit,
+    onPrintTicket: (() -> Unit)? = null,
     currencySymbol: String = "$",
     isPanama: Boolean = false,
 ) {
@@ -72,6 +74,10 @@ internal fun CreditNoteDetailSheet(
             CreditNoteDetailObservacionCard(observacion = detail.observacion)
         }
 
+        if (detail.fiscalStatus == CreditNoteFiscalStatusDto.RECHAZADA && detail.informacionInteres.isNotBlank()) {
+            CreditNoteDetailRechazoCard(motivo = detail.informacionInteres)
+        }
+
         CreditNoteDetailProductsCard(
             lines = detail.lines,
             currencySymbol = currencySymbol,
@@ -86,6 +92,11 @@ internal fun CreditNoteDetailSheet(
             ProcessFiscalButton(
                 isSubmitting = isSubmitting,
                 onClick = onProcessFiscal,
+            )
+        } else if (detail.fiscalStatus == CreditNoteFiscalStatusDto.CONFIRMADA && onPrintTicket != null) {
+            PrintTicketButton(
+                isSubmitting = isSubmitting,
+                onClick = onPrintTicket,
             )
         }
     }
@@ -454,6 +465,71 @@ private fun ProcessFiscalButton(
             Icon(Icons.Default.Print, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
             Text("Procesar nota de crédito fiscal", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** Botón para imprimir o reimprimir el comprobante térmico de la nota de crédito. */
+@Composable
+private fun PrintTicketButton(
+    isSubmitting: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = !isSubmitting,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors =
+            ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+    ) {
+        if (isSubmitting) {
+            CircularProgressIndicator(color = PosPalette.FixedWhite, modifier = Modifier.size(24.dp))
+        } else {
+            Icon(Icons.Default.Print, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Imprimir comprobante", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** Tarjeta que muestra el motivo del rechazo devuelto por el PAC o DGI. */
+@Composable
+private fun CreditNoteDetailRechazoCard(motivo: String) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Motivo del rechazo",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+            Text(
+                text = motivo,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
     }
 }

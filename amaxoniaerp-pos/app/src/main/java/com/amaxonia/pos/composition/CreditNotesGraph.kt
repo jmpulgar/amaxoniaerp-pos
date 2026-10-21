@@ -1,5 +1,6 @@
 package com.amaxonia.pos.composition
 
+import com.amaxonia.pos.data.printer.DefaultCreditNoteTicketPrinter
 import com.amaxonia.pos.domain.usecase.creditnote.ProcessCreditNoteFiscalUseCase
 import com.amaxonia.pos.ui.creditnotes.CreditNotesViewModel
 
@@ -20,5 +21,11 @@ object CreditNotesGraph {
                     DependencyContainer.posConfigurationRepository,
                 ),
             contextReader = DependencyContainer.posConfigurationRepository,
+            printCreditNoteTicket =
+                DefaultCreditNoteTicketPrinter(
+                    printerProvider = DependencyContainer.printerFactory,
+                    localStore = DependencyContainer.localStore,
+                    contextProvider = { DependencyContainer.syncAppContext() },
+                ),
         )
 }

@@ -19,6 +19,8 @@ data class CreditNoteSummary(
     val fiscalNumber: String = "",
     val printerSerial: String = "",
     val observacion: String = "",
+    val cufe: String = "",
+    val qr: String = "",
 )
 
 @Serializable
@@ -47,6 +49,11 @@ data class CreditNoteDetailResponse(
     val anulaFacturaCompleta: Boolean,
     val lines: List<CreditNoteDetailLine>,
     val fiscalDocument: CreditNoteFiscalDocument? = null,
+    val cufe: String = "",
+    val qr: String = "",
+    val nroProtocoloAutorizacion: String = "",
+    val fechaRecepcionDGI: String = "",
+    val informacionInteres: String = "",
 )
 
 @Serializable

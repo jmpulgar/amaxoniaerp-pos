@@ -246,6 +246,30 @@ class TheFactoryHkaPayloadBuilderTest {
         assertEquals("PANAMA", direccion)
     }
 
+    @Test
+    fun `single digit sucursal and punto facturacion are padded with leading zeroes`() {
+        val ctx =
+            context().copy(
+                codigoSucursalEmisor = "1",
+                puntoFacturacionFiscal = "1",
+            )
+        val payload = builderFijo().build(ctx)
+        assertEquals("0001", payload.documento.codigoSucursalEmisor)
+        assertEquals("001", payload.documento.datosTransaccion.puntoFacturacionFiscal)
+    }
+
+    @Test
+    fun `already formatted sucursal and punto facturacion preserve format`() {
+        val ctx =
+            context().copy(
+                codigoSucursalEmisor = "0001",
+                puntoFacturacionFiscal = "001",
+            )
+        val payload = builderFijo().build(ctx)
+        assertEquals("0001", payload.documento.codigoSucursalEmisor)
+        assertEquals("001", payload.documento.datosTransaccion.puntoFacturacionFiscal)
+    }
+
     private fun builderFijo(): TheFactoryHkaPayloadBuilder =
         TheFactoryHkaPayloadBuilder(
             Clock.fixed(Instant.parse("2026-09-03T19:00:00Z"), ZoneId.of("America/Panama")),

@@ -111,6 +111,7 @@ fun CreditNotesScreen(
     CreditNoteDetailSheetOverlay(
         state = state,
         onProcessFiscal = viewModel::processSelectedCreditNoteFiscal,
+        onPrintTicket = viewModel::printSelectedCreditNoteTicket,
         onDismiss = viewModel::dismissCreditNoteDetail,
     )
 
@@ -352,6 +353,7 @@ private fun CreditNotesSnackbarEffects(
 private fun CreditNoteDetailSheetOverlay(
     state: CreditNotesState,
     onProcessFiscal: () -> Unit,
+    onPrintTicket: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val selectedCreditNote = state.selectedCreditNote
@@ -365,6 +367,7 @@ private fun CreditNoteDetailSheetOverlay(
                 detail = selectedCreditNote,
                 isSubmitting = state.isSubmitting,
                 onProcessFiscal = onProcessFiscal,
+                onPrintTicket = onPrintTicket,
                 currencySymbol = state.currencySymbol,
                 isPanama = state.isPanama,
             )

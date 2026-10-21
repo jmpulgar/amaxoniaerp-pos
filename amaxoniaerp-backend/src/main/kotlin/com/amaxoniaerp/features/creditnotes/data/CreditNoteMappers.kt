@@ -56,6 +56,11 @@ internal fun buildDetailResponse(
                         )
                     },
             ),
+        cufe = header.cufe,
+        qr = header.qr,
+        nroProtocoloAutorizacion = header.nroProtocoloAutorizacion,
+        fechaRecepcionDGI = header.fechaRecepcionDGI,
+        informacionInteres = header.informacionInteres,
     )
 
 internal fun mapSummaryRow(
@@ -109,6 +114,8 @@ internal fun mapSummaryRow(
         printerSerial =
             if (headerTable is CreditNoteHeaderTableVE) row[headerTable.impresoraSerial].orEmpty() else "",
         observacion = row[headerTable.observacion].orEmpty(),
+        cufe = row[headerTable.cufe].orEmpty(),
+        qr = row[headerTable.qr].orEmpty(),
     )
 }
 
@@ -169,6 +176,11 @@ internal fun mapHeaderContext(
             },
         originalInvoiceDate = row[CreditNoteFacturaTable.fechaFactura],
         anulaFacturaCompleta = row[headerTable.total].compareTo(row[CreditNoteFacturaTable.totalTotalFactura]) == 0,
+        cufe = row[headerTable.cufe].orEmpty(),
+        qr = row[headerTable.qr].orEmpty(),
+        nroProtocoloAutorizacion = row[headerTable.nroProtocoloAutorizacion].orEmpty(),
+        fechaRecepcionDGI = row[headerTable.fechaRecepcionDGI]?.let(::formatDateTime).orEmpty(),
+        informacionInteres = row[headerTable.informacionInteres].orEmpty(),
     )
 }
 

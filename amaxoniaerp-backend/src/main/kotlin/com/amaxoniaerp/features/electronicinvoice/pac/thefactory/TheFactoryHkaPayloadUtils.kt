@@ -12,6 +12,8 @@ private const val ITBMS_RATE_7 = 7.0
 private const val ITBMS_RATE_10 = 10.0
 private const val ITBMS_RATE_15 = 15.0
 private const val ISO_DATE_LENGTH = 10
+private const val BRANCH_CODE_LENGTH = 4
+private const val BILLING_POINT_LENGTH = 3
 
 /**
  * Mapea el porcentaje de IVA/ITBMS al código del catálogo The Factory.
@@ -42,6 +44,30 @@ internal fun normalizeTipoClienteFE(value: String): String {
 internal fun normalizeToTwoDigits(value: String): String {
     val trimmed = value.trim()
     return if (trimmed.length == 1) "0$trimmed" else trimmed
+}
+
+/**
+ * Normaliza el código de sucursal emisor a 4 dígitos con ceros al frente (ej. "1" → "0001").
+ */
+internal fun normalizeCodigoSucursal(value: String?): String {
+    val trimmed = value?.trim().orEmpty()
+    return if (trimmed.isNotBlank() && trimmed.all(Char::isDigit) && trimmed.length <= BRANCH_CODE_LENGTH) {
+        trimmed.padStart(BRANCH_CODE_LENGTH, '0')
+    } else {
+        trimmed
+    }
+}
+
+/**
+ * Normaliza el punto de facturación fiscal a 3 dígitos con ceros al frente (ej. "1" → "001").
+ */
+internal fun normalizePuntoFacturacion(value: String?): String {
+    val trimmed = value?.trim().orEmpty()
+    return if (trimmed.isNotBlank() && trimmed.all(Char::isDigit) && trimmed.length <= BILLING_POINT_LENGTH) {
+        trimmed.padStart(BILLING_POINT_LENGTH, '0')
+    } else {
+        trimmed
+    }
 }
 
 /**

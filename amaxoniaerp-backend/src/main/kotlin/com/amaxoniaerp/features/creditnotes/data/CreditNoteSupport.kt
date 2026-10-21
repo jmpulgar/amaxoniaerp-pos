@@ -266,6 +266,11 @@ internal data class CreditNoteHeaderContext(
     val originalFiscalNumber: String,
     val originalInvoiceDate: LocalDate?,
     val anulaFacturaCompleta: Boolean,
+    val cufe: String = "",
+    val qr: String = "",
+    val nroProtocoloAutorizacion: String = "",
+    val fechaRecepcionDGI: String = "",
+    val informacionInteres: String = "",
 )
 
 /** Filtros de listado de notas de crédito (paginación + búsqueda + rango de fechas). */
