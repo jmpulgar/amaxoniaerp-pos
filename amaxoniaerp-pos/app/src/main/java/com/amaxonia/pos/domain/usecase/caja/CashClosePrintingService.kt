@@ -60,6 +60,6 @@ class CashClosePrintingService(
 
     private companion object {
         val TICKET_COUNTRIES = setOf("PA", "VE")
-        val TICKET_PRINTER_TYPES = setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
+        val TICKET_PRINTER_TYPES = setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT, PrinterType.SENRAISE_H10S)
     }
 }

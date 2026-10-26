@@ -30,10 +30,10 @@ internal fun buildCliente(ctx: InvoiceFEContext): TheFactoryHkaCliente {
         tipoClienteFE = tipoClienteFE,
         tipoContribuyente = tipoContribuyenteFor(esExtranjero, tipoClienteFE, cliente.tipoContribuyente),
         numeroRUC = rucFor(esExtranjero, cliente.identificacion),
-        digitoVerificadorRUC = if (esExtranjero) null else cliente.dv,
+        digitoVerificadorRUC = dvFor(esExtranjero, tipoClienteFE, cliente.dv),
         razonSocial = cliente.nombre,
         direccion = direccionFor(tipoClienteFE, cliente.direccion),
-        codigoUbicacion = cliente.codigoUbicacion,
+        codigoUbicacion = if (esExtranjero) null else cliente.codigoUbicacion?.takeIf { it.isNotBlank() },
         telefono1 = telefonoFor(cliente.telefono),
         correoElectronico1 = correoFor(ctx.factura.tipoFactura, correoBase),
         tipoIdentificacion = if (esExtranjero) "01" else null,
@@ -72,6 +72,18 @@ private fun tipoContribuyenteFor(
         tipoClienteFE == "02" && tipoContribuyente in setOf("", "0", "2") -> "1"
         tipoClienteFE == "02" -> "1"
         else -> tipoContribuyente
+    }
+
+private fun dvFor(
+    esExtranjero: Boolean,
+    tipoClienteFE: String,
+    rawDv: String?,
+): String? =
+    when {
+        esExtranjero -> null
+        !rawDv.isNullOrBlank() -> rawDv.trim()
+        tipoClienteFE == "02" -> "00"
+        else -> "00"
     }
 
 // RUC: si es extranjero, vaciar. Si tiene menos de 5 chars, enviar "00000"

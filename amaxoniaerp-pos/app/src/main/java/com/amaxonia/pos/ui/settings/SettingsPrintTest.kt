@@ -170,7 +170,7 @@ internal suspend fun runPrintTest(
         val saveResult = viewModel.persistTheFactorySettings(requireGatewaySelection = false)
         if (saveResult.isFailure) return
     }
-    if (printerType == PrinterType.SUNMI_V2 || printerType == PrinterType.IMIN_SWIFT) {
+    if (printerType in setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT, PrinterType.SENRAISE_H10S)) {
         printTicketTestReceipt(printerType, brandPrintTestMessage, snackbarHostState)
     } else {
         printGenericTestReceipt(snackbarHostState)
@@ -184,7 +184,12 @@ private suspend fun printTicketTestReceipt(
     snackbarHostState: SnackbarHostState,
 ) {
     val ticketPrinter = AppGraph.settings.activeTicketPrinter()
-    val brand = if (printerType == PrinterType.IMIN_SWIFT) "iMin Swift" else "SUNMI"
+    val brand =
+        when (printerType) {
+            PrinterType.IMIN_SWIFT -> "iMin Swift"
+            PrinterType.SENRAISE_H10S -> "Senraise H10S"
+            else -> "SUNMI"
+        }
     val result = ticketPrinter?.printText(brandPrintTestMessage)
     if (result is PrintResult.Success) {
         snackbarHostState.showSnackbar(

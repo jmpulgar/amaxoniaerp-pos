@@ -53,6 +53,15 @@ class PanamaInvoiceTicketFormatterTest {
     }
 
     @Test
+    fun printsObservacionWhenPresent() {
+        val payload = payload().copy(observacion = "Entregar en puerta trasera")
+        val ticket = PanamaInvoiceTicketFormatter().format(payload)
+        val textElements = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+
+        assertTrue(textElements.contains("Observación: Entregar en puerta trasera"))
+    }
+
+    @Test
     fun supportsNullableOptionalFields() {
         val payload = payload().copy(cliente = null, vendedor = null, qrUrl = null, cufe = null)
         val ticket = PanamaInvoiceTicketFormatter().format(payload)

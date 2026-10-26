@@ -69,7 +69,7 @@ data class Client(
 
 @Serializable
 data class CreateClientRequest(
-    val identification: String,
+    val identification: String = "",
     val name: String,
     val lastName: String = "",
     val address: String = "",
@@ -125,6 +125,7 @@ data class CreateClientRequest(
     val alterna: String = "",
     val alterna2: String = "",
     val status: Boolean = true,
+    val sellerId: Int? = null,
 )
 
 @Serializable

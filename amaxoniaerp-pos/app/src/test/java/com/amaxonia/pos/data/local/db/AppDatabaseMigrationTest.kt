@@ -31,6 +31,7 @@ import java.io.File
 class AppDatabaseMigrationTest {
     private lateinit var context: Context
     private val usedDatabases = mutableListOf<String>()
+    private var testCounter = 0
 
     @Before
     fun setUp() {
@@ -39,7 +40,7 @@ class AppDatabaseMigrationTest {
 
     @After
     fun tearDown() {
-        usedDatabases.forEach { context.deleteDatabase(it) }
+        usedDatabases.forEach { runCatching { context.deleteDatabase(it) } }
     }
 
     @Test
@@ -196,12 +197,13 @@ class AppDatabaseMigrationTest {
     }
 
     private fun openMigratedFrom(startVersion: Int): AppDatabase {
-        val name = "migration-from-$startVersion.db"
+        val name = "migration-from-$startVersion-${++testCounter}.db"
         usedDatabases += name
         createLegacyDatabase(name, startVersion)
         val db =
             Room
                 .databaseBuilder(context, AppDatabase::class.java, name)
+                .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
                 .addMigrations(*AppDatabase.ALL_MIGRATIONS)
                 .allowMainThreadQueries()
                 .build()

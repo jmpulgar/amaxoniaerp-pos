@@ -69,9 +69,19 @@ internal class ClientsHandlers(
                     ?.split(',')
                     ?.mapNotNull { it.trim().toIntOrNull() }
                     ?.filter { it > 0 }
+            val sellerId = call.request.queryParameters["sellerId"]?.toIntOrNull()
 
             val companyDb = ctx.connectDatabase()
-            val (clients, total) = clientsRepository.listClients(companyDb, limit, offset, search, includeTotal, branchIds)
+            val (clients, total) =
+                clientsRepository.listClients(
+                    companyDb,
+                    limit,
+                    offset,
+                    search,
+                    includeTotal,
+                    branchIds,
+                    sellerId,
+                )
             call.respond(ClientsListResponse(data = clients, total = total))
         }
 
@@ -140,12 +150,21 @@ internal class ClientsHandlers(
             val ctx = call.resolveCompanyRequestContext() ?: return@run
 
             val request = call.receive<CreateClientRequest>()
-            if (request.identification.isBlank() || request.name.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "RUC and Name are required"))
+            if (request.name.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Name is required"))
                 return@run
             }
 
             val companyDb = ctx.connectDatabase()
+
+            if (request.sellerId != null) {
+                val canCreate = clientsRepository.canSellerCreateClients(companyDb, request.sellerId)
+                if (!canCreate) {
+                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "El vendedor no tiene permiso para crear clientes"))
+                    return@run
+                }
+            }
+
             val client = clientsRepository.createClient(companyDb, ctx.countryCode, request)
             call.respond(HttpStatusCode.Created, client)
         }

@@ -34,6 +34,7 @@ data class FacturaPrintPayloadDto(
     val puntoFacturacionFiscal: String? = null,
     val codigoSucursal: String? = null,
     val protocoloAutorizacion: String? = null,
+    val observacion: String? = null,
     /**
      * FASE 2.3b — Venezuela digital.
      *

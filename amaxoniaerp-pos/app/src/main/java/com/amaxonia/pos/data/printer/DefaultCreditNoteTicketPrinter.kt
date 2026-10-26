@@ -7,6 +7,7 @@ import androidx.core.content.FileProvider
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
+import com.amaxonia.pos.data.local.readTicketFontSize
 import com.amaxonia.pos.data.printer.panama.PanamaCreditNoteTicketFormatter
 import com.amaxonia.pos.data.printer.pdf.TicketPdfGenerator
 import com.amaxonia.pos.domain.model.creditnote.CreditNoteDetailDto
@@ -41,7 +42,8 @@ class DefaultCreditNoteTicketPrinter(
         return if (printer != null) {
             printWithPhysicalPrinter(printer, ticket)
         } else {
-            generateAndOpenPdf(detail, ticket)
+            val fontSize = localStore.readTicketFontSize()
+            generateAndOpenPdf(detail, ticket, fontSize)
         }
     }
 
@@ -57,10 +59,11 @@ class DefaultCreditNoteTicketPrinter(
     private fun generateAndOpenPdf(
         detail: CreditNoteDetailDto,
         ticket: TicketDocument,
+        fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize = com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL,
     ): Result<Unit> =
         runCatching {
             val context = contextProvider()
-            val pdfBytes = TicketPdfGenerator.generatePdf(ticket)
+            val pdfBytes = TicketPdfGenerator.generatePdf(ticket, fontSize)
             val noteCode = detail.codigo.ifBlank { detail.id }
             val cleanName = noteCode.replace('/', '_').replace('\\', '_')
             val pdfFile =

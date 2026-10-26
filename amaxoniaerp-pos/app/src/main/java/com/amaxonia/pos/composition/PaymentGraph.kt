@@ -8,10 +8,12 @@ import com.amaxonia.pos.data.local.readActiveCajaForToday
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.readNoPrinterPdfFormat
 import com.amaxonia.pos.data.local.readSelectedPrinterType
+import com.amaxonia.pos.data.local.readTicketFontSize
 import com.amaxonia.pos.data.local.saveLastPaymentSuccess
 import com.amaxonia.pos.data.printer.LocalInvoicePrintPayloadMapper
 import com.amaxonia.pos.data.printer.panama.PanamaInvoiceTicketFormatter
 import com.amaxonia.pos.data.printer.pdf.TicketPdfGenerator
+import com.amaxonia.pos.data.printer.senraise.SenraiseDeviceDetector
 import com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
 import com.amaxonia.pos.data.printer.venezuela.VenezuelaInvoiceTicketFormatter
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
@@ -77,11 +79,7 @@ object PaymentGraph {
         transactionId: String,
     ): Result<String> {
         val selectedPrinter = DependencyContainer.localStore.readSelectedPrinterType()
-        val isTicketDevice =
-            selectedPrinter in setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT) ||
-                SunmiDeviceDetector.isSunmiDevice() ||
-                com.amaxonia.pos.data.printer.imin.IminDeviceDetector
-                    .isIminDevice()
+        val isTicketDevice = isTicketPrinterDevice(selectedPrinter)
 
         return when {
             isTicketDevice -> printSunmiTicket(transactionId)
@@ -139,9 +137,10 @@ object PaymentGraph {
                 "VE" -> VenezuelaInvoiceTicketFormatter().format(payload)
                 else -> PanamaInvoiceTicketFormatter().format(payload, countryCode)
             }
+        val ticketFontSize = DependencyContainer.localStore.readTicketFontSize()
 
         return runCatching {
-            val pdfBytes = TicketPdfGenerator.generatePdf(ticket)
+            val pdfBytes = TicketPdfGenerator.generatePdf(ticket, ticketFontSize)
             val invoiceNumber = payload.numeroFactura.ifBlank { transactionId }
             val cleanName = invoiceNumber.replace('/', '_').replace('\\', '_')
             val pdfFile =
@@ -171,11 +170,7 @@ object PaymentGraph {
     }
 
     suspend fun printSuccessReceipt(transactionId: String): Result<String> =
-        if (DependencyContainer.localStore.readSelectedPrinterType() in setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT) ||
-            SunmiDeviceDetector.isSunmiDevice() ||
-            com.amaxonia.pos.data.printer.imin.IminDeviceDetector
-                .isIminDevice()
-        ) {
+        if (isTicketPrinterDevice(DependencyContainer.localStore.readSelectedPrinterType())) {
             printSunmiTicket(transactionId)
         } else {
             printGenericReceipt(transactionId)
@@ -293,4 +288,14 @@ object PaymentGraph {
             onFailure = { Result.failure(it) },
         )
     }
+
+    private fun isTicketPrinterDevice(selectedPrinter: PrinterType): Boolean =
+        selectedPrinter in TICKET_PRINTER_TYPES || isHardwareTicketDevice()
+
+    private fun isHardwareTicketDevice(): Boolean =
+        SunmiDeviceDetector.isSunmiDevice() ||
+            com.amaxonia.pos.data.printer.imin.IminDeviceDetector.isIminDevice() ||
+            SenraiseDeviceDetector.isSenraiseDevice()
+
+    private val TICKET_PRINTER_TYPES = setOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT, PrinterType.SENRAISE_H10S)
 }

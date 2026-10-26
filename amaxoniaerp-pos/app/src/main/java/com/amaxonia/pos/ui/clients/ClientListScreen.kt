@@ -73,12 +73,14 @@ fun ClientListScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ClientsTopBar(title = "Clientes", onBack = onBack) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onNavigateToForm(null) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Nuevo Cliente")
+            if (state.canCreateClients) {
+                FloatingActionButton(
+                    onClick = { onNavigateToForm(null) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Nuevo Cliente")
+                }
             }
         },
     ) { padding ->

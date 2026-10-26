@@ -8,4 +8,5 @@ enum class PrinterType(
     GENERIC_BLUETOOTH("Genérica (Bluetooth)"),
     SUNMI_V2("Terminal Sunmi V2"),
     IMIN_SWIFT("Terminal iMin Swift 2"),
+    SENRAISE_H10S("Terminal Senraise H10S"),
 }

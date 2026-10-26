@@ -13,8 +13,21 @@ object PrinterTypePolicy {
             )
         val countryCode = country?.code?.uppercase()
         return when (countryCode) {
-            "VE" -> base + listOf(PrinterType.THE_FACTORY_HKA, PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
-            PANAMA_CODE -> base + listOf(PrinterType.SUNMI_V2, PrinterType.IMIN_SWIFT)
+            "VE" ->
+                base +
+                    listOf(
+                        PrinterType.THE_FACTORY_HKA,
+                        PrinterType.SUNMI_V2,
+                        PrinterType.IMIN_SWIFT,
+                        PrinterType.SENRAISE_H10S,
+                    )
+            PANAMA_CODE ->
+                base +
+                    listOf(
+                        PrinterType.SUNMI_V2,
+                        PrinterType.IMIN_SWIFT,
+                        PrinterType.SENRAISE_H10S,
+                    )
             else -> base
         }
     }
@@ -33,6 +46,7 @@ object PrinterTypePolicy {
                 when (printerType) {
                     PrinterType.SUNMI_V2,
                     PrinterType.IMIN_SWIFT,
+                    PrinterType.SENRAISE_H10S,
                     -> "Esta impresora de tickets solo está disponible para Panamá y Venezuela."
                     PrinterType.THE_FACTORY_HKA -> "The Factory HKA solo está disponible para Venezuela."
                     else -> "La impresora seleccionada no está disponible para el país configurado."

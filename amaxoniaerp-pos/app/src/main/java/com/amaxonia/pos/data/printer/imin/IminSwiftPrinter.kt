@@ -1,16 +1,20 @@
 package com.amaxonia.pos.data.printer.imin
 
 import android.content.Context
+import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readTicketFontSize
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.TicketAlign
 import com.amaxonia.pos.domain.model.printer.TicketDocument
 import com.amaxonia.pos.domain.model.printer.TicketElement
+import com.amaxonia.pos.domain.model.printer.TicketFontSize
 import com.amaxonia.pos.domain.model.printer.TicketPrinter
 import com.imin.printer.PrinterHelper
 
 class IminSwiftPrinter(
     context: Context,
     private val manager: IminPrinterManager = IminPrinterManager(context),
+    private val localStore: LocalStore? = null,
 ) : TicketPrinter {
     override suspend fun connect(): PrintResult =
         if (manager.bind()) PrintResult.Success else PrintResult.Error("No se pudo conectar con la impresora iMin Swift")
@@ -24,26 +28,30 @@ class IminSwiftPrinter(
         return manager.bind()
     }
 
-    override suspend fun printText(text: String): PrintResult =
-        withPrinter { helper ->
+    override suspend fun printText(text: String): PrintResult {
+        val dimensions = IminFontSize.dimensionsFor(resolveFontSize())
+        return withPrinter { helper ->
             helper.initPrinterParams()
+            helper.setTextBitmapSize(dimensions.regular)
             helper.printText(text + "\n", null)
             helper.printAndFeedPaper(FEED_LINES_SHORT)
         }
+    }
 
-    override suspend fun printTicket(ticket: TicketDocument): PrintResult =
-        withPrinter { helper ->
+    override suspend fun printTicket(ticket: TicketDocument): PrintResult {
+        val dimensions = IminFontSize.dimensionsFor(resolveFontSize())
+        return withPrinter { helper ->
             helper.initPrinterParams()
             ticket.elements.forEach { element ->
                 when (element) {
                     is TicketElement.Text -> {
-                        helper.setTextBitmapSize(if (element.bold) FONT_SIZE_BOLD else FONT_SIZE_REGULAR)
+                        helper.setTextBitmapSize(if (element.bold) dimensions.bold else dimensions.regular)
                         helper.setTextBitmapStyle(if (element.bold) 1 else 0)
                         helper.printTextWithAli(element.value + "\n", element.align.toIminAlign(), null)
                     }
 
                     is TicketElement.Columns -> {
-                        val sizes = IntArray(element.values.size) { FONT_SIZE_REGULAR }
+                        val sizes = IntArray(element.values.size) { dimensions.regular }
                         helper.printColumnsString(
                             element.values.toTypedArray(),
                             element.widths.toIntArray(),
@@ -54,7 +62,7 @@ class IminSwiftPrinter(
                     }
 
                     is TicketElement.TotalsRow -> {
-                        helper.setTextBitmapSize(if (element.bold) FONT_SIZE_TOTALS_BOLD else FONT_SIZE_TOTALS_REGULAR)
+                        helper.setTextBitmapSize(if (element.bold) dimensions.totalsBold else dimensions.totalsRegular)
                         helper.setTextBitmapStyle(if (element.bold) 1 else 0)
                         helper.printTextWithAli(element.formatMonospacedLine() + "\n", 0, null)
                     }
@@ -79,6 +87,10 @@ class IminSwiftPrinter(
             helper.printAndFeedPaper(FEED_LINES_TRAILING)
             runCatching { helper.partialCutAndFeedPaper(10) }
         }
+    }
+
+    private suspend fun resolveFontSize(): TicketFontSize =
+        localStore?.readTicketFontSize() ?: TicketFontSize.NORMAL
 
     private suspend fun withPrinter(block: (PrinterHelper) -> Unit): PrintResult {
         if (!manager.bind()) return PrintResult.Error("Servicio de impresión iMin no disponible")
@@ -99,14 +111,28 @@ class IminSwiftPrinter(
         }
 
     private companion object {
-        const val FONT_SIZE_REGULAR = 24
-        const val FONT_SIZE_BOLD = 28
-        const val FONT_SIZE_TOTALS_REGULAR = 24
-        const val FONT_SIZE_TOTALS_BOLD = 26
         const val FEED_UNIT_HEIGHT = 20
         const val FEED_LINES_SHORT = 40
         const val FEED_LINES_TRAILING = 80
     }
+}
+
+private data class IminFontDimensions(
+    val regular: Int,
+    val bold: Int,
+    val totalsRegular: Int,
+    val totalsBold: Int,
+)
+
+private object IminFontSize {
+    private val NORMAL = IminFontDimensions(regular = 20, bold = 24, totalsRegular = 20, totalsBold = 22)
+    private val COMPACT = IminFontDimensions(regular = 18, bold = 22, totalsRegular = 18, totalsBold = 20)
+
+    fun dimensionsFor(size: TicketFontSize): IminFontDimensions =
+        when (size) {
+            TicketFontSize.NORMAL -> NORMAL
+            TicketFontSize.COMPACT -> COMPACT
+        }
 }
 
 /** Formatea TotalsRow como una sola línea monoespaciada para papel de 58 mm. */

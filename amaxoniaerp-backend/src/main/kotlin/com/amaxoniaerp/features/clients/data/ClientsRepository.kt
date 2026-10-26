@@ -2,6 +2,7 @@ package com.amaxoniaerp.features.clients.data
 
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.core.time.BusinessClock
+import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.clients.domain.AccountStatementItem
 import com.amaxoniaerp.features.clients.domain.AccountStatementResponse
 import com.amaxoniaerp.features.clients.domain.Client
@@ -43,6 +44,59 @@ private fun String.fallback(
     default: String = "",
 ): String = this.ifBlank { existing?.takeIf { it.isNotBlank() } ?: default }
 
+private data class EffectiveClientValues(
+    val identification: String,
+    val dv: String,
+    val clientType: Int,
+    val taxpayerType: Int,
+    val country: Int,
+    val address: String,
+    val level1: String,
+    val level2: String,
+    val level3: String,
+    val phone: String,
+    val email: String,
+    val priceType: Int,
+)
+
+private fun resolveEffectiveClientValues(
+    request: CreateClientRequest,
+    defaultClient: Client?,
+): EffectiveClientValues {
+    val isConsumidorFinal = request.identification.isBlank() || request.identification == "00000"
+    return if (isConsumidorFinal && defaultClient != null) {
+        EffectiveClientValues(
+            identification = defaultClient.identification.ifBlank { "00000" },
+            dv = defaultClient.dv.ifBlank { "00" },
+            clientType = defaultClient.clientTypeId,
+            taxpayerType = defaultClient.taxpayerTypeId,
+            country = defaultClient.countryId,
+            address = defaultClient.address.ifBlank { "PANAMA" },
+            level1 = defaultClient.addressLevel1.ifBlank { "8" },
+            level2 = defaultClient.addressLevel2.ifBlank { "8-8" },
+            level3 = defaultClient.addressLevel3.ifBlank { "8-8-9" },
+            phone = defaultClient.phone.ifBlank { "9999-9999" },
+            email = defaultClient.email.ifBlank { "email@correo.com" },
+            priceType = defaultClient.codTipoPrecio,
+        )
+    } else {
+        EffectiveClientValues(
+            identification = request.identification.trim().ifBlank { "00000" },
+            dv = request.dv.trim().ifBlank { "00" },
+            clientType = if (request.clientTypeId > 0) request.clientTypeId else 2,
+            taxpayerType = if (request.taxpayerTypeId > 0) request.taxpayerTypeId else 1,
+            country = if (request.countryId > 0) request.countryId else DEFAULT_PANAMA_COUNTRY_ID,
+            address = request.address.trim().ifBlank { "PANAMA" },
+            level1 = request.addressLevel1.trim().ifBlank { "8" },
+            level2 = request.addressLevel2.trim().ifBlank { "8-8" },
+            level3 = request.addressLevel3.trim().ifBlank { "8-8-9" },
+            phone = request.phone.trim().ifBlank { "9999-9999" },
+            email = request.email.trim().ifBlank { "email@correo.com" },
+            priceType = if (request.codTipoPrecio > 0) request.codTipoPrecio else 2,
+        )
+    }
+}
+
 class ClientsRepository {
     private val log = LoggerFactory.getLogger(ClientsRepository::class.java)
 
@@ -53,12 +107,30 @@ class ClientsRepository {
         search: String?,
         includeTotal: Boolean,
         branchIds: List<Int>? = null,
+        sellerId: Int? = null,
     ): Pair<List<Client>, Long> =
         dbQuery(database) {
             val query = ClientsTable.selectAll()
 
             if (!branchIds.isNullOrEmpty()) {
                 query.andWhere { ClientsTable.idSucursal inList branchIds }
+            }
+
+            if (sellerId != null) {
+                val sellerRow =
+                    VendedorTable
+                        .select(VendedorTable.idClientes)
+                        .where { VendedorTable.idVendedor eq sellerId }
+                        .firstOrNull()
+                val rawClientIds = sellerRow?.getOrNull(VendedorTable.idClientes)?.trim().orEmpty()
+                if (rawClientIds.isNotBlank()) {
+                    val clientIds = rawClientIds.split(',').map { it.trim() }.filter { it.isNotBlank() }
+                    if (clientIds.isNotEmpty()) {
+                        query.andWhere {
+                            (ClientsTable.idCliente inList clientIds) or (ClientsTable.codCliente inList clientIds)
+                        }
+                    }
+                }
             }
 
             if (!search.isNullOrBlank()) {
@@ -110,34 +182,37 @@ class ClientsRepository {
                 generatedCode = codeInt.toString().padStart(CLIENT_CODE_LENGTH, '0')
             }
 
+            val defaultClient = runCatching { findDefaultClientDirect(countryCode) }.getOrNull()
+            val effective = resolveEffectiveClientValues(request, defaultClient)
+
             ClientsTable.insert {
                 it[idCliente] = newId
                 it[codCliente] = generatedCode
-                it[rif] = request.identification
+                it[rif] = effective.identification
                 it[nombre] = request.name.uppercase()
                 it[apellido] = request.lastName.uppercase()
-                it[dv] = request.dv
-                it[direccion] = request.address.uppercase()
-                it[direccionNivel1] = request.addressLevel1
-                it[direccionNivel2] = request.addressLevel2
-                it[direccionNivel3] = request.addressLevel3
+                it[dv] = effective.dv
+                it[direccion] = effective.address.uppercase()
+                it[direccionNivel1] = effective.level1
+                it[direccionNivel2] = effective.level2
+                it[direccionNivel3] = effective.level3
                 it[tipoIdentificacionExtranjera] = request.foreignAuthTypeId.takeIf { !it.isNullOrBlank() } ?: "01"
-                it[telefonos] = request.phone
-                it[email] = request.email
+                it[telefonos] = effective.phone
+                it[email] = effective.email
                 it[estado] = if (request.status) "A" else "I"
-                it[pais] = if (request.countryId > 0) request.countryId else DEFAULT_PANAMA_COUNTRY_ID
-                it[codTipoCliente] = if (request.clientTypeId > 0) request.clientTypeId else 1
-                it[tipoContribuyente] = if (request.taxpayerTypeId > 0) request.taxpayerTypeId else 1
+                it[pais] = effective.country
+                it[codTipoCliente] = effective.clientType
+                it[tipoContribuyente] = effective.taxpayerType
                 it[permiteCredito] = request.permiteCredito
                 it[limite] = request.limiteCredito
                 it[dias] = request.diasCredito
                 it[tolerancia] = request.tolerancia
                 it[porcParcial] = request.porcParcial
                 it[porcDescuentoGlobal] = request.porcDescuentoGlobal
-                it[codTipoPrecio] = if (request.codTipoPrecio > 0) request.codTipoPrecio else 2
-                it[cuentaContable] = request.cuentaContable.fallback(null, DEFAULT_ACCOUNT_NUMBER)
-                it[codVendedor] = request.codVendedor.fallback(null, DEFAULT_VENDOR_CODE)
-                it[codZona] = request.codZona.fallback(null, DEFAULT_ZONE_CODE)
+                it[codTipoPrecio] = effective.priceType
+                it[cuentaContable] = request.cuentaContable.fallback(defaultClient?.cuentaContable, DEFAULT_ACCOUNT_NUMBER)
+                it[codVendedor] = request.codVendedor.fallback(defaultClient?.codVendedor, DEFAULT_VENDOR_CODE)
+                it[codZona] = request.codZona.fallback(defaultClient?.codZona, DEFAULT_ZONE_CODE)
                 it[lugarEntrega] = request.lugarEntrega
                 it[contribuyenteEspecial] = request.contribuyenteEspecial
                 it[retenidoPorCliente] = request.retenidoPorCliente.fallback(null, DEFAULT_ZERO_AMOUNT_STRING)
@@ -152,12 +227,12 @@ class ClientsRepository {
                 it[actividad] = request.actividad
                 it[empresaZonaLibre] = request.empresaZonaLibre
                 it[pedidosOnline] = request.pedidosOnline
-                it[fnacimiento] = request.fnacimiento
+                it[fnacimiento] = request.fnacimiento.trim().ifBlank { "1970-01-01" }
                 it[genero] = request.genero
                 it[clienteFidelizacion] = request.clienteFidelizacion
                 it[clienteFidelizacionSucursal] = request.clienteFidelizacionSucursal
                 it[clienteFidelizacionNivel] = request.clienteFidelizacionNivel
-                it[clienteFidelizacionFecha] = request.clienteFidelizacionFecha
+                it[clienteFidelizacionFecha] = request.clienteFidelizacionFecha.trim().ifBlank { "1970-01-01 00:00:00" }
                 it[direccionCiudad] = request.direccionCiudad
                 it[localidad] = request.localidad
                 it[direccionSector] = request.direccionSector
@@ -172,6 +247,22 @@ class ClientsRepository {
                 it[fecha] = BusinessClock.todayForCountry(countryCode).toString()
             }
 
+            if (request.sellerId != null) {
+                val seller =
+                    VendedorTable
+                        .select(VendedorTable.idClientes)
+                        .where { VendedorTable.idVendedor eq request.sellerId }
+                        .firstOrNull()
+
+                if (seller != null) {
+                    val currentIds = seller[VendedorTable.idClientes]?.trim().orEmpty()
+                    val updatedIds = if (currentIds.isBlank()) newId else "$currentIds,$newId"
+                    VendedorTable.update({ VendedorTable.idVendedor eq request.sellerId }) {
+                        it[idClientes] = updatedIds
+                    }
+                }
+            }
+
             ClientsTable
                 .selectAll()
                 .where { ClientsTable.idCliente eq newId }
@@ -179,8 +270,8 @@ class ClientsRepository {
                 .singleOrNull() ?: Client(
                 id = newId,
                 code = generatedCode,
-                identification = request.identification,
-                dv = request.dv,
+                identification = effective.identification,
+                dv = effective.dv,
                 name = request.name,
                 lastName = request.lastName,
                 address = request.address,
@@ -291,13 +382,13 @@ class ClientsRepository {
         stmt[ClientsTable.actividad] = request.actividad.fallback(existing[ClientsTable.actividad])
         stmt[ClientsTable.empresaZonaLibre] = request.empresaZonaLibre
         stmt[ClientsTable.pedidosOnline] = request.pedidosOnline
-        stmt[ClientsTable.fnacimiento] = request.fnacimiento.fallback(existing[ClientsTable.fnacimiento])
+        stmt[ClientsTable.fnacimiento] = request.fnacimiento.fallback(existing[ClientsTable.fnacimiento], "1970-01-01")
         stmt[ClientsTable.genero] = request.genero.fallback(existing[ClientsTable.genero])
         stmt[ClientsTable.clienteFidelizacion] = request.clienteFidelizacion
         stmt[ClientsTable.clienteFidelizacionSucursal] = request.clienteFidelizacionSucursal
         stmt[ClientsTable.clienteFidelizacionNivel] = request.clienteFidelizacionNivel
         stmt[ClientsTable.clienteFidelizacionFecha] =
-            request.clienteFidelizacionFecha.fallback(existing[ClientsTable.clienteFidelizacionFecha])
+            request.clienteFidelizacionFecha.fallback(existing[ClientsTable.clienteFidelizacionFecha], "1970-01-01 00:00:00")
         stmt[ClientsTable.direccionCiudad] = request.direccionCiudad.fallback(existing[ClientsTable.direccionCiudad])
         stmt[ClientsTable.localidad] = request.localidad.fallback(existing[ClientsTable.localidad])
         stmt[ClientsTable.direccionSector] = request.direccionSector.fallback(existing[ClientsTable.direccionSector])
@@ -364,30 +455,34 @@ class ClientsRepository {
         countryCode: String,
     ): Client? =
         dbQuery(database) {
-            val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
-            val defaultCode =
-                parametrosTable
-                    .select(parametrosTable.defaultCodClienteFactura)
-                    .orderBy(parametrosTable.codEmpresa)
-                    .limit(1)
-                    .map { it[parametrosTable.defaultCodClienteFactura].trim() }
-                    .firstOrNull()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: return@dbQuery null
-
-            val candidates =
-                listOf(defaultCode, defaultCode.trimStart('0'))
-                    .filter { it.isNotBlank() }
-                    .distinct()
-
-            ClientsTable
-                .selectAll()
-                .andWhere { ClientsTable.codCliente inList candidates }
-                .orderBy(ClientsTable.codCliente)
-                .limit(1)
-                .map { row -> mapRowToClient(row) }
-                .singleOrNull()
+            findDefaultClientDirect(countryCode)
         }
+
+    private fun findDefaultClientDirect(countryCode: String): Client? {
+        val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)
+        val defaultCode =
+            parametrosTable
+                .select(parametrosTable.defaultCodClienteFactura)
+                .orderBy(parametrosTable.codEmpresa)
+                .limit(1)
+                .map { it[parametrosTable.defaultCodClienteFactura].trim() }
+                .firstOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+
+        val candidates =
+            listOf(defaultCode, defaultCode.trimStart('0'))
+                .filter { it.isNotBlank() }
+                .distinct()
+
+        return ClientsTable
+            .selectAll()
+            .andWhere { ClientsTable.codCliente inList candidates }
+            .orderBy(ClientsTable.codCliente)
+            .limit(1)
+            .map { row -> mapRowToClient(row) }
+            .singleOrNull()
+    }
 
     private fun getNextCode(): String {
         var maxCode = 0
@@ -873,4 +968,17 @@ class ClientsRepository {
             alterna2 = row.text(ClientsTable.alterna2),
         )
     }
+
+    suspend fun canSellerCreateClients(
+        database: Database,
+        sellerId: Int,
+    ): Boolean =
+        dbQuery(database) {
+            val seller =
+                VendedorTable
+                    .select(VendedorTable.crearClientes)
+                    .where { VendedorTable.idVendedor eq sellerId }
+                    .firstOrNull()
+            seller == null || seller[VendedorTable.crearClientes] != 0
+        }
 }

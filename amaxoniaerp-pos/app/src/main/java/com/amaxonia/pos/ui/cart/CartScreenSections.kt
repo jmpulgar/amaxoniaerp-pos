@@ -296,11 +296,13 @@ internal fun CartTopAppBar(
 internal fun CartBottomBarArea(
     state: CartState,
     viewModel: CartViewModel,
+    onObservacionClick: () -> Unit = {},
 ) {
     if (state.items.isNotEmpty()) {
         CartBottomBar(
             state = state,
             onSaveDraft = { viewModel.onAction(CartUiAction.SaveDraft) },
+            onObservacionClick = onObservacionClick,
             onCheckout = { viewModel.onAction(CartUiAction.Checkout) },
         )
     }

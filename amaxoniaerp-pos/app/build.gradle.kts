@@ -53,7 +53,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 8
-        versionName = "1.1.8"
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -123,6 +123,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     testOptions {

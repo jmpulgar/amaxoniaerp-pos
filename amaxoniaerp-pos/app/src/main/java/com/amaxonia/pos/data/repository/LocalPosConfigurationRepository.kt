@@ -18,11 +18,13 @@ import com.amaxonia.pos.data.local.saveAllowEditPrices
 import com.amaxonia.pos.data.local.saveAllowChangeSeller
 import com.amaxonia.pos.data.local.saveCustomerDisplayEnabled
 import com.amaxonia.pos.data.local.saveNoPrinterPdfFormat
+import com.amaxonia.pos.data.local.saveTicketFontSize
 import com.amaxonia.pos.data.local.saveSelectedPrinterType
 import com.amaxonia.pos.data.local.saveTheFactorySettings
 import com.amaxonia.pos.data.local.selectedCountryFlow
 import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
 import com.amaxonia.pos.data.local.theFactorySettingsFlow
+import com.amaxonia.pos.data.local.ticketFontSizeFlow
 import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.ServerCountry
 import com.amaxonia.pos.domain.model.payment.PaymentSuccessPayload
@@ -55,6 +57,8 @@ class LocalPosConfigurationRepository(
     override val customerDisplayEnabled: Flow<Boolean> = localStore.customerDisplayEnabledFlow()
     override val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat> =
         localStore.noPrinterPdfFormatFlow()
+    override val ticketFontSize: Flow<com.amaxonia.pos.domain.model.printer.TicketFontSize> =
+        localStore.ticketFontSizeFlow()
 
     override suspend fun currentAdminDatabase(): String =
         localStore
@@ -122,5 +126,9 @@ class LocalPosConfigurationRepository(
 
     override suspend fun saveNoPrinterPdfFormat(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat) {
         localStore.saveNoPrinterPdfFormat(format)
+    }
+
+    override suspend fun saveTicketFontSize(fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize) {
+        localStore.saveTicketFontSize(fontSize)
     }
 }

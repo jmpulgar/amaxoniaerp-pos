@@ -36,6 +36,8 @@ fun LocalStore.selectedPrinterTypeFlow(): Flow<PrinterType> =
                     .isSunmiDevice() -> PrinterType.SUNMI_V2
                 com.amaxonia.pos.data.printer.imin.IminDeviceDetector
                     .isIminDevice() -> PrinterType.IMIN_SWIFT
+                com.amaxonia.pos.data.printer.senraise.SenraiseDeviceDetector
+                    .isSenraiseDevice() -> PrinterType.SENRAISE_H10S
                 else -> PrinterType.NONE
             }
         val storedPrinter =
@@ -59,6 +61,22 @@ fun LocalStore.noPrinterPdfFormatFlow(): Flow<com.amaxonia.pos.domain.model.prin
         prefs[noPrinterPdfFormatKey]
             ?.let { stored -> com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.entries.firstOrNull { it.name == stored } }
             ?: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA
+    }
+
+suspend fun LocalStore.saveTicketFontSize(fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize) {
+    dataStore.edit { prefs ->
+        prefs[ticketFontSizeKey] = fontSize.name
+    }
+}
+
+suspend fun LocalStore.readTicketFontSize(): com.amaxonia.pos.domain.model.printer.TicketFontSize =
+    ticketFontSizeFlow().first()
+
+fun LocalStore.ticketFontSizeFlow(): Flow<com.amaxonia.pos.domain.model.printer.TicketFontSize> =
+    dataStore.data.map { prefs ->
+        prefs[ticketFontSizeKey]
+            ?.let { stored -> com.amaxonia.pos.domain.model.printer.TicketFontSize.entries.firstOrNull { it.name == stored } }
+            ?: com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL
     }
 
 suspend fun LocalStore.saveTheFactorySettings(settings: TheFactorySettings) {

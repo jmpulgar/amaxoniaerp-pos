@@ -68,6 +68,7 @@ internal fun printFacturaSql(
         f.facturar_a_direccion,
         f.facturar_a_telefono,
         f.usuario_creacion,
+        f.observacion,
         f.subtotal,
         f.totalizar_base_imponible,
         f.totalizar_monto_iva,
@@ -85,7 +86,7 @@ internal fun printFacturaSql(
     LEFT JOIN caja c ON c.id = f.id_caja
     LEFT JOIN sucursal s ON s.id = f.id_sucursal
     ${printClientBranchJoin(isPanama)}
-    WHERE f.id_factura = '${facturaId.sqlLiteral()}'
+    WHERE (f.id_factura = '${facturaId.sqlLiteral()}' OR f.cod_factura = '${facturaId.sqlLiteral()}')
     LIMIT 1
     """.trimIndent()
 
@@ -214,7 +215,10 @@ internal fun buildPrintResponse(ctx: PrintBuildContext): FacturaPrintPayloadResp
         puntoFacturacionFiscal = ctx.factura.stringOrNull("puntoFacturacionFiscal"),
         codigoSucursal = ctx.factura.stringOrNull("sucursal_codigo"),
         protocoloAutorizacion = ctx.factura.stringOrNull("nroProtocoloAutorizacion"),
+        observacion = ctx.factura.cleanedStringOrNull("observacion"),
         // FASE 2.3b — Exponer número de control HKA persistido (Venezuela digital).
         // En Panamá el SELECT emite NULL; aquí nunca se inventa un valor.
         numeroControlThka = ctx.factura.stringOrNull("numero_control_thka"),
     )
+
+private fun SqlRow.cleanedStringOrNull(column: String): String? = stringOrNull(column)?.trim()?.ifBlank { null }

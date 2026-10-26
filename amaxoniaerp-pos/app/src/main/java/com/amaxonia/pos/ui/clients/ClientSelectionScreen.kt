@@ -10,26 +10,37 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +63,7 @@ fun ClientSelectionScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    var showQuickCreateDialog by remember { mutableStateOf(false) }
 
     val reachedBottom: Boolean by remember {
         derivedStateOf {
@@ -64,9 +76,41 @@ fun ClientSelectionScreen(
         if (reachedBottom) viewModel.loadMoreClients()
     }
 
+    if (showQuickCreateDialog) {
+        QuickCreateClientDialog(
+            isSaving = state.isCreatingQuickClient,
+            errorMessage = state.quickClientError,
+            onDismiss = {
+                showQuickCreateDialog = false
+                viewModel.clearQuickClientError()
+            },
+            onConfirm = { name ->
+                viewModel.createQuickClient(name) { created ->
+                    showQuickCreateDialog = false
+                    viewModel.clearQuickClientError()
+                    onClientSelected(created)
+                }
+            },
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { ClientsTopBar(title = "Seleccionar Cliente", onBack = onBack) },
+        floatingActionButton = {
+            if (state.canCreateClients) {
+                FloatingActionButton(
+                    onClick = {
+                        viewModel.clearQuickClientError()
+                        showQuickCreateDialog = true
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Nuevo Cliente")
+                }
+            }
+        },
     ) { padding ->
         ClientSelectionContent(
             state = state,
@@ -186,4 +230,72 @@ fun ClientSelectionItem(
             )
         }
     }
+}
+
+@Composable
+private fun QuickCreateClientDialog(
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = {
+            Text(
+                text = "Nuevo cliente",
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Ingrese el nombre del cliente. Se registrará como consumidor final.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre del cliente") },
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank() && !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Text("Crear y seleccionar")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancelar")
+            }
+        },
+    )
 }

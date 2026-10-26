@@ -95,6 +95,11 @@ class CartStateCoordinator(
                 loadClientBranches(client, state)
             }
         }
+        scope.launch {
+            cartRepository.observacion.collect { obs ->
+                state.update { it.copy(observacion = obs) }
+            }
+        }
     }
 
     private fun observeSellersAndBranches(
@@ -243,6 +248,9 @@ class CartActionHandler(
             CartUiAction.SaveDraft -> saveDraft(scope, state)
             CartUiAction.ClearMessage -> state.update { it.copy(orderSuccessMessage = null) }
             CartUiAction.ClearActionError -> state.update { it.copy(cartActionError = null) }
+            is CartUiAction.UpdateObservacion -> {
+                cartRepository.setObservacion(action.observacion)
+            }
             CartUiAction.Checkout -> {
                 if (validateClientBranch(state, "Selecciona la sucursal del cliente antes de cobrar.")) {
                     effects.tryEmit(CartUiEffect.Checkout(state.value.total))

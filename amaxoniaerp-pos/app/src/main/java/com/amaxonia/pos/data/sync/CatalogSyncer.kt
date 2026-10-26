@@ -21,6 +21,7 @@ import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.setInitialSyncCompleted
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
+import com.amaxonia.pos.data.remote.ClientQueryParams
 import com.amaxonia.pos.data.remote.getAddressLevels
 import com.amaxonia.pos.data.remote.getClientSucursales
 import com.amaxonia.pos.data.remote.getClientTypes
@@ -87,10 +88,13 @@ class CatalogSyncer(
             val response =
                 apiService.getClients(
                     token = token,
-                    limit = pageSize,
-                    offset = offset,
-                    search = null,
-                    includeTotal = false,
+                    params =
+                        ClientQueryParams(
+                            limit = pageSize,
+                            offset = offset,
+                            search = null,
+                            includeTotal = false,
+                        ),
                 )
             if (response.data.isEmpty()) break
             clientDao.insertAll(response.data.map { it.toEntity() })

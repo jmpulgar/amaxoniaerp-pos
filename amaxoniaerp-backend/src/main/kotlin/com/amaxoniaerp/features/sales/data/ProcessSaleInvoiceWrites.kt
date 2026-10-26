@@ -12,6 +12,7 @@ import java.time.LocalDateTime
 private const val SHORT_CODE_LENGTH = 10
 private const val DEFAULT_TERM_PAYMENT_ID = 3
 private const val SEQUENCE_ID_MAX_LENGTH = 36
+private const val MAX_OBSERVATION_LENGTH = 300
 
 /** Contexto compartido por las escrituras de factura dentro de la transacción de venta. */
 internal data class SaleWriteContext(
@@ -63,7 +64,7 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.idShop] = f.idShop
         it[facturaTable.servicioPeriodo] = ""
         it[facturaTable.servicioOrden] = ""
-        it[facturaTable.observacion] = ""
+        it[facturaTable.observacion] = f.observacion.take(MAX_OBSERVATION_LENGTH)
         it[facturaTable.fechaVencimiento] = v.fechaVencimientoFactura
         it[facturaTable.servicioAnio] = ctx.today.year
         it[facturaTable.servicioMes] =

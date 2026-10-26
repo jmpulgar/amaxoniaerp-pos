@@ -326,6 +326,14 @@ class VenezuelaInvoiceTicketFormatterTest {
         assertTrue(textElements.any { it.contains("Harina PAN 1kg") })
     }
 
+    @Test
+    fun `21 - imprime observacion cuando esta presente`() {
+        val payloadWithObs = payload().copy(observacion = "Despachar con factura original")
+        val ticket = VenezuelaInvoiceTicketFormatter().format(payloadWithObs)
+        val textElements = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+        assertTrue(textElements.contains("Observación: Despachar con factura original"))
+    }
+
     // ─── Fixture ───────────────────────────────────────────────────────────
 
     private fun payload(): FacturaPrintPayloadDto =

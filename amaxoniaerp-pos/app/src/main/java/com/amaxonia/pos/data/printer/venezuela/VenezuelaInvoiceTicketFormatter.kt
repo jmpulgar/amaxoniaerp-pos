@@ -91,6 +91,7 @@ class VenezuelaInvoiceTicketFormatter {
             ?.let { add(labelValue("Caja:", it)) }
         add(labelValue("Factura:", payload.numeroFactura))
         payload.vendedor?.takeIfNotBlank()?.let { add(labelValue("Vendedor:", it)) }
+        payload.observacion?.takeIfNotBlank()?.let { add(TicketElement.Text("Observación: $it", TicketAlign.LEFT)) }
         add(TicketElement.Divider)
     }
 

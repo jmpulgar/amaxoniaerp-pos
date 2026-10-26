@@ -299,8 +299,9 @@ class FacturasRepository {
             }
 
             val factura = queryOne(printFacturaSql(facturaId, isPanama)) ?: return@dbQuery null
+            val resolvedFacturaId = factura.string("id_factura")
 
-            val productos = printProductos(facturaId)
+            val productos = printProductos(resolvedFacturaId)
 
             val subtotal = factura.decimal("subtotal")
             val baseImponible = factura.decimal("totalizar_base_imponible")
@@ -316,8 +317,8 @@ class FacturasRepository {
                     .fold(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)) { acc, producto ->
                         acc + (producto.descuento.toBigDecimalOrNull() ?: BigDecimal.ZERO)
                     }.setScale(2, RoundingMode.HALF_UP)
-            val pagos = printPagos(facturaId, factura, total)
-            val cambio = printCambio(facturaId)
+            val pagos = printPagos(resolvedFacturaId, factura, total)
+            val cambio = printCambio(resolvedFacturaId)
 
             buildPrintResponse(
                 PrintBuildContext(

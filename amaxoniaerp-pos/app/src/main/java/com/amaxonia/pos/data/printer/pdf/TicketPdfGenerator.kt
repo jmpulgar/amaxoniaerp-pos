@@ -11,6 +11,7 @@ import android.graphics.pdf.PdfDocument
 import com.amaxonia.pos.domain.model.printer.TicketAlign
 import com.amaxonia.pos.domain.model.printer.TicketDocument
 import com.amaxonia.pos.domain.model.printer.TicketElement
+import com.amaxonia.pos.domain.model.printer.TicketFontSize
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import java.io.ByteArrayOutputStream
@@ -24,16 +25,20 @@ object TicketPdfGenerator {
     private const val PADDING_HORIZONTAL_PT = 16f
     private const val PADDING_VERTICAL_PT = 24f
     private const val CONTENT_WIDTH_PT = PAGE_WIDTH_PT - (PADDING_HORIZONTAL_PT * 2f)
-    private const val FONT_SIZE_PT = 9.0f
-    private const val LINE_HEIGHT_PT = 13.0f
-    private const val BASELINE_OFFSET_PT = 10.0f
     private const val QR_SIZE_PT = 110f
 
-    fun generatePdf(ticket: TicketDocument): ByteArray {
+    private val NORMAL_METRICS = PdfFontMetrics(fontSizePt = 8.0f, lineHeightPt = 11.5f, baselineOffsetPt = 9.0f)
+    private val COMPACT_METRICS = PdfFontMetrics(fontSizePt = 7.0f, lineHeightPt = 10.0f, baselineOffsetPt = 8.0f)
+
+    fun generatePdf(
+        ticket: TicketDocument,
+        fontSize: TicketFontSize = TicketFontSize.NORMAL,
+    ): ByteArray {
+        val metrics = if (fontSize == TicketFontSize.COMPACT) COMPACT_METRICS else NORMAL_METRICS
         val textPaint =
             Paint().apply {
                 color = Color.BLACK
-                textSize = FONT_SIZE_PT
+                textSize = metrics.fontSizePt
                 typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
                 isAntiAlias = true
             }
@@ -59,13 +64,13 @@ object TicketPdfGenerator {
                 is TicketElement.Text -> {
                     val paint = if (element.bold) boldPaint else textPaint
                     val lines = wrapText(element.value, paint, CONTENT_WIDTH_PT)
-                    totalHeight += lines.size * LINE_HEIGHT_PT
+                    totalHeight += lines.size * metrics.lineHeightPt
                 }
                 is TicketElement.Columns -> {
-                    totalHeight += LINE_HEIGHT_PT
+                    totalHeight += metrics.lineHeightPt
                 }
                 is TicketElement.TotalsRow -> {
-                    totalHeight += LINE_HEIGHT_PT + 2f
+                    totalHeight += metrics.lineHeightPt + 2f
                 }
                 is TicketElement.Divider -> {
                     totalHeight += 12f
@@ -114,8 +119,8 @@ object TicketPdfGenerator {
                                 TicketAlign.CENTER -> PADDING_HORIZONTAL_PT + (CONTENT_WIDTH_PT - textWidth) / 2f
                                 TicketAlign.RIGHT -> PADDING_HORIZONTAL_PT + CONTENT_WIDTH_PT - textWidth
                             }
-                        canvas.drawText(line, drawX, currentY + BASELINE_OFFSET_PT, paint)
-                        currentY += LINE_HEIGHT_PT
+                        canvas.drawText(line, drawX, currentY + metrics.baselineOffsetPt, paint)
+                        currentY += metrics.lineHeightPt
                     }
                 }
                 is TicketElement.Columns -> {
@@ -132,17 +137,22 @@ object TicketPdfGenerator {
                                 TicketAlign.CENTER -> colX + (colW - textW) / 2f
                                 TicketAlign.RIGHT -> colX + colW - textW
                             }
-                        canvas.drawText(text, drawX, currentY + BASELINE_OFFSET_PT, textPaint)
+                        canvas.drawText(text, drawX, currentY + metrics.baselineOffsetPt, textPaint)
                         colX += colW
                     }
-                    currentY += LINE_HEIGHT_PT
+                    currentY += metrics.lineHeightPt
                 }
                 is TicketElement.TotalsRow -> {
                     val paint = if (element.bold) boldPaint else textPaint
-                    canvas.drawText(element.label, PADDING_HORIZONTAL_PT, currentY + BASELINE_OFFSET_PT, paint)
+                    canvas.drawText(element.label, PADDING_HORIZONTAL_PT, currentY + metrics.baselineOffsetPt, paint)
                     val valWidth = paint.measureText(element.value)
-                    canvas.drawText(element.value, PADDING_HORIZONTAL_PT + CONTENT_WIDTH_PT - valWidth, currentY + BASELINE_OFFSET_PT, paint)
-                    currentY += LINE_HEIGHT_PT + 2f
+                    canvas.drawText(
+                        element.value,
+                        PADDING_HORIZONTAL_PT + CONTENT_WIDTH_PT - valWidth,
+                        currentY + metrics.baselineOffsetPt,
+                        paint,
+                    )
+                    currentY += metrics.lineHeightPt + 2f
                 }
                 is TicketElement.Divider -> {
                     canvas.drawLine(
@@ -233,3 +243,9 @@ object TicketPdfGenerator {
             bitmap
         }.getOrNull()
 }
+
+private data class PdfFontMetrics(
+    val fontSizePt: Float,
+    val lineHeightPt: Float,
+    val baselineOffsetPt: Float,
+)

@@ -1,10 +1,12 @@
 package com.amaxoniaerp.features.clients.data
 
+import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -24,7 +26,7 @@ class ClientsRepositoryTest {
                 "org.h2.Driver",
             )
         transaction(database) {
-            SchemaUtils.create(ClientsTable)
+            SchemaUtils.create(ClientsTable, VendedorTable)
             insertClient(id = "client-credit", code = "000000001", permiteCredito = true, dias = 30)
             insertClient(id = "client-cash", code = "000000002", permiteCredito = false, dias = 0)
             insertClient(id = "client-generic", code = "999999999", permiteCredito = false, dias = 0)
@@ -34,7 +36,7 @@ class ClientsRepositoryTest {
     @AfterTest
     fun tearDown() {
         transaction(database) {
-            SchemaUtils.drop(ClientsTable)
+            SchemaUtils.drop(ClientsTable, VendedorTable)
         }
     }
 
@@ -90,6 +92,124 @@ class ClientsRepositoryTest {
                 )
             assertNotNull(updatedByCode)
             assertEquals("CLIENTE CASH MODIFICADO", updatedByCode.name)
+        }
+
+    @Test
+    fun `listClients filtra por vendedor cuando id_clientes no esta vacio`() =
+        runBlocking {
+            transaction(database) {
+                VendedorTable.insert {
+                    it[idVendedor] = 10
+                    it[codVendedor] = 10
+                    it[nombre] = "Vendedor Con Clientes"
+                    it[codUsuarios] = "1"
+                    it[idTiendas] = "1"
+                    it[idCajas] = "1"
+                    it[activo] = 1
+                    it[idClientes] = "client-credit"
+                    it[crearClientes] = 1
+                }
+            }
+
+            val filtered =
+                repository.listClients(
+                    database,
+                    limit = 10,
+                    offset = 0,
+                    search = null,
+                    includeTotal = true,
+                    sellerId = 10,
+                )
+            assertEquals(1, filtered.first.size)
+            assertEquals("client-credit", filtered.first.first().id)
+        }
+
+    @Test
+    fun `listClients devuelve todos cuando id_clientes del vendedor esta vacio`() =
+        runBlocking {
+            transaction(database) {
+                VendedorTable.insert {
+                    it[idVendedor] = 20
+                    it[codVendedor] = 20
+                    it[nombre] = "Vendedor Sin Restriccion"
+                    it[codUsuarios] = "1"
+                    it[idTiendas] = "1"
+                    it[idCajas] = "1"
+                    it[activo] = 1
+                    it[idClientes] = ""
+                    it[crearClientes] = 1
+                }
+            }
+
+            val all =
+                repository.listClients(
+                    database,
+                    limit = 10,
+                    offset = 0,
+                    search = null,
+                    includeTotal = true,
+                    sellerId = 20,
+                )
+            assertEquals(3, all.first.size)
+        }
+
+    @Test
+    fun `createClient autoasocia cliente al vendedor si sellerId viene informado`() =
+        runBlocking {
+            transaction(database) {
+                VendedorTable.insert {
+                    it[idVendedor] = 30
+                    it[codVendedor] = 30
+                    it[nombre] = "Vendedor Para Autoasociar"
+                    it[codUsuarios] = "1"
+                    it[idTiendas] = "1"
+                    it[idCajas] = "1"
+                    it[activo] = 1
+                    it[idClientes] = "client-cash"
+                    it[crearClientes] = 1
+                }
+            }
+
+            val req =
+                CreateClientRequest(
+                    name = "CLIENTE AUTOASOCIADO",
+                    sellerId = 30,
+                )
+            val created = repository.createClient(database, "PA", req)
+            assertNotNull(created.id)
+            assertEquals("00000", created.identification)
+
+            val sellerRow =
+                transaction(database) {
+                    VendedorTable
+                        .select(VendedorTable.idClientes)
+                        .where { VendedorTable.idVendedor eq 30 }
+                        .single()
+                }
+            val assigned = sellerRow[VendedorTable.idClientes]
+            assertNotNull(assigned)
+            assertEquals("client-cash,${created.id}", assigned)
+        }
+
+    @Test
+    fun `canSellerCreateClients respeta permiso crear_clientes`() =
+        runBlocking {
+            transaction(database) {
+                VendedorTable.insert {
+                    it[idVendedor] = 40
+                    it[codVendedor] = 40
+                    it[nombre] = "Vendedor Bloqueado"
+                    it[codUsuarios] = "1"
+                    it[idTiendas] = "1"
+                    it[idCajas] = "1"
+                    it[activo] = 1
+                    it[idClientes] = ""
+                    it[crearClientes] = 0
+                }
+            }
+
+            val canCreate = repository.canSellerCreateClients(database, 40)
+            assertEquals(false, canCreate)
         }
 
     private fun insertClient(

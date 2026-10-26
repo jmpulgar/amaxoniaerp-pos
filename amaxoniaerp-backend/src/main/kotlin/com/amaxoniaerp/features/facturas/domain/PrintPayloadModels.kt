@@ -35,6 +35,7 @@ data class FacturaPrintPayloadResponse(
     val puntoFacturacionFiscal: String? = null,
     val codigoSucursal: String? = null,
     val protocoloAutorizacion: String? = null,
+    val observacion: String? = null,
     /**
      * FASE 2.3b — Venezuela digital: número de control persistido por el PAC
      * The Factory HKA en `factura.numero_control_thka`. El emisor se sirve

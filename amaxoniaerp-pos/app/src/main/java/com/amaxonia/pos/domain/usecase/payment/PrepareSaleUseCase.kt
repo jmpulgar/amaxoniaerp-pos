@@ -132,12 +132,13 @@ internal class PrepareSaleUseCase(
         val cartItems = repositories.state.cart.cartItems.value
         val client = repositories.state.cart.selectedClient.value
         val caja = repositories.state.caja.activeCaja.value
+        val observacion = repositories.state.cart.observacion.value
         val itemCount = input.saleItemsOverride?.size ?: cartItems.size
         val validation = operations.validatePayment.validateSaleContext(itemCount, client != null, caja != null)
         return when {
             validation != null -> PreparationStep.Failure(validation.message)
             client == null || caja == null -> PreparationStep.Failure("No se pudo preparar la venta")
-            else -> PreparationStep.Success(BaseSaleContext(cartItems, client, caja))
+            else -> PreparationStep.Success(BaseSaleContext(cartItems, client, caja, observacion))
         }
     }
 
@@ -338,6 +339,7 @@ internal class AssemblePreparedSaleUseCase(
             clienteSucursalId = branch?.sucursalId,
             nroz = if (input.countryCode == VENEZUELA_CODE) "0000" else "",
             impresoraSerial = "",
+            observacion = base.observacion,
         )
     }
 
@@ -415,6 +417,7 @@ internal data class BaseSaleContext(
     val cartItems: List<CartItem>,
     val client: Client,
     val caja: Caja,
+    val observacion: String = "",
 )
 
 internal data class BranchedSaleContext(

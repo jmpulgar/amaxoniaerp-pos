@@ -53,6 +53,7 @@ interface PosSettingsRepository {
     val allowChangeSeller: Flow<Boolean>
     val customerDisplayEnabled: Flow<Boolean>
     val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat>
+    val ticketFontSize: Flow<com.amaxonia.pos.domain.model.printer.TicketFontSize>
 
     suspend fun currentCountry(): ServerCountry?
 
@@ -69,4 +70,6 @@ interface PosSettingsRepository {
     suspend fun saveCustomerDisplayEnabled(enabled: Boolean)
 
     suspend fun saveNoPrinterPdfFormat(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat)
+
+    suspend fun saveTicketFontSize(fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize)
 }

@@ -6,8 +6,10 @@ import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.ApiService
+import com.amaxonia.pos.data.remote.ClientQueryParams
 import com.amaxonia.pos.data.remote.NetworkMonitor
 import com.amaxonia.pos.data.remote.createClient
+import com.amaxonia.pos.data.remote.dto.CreateClientRequest
 import com.amaxonia.pos.data.remote.getClients
 import com.amaxonia.pos.data.remote.getDefaultClient
 import com.amaxonia.pos.data.remote.updateClient
@@ -45,13 +47,20 @@ class OfflineFirstClientRepository(
     override suspend fun getAllClients(
         page: Int,
         pageSize: Int,
+    ): Result<List<Client>> = getAllClients(page, pageSize, sellerId = null, allowedClientIds = emptySet())
+
+    override suspend fun getAllClients(
+        page: Int,
+        pageSize: Int,
+        sellerId: Int?,
+        allowedClientIds: Set<String>,
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = getCachedClients(pageSize, offset, scope)
+                val cached = getCachedClients(pageSize, offset, scope, allowedClientIds)
                 if (cached.isNotEmpty()) {
                     Result.success(cached)
                 } else {
@@ -62,7 +71,18 @@ class OfflineFirstClientRepository(
             else ->
                 runCatching {
                     val branchIds = if (scope.allClients) null else scope.branchIds.toList()
-                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = null, branchIds = branchIds)
+                    val response =
+                        apiService.getClients(
+                            token = token,
+                            params =
+                                ClientQueryParams(
+                                    limit = pageSize,
+                                    offset = offset,
+                                    search = null,
+                                    branchIds = branchIds,
+                                    sellerId = sellerId,
+                                ),
+                        )
                     if (scope.enabled) {
                         val entities = response.data.map { it.toEntity() }
                         val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
@@ -70,7 +90,7 @@ class OfflineFirstClientRepository(
                     }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = getCachedClients(pageSize, offset, scope)
+                    val cached = getCachedClients(pageSize, offset, scope, allowedClientIds)
                     if (cached.isNotEmpty()) cached else throw error
                 }
         }
@@ -91,20 +111,39 @@ class OfflineFirstClientRepository(
         query: String,
         page: Int,
         pageSize: Int,
+    ): Result<List<Client>> = searchClients(query, page, pageSize, sellerId = null, allowedClientIds = emptySet())
+
+    override suspend fun searchClients(
+        query: String,
+        page: Int,
+        pageSize: Int,
+        sellerId: Int?,
+        allowedClientIds: Set<String>,
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = searchCachedClients(query, pageSize, offset, scope)
+                val cached = searchCachedClients(query, pageSize, offset, scope, allowedClientIds)
                 Result.success(cached)
             }
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
             else ->
                 runCatching {
                     val branchIds = if (scope.allClients) null else scope.branchIds.toList()
-                    val response = apiService.getClients(token, limit = pageSize, offset = offset, search = query, branchIds = branchIds)
+                    val response =
+                        apiService.getClients(
+                            token = token,
+                            params =
+                                ClientQueryParams(
+                                    limit = pageSize,
+                                    offset = offset,
+                                    search = query,
+                                    branchIds = branchIds,
+                                    sellerId = sellerId,
+                                ),
+                        )
                     if (scope.enabled) {
                         val entities = response.data.map { it.toEntity() }
                         val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
@@ -112,7 +151,7 @@ class OfflineFirstClientRepository(
                     }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = searchCachedClients(query, pageSize, offset, scope)
+                    val cached = searchCachedClients(query, pageSize, offset, scope, allowedClientIds)
                     if (cached.isNotEmpty()) cached else throw error
                 }
         }
@@ -122,6 +161,7 @@ class OfflineFirstClientRepository(
         limit: Int,
         offset: Int,
         scope: OfflineSyncScope,
+        allowedClientIds: Set<String> = emptySet(),
     ): List<Client> {
         val entities =
             if (scope.allClients) {
@@ -129,7 +169,13 @@ class OfflineFirstClientRepository(
             } else {
                 clientDao.getPagedBySucursales(scope.branchIds.toList(), limit, offset)
             }
-        return entities.map { it.toDomain() }
+        val filtered =
+            if (allowedClientIds.isEmpty()) {
+                entities
+            } else {
+                entities.filter { it.id in allowedClientIds || it.code in allowedClientIds }
+            }
+        return filtered.map { it.toDomain() }
     }
 
     private suspend fun searchCachedClients(
@@ -137,6 +183,7 @@ class OfflineFirstClientRepository(
         limit: Int,
         offset: Int,
         scope: OfflineSyncScope,
+        allowedClientIds: Set<String> = emptySet(),
     ): List<Client> {
         val normalized = normalizeQuery(query)
         val entities =
@@ -145,7 +192,13 @@ class OfflineFirstClientRepository(
             } else {
                 clientDao.searchPagedBySucursales(normalized, scope.branchIds.toList(), limit = limit, offset = offset)
             }
-        return entities.map { it.toDomain() }
+        val filtered =
+            if (allowedClientIds.isEmpty()) {
+                entities
+            } else {
+                entities.filter { it.id in allowedClientIds || it.code in allowedClientIds }
+            }
+        return filtered.map { it.toDomain() }
     }
 
     override suspend fun saveClient(client: Client): Result<Unit> {
@@ -164,6 +217,43 @@ class OfflineFirstClientRepository(
             if (scope.enabled) {
                 clientDao.insertAll(listOf(saved.toEntity()))
             }
+        }
+    }
+
+    override suspend fun createQuickClient(
+        name: String,
+        sellerId: Int?,
+    ): Result<Client> {
+        val token =
+            localStore.readCompanySession()?.token
+                ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
+        val request =
+            CreateClientRequest(
+                identification = "00000",
+                name = name.trim().uppercase(),
+                lastName = "",
+                address = "PANAMA",
+                phone = "",
+                email = "",
+                clientTypeId = 2,
+                taxpayerTypeId = 1,
+                countryId = 170,
+                addressLevel1 = "",
+                addressLevel2 = "",
+                addressLevel3 = "",
+                dv = "00",
+                sellerId = sellerId,
+            )
+        return runCatching {
+            val saved = apiService.createClient(token, request)
+            if (saved.id.isNullOrBlank()) {
+                error("No se pudo obtener el ID del cliente creado")
+            }
+            val scope = offlineScopeProvider()
+            if (scope.enabled) {
+                clientDao.insertAll(listOf(saved.toEntity()))
+            }
+            saved.toDomain()
         }
     }
 

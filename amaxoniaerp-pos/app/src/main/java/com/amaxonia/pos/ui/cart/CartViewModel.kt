@@ -41,6 +41,7 @@ data class CartState(
     val taxLabel: String = "",
     val sesionMesaId: Int? = null,
     val selectedTable: SelectedTable? = null,
+    val observacion: String = "",
 ) {
     // Conversión Bs en BigDecimal (mismo camino que PaymentScreen:Money.times)
     // para no multiplicar en Double; el formateo "%.2f" legacy se preserva.
@@ -124,6 +125,10 @@ sealed interface CartUiAction {
     data object ClearMessage : CartUiAction
 
     data object ClearActionError : CartUiAction
+
+    data class UpdateObservacion(
+        val observacion: String,
+    ) : CartUiAction
 
     data object Checkout : CartUiAction
 }

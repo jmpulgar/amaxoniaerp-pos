@@ -47,6 +47,8 @@ class SettingsViewModel(
     val customerDisplayEnabled = _customerDisplayEnabled.asStateFlow()
     private val _noPrinterPdfFormat = MutableStateFlow(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA)
     val noPrinterPdfFormat = _noPrinterPdfFormat.asStateFlow()
+    private val _ticketFontSize = MutableStateFlow(com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL)
+    val ticketFontSize = _ticketFontSize.asStateFlow()
 
     val isSecondaryDisplayAvailable: StateFlow<Boolean> =
         customerDisplayManager?.isSecondaryDisplayAvailable ?: MutableStateFlow(false)
@@ -65,6 +67,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.noPrinterPdfFormat.collect { format ->
                 _noPrinterPdfFormat.value = format
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.ticketFontSize.collect { size ->
+                _ticketFontSize.value = size
             }
         }
         viewModelScope.launch {
@@ -144,6 +151,19 @@ class SettingsViewModel(
             }.onFailure { throwable ->
                 _errorMessage.update {
                     throwable.message ?: "No se pudo guardar el formato de PDF"
+                }
+            }
+        }
+    }
+
+    fun onTicketFontSizeSelected(fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize) {
+        if (_ticketFontSize.value == fontSize) return
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.saveTicketFontSize(fontSize)
+            }.onFailure { throwable ->
+                _errorMessage.update {
+                    throwable.message ?: "No se pudo guardar el tamaño de fuente"
                 }
             }
         }

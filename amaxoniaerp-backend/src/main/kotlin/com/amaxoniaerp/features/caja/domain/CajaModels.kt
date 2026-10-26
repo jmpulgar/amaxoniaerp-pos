@@ -60,6 +60,10 @@ data class CurrencyConfig(
 data class SellerSummary(
     val id: Int,
     val nombre: String,
+    @SerialName("id_clientes")
+    val idClientes: String? = null,
+    @SerialName("crear_clientes")
+    val crearClientes: Boolean = true,
 )
 
 @Serializable

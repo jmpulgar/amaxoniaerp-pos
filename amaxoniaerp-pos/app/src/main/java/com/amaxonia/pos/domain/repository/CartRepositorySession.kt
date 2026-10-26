@@ -170,6 +170,18 @@ fun CartRepository.setCurrentSeller(seller: Seller) {
     applyCurrentSeller(seller)
 }
 
+/** Asocia un nuevo cliente creado al vendedor actual en memoria. */
+fun CartRepository.appendClientToCurrentSeller(clientId: String) {
+    val current = currentSellerState.value ?: return
+    val existing = current.idClientes?.trim().orEmpty()
+    val updated = if (existing.isBlank()) clientId else "$existing,$clientId"
+    val updatedSeller = current.copy(idClientes = updated)
+    currentSellerState.value = updatedSeller
+    availableSellersState.update { list ->
+        list.map { if (it.id == updatedSeller.id) updatedSeller else it }
+    }
+}
+
 private fun CartRepository.applyCurrentSeller(seller: Seller) {
     val changed = currentSellerState.value?.id != seller.id
     currentSellerState.value = seller

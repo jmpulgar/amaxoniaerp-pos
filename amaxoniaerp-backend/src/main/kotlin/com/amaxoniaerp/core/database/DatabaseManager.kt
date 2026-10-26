@@ -213,6 +213,9 @@ object DatabaseManager {
                 keepaliveTime = DATABASE_KEEPALIVE_TIME_MS // 1 minuto
                 isAutoCommit = false
                 transactionIsolation = "TRANSACTION_READ_COMMITTED"
+                connectionInitSql = "SET SESSION sql_mode = ''"
+                addDataSourceProperty("sessionVariables", "sql_mode=''")
+                addDataSourceProperty("jdbcCompliantTruncation", "false")
                 addDataSourceProperty("cachePrepStmts", "true")
                 addDataSourceProperty("prepStmtCacheSize", "250")
                 addDataSourceProperty("prepStmtCacheSqlLimit", "2048")

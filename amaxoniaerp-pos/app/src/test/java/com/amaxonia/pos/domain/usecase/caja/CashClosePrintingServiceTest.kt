@@ -58,6 +58,22 @@ class CashClosePrintingServiceTest {
         }
 
     @Test
+    fun `close ticket offer supports Panama and Venezuela with Senraise H10S`() =
+        runTest {
+            val ticketPrinter = RecordingTicketPrinter()
+
+            val senraiseService = service(printerType = PrinterType.SENRAISE_H10S, ticketPrinter = ticketPrinter)
+            assertTrue(senraiseService.shouldOfferCloseTicket())
+
+            val senraiseVeService =
+                service(country = "VE", printerType = PrinterType.SENRAISE_H10S, ticketPrinter = ticketPrinter)
+            assertTrue(senraiseVeService.shouldOfferCloseTicket())
+
+            val senraiseNullService = service(printerType = PrinterType.SENRAISE_H10S, ticketPrinter = null)
+            assertFalse(senraiseNullService.shouldOfferCloseTicket())
+        }
+
+    @Test
     fun `successful close ticket keeps exact user message`() =
         runTest {
             val ticketPrinter = RecordingTicketPrinter()

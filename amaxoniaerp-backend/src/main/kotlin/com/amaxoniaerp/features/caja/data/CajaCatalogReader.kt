@@ -19,6 +19,8 @@ internal data class SellerRecord(
     val codUsuarios: String,
     val idCajas: String?,
     val idTiendas: String,
+    val idClientes: String? = null,
+    val crearClientes: Int = 1,
 )
 
 internal class CajaCatalogParams(
@@ -208,6 +210,8 @@ internal fun loadActiveSellers(): List<SellerRecord> =
             VendedorTable.codUsuarios,
             VendedorTable.idCajas,
             VendedorTable.idTiendas,
+            VendedorTable.idClientes,
+            VendedorTable.crearClientes,
         ).where { VendedorTable.activo eq 1 }
         .orderBy(VendedorTable.idVendedor)
         .map { row ->
@@ -217,6 +221,8 @@ internal fun loadActiveSellers(): List<SellerRecord> =
                 codUsuarios = row[VendedorTable.codUsuarios],
                 idCajas = row[VendedorTable.idCajas],
                 idTiendas = row[VendedorTable.idTiendas],
+                idClientes = row[VendedorTable.idClientes],
+                crearClientes = row[VendedorTable.crearClientes],
             )
         }
 
@@ -242,7 +248,15 @@ internal fun mapCajaRows(
     all: Boolean = false,
     allWarehousesBySucursal: Map<Int, List<Int>> = emptyMap(),
 ): List<Caja> {
-    val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
+    val availableSellers =
+        activeSellers.map {
+            SellerSummary(
+                id = it.id,
+                nombre = it.nombre,
+                idClientes = it.idClientes,
+                crearClientes = it.crearClientes == 1,
+            )
+        }
     val userIdToken = userId.toString()
     val assignedCajaIds =
         activeSellers
@@ -283,7 +297,15 @@ internal fun findCajaRowById(
     userId: Int? = null,
     allWarehousesBySucursal: Map<Int, List<Int>> = emptyMap(),
 ): Caja? {
-    val availableSellers = activeSellers.map { SellerSummary(id = it.id, nombre = it.nombre) }
+    val availableSellers =
+        activeSellers.map {
+            SellerSummary(
+                id = it.id,
+                nombre = it.nombre,
+                idClientes = it.idClientes,
+                crearClientes = it.crearClientes == 1,
+            )
+        }
     val isVE = countryCode.equals("VE", ignoreCase = true)
     val cajaColumns =
         CajaTable.columns

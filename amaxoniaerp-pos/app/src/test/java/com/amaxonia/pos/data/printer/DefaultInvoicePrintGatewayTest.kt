@@ -221,4 +221,47 @@ class DefaultInvoicePrintGatewayTest {
             assertTrue(texts.contains("TEST RESTAURANT CORP"))
             assertTrue(texts.any { it.contains("Menu Ejecutivo") })
         }
+
+    @Test
+    fun printsOfflineSenraiseH10STicketUsingLocalFallbackForPanama() =
+        runTest {
+            localStore.saveSelectedCountry(ServerCountries.PANAMA)
+            localStore.saveSelectedPrinterType(PrinterType.SENRAISE_H10S)
+            val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
+
+            val feedback =
+                gateway.print(
+                    countryCode = "PA",
+                    transaction = testTransaction,
+                    remoteInvoiceId = "OFF-100",
+                )
+
+            assertNotNull(feedback)
+            assertEquals("Ticket Senraise H10S enviado correctamente", feedback?.displayMessage)
+            assertEquals(1, printedTickets.size)
+
+            val ticket = printedTickets.first()
+            val texts = ticket.elements.filterIsInstance<TicketElement.Text>().map { it.value }
+            assertTrue(texts.contains("TEST RESTAURANT CORP"))
+            assertTrue(texts.any { it.contains("Menu Ejecutivo") })
+        }
+
+    @Test
+    fun returnsFailureWhenRemoteInvoicePrintPayloadFailsAndTransactionHasNoItems() =
+        runTest {
+            val emptyRemoteTx = testTransaction.copy(id = "123", invoiceNumber = "F001-123", fiscalItems = emptyList())
+            val gateway = DefaultInvoicePrintGateway(fakePrinterProvider, localStore, fakeSalesRepository)
+
+            val feedback =
+                gateway.print(
+                    countryCode = "PA",
+                    transaction = emptyRemoteTx,
+                    remoteInvoiceId = "123",
+                )
+
+            assertNotNull(feedback)
+            assertEquals(false, feedback?.isSuccess)
+            assertEquals("Network unavailable", feedback?.displayMessage)
+            assertEquals(0, printedTickets.size)
+        }
 }

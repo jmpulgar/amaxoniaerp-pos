@@ -23,6 +23,12 @@ class PrinterTypePolicyTest {
     }
 
     @Test
+    fun senraiseH10SAppearsForPanamaAndVenezuela() {
+        assertTrue(PrinterType.SENRAISE_H10S in PrinterTypePolicy.availablePrinterTypes(panama))
+        assertTrue(PrinterType.SENRAISE_H10S in PrinterTypePolicy.availablePrinterTypes(venezuela))
+    }
+
+    @Test
     fun sunmiCanBeSavedForVenezuela() {
         PrinterTypePolicy.validate(venezuela, PrinterType.SUNMI_V2)
     }
@@ -34,6 +40,12 @@ class PrinterTypePolicyTest {
     }
 
     @Test
+    fun senraiseH10SCanBeSavedForVenezuelaAndPanama() {
+        PrinterTypePolicy.validate(venezuela, PrinterType.SENRAISE_H10S)
+        PrinterTypePolicy.validate(panama, PrinterType.SENRAISE_H10S)
+    }
+
+    @Test
     fun sunmiIsPreservedForVenezuela() {
         assertEquals(PrinterType.SUNMI_V2, PrinterTypePolicy.coerce(venezuela, PrinterType.SUNMI_V2))
     }
@@ -42,5 +54,11 @@ class PrinterTypePolicyTest {
     fun iminSwiftIsPreservedForVenezuelaAndPanama() {
         assertEquals(PrinterType.IMIN_SWIFT, PrinterTypePolicy.coerce(venezuela, PrinterType.IMIN_SWIFT))
         assertEquals(PrinterType.IMIN_SWIFT, PrinterTypePolicy.coerce(panama, PrinterType.IMIN_SWIFT))
+    }
+
+    @Test
+    fun senraiseH10SIsPreservedForVenezuelaAndPanama() {
+        assertEquals(PrinterType.SENRAISE_H10S, PrinterTypePolicy.coerce(venezuela, PrinterType.SENRAISE_H10S))
+        assertEquals(PrinterType.SENRAISE_H10S, PrinterTypePolicy.coerce(panama, PrinterType.SENRAISE_H10S))
     }
 }

@@ -13,6 +13,17 @@ import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
+import io.ktor.http.isSuccess
+
+/** Parámetros de consulta paginada y filtrado del directorio de clientes. */
+data class ClientQueryParams(
+    val limit: Int,
+    val offset: Int,
+    val search: String? = null,
+    val includeTotal: Boolean? = null,
+    val branchIds: List<Int>? = null,
+    val sellerId: Int? = null,
+)
 
 /**
  * Endpoints del directorio de clientes y catálogos de dirección/tipo.
@@ -20,26 +31,25 @@ import io.ktor.client.request.url
  */
 suspend fun ApiService.getClients(
     token: String,
-    limit: Int,
-    offset: Int,
-    search: String?,
-    includeTotal: Boolean? = null,
-    branchIds: List<Int>? = null,
+    params: ClientQueryParams,
 ): PagedResponse<ClientDto> =
     client
         .get("clients") {
             authHeaders(token)
             url {
-                parameters.append("limit", limit.toString())
-                parameters.append("offset", offset.toString())
-                if (!search.isNullOrBlank()) {
-                    parameters.append("search", search)
+                parameters.append("limit", params.limit.toString())
+                parameters.append("offset", params.offset.toString())
+                if (!params.search.isNullOrBlank()) {
+                    parameters.append("search", params.search)
                 }
-                if (includeTotal != null) {
-                    parameters.append("includeTotal", includeTotal.toString())
+                if (params.includeTotal != null) {
+                    parameters.append("includeTotal", params.includeTotal.toString())
                 }
-                if (!branchIds.isNullOrEmpty()) {
-                    parameters.append("branchIds", branchIds.joinToString(","))
+                if (!params.branchIds.isNullOrEmpty()) {
+                    parameters.append("branchIds", params.branchIds.joinToString(","))
+                }
+                if (params.sellerId != null && params.sellerId > 0) {
+                    parameters.append("sellerId", params.sellerId.toString())
                 }
             }
         }.body()
@@ -47,12 +57,20 @@ suspend fun ApiService.getClients(
 suspend fun ApiService.createClient(
     token: String,
     request: CreateClientRequest,
-): ClientDto =
-    client
-        .post("clients") {
-            authHeaders(token)
-            setBody(request)
-        }.body()
+): ClientDto {
+    val response =
+        client
+            .post("clients") {
+                authHeaders(token)
+                setBody(request)
+            }
+    if (!response.status.isSuccess()) {
+        val errorBody = runCatching { response.body<Map<String, String>>() }.getOrNull()
+        val errorMsg = errorBody?.get("error") ?: "Error al crear cliente: ${response.status.value}"
+        error(errorMsg)
+    }
+    return response.body()
+}
 
 suspend fun ApiService.getDefaultClient(token: String): ClientDto =
     client

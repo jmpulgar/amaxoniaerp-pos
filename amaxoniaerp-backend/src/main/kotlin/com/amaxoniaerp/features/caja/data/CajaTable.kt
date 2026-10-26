@@ -68,6 +68,8 @@ object VendedorTable : Table("vendedor") {
     val idTiendas = varchar("id_tiendas", S.VARCHAR_LENGTH_50)
     val idCajas = varchar("id_cajas", S.VARCHAR_LENGTH_500).nullable()
     val activo = integer("activo")
+    val idClientes = text("id_clientes").nullable()
+    val crearClientes = integer("crear_clientes").default(1)
 
     override val primaryKey = PrimaryKey(idVendedor)
 }

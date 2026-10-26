@@ -3,6 +3,7 @@ package com.amaxonia.pos.data.printer.pdf
 import com.amaxonia.pos.domain.model.printer.TicketAlign
 import com.amaxonia.pos.domain.model.printer.TicketDocument
 import com.amaxonia.pos.domain.model.printer.TicketElement
+import com.amaxonia.pos.domain.model.printer.TicketFontSize
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,6 +50,32 @@ class TicketPdfGeneratorTest {
 
         val pdfBytes = TicketPdfGenerator.generatePdf(document)
         assertTrue("PDF bytes must not be empty", pdfBytes.isNotEmpty())
+        val header = String(pdfBytes.take(5).toByteArray())
+        assertTrue("File header must start with %PDF: $header", header.startsWith("%PDF"))
+    }
+
+    @Test
+    fun generatesValidPdfBytesWithCompactFontSize() {
+        val document =
+            TicketDocument(
+                elements =
+                    listOf(
+                        TicketElement.Text("TIENDA CENTRAL S.A.", TicketAlign.CENTER, bold = true),
+                        TicketElement.Text("RUC: 12345-1-67890", TicketAlign.CENTER),
+                        TicketElement.Divider,
+                        TicketElement.Text("Producto 1 (7%)", TicketAlign.LEFT, bold = true),
+                        TicketElement.TotalsRow(
+                            label = "Total:",
+                            value = "10.70",
+                            labelWidth = 18,
+                            printerWidth = 32,
+                            bold = true,
+                        ),
+                    ),
+            )
+
+        val pdfBytes = TicketPdfGenerator.generatePdf(document, TicketFontSize.COMPACT)
+        assertTrue("Compact PDF bytes must not be empty", pdfBytes.isNotEmpty())
         val header = String(pdfBytes.take(5).toByteArray())
         assertTrue("File header must start with %PDF: $header", header.startsWith("%PDF"))
     }

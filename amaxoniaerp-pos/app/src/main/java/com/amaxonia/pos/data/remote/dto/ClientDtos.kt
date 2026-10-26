@@ -50,6 +50,8 @@ data class CreateClientRequest(
     val addressLevel1: String,
     val addressLevel2: String,
     val addressLevel3: String,
+    val dv: String = "00",
+    val sellerId: Int? = null,
 )
 
 @Serializable

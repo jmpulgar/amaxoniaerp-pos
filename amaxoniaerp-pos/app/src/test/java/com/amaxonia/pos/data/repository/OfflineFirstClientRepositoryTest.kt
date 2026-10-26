@@ -181,6 +181,42 @@ class OfflineFirstClientRepositoryTest {
             assertEquals(listOf("Juan Sucursal 10"), result.getOrThrow().map { it.firstName })
         }
 
+    @Test
+    fun `getAllClients offline filtra por allowedClientIds cuando no esta vacio`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            seedCache(client("1", name = "Ana"), client("2", name = "Pedro"), client("3", name = "Carlos"))
+            val repository = repository(online = false)
+
+            val result =
+                repository.getAllClients(
+                    page = 1,
+                    pageSize = 10,
+                    sellerId = 5,
+                    allowedClientIds = setOf("1", "3"),
+                )
+
+            assertEquals(listOf("Ana", "Carlos"), result.getOrThrow().map { it.firstName })
+        }
+
+    @Test
+    fun `getAllClients offline devuelve todos cuando allowedClientIds esta vacio`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            seedCache(client("1", name = "Ana"), client("2", name = "Pedro"))
+            val repository = repository(online = false)
+
+            val result =
+                repository.getAllClients(
+                    page = 1,
+                    pageSize = 10,
+                    sellerId = 5,
+                    allowedClientIds = emptySet(),
+                )
+
+            assertEquals(listOf("Ana", "Pedro"), result.getOrThrow().map { it.firstName })
+        }
+
     private fun repository(
         online: Boolean,
         scope: com.amaxonia.pos.data.sync.OfflineSyncScope = com.amaxonia.pos.data.sync.OfflineSyncScope.ALL,

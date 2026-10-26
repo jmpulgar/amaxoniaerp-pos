@@ -9,4 +9,7 @@ data class ClientListState(
     val endOfListReached: Boolean = false,
     val page: Int = 1,
     val error: String? = null,
+    val canCreateClients: Boolean = true,
+    val isCreatingQuickClient: Boolean = false,
+    val quickClientError: String? = null,
 )

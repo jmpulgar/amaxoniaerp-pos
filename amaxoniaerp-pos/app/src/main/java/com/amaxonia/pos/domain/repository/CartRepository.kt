@@ -56,6 +56,13 @@ class CartRepository {
     internal val currentSellerState = MutableStateFlow<Seller?>(null)
     val currentSeller: StateFlow<Seller?> = currentSellerState.asStateFlow()
 
+    internal val observacionState = MutableStateFlow("")
+    val observacion: StateFlow<String> = observacionState.asStateFlow()
+
+    fun setObservacion(value: String) {
+        observacionState.value = value
+    }
+
     private val _financialSnapshot = MutableStateFlow<SaleFinancialSnapshot?>(null)
     val financialSnapshot: StateFlow<SaleFinancialSnapshot?> = _financialSnapshot.asStateFlow()
 
@@ -369,6 +376,7 @@ class CartRepository {
         clientSucursalesState.value = emptyList()
         currentSellerState.value = null
         availableSellersState.value = emptyList()
+        observacionState.value = ""
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)

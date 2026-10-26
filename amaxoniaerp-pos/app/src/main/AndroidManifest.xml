@@ -13,6 +13,7 @@
         <package android:name="woyou.aidlservice.jiuiv5" />
         <package android:name="com.sunmi.peripheral.printer" />
         <package android:name="com.imin.printer" />
+        <package android:name="recieptservice.com.recieptservice" />
     </queries>
     <application
         android:allowBackup="true"

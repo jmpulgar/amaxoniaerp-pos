@@ -78,6 +78,7 @@ class PanamaInvoiceTicketFormatter {
             ?.takeIfNotBlank()
             ?.let { add(labelValue("N. Doc Fiscal:", it)) }
         payload.vendedor?.takeIfNotBlank()?.let { add(labelValue("Vendedor:", it)) }
+        payload.observacion?.takeIfNotBlank()?.let { add(TicketElement.Text("Observación: $it", TicketAlign.LEFT)) }
         add(TicketElement.Divider)
     }
 

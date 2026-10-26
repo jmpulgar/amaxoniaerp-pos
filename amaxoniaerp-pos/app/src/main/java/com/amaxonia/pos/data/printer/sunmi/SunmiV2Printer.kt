@@ -2,15 +2,19 @@ package com.amaxonia.pos.data.printer.sunmi
 
 import android.content.Context
 import android.os.RemoteException
+import com.amaxonia.pos.data.local.LocalStore
+import com.amaxonia.pos.data.local.readTicketFontSize
 import com.amaxonia.pos.domain.model.printer.PrintResult
 import com.amaxonia.pos.domain.model.printer.TicketAlign
 import com.amaxonia.pos.domain.model.printer.TicketDocument
 import com.amaxonia.pos.domain.model.printer.TicketElement
+import com.amaxonia.pos.domain.model.printer.TicketFontSize
 import com.amaxonia.pos.domain.model.printer.TicketPrinter
 
 class SunmiV2Printer(
     context: Context,
     private val manager: SunmiPrinterManager = SunmiPrinterManager(context),
+    private val localStore: LocalStore? = null,
 ) : TicketPrinter {
     override suspend fun connect(): PrintResult =
         if (manager.bind()) PrintResult.Success else PrintResult.Error("No se pudo conectar con la impresora SUNMI")
@@ -24,24 +28,29 @@ class SunmiV2Printer(
         return manager.bind()
     }
 
-    override suspend fun printText(text: String): PrintResult =
-        withService { service ->
+    override suspend fun printText(text: String): PrintResult {
+        val dimensions = SunmiFontSize.dimensionsFor(resolveFontSize())
+        return withService { service ->
             service.printerInit(null)
+            service.setFontSize(dimensions.regular, null)
             service.printText(text + "\n", null)
             service.lineWrap(2, null)
         }
+    }
 
-    override suspend fun printTicket(ticket: TicketDocument): PrintResult =
-        withService { service ->
+    override suspend fun printTicket(ticket: TicketDocument): PrintResult {
+        val dimensions = SunmiFontSize.dimensionsFor(resolveFontSize())
+        return withService { service ->
             service.printerInit(null)
+            service.setFontSize(dimensions.regular, null)
             ticket.elements.forEach { element ->
                 when (element) {
                     is TicketElement.Text -> {
                         service.setAlignment(element.align.toSunmiAlign(), null)
-                        val size = if (element.bold) SunmiFontSize.BOLD else SunmiFontSize.REGULAR
+                        val size = if (element.bold) dimensions.bold else dimensions.regular
                         service.setFontSize(size, null)
                         service.printText(element.value + "\n", null)
-                        service.setFontSize(SunmiFontSize.REGULAR, null)
+                        service.setFontSize(dimensions.regular, null)
                     }
 
                     is TicketElement.Columns -> {
@@ -60,12 +69,12 @@ class SunmiV2Printer(
                         // next physical line on the SUNMI thermal printer.
                         service.setAlignment(TicketAlign.LEFT.toSunmiAlign(), null)
                         if (element.bold) {
-                            service.setFontSize(SunmiFontSize.TOTALS_BOLD, null)
+                            service.setFontSize(dimensions.totalsBold, null)
                         } else {
-                            service.setFontSize(SunmiFontSize.TOTALS_REGULAR, null)
+                            service.setFontSize(dimensions.totalsRegular, null)
                         }
                         service.printText(element.formatMonospacedLine() + "\n", null)
-                        service.setFontSize(SunmiFontSize.TOTALS_REGULAR, null)
+                        service.setFontSize(dimensions.regular, null)
                     }
 
                     is TicketElement.Qr -> {
@@ -82,6 +91,10 @@ class SunmiV2Printer(
             }
             service.lineWrap(TICKET_TRAILING_FEED_LINES, null)
         }
+    }
+
+    private suspend fun resolveFontSize(): TicketFontSize =
+        localStore?.readTicketFontSize() ?: TicketFontSize.NORMAL
 
     private suspend fun withService(block: (com.sunmi.peripheral.printer.SunmiPrinterService) -> Unit): PrintResult {
         if (!manager.bind()) return PrintResult.Error("Servicio de impresión SUNMI no disponible")
@@ -112,15 +125,26 @@ class SunmiV2Printer(
         }
 }
 
+private data class SunmiFontDimensions(
+    val regular: Float,
+    val bold: Float,
+    val totalsRegular: Float,
+    val totalsBold: Float,
+)
+
 /**
  * SUNMI v2 font sizes (points) used by [SunmiV2Printer]. Centralized so detekt magic-number
  * rule does not flag the print pipeline.
  */
 private object SunmiFontSize {
-    const val REGULAR = 24f
-    const val BOLD = 28f
-    const val TOTALS_REGULAR = 24f
-    const val TOTALS_BOLD = 26f
+    private val NORMAL = SunmiFontDimensions(regular = 20f, bold = 24f, totalsRegular = 20f, totalsBold = 22f)
+    private val COMPACT = SunmiFontDimensions(regular = 18f, bold = 22f, totalsRegular = 18f, totalsBold = 20f)
+
+    fun dimensionsFor(size: TicketFontSize): SunmiFontDimensions =
+        when (size) {
+            TicketFontSize.NORMAL -> NORMAL
+            TicketFontSize.COMPACT -> COMPACT
+        }
 }
 
 /** Saltos de línea que alimentan el papel tras imprimir un ticket completo. */

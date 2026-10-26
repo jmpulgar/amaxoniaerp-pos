@@ -57,6 +57,7 @@ data class Transaction(
     val fiscalItems: List<TransactionFiscalItem> = emptyList(),
     val totalRef: Double? = null,
     val abrMonedaSecundaria: String? = null,
+    val observacion: String = "",
 )
 
 data class TransactionPaymentMethod(

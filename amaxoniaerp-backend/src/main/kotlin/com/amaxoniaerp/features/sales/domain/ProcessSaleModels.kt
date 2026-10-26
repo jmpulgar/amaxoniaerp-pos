@@ -104,6 +104,7 @@ data class SaleInvoiceInput(
     val codFacturaFiscal: String = "",
     val nroz: String = "0000",
     val impresoraSerial: String = "",
+    val observacion: String = "",
 )
 
 @Serializable

@@ -223,7 +223,7 @@ fun ClientDto.toDomain(): Client =
         photoFilename = photoFilename.orEmpty(),
     )
 
-fun Client.toCreateRequest(): CreateClientRequest =
+fun Client.toCreateRequest(sellerId: Int? = null): CreateClientRequest =
     CreateClientRequest(
         identification = if (clientTypeId == 4) foreignIdNumber else ruc.ifBlank { cedula.ifBlank { id } },
         name = firstName,
@@ -240,6 +240,8 @@ fun Client.toCreateRequest(): CreateClientRequest =
         addressLevel1 = addressLevel1,
         addressLevel2 = addressLevel2,
         addressLevel3 = addressLevel3,
+        dv = dv.ifBlank { if (clientTypeId == 2) "00" else "00" },
+        sellerId = sellerId,
     )
 
 // --- Helpers para conversión de Tipos ---

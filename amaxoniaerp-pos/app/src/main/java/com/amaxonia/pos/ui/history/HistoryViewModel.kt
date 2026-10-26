@@ -244,7 +244,8 @@ class HistoryViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isReprinting = true, detalleActionError = null, detalleMessage = null) }
             val countryCode = sessionReader?.currentCountry()?.code ?: DEFAULT_COUNTRY_CODE
-            val feedback = printInvoiceUseCase(countryCode, transaction, transaction.id)
+            val invoiceIdToQuery = transaction.id.ifBlank { transaction.invoiceNumber }
+            val feedback = printInvoiceUseCase(countryCode, transaction, invoiceIdToQuery)
             if (feedback == null) {
                 _state.update {
                     it.copy(

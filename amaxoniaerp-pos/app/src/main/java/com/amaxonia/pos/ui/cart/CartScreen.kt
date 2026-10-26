@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.LocalOffer
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -58,6 +60,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -112,10 +115,20 @@ fun CartScreen(
         }
     }
     var showSellerSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showObservacionDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val editState = androidx.compose.runtime.remember { CartEditState() }
 
     CartOrderSavedOverlay(state = state, viewModel = viewModel, onBack = onBack)
     CartEditDialogs(editState = editState, viewModel = viewModel)
+    if (showObservacionDialog) {
+        CartObservacionDialog(
+            initialValue = state.observacion,
+            onDismiss = { showObservacionDialog = false },
+            onSave = { newObs ->
+                viewModel.onAction(CartUiAction.UpdateObservacion(newObs))
+            },
+        )
+    }
     if (showSellerSheet && state.allowChangeSeller) {
         CartSellerSheetOverlay(
             state = state,
@@ -133,7 +146,13 @@ fun CartScreen(
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = { CartBottomBarArea(state = state, viewModel = viewModel) },
+        bottomBar = {
+            CartBottomBarArea(
+                state = state,
+                viewModel = viewModel,
+                onObservacionClick = { showObservacionDialog = true },
+            )
+        },
     ) { padding ->
         Box(
             modifier =
@@ -171,6 +190,7 @@ internal fun CartBottomBar(
     onSaveDraft: () -> Unit,
     onCheckout: () -> Unit,
     modifier: Modifier = Modifier,
+    onObservacionClick: () -> Unit = {},
 ) {
     var breakdownExpanded by remember { mutableStateOf(true) }
     val total = state.total
@@ -229,7 +249,9 @@ internal fun CartBottomBar(
                 Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
                 CartBottomActions(
                     isMesaSession = state.sesionMesaId != null,
+                    hasObservacion = state.observacion.isNotBlank(),
                     onSaveDraft = onSaveDraft,
+                    onObservacionClick = onObservacionClick,
                     onCheckout = onCheckout,
                 )
             }
@@ -328,7 +350,9 @@ private fun CartBottomTotalRow(
 @Composable
 private fun CartBottomActions(
     isMesaSession: Boolean = false,
+    hasObservacion: Boolean = false,
     onSaveDraft: () -> Unit,
+    onObservacionClick: () -> Unit = {},
     onCheckout: () -> Unit,
 ) {
     if (isMesaSession) {
@@ -350,23 +374,27 @@ private fun CartBottomActions(
             Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp), tint = PosPalette.FixedWhite)
         }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(modifier = Modifier.weight(1f)) {
-                SaveDraftButton(onClick = onSaveDraft)
-            }
-            Box(modifier = Modifier.weight(1.35f)) {
-                CheckoutButton(onClick = onCheckout)
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SaveDraftButton(onClick = onSaveDraft)
+            ObservacionButton(hasObservacion = hasObservacion, onClick = onObservacionClick)
+            CheckoutButton(onClick = onCheckout, modifier = Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun SaveDraftButton(onClick: () -> Unit) {
+private fun SaveDraftButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(54.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = modifier.size(54.dp),
+        contentPadding = PaddingValues(0.dp),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
         colors =
@@ -375,26 +403,66 @@ private fun SaveDraftButton(onClick: () -> Unit) {
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
     ) {
-        Icon(Icons.Default.Save, null, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            "Guardar",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Icon(
+            Icons.Default.Save,
+            contentDescription = "Guardar",
+            modifier = Modifier.size(22.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun CheckoutButton(onClick: () -> Unit) {
+private fun ObservacionButton(
+    hasObservacion: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val borderColor = if (hasObservacion) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val iconTint = if (hasObservacion) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val containerColor =
+        if (hasObservacion) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.size(54.dp),
+        contentPadding = PaddingValues(0.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, borderColor),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = containerColor,
+                contentColor = iconTint,
+            ),
+    ) {
+        Box(contentAlignment = Alignment.TopEnd) {
+            Icon(
+                Icons.Default.EditNote,
+                contentDescription = "Observación",
+                modifier = Modifier.size(26.dp),
+                tint = iconTint,
+            )
+            if (hasObservacion) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     PosGradientButton(
         onClick = onClick,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(54.dp),
+        modifier = modifier.height(54.dp),
     ) {
         Text(
             "Cobrar",
@@ -414,6 +482,75 @@ private fun CheckoutButton(onClick: () -> Unit) {
         )
     }
 }
+
+@Composable
+private fun CartObservacionDialog(
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(initialValue) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Observación de la Venta",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Esta nota aparecerá impresa en el ticket de la factura.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.take(MAX_OBSERVACION_LENGTH) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    placeholder = { Text("Escribe una observación...") },
+                    shape = RoundedCornerShape(12.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(text.trim())
+                    onDismiss()
+                },
+            ) {
+                Text("Guardar", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Row {
+                if (text.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            text = ""
+                            onSave("")
+                            onDismiss()
+                        },
+                    ) {
+                        Text("Limpiar", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancelar")
+                }
+            }
+        },
+    )
+}
+
+private const val MAX_OBSERVACION_LENGTH = 300
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cliente + vendedor: panel consolidado con tipografía tokenizada e iconos

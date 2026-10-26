@@ -7,6 +7,8 @@ import com.amaxonia.pos.data.local.readSelectedPrinterType
 import com.amaxonia.pos.data.local.selectedPrinterTypeFlow
 import com.amaxonia.pos.data.printer.imin.IminDeviceDetector
 import com.amaxonia.pos.data.printer.imin.IminSwiftPrinter
+import com.amaxonia.pos.data.printer.senraise.SenraiseDeviceDetector
+import com.amaxonia.pos.data.printer.senraise.SenraiseH10Printer
 import com.amaxonia.pos.data.printer.sunmi.SunmiDeviceDetector
 import com.amaxonia.pos.data.printer.sunmi.SunmiV2Printer
 import com.amaxonia.pos.domain.model.printer.PrinterType
@@ -39,6 +41,7 @@ class PrinterFactory(
     private var theFactoryPrinterInstance: PrinterRepository? = null
     private var sunmiPrinterInstance: TicketPrinter? = null
     private var iminPrinterInstance: TicketPrinter? = null
+    private var senraisePrinterInstance: TicketPrinter? = null
 
     private fun getTheFactoryPrinterOrNull(): PrinterRepository? {
         theFactoryPrinterInstance?.let { return it }
@@ -75,7 +78,7 @@ class PrinterFactory(
                 else -> {
                     sunmiPrinterInstance =
                         runCatching {
-                            SunmiV2Printer(appContext)
+                            SunmiV2Printer(appContext, localStore = localStore)
                         }.fold(
                             onSuccess = { it },
                             onFailure = { t ->
@@ -97,7 +100,7 @@ class PrinterFactory(
                 else -> {
                     iminPrinterInstance =
                         runCatching {
-                            IminSwiftPrinter(appContext)
+                            IminSwiftPrinter(appContext, localStore = localStore)
                         }.fold(
                             onSuccess = { it },
                             onFailure = { t ->
@@ -106,6 +109,28 @@ class PrinterFactory(
                             },
                         )
                     iminPrinterInstance
+                }
+            }
+        }
+    }
+
+    private fun getSenraisePrinterOrNull(): TicketPrinter? {
+        senraisePrinterInstance?.let { return it }
+        synchronized(this) {
+            return when {
+                senraisePrinterInstance != null -> senraisePrinterInstance
+                else -> {
+                    senraisePrinterInstance =
+                        runCatching {
+                            SenraiseH10Printer(appContext, localStore = localStore)
+                        }.fold(
+                            onSuccess = { it },
+                            onFailure = { t ->
+                                SafeLog.e(TAG, "Senraise printer implementation is unavailable", t)
+                                null
+                            },
+                        )
+                    senraisePrinterInstance
                 }
             }
         }
@@ -139,6 +164,7 @@ class PrinterFactory(
             PrinterType.GENERIC_BLUETOOTH,
             PrinterType.SUNMI_V2,
             PrinterType.IMIN_SWIFT,
+            PrinterType.SENRAISE_H10S,
             -> null
         }
     }
@@ -159,6 +185,7 @@ class PrinterFactory(
         return when (printerType) {
             PrinterType.SUNMI_V2 -> getSunmiPrinterOrNull()
             PrinterType.IMIN_SWIFT -> getIminPrinterOrNull()
+            PrinterType.SENRAISE_H10S -> getSenraisePrinterOrNull()
             PrinterType.NONE,
             PrinterType.THE_FACTORY_HKA,
             PrinterType.GENERIC_BLUETOOTH,
@@ -166,6 +193,7 @@ class PrinterFactory(
                 when {
                     SunmiDeviceDetector.isSunmiDevice() -> getSunmiPrinterOrNull()
                     IminDeviceDetector.isIminDevice() -> getIminPrinterOrNull()
+                    SenraiseDeviceDetector.isSenraiseDevice() -> getSenraisePrinterOrNull()
                     else -> null
                 }
         }

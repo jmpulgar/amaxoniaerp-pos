@@ -110,6 +110,8 @@ class CustomerDisplayManagerTest {
         override val allowChangeSeller: Flow<Boolean> = MutableStateFlow(false)
         override val noPrinterPdfFormat: Flow<com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat> =
             MutableStateFlow(com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat.FACTURA_CARTA)
+        override val ticketFontSize: Flow<com.amaxonia.pos.domain.model.printer.TicketFontSize> =
+            MutableStateFlow(com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL)
 
         override suspend fun currentCountry(): ServerCountry? = null
         override suspend fun savePrinterType(printerType: PrinterType) {}
@@ -121,6 +123,7 @@ class CustomerDisplayManagerTest {
             displayEnabledFlow.value = enabled
         }
         override suspend fun saveNoPrinterPdfFormat(format: com.amaxonia.pos.domain.model.printer.NoPrinterPdfFormat) {}
+        override suspend fun saveTicketFontSize(fontSize: com.amaxonia.pos.domain.model.printer.TicketFontSize) = Unit
     }
 
     private class FakeCashCloseReader : CashCloseContextReader {

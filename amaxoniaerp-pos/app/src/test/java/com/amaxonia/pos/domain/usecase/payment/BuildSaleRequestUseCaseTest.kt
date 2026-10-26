@@ -168,4 +168,22 @@ class BuildSaleRequestUseCaseTest {
 
         assertEquals(false, request.useHka20)
     }
+
+    @Test
+    fun `propagates observacion in sale invoice`() {
+        val invoice = invoice().copy(observacion = "Nota de prueba")
+        val request =
+            BuildSaleRequestUseCase()(
+                BuildSaleRequestInput(
+                    invoice = invoice,
+                    items = listOf(item()),
+                    taxes = emptyList(),
+                    paymentSummary = SalePaymentSummaryDto(11.6, 20.0, 8.4, 0.0, mapOf("CASH" to 11.6)),
+                    payments = listOf(SalePaymentDto(1, "CASH", 11.6, 20.0, 8.4)),
+                    currency = SaleCurrencyDto("NO", 1.0, 0, 1, "USD", 1, "USD", 11.6),
+                ),
+            )
+
+        assertEquals("Nota de prueba", request.factura.observacion)
+    }
 }

@@ -54,6 +54,7 @@ class LocalStore(
     internal val selectedCountryKey = stringPreferencesKey("selected_country_code")
     internal val selectedPrinterTypeKey = stringPreferencesKey("selected_printer_type")
     internal val noPrinterPdfFormatKey = stringPreferencesKey("no_printer_pdf_format")
+    internal val ticketFontSizeKey = stringPreferencesKey("ticket_font_size")
     internal val theFactoryIpKey = stringPreferencesKey("the_factory_ip")
     internal val theFactoryPortKey = stringPreferencesKey("the_factory_port")
     internal val theFactoryModeKey = stringPreferencesKey("the_factory_mode")

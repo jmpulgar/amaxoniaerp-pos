@@ -13,6 +13,7 @@ object ClientsGraph {
             DependencyContainer.clientRepository,
             DependencyContainer.posConfigurationRepository,
             DependencyContainer.imageUrlResolver,
+            DependencyContainer.cartRepository,
         )
 
     fun clientFormViewModel(): ClientFormViewModel =
