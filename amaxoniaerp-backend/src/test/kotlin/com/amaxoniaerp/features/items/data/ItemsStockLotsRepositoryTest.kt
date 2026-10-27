@@ -119,6 +119,32 @@ class ItemsStockLotsRepositoryTest {
             assertEquals(emptyList<kotlin.String>(), response.lotes.map { it.codigoLoteItem })
         }
 
+    @Test
+    fun `lotes con id superior a Int MAX_VALUE no se desbordan`() =
+        runBlocking {
+            val largeId = 2_147_546_423L
+            transaction(database) {
+                ConfiguracionLoteTable.insert {
+                    it[idItem] = ITEM
+                    it[habilitado] = 1
+                }
+                ItemLoteTable.insert {
+                    it[idLoteItem] = largeId
+                    it[idItem] = ITEM
+                    it[codAlmacen] = 1
+                    it[codigoLoteItem] = "LOTE-BIGINT"
+                    it[vencimiento] = LocalDate.parse("2026-10-27")
+                    it[disponibilidad] = java.math.BigDecimal("5")
+                }
+            }
+
+            val response = repository.getItemLots(database, ITEM)
+
+            assertTrue(response.poseeConfiguracionLote)
+            val lot = response.lotes.single { it.codigoLoteItem == "LOTE-BIGINT" }
+            assertEquals(largeId, lot.idLoteItem)
+        }
+
     private fun seedWarehousesAndStock() {
         transaction(database) {
             AlmacenTable.insert {

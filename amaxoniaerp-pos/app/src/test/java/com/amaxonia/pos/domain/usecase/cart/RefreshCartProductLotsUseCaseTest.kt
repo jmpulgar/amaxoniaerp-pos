@@ -20,8 +20,8 @@ class RefreshCartProductLotsUseCaseTest {
                 }
             val lots =
                 listOf(
-                    ProductLotAvailability(1, "OLD", "2026-01-01", 2, 10),
-                    ProductLotAvailability(2, "NEW", "2027-01-01", 5, 11),
+                    ProductLotAvailability(2_147_546_423L, "OLD", "2026-01-01", 2, 10),
+                    ProductLotAvailability(2L, "NEW", "2027-01-01", 5, 11),
                 )
             val useCase = RefreshCartProductLotsUseCase(cart, FixedProductLotRepository(lots))
 
@@ -31,6 +31,7 @@ class RefreshCartProductLotsUseCaseTest {
             assertEquals(true, item.hasLotConfig)
             assertEquals(listOf(2, 1), item.lotAssignments.map { it.cantidad })
             assertEquals(listOf("OLD", "NEW"), item.lotAssignments.map { it.codigoLote })
+            assertEquals("2147546423", item.lotAssignments.first().idLoteItem)
         }
 
     @Test

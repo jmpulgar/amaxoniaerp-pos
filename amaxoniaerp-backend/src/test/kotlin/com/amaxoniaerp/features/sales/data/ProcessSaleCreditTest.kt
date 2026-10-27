@@ -81,6 +81,7 @@ class ProcessSaleCreditTest {
 
         assertEquals("contado", invoiceFormaPago())
         assertEquals(CajaStatus.Pagada, cajaStatus())
+        assertEquals("01", invoiceTipoDocumento())
     }
 
     @Test
@@ -501,6 +502,13 @@ class ProcessSaleCreditTest {
             SalesFacturaTablePA
                 .select(SalesFacturaTablePA.formaPago)
                 .single()[SalesFacturaTablePA.formaPago]
+        }
+
+    private fun invoiceTipoDocumento(): String =
+        transaction(database) {
+            SalesFacturaTablePA
+                .select(SalesFacturaTablePA.tipoDocumento)
+                .single()[SalesFacturaTablePA.tipoDocumento]
         }
 
     private fun invoiceDueDate(): LocalDate? =

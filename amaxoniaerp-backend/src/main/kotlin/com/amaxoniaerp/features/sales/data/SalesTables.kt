@@ -44,6 +44,7 @@ abstract class BaseSalesFacturaTable(
     val fechaCreacion = datetime("fecha_creacion").nullable()
     val usuarioCreacion = varchar("usuario_creacion", S.VARCHAR_LENGTH_40)
     val tipoFactura = varchar("tipo_factura", S.VARCHAR_LENGTH_50)
+    val tipoDocumento = varchar("tipo_documento", S.VARCHAR_LENGTH_5).default("01")
     val modeloFactura = varchar("modelo_factura", S.VARCHAR_LENGTH_100).nullable()
     val terminoPagoId = integer("termino_pago_id").nullable()
     val facturarA = varchar("facturar_a", S.VARCHAR_LENGTH_80)

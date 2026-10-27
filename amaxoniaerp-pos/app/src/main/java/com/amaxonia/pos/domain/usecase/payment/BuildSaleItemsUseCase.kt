@@ -92,7 +92,7 @@ class BuildSaleItemsUseCase {
     private fun CartItem.toSaleLots(): List<SaleLotDto> =
         lotAssignments.map { lot ->
             SaleLotDto(
-                idLoteItem = lot.idLoteItem.toIntOrNull() ?: 0,
+                idLoteItem = lot.idLoteItem.toLongOrNull() ?: 0L,
                 codigoLoteItem = lot.codigoLote,
                 cantidad = lot.cantidad,
                 idAlmacen = lot.almacen,

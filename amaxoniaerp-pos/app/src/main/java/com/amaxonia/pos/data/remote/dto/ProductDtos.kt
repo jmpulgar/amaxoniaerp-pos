@@ -65,7 +65,7 @@ data class PriceDto(
 
 @Serializable
 data class ItemLotInfoDto(
-    val idLoteItem: Int,
+    val idLoteItem: Long,
     val codigoLoteItem: String,
     val vencimiento: String? = null,
     val disponibilidad: Int,

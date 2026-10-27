@@ -79,7 +79,7 @@ class BuildSaleItemsUseCaseTest {
         assertEquals(9, result.codVendedor)
         assertEquals(4, result.idSegmento)
         assertEquals(5, result.idFamilia)
-        assertEquals(listOf(12, 0), result.codigosLote.map { it.idLoteItem })
+        assertEquals(listOf(12L, 0L), result.codigosLote.map { it.idLoteItem })
         assertEquals("si", result.poseeConfiguracionLote)
         assertEquals(2.0, result.promocionCantidad, 0.0)
     }

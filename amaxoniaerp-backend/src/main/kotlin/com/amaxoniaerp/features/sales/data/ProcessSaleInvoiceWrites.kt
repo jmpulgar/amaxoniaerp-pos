@@ -53,6 +53,7 @@ internal fun insertFactura(ctx: SaleWriteContext) {
         it[facturaTable.fechaCreacion] = ctx.now
         it[facturaTable.usuarioCreacion] = f.usuarioCreacion
         it[facturaTable.tipoFactura] = "factura_pos"
+        it[facturaTable.tipoDocumento] = "01"
         it[facturaTable.modeloFactura] = "pos"
         it[facturaTable.terminoPagoId] =
             ctx.monetaryContext.defaultFormaPagoId.takeIf { id -> id > 0 } ?: DEFAULT_TERM_PAYMENT_ID
@@ -115,6 +116,7 @@ internal fun updateFactura(ctx: SaleWriteContext) {
         it[facturaTable.idCaja] = f.idCaja
         it[facturaTable.codigoCaja] = f.codigoCaja
         it[facturaTable.codCliente] = f.codCliente
+        it[facturaTable.tipoDocumento] = "01"
         applyFacturaCountryFields(it, facturaTable, f, ctx)
     }
 }

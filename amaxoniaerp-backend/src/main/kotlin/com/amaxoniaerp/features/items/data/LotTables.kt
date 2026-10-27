@@ -17,7 +17,7 @@ object ConfiguracionLoteTable : Table("configuracion_lote") {
 
 /** Lotes disponibles por item */
 object ItemLoteTable : Table("item_lote") {
-    val idLoteItem = integer("id_lote_item").autoIncrement()
+    val idLoteItem = long("id_lote_item").autoIncrement()
     val codAlmacen = integer("cod_almacen")
     val idItem = integer("id_item")
     val codigoLoteItem = varchar("codigo_lote_item", S.VARCHAR_LENGTH_100)
@@ -34,7 +34,7 @@ object FacturaDetalleProductoLoteTable : Table("factura_detalle_producto_lote") 
     val id = varchar("id", S.VARCHAR_LENGTH_36)
     val idDetalleFactura = varchar("id_detalle_factura", S.VARCHAR_LENGTH_36)
     val idItem = integer("id_item")
-    val idLoteItem = integer("id_lote_item")
+    val idLoteItem = long("id_lote_item")
     val cantidad = integer("cantidad")
 
     override val primaryKey = PrimaryKey(id)

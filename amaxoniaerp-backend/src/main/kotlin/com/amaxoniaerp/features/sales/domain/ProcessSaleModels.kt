@@ -161,7 +161,7 @@ data class SaleItemInput(
 @Serializable
 data class SaleLotInput(
     @SerialName("id_lote_item")
-    val idLoteItem: Int,
+    val idLoteItem: Long,
     @SerialName("codigo_lote_item")
     val codigoLoteItem: String,
     val cantidad: Int,

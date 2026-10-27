@@ -309,7 +309,7 @@ class ItemsRepository {
                     while (rs.next()) {
                         list.add(
                             ItemLotInfo(
-                                idLoteItem = rs.getInt("id_lote_item"),
+                                idLoteItem = rs.getLong("id_lote_item"),
                                 codigoLoteItem = rs.getString("codigo_lote_item"),
                                 vencimiento = rs.getString("vencimiento"),
                                 disponibilidad = rs.getInt("disponibilidad"),

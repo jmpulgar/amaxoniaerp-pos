@@ -198,7 +198,7 @@ class ProcessSaleLotAtomicityTest {
 
     private fun Transaction.insertLote(available: Int) {
         ItemLoteTable.insert {
-            it[idLoteItem] = 1
+            it[idLoteItem] = 1L
             it[codAlmacen] = 1
             it[idItem] = 1
             it[codigoLoteItem] = "LOT-1"
@@ -266,7 +266,7 @@ class ProcessSaleLotAtomicityTest {
             codigosLote =
                 listOf(
                     SaleLotInput(
-                        idLoteItem = 1,
+                        idLoteItem = 1L,
                         codigoLoteItem = "LOT-1",
                         cantidad = lotQuantity,
                         idAlmacen = 1,

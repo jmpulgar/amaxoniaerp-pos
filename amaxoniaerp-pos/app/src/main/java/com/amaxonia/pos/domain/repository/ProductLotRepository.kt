@@ -1,7 +1,7 @@
 package com.amaxonia.pos.domain.repository
 
 data class ProductLotAvailability(
-    val id: Int,
+    val id: Long,
     val code: String,
     val expiration: String?,
     val availableQuantity: Int,

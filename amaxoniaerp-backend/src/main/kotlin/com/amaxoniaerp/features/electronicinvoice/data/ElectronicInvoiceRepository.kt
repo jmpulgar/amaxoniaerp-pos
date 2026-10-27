@@ -188,6 +188,7 @@ open class ElectronicInvoiceRepository {
             it[FacturasTablePA.numeroDocumentoFiscal] = update.numeroDocumentoFiscal
             it[FacturasTablePA.puntoFacturacionFiscal] = update.puntoFacturacionFiscal
             it[FacturasTablePA.cufe] = update.cufe
+            it[FacturasTablePA.tipoDocumento] = "01"
             if (update.fechaRecepcionDGI != null) {
                 it[FacturasTablePA.fechaRecepcionDGI] = formatFechaRecepcion(update.fechaRecepcionDGI)
             }
