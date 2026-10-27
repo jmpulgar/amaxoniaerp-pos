@@ -72,11 +72,22 @@ suspend fun ApiService.createClient(
     return response.body()
 }
 
-suspend fun ApiService.getDefaultClient(token: String): ClientDto =
-    client
-        .get("clients/default") {
+suspend fun ApiService.getDefaultClient(token: String): ClientDto {
+    val response =
+        client.get("clients/default") {
             authHeaders(token)
-        }.body()
+        }
+    if (!response.status.isSuccess()) {
+        val errorBody = runCatching { response.body<Map<String, String>>() }.getOrNull()
+        val errorMsg = errorBody?.get("error") ?: "Error al obtener cliente por defecto: ${response.status.value}"
+        error(errorMsg)
+    }
+    val dto: ClientDto = response.body()
+    if (dto.id.isNullOrBlank()) {
+        error("El cliente por defecto devuelto no tiene un id válido")
+    }
+    return dto
+}
 
 suspend fun ApiService.getClientSucursales(
     token: String,

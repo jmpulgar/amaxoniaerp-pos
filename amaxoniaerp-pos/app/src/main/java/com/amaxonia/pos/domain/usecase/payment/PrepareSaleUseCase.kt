@@ -134,10 +134,17 @@ internal class PrepareSaleUseCase(
         val caja = repositories.state.caja.activeCaja.value
         val observacion = repositories.state.cart.observacion.value
         val itemCount = input.saleItemsOverride?.size ?: cartItems.size
-        val validation = operations.validatePayment.validateSaleContext(itemCount, client != null, caja != null)
+        val hasValidClient = client != null && client.id.isNotBlank()
+        val validation =
+            operations.validatePayment.validateSaleContext(
+                itemCount = itemCount,
+                hasClient = client != null,
+                hasCaja = caja != null,
+                hasValidClientId = hasValidClient,
+            )
         return when {
             validation != null -> PreparationStep.Failure(validation.message)
-            client == null || caja == null -> PreparationStep.Failure("No se pudo preparar la venta")
+            client == null || client.id.isBlank() || caja == null -> PreparationStep.Failure("No se pudo preparar la venta")
             else -> PreparationStep.Success(BaseSaleContext(cartItems, client, caja, observacion))
         }
     }

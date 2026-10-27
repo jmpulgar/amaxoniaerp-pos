@@ -5,6 +5,7 @@ import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.dashboard.DashboardCajaCoordinator
 import com.amaxonia.pos.ui.dashboard.DashboardCartCoordinator
+import com.amaxonia.pos.ui.dashboard.DashboardCartDependencies
 import com.amaxonia.pos.ui.dashboard.DashboardCatalogCoordinator
 import com.amaxonia.pos.ui.dashboard.DashboardProductMapper
 import com.amaxonia.pos.ui.dashboard.DashboardViewModel
@@ -36,15 +37,19 @@ object DashboardGraph {
                 ),
             cartCoordinator =
                 DashboardCartCoordinator(
-                    DependencyContainer.promotionRepository,
-                    DependencyContainer.cartRepository,
-                    ResolveClientBranchesUseCase(
-                        DependencyContainer.posConfigurationRepository,
-                        DependencyContainer.clientBranchRepository,
-                    ),
-                    DependencyContainer.refreshCartProductLotsUseCase,
-                    cajaCoordinator,
-                    DependencyContainer.appClock,
+                    dependencies =
+                        DashboardCartDependencies(
+                            promotionRepository = DependencyContainer.promotionRepository,
+                            cartRepository = DependencyContainer.cartRepository,
+                            resolveClientBranches =
+                                ResolveClientBranchesUseCase(
+                                    DependencyContainer.posConfigurationRepository,
+                                    DependencyContainer.clientBranchRepository,
+                                ),
+                            refreshProductLots = DependencyContainer.refreshCartProductLotsUseCase,
+                        ),
+                    saleGate = cajaCoordinator,
+                    clock = DependencyContainer.appClock,
                 ),
             cajaCoordinator = cajaCoordinator,
         )

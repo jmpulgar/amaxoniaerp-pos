@@ -32,6 +32,9 @@ class QueueOfflineInvoiceUseCase(
         clientName: String,
         tenant: SaleTenant,
     ): OfflineInvoice {
+        require(request.factura.idCliente.isNotBlank()) {
+            "No se puede encolar offline una factura sin idCliente válido"
+        }
         val now = clock.now().toEpochMilli()
         val id = idGenerator.nextId()
         val localNumber = "OFF-$now"

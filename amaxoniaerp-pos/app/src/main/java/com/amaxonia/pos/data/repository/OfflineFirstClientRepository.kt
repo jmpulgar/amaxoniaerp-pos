@@ -32,6 +32,9 @@ class OfflineFirstClientRepository(
         return runCatching {
             val dto = apiService.getDefaultClient(token)
             val client = dto.toDomain()
+            if (client.id.isBlank()) {
+                error("Cliente por defecto sin ID válido")
+            }
             val scope = offlineScopeProvider()
             if (scope.enabled) {
                 clientDao.insertAll(listOf(dto.toEntity()))
@@ -40,7 +43,11 @@ class OfflineFirstClientRepository(
         }.recoverCatching { error ->
             val scope = offlineScopeProvider()
             val cached = getCachedClients(limit = 1, offset = 0, scope = scope).firstOrNull()
-            cached ?: throw error
+            if (cached != null && cached.id.isNotBlank()) {
+                cached
+            } else {
+                throw error
+            }
         }
     }
 

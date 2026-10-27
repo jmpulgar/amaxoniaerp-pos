@@ -441,6 +441,10 @@ class ExecutePaymentFlowUseCaseTest {
                         "Debes seleccionar un cliente",
                     ),
                     PreparationScenario(
+                        FixtureOptions(isOnline = true, client = Client(id = "")),
+                        "Debes seleccionar un cliente",
+                    ),
+                    PreparationScenario(
                         FixtureOptions(isOnline = true, includeCaja = false),
                         "Debes seleccionar una caja",
                     ),

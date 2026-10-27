@@ -21,10 +21,11 @@ class ValidatePaymentUseCase {
         itemCount: Int,
         hasClient: Boolean,
         hasCaja: Boolean,
+        hasValidClientId: Boolean = true,
     ): PaymentValidationFailure? =
         when {
             itemCount == 0 -> PaymentValidationFailure.EmptyCart
-            !hasClient -> PaymentValidationFailure.MissingClient
+            !hasClient || !hasValidClientId -> PaymentValidationFailure.MissingClient
             !hasCaja -> PaymentValidationFailure.MissingCaja
             else -> null
         }

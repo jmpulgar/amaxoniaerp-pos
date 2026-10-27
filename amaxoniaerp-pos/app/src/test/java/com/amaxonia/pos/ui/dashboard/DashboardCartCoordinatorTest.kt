@@ -112,10 +112,13 @@ class DashboardCartCoordinatorTest {
         cart: CartRepository,
         gate: DashboardSaleGate,
     ) = DashboardCartCoordinator(
-        promotionRepository = EmptyPromotionRepository,
-        cartRepository = cart,
-        resolveClientBranches = ResolveClientBranchesUseCase(EmptySessionReader) { emptyList() },
-        refreshProductLots = RefreshCartProductLotsUseCase(cart, EmptyLotRepository),
+        dependencies =
+            DashboardCartDependencies(
+                promotionRepository = EmptyPromotionRepository,
+                cartRepository = cart,
+                resolveClientBranches = ResolveClientBranchesUseCase(EmptySessionReader) { emptyList() },
+                refreshProductLots = RefreshCartProductLotsUseCase(cart, EmptyLotRepository),
+            ),
         saleGate = gate,
         clock = AppClock { Instant.ofEpochMilli(1_234L) },
     )

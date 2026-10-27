@@ -12,6 +12,7 @@ import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.dto.ClientDto
+import com.amaxonia.pos.domain.model.Client
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -145,6 +146,17 @@ class OfflineFirstClientRepositoryTest {
             val result = repository.getDefaultClient()
 
             assertEquals("Ana", result.getOrThrow().firstName)
+        }
+
+    @Test
+    fun `getDefaultClient con fallo de red y cache vacio retorna failure`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            val repository = repository(online = true)
+
+            val result = repository.getDefaultClient()
+
+            assertTrue(result.isFailure)
         }
 
     @Test

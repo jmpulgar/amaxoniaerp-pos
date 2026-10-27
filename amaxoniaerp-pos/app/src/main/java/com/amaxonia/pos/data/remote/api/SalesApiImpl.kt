@@ -47,8 +47,11 @@ class SalesApiImpl(
     override suspend fun processSale(
         authHeader: String,
         payload: ProcessSaleRequestDto,
-    ): Result<ProcessSaleResponseDto> =
-        catchingResult {
+    ): Result<ProcessSaleResponseDto> {
+        if (payload.factura.idCliente.isBlank()) {
+            return Result.failure(IllegalArgumentException("No se puede enviar una factura con idCliente vacío"))
+        }
+        return catchingResult {
             val response =
                 apiClient.httpClient.post("api/pos/ventas/procesar") {
                     header("Authorization", authHeader)
@@ -99,6 +102,7 @@ class SalesApiImpl(
 
             Result.success(parsed)
         }
+    }
 
     override suspend fun getFacturas(
         authHeader: String,

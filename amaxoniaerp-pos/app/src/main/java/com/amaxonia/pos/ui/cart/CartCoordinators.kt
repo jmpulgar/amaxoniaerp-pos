@@ -179,7 +179,8 @@ class CartStateCoordinator(
     }
 
     private fun ensureDefaultClient(scope: CoroutineScope) {
-        if (cartRepository.selectedClient.value != null) return
+        val current = cartRepository.selectedClient.value
+        if (current != null && current.id.isNotBlank()) return
         scope.launch {
             clientRepository.getDefaultClient().onSuccess(cartRepository::setClient)
         }

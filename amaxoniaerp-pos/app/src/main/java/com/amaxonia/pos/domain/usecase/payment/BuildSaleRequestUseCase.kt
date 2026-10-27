@@ -10,8 +10,11 @@ import com.amaxonia.pos.domain.model.sales.SalePaymentSummaryDto
 import com.amaxonia.pos.domain.model.sales.SaleTaxDto
 
 class BuildSaleRequestUseCase {
-    operator fun invoke(input: BuildSaleRequestInput): ProcessSaleRequestDto =
-        ProcessSaleRequestDto(
+    operator fun invoke(input: BuildSaleRequestInput): ProcessSaleRequestDto {
+        require(input.invoice.idCliente.isNotBlank()) {
+            "No se puede construir una factura con idCliente vacío"
+        }
+        return ProcessSaleRequestDto(
             idFactura = input.idFactura,
             procesar = input.procesar,
             esCobroCreditoPrevio = input.isPriorCreditCollection,
@@ -26,6 +29,7 @@ class BuildSaleRequestUseCase {
             // partir de la configuración de impresora persistida en Settings.
             useHka20 = input.printerType == PrinterType.THE_FACTORY_HKA,
         )
+    }
 }
 
 data class BuildSaleRequestInput(

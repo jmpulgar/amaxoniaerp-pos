@@ -66,6 +66,20 @@ class BuildSaleRequestUseCaseTest {
         assertFalse(json.containsKey("idFactura"))
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun `building sale request with blank idCliente throws exception`() {
+        BuildSaleRequestUseCase()(
+            BuildSaleRequestInput(
+                invoice = invoice().copy(idCliente = ""),
+                items = listOf(item()),
+                taxes = emptyList(),
+                paymentSummary = SalePaymentSummaryDto(11.6, 20.0, 8.4, 0.0, mapOf("CASH" to 11.6)),
+                payments = emptyList(),
+                currency = SaleCurrencyDto("NO", 1.0, 0, 1, "USD", 1, "USD", 0.0),
+            ),
+        )
+    }
+
     private fun invoice() =
         SaleInvoiceDto(
             idCliente = "client",

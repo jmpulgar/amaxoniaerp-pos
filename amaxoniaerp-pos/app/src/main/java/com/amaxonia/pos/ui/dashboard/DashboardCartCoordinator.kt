@@ -18,19 +18,27 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class DashboardCartDependencies(
+    val promotionRepository: PromotionRepository,
+    val cartRepository: CartRepository,
+    val resolveClientBranches: ResolveClientBranchesUseCase,
+    val refreshProductLots: RefreshCartProductLotsUseCase,
+)
+
 class DashboardCartCoordinator(
-    private val promotionRepository: PromotionRepository,
-    private val cartRepository: CartRepository,
-    private val resolveClientBranches: ResolveClientBranchesUseCase,
-    private val refreshProductLots: RefreshCartProductLotsUseCase,
+    dependencies: DashboardCartDependencies,
     saleGate: DashboardSaleGate,
     clock: AppClock,
 ) {
+    private val promotionRepository = dependencies.promotionRepository
+    private val cartRepository = dependencies.cartRepository
+    private val resolveClientBranches = dependencies.resolveClientBranches
+
     private val productHandler =
         DashboardProductActionHandler(
             promotionRepository,
             cartRepository,
-            refreshProductLots,
+            dependencies.refreshProductLots,
             saleGate,
         )
     private val manualHandler = DashboardManualEntryHandler(productHandler, clock)

@@ -31,6 +31,10 @@ class ValidatePaymentUseCaseTest {
             PaymentValidationFailure.MissingCaja,
             useCase.validateSaleContext(itemCount = 1, hasClient = true, hasCaja = false),
         )
+        assertEquals(
+            PaymentValidationFailure.MissingClient,
+            useCase.validateSaleContext(itemCount = 1, hasClient = true, hasCaja = true, hasValidClientId = false),
+        )
         assertNull(useCase.validateSaleContext(itemCount = 1, hasClient = true, hasCaja = true))
     }
 
