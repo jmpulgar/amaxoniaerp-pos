@@ -80,6 +80,23 @@ class AppDatabaseMigrationTest {
     fun `base creada en v21 migra al schema actual`() = migrateFrom(21)
 
     @Test
+    fun `base creada en v22 migra al schema actual`() = migrateFrom(22)
+
+    @Test
+    fun `migracion 22 a 23 agrega columna codZona a clients`() {
+        val db = openMigratedFrom(22)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            assertTrue(
+                "columna 'codZona' debe existir en clients",
+                sqlite.hasColumn("clients", "codZona"),
+            )
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `migracion 21 a 22 agrega columnas itemDescripcion y itemCodigo a promocion_detalles`() {
         val db = openMigratedFrom(21)
         try {
@@ -277,6 +294,6 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 22
+        const val SCHEMA_VERSION = 23
     }
 }

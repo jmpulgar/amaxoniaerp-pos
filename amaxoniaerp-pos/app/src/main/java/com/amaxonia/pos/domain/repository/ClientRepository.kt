@@ -17,7 +17,7 @@ interface ClientRepository {
 
     suspend fun getClientById(id: String): Result<Client>
 
-    suspend fun getDefaultClient(): Result<Client>
+    suspend fun getDefaultClient(sucursalId: Int? = null): Result<Client>
 
     suspend fun searchClients(query: String): Result<List<Client>>
 

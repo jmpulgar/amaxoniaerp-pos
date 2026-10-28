@@ -359,13 +359,13 @@ class SyncCatalogReader {
     private fun clientQuery(scope: SyncScope): Query {
         val query = ClientsTable.selectAll()
         if (!scope.allClients) {
-            val branchIds = scope.branchIds.toList()
-            query.andWhere {
-                if (branchIds.isEmpty()) {
-                    Op.FALSE
-                } else {
-                    ClientsTable.idSucursal inList branchIds
-                }
+            if (scope.branchIds.isNotEmpty()) {
+                val branchIds = scope.branchIds.toList()
+                query.andWhere { ClientsTable.idSucursal inList branchIds }
+            }
+            if (scope.zoneCodes.isNotEmpty()) {
+                val zoneCodes = scope.zoneCodes.toList()
+                query.andWhere { ClientsTable.codZona inList zoneCodes }
             }
         }
         return query

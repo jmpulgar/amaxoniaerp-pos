@@ -24,6 +24,15 @@ class SyncScopeTest {
     }
 
     @Test
+    fun `parsea zoneCodes y restringe alcance de clientes`() {
+        val expectedZones = setOf("Z-1", "Z-2")
+        val scope = SyncScope.fromParams(null, null, " Z-1, Z-2 , Z-1 ")
+        assertEquals(expectedZones, scope.zoneCodes)
+        assertTrue(scope.allProducts)
+        assertFalse(scope.allClients)
+    }
+
+    @Test
     fun `el alcance restringido limita la cantidad de ids por filtro`() {
         val extra = 50
         val many = (1..(SyncScope.MAX_IDS_PER_FILTER + extra)).joinToString(",") { it.toString() }

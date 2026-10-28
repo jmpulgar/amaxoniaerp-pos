@@ -69,6 +69,11 @@ internal class ClientsHandlers(
                     ?.split(',')
                     ?.mapNotNull { it.trim().toIntOrNull() }
                     ?.filter { it > 0 }
+            val zoneCodes =
+                call.request.queryParameters["zoneCodes"]
+                    ?.split(',')
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() }
             val sellerId = call.request.queryParameters["sellerId"]?.toIntOrNull()
 
             val companyDb = ctx.connectDatabase()
@@ -81,6 +86,7 @@ internal class ClientsHandlers(
                     includeTotal,
                     branchIds,
                     sellerId,
+                    zoneCodes,
                 )
             call.respond(ClientsListResponse(data = clients, total = total))
         }
@@ -89,8 +95,12 @@ internal class ClientsHandlers(
         run {
             val ctx = call.resolveCompanyRequestContext() ?: return@run
 
+            val sucursalId =
+                call.request.queryParameters["sucursalId"]?.toIntOrNull()
+                    ?: call.request.queryParameters["branchId"]?.toIntOrNull()
+
             val companyDb = ctx.connectDatabase()
-            val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode)
+            val defaultClient = clientsRepository.getDefaultClient(companyDb, ctx.countryCode, sucursalId)
             if (defaultClient == null) {
                 call.respond(HttpStatusCode.NotFound, mapOf("error" to "Default client not configured"))
                 return@run

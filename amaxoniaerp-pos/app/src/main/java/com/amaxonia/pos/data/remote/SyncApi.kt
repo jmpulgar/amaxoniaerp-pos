@@ -23,6 +23,7 @@ class SyncCursorExpiredApiException(
 data class SyncScopeQuery(
     val deptIds: List<Int>? = null,
     val branchIds: List<Int>? = null,
+    val zoneCodes: List<String>? = null,
 )
 
 interface SyncApiClient {
@@ -53,6 +54,8 @@ interface SyncApiClient {
     ): SyncScopePreviewDto
 
     suspend fun sucursales(token: String): List<SyncCatalogItemDto>
+
+    suspend fun zonas(token: String): List<SyncCatalogItemDto>
 }
 
 private val syncErrorJson = Json { ignoreUnknownKeys = true }
@@ -73,6 +76,7 @@ class SyncApi(
                 url {
                     appendCsv("deptIds", scope.deptIds)
                     appendCsv("branchIds", scope.branchIds)
+                    appendStringCsv("zoneCodes", scope.zoneCodes)
                 }
             }.scopedBody()
 
@@ -91,6 +95,7 @@ class SyncApi(
                     if (afterId != null) parameters.append("afterId", afterId)
                     appendCsv("deptIds", scope.deptIds)
                     appendCsv("branchIds", scope.branchIds)
+                    appendStringCsv("zoneCodes", scope.zoneCodes)
                 }
             }.scopedBody()
 
@@ -109,6 +114,7 @@ class SyncApi(
                         parameters.append("limit", limit.toString())
                         appendCsv("deptIds", scope.deptIds)
                         appendCsv("branchIds", scope.branchIds)
+                        appendStringCsv("zoneCodes", scope.zoneCodes)
                     }
                 }
         if (response.status.value == HTTP_GONE) {
@@ -131,6 +137,7 @@ class SyncApi(
                     parameters.append("entity", entity)
                     appendCsv("deptIds", scope.deptIds)
                     appendCsv("branchIds", scope.branchIds)
+                    appendStringCsv("zoneCodes", scope.zoneCodes)
                 }
             }.scopedBody()
 
@@ -139,11 +146,26 @@ class SyncApi(
             .get("api/sync/v1/sucursales") {
                 authHeaders(token)
             }.body()
+
+    override suspend fun zonas(token: String): List<SyncCatalogItemDto> =
+        apiService.client
+            .get("api/sync/v1/zonas") {
+                authHeaders(token)
+            }.body()
 }
 
 private fun io.ktor.http.URLBuilder.appendCsv(
     name: String,
     values: List<Int>?,
+) {
+    if (!values.isNullOrEmpty()) {
+        parameters.append(name, values.joinToString(","))
+    }
+}
+
+private fun io.ktor.http.URLBuilder.appendStringCsv(
+    name: String,
+    values: List<String>?,
 ) {
     if (!values.isNullOrEmpty()) {
         parameters.append(name, values.joinToString(","))

@@ -10,11 +10,11 @@ import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.SyncApi
 import com.amaxonia.pos.data.repository.FakeSecureKeyValueStore
-import com.amaxonia.pos.domain.repository.Department
-import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
-import kotlinx.coroutines.test.runTest
+import com.amaxonia.pos.domain.model.offline.ClientFilterMode
+import com.amaxonia.pos.domain.repository.Department
+import com.amaxonia.pos.domain.repository.ProductRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,7 +45,11 @@ class OfflineSyncSettingsRepositoryTest {
         override suspend fun getAllProducts(page: Int, pageSize: Int): Result<List<Product>> = Result.success(emptyList())
         override suspend fun getAllProducts(): Result<List<Product>> = Result.success(emptyList())
         override suspend fun getAllProducts(departmentId: Int?): Result<List<Product>> = Result.success(emptyList())
-        override suspend fun getAllProducts(departmentId: Int?, page: Int, pageSize: Int): Result<List<Product>> = Result.success(emptyList())
+        override suspend fun getAllProducts(
+            departmentId: Int?,
+            page: Int,
+            pageSize: Int,
+        ): Result<List<Product>> = Result.success(emptyList())
         override suspend fun getProductById(id: String): Result<Product> = Result.failure(NotImplementedError())
         override suspend fun getProductStock(id: String): Result<ProductStock> = Result.failure(NotImplementedError())
         override suspend fun searchProducts(query: String): Result<List<Product>> = Result.success(emptyList())
@@ -148,5 +152,45 @@ class OfflineSyncSettingsRepositoryTest {
         repository.clearSucursales()
         assertFalse(repository.uiState.value.clientModeAll)
         assertTrue(repository.uiState.value.selectedSucursalIds.isEmpty())
+    }
+
+    @Test
+    fun `toggleZone activa ClientFilterMode ZONE y agrega la zona seleccionada`() {
+        repository.setClientModeAll(true)
+        assertTrue(repository.uiState.value.clientModeAll)
+
+        repository.toggleZone("Z-NORTE")
+
+        assertEquals(ClientFilterMode.ZONE, repository.uiState.value.clientFilterMode)
+        assertFalse(repository.uiState.value.clientModeAll)
+        assertEquals(setOf("Z-NORTE"), repository.uiState.value.selectedZoneCodes)
+    }
+
+    @Test
+    fun `selectAllZones y clearZones operan sobre selectedZoneCodes y ClientFilterMode ZONE`() {
+        repository.setClientModeAll(true)
+        repository.selectAllZones(setOf("Z1", "Z2"))
+
+        assertEquals(ClientFilterMode.ZONE, repository.uiState.value.clientFilterMode)
+        assertFalse(repository.uiState.value.clientModeAll)
+        assertEquals(setOf("Z1", "Z2"), repository.uiState.value.selectedZoneCodes)
+
+        repository.clearZones()
+        assertEquals(ClientFilterMode.ZONE, repository.uiState.value.clientFilterMode)
+        assertTrue(repository.uiState.value.selectedZoneCodes.isEmpty())
+    }
+
+    @Test
+    fun `setClientFilterMode ALL limpia sucursales y zonas seleccionadas`() {
+        repository.toggleZone("Z1")
+        repository.toggleSucursal("10")
+        assertFalse(repository.uiState.value.clientModeAll)
+
+        repository.setClientFilterMode(ClientFilterMode.ALL)
+
+        assertTrue(repository.uiState.value.clientModeAll)
+        assertEquals(ClientFilterMode.ALL, repository.uiState.value.clientFilterMode)
+        assertTrue(repository.uiState.value.selectedSucursalIds.isEmpty())
+        assertTrue(repository.uiState.value.selectedZoneCodes.isEmpty())
     }
 }

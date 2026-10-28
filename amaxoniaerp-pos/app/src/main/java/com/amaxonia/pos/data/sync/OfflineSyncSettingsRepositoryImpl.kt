@@ -5,6 +5,7 @@ import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.remote.SyncApi
 import com.amaxonia.pos.data.remote.SyncScopeQuery
+import com.amaxonia.pos.domain.model.offline.ClientFilterMode
 import com.amaxonia.pos.domain.model.offline.OfflineCatalogEntry
 import com.amaxonia.pos.domain.model.tenant.SaleTenant
 import com.amaxonia.pos.domain.repository.OfflineSettingsStatus
@@ -58,16 +59,22 @@ class OfflineSyncSettingsRepositoryImpl(
                 runCatching { syncApi.sucursales(token) }
                     .getOrDefault(emptyList())
                     .map { entry -> OfflineCatalogEntry(id = entry.id, nombre = entry.nombre) }
+            val zonas =
+                runCatching { syncApi.zonas(token) }
+                    .getOrDefault(emptyList())
+                    .map { entry -> OfflineCatalogEntry(id = entry.id, nombre = entry.nombre) }
             _uiState.update {
                 it.copy(
                     status = OfflineSettingsStatus.IDLE,
                     syncEnabled = saved.enabled,
                     productModeAll = saved.allProducts,
-                    clientModeAll = saved.allClients,
+                    clientFilterMode = saved.clientFilterMode,
                     selectedDepartmentIds = saved.departmentIds,
                     selectedSucursalIds = saved.branchIds.map { id -> id.toString() }.toSet(),
+                    selectedZoneCodes = saved.zoneCodes,
                     departments = departments,
                     sucursales = sucursales,
+                    zonas = zonas,
                 )
             }
         }
@@ -124,10 +131,15 @@ class OfflineSyncSettingsRepositoryImpl(
     }
 
     override fun setClientModeAll(all: Boolean) {
+        setClientFilterMode(if (all) ClientFilterMode.ALL else ClientFilterMode.SUCURSAL)
+    }
+
+    override fun setClientFilterMode(mode: ClientFilterMode) {
         _uiState.update { current ->
             current.copy(
-                clientModeAll = all,
-                selectedSucursalIds = if (all) emptySet() else current.selectedSucursalIds,
+                clientFilterMode = mode,
+                selectedSucursalIds = if (mode == ClientFilterMode.ALL) emptySet() else current.selectedSucursalIds,
+                selectedZoneCodes = if (mode == ClientFilterMode.ALL) emptySet() else current.selectedZoneCodes,
             )
         }
         refreshPreview()
@@ -143,7 +155,7 @@ class OfflineSyncSettingsRepositoryImpl(
                 }
             current.copy(
                 selectedSucursalIds = selected,
-                clientModeAll = false,
+                clientFilterMode = ClientFilterMode.SUCURSAL,
             )
         }
         refreshPreview()
@@ -153,7 +165,7 @@ class OfflineSyncSettingsRepositoryImpl(
         _uiState.update { current ->
             current.copy(
                 selectedSucursalIds = ids,
-                clientModeAll = false,
+                clientFilterMode = ClientFilterMode.SUCURSAL,
             )
         }
         refreshPreview()
@@ -163,7 +175,43 @@ class OfflineSyncSettingsRepositoryImpl(
         _uiState.update { current ->
             current.copy(
                 selectedSucursalIds = emptySet(),
-                clientModeAll = false,
+                clientFilterMode = ClientFilterMode.SUCURSAL,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun toggleZone(code: String) {
+        _uiState.update { current ->
+            val selected =
+                if (code in current.selectedZoneCodes) {
+                    current.selectedZoneCodes - code
+                } else {
+                    current.selectedZoneCodes + code
+                }
+            current.copy(
+                selectedZoneCodes = selected,
+                clientFilterMode = ClientFilterMode.ZONE,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun selectAllZones(codes: Set<String>) {
+        _uiState.update { current ->
+            current.copy(
+                selectedZoneCodes = codes,
+                clientFilterMode = ClientFilterMode.ZONE,
+            )
+        }
+        refreshPreview()
+    }
+
+    override fun clearZones() {
+        _uiState.update { current ->
+            current.copy(
+                selectedZoneCodes = emptySet(),
+                clientFilterMode = ClientFilterMode.ZONE,
             )
         }
         refreshPreview()
@@ -175,18 +223,33 @@ class OfflineSyncSettingsRepositoryImpl(
         ioScope.launch {
             val token = localStore.readCompanySession()?.token ?: return@launch
             val deptIds = if (current.productModeAll) null else current.selectedDepartmentIds.toList()
-            val branchIds = if (current.clientModeAll) null else current.selectedSucursalIds.mapNotNull { it.toIntOrNull() }
+            val branchIds =
+                if (current.clientFilterMode == ClientFilterMode.SUCURSAL) {
+                    current.selectedSucursalIds.mapNotNull { it.toIntOrNull() }
+                } else {
+                    null
+                }
+            val zoneCodes =
+                if (current.clientFilterMode == ClientFilterMode.ZONE) {
+                    current.selectedZoneCodes.toList()
+                } else {
+                    null
+                }
             val productPreview =
                 if (current.productModeAll) {
                     null
                 } else {
-                    runCatching { syncApi.scopePreview(token, "PRODUCT", SyncScopeQuery(deptIds, branchIds)) }.getOrNull()?.count
+                    runCatching {
+                        syncApi.scopePreview(token, "PRODUCT", SyncScopeQuery(deptIds, branchIds, zoneCodes))
+                    }.getOrNull()?.count
                 }
             val clientPreview =
-                if (current.clientModeAll) {
+                if (current.clientFilterMode == ClientFilterMode.ALL) {
                     null
                 } else {
-                    runCatching { syncApi.scopePreview(token, "CLIENT", SyncScopeQuery(deptIds, branchIds)) }.getOrNull()?.count
+                    runCatching {
+                        syncApi.scopePreview(token, "CLIENT", SyncScopeQuery(deptIds, branchIds, zoneCodes))
+                    }.getOrNull()?.count
                 }
             _uiState.update { it.copy(productPreview = productPreview, clientPreview = clientPreview) }
         }
@@ -196,42 +259,22 @@ class OfflineSyncSettingsRepositoryImpl(
         val current = _uiState.value
         if (current.status == OfflineSettingsStatus.APPLYING) return
         _uiState.update { it.copy(status = OfflineSettingsStatus.APPLYING) }
-        val departmentIds = if (current.productModeAll) emptySet() else current.selectedDepartmentIds
-        val branchIds = if (current.clientModeAll) emptySet() else current.selectedSucursalIds.mapNotNull { it.toIntOrNull() }.toSet()
-        val newScope =
-            OfflineSyncScope(
-                enabled = current.syncEnabled,
-                departmentIds = departmentIds,
-                branchIds = branchIds,
-            )
+        val newScope = buildNewScope(current)
         ioScope.launch {
             scopeStore.save(newScope)
             if (current.syncEnabled) {
                 val purge = syncEngine.purgeForScope(newScope)
                 if (purge is SyncEngine.Outcome.Error) {
-                    _uiState.update {
-                        it.copy(
-                            status = OfflineSettingsStatus.IDLE,
-                            message = purge.message,
-                        )
-                    }
+                    _uiState.update { it.copy(status = OfflineSettingsStatus.IDLE, message = purge.message) }
                     return@launch
                 }
-                _uiState.update {
-                    it.copy(message = "Sincronizando catálogo offline...")
-                }
+                _uiState.update { it.copy(message = "Sincronizando catálogo offline...") }
                 val syncResult = syncEngine.runBootstrap()
                 bootstrapEnqueuer()
                 _uiState.update {
                     it.copy(
                         status = OfflineSettingsStatus.IDLE,
-                        message =
-                            when (syncResult) {
-                                is SyncEngine.Outcome.Success ->
-                                    "Ajustes de visibilidad guardados y catálogo sincronizado (${syncResult.changesApplied} elementos descargados)."
-                                is SyncEngine.Outcome.Error ->
-                                    "Ajustes de visibilidad guardados. Error al descargar: ${syncResult.message}. Sincronización re-encolada en segundo plano."
-                            },
+                        message = syncResultMessage(syncResult),
                     )
                 }
             } else {
@@ -245,4 +288,37 @@ class OfflineSyncSettingsRepositoryImpl(
             }
         }
     }
+
+    private fun buildNewScope(current: OfflineSettingsUiModel): OfflineSyncScope {
+        val departmentIds = if (current.productModeAll) emptySet() else current.selectedDepartmentIds
+        val branchIds =
+            if (current.clientFilterMode == ClientFilterMode.SUCURSAL) {
+                current.selectedSucursalIds.mapNotNull { it.toIntOrNull() }.toSet()
+            } else {
+                emptySet()
+            }
+        val zoneCodes =
+            if (current.clientFilterMode == ClientFilterMode.ZONE) {
+                current.selectedZoneCodes
+            } else {
+                emptySet()
+            }
+        return OfflineSyncScope(
+            enabled = current.syncEnabled,
+            departmentIds = departmentIds,
+            branchIds = branchIds,
+            zoneCodes = zoneCodes,
+            clientFilterMode = current.clientFilterMode,
+        )
+    }
+
+    private fun syncResultMessage(syncResult: SyncEngine.Outcome): String =
+        when (syncResult) {
+            is SyncEngine.Outcome.Success ->
+                "Ajustes de visibilidad guardados y catálogo sincronizado " +
+                    "(${syncResult.changesApplied} elementos descargados)."
+            is SyncEngine.Outcome.Error ->
+                "Ajustes de visibilidad guardados. Error al descargar: " +
+                    "${syncResult.message}. Sincronización re-encolada en segundo plano."
+        }
 }

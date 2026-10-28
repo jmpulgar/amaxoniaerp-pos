@@ -147,6 +147,14 @@ fun Route.syncRoutes(
                 }
             }
 
+            get("/zonas") {
+                run {
+                    val ctx = call.resolveCompanyRequestContext() ?: return@run
+                    val companyDb = ctx.connectDatabase()
+                    call.respond(syncRepository.zonas(companyDb))
+                }
+            }
+
             get("/departamentos") {
                 run {
                     val ctx = call.resolveCompanyRequestContext() ?: return@run
@@ -170,6 +178,7 @@ private fun ApplicationCall.syncScope(): SyncScope =
     SyncScope.fromParams(
         deptIds = request.queryParameters["deptIds"],
         branchIds = request.queryParameters["branchIds"],
+        zoneCodes = request.queryParameters["zoneCodes"],
     )
 
 private fun ApplicationCall.pageLimit(): Int =

@@ -31,6 +31,9 @@ data class ClientDto(
     val photoFilename: String? = null,
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
+    val codZona: String? = null,
+    @kotlinx.serialization.SerialName("cod_zona")
+    val codZonaSnake: String? = null,
 )
 
 @Serializable

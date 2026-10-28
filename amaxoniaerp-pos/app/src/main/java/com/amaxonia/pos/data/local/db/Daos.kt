@@ -24,6 +24,10 @@ interface ClientDao {
     @Query("DELETE FROM clients WHERE idSucursal IS NULL OR idSucursal NOT IN (:sucursalIds)")
     suspend fun deleteBySucursalesNotIn(sucursalIds: List<Int>)
 
+    /** Purga de alcance: conserva solo clientes de las zonas dadas. */
+    @Query("DELETE FROM clients WHERE codZona IS NULL OR codZona NOT IN (:zoneCodes)")
+    suspend fun deleteByZonasNotIn(zoneCodes: List<String>)
+
     @Query("DELETE FROM clients")
     suspend fun clearAll()
 
@@ -42,6 +46,16 @@ interface ClientDao {
     )
     suspend fun getPagedBySucursales(
         sucursalIds: List<Int>,
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
+
+    @Query(
+        "SELECT * FROM clients WHERE codZona IN (:zoneCodes) " +
+            "ORDER BY name, lastName LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getPagedByZonas(
+        zoneCodes: List<String>,
         limit: Int,
         offset: Int,
     ): List<ClientEntity>
@@ -74,6 +88,23 @@ interface ClientDao {
     suspend fun searchPagedBySucursales(
         query: String,
         sucursalIds: List<Int>,
+        limit: Int,
+        offset: Int,
+    ): List<ClientEntity>
+
+    @Query(
+        "SELECT * FROM clients " +
+            "WHERE codZona IN (:zoneCodes) AND (" +
+            "name LIKE :query COLLATE NOCASE " +
+            "OR lastName LIKE :query COLLATE NOCASE " +
+            "OR identification LIKE :query COLLATE NOCASE " +
+            "OR phone LIKE :query COLLATE NOCASE " +
+            "OR email LIKE :query COLLATE NOCASE) " +
+            "ORDER BY name, lastName LIMIT :limit OFFSET :offset",
+    )
+    suspend fun searchPagedByZonas(
+        query: String,
+        zoneCodes: List<String>,
         limit: Int,
         offset: Int,
     ): List<ClientEntity>

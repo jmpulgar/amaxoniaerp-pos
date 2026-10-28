@@ -39,6 +39,7 @@ internal fun mapClientSync(row: ResultRow): ClientSyncDto =
         limite = row[ClientsTable.limite],
         dias = row[ClientsTable.dias],
         idSucursal = row[ClientsTable.idSucursal]?.takeIf { it > 0 },
+        codZona = row[ClientsTable.codZona]?.takeIf { it.isNotBlank() },
     )
 
 internal fun mapClientBranchSync(row: ResultRow): ClientBranchSyncDto =

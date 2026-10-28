@@ -76,6 +76,7 @@ class SyncRepositoryContractTest {
                 it[nombre] = "CLIENTE A"
                 it[estado] = "1"
                 it[idSucursal] = sucursalA
+                it[codZona] = "ZONA-NORTE"
             }
             ClientsTable.insert {
                 it[idCliente] = "CLI-B"
@@ -84,6 +85,7 @@ class SyncRepositoryContractTest {
                 it[nombre] = "CLIENTE B"
                 it[estado] = "1"
                 it[idSucursal] = sucursalB
+                it[codZona] = "ZONA-SUR"
             }
             CatalogChangesTable.insert {
                 it[entityType] = "PRODUCT"
@@ -134,6 +136,10 @@ class SyncRepositoryContractTest {
             val allProducts = all.entities.first { it.type == "PRODUCT" }
             assertEquals(3L, allProducts.count)
             assertTrue(allProducts.hash != products.hash)
+
+            val scopedZone = repository.manifest(database, country, SyncScope.fromParams(null, null, "ZONA-NORTE"))
+            val zoneClients = scopedZone.entities.first { it.type == "CLIENT" }
+            assertEquals(1L, zoneClients.count)
         }
 
     @Test

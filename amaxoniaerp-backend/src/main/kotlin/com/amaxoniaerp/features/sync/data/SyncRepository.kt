@@ -170,6 +170,31 @@ class SyncRepository(
             }
         }
 
+    suspend fun zonas(database: Database): List<SimpleCatalogItemDto> =
+        dbQuery(database) {
+            runCatching {
+                TransactionManager.current().exec("SELECT * FROM zonas ORDER BY 1") { rs ->
+                    val meta = rs.metaData
+                    val cols = (1..meta.columnCount).associateBy { meta.getColumnLabel(it).lowercase() }
+                    val idIdx = firstColumn(cols, "cod_zona", "codigo", "id")
+                    val nameIdx = firstColumn(cols, "descripcion", "nombre", "zona")
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                SimpleCatalogItemDto(
+                                    id = valueAsString(idIdx?.let { rs.getObject(it) }).orEmpty(),
+                                    nombre = valueAsString(nameIdx?.let { rs.getObject(it) }),
+                                ),
+                            )
+                        }
+                    }
+                } ?: emptyList()
+            }.getOrElse {
+                log.warn("No se pudo leer el catálogo de zonas: {}", it.message)
+                emptyList()
+            }
+        }
+
     /** Elimina del feed los cambios más viejos que `retentionDays`. */
     suspend fun pruneOldChanges(
         database: Database,

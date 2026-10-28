@@ -23,6 +23,7 @@ data class ClientQueryParams(
     val includeTotal: Boolean? = null,
     val branchIds: List<Int>? = null,
     val sellerId: Int? = null,
+    val zoneCodes: List<String>? = null,
 )
 
 /**
@@ -48,6 +49,9 @@ suspend fun ApiService.getClients(
                 if (!params.branchIds.isNullOrEmpty()) {
                     parameters.append("branchIds", params.branchIds.joinToString(","))
                 }
+                if (!params.zoneCodes.isNullOrEmpty()) {
+                    parameters.append("zoneCodes", params.zoneCodes.joinToString(","))
+                }
                 if (params.sellerId != null && params.sellerId > 0) {
                     parameters.append("sellerId", params.sellerId.toString())
                 }
@@ -72,10 +76,18 @@ suspend fun ApiService.createClient(
     return response.body()
 }
 
-suspend fun ApiService.getDefaultClient(token: String): ClientDto {
+suspend fun ApiService.getDefaultClient(
+    token: String,
+    sucursalId: Int? = null,
+): ClientDto {
     val response =
         client.get("clients/default") {
             authHeaders(token)
+            if (sucursalId != null) {
+                url {
+                    parameters.append("sucursalId", sucursalId.toString())
+                }
+            }
         }
     if (!response.status.isSuccess()) {
         val errorBody = runCatching { response.body<Map<String, String>>() }.getOrNull()

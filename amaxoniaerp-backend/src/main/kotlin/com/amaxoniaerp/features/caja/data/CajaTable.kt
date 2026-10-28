@@ -48,6 +48,7 @@ object SucursalTable : Table("sucursal") {
     val codigoSucursalEmisor = varchar("codigo_sucursal_emisor", S.VARCHAR_LENGTH_20).nullable()
     val sucursal = varchar("sucursal", S.VARCHAR_LENGTH_100).nullable()
     val descripcion = varchar("descripcion", S.VARCHAR_LENGTH_150).nullable()
+    val idClienteDefault = varchar("id_cliente_default", S.VARCHAR_LENGTH_36).nullable()
 
     override val primaryKey = PrimaryKey(idSucursal)
 }

@@ -12,7 +12,6 @@ import com.amaxonia.pos.data.remote.ApiClient
 import com.amaxonia.pos.data.remote.ApiConfigManager
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.dto.ClientDto
-import com.amaxonia.pos.domain.model.Client
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -169,7 +168,11 @@ class OfflineFirstClientRepositoryTest {
                     entity("2", name = "Cliente Sucursal 20", idSucursal = 20),
                 ),
             )
-            val repository = repository(online = false, scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)))
+            val repository =
+                repository(
+                    online = false,
+                    scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)),
+                )
 
             val result = repository.getAllClients(page = 1, pageSize = 10)
 
@@ -186,11 +189,57 @@ class OfflineFirstClientRepositoryTest {
                     entity("2", name = "Juan Sucursal 20", idSucursal = 20),
                 ),
             )
-            val repository = repository(online = false, scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)))
+            val repository =
+                repository(
+                    online = false,
+                    scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, branchIds = setOf(10)),
+                )
 
             val result = repository.searchClients("Juan", page = 1, pageSize = 10)
 
             assertEquals(listOf("Juan Sucursal 10"), result.getOrThrow().map { it.firstName })
+        }
+
+    @Test
+    fun `getAllClients offline respeta el alcance de visibilidad de zonas`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            db.clientDao().insertAll(
+                listOf(
+                    entity("1", name = "Cliente Zona Norte", codZona = "NORTE"),
+                    entity("2", name = "Cliente Zona Sur", codZona = "SUR"),
+                ),
+            )
+            val repository =
+                repository(
+                    online = false,
+                    scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, zoneCodes = setOf("NORTE")),
+                )
+
+            val result = repository.getAllClients(page = 1, pageSize = 10)
+
+            assertEquals(listOf("Cliente Zona Norte"), result.getOrThrow().map { it.firstName })
+        }
+
+    @Test
+    fun `searchClients offline respeta el alcance de visibilidad de zonas`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            db.clientDao().insertAll(
+                listOf(
+                    entity("1", name = "Carlos Norte", codZona = "NORTE"),
+                    entity("2", name = "Carlos Sur", codZona = "SUR"),
+                ),
+            )
+            val repository =
+                repository(
+                    online = false,
+                    scope = com.amaxonia.pos.data.sync.OfflineSyncScope(enabled = true, zoneCodes = setOf("NORTE")),
+                )
+
+            val result = repository.searchClients("Carlos", page = 1, pageSize = 10)
+
+            assertEquals(listOf("Carlos Norte"), result.getOrThrow().map { it.firstName })
         }
 
     @Test
@@ -263,6 +312,7 @@ class OfflineFirstClientRepositoryTest {
         name: String,
         lastName: String = "",
         idSucursal: Int? = null,
+        codZona: String? = null,
     ): com.amaxonia.pos.data.local.db.ClientEntity =
         com.amaxonia.pos.data.local.db.ClientEntity(
             id = id,
@@ -282,6 +332,7 @@ class OfflineFirstClientRepositoryTest {
             addressLevel2 = "",
             addressLevel3 = "",
             idSucursal = idSucursal,
+            codZona = codZona,
         )
 
     private fun domainClient(

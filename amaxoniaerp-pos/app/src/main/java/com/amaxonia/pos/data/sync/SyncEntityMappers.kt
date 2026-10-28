@@ -65,6 +65,7 @@ fun ClientSyncDto.toEntity(): ClientEntity =
         diasCredito = dias,
         codTipoPrecio = codTipoPrecio,
         idSucursal = idSucursal,
+        codZona = codZona,
     )
 
 fun ClientBranchSyncDto.toEntity(): ClientSucursalEntity =

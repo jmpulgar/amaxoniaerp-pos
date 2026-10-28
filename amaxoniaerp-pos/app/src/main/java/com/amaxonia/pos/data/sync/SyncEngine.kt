@@ -15,6 +15,7 @@ import com.amaxonia.pos.data.remote.SyncApiClient
 import com.amaxonia.pos.data.remote.SyncCursorExpiredApiException
 import com.amaxonia.pos.data.remote.SyncScopeQuery
 import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
+import com.amaxonia.pos.domain.model.offline.ClientFilterMode
 import kotlinx.serialization.json.JsonElement
 
 private const val SCOPE_GLOBAL = "GLOBAL"
@@ -146,7 +147,10 @@ class SyncEngine(
                 null
             } else {
                 runCatching {
-                    api.manifest(token = context.token, scope = SyncScopeQuery(scope.deptParams(), scope.branchParams()))
+                    api.manifest(
+                        token = context.token,
+                        scope = SyncScopeQuery(scope.deptParams(), scope.branchParams(), scope.zoneParams()),
+                    )
                 }.getOrNull()
             }
         val outcome =
@@ -187,7 +191,7 @@ class SyncEngine(
                         token = context.token,
                         cursor = cursor,
                         limit = PAGE_LIMIT,
-                        scope = SyncScopeQuery(scope.deptParams(), scope.branchParams()),
+                        scope = SyncScopeQuery(scope.deptParams(), scope.branchParams(), scope.zoneParams()),
                     )
                 }
             val page = pageResult.getOrNull()
@@ -242,7 +246,7 @@ class SyncEngine(
     ): Outcome {
         val manifest =
             runCatching {
-                api.manifest(token = context.token, scope = SyncScopeQuery(scope.deptParams(), scope.branchParams()))
+                api.manifest(token = context.token, scope = SyncScopeQuery(scope.deptParams(), scope.branchParams(), scope.zoneParams()))
             }
         val snapshotId = manifest.getOrNull()?.latestChangeId
         val bootstrap =
@@ -279,7 +283,7 @@ class SyncEngine(
                             entityType = entity,
                             afterId = afterId,
                             limit = PAGE_LIMIT,
-                            scope = SyncScopeQuery(scope.deptParams(), scope.branchParams()),
+                            scope = SyncScopeQuery(scope.deptParams(), scope.branchParams(), scope.zoneParams()),
                         )
                     }.getOrNull()
                 if (page == null) {
@@ -347,10 +351,10 @@ class SyncEngine(
             } else {
                 database.productDao().deleteByDepartmentsNotIn(scope.departmentIds.toList())
             }
-            if (scope.allClients) {
-                database.clientDao().deleteBySucursalesNotIn(emptyList())
-            } else {
-                database.clientDao().deleteBySucursalesNotIn(scope.branchIds.toList())
+            when (scope.clientFilterMode) {
+                ClientFilterMode.ALL -> database.clientDao().deleteBySucursalesNotIn(emptyList())
+                ClientFilterMode.SUCURSAL -> database.clientDao().deleteBySucursalesNotIn(scope.branchIds.toList())
+                ClientFilterMode.ZONE -> database.clientDao().deleteByZonasNotIn(scope.zoneCodes.toList())
             }
             SYNC_ENTITY_ORDER.forEach { entity ->
                 val state = database.syncStateDao().get(tenant, entity)

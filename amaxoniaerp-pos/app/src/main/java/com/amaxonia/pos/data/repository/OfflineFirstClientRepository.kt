@@ -15,6 +15,7 @@ import com.amaxonia.pos.data.remote.getDefaultClient
 import com.amaxonia.pos.data.remote.updateClient
 import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Client
+import com.amaxonia.pos.domain.model.offline.ClientFilterMode
 import com.amaxonia.pos.domain.repository.ClientRepository
 
 class OfflineFirstClientRepository(
@@ -24,13 +25,13 @@ class OfflineFirstClientRepository(
     private val networkMonitor: NetworkMonitor,
     private val offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
 ) : ClientRepository {
-    override suspend fun getDefaultClient(): Result<Client> {
+    override suspend fun getDefaultClient(sucursalId: Int?): Result<Client> {
         val token =
             localStore.readCompanySession()?.token
                 ?: return Result.failure(IllegalStateException("No hay empresa seleccionada"))
 
         return runCatching {
-            val dto = apiService.getDefaultClient(token)
+            val dto = apiService.getDefaultClient(token, sucursalId)
             val client = dto.toDomain()
             if (client.id.isBlank()) {
                 error("Cliente por defecto sin ID válido")
@@ -41,6 +42,11 @@ class OfflineFirstClientRepository(
             }
             client
         }.recoverCatching { error ->
+            if (error.message?.contains("Default client not configured", ignoreCase = true) == true ||
+                error.message?.contains("404") == true
+            ) {
+                throw error
+            }
             val scope = offlineScopeProvider()
             val cached = getCachedClients(limit = 1, offset = 0, scope = scope).firstOrNull()
             if (cached != null && cached.id.isNotBlank()) {
@@ -77,7 +83,8 @@ class OfflineFirstClientRepository(
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
             else ->
                 runCatching {
-                    val branchIds = if (scope.allClients) null else scope.branchIds.toList()
+                    val branchIds = if (scope.clientFilterMode == ClientFilterMode.SUCURSAL) scope.branchIds.toList() else null
+                    val zoneCodes = if (scope.clientFilterMode == ClientFilterMode.ZONE) scope.zoneCodes.toList() else null
                     val response =
                         apiService.getClients(
                             token = token,
@@ -88,11 +95,17 @@ class OfflineFirstClientRepository(
                                     search = null,
                                     branchIds = branchIds,
                                     sellerId = sellerId,
+                                    zoneCodes = zoneCodes,
                                 ),
                         )
                     if (scope.enabled) {
                         val entities = response.data.map { it.toEntity() }
-                        val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
+                        val toCache =
+                            when (scope.clientFilterMode) {
+                                ClientFilterMode.ALL -> entities
+                                ClientFilterMode.SUCURSAL -> entities.filter { it.idSucursal in scope.branchIds }
+                                ClientFilterMode.ZONE -> entities.filter { it.codZona in scope.zoneCodes }
+                            }
                         if (toCache.isNotEmpty()) clientDao.insertAll(toCache)
                     }
                     response.data.map { it.toDomain() }
@@ -138,7 +151,8 @@ class OfflineFirstClientRepository(
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
             else ->
                 runCatching {
-                    val branchIds = if (scope.allClients) null else scope.branchIds.toList()
+                    val branchIds = if (scope.clientFilterMode == ClientFilterMode.SUCURSAL) scope.branchIds.toList() else null
+                    val zoneCodes = if (scope.clientFilterMode == ClientFilterMode.ZONE) scope.zoneCodes.toList() else null
                     val response =
                         apiService.getClients(
                             token = token,
@@ -149,11 +163,17 @@ class OfflineFirstClientRepository(
                                     search = query,
                                     branchIds = branchIds,
                                     sellerId = sellerId,
+                                    zoneCodes = zoneCodes,
                                 ),
                         )
                     if (scope.enabled) {
                         val entities = response.data.map { it.toEntity() }
-                        val toCache = if (!scope.allClients) entities.filter { it.idSucursal in scope.branchIds } else entities
+                        val toCache =
+                            when (scope.clientFilterMode) {
+                                ClientFilterMode.ALL -> entities
+                                ClientFilterMode.SUCURSAL -> entities.filter { it.idSucursal in scope.branchIds }
+                                ClientFilterMode.ZONE -> entities.filter { it.codZona in scope.zoneCodes }
+                            }
                         if (toCache.isNotEmpty()) clientDao.insertAll(toCache)
                     }
                     response.data.map { it.toDomain() }
@@ -171,10 +191,10 @@ class OfflineFirstClientRepository(
         allowedClientIds: Set<String> = emptySet(),
     ): List<Client> {
         val entities =
-            if (scope.allClients) {
-                clientDao.getPaged(limit, offset)
-            } else {
-                clientDao.getPagedBySucursales(scope.branchIds.toList(), limit, offset)
+            when (scope.clientFilterMode) {
+                ClientFilterMode.ALL -> clientDao.getPaged(limit, offset)
+                ClientFilterMode.SUCURSAL -> clientDao.getPagedBySucursales(scope.branchIds.toList(), limit, offset)
+                ClientFilterMode.ZONE -> clientDao.getPagedByZonas(scope.zoneCodes.toList(), limit, offset)
             }
         val filtered =
             if (allowedClientIds.isEmpty()) {
@@ -194,10 +214,23 @@ class OfflineFirstClientRepository(
     ): List<Client> {
         val normalized = normalizeQuery(query)
         val entities =
-            if (scope.allClients) {
-                clientDao.searchPaged(normalized, limit = limit, offset = offset)
-            } else {
-                clientDao.searchPagedBySucursales(normalized, scope.branchIds.toList(), limit = limit, offset = offset)
+            when (scope.clientFilterMode) {
+                ClientFilterMode.ALL ->
+                    clientDao.searchPaged(normalized, limit = limit, offset = offset)
+                ClientFilterMode.SUCURSAL ->
+                    clientDao.searchPagedBySucursales(
+                        normalized,
+                        scope.branchIds.toList(),
+                        limit = limit,
+                        offset = offset,
+                    )
+                ClientFilterMode.ZONE ->
+                    clientDao.searchPagedByZonas(
+                        normalized,
+                        scope.zoneCodes.toList(),
+                        limit = limit,
+                        offset = offset,
+                    )
             }
         val filtered =
             if (allowedClientIds.isEmpty()) {

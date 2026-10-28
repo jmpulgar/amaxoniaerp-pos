@@ -12,8 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,13 +36,17 @@ import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SelectAll
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Deselect
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.WifiOff
+import com.amaxonia.pos.domain.model.offline.ClientFilterMode
+import com.amaxonia.pos.domain.model.offline.OfflineCatalogEntry
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,6 +68,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -239,33 +246,24 @@ fun OfflineSettingsScreen(
             )
 
             // Directorio de Clientes (SIEMPRE VISIBLE - define qué clientes se muestran en el POS)
-            ScopeCard(
-                icon = Icons.Rounded.People,
-                title = "Directorio de Clientes",
-                subtitle = "Selecciona qué clientes se mostrarán en el POS" +
-                    if (state.syncEnabled) " y se descargarán para facturar sin red." else ".",
-                modeAll = state.clientModeAll,
-                onModeAllSelected = { viewModel.setClientModeAll(true) },
-                onCustomSelected = { viewModel.setClientModeAll(false) },
-                customOptionLabel = "Por sucursales",
-                allOptionSubtitle = "Muestra todos los clientes de la empresa",
-                customOptionSubtitle = "Solo clientes asignados a sucursales elegidas",
-                selectedCount = state.selectedSucursalIds.size,
-                totalCount = state.sucursales.size,
-                onSelectAll = {
-                    viewModel.selectAllSucursales(state.sucursales.map { it.id }.toSet())
-                },
-                onClearAll = viewModel::clearSucursales,
+            ClientScopeCard(
+                syncEnabled = state.syncEnabled,
+                mode = state.clientFilterMode,
+                onModeChange = viewModel::setClientFilterMode,
+                sucursales = state.sucursales,
+                selectedSucursalIds = state.selectedSucursalIds,
+                onToggleSucursal = viewModel::toggleSucursal,
+                onSelectAllSucursales = { viewModel.selectAllSucursales(state.sucursales.map { it.id }.toSet()) },
+                onClearSucursales = viewModel::clearSucursales,
+                zonas = state.zonas,
+                selectedZoneCodes = state.selectedZoneCodes,
+                onToggleZone = viewModel::toggleZone,
+                onSelectAllZones = { viewModel.selectAllZones(state.zonas.map { it.id }.toSet()) },
+                onClearZones = viewModel::clearZones,
                 previewText = state.clientPreview?.let {
                     if (state.syncEnabled) "≈ $it clientes calculados para descarga"
                     else "≈ $it clientes visibles"
                 },
-                items = state.sucursales,
-                itemKey = { it.id },
-                itemLabel = { it.nombre ?: it.id },
-                isItemSelected = { it.id in state.selectedSucursalIds },
-                onItemToggle = { viewModel.toggleSucursal(it.id) },
-                emptyMessage = "No hay sucursales disponibles (conéctate a internet para cargarlas).",
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -428,8 +426,6 @@ private fun <T> ScopeCard(
     onItemToggle: (T) -> Unit,
     emptyMessage: String,
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
@@ -475,11 +471,11 @@ private fun <T> ScopeCard(
 
             // Selector de modo táctil para POS: 2 tarjetas de opción clara
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 ModeSelectionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                     title = "Todos",
                     subtitle = allOptionSubtitle,
                     icon = Icons.Rounded.DoneAll,
@@ -487,7 +483,7 @@ private fun <T> ScopeCard(
                     onClick = onModeAllSelected,
                 )
                 ModeSelectionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                     title = customOptionLabel,
                     subtitle = customOptionSubtitle,
                     icon = Icons.Rounded.Tune,
@@ -521,191 +517,377 @@ private fun <T> ScopeCard(
                     }
                 }
             } else {
-                // Modo Personalizado: lista de elementos con checkboxes y buscador
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ScopeItemsList(
+                    items = items,
+                    itemKey = itemKey,
+                    itemLabel = itemLabel,
+                    isItemSelected = isItemSelected,
+                    onItemToggle = onItemToggle,
+                    selectedCount = selectedCount,
+                    totalCount = totalCount,
+                    onSelectAll = onSelectAll,
+                    onClearAll = onClearAll,
+                    emptyMessage = emptyMessage,
+                    previewText = previewText,
+                )
+            }
+        }
+    }
+}
+
+/** Tarjeta especializada para el alcance del directorio de clientes (Todos, Por sucursal, Por zona) */
+@Composable
+private fun ClientScopeCard(
+    syncEnabled: Boolean,
+    mode: ClientFilterMode,
+    onModeChange: (ClientFilterMode) -> Unit,
+    sucursales: List<OfflineCatalogEntry>,
+    selectedSucursalIds: Set<String>,
+    onToggleSucursal: (String) -> Unit,
+    onSelectAllSucursales: () -> Unit,
+    onClearSucursales: () -> Unit,
+    zonas: List<OfflineCatalogEntry>,
+    selectedZoneCodes: Set<String>,
+    onToggleZone: (String) -> Unit,
+    onSelectAllZones: () -> Unit,
+    onClearZones: () -> Unit,
+    previewText: String?,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Encabezado de la tarjeta
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(38.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = CircleShape,
+                            ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // Barra de resumen y botones rápidos
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                    Icon(
+                        imageVector = Icons.Rounded.People,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Directorio de Clientes",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Selecciona qué clientes se mostrarán en el POS" +
+                            if (syncEnabled) " y se descargarán para facturar sin red." else ".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // Selector de 3 modos: Todos, Por sucursal, Por zona
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ModeSelectionButton(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    title = "Todos",
+                    subtitle = "Toda la empresa",
+                    icon = Icons.Rounded.DoneAll,
+                    selected = mode == ClientFilterMode.ALL,
+                    onClick = { onModeChange(ClientFilterMode.ALL) },
+                )
+                ModeSelectionButton(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    title = "Por sucursal",
+                    subtitle = "Sucursales elegidas",
+                    icon = Icons.Rounded.Storefront,
+                    selected = mode == ClientFilterMode.SUCURSAL,
+                    onClick = { onModeChange(ClientFilterMode.SUCURSAL) },
+                )
+                ModeSelectionButton(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    title = "Por zona",
+                    subtitle = "Zonas elegidas",
+                    icon = Icons.Rounded.LocationOn,
+                    selected = mode == ClientFilterMode.ZONE,
+                    onClick = { onModeChange(ClientFilterMode.ZONE) },
+                )
+            }
+
+            when (mode) {
+                ClientFilterMode.ALL -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
                     ) {
-                        Text(
-                            text = "$selectedCount de $totalCount seleccionados",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
                         Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            IconButton(
-                                onClick = onSelectAll,
-                                enabled = selectedCount < totalCount,
-                                modifier = Modifier.size(36.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.SelectAll,
-                                    contentDescription = "Marcar todos",
-                                    tint =
-                                        if (selectedCount < totalCount) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.outlineVariant
-                                        },
-                                    modifier = Modifier.size(22.dp),
-                                )
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Se mostrarán y sincronizarán todos los clientes de la empresa.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                ClientFilterMode.SUCURSAL -> {
+                    ScopeItemsList(
+                        items = sucursales,
+                        itemKey = { it.id },
+                        itemLabel = { it.nombre ?: it.id },
+                        isItemSelected = { it.id in selectedSucursalIds },
+                        onItemToggle = { onToggleSucursal(it.id) },
+                        selectedCount = selectedSucursalIds.size,
+                        totalCount = sucursales.size,
+                        onSelectAll = onSelectAllSucursales,
+                        onClearAll = onClearSucursales,
+                        emptyMessage = "No hay sucursales disponibles (conéctate a internet para cargarlas).",
+                        previewText = previewText,
+                    )
+                }
+                ClientFilterMode.ZONE -> {
+                    ScopeItemsList(
+                        items = zonas,
+                        itemKey = { it.id },
+                        itemLabel = { it.nombre ?: it.id },
+                        isItemSelected = { it.id in selectedZoneCodes },
+                        onItemToggle = { onToggleZone(it.id) },
+                        selectedCount = selectedZoneCodes.size,
+                        totalCount = zonas.size,
+                        onSelectAll = onSelectAllZones,
+                        onClearAll = onClearZones,
+                        emptyMessage = "No hay zonas disponibles (conéctate a internet para cargarlas).",
+                        previewText = previewText,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Componente común para lista de checkboxes de alcance con buscador y acciones de selección */
+@Composable
+private fun <T> ScopeItemsList(
+    items: List<T>,
+    itemKey: (T) -> String,
+    itemLabel: (T) -> String,
+    isItemSelected: (T) -> Boolean,
+    onItemToggle: (T) -> Unit,
+    selectedCount: Int,
+    totalCount: Int,
+    onSelectAll: () -> Unit,
+    onClearAll: () -> Unit,
+    emptyMessage: String,
+    previewText: String?,
+) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Barra de resumen y botones rápidos
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$selectedCount de $totalCount seleccionados",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(
+                    onClick = onSelectAll,
+                    enabled = selectedCount < totalCount,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SelectAll,
+                        contentDescription = "Marcar todos",
+                        tint =
+                            if (selectedCount < totalCount) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                IconButton(
+                    onClick = onClearAll,
+                    enabled = selectedCount > 0,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Deselect,
+                        contentDescription = "Limpiar selección",
+                        tint =
+                            if (selectedCount > 0) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+
+        if (totalCount == 0) {
+            Text(
+                text = emptyMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        } else {
+            // Buscador si hay más de 5 elementos
+            if (totalCount > 5) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodySmall) },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Search, contentDescription = "Buscar", modifier = Modifier.size(18.dp))
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Rounded.Clear, contentDescription = "Borrar", modifier = Modifier.size(18.dp))
                             }
-                            IconButton(
-                                onClick = onClearAll,
-                                enabled = selectedCount > 0,
-                                modifier = Modifier.size(36.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Deselect,
-                                    contentDescription = "Limpiar selección",
-                                    tint =
-                                        if (selectedCount > 0) {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                )
+            }
+
+            val filteredItems =
+                if (searchQuery.isBlank()) {
+                    items
+                } else {
+                    items.filter { itemLabel(it).contains(searchQuery, ignoreCase = true) }
+                }
+
+            // Contenedor delimitado y scrolleable para evitar listas eternas
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                        .verticalScroll(rememberScrollState())
+                        .padding(4.dp),
+            ) {
+                if (filteredItems.isEmpty()) {
+                    Text(
+                        text = "No se encontraron elementos",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        filteredItems.forEach { item ->
+                            val selected = isItemSelected(item)
+                            key(itemKey(item)) {
+                                Surface(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onItemToggle(item) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color =
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                                         } else {
-                                            MaterialTheme.colorScheme.outlineVariant
+                                            MaterialTheme.colorScheme.surface
                                         },
-                                    modifier = Modifier.size(22.dp),
-                                )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Checkbox(
+                                            checked = selected,
+                                            onCheckedChange = { onItemToggle(item) },
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = itemLabel(item),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+                }
+            }
 
-                    if (totalCount == 0) {
-                        Text(
-                            text = emptyMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp),
+            // Previsualización de elementos a descargar
+            previewText?.let { preview ->
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CloudSync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp),
                         )
-                    } else {
-                        // Buscador si hay más de 5 elementos
-                        if (totalCount > 5) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodySmall) },
-                                leadingIcon = {
-                                    Icon(Icons.Rounded.Search, contentDescription = "Buscar", modifier = Modifier.size(18.dp))
-                                },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Rounded.Clear, contentDescription = "Borrar", modifier = Modifier.size(18.dp))
-                                        }
-                                    }
-                                },
-                                singleLine = true,
-                                shape = RoundedCornerShape(10.dp),
-                            )
-                        }
-
-                        val filteredItems =
-                            if (searchQuery.isBlank()) {
-                                items
-                            } else {
-                                items.filter { itemLabel(it).contains(searchQuery, ignoreCase = true) }
-                            }
-
-                        // Contenedor delimitado y scrolleable para evitar listas eternas
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 200.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                        shape = RoundedCornerShape(8.dp),
-                                    )
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(4.dp),
-                        ) {
-                            if (filteredItems.isEmpty()) {
-                                Text(
-                                    text = "No se encontraron elementos",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(12.dp),
-                                )
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    filteredItems.forEach { item ->
-                                        val selected = isItemSelected(item)
-                                        Surface(
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable { onItemToggle(item) },
-                                            shape = RoundedCornerShape(6.dp),
-                                            color =
-                                                if (selected) {
-                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                                                } else {
-                                                    MaterialTheme.colorScheme.surface
-                                                },
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                            ) {
-                                                Checkbox(
-                                                    checked = selected,
-                                                    onCheckedChange = { onItemToggle(item) },
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = itemLabel(item),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Previsualización de elementos a descargar
-                        previewText?.let { preview ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(8.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CloudSync,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = preview,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    )
-                                }
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = preview,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
                     }
                 }
             }
@@ -738,47 +920,50 @@ private fun ModeSelectionButton(
 
     OutlinedCard(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.fillMaxHeight(),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
         colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else NeutralGray,
-                    modifier = Modifier.size(20.dp),
-                )
-                if (selected) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = "Seleccionado",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (selected) MaterialTheme.colorScheme.primary else NeutralGray,
+                        modifier = Modifier.size(20.dp),
                     )
+                    if (selected) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = "Seleccionado",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                )
             }
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 lineHeight = 14.sp,
+                minLines = 2,
             )
         }
     }

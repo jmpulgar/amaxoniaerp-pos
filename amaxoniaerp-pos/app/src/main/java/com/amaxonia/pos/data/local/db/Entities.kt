@@ -29,6 +29,8 @@ data class ClientEntity(
     @ColumnInfo(defaultValue = "2") val codTipoPrecio: Int = 2,
     /** Sucursal de Amaxonia propietaria del cliente (filtro de alcance, ADR-008). */
     val idSucursal: Int? = null,
+    /** Zona asignada al cliente (filtro de alcance). */
+    val codZona: String? = null,
 )
 
 @Entity(tableName = "client_sucursales")

@@ -5,6 +5,7 @@ import com.amaxonia.pos.domain.usecase.cart.ResolveProductImageUrlUseCase
 import com.amaxonia.pos.ui.cart.CartActionHandler
 import com.amaxonia.pos.ui.cart.CartConfigurationCoordinator
 import com.amaxonia.pos.ui.cart.CartStateCoordinator
+import com.amaxonia.pos.ui.cart.CartStateDependencies
 import com.amaxonia.pos.ui.cart.CartViewModel
 
 /**
@@ -16,15 +17,19 @@ object CartGraph {
         CartViewModel(
             stateCoordinator =
                 CartStateCoordinator(
-                    DependencyContainer.cartRepository,
-                    DependencyContainer.clientRepository,
-                    DependencyContainer.posConfigurationRepository,
-                    DependencyContainer.clientBranchRepository,
-                    ResolveClientImageUrlUseCase(
-                        DependencyContainer.posConfigurationRepository,
-                        DependencyContainer.imageUrlResolver,
+                    CartStateDependencies(
+                        cartRepository = DependencyContainer.cartRepository,
+                        clientRepository = DependencyContainer.clientRepository,
+                        sessionReader = DependencyContainer.posConfigurationRepository,
+                        clientBranchRepository = DependencyContainer.clientBranchRepository,
+                        resolveClientImageUrl =
+                            ResolveClientImageUrlUseCase(
+                                DependencyContainer.posConfigurationRepository,
+                                DependencyContainer.imageUrlResolver,
+                            ),
+                        selectedTableHolder = DependencyContainer.selectedTableHolder,
+                        activeCajaReader = DependencyContainer.cajaRepository,
                     ),
-                    DependencyContainer.selectedTableHolder,
                 ),
             configurationCoordinator =
                 CartConfigurationCoordinator(

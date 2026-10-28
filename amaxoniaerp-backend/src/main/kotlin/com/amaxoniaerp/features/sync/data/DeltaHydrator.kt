@@ -77,7 +77,8 @@ class DeltaHydrator(
                 .toList()
         val row = rows.firstOrNull() ?: return Hydrated.Delete
         val dto = mapClientSync(row)
-        if (!scope.allClients && dto.idSucursal !in scope.branchIds) return Hydrated.Delete
+        if (scope.branchIds.isNotEmpty() && dto.idSucursal !in scope.branchIds) return Hydrated.Delete
+        if (scope.zoneCodes.isNotEmpty() && (dto.codZona == null || dto.codZona !in scope.zoneCodes)) return Hydrated.Delete
         return Hydrated.Upsert(dto)
     }
 

@@ -112,6 +112,8 @@ private class FakeSyncApi : SyncApiClient {
     ): SyncScopePreviewDto = SyncScopePreviewDto(entityType = entity)
 
     override suspend fun sucursales(token: String): List<SyncCatalogItemDto> = emptyList()
+
+    override suspend fun zonas(token: String): List<SyncCatalogItemDto> = emptyList()
 }
 
 @RunWith(RobolectricTestRunner::class)

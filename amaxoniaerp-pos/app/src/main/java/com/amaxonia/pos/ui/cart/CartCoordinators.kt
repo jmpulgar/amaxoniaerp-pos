@@ -29,14 +29,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class CartStateDependencies(
+    val cartRepository: CartRepository,
+    val clientRepository: ClientRepository,
+    val sessionReader: DashboardSessionReader,
+    val clientBranchRepository: ClientBranchRepository,
+    val resolveClientImageUrl: ResolveClientImageUrlUseCase,
+    val selectedTableHolder: SelectedTableHolder? = null,
+    val activeCajaReader: ActiveCajaReader? = null,
+)
+
 class CartStateCoordinator(
-    private val cartRepository: CartRepository,
-    private val clientRepository: ClientRepository,
-    private val sessionReader: DashboardSessionReader,
-    private val clientBranchRepository: ClientBranchRepository,
-    private val resolveClientImageUrl: ResolveClientImageUrlUseCase,
-    private val selectedTableHolder: SelectedTableHolder? = null,
+    dependencies: CartStateDependencies,
 ) {
+    private val cartRepository = dependencies.cartRepository
+    private val clientRepository = dependencies.clientRepository
+    private val sessionReader = dependencies.sessionReader
+    private val clientBranchRepository = dependencies.clientBranchRepository
+    private val resolveClientImageUrl = dependencies.resolveClientImageUrl
+    private val selectedTableHolder = dependencies.selectedTableHolder
+    private val activeCajaReader = dependencies.activeCajaReader
     fun start(
         scope: CoroutineScope,
         state: MutableStateFlow<CartState>,
@@ -182,7 +194,8 @@ class CartStateCoordinator(
         val current = cartRepository.selectedClient.value
         if (current != null && current.id.isNotBlank()) return
         scope.launch {
-            clientRepository.getDefaultClient().onSuccess(cartRepository::setClient)
+            val sucursalId = activeCajaReader?.activeCaja?.value?.idSucursal
+            clientRepository.getDefaultClient(sucursalId).onSuccess(cartRepository::setClient)
         }
     }
 

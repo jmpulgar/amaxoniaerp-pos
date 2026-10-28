@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -238,22 +239,24 @@ class DashboardCatalogCoordinatorTest {
         }
 
     @Test
-    fun `offlineScopeFlow emission auto-updates selectedDepartmentId and reloads catalog`() =
+    fun `offlineScopeFlow emission filters departments and preserves valid selection without forcing first department`() =
         runTest {
             val fakeRepo = FakeProductRepository()
-            fakeRepo.departmentsResult = Result.success(
-                listOf(
-                    Department(id = 10, name = "Bebidas"),
-                    Department(id = 20, name = "Comidas"),
-                ),
-            )
+            fakeRepo.departmentsResult =
+                Result.success(
+                    listOf(
+                        Department(id = 10, name = "Bebidas"),
+                        Department(id = 20, name = "Comidas"),
+                    ),
+                )
             fakeRepo.searchResult = Result.success(listOf(testProduct("1", "Agua Mineral")))
 
-            val scopeFlow = MutableStateFlow(
-                com.amaxonia.pos.domain.model.offline.OfflineScopeSelection(
-                    departmentIds = setOf(10),
-                ),
-            )
+            val scopeFlow =
+                MutableStateFlow(
+                    com.amaxonia.pos.domain.model.offline.OfflineScopeSelection(
+                        departmentIds = setOf(10, 20),
+                    ),
+                )
 
             val coordinator =
                 DashboardCatalogCoordinator(
@@ -269,24 +272,34 @@ class DashboardCatalogCoordinatorTest {
             coordinator.start(this, state)
             advanceUntilIdle()
 
-            // Department 10 should be selected automatically as per the scope, and departments filtered to scope
-            assertEquals(10, state.value.selectedDepartmentId)
-            assertEquals("Bebidas", state.value.selectedCategory)
-            assertEquals(1, state.value.departments.size)
-            assertEquals(10, state.value.departments.first().id)
-            assertEquals(listOf(10), fakeRepo.allProductsCalls)
+            // Departments are filtered to the scope, and selectedDepartmentId remains null (Todos los productos)
+            assertNull(state.value.selectedDepartmentId)
+            assertEquals("Todos los productos", state.value.selectedCategory)
+            assertEquals(2, state.value.departments.size)
+            assertEquals(listOf<Int?>(null), fakeRepo.allProductsCalls)
 
-            // When scope changes to department 20
-            scopeFlow.value = com.amaxonia.pos.domain.model.offline.OfflineScopeSelection(
-                departmentIds = setOf(20),
+            // When user selects department 10 manually
+            coordinator.onAction(
+                DashboardCatalogUiAction.SelectDepartment(10),
+                this,
+                state,
             )
             advanceUntilIdle()
+            assertEquals(10, state.value.selectedDepartmentId)
+            assertEquals("Bebidas", state.value.selectedCategory)
 
-            assertEquals(20, state.value.selectedDepartmentId)
-            assertEquals("Comidas", state.value.selectedCategory)
+            // When scope changes to department 20 (department 10 is no longer visible)
+            scopeFlow.value =
+                com.amaxonia.pos.domain.model.offline.OfflineScopeSelection(
+                    departmentIds = setOf(20),
+                )
+            advanceUntilIdle()
+
+            // Selection resets to null (Todos) since 10 is no longer visible
+            assertNull(state.value.selectedDepartmentId)
+            assertEquals("Todos los productos", state.value.selectedCategory)
             assertEquals(1, state.value.departments.size)
             assertEquals(20, state.value.departments.first().id)
-            assertEquals(listOf(10, 20), fakeRepo.allProductsCalls)
 
             coordinator.stop()
         }

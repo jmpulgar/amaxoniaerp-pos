@@ -2,6 +2,7 @@ package com.amaxoniaerp.features.clients.data
 
 import com.amaxoniaerp.core.database.dbQuery
 import com.amaxoniaerp.core.time.BusinessClock
+import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.clients.domain.AccountStatementItem
 import com.amaxoniaerp.features.clients.domain.AccountStatementResponse
@@ -108,12 +109,17 @@ class ClientsRepository {
         includeTotal: Boolean,
         branchIds: List<Int>? = null,
         sellerId: Int? = null,
+        zoneCodes: List<String>? = null,
     ): Pair<List<Client>, Long> =
         dbQuery(database) {
             val query = ClientsTable.selectAll()
 
             if (!branchIds.isNullOrEmpty()) {
                 query.andWhere { ClientsTable.idSucursal inList branchIds }
+            }
+
+            if (!zoneCodes.isNullOrEmpty()) {
+                query.andWhere { ClientsTable.codZona inList zoneCodes }
             }
 
             if (sellerId != null) {
@@ -453,10 +459,43 @@ class ClientsRepository {
     suspend fun getDefaultClient(
         database: Database,
         countryCode: String,
+        sucursalId: Int? = null,
     ): Client? =
         dbQuery(database) {
-            findDefaultClientDirect(countryCode)
+            findDefaultClient(countryCode, sucursalId)
         }
+
+    private fun findDefaultClient(
+        countryCode: String,
+        sucursalId: Int?,
+    ): Client? {
+        if (sucursalId != null) {
+            val sucursalClientId = findSucursalDefaultClientId(sucursalId)
+            if (!sucursalClientId.isNullOrBlank()) {
+                val client = findClientByIdOrCode(sucursalClientId)
+                if (client != null) return client
+            }
+        }
+        return findDefaultClientDirect(countryCode)
+    }
+
+    private fun findSucursalDefaultClientId(sucursalId: Int): String? =
+        runCatching {
+            SucursalTable
+                .select(SucursalTable.idClienteDefault)
+                .where { SucursalTable.idSucursal eq sucursalId }
+                .limit(1)
+                .mapNotNull { it[SucursalTable.idClienteDefault]?.trim() }
+                .firstOrNull()
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun findClientByIdOrCode(clientId: String): Client? =
+        ClientsTable
+            .selectAll()
+            .where { (ClientsTable.idCliente eq clientId) or (ClientsTable.codCliente eq clientId) }
+            .limit(1)
+            .map { row -> mapRowToClient(row) }
+            .singleOrNull()
 
     private fun findDefaultClientDirect(countryCode: String): Client? {
         val parametrosTable = ParametrosGeneralesTableFactory.forCountry(countryCode)

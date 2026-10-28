@@ -36,6 +36,7 @@ class SucursalRepository {
                     sucursal = row[SucursalTable.sucursal],
                     descripcion = row[SucursalTable.descripcion],
                     defaultWarehouseId = defaultWarehouseMap[id],
+                    idClienteDefault = row[SucursalTable.idClienteDefault],
                 )
             }
         }
@@ -66,6 +67,7 @@ class SucursalRepository {
                 sucursal = row[SucursalTable.sucursal],
                 descripcion = row[SucursalTable.descripcion],
                 defaultWarehouseId = defaultWarehouse,
+                idClienteDefault = row[SucursalTable.idClienteDefault],
             )
         }
 
@@ -81,6 +83,7 @@ class SucursalRepository {
                     it[codigoSucursalEmisor] = request.codigoSucursalEmisor
                     it[sucursal] = request.sucursal
                     it[descripcion] = request.descripcion
+                    it[idClienteDefault] = request.idClienteDefault
                 }[SucursalTable.idSucursal]
 
             if (request.defaultWarehouseId != null) {
@@ -101,6 +104,7 @@ class SucursalRepository {
                 sucursal = request.sucursal,
                 descripcion = request.descripcion,
                 defaultWarehouseId = request.defaultWarehouseId,
+                idClienteDefault = request.idClienteDefault,
             )
         }
 
@@ -117,6 +121,7 @@ class SucursalRepository {
                     it[codigoSucursalEmisor] = request.codigoSucursalEmisor
                     it[sucursal] = request.sucursal
                     it[descripcion] = request.descripcion
+                    it[idClienteDefault] = request.idClienteDefault
                 }
 
             if (updatedRows == 0) {
@@ -141,6 +146,7 @@ class SucursalRepository {
                 sucursal = request.sucursal,
                 descripcion = request.descripcion,
                 defaultWarehouseId = request.defaultWarehouseId,
+                idClienteDefault = request.idClienteDefault,
             )
         }
 }

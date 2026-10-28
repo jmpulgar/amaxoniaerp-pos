@@ -97,20 +97,12 @@ class DashboardCatalogCoordinator(
                         allDepartments.filter { it.id in syncScope.departmentIds }
                     }
 
+                val currentId = state.value.selectedDepartmentId
                 val newSelectedId =
-                    if (!syncScope.allProducts && syncScope.departmentIds.isNotEmpty()) {
-                        if (state.value.selectedDepartmentId in syncScope.departmentIds) {
-                            state.value.selectedDepartmentId
-                        } else {
-                            syncScope.departmentIds.first()
-                        }
+                    if (currentId != null && visibleDepartments.any { it.id == currentId }) {
+                        currentId
                     } else {
-                        val currentId = state.value.selectedDepartmentId
-                        if (currentId != null && visibleDepartments.any { it.id == currentId }) {
-                            currentId
-                        } else {
-                            null
-                        }
+                        null
                     }
                 val categoryName =
                     newSelectedId?.let { id -> visibleDepartments.find { it.id == id }?.name }

@@ -11,6 +11,7 @@ data class SucursalDto(
     val sucursal: String? = null,
     val descripcion: String? = null,
     val defaultWarehouseId: Int? = null,
+    val idClienteDefault: String? = null,
 )
 
 @Serializable
@@ -21,6 +22,7 @@ data class SaveSucursalRequest(
     val sucursal: String,
     val descripcion: String? = null,
     val defaultWarehouseId: Int? = null,
+    val idClienteDefault: String? = null,
 )
 
 @Serializable

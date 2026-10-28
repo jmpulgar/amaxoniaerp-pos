@@ -1,5 +1,6 @@
 package com.amaxoniaerp.features.clients.data
 
+import com.amaxoniaerp.features.caja.data.SucursalTable
 import com.amaxoniaerp.features.caja.data.VendedorTable
 import com.amaxoniaerp.features.clients.domain.CreateClientRequest
 import kotlinx.coroutines.runBlocking
@@ -13,6 +14,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class ClientsRepositoryTest {
     private lateinit var database: Database
@@ -26,7 +28,8 @@ class ClientsRepositoryTest {
                 "org.h2.Driver",
             )
         transaction(database) {
-            SchemaUtils.create(ClientsTable, VendedorTable)
+            SchemaUtils.create(ClientsTable, VendedorTable, SucursalTable)
+            exec("CREATE TABLE IF NOT EXISTS parametros_generales (cod_empresa INT, default_cod_cliente_factura VARCHAR(80))")
             insertClient(id = "client-credit", code = "000000001", permiteCredito = true, dias = 30)
             insertClient(id = "client-cash", code = "000000002", permiteCredito = false, dias = 0)
             insertClient(id = "client-generic", code = "999999999", permiteCredito = false, dias = 0)
@@ -36,7 +39,8 @@ class ClientsRepositoryTest {
     @AfterTest
     fun tearDown() {
         transaction(database) {
-            SchemaUtils.drop(ClientsTable, VendedorTable)
+            exec("DROP TABLE IF EXISTS parametros_generales")
+            SchemaUtils.drop(SucursalTable, VendedorTable, ClientsTable)
         }
     }
 
@@ -210,6 +214,87 @@ class ClientsRepositoryTest {
 
             val canCreate = repository.canSellerCreateClients(database, 40)
             assertEquals(false, canCreate)
+        }
+
+    @Test
+    fun `getDefaultClient retorna cliente de sucursal cuando la sucursal tiene id_cliente_default`() =
+        runBlocking {
+            transaction(database) {
+                SucursalTable.insert {
+                    it[idSucursal] = 1
+                    it[sucursal] = "Sucursal con cliente default"
+                    it[idClienteDefault] = "client-credit"
+                }
+                exec("INSERT INTO parametros_generales (cod_empresa, default_cod_cliente_factura) VALUES (1, '000000002')")
+            }
+
+            val defaultClient = repository.getDefaultClient(database, "PA", sucursalId = 1)
+            assertNotNull(defaultClient)
+            assertEquals("client-credit", defaultClient.id)
+        }
+
+    @Test
+    fun `getDefaultClient cae a parametros_generales cuando sucursal no tiene id_cliente_default`() =
+        runBlocking {
+            transaction(database) {
+                SucursalTable.insert {
+                    it[idSucursal] = 2
+                    it[sucursal] = "Sucursal sin cliente default"
+                    it[idClienteDefault] = null
+                }
+                exec("INSERT INTO parametros_generales (cod_empresa, default_cod_cliente_factura) VALUES (1, '000000002')")
+            }
+
+            val defaultClient = repository.getDefaultClient(database, "PA", sucursalId = 2)
+            assertNotNull(defaultClient)
+            assertEquals("client-cash", defaultClient.id)
+        }
+
+    @Test
+    fun `getDefaultClient cae a parametros_generales cuando sucursalId es null`() =
+        runBlocking {
+            transaction(database) {
+                exec("INSERT INTO parametros_generales (cod_empresa, default_cod_cliente_factura) VALUES (1, '000000001')")
+            }
+
+            val defaultClient = repository.getDefaultClient(database, "PA", sucursalId = null)
+            assertNotNull(defaultClient)
+            assertEquals("client-credit", defaultClient.id)
+        }
+
+    @Test
+    fun `getDefaultClient retorna null cuando ni sucursal ni parametros_generales tienen default`() =
+        runBlocking {
+            transaction(database) {
+                SucursalTable.insert {
+                    it[idSucursal] = 3
+                    it[sucursal] = "Sucursal vacia"
+                    it[idClienteDefault] = null
+                }
+            }
+
+            val defaultClient = repository.getDefaultClient(database, "PA", sucursalId = 3)
+            assertNull(defaultClient)
+
+            val defaultClientSinSucursal = repository.getDefaultClient(database, "PA", sucursalId = null)
+            assertNull(defaultClientSinSucursal)
+        }
+
+    @Test
+    fun `getDefaultClient cae a parametros_generales si cliente de sucursal no existe en clientes`() =
+        runBlocking {
+            transaction(database) {
+                SucursalTable.insert {
+                    it[idSucursal] = 4
+                    it[sucursal] = "Sucursal con cliente inexistente"
+                    it[idClienteDefault] = "cliente-inexistente"
+                }
+                exec("INSERT INTO parametros_generales (cod_empresa, default_cod_cliente_factura) VALUES (1, '000000002')")
+            }
+
+            val defaultClient = repository.getDefaultClient(database, "PA", sucursalId = 4)
+            assertNotNull(defaultClient)
+            assertEquals("client-cash", defaultClient.id)
         }
 
     private fun insertClient(

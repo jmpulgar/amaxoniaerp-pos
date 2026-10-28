@@ -67,6 +67,7 @@ fun clientContentHash(dto: ClientSyncDto): Long =
         dbl(dto.limite)
         int(dto.dias.toLong())
         str(dto.idSucursal?.toString())
+        str(dto.codZona)
     }
 
 fun clientBranchContentHash(dto: ClientBranchSyncDto): Long =

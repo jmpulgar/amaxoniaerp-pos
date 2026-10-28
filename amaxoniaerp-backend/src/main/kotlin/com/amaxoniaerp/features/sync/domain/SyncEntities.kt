@@ -89,6 +89,7 @@ data class ClientSyncDto(
     val limite: Double = 0.0,
     val dias: Int = 0,
     val idSucursal: Int? = null,
+    val codZona: String? = null,
 )
 
 /** Espejo directo de `cliente_sucursal` (sucursales DEL cliente, feature PA). */
