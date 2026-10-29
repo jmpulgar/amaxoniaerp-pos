@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
@@ -119,6 +120,21 @@ private fun ProductCardImage(
         contentAlignment = Alignment.Center,
     ) {
         ProductImageContent(product = product, fallbackIconSize = 44.dp, logImageLoad = true)
+        if (product.hasOptions) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(bottomEnd = 6.dp),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.TopStart),
+            ) {
+                Text(
+                    text = "Combo",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
     }
 }
 
@@ -195,6 +211,21 @@ private fun ProductListRowInfo(
             )
         } else {
             Spacer(Modifier.height(4.dp))
+        }
+        if (product.hasOptions) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.padding(vertical = 2.dp),
+            ) {
+                Text(
+                    text = "Combo",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
         }
         AdaptiveAmountText(
             text = "$${String.format(Locale.getDefault(), "%.2f", product.price)}",

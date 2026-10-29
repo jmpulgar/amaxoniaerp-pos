@@ -56,3 +56,31 @@ data class SimpleCatalogItemDto(
     val nombre: String? = null,
     val conteo: Long? = null,
 )
+
+@Serializable
+data class AuthDirectoryResponse(
+    val countryCode: String,
+    val users: List<OfflineUserSyncDto>,
+    val companies: List<OfflineCompanySyncDto>,
+)
+
+@Serializable
+data class OfflineUserSyncDto(
+    val id: Int,
+    val username: String,
+    val passwordHash: String,
+    val role: String,
+    val levelId: Int,
+    val companyCodes: List<Int>,
+)
+
+@Serializable
+data class OfflineCompanySyncDto(
+    val id: Int,
+    val name: String,
+    val adminDb: String,
+    val accountingDb: String = "",
+    val payrollDb: String = "",
+    val rif: String = "",
+    val countryCode: String = "",
+)

@@ -6,6 +6,8 @@ import com.amaxonia.pos.data.local.db.AppDatabase
 import com.amaxonia.pos.data.local.db.CajaPaymentMethodEntity
 import com.amaxonia.pos.data.local.db.ClientSucursalEntity
 import com.amaxonia.pos.data.local.db.ClientTypeEntity
+import com.amaxonia.pos.data.local.db.OfflineCompanyEntity
+import com.amaxonia.pos.data.local.db.OfflineUserEntity
 import com.amaxonia.pos.data.local.db.PaymentMethodEntity
 import com.amaxonia.pos.data.local.db.ProductEntity
 import com.amaxonia.pos.data.local.db.PromocionDetalleEntity
@@ -220,6 +222,9 @@ class SyncEngine(
                 outcome = Outcome.Success(bootstrapped = false, changesApplied = applied)
             }
         }
+        if (outcome is Outcome.Success) {
+            syncAuthDirectory(context)
+        }
         return outcome
     }
 
@@ -258,6 +263,7 @@ class SyncEngine(
                     Outcome.Error(error)
                 } else {
                     markUpToDate(context.tenant, snapshotId)
+                    syncAuthDirectory(context)
                     Outcome.Success(bootstrapped = true, changesApplied = entitiesLoaded)
                 }
             }
@@ -432,6 +438,46 @@ class SyncEngine(
             "CAJA_PAYMENT_METHOD" -> AppJson.decodeFromJsonElement(CajaPaymentMethodSyncDto.serializer(), element).toEntity()
             else -> throw IllegalArgumentException("Entidad de sync desconocida: $entityType")
         }
+
+    private suspend fun syncAuthDirectory(context: SyncContext) {
+        runCatching {
+            val authDirectory = api.authDirectory(context.token)
+            database.withTransaction {
+                val now = System.currentTimeMillis()
+                val users =
+                    authDirectory.users.map { u ->
+                        OfflineUserEntity(
+                            id = u.id,
+                            username = u.username,
+                            passwordHash = u.passwordHash,
+                            role = u.role,
+                            levelId = u.levelId,
+                            companyCodes = u.companyCodes,
+                            countryCode = authDirectory.countryCode,
+                            status = "A",
+                            updatedAt = now,
+                        )
+                    }
+                val companies =
+                    authDirectory.companies.map { c ->
+                        OfflineCompanyEntity(
+                            id = c.id,
+                            name = c.name,
+                            adminDb = c.adminDb,
+                            accountingDb = c.accountingDb,
+                            payrollDb = c.payrollDb,
+                            rif = c.rif,
+                            countryCode = c.countryCode.ifBlank { authDirectory.countryCode },
+                            updatedAt = now,
+                        )
+                    }
+                database.offlineUserDao().upsertAll(users)
+                database.offlineCompanyDao().upsertAll(companies)
+            }
+        }.onFailure { error ->
+            logFn("Error al sincronizar directorio de usuarios offline: ${error.message}")
+        }
+    }
 
     private fun OfflineSyncScope.deptParams(): List<Int>? = if (allProducts) null else departmentIds.toList()
 

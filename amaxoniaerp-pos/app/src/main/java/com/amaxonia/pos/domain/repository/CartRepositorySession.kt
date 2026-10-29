@@ -156,13 +156,19 @@ fun CartRepository.setSellerContext(
     availableSellersState.value = available
 
     val selected =
-        available.firstOrNull { it.id == defaultSellerId }
-            ?: currentSellerState.value?.let { current -> available.firstOrNull { it.id == current.id } }
+        currentSellerState.value?.let { current -> available.firstOrNull { it.id == current.id } }
+            ?: available.firstOrNull { it.id == defaultSellerId }
             ?: available.firstOrNull()
 
     if (selected != null) {
         applyCurrentSeller(selected)
     }
+}
+
+/** Limpia el contexto de vendedores (disponibles y seleccionado). Usado al cerrar sesión o cerrar caja. */
+fun CartRepository.clearSellerContext() {
+    availableSellersState.value = emptyList()
+    currentSellerState.value = null
 }
 
 /** Cambia el vendedor actual y re-etiqueta los ítems del carrito. */

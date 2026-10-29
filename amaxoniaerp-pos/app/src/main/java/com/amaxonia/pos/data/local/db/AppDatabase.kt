@@ -28,8 +28,11 @@ import com.amaxonia.pos.domain.model.sales.FiscalStateConverter
         PaymentMethodEntity::class,
         CajaPaymentMethodEntity::class,
         CajaSesionEntity::class,
+        OfflineUserEntity::class,
+        OfflineCompanyEntity::class,
+        ProductOptionsEntity::class,
     ],
-    version = 23,
+    version = 25,
     exportSchema = true,
 )
 @TypeConverters(Converters::class, FiscalStateConverter::class)
@@ -63,6 +66,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun paymentMethodDao(): PaymentMethodDao
 
     abstract fun cajaSesionDao(): CajaSesionDao
+
+    abstract fun offlineUserDao(): OfflineUserDao
+
+    abstract fun offlineCompanyDao(): OfflineCompanyDao
+
+    abstract fun productOptionsDao(): ProductOptionsDao
 
     companion object {
         @Volatile
@@ -864,6 +873,60 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        internal val MIGRATION_23_24 =
+            object : Migration(23, 24) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS offline_users (" +
+                            "id INTEGER NOT NULL, " +
+                            "username TEXT NOT NULL, " +
+                            "passwordHash TEXT NOT NULL, " +
+                            "role TEXT NOT NULL, " +
+                            "levelId INTEGER NOT NULL, " +
+                            "companyCodes TEXT NOT NULL, " +
+                            "countryCode TEXT NOT NULL, " +
+                            "status TEXT NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(id)" +
+                            ")",
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS index_offline_users_username_countryCode " +
+                            "ON offline_users(username, countryCode)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS offline_companies (" +
+                            "id INTEGER NOT NULL, " +
+                            "name TEXT NOT NULL, " +
+                            "adminDb TEXT NOT NULL, " +
+                            "accountingDb TEXT NOT NULL, " +
+                            "payrollDb TEXT NOT NULL, " +
+                            "rif TEXT NOT NULL, " +
+                            "countryCode TEXT NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(id)" +
+                            ")",
+                    )
+                }
+            }
+
+        internal val MIGRATION_24_25 =
+            object : Migration(24, 25) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE products ADD COLUMN poseeProductoCombo INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE products ADD COLUMN tipoArticulo TEXT DEFAULT NULL")
+                    db.execSQL("ALTER TABLE products ADD COLUMN idCombo TEXT DEFAULT NULL")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS product_options (" +
+                            "productId TEXT NOT NULL, " +
+                            "optionsJson TEXT NOT NULL, " +
+                            "updatedAt INTEGER NOT NULL, " +
+                            "PRIMARY KEY(productId)" +
+                            ")",
+                    )
+                }
+            }
+
         internal val ALL_MIGRATIONS =
             arrayOf(
                 MIGRATION_1_2,
@@ -888,6 +951,8 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_20_21,
                 MIGRATION_21_22,
                 MIGRATION_22_23,
+                MIGRATION_23_24,
+                MIGRATION_24_25,
             )
 
         fun getInstance(context: Context): AppDatabase =
@@ -920,6 +985,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_20_21,
                         MIGRATION_21_22,
                         MIGRATION_22_23,
+                        MIGRATION_23_24,
+                        MIGRATION_24_25,
                     ).build()
                     .also { instance = it }
             }

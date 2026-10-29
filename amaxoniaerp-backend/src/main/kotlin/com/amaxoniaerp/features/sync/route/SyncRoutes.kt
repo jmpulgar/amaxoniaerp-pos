@@ -170,6 +170,18 @@ fun Route.syncRoutes(
                     call.respond(items)
                 }
             }
+
+            get("/auth-directory") {
+                run {
+                    val ctx = call.resolveCompanyRequestContext() ?: return@run
+                    call.respond(
+                        syncRepository.authDirectory(
+                            countryCode = ctx.countryCode,
+                            activeAdminDb = ctx.adminDb,
+                        ),
+                    )
+                }
+            }
         }
     }
 }

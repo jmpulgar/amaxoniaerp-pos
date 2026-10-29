@@ -1,7 +1,10 @@
 package com.amaxonia.pos.data.repository
 
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.ProductDao
+import com.amaxonia.pos.data.local.db.ProductOptionsDao
+import com.amaxonia.pos.data.local.db.ProductOptionsEntity
 import com.amaxonia.pos.data.local.db.toDomain
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.local.readCompanySession
@@ -11,6 +14,7 @@ import com.amaxonia.pos.data.remote.createProduct
 import com.amaxonia.pos.data.remote.getBrands
 import com.amaxonia.pos.data.remote.getDepartments
 import com.amaxonia.pos.data.remote.getFamilies
+import com.amaxonia.pos.data.remote.getItemOptions
 import com.amaxonia.pos.data.remote.getItemStock
 import com.amaxonia.pos.data.remote.getLines
 import com.amaxonia.pos.data.remote.getProductById
@@ -20,8 +24,11 @@ import com.amaxonia.pos.data.remote.updateProduct
 import com.amaxonia.pos.data.sync.OfflineSyncScope
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
+import com.amaxonia.pos.domain.model.options.ProductOptionGroup
 import com.amaxonia.pos.domain.repository.Department
+import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import com.amaxonia.pos.domain.repository.ProductRepository
+import kotlinx.serialization.encodeToString
 
 /**
  * Repositorio offline-first de productos. La política offline/online y la
@@ -35,6 +42,8 @@ class OfflineFirstProductRepository(
     productDao: ProductDao,
     networkMonitor: NetworkMonitor,
     offlineScopeProvider: suspend () -> OfflineSyncScope = { OfflineSyncScope.ALL },
+    imageUrlResolver: ImageUrlResolver? = null,
+    private val productOptionsDao: ProductOptionsDao? = null,
 ) : ProductRepository {
     private val fetch = ProductFetchPolicy(apiService, localStore, productDao, networkMonitor, offlineScopeProvider)
     private val cache = ProductPageCache(productDao)
@@ -43,6 +52,7 @@ class OfflineFirstProductRepository(
     private val productDao = productDao
     private val networkMonitor = networkMonitor
     private val offlineScopeProvider = offlineScopeProvider
+    private val imageUrlResolver = imageUrlResolver
 
     override suspend fun getDepartments(): Result<List<Department>> =
         fetch.onlineCatalog { token ->
@@ -152,6 +162,51 @@ class OfflineFirstProductRepository(
             !networkMonitor.isOnline() -> Result.failure(IllegalStateException("Sin conexión para consultar stock por almacén"))
             else -> runCatching { apiService.getItemStock(token, id).toDomain() }
         }
+    }
+
+    override suspend fun getProductOptions(
+        productId: String,
+        almacenId: Int?,
+    ): Result<List<ProductOptionGroup>> {
+        val session = localStore.readCompanySession()
+        val token = session?.token
+        val adminDb = session?.company?.adminDb.orEmpty()
+        val isOnline = networkMonitor.isOnline() && !token.isNullOrBlank()
+
+        if (isOnline) {
+            val remoteResult =
+                runCatching {
+                    apiService.getItemOptions(token!!, productId, almacenId).grupos.map {
+                        it.toDomain(adminDb = adminDb, imageUrlResolver = imageUrlResolver)
+                    }
+                }
+            if (remoteResult.isSuccess) {
+                val groups = remoteResult.getOrThrow()
+                productOptionsDao?.let { dao ->
+                    runCatching {
+                        val json = AppJson.encodeToString(groups)
+                        dao.upsert(ProductOptionsEntity(productId, json, System.currentTimeMillis()))
+                    }
+                }
+                return remoteResult
+            }
+        }
+
+        // Fallback offline: buscar en la base de datos local
+        val cached = productOptionsDao?.getByProductId(productId)
+        if (cached != null) {
+            val groups =
+                runCatching {
+                    AppJson.decodeFromString<List<ProductOptionGroup>>(cached.optionsJson)
+                }.getOrNull()
+            if (!groups.isNullOrEmpty()) {
+                return Result.success(groups)
+            }
+        }
+
+        return Result.failure(
+            IllegalStateException("No hay opciones sincronizadas para este producto en modo offline"),
+        )
     }
 
     override suspend fun searchProducts(query: String): Result<List<Product>> =

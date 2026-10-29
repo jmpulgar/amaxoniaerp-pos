@@ -37,12 +37,20 @@ data class Product(
     val unitOrPackage: String = "UNIDAD",
     val isService: Boolean = false,
     val prices: List<PriceLevel> = generateDefaultPrices(),
+    val poseeProductoCombo: Boolean = false,
+    val idCombo: String? = null,
+    val tipoArticulo: String? = null,
+    val poseeVariantes: Boolean = false,
+    val variantesTotal: Int = 0,
 ) {
     val canSwitchUnit: Boolean
         get() = bulkQuantity > 1.0
 
     val packageLabel: String
         get() = unitPackage.ifBlank { unitOrPackage.ifBlank { "EMPAQUE" } }
+
+    val hasOptions: Boolean
+        get() = poseeProductoCombo || tipoArticulo.equals("K", ignoreCase = true) || tipoArticulo.equals("C", ignoreCase = true)
 }
 
 @Serializable

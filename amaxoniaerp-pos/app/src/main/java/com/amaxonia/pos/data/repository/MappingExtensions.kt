@@ -7,6 +7,8 @@ import com.amaxonia.pos.data.remote.dto.CreateClientRequest
 import com.amaxonia.pos.data.remote.dto.CreateProductRequest
 import com.amaxonia.pos.data.remote.dto.PriceDto
 import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.data.remote.dto.ProductOptionGroupDto
+import com.amaxonia.pos.data.remote.dto.ProductOptionItemDto
 import com.amaxonia.pos.data.remote.dto.ProductStockResponseDto
 import com.amaxonia.pos.domain.model.Client
 import com.amaxonia.pos.domain.model.Company
@@ -19,6 +21,9 @@ import com.amaxonia.pos.domain.model.ProductWarehouseStock
 import com.amaxonia.pos.domain.model.SelectedCompany
 import com.amaxonia.pos.domain.model.TaxpayerType
 import com.amaxonia.pos.domain.model.generateDefaultPrices
+import com.amaxonia.pos.domain.model.options.ProductOptionGroup
+import com.amaxonia.pos.domain.model.options.ProductOptionItem
+import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import java.util.UUID
 
 private const val PERCENT_MULTIPLIER = 100.0
@@ -77,6 +82,14 @@ private fun resolveEffectiveTaxRate(
     }
 }
 
+private fun ProductDto.resolvePoseeCombo(): Boolean =
+    poseeProductoCombo.equals("si", ignoreCase = true) ||
+        tipoArticulo.equals("C", ignoreCase = true) ||
+        tipoArticulo.equals("K", ignoreCase = true)
+
+private fun ProductDto.resolveIsService(): Boolean =
+    isService ?: (tipoProd == 1) ?: (codItemForma == 2) ?: false
+
 // --- Product Mappers ---
 fun ProductDto.toDomain(): Product {
     val mappedPrices =
@@ -120,8 +133,13 @@ fun ProductDto.toDomain(): Product {
         bulkQuantity = bulkQuantity?.takeIf { it > 0.0 } ?: 1.0,
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
-        isService = isService ?: (tipoProd == 1) ?: (codItemForma == 2) ?: false,
+        isService = resolveIsService(),
         prices = mappedPrices,
+        poseeProductoCombo = resolvePoseeCombo(),
+        idCombo = idCombo,
+        tipoArticulo = tipoArticulo,
+        poseeVariantes = poseeVariantes.equals("si", ignoreCase = true),
+        variantesTotal = variantesTotal ?: 0,
     )
 }
 
@@ -273,3 +291,48 @@ private fun ForeignIdType.toApiCode(): String =
         ForeignIdType.PASAPORTE -> "02"
         ForeignIdType.TRIBUTARIA -> "01"
     }
+
+fun ProductOptionGroupDto.toDomain(
+    adminDb: String = "",
+    imageUrlResolver: ImageUrlResolver? = null,
+): ProductOptionGroup {
+    val rawOptions = if (opciones.isNotEmpty()) opciones else items
+    val effectiveName = nombre.ifBlank { nombreGrupo.orEmpty() }
+    val effectiveMax = if (maximo > 0) maximo else if (maximoVeces > 0) maximoVeces else 1
+    return ProductOptionGroup(
+        idGrupo = idGrupo,
+        tipo = tipo,
+        nombre = effectiveName,
+        minimo = minimo,
+        maximo = effectiveMax,
+        opciones = rawOptions.map { it.toDomain(adminDb = adminDb, imageUrlResolver = imageUrlResolver) },
+    )
+}
+
+fun ProductOptionItemDto.toDomain(
+    adminDb: String = "",
+    imageUrlResolver: ImageUrlResolver? = null,
+): ProductOptionItem {
+    val effectiveName = nombre.ifBlank { nombreOpcion ?: descripcion1.orEmpty() }
+    val effectivePrice = if (precioExtra != null && precioExtra > 0.0) precioExtra else precio
+    val rawPhoto = foto?.takeIf { it.isNotBlank() } ?: foto1?.takeIf { it.isNotBlank() }
+    val resolvedPhoto =
+        when {
+            rawPhoto.isNullOrBlank() -> null
+            rawPhoto.startsWith("http://") || rawPhoto.startsWith("https://") -> rawPhoto
+            imageUrlResolver != null && adminDb.isNotBlank() -> imageUrlResolver.product(adminDb, rawPhoto)
+            else -> rawPhoto
+        }
+    return ProductOptionItem(
+        idGrupoItem = idGrupoItem,
+        idItem = idItem,
+        codItem = codItem,
+        nombre = effectiveName,
+        precioExtra = effectivePrice,
+        cantidad = cantidad,
+        isDefault = porDefecto == 1,
+        isSoldOut = agotado == 1,
+        photoUrl = resolvedPhoto,
+    )
+}
+

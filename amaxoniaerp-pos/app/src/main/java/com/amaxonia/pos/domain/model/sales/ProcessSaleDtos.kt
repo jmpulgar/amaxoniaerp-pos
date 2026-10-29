@@ -151,6 +151,8 @@ data class SaleItemDto(
     val promocionNombre: String = "",
     val promocionGrupo: String = "",
     val promocionDetalleId: String = "",
+    @SerialName("composicion")
+    val composicion: String = "",
 )
 
 @Serializable

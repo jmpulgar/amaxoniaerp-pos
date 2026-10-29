@@ -7,8 +7,10 @@ import com.amaxonia.pos.data.local.clearActiveCaja
 import com.amaxonia.pos.data.local.db.CajaSesionDao
 import com.amaxonia.pos.data.local.db.CajaSesionEntity
 import com.amaxonia.pos.data.local.readActiveCajaForToday
+import com.amaxonia.pos.data.local.readCachedCajas
 import com.amaxonia.pos.data.local.readCompanySession
 import com.amaxonia.pos.data.local.saveActiveCaja
+import com.amaxonia.pos.data.local.saveCachedCajas
 import com.amaxonia.pos.data.remote.api.CajaApi
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.Caja
@@ -46,6 +48,22 @@ class CajaRepositoryImpl(
             val authHeader = getAuthHeader()
             val companyDb = getCompanyDb()
             cajaApi.getCajas(authHeader, companyDb)
+        }.onSuccess { cajas ->
+            if (cajas.isNotEmpty()) {
+                localStore.saveCachedCajas(cajas)
+            }
+        }.recoverCatching { error ->
+            val cached = localStore.readCachedCajas()
+            if (cached.isNotEmpty()) {
+                cached
+            } else {
+                val active = localStore.readActiveCajaForToday()
+                if (active != null) {
+                    listOf(active)
+                } else {
+                    throw error
+                }
+            }
         }
 
     override suspend fun getNextSecuenciaCodigo(idCaja: String): Result<String> =
@@ -64,10 +82,19 @@ class CajaRepositoryImpl(
             _activeCaja.update { caja }
             restorePersistedSesion(caja.idCaja)
         } else {
-            _activeCajaName.update { "Caja no seleccionada" }
-            _activeCaja.update { null }
-            activeSecuencia = null
-            _activeCajaSecuencia.update { null }
+            val tenant = tenantId()
+            val openSesion = cajaSesionDao.getAbierta(tenant)
+            val cachedCaja = openSesion?.let { localStore.readCachedCajas().firstOrNull { c -> c.idCaja == it.cajaId } }
+            if (cachedCaja != null) {
+                _activeCajaName.update { cachedCaja.caja ?: cachedCaja.descripcion ?: "Caja Principal" }
+                _activeCaja.update { cachedCaja }
+                restorePersistedSesion(cachedCaja.idCaja)
+            } else {
+                _activeCajaName.update { "Caja no seleccionada" }
+                _activeCaja.update { null }
+                activeSecuencia = null
+                _activeCajaSecuencia.update { null }
+            }
         }
     }
 

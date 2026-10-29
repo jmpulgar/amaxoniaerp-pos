@@ -1,9 +1,18 @@
 package com.amaxoniaerp.features.sync.data
 
+import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.core.database.dbQuery
+import com.amaxoniaerp.features.auth.data.UsersTable
+import com.amaxoniaerp.features.companies.data.CompaniesTable
+import com.amaxoniaerp.features.companies.data.CompanyRepository
+import com.amaxoniaerp.features.companies.data.DatosEmpresaTable
+import com.amaxoniaerp.features.companies.domain.parseCompanyCodes
+import com.amaxoniaerp.features.sync.domain.AuthDirectoryResponse
 import com.amaxoniaerp.features.sync.domain.CatalogContentHash
 import com.amaxoniaerp.features.sync.domain.DeltaChangeDto
 import com.amaxoniaerp.features.sync.domain.EntityStatDto
+import com.amaxoniaerp.features.sync.domain.OfflineCompanySyncDto
+import com.amaxoniaerp.features.sync.domain.OfflineUserSyncDto
 import com.amaxoniaerp.features.sync.domain.ScopePreviewResponse
 import com.amaxoniaerp.features.sync.domain.SimpleCatalogItemDto
 import com.amaxoniaerp.features.sync.domain.SyncBootstrapResponse
@@ -249,6 +258,91 @@ class SyncRepository(
             null -> null
             else -> value.toString()
         }
+
+    suspend fun authDirectory(
+        countryCode: String,
+        activeAdminDb: String? = null,
+        configDatabase: Database = DatabaseManager.getConfigDatabase(countryCode),
+        companyRepository: CompanyRepository = CompanyRepository(configDatabase),
+    ): AuthDirectoryResponse {
+        val (users, companies) =
+            dbQuery(configDatabase) {
+                val loadedUsers =
+                    UsersTable
+                        .selectAll()
+                        .where { UsersTable.status eq "A" }
+                        .map { row ->
+                            OfflineUserSyncDto(
+                                id = row[UsersTable.codUsuario],
+                                username = row[UsersTable.usuario],
+                                passwordHash = row[UsersTable.clave],
+                                role = row[UsersTable.perfil].toString(),
+                                levelId = row[UsersTable.nivelId],
+                                companyCodes = parseCompanyCodes(row[UsersTable.codEmpresas]),
+                            )
+                        }
+
+                val rifsByCode =
+                    runCatching {
+                        DatosEmpresaTable
+                            .selectAll()
+                            .associate { row ->
+                                val rawRif = row[DatosEmpresaTable.rif]?.trim().orEmpty()
+                                val rawNit = row[DatosEmpresaTable.nit]?.trim().orEmpty()
+                                val formattedRif =
+                                    when {
+                                        rawRif.isBlank() -> ""
+                                        rawNit.isNotBlank() && !rawRif.contains("DV", ignoreCase = true) -> "$rawRif DV $rawNit"
+                                        else -> rawRif
+                                    }
+                                row[DatosEmpresaTable.codEmpresa] to formattedRif
+                            }
+                    }.getOrDefault(emptyMap())
+
+                val loadedCompanies =
+                    CompaniesTable
+                        .selectAll()
+                        .where { CompaniesTable.admisActivo eq true }
+                        .map { row ->
+                            val code = row[CompaniesTable.codigo]
+                            OfflineCompanySyncDto(
+                                id = code,
+                                name = row[CompaniesTable.nombre],
+                                adminDb = row[CompaniesTable.bd].orEmpty(),
+                                accountingDb = row[CompaniesTable.bdContabilidad].orEmpty(),
+                                payrollDb = row[CompaniesTable.bdNomina].orEmpty(),
+                                rif = rifsByCode[code].orEmpty(),
+                                countryCode = countryCode,
+                            )
+                        }
+
+                loadedUsers to loadedCompanies
+            }
+
+        val companiesWithRif =
+            companies.map { company ->
+                val shouldLoadRif =
+                    company.rif.isBlank() &&
+                        (
+                            activeAdminDb == null ||
+                                company.adminDb.equals(activeAdminDb, ignoreCase = true) ||
+                                companies.size == 1
+                        )
+                val rif =
+                    if (shouldLoadRif) {
+                        companyRepository.loadCompanyRifByAdminDb(company.adminDb, countryCode).orEmpty()
+                    } else {
+                        company.rif
+                    }
+                company.copy(rif = rif)
+            }
+
+        return AuthDirectoryResponse(
+            countryCode = countryCode,
+            users = users,
+            companies = companiesWithRif,
+        )
+    }
 
     companion object {
         const val SCHEMA_VERSION = 1

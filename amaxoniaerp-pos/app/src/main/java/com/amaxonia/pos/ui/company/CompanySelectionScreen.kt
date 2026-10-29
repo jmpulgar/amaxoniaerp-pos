@@ -314,13 +314,23 @@ fun CompanyItemModern(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "ID: ${company.ruc.ifBlank { "-" }}",
-                fontSize = 13.sp,
-                color = subtitleColor,
-                fontWeight = FontWeight.Medium,
-            )
+            if (company.ruc.isNotBlank()) {
+                val formattedRuc =
+                    if (company.ruc.startsWith("RUC", ignoreCase = true) ||
+                        company.ruc.startsWith("RIF", ignoreCase = true)
+                    ) {
+                        company.ruc
+                    } else {
+                        "RUC: ${company.ruc}"
+                    }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = formattedRuc,
+                    fontSize = 13.sp,
+                    color = subtitleColor,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
         }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,

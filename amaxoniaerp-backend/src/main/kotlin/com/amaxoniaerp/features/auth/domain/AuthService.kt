@@ -39,7 +39,7 @@ class AuthService(
             if (companyCodes.isEmpty()) {
                 emptyList()
             } else {
-                companyRepository.loadCompanies(companyCodes, countryCode)
+                companyRepository.loadCompanies(companyCodes)
             }
 
         // Crear token con metadata del país

@@ -45,7 +45,6 @@ suspend fun LocalStore.clearAuthSession() {
     dataStore.edit { prefs ->
         prefs.remove(authSnapshotKey)
         prefs.remove(companySessionKey)
-        prefs.remove(activeCajaKey)
         // La configuración de salón es por sucursal: al cerrar sesión debe desaparecer para
         // que un login distinto nunca vea áreas ni mesas de la sesión anterior.
         prefs.remove(areasKey)

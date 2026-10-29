@@ -2,6 +2,7 @@ package com.amaxonia.pos.domain.repository
 
 import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.ProductStock
+import com.amaxonia.pos.domain.model.options.ProductOptionGroup
 
 data class Department(
     val id: Int,
@@ -69,6 +70,11 @@ interface ProductCatalogReader {
     suspend fun getProductById(id: String): Result<Product>
 
     suspend fun getProductStock(id: String): Result<ProductStock>
+
+    suspend fun getProductOptions(
+        productId: String,
+        almacenId: Int? = null,
+    ): Result<List<ProductOptionGroup>> = Result.success(emptyList())
 
     suspend fun searchProducts(query: String): Result<List<Product>>
 

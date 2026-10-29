@@ -114,6 +114,9 @@ private class FakeSyncApi : SyncApiClient {
     override suspend fun sucursales(token: String): List<SyncCatalogItemDto> = emptyList()
 
     override suspend fun zonas(token: String): List<SyncCatalogItemDto> = emptyList()
+
+    override suspend fun authDirectory(token: String): AuthDirectoryResponseDto =
+        AuthDirectoryResponseDto(countryCode = "PA")
 }
 
 @RunWith(RobolectricTestRunner::class)

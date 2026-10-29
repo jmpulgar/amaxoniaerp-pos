@@ -1,5 +1,6 @@
 package com.amaxonia.pos.domain.model
 
+import com.amaxonia.pos.domain.model.options.ProductComposition
 import kotlinx.serialization.Serializable
 
 private const val PERCENT_MULTIPLIER = 100.0
@@ -37,8 +38,10 @@ data class CartItem(
     val promocionVeces: Int = 1,
     val selectedPriceLabel: String = "A",
     val isManualPrice: Boolean = false,
+    val composition: ProductComposition? = null,
 ) {
     val isPromotionLine: Boolean get() = !promocionId.isNullOrBlank()
+    val hasComposition: Boolean get() = composition != null && composition.opciones.isNotEmpty()
 
     val taxRate: Double
         get() {

@@ -4,6 +4,7 @@ import com.amaxoniaerp.JwtConfig
 import com.amaxoniaerp.core.database.DatabaseManager
 import com.amaxoniaerp.features.companies.data.ParametrosGeneralesTablePA
 import com.amaxoniaerp.features.sales.data.SalesCajaTable
+import com.amaxoniaerp.features.sales.data.SalesFacturaDetalleTable
 import com.amaxoniaerp.features.sales.data.SalesFacturaTablePA
 import com.amaxoniaerp.features.sales.data.SalesSucursalAlmacenTable
 import com.amaxoniaerp.features.sales.data.SalesSucursalTable
@@ -97,6 +98,7 @@ class SalesRoutesIntegrationTest {
                 SalesSucursalAlmacenTable,
                 ParametrosGeneralesTablePA,
                 SalesFacturaTablePA,
+                SalesFacturaDetalleTable,
             )
             seedCajaConAlmacen()
             seedParametrosGenerales()
@@ -191,6 +193,38 @@ class SalesRoutesIntegrationTest {
             it[monedaSecundaria] = 1
             it[abrMonedaSecundaria] = "USD"
             it[totalRef] = 10.70f
+        }
+        SalesFacturaDetalleTable.insert {
+            it[idDetalleFactura] = "det-dup-001"
+            it[idFactura] = DUPLICATE_ID_FACTURA
+            it[idItem] = 1
+            it[itemAlmacen] = 1
+            it[itemDescripcion] = "ITEM DUP"
+            it[itemCantidad] = BigDecimal("1.000")
+            it[itemPrecioSinIva] = BigDecimal("10.00")
+            it[itemDescuento] = BigDecimal("0.00")
+            it[itemMontoDescuento] = BigDecimal("0.00")
+            it[itemPiva] = BigDecimal("7.00")
+            it[itemTotalSinIva] = BigDecimal("10.00")
+            it[itemTotalConIva] = BigDecimal("10.70")
+            it[poseeSerial] = "NO"
+            it[serialesSeleccionados] = ""
+            it[usuarioCreacion] = "cajero1"
+            it[itemListaPrecio] = "BASE"
+            it[itemUnidadEmpaque] = "UNIDAD"
+            it[itemCantidadTotal] = BigDecimal("1")
+            it[promocionId] = ""
+            it[promocionTipo] = ""
+            it[promocionCodigo] = ""
+            it[promocionNombre] = ""
+            it[promocionGrupo] = ""
+            it[promocionDetalleId] = ""
+            it[promocionCantidad] = BigDecimal("0.000")
+            it[grupo] = 1
+            it[descuentoAutorizacion] = ""
+            it[codVendedor] = 5
+            it[itemCodigo] = "P1"
+            it[itemReferencia] = "R1"
         }
     }
 

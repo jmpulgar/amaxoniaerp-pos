@@ -61,6 +61,16 @@ class FacturasRepository {
                     .limit(1)
                     .singleOrNull()
                     ?: return@dbQuery null
+
+            val hasDetails =
+                SalesFacturaDetalleTable
+                    .select(SalesFacturaDetalleTable.idFactura)
+                    .where { SalesFacturaDetalleTable.idFactura eq idFactura }
+                    .limit(1)
+                    .any()
+            if (!hasDetails) {
+                return@dbQuery null
+            }
             val sesionCerrada =
                 CuentaMesaTable
                     .join(

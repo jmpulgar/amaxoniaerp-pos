@@ -5,6 +5,8 @@ import com.amaxonia.pos.domain.model.Product
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.money.Money
 import com.amaxonia.pos.domain.repository.CartRepository
+import com.amaxonia.pos.domain.repository.Department
+import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.PromotionRepository
 import com.amaxonia.pos.domain.repository.setClientSucursales
 import com.amaxonia.pos.domain.repository.setCurrentSeller
@@ -23,7 +25,37 @@ data class DashboardCartDependencies(
     val cartRepository: CartRepository,
     val resolveClientBranches: ResolveClientBranchesUseCase,
     val refreshProductLots: RefreshCartProductLotsUseCase,
+    val productRepository: ProductRepository = NoOpProductRepository,
 )
+
+private object NoOpProductRepository : ProductRepository {
+    override suspend fun getDepartments(): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getSections(departmentId: Int): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getFamilies(sectionId: Int): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getSubFamilies(familyId: Int): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getBrands(): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getLines(brandId: Int): Result<List<Department>> = Result.success(emptyList())
+
+    override suspend fun getAllProducts(): Result<List<Product>> = Result.success(emptyList())
+
+    override suspend fun getAllProducts(departmentId: Int?): Result<List<Product>> = Result.success(emptyList())
+
+    override suspend fun getProductById(id: String): Result<Product> = Result.failure(NoSuchElementException())
+
+    override suspend fun getProductStock(id: String): Result<com.amaxonia.pos.domain.model.ProductStock> =
+        Result.failure(NoSuchElementException())
+
+    override suspend fun searchProducts(query: String): Result<List<Product>> = Result.success(emptyList())
+
+    override suspend fun saveProduct(product: Product): Result<Unit> = Result.success(Unit)
+
+    override suspend fun deleteProduct(id: String): Result<Unit> = Result.success(Unit)
+}
 
 class DashboardCartCoordinator(
     dependencies: DashboardCartDependencies,
@@ -40,6 +72,7 @@ class DashboardCartCoordinator(
             cartRepository,
             dependencies.refreshProductLots,
             saleGate,
+            dependencies.productRepository,
         )
     private val manualHandler = DashboardManualEntryHandler(productHandler, clock)
 
@@ -135,6 +168,7 @@ private class DashboardProductActionHandler(
     private val cartRepository: CartRepository,
     private val refreshProductLots: RefreshCartProductLotsUseCase,
     private val saleGate: DashboardSaleGate,
+    private val productRepository: ProductRepository,
 ) {
     private val validatePromotion = ValidarAdicionPromocionUseCase()
 
@@ -152,6 +186,9 @@ private class DashboardProductActionHandler(
             is DashboardSaleUiAction.AddPromotionFromChoice -> addPromotionChoice(action.promotion, action.times, state)
             DashboardSaleUiAction.DismissPromotionChoice -> dismissPromotionChoice(state)
             DashboardSaleUiAction.ClearPromotionMessage -> state.update { it.copy(promotionMessage = null) }
+            is DashboardSaleUiAction.OpenProductOptions -> openProductOptions(action.product, scope, state)
+            DashboardSaleUiAction.DismissProductOptions -> dismissProductOptions(state)
+            is DashboardSaleUiAction.ConfirmProductOptions -> confirmProductOptions(action, scope, state)
         }
     }
 
@@ -162,6 +199,10 @@ private class DashboardProductActionHandler(
         state: MutableStateFlow<DashboardState>,
     ) {
         if (!saleGate.canProceed(scope, state)) return
+        if (product.hasOptions) {
+            openProductOptions(product, scope, state)
+            return
+        }
         val safeQuantity = quantity.coerceAtLeast(1)
         scope.launch {
             promotionRepository.getActivePromotionsForProduct(product.id).fold(
@@ -187,6 +228,69 @@ private class DashboardProductActionHandler(
                     }
                 },
                 onFailure = { addProductIndividual(product, safeQuantity, scope, state) },
+            )
+        }
+    }
+
+    private fun openProductOptions(
+        product: DashboardProduct,
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
+        if (!saleGate.canProceed(scope, state)) return
+        state.update {
+            it.copy(
+                productOptionsProduct = product,
+                isLoadingProductOptions = true,
+                productOptionsGroups = emptyList(),
+                productOptionsError = null,
+                quantityPickerProduct = null,
+            )
+        }
+        scope.launch {
+            productRepository.getProductOptions(product.id).fold(
+                onSuccess = { groups ->
+                    state.update {
+                        it.copy(
+                            isLoadingProductOptions = false,
+                            productOptionsGroups = groups,
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    state.update {
+                        it.copy(
+                            isLoadingProductOptions = false,
+                            productOptionsError = error.message ?: "No se pudieron cargar las opciones",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    private fun confirmProductOptions(
+        action: DashboardSaleUiAction.ConfirmProductOptions,
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
+        val product = action.product.sourceProduct ?: action.product.toManualProduct()
+        cartRepository.addToCart(
+            product = product,
+            quantity = action.quantity.coerceAtLeast(1),
+            composition = action.composition,
+        )
+        dismissProductOptions(state)
+        scope.launch { refreshProductLots(product.id, LotRefreshPolicy.DISCOVER_CONFIGURATION) }
+    }
+
+    private fun dismissProductOptions(state: MutableStateFlow<DashboardState>) {
+        state.update {
+            it.copy(
+                productOptionsProduct = null,
+                productOptionsGroups = emptyList(),
+                isLoadingProductOptions = false,
+                productOptionsError = null,
             )
         }
     }

@@ -6,6 +6,7 @@ import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.repository.CajaRepository
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ConnectivityStatus
+import com.amaxonia.pos.domain.repository.clearSellerContext
 import com.amaxonia.pos.domain.repository.setSellerContext
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintOutcome
 import com.amaxonia.pos.domain.usecase.caja.CashClosePrintingService
@@ -39,11 +40,26 @@ class DashboardCajaCoordinator(
         scope: CoroutineScope,
         state: MutableStateFlow<DashboardState>,
     ) {
+        observeActiveCajaName(scope, state)
+        observeActiveCaja(scope, state)
+        restoreAndVerifySession(scope, state)
+    }
+
+    private fun observeActiveCajaName(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
         scope.launch {
             cajaRepository.activeCajaName.collect { cajaName ->
                 state.update { it.copy(cajaPrincipalNombre = cajaName) }
             }
         }
+    }
+
+    private fun observeActiveCaja(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
         scope.launch {
             combine(
                 cajaRepository.activeCaja,
@@ -78,18 +94,33 @@ class DashboardCajaCoordinator(
                         cajaSession = resolveSession(caja, secuencia, isVerifying),
                         cajaFechaApertura = formattedFecha,
                         isCajaDiaAnterior = isDiaAnterior,
-                        showAvisoCajaAnterior = if (shouldPrompt) true else (if (!isVerifying && isDiaAnterior) it.showAvisoCajaAnterior else false),
+                        showAvisoCajaAnterior =
+                            if (shouldPrompt) {
+                                true
+                            } else if (!isVerifying && isDiaAnterior) {
+                                it.showAvisoCajaAnterior
+                            } else {
+                                false
+                            },
                     )
                 }
-                caja?.let {
+                if (caja != null) {
                     cartRepository.setSellerContext(
-                        defaultSellerId = it.defaultSellerId,
-                        defaultSellerName = it.defaultSellerName,
-                        sellers = it.availableSellers,
+                        defaultSellerId = caja.defaultSellerId,
+                        defaultSellerName = caja.defaultSellerName,
+                        sellers = caja.availableSellers,
                     )
+                } else {
+                    cartRepository.clearSellerContext()
                 }
             }
         }
+    }
+
+    private fun restoreAndVerifySession(
+        scope: CoroutineScope,
+        state: MutableStateFlow<DashboardState>,
+    ) {
         scope.launch {
             verifying.value = true
             cajaRepository.restoreActiveCajaIfValid()

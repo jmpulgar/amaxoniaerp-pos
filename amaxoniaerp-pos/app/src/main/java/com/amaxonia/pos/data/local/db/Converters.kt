@@ -18,4 +18,15 @@ class Converters {
         runCatching {
             json.decodeFromString(ListSerializer(PriceLevel.serializer()), value)
         }.getOrDefault(emptyList())
+
+    @TypeConverter
+    fun intListToString(list: List<Int>?): String = list?.joinToString(",") ?: ""
+
+    @TypeConverter
+    fun stringToIntList(value: String?): List<Int> =
+        if (value.isNullOrBlank()) {
+            emptyList()
+        } else {
+            value.split(",").mapNotNull { it.trim().toIntOrNull() }
+        }
 }

@@ -8,6 +8,8 @@ import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.caja.Caja
 import com.amaxonia.pos.domain.model.caja.CajaSessionStatus
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketPayload
+import com.amaxonia.pos.domain.model.options.ProductComposition
+import com.amaxonia.pos.domain.model.options.ProductOptionGroup
 import com.amaxonia.pos.domain.model.seller.Seller
 import com.amaxonia.pos.domain.repository.Department
 
@@ -40,6 +42,7 @@ data class DashboardProduct(
     val barcode: String? = null,
     val isService: Boolean = false,
     val sourceProduct: Product? = null,
+    val hasOptions: Boolean = false,
 )
 
 data class DashboardState(
@@ -97,6 +100,10 @@ data class DashboardState(
     val showPromotionChoice: Boolean = false,
     val promotionMessage: String? = null,
     val quantityPickerProduct: DashboardProduct? = null,
+    val productOptionsProduct: DashboardProduct? = null,
+    val productOptionsGroups: List<ProductOptionGroup> = emptyList(),
+    val isLoadingProductOptions: Boolean = false,
+    val productOptionsError: String? = null,
     // --- AUTO-CLOSE ---
     val autoCloseMessage: String? = null,
     val automaticCloseTicketOffer: AutomaticCloseTicketOffer? = null,
@@ -202,6 +209,18 @@ sealed interface DashboardSaleUiAction : DashboardUiAction {
     data object DismissPromotionChoice : Product
 
     data object ClearPromotionMessage : Product
+
+    data class OpenProductOptions(
+        val product: DashboardProduct,
+    ) : Product
+
+    data object DismissProductOptions : Product
+
+    data class ConfirmProductOptions(
+        val product: DashboardProduct,
+        val quantity: Int,
+        val composition: ProductComposition,
+    ) : Product
 
     data class ManualKey(
         val key: String,

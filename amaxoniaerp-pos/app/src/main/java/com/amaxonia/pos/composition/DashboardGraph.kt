@@ -2,6 +2,7 @@ package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.data.local.clearActiveCaja
 import com.amaxonia.pos.domain.repository.CartRepository
+import com.amaxonia.pos.domain.repository.clearSellerContext
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientBranchesUseCase
 import com.amaxonia.pos.ui.dashboard.DashboardCajaCoordinator
 import com.amaxonia.pos.ui.dashboard.DashboardCartCoordinator
@@ -47,6 +48,7 @@ object DashboardGraph {
                                     DependencyContainer.clientBranchRepository,
                                 ),
                             refreshProductLots = DependencyContainer.refreshCartProductLotsUseCase,
+                            productRepository = DependencyContainer.productRepository,
                         ),
                     saleGate = cajaCoordinator,
                     clock = DependencyContainer.appClock,
@@ -58,10 +60,9 @@ object DashboardGraph {
     /** Limpia la sesión local al cerrar sesión desde el drawer. */
     suspend fun logout() {
         DependencyContainer.cartRepository.clearCart()
-        DependencyContainer.cajaRepository.clearActiveCaja()
+        DependencyContainer.cartRepository.clearSellerContext()
         DependencyContainer.selectedTableHolder.clear()
         DependencyContainer.tableAccountPaymentHolder.clear()
-        DependencyContainer.purgeOfflineCatalogDataUseCase()
         DependencyContainer.authRepository.logout()
     }
 

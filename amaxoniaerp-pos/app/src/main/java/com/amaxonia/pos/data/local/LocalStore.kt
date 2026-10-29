@@ -66,6 +66,7 @@ class LocalStore(
     internal val allowChangeSellerKey = booleanPreferencesKey("allow_change_seller")
     internal val customerDisplayEnabledKey = booleanPreferencesKey("customer_display_enabled")
     internal val activeCajaKey = stringPreferencesKey("active_caja_snapshot")
+    internal val cachedCajasKey = stringPreferencesKey("cached_cajas_snapshot")
     internal val formasPagoKey = stringPreferencesKey("formas_pago_snapshot")
     internal val areasKey = stringPreferencesKey("areas_snapshot")
     internal val mesasKey = stringPreferencesKey("mesas_snapshot")
@@ -275,6 +276,12 @@ data class ActiveCajaSnapshot(
     val companyDb: String,
     val date: String,
     val caja: Caja,
+)
+
+@Serializable
+data class CachedCajasSnapshot(
+    val companyDb: String,
+    val cajas: List<Caja>,
 )
 
 @Serializable

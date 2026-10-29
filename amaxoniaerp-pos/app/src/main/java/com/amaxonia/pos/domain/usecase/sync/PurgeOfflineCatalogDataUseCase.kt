@@ -5,7 +5,6 @@ import androidx.room.withTransaction
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.clearCatalogCache
 import com.amaxonia.pos.data.local.db.AppDatabase
-import com.amaxonia.pos.data.sync.OfflineSyncSettingsStore
 import com.amaxonia.pos.data.sync.SyncScheduler
 
 /**
@@ -15,12 +14,12 @@ import com.amaxonia.pos.data.sync.SyncScheduler
  *    sucursales, promociones, formas de pago, países, niveles de dirección, tipos de cliente,
  *    sesiones de caja, borradores y estados de sync).
  *    NOTA: Se conservan `pending_invoices` y `transaction_log` para no perder ventas offline pendientes.
- * 3. Limpia los cachés de DataStore (productos, clientes, flags de sync completado por empresa y alcance offline).
+ * 3. Limpia los cachés de DataStore (productos, clientes, flags de sync completado por empresa).
+ *    NOTA: Se conservan los ajustes de visibilidad y alcance offline del terminal (ADR-008).
  */
 class PurgeOfflineCatalogDataUseCase(
     private val database: AppDatabase,
     private val localStore: LocalStore,
-    private val offlineSyncSettingsStore: OfflineSyncSettingsStore,
     private val appContext: Context,
 ) {
     suspend operator fun invoke() {
@@ -46,8 +45,7 @@ class PurgeOfflineCatalogDataUseCase(
             database.draftInvoiceDao().deleteAll()
         }
 
-        // 3. Limpiar cachés y flags en DataStore
+        // 3. Limpiar cachés y flags en DataStore (se preservan ajustes de visibilidad del terminal)
         localStore.clearCatalogCache()
-        offlineSyncSettingsStore.reset()
     }
 }

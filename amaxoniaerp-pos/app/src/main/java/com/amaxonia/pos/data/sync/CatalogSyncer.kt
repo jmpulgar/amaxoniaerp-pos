@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.sync
 
+import com.amaxonia.pos.data.local.AppJson
 import com.amaxonia.pos.data.local.LocalStore
 import com.amaxonia.pos.data.local.db.AddressLevel1Dao
 import com.amaxonia.pos.data.local.db.AddressLevel2Dao
@@ -9,7 +10,13 @@ import com.amaxonia.pos.data.local.db.ClientDao
 import com.amaxonia.pos.data.local.db.ClientSucursalDao
 import com.amaxonia.pos.data.local.db.ClientTypeDao
 import com.amaxonia.pos.data.local.db.CountryDao
+import com.amaxonia.pos.data.local.db.OfflineCompanyDao
+import com.amaxonia.pos.data.local.db.OfflineCompanyEntity
+import com.amaxonia.pos.data.local.db.OfflineUserDao
+import com.amaxonia.pos.data.local.db.OfflineUserEntity
 import com.amaxonia.pos.data.local.db.ProductDao
+import com.amaxonia.pos.data.local.db.ProductOptionsDao
+import com.amaxonia.pos.data.local.db.ProductOptionsEntity
 import com.amaxonia.pos.data.local.db.PromocionDao
 import com.amaxonia.pos.data.local.db.toEntity
 import com.amaxonia.pos.data.local.db.toLevel1Entity
@@ -22,13 +29,20 @@ import com.amaxonia.pos.data.local.setInitialSyncCompleted
 import com.amaxonia.pos.data.remote.ApiService
 import com.amaxonia.pos.data.remote.CatalogPage
 import com.amaxonia.pos.data.remote.ClientQueryParams
+import com.amaxonia.pos.data.remote.authHeaders
 import com.amaxonia.pos.data.remote.getAddressLevels
 import com.amaxonia.pos.data.remote.getClientSucursales
 import com.amaxonia.pos.data.remote.getClientTypes
 import com.amaxonia.pos.data.remote.getClients
 import com.amaxonia.pos.data.remote.getCountries
+import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.data.remote.getItemOptions
 import com.amaxonia.pos.data.remote.getProducts
 import com.amaxonia.pos.data.remote.getPromotions
+import com.amaxonia.pos.data.repository.toDomain
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import kotlinx.serialization.encodeToString
 
 class CatalogSyncer(
     private val apiService: ApiService,
@@ -45,6 +59,9 @@ class CatalogSyncer(
     private val addressLevel3Dao = daos.addressLevel3Dao
     private val clientTypeDao = daos.clientTypeDao
     private val promocionDao = daos.promocionDao
+    private val offlineUserDao = daos.offlineUserDao
+    private val offlineCompanyDao = daos.offlineCompanyDao
+    private val productOptionsDao = daos.productOptionsDao
 
     private companion object {
         /** Longitud máxima del código de cliente usada como clave de sus sucursales. */
@@ -65,6 +82,7 @@ class CatalogSyncer(
             syncClients(session.token, pageSize)
             syncProducts(session.token, pageSize)
             syncPromotions(session.token)
+            syncAuthDirectory(session.token)
             localStore.setInitialSyncCompleted(session.company.id, true)
 
             // Secondary catalogs keep syncing after the app can already operate.
@@ -143,6 +161,15 @@ class CatalogSyncer(
                 }
             if (entitiesToCache.isNotEmpty()) {
                 productDao.insertAll(entitiesToCache)
+            }
+            val comboDtos =
+                response.data.filter {
+                    it.poseeProductoCombo.equals("si", ignoreCase = true) ||
+                        it.tipoArticulo.equals("C", ignoreCase = true) ||
+                        it.tipoArticulo.equals("K", ignoreCase = true)
+                }
+            if (comboDtos.isNotEmpty()) {
+                syncProductOptions(token, comboDtos)
             }
             offset += pageSize
         }
@@ -229,6 +256,67 @@ class CatalogSyncer(
             offset += pageSize
         }
     }
+
+    private suspend fun syncAuthDirectory(token: String) {
+        val userDao = offlineUserDao ?: return
+        val companyDao = offlineCompanyDao ?: return
+        runCatching {
+            val response: AuthDirectoryResponseDto =
+                apiService.client
+                    .get("api/sync/v1/auth-directory") {
+                        authHeaders(token)
+                    }.body()
+
+            val now = System.currentTimeMillis()
+            val users =
+                response.users.map { u ->
+                    OfflineUserEntity(
+                        id = u.id,
+                        username = u.username,
+                        passwordHash = u.passwordHash,
+                        role = u.role,
+                        levelId = u.levelId,
+                        companyCodes = u.companyCodes,
+                        countryCode = response.countryCode,
+                        status = "A",
+                        updatedAt = now,
+                    )
+                }
+            val companies =
+                response.companies.map { c ->
+                    OfflineCompanyEntity(
+                        id = c.id,
+                        name = c.name,
+                        adminDb = c.adminDb,
+                        accountingDb = c.accountingDb,
+                        payrollDb = c.payrollDb,
+                        rif = c.rif,
+                        countryCode = c.countryCode.ifBlank { response.countryCode },
+                        updatedAt = now,
+                    )
+                }
+            userDao.upsertAll(users)
+            companyDao.upsertAll(companies)
+        }
+    }
+
+    private suspend fun syncProductOptions(
+        token: String,
+        comboProducts: List<ProductDto>,
+    ) {
+        val optionsDao = productOptionsDao ?: return
+        comboProducts.forEach { dto ->
+            val id = dto.id ?: return@forEach
+            runCatching {
+                val options = apiService.getItemOptions(token, id)
+                val groups = options.grupos.map { it.toDomain() }
+                if (groups.isNotEmpty()) {
+                    val json = AppJson.encodeToString(groups)
+                    optionsDao.upsert(ProductOptionsEntity(id, json, System.currentTimeMillis()))
+                }
+            }
+        }
+    }
 }
 
 /** DAOs de Room que alimentan el caché offline de los catálogos sincronizados. */
@@ -242,6 +330,9 @@ data class CatalogDaos(
     val addressLevel3Dao: AddressLevel3Dao,
     val clientTypeDao: ClientTypeDao,
     val promocionDao: PromocionDao,
+    val offlineUserDao: OfflineUserDao? = null,
+    val offlineCompanyDao: OfflineCompanyDao? = null,
+    val productOptionsDao: ProductOptionsDao? = null,
 ) {
     companion object {
         fun from(database: AppDatabase): CatalogDaos =
@@ -255,6 +346,9 @@ data class CatalogDaos(
                 addressLevel3Dao = database.addressLevel3Dao(),
                 clientTypeDao = database.clientTypeDao(),
                 promocionDao = database.promocionDao(),
+                offlineUserDao = database.offlineUserDao(),
+                offlineCompanyDao = database.offlineCompanyDao(),
+                productOptionsDao = database.productOptionsDao(),
             )
     }
 }

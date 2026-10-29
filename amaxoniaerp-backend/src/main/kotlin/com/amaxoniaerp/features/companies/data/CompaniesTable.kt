@@ -12,3 +12,11 @@ object CompaniesTable : Table("nomempresa") {
 
     override val primaryKey = PrimaryKey(codigo)
 }
+
+object DatosEmpresaTable : Table("datos_empresa") {
+    val codEmpresa = integer("cod_empresa")
+    val rif = varchar("rif", length = 50).nullable()
+    val nit = varchar("nit", length = 50).nullable()
+
+    override val primaryKey = PrimaryKey(codEmpresa)
+}

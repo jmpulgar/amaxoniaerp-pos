@@ -80,6 +80,9 @@ data class ProductEntity(
      */
     @ColumnInfo(defaultValue = "A") val estatus: String = "A",
     @ColumnInfo(defaultValue = "0") val isService: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val poseeProductoCombo: Boolean = false,
+    val tipoArticulo: String? = null,
+    val idCombo: String? = null,
     val prices: List<PriceLevel>,
 )
 

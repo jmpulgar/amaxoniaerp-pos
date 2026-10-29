@@ -113,14 +113,24 @@ open class ProcessSaleTransactionalRepository(
         val idFactura = writeContext.invoiceId
         val countryCode = writeContext.monetaryContext.countryCode
         val facturaTable = SalesFacturaTableFactory.forCountry(countryCode)
-        val isExistingPending =
+        val existingFactura =
             facturaTable
-                .select(facturaTable.idFactura)
-                .where { (facturaTable.idFactura eq idFactura) and (facturaTable.codEstatus eq 1) }
+                .select(facturaTable.idFactura, facturaTable.codEstatus)
+                .where { facturaTable.idFactura eq idFactura }
                 .limit(1)
-                .any()
+                .firstOrNull()
 
-        if (isExistingPending) {
+        val isExistingPending = existingFactura?.get(facturaTable.codEstatus) == 1
+        val isExistingOrphan =
+            existingFactura != null &&
+                !isExistingPending &&
+                !SalesFacturaDetalleTable
+                    .select(SalesFacturaDetalleTable.idFactura)
+                    .where { SalesFacturaDetalleTable.idFactura eq idFactura }
+                    .limit(1)
+                    .any()
+
+        if (isExistingPending || isExistingOrphan) {
             SalesFacturaDetalleTable.deleteWhere { SalesFacturaDetalleTable.idFactura eq idFactura }
             SalesFacturaImpuestosTable.deleteWhere { SalesFacturaImpuestosTable.idFactura eq idFactura }
             val fpgTable = SalesFacturaDetalleFormaPagoTableFactory.forCountry(countryCode)
@@ -239,7 +249,15 @@ open class ProcessSaleTransactionalRepository(
 
         val status = existing[t.codEstatus] ?: 0
         if (status == 2) {
-            throw DuplicateInvoiceException("La factura ya existe y está procesada (cod_estatus=2)")
+            val hasDetails =
+                SalesFacturaDetalleTable
+                    .select(SalesFacturaDetalleTable.idFactura)
+                    .where { SalesFacturaDetalleTable.idFactura eq idFactura }
+                    .limit(1)
+                    .any()
+            if (hasDetails) {
+                throw DuplicateInvoiceException("La factura ya existe y está procesada (cod_estatus=2)")
+            }
         }
         if (status == 3) {
             throw DuplicateInvoiceException("La factura ya existe y está anulada (cod_estatus=3)")

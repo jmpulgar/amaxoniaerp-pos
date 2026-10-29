@@ -62,7 +62,6 @@ class PurgeOfflineCatalogDataUseCaseTest {
             PurgeOfflineCatalogDataUseCase(
                 database = database,
                 localStore = localStore,
-                offlineSyncSettingsStore = offlineSyncSettingsStore,
                 appContext = context,
             )
     }
@@ -239,12 +238,17 @@ class PurgeOfflineCatalogDataUseCaseTest {
             assertTrue(database.cajaSesionDao().getAbierta("T1") == null)
             assertEquals(0, database.draftInvoiceDao().count())
 
-            // DataStore limpio
+            // DataStore de catálogos limpio
             assertTrue(localStore.readProducts().isEmpty())
             assertTrue(localStore.readClients().isEmpty())
             assertFalse(localStore.isInitialSyncCompleted(1))
             assertFalse(localStore.isInitialSyncCompleted(2))
-            assertFalse(offlineSyncSettingsStore.load().enabled)
+
+            // Configuración de visibilidad y alcance offline del terminal preservada (ADR-008)
+            val preservedScope = offlineSyncSettingsStore.load()
+            assertTrue(preservedScope.enabled)
+            assertEquals(setOf(1), preservedScope.departmentIds)
+            assertEquals(setOf(10), preservedScope.branchIds)
 
             // 6. VERIFICAR QUE LAS VENTAS PENDIENTES Y TRANSACTION LOG SE PRESERVAN
             val pendingSales = database.pendingInvoiceDao().getPending()

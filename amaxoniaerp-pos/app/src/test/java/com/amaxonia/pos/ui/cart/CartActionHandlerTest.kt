@@ -11,8 +11,8 @@ import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.DraftInvoiceRepository
 import com.amaxonia.pos.domain.repository.ProductLotConfiguration
 import com.amaxonia.pos.domain.repository.ProductLotRepository
+import com.amaxonia.pos.domain.repository.clearSellerContext
 import com.amaxonia.pos.domain.repository.setSellerContext
-import com.amaxonia.pos.domain.repository.setCurrentSeller
 import com.amaxonia.pos.domain.system.AppClock
 import com.amaxonia.pos.domain.system.IdGenerator
 import com.amaxonia.pos.domain.usecase.cart.RefreshCartProductLotsUseCase
@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
@@ -75,6 +77,89 @@ class CartActionHandlerTest {
             state.value = state.value.copy(allowChangeSeller = true)
             handler.onAction(CartUiAction.SelectSeller(2), this, state, effects)
             assertEquals(2, cart.currentSeller.value?.id)
+        }
+
+    @Test
+    fun `clear cart empties items but preserves current seller and available sellers`() =
+        runTest {
+            val seller1 = Seller(1, "Seller 1")
+            val seller2 = Seller(2, "Seller 2")
+            val cart =
+                CartRepository().apply {
+                    setSellerContext(1, "Seller 1", listOf(seller1, seller2))
+                    addToCart(product())
+                }
+            assertEquals(1, cart.cartItems.value.size)
+            assertEquals(1, cart.currentSeller.value?.id)
+            assertEquals(2, cart.availableSellers.value.size)
+
+            val state = MutableStateFlow(CartState(allowChangeSeller = false))
+            val handler = handler(cart)
+            val effects = MutableSharedFlow<CartUiEffect>(extraBufferCapacity = 1)
+
+            handler.onAction(CartUiAction.ClearCart, this, state, effects)
+
+            assertTrue(cart.cartItems.value.isEmpty())
+            assertEquals(1, cart.currentSeller.value?.id)
+            assertEquals(2, cart.availableSellers.value.size)
+
+            // Cuando se agrega un nuevo producto luego de vaciar el carrito, hereda el vendedor activo
+            cart.addToCart(product())
+            assertEquals(
+                1,
+                cart.cartItems.value
+                    .single()
+                    .codVendedor,
+            )
+        }
+
+    @Test
+    fun `clear cart preserves manually selected seller and available sellers`() =
+        runTest {
+            val seller1 = Seller(1, "Seller 1")
+            val seller2 = Seller(2, "Seller 2")
+            val cart =
+                CartRepository().apply {
+                    setSellerContext(1, "Seller 1", listOf(seller1, seller2))
+                    addToCart(product())
+                }
+            val state = MutableStateFlow(CartState(allowChangeSeller = true))
+            val handler = handler(cart)
+            val effects = MutableSharedFlow<CartUiEffect>(extraBufferCapacity = 1)
+
+            handler.onAction(CartUiAction.SelectSeller(2), this, state, effects)
+            assertEquals(2, cart.currentSeller.value?.id)
+
+            handler.onAction(CartUiAction.ClearCart, this, state, effects)
+
+            assertTrue(cart.cartItems.value.isEmpty())
+            assertEquals(2, cart.currentSeller.value?.id)
+            assertEquals(2, cart.availableSellers.value.size)
+
+            cart.addToCart(product())
+            assertEquals(
+                2,
+                cart.cartItems.value
+                    .single()
+                    .codVendedor,
+            )
+        }
+
+    @Test
+    fun `clearSellerContext wipes current and available sellers`() =
+        runTest {
+            val seller1 = Seller(1, "Seller 1")
+            val cart =
+                CartRepository().apply {
+                    setSellerContext(1, "Seller 1", listOf(seller1))
+                }
+            assertEquals(1, cart.currentSeller.value?.id)
+            assertEquals(1, cart.availableSellers.value.size)
+
+            cart.clearSellerContext()
+
+            assertNull(cart.currentSeller.value)
+            assertTrue(cart.availableSellers.value.isEmpty())
         }
 
     @Test

@@ -1,5 +1,6 @@
 package com.amaxonia.pos.data.remote
 
+import com.amaxonia.pos.data.sync.AuthDirectoryResponseDto
 import com.amaxonia.pos.data.sync.SyncBootstrapResponseDto
 import com.amaxonia.pos.data.sync.SyncCatalogItemDto
 import com.amaxonia.pos.data.sync.SyncDeltaResponseDto
@@ -56,6 +57,8 @@ interface SyncApiClient {
     suspend fun sucursales(token: String): List<SyncCatalogItemDto>
 
     suspend fun zonas(token: String): List<SyncCatalogItemDto>
+
+    suspend fun authDirectory(token: String): AuthDirectoryResponseDto
 }
 
 private val syncErrorJson = Json { ignoreUnknownKeys = true }
@@ -150,6 +153,12 @@ class SyncApi(
     override suspend fun zonas(token: String): List<SyncCatalogItemDto> =
         apiService.client
             .get("api/sync/v1/zonas") {
+                authHeaders(token)
+            }.body()
+
+    override suspend fun authDirectory(token: String): AuthDirectoryResponseDto =
+        apiService.client
+            .get("api/sync/v1/auth-directory") {
                 authHeaders(token)
             }.body()
 }

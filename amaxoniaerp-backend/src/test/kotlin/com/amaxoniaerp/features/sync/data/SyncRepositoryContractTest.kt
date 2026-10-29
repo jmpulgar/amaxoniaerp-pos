@@ -1,7 +1,10 @@
 package com.amaxoniaerp.features.sync.data
 
+import com.amaxoniaerp.features.auth.data.UsersTable
 import com.amaxoniaerp.features.clients.data.ClientSucursalTable
 import com.amaxoniaerp.features.clients.data.ClientsTable
+import com.amaxoniaerp.features.companies.data.CompaniesTable
+import com.amaxoniaerp.features.companies.data.CompanyRepository
 import com.amaxoniaerp.features.items.data.ItemsTableFactory
 import com.amaxoniaerp.features.items.data.mapRowToProductSync
 import com.amaxoniaerp.features.pos.data.CajaFormaPagoTable
@@ -267,5 +270,76 @@ class SyncRepositoryContractTest {
                 }
             }
             assertEquals(expectedHash, products.hash)
+        }
+
+    @Test
+    fun `authDirectory retorna usuarios activos y empresas activas`() =
+        runBlocking {
+            val configDb =
+                Database.connect(
+                    "jdbc:h2:mem:config_contract_${System.nanoTime()};MODE=MySQL;DB_CLOSE_DELAY=-1",
+                    "org.h2.Driver",
+                )
+            transaction(configDb) {
+                SchemaUtils.create(UsersTable, CompaniesTable)
+                UsersTable.insert {
+                    it[codUsuario] = 10
+                    it[usuario] = "cajero1"
+                    it[clave] = "hash123"
+                    it[status] = "A"
+                    it[codEmpresas] = "1,2"
+                    it[perfil] = 2
+                    it[nivelId] = 1
+                }
+                UsersTable.insert {
+                    it[codUsuario] = 11
+                    it[usuario] = "inactivo"
+                    it[clave] = "hash456"
+                    it[status] = "I"
+                    it[codEmpresas] = "1"
+                    it[perfil] = 2
+                    it[nivelId] = 1
+                }
+                CompaniesTable.insert {
+                    it[codigo] = 1
+                    it[nombre] = "Empresa 1"
+                    it[bd] = "db_empresa_1"
+                    it[bdContabilidad] = "db_cont_1"
+                    it[bdNomina] = "db_nom_1"
+                    it[admisActivo] = true
+                }
+                CompaniesTable.insert {
+                    it[codigo] = 2
+                    it[nombre] = "Empresa Inactiva"
+                    it[bd] = "db_empresa_2"
+                    it[admisActivo] = false
+                }
+            }
+
+            val mockCompanyRepo =
+                object : CompanyRepository(configDb) {
+                    override suspend fun loadCompanyRifByAdminDb(
+                        adminDb: String?,
+                        countryCode: String,
+                    ): String? = if (adminDb == "db_empresa_1") "J-12345678" else null
+                }
+
+            val result =
+                repository.authDirectory(
+                    countryCode = "PA",
+                    activeAdminDb = null,
+                    configDatabase = configDb,
+                    companyRepository = mockCompanyRepo,
+                )
+
+            assertEquals("PA", result.countryCode)
+            assertEquals(1, result.users.size)
+            assertEquals("cajero1", result.users.first().username)
+            assertEquals("hash123", result.users.first().passwordHash)
+            assertEquals(listOf(1, 2), result.users.first().companyCodes)
+
+            assertEquals(1, result.companies.size)
+            assertEquals("Empresa 1", result.companies.first().name)
+            assertEquals("J-12345678", result.companies.first().rif)
         }
 }

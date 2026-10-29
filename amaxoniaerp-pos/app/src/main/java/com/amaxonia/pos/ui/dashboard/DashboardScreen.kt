@@ -230,10 +230,13 @@ fun DashboardScreen(
     var showSellerSheet by remember { mutableStateOf(false) }
     val productGridState = rememberLazyGridState()
     val productListState = rememberLazyListState()
+    val isOnline by AppGraph.networkMonitor.isOnlineFlow.collectAsStateWithLifecycle(
+        initialValue = AppGraph.networkMonitor.isOnline(),
+    )
     val manualSyncInfos by AppGraph.sync.manualSyncWorkInfos(context).observeAsState(emptyList())
     val isSyncRunning =
-        manualSyncInfos.any { info ->
-            info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.ENQUEUED
+        isOnline && manualSyncInfos.any { info ->
+            info.state == WorkInfo.State.RUNNING
         }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -516,6 +519,25 @@ fun DashboardScreen(
                 viewModel.onAction(DashboardSaleUiAction.AddPromotionFromChoice(promo, times))
             },
             onDismiss = { viewModel.onAction(DashboardSaleUiAction.DismissPromotionChoice) },
+        )
+    }
+
+    state.productOptionsProduct?.let { product ->
+        ProductOptionsSheet(
+            product = product,
+            groups = state.productOptionsGroups,
+            isLoading = state.isLoadingProductOptions,
+            errorMessage = state.productOptionsError,
+            onConfirm = { quantity, composition ->
+                viewModel.onAction(
+                    DashboardSaleUiAction.ConfirmProductOptions(
+                        product = product,
+                        quantity = quantity,
+                        composition = composition,
+                    ),
+                )
+            },
+            onDismiss = { viewModel.onAction(DashboardSaleUiAction.DismissProductOptions) },
         )
     }
 

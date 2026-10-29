@@ -43,10 +43,35 @@ suspend fun LocalStore.readActiveCajaForToday(): Caja? {
 }
 
 private suspend fun LocalStore.isActiveCajaSnapshotUsable(snapshot: ActiveCajaSnapshot): Boolean {
-    val session = readCompanySession()
-    val isSameCompany = session?.company?.adminDb == snapshot.companyDb
-    val isToday = snapshot.date == LocalDate.now().toString()
-    return isSameCompany && isToday
+    val session = readCompanySession() ?: return false
+    return session.company.adminDb.equals(snapshot.companyDb, ignoreCase = true)
+}
+
+suspend fun LocalStore.saveCachedCajas(cajas: List<Caja>) {
+    val session = readCompanySession() ?: return
+    val snapshot =
+        CachedCajasSnapshot(
+            companyDb = session.company.adminDb,
+            cajas = cajas,
+        )
+    val json = AppJson.encodeToString(snapshot)
+    dataStore.edit { prefs ->
+        prefs[cachedCajasKey] = json
+    }
+}
+
+suspend fun LocalStore.readCachedCajas(): List<Caja> {
+    val session = readCompanySession() ?: return emptyList()
+    val json = dataStore.data.first()[cachedCajasKey] ?: return emptyList()
+    val snapshot =
+        runCatching {
+            AppJson.decodeFromString(CachedCajasSnapshot.serializer(), json)
+        }.getOrNull() ?: return emptyList()
+    return if (session.company.adminDb.equals(snapshot.companyDb, ignoreCase = true)) {
+        snapshot.cajas
+    } else {
+        emptyList()
+    }
 }
 
 suspend fun LocalStore.clearActiveCaja() {

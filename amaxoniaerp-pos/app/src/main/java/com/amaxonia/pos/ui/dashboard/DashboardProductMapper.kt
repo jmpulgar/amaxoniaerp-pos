@@ -22,6 +22,7 @@ class DashboardProductMapper(
             barcode = product.barcode1,
             isService = product.isService,
             sourceProduct = product,
+            hasOptions = product.hasOptions,
         )
 
     fun imageUrl(

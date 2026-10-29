@@ -10,36 +10,42 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 
-class CompanyRepository(
+open class CompanyRepository(
     private val database: Database,
 ) {
-    suspend fun loadCompanies(
-        companyCodes: List<Int>,
-        countryCode: String,
-    ): List<CompanyResponse> {
+    suspend fun loadCompanies(companyCodes: List<Int>): List<CompanyResponse> {
         if (companyCodes.isEmpty()) return emptyList()
 
-        val companies =
-            dbQuery(database) {
-                CompaniesTable
-                    .selectAll()
-                    .where { (CompaniesTable.codigo inList companyCodes) and (CompaniesTable.admisActivo eq true) }
-                    .map { row ->
-                        CompanyInfo(
-                            id = row[CompaniesTable.codigo],
-                            name = row[CompaniesTable.nombre],
-                            adminDb = row[CompaniesTable.bd],
-                        )
-                    }
-            }
+        return dbQuery(database) {
+            val rifsByCode =
+                runCatching {
+                    DatosEmpresaTable
+                        .selectAll()
+                        .where { DatosEmpresaTable.codEmpresa inList companyCodes }
+                        .associate { row ->
+                            val rawRif = row[DatosEmpresaTable.rif]?.trim().orEmpty()
+                            val rawNit = row[DatosEmpresaTable.nit]?.trim().orEmpty()
+                            val formattedRif =
+                                when {
+                                    rawRif.isBlank() -> ""
+                                    rawNit.isNotBlank() && !rawRif.contains("DV", ignoreCase = true) -> "$rawRif DV $rawNit"
+                                    else -> rawRif
+                                }
+                            row[DatosEmpresaTable.codEmpresa] to formattedRif
+                        }
+                }.getOrDefault(emptyMap())
 
-        return companies.map { company ->
-            val rif = loadCompanyRifByAdminDb(company.adminDb, countryCode)
-            CompanyResponse(
-                id = company.id,
-                name = company.name,
-                rif = rif,
-            )
+            CompaniesTable
+                .selectAll()
+                .where { (CompaniesTable.codigo inList companyCodes) and (CompaniesTable.admisActivo eq true) }
+                .map { row ->
+                    val code = row[CompaniesTable.codigo]
+                    CompanyResponse(
+                        id = code,
+                        name = row[CompaniesTable.nombre],
+                        rif = rifsByCode[code]?.takeIf { it.isNotBlank() },
+                    )
+                }
         }
     }
 
@@ -60,7 +66,7 @@ class CompanyRepository(
                 }.singleOrNull()
         }
 
-    suspend fun loadCompanyRifByAdminDb(
+    open suspend fun loadCompanyRifByAdminDb(
         adminDb: String?,
         countryCode: String,
     ): String? {
@@ -78,10 +84,4 @@ class CompanyRepository(
             }
         }.getOrNull()
     }
-
-    private data class CompanyInfo(
-        val id: Int,
-        val name: String,
-        val adminDb: String?,
-    )
 }

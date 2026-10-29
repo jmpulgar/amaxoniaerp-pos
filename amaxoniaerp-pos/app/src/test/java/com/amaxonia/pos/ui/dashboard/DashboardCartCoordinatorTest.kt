@@ -2,6 +2,8 @@ package com.amaxonia.pos.ui.dashboard
 
 import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.ServerCountry
+import com.amaxonia.pos.domain.model.options.ProductComposition
+import com.amaxonia.pos.domain.model.options.SelectedOption
 import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.DashboardSessionReader
 import com.amaxonia.pos.domain.repository.ProductLotConfiguration
@@ -81,6 +83,93 @@ class DashboardCartCoordinatorTest {
             // Con fold Money el residuo IEEE-754 desaparece y queda 0.3 exacto
             // — única diferencia permitida, documentada en el commit TASK-151.
             assertEquals(0.3, state.value.cartTotal, 0.0)
+        }
+
+    @Test
+    fun `adding product with hasOptions opens options sheet instead of cart`() =
+        runTest {
+            val cart = CartRepository()
+            val state = MutableStateFlow(DashboardState())
+            val coordinator = coordinator(cart, DashboardSaleGate { _, _ -> true })
+
+            val comboProduct = DashboardProduct(
+                id = "combo-1",
+                name = "Combo Familiar",
+                price = 15.0,
+                hasOptions = true,
+            )
+
+            coordinator.onAction(
+                DashboardSaleUiAction.AddProduct(comboProduct),
+                this,
+                state,
+            )
+            advanceUntilIdle()
+
+            assertTrue(cart.cartItems.value.isEmpty())
+            assertEquals("combo-1", state.value.productOptionsProduct?.id)
+        }
+
+    @Test
+    fun `confirming product options adds to cart with composition and dismisses sheet`() =
+        runTest {
+            val cart = CartRepository()
+            val state = MutableStateFlow(DashboardState())
+            val coordinator = coordinator(cart, DashboardSaleGate { _, _ -> true })
+
+            val comboProduct = DashboardProduct(
+                id = "combo-1",
+                name = "Combo Familiar",
+                price = 15.0,
+                hasOptions = true,
+            )
+
+            val composition = ProductComposition(
+                idCombo = "c-1",
+                opciones = listOf(
+                    SelectedOption(
+                        idGrupo = "g1",
+                        grupo = "Bebida",
+                        tipo = "COMBO",
+                        idGrupoItem = "opt-coca",
+                        nombre = "Coca Cola",
+                        precio = 0.0,
+                    ),
+                ),
+            )
+
+            coordinator.onAction(
+                DashboardSaleUiAction.ConfirmProductOptions(
+                    product = comboProduct,
+                    quantity = 2,
+                    composition = composition,
+                ),
+                this,
+                state,
+            )
+            advanceUntilIdle()
+
+            val item = cart.cartItems.value.single()
+            assertEquals("combo-1", item.product.id)
+            assertEquals(2, item.quantity)
+            assertEquals(composition, item.composition)
+            assertEquals(null, state.value.productOptionsProduct)
+        }
+
+    @Test
+    fun `dismissing product options clears sheet state`() =
+        runTest {
+            val cart = CartRepository()
+            val state = MutableStateFlow(DashboardState(productOptionsProduct = DashboardProduct(id = "c", name = "C", price = 10.0)))
+            val coordinator = coordinator(cart, DashboardSaleGate { _, _ -> true })
+
+            coordinator.onAction(
+                DashboardSaleUiAction.DismissProductOptions,
+                this,
+                state,
+            )
+
+            assertEquals(null, state.value.productOptionsProduct)
         }
 
     private fun itemWithTotal(

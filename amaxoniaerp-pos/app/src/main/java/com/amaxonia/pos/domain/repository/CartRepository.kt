@@ -9,6 +9,7 @@ import com.amaxonia.pos.domain.model.Promocion
 import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
 import com.amaxonia.pos.domain.model.computeFinancialSnapshot
+import com.amaxonia.pos.domain.model.options.ProductComposition
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -115,16 +116,22 @@ class CartRepository {
     fun addToCart(
         product: Product,
         quantity: Int = 1,
+        composition: ProductComposition? = null,
     ) {
         val safeQuantity = quantity.coerceAtLeast(1)
         val currentSellerId = currentSellerState.value?.id ?: 0
         val defaultUnit = if (product.bulkQuantity > 1.0) "EMPAQUE" else "UNIDAD"
         val clientLabel = codTipoPrecioToLabel(selectedClientState.value?.codTipoPrecio)
-        val (effectiveLabel, initialPrice) = resolveItemPrice(product, defaultUnit, clientLabel)
+        val (effectiveLabel, initialBasePrice) = resolveItemPrice(product, defaultUnit, clientLabel)
+        val extraWithTax = composition?.extraConIva ?: 0.0
+        val initialPrice = initialBasePrice + extraWithTax
         val effectiveLevel = product.prices.firstOrNull { it.label.equals(effectiveLabel, ignoreCase = true) }
         val initialDiscount = effectiveLevel?.discountPercent ?: 0.0
         cartItemsState.update { currentItems ->
-            val existingIndex = currentItems.indexOfFirst { it.product.id == product.id && !it.isPromotionLine }
+            val existingIndex =
+                currentItems.indexOfFirst {
+                    it.product.id == product.id && !it.isPromotionLine && it.composition == composition
+                }
             if (existingIndex != -1) {
                 val mutable = currentItems.toMutableList()
                 val existingItem = mutable[existingIndex]
@@ -148,7 +155,45 @@ class CartRepository {
                         discountPercent = initialDiscount,
                         selectedPriceLabel = effectiveLabel,
                         isManualPrice = false,
+                        composition = composition,
                     )
+            }
+        }
+        invalidateFinancialSnapshot()
+    }
+
+    fun updateItemComposition(
+        itemIndex: Int,
+        newComposition: ProductComposition,
+    ) {
+        cartItemsState.update { items ->
+            if (itemIndex !in items.indices) return@update items
+            val mutable = items.toMutableList()
+            val oldItem = mutable[itemIndex]
+            val clientLabel = codTipoPrecioToLabel(selectedClientState.value?.codTipoPrecio)
+            val (_, basePrice) = resolveItemPrice(oldItem.product, oldItem.itemUnitPackage, clientLabel)
+            val finalPrice =
+                if (oldItem.isManualPrice) {
+                    oldItem.unitPriceWithTax - (oldItem.composition?.extraConIva ?: 0.0) + newComposition.extraConIva
+                } else {
+                    basePrice + newComposition.extraConIva
+                }
+            mutable[itemIndex] =
+                oldItem.copy(
+                    composition = newComposition,
+                    unitPriceWithTax = finalPrice,
+                )
+            mutable
+        }
+        invalidateFinancialSnapshot()
+    }
+
+    fun removeItemAtIndex(index: Int) {
+        cartItemsState.update { items ->
+            if (index in items.indices) {
+                items.filterIndexed { i, _ -> i != index }
+            } else {
+                items
             }
         }
         invalidateFinancialSnapshot()
@@ -374,8 +419,6 @@ class CartRepository {
         selectedClientState.value = null
         selectedClientSucursalState.value = null
         clientSucursalesState.value = emptyList()
-        currentSellerState.value = null
-        availableSellersState.value = emptyList()
         observacionState.value = ""
     }
 

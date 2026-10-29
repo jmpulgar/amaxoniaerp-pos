@@ -9,6 +9,7 @@ import com.amaxonia.pos.data.remote.dto.DepartmentsResponse
 import com.amaxonia.pos.data.remote.dto.ItemLotsResponseDto
 import com.amaxonia.pos.data.remote.dto.PagedResponse
 import com.amaxonia.pos.data.remote.dto.ProductDto
+import com.amaxonia.pos.data.remote.dto.ProductOptionsResponseDto
 import com.amaxonia.pos.data.remote.dto.ProductStockResponseDto
 import com.amaxonia.pos.data.remote.dto.PromocionDto
 import io.ktor.client.call.body
@@ -206,4 +207,17 @@ suspend fun ApiService.getItemLots(
     client
         .get("items/$id/lots") {
             authHeaders(token)
+        }.body()
+
+suspend fun ApiService.getItemOptions(
+    token: String,
+    id: String,
+    almacenId: Int? = null,
+): ProductOptionsResponseDto =
+    client
+        .get("items/$id/options") {
+            authHeaders(token)
+            if (almacenId != null && almacenId > 0) {
+                url { parameters.append("almacen", almacenId.toString()) }
+            }
         }.body()

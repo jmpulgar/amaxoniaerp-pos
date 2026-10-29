@@ -123,6 +123,17 @@ fun CartItemRow(
                     // Nivel 1: Título + Total de línea
                     CartItemTopRow(item = item)
 
+                    if (item.hasComposition) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = item.composition?.summaryText.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(3.dp))
 
                     // Nivel 2: Metadata (Precio unitario, Lista, Unidad) + Eliminar

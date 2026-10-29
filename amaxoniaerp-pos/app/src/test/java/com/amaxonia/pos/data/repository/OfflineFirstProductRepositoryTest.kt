@@ -160,6 +160,31 @@ class OfflineFirstProductRepositoryTest {
             assertEquals(listOf("1"), searchProducts.getOrThrow().map { it.id })
         }
 
+    @Test
+    fun `getProductOptions offline recupera opciones desde productOptionsDao`() =
+        runTest {
+            store.saveCompanySession(testCompanySession())
+            val optionsJson = """
+                [{"idGrupo":"g1","tipo":"COMBO","nombre":"Bebida","minimo":1,"maximo":1,"opciones":[{"idGrupoItem":"i1","codItem":"COLA","nombre":"Coca Cola","precioExtra":0.0,"cantidad":1.0,"isDefault":true,"isSoldOut":false}]}]
+            """.trimIndent()
+            db.productOptionsDao().upsert(
+                com.amaxonia.pos.data.local.db.ProductOptionsEntity(
+                    productId = "prod-1",
+                    optionsJson = optionsJson,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+            val repository = repository(online = false)
+
+            val result = repository.getProductOptions("prod-1")
+
+            assertTrue("Debe retornar éxito offline", result.isSuccess)
+            val groups = result.getOrThrow()
+            assertEquals(1, groups.size)
+            assertEquals("Bebida", groups.first().nombre)
+            assertEquals("Coca Cola", groups.first().opciones.first().nombre)
+        }
+
     private fun repository(
         online: Boolean,
         scope: com.amaxonia.pos.data.sync.OfflineSyncScope = com.amaxonia.pos.data.sync.OfflineSyncScope.ALL,
@@ -176,6 +201,7 @@ class OfflineFirstProductRepositoryTest {
             productDao = db.productDao(),
             networkMonitor = SettableNetworkMonitor(context, online),
             offlineScopeProvider = { scope },
+            productOptionsDao = db.productOptionsDao(),
         )
     }
 

@@ -117,6 +117,11 @@ fun ProductDto.toEntity(): ProductEntity {
         portionUnit = portionUnit,
         unitOrPackage = unitOrPackage.orEmpty().ifBlank { "UNIDAD" },
         isService = isService ?: (tipoProd == 1) ?: (codItemForma == 2) ?: false,
+        poseeProductoCombo = poseeProductoCombo.equals("si", ignoreCase = true) ||
+            tipoArticulo.equals("C", ignoreCase = true) ||
+            tipoArticulo.equals("K", ignoreCase = true),
+        tipoArticulo = tipoArticulo,
+        idCombo = idCombo,
         prices = if (prices.isNotEmpty()) prices.map { it.toDomain() } else generateDefaultPrices(),
     )
 }
@@ -140,6 +145,9 @@ fun ProductEntity.toDomain(): Product =
         unitOrPackage = unitOrPackage.ifBlank { "UNIDAD" },
         isService = isService,
         prices = prices.ifEmpty { generateDefaultPrices() },
+        poseeProductoCombo = poseeProductoCombo,
+        idCombo = idCombo,
+        tipoArticulo = tipoArticulo,
     )
 
 fun CountryDto.toEntity(): CountryEntity = CountryEntity(id = id, iso = iso, name = name)

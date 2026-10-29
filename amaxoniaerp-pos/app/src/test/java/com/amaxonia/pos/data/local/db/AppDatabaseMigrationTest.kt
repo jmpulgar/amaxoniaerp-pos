@@ -83,6 +83,48 @@ class AppDatabaseMigrationTest {
     fun `base creada en v22 migra al schema actual`() = migrateFrom(22)
 
     @Test
+    fun `base creada en v23 migra al schema actual`() = migrateFrom(23)
+
+    @Test
+    fun `base creada en v24 migra al schema actual`() = migrateFrom(24)
+
+    @Test
+    fun `migracion 24 a 25 agrega columnas de combo a products y crea tabla product_options`() {
+        val db = openMigratedFrom(24)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            assertTrue(
+                "columna 'poseeProductoCombo' debe existir en products",
+                sqlite.hasColumn("products", "poseeProductoCombo"),
+            )
+            assertTrue(
+                "columna 'productId' debe existir en product_options",
+                sqlite.hasColumn("product_options", "productId"),
+            )
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `migracion 23 a 24 crea tablas offline_users y offline_companies`() {
+        val db = openMigratedFrom(23)
+        try {
+            val sqlite = db.openHelper.readableDatabase
+            assertTrue(
+                "columna 'username' debe existir en offline_users",
+                sqlite.hasColumn("offline_users", "username"),
+            )
+            assertTrue(
+                "columna 'name' debe existir en offline_companies",
+                sqlite.hasColumn("offline_companies", "name"),
+            )
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun `migracion 22 a 23 agrega columna codZona a clients`() {
         val db = openMigratedFrom(22)
         try {
@@ -294,6 +336,6 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 23
+        const val SCHEMA_VERSION = 25
     }
 }

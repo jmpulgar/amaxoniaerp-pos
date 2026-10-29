@@ -48,6 +48,16 @@ data class ProductDto(
     val tipoProd: Int? = null,
     @kotlinx.serialization.SerialName("cod_item_forma")
     val codItemForma: Int? = null,
+    @kotlinx.serialization.SerialName("posee_producto_combo")
+    val poseeProductoCombo: String? = null,
+    @kotlinx.serialization.SerialName("id_combo")
+    val idCombo: String? = null,
+    @kotlinx.serialization.SerialName("tipo_articulo")
+    val tipoArticulo: String? = null,
+    @kotlinx.serialization.SerialName("posee_variantes")
+    val poseeVariantes: String? = null,
+    @kotlinx.serialization.SerialName("variantes_total")
+    val variantesTotal: Int? = null,
     val prices: List<PriceDto> = emptyList(),
 )
 

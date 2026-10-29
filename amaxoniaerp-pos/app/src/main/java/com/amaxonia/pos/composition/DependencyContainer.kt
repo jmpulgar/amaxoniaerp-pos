@@ -459,8 +459,15 @@ object DependencyContainer {
     /** Repositorios respaldados por la API remota. */
     private fun initializeRemoteRepositories(database: AppDatabase) {
         offlineSyncSettingsStore = OfflineSyncSettingsStore(syncAppContext())
-        authRepository = AuthRepositoryImpl(apiService, localStore)
-        companyRepository = CachedCompanyRepository(localStore)
+        authRepository =
+            AuthRepositoryImpl(
+                apiService = apiService,
+                localStore = localStore,
+                offlineUserDao = database.offlineUserDao(),
+                offlineCompanyDao = database.offlineCompanyDao(),
+                offlineSyncSettingsStore = offlineSyncSettingsStore,
+            )
+        companyRepository = CachedCompanyRepository(localStore, networkMonitor)
         productRepository =
             OfflineFirstProductRepository(
                 apiService = apiService,
@@ -468,6 +475,8 @@ object DependencyContainer {
                 productDao = database.productDao(),
                 networkMonitor = networkMonitor,
                 offlineScopeProvider = { offlineSyncSettingsStore.load() },
+                imageUrlResolver = imageUrlResolver,
+                productOptionsDao = database.productOptionsDao(),
             )
         promotionRepository =
             PromotionRepositoryImpl(apiService, localStore, database.promocionDao(), database.productDao(), networkMonitor)
@@ -540,7 +549,6 @@ object DependencyContainer {
             PurgeOfflineCatalogDataUseCase(
                 database = database,
                 localStore = localStore,
-                offlineSyncSettingsStore = offlineSyncSettingsStore,
                 appContext = syncAppContext(),
             )
     }
