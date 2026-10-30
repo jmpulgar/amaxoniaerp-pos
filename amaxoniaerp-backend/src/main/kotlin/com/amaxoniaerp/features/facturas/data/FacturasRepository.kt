@@ -329,6 +329,7 @@ class FacturasRepository {
                     }.setScale(2, RoundingMode.HALF_UP)
             val pagos = printPagos(resolvedFacturaId, factura, total)
             val cambio = printCambio(resolvedFacturaId)
+            val empresaInfo = printEmpresaInfo(factura)
 
             buildPrintResponse(
                 PrintBuildContext(
@@ -343,6 +344,7 @@ class FacturasRepository {
                     descuentoTotal = descuentoTotal,
                     isPanama = isPanama,
                     companyNameFallback = companyNameFallback,
+                    empresaInfo = empresaInfo,
                 ),
             )
         }

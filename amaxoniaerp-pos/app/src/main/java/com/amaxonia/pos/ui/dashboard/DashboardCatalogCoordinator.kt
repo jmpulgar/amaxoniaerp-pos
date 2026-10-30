@@ -7,6 +7,7 @@ import com.amaxonia.pos.domain.repository.ProductCatalogFilter
 import com.amaxonia.pos.domain.repository.ProductRepository
 import com.amaxonia.pos.domain.repository.ReportRepository
 import com.amaxonia.pos.domain.repository.ServerEnvironment
+import com.amaxonia.pos.domain.util.cleanMojibake
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -376,21 +377,36 @@ class DashboardCatalogCoordinator(
     ) {
         scope.launch {
             state.update { it.copy(isLoadingBestSellers = true, error = null) }
+            if (adminDatabase.isBlank()) adminDatabase = sessionReader.currentAdminDatabase()
             reportRepository.getBestSellers().fold(
                 onSuccess = { bestSellers ->
                     val products =
                         bestSellers.take(BEST_SELLERS_LIMIT).map { bestSeller ->
-                            DashboardProduct(
-                                id = bestSeller.id,
-                                name = bestSeller.name,
-                                price = bestSeller.price,
-                                taxRate = 0.0,
-                                isExempt = false,
-                                imageUrl = productMapper.imageUrl(adminDatabase, bestSeller.photoUrl),
-                                category = "Más Vendidos",
-                                code = null,
-                                barcode = null,
-                            )
+                            val localProduct = productRepository.getProductById(bestSeller.id).getOrNull()
+                            if (localProduct != null) {
+                                val mapped = productMapper.fromProduct(localProduct, adminDatabase)
+                                mapped.copy(
+                                    category = "Más Vendidos",
+                                    name = cleanMojibake(localProduct.description),
+                                    price = if (bestSeller.price > 0.0) bestSeller.price else mapped.price,
+                                    code = localProduct.code.ifBlank { bestSeller.code },
+                                    isExempt = localProduct.isExempt,
+                                    taxRate = localProduct.taxRate,
+                                    sourceProduct = localProduct,
+                                )
+                            } else {
+                                DashboardProduct(
+                                    id = bestSeller.id,
+                                    name = cleanMojibake(bestSeller.name),
+                                    price = bestSeller.price,
+                                    taxRate = bestSeller.taxRate,
+                                    isExempt = bestSeller.isExempt,
+                                    imageUrl = productMapper.imageUrl(adminDatabase, bestSeller.photoUrl),
+                                    category = "Más Vendidos",
+                                    code = bestSeller.code,
+                                    barcode = null,
+                                )
+                            }
                         }
                     state.update {
                         it.copy(bestSellers = products, isLoadingBestSellers = false, error = null)

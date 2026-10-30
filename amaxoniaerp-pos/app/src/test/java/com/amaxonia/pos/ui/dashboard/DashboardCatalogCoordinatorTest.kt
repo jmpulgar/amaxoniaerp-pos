@@ -65,8 +65,10 @@ class DashboardCatalogCoordinatorTest {
             return Result.success(emptyList())
         }
 
+        val productsById = mutableMapOf<String, Product>()
+
         override suspend fun getProductById(id: String): Result<Product> =
-            Result.failure(UnsupportedOperationException())
+            productsById[id]?.let { Result.success(it) } ?: Result.failure(NoSuchElementException(id))
 
         override suspend fun getDepartments(): Result<List<Department>> = departmentsResult
 
@@ -102,10 +104,12 @@ class DashboardCatalogCoordinatorTest {
     }
 
     private class FakeReportRepository : ReportRepository {
+        var bestSellersResult: Result<List<BestSellerProduct>> = Result.success(emptyList())
+
         override suspend fun getSummaryStats(filter: InvoiceHistoryFilter): Result<SummaryStats> =
             Result.failure(UnsupportedOperationException())
 
-        override suspend fun getBestSellers(): Result<List<BestSellerProduct>> = Result.success(emptyList())
+        override suspend fun getBestSellers(): Result<List<BestSellerProduct>> = bestSellersResult
     }
 
     private class FakeSessionReader(
@@ -122,7 +126,9 @@ class DashboardCatalogCoordinatorTest {
     }
 
     private class FakeServerEnvironment : ServerEnvironment {
-        override fun selectCountry(country: ServerCountry) {}
+        override fun selectCountry(country: ServerCountry) {
+            // no-op for tests
+        }
     }
 
     private object FixedImageResolver : ImageUrlResolver {
@@ -381,6 +387,118 @@ class DashboardCatalogCoordinatorTest {
             advanceUntilIdle()
 
             assertEquals(false, state.value.allowChangeSeller)
+
+            coordinator.stop()
+        }
+
+    @Test
+    fun `loadBestSellers attaches sourceProduct, code, clean name and exemption when local product exists`() =
+        runTest {
+            val fakeProductRepo = FakeProductRepository()
+            val exemptProduct =
+                Product(
+                    id = "p-100",
+                    description = "Café Molido",
+                    code = "REF-CAFE-100",
+                    department = "Torrefactora",
+                    isExempt = true,
+                    taxRate = 0.0,
+                    prices = listOf(PriceLevel(label = "A", price = 5.0, pricePlusTax = 5.0)),
+                )
+            fakeProductRepo.productsById["p-100"] = exemptProduct
+
+            val fakeReportRepo = FakeReportRepository()
+            fakeReportRepo.bestSellersResult =
+                Result.success(
+                    listOf(
+                        BestSellerProduct(
+                            id = "p-100",
+                            name = "Caf\u00C3\u00A9 Molido",
+                            price = 5.0,
+                            salesCount = 50,
+                            progress = 1.0f,
+                            colorHex = 0xFF1565C0,
+                            code = "REF-CAFE-100",
+                            isExempt = true,
+                            taxRate = 0.0,
+                        ),
+                    ),
+                )
+
+            val coordinator =
+                DashboardCatalogCoordinator(
+                    productRepository = fakeProductRepo,
+                    reportRepository = fakeReportRepo,
+                    sessionReader = FakeSessionReader(),
+                    serverEnvironment = FakeServerEnvironment(),
+                    productMapper = DashboardProductMapper(FixedImageResolver),
+                )
+
+            val state = MutableStateFlow(DashboardState())
+            coordinator.start(this, state)
+            advanceUntilIdle()
+
+            coordinator.onAction(DashboardCatalogUiAction.SetBottomSelected(1), this, state)
+            advanceUntilIdle()
+
+            assertEquals(1, state.value.bestSellers.size)
+            val bestSellerItem = state.value.bestSellers.first()
+            assertEquals("p-100", bestSellerItem.id)
+            assertEquals("Café Molido", bestSellerItem.name)
+            assertEquals("REF-CAFE-100", bestSellerItem.code)
+            assertEquals(true, bestSellerItem.isExempt)
+            assertEquals(0.0, bestSellerItem.taxRate, 0.0)
+            assertEquals(exemptProduct, bestSellerItem.sourceProduct)
+            assertEquals("Más Vendidos", bestSellerItem.category)
+
+            coordinator.stop()
+        }
+
+    @Test
+    fun `loadBestSellers falls back to bestSeller dto with clean name, code and exemption when local product not found`() =
+        runTest {
+            val fakeProductRepo = FakeProductRepository()
+            val fakeReportRepo = FakeReportRepository()
+            fakeReportRepo.bestSellersResult =
+                Result.success(
+                    listOf(
+                        BestSellerProduct(
+                            id = "p-200",
+                            name = "Caf\u00C3\u00A9 Especial",
+                            price = 7.5,
+                            salesCount = 30,
+                            progress = 0.6f,
+                            colorHex = 0xFF1565C0,
+                            code = "REF-200",
+                            isExempt = true,
+                            taxRate = 0.0,
+                        ),
+                    ),
+                )
+
+            val coordinator =
+                DashboardCatalogCoordinator(
+                    productRepository = fakeProductRepo,
+                    reportRepository = fakeReportRepo,
+                    sessionReader = FakeSessionReader(),
+                    serverEnvironment = FakeServerEnvironment(),
+                    productMapper = DashboardProductMapper(FixedImageResolver),
+                )
+
+            val state = MutableStateFlow(DashboardState())
+            coordinator.start(this, state)
+            advanceUntilIdle()
+
+            coordinator.onAction(DashboardCatalogUiAction.SetBottomSelected(1), this, state)
+            advanceUntilIdle()
+
+            assertEquals(1, state.value.bestSellers.size)
+            val bestSellerItem = state.value.bestSellers.first()
+            assertEquals("p-200", bestSellerItem.id)
+            assertEquals("Café Especial", bestSellerItem.name)
+            assertEquals("REF-200", bestSellerItem.code)
+            assertEquals(true, bestSellerItem.isExempt)
+            assertEquals(0.0, bestSellerItem.taxRate, 0.0)
 
             coordinator.stop()
         }

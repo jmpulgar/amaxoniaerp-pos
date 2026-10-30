@@ -362,7 +362,7 @@ private fun TicketFontSizeSection(
     PrinterOptionCard(
         visual = PrinterOptionVisual(icon = Icons.Rounded.Receipt, iconTint = InfoBlue),
         title = "Normal",
-        description = "Tamaño estándar (20pt térmico / 8pt PDF). Formato idéntico al administrativo web.",
+        description = "Tamaño estándar (16pt térmico / 7pt PDF). Formato optimizado para punto de venta.",
         isSelected = selectedSize == com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL,
         onSelect = { onSelectSize(com.amaxonia.pos.domain.model.printer.TicketFontSize.NORMAL) },
     )
@@ -372,7 +372,7 @@ private fun TicketFontSizeSection(
     PrinterOptionCard(
         visual = PrinterOptionVisual(icon = Icons.AutoMirrored.Rounded.ReceiptLong, iconTint = SuccessGreen),
         title = "Pequeña",
-        description = "Tamaño compacto (18pt térmico / 7pt PDF). Optimiza el espacio y reduce el consumo de papel.",
+        description = "Tamaño compacto (14pt térmico / 6pt PDF). Optimiza el espacio y reduce el consumo de papel.",
         isSelected = selectedSize == com.amaxonia.pos.domain.model.printer.TicketFontSize.COMPACT,
         onSelect = { onSelectSize(com.amaxonia.pos.domain.model.printer.TicketFontSize.COMPACT) },
     )

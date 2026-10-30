@@ -32,6 +32,9 @@ class SunmiV2Printer(
         val dimensions = SunmiFontSize.dimensionsFor(resolveFontSize())
         return withService { service ->
             service.printerInit(null)
+            runCatching {
+                service.sendRAWData(byteArrayOf(ESC_COMMAND, SET_LINE_SPACING_COMMAND, COMPACT_LINE_SPACING_DOTS), null)
+            }
             service.setFontSize(dimensions.regular, null)
             service.printText(text + "\n", null)
             service.lineWrap(2, null)
@@ -42,6 +45,9 @@ class SunmiV2Printer(
         val dimensions = SunmiFontSize.dimensionsFor(resolveFontSize())
         return withService { service ->
             service.printerInit(null)
+            runCatching {
+                service.sendRAWData(byteArrayOf(ESC_COMMAND, SET_LINE_SPACING_COMMAND, COMPACT_LINE_SPACING_DOTS), null)
+            }
             service.setFontSize(dimensions.regular, null)
             ticket.elements.forEach { element ->
                 when (element) {
@@ -137,8 +143,8 @@ private data class SunmiFontDimensions(
  * rule does not flag the print pipeline.
  */
 private object SunmiFontSize {
-    private val NORMAL = SunmiFontDimensions(regular = 20f, bold = 24f, totalsRegular = 20f, totalsBold = 22f)
-    private val COMPACT = SunmiFontDimensions(regular = 18f, bold = 22f, totalsRegular = 18f, totalsBold = 20f)
+    private val NORMAL = SunmiFontDimensions(regular = 16f, bold = 18f, totalsRegular = 16f, totalsBold = 18f)
+    private val COMPACT = SunmiFontDimensions(regular = 14f, bold = 16f, totalsRegular = 14f, totalsBold = 16f)
 
     fun dimensionsFor(size: TicketFontSize): SunmiFontDimensions =
         when (size) {
@@ -147,8 +153,13 @@ private object SunmiFontSize {
         }
 }
 
+/** Comandos ESC/POS para interlineado compacto. */
+private const val ESC_COMMAND: Byte = 0x1B
+private const val SET_LINE_SPACING_COMMAND: Byte = 0x33
+private const val COMPACT_LINE_SPACING_DOTS: Byte = 16
+
 /** Saltos de línea que alimentan el papel tras imprimir un ticket completo. */
-private const val TICKET_TRAILING_FEED_LINES = 4
+private const val TICKET_TRAILING_FEED_LINES = 2
 
 /**
  * Builds a single physical line for [TicketElement.TotalsRow], guaranteeing that the rendered

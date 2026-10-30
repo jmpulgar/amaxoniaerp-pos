@@ -8,6 +8,7 @@ import com.amaxonia.pos.domain.model.BestSellerProduct
 import com.amaxonia.pos.domain.model.SummaryStats
 import com.amaxonia.pos.domain.repository.InvoiceHistoryFilter
 import com.amaxonia.pos.domain.repository.ReportRepository
+import com.amaxonia.pos.domain.util.cleanMojibake
 
 /**
  * Real implementation of ReportRepository that uses the API for both
@@ -72,12 +73,16 @@ class ApiReportRepository(
             list.mapIndexed { index, dto ->
                 BestSellerProduct(
                     id = dto.id,
-                    name = dto.name,
+                    name = cleanMojibake(dto.name),
                     price = dto.price,
                     salesCount = dto.salesCount,
                     progress = if (maxCount > 0) dto.salesCount / maxCount else 0f,
                     colorHex = bestSellerColors[index % bestSellerColors.size],
                     photoUrl = dto.photoUrl,
+                    code = dto.code,
+                    reference = dto.reference,
+                    isExempt = dto.isExempt,
+                    taxRate = dto.taxRate,
                 )
             }
         }.fold(

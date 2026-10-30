@@ -23,12 +23,12 @@ import java.io.ByteArrayOutputStream
 object TicketPdfGenerator {
     private const val PAGE_WIDTH_PT = 280f
     private const val PADDING_HORIZONTAL_PT = 16f
-    private const val PADDING_VERTICAL_PT = 24f
+    private const val PADDING_VERTICAL_PT = 14f
     private const val CONTENT_WIDTH_PT = PAGE_WIDTH_PT - (PADDING_HORIZONTAL_PT * 2f)
     private const val QR_SIZE_PT = 110f
 
-    private val NORMAL_METRICS = PdfFontMetrics(fontSizePt = 8.0f, lineHeightPt = 11.5f, baselineOffsetPt = 9.0f)
-    private val COMPACT_METRICS = PdfFontMetrics(fontSizePt = 7.0f, lineHeightPt = 10.0f, baselineOffsetPt = 8.0f)
+    private val NORMAL_METRICS = PdfFontMetrics(fontSizePt = 7.0f, lineHeightPt = 9.5f, baselineOffsetPt = 7.5f)
+    private val COMPACT_METRICS = PdfFontMetrics(fontSizePt = 6.0f, lineHeightPt = 8.0f, baselineOffsetPt = 6.5f)
 
     fun generatePdf(
         ticket: TicketDocument,

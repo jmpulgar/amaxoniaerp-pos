@@ -41,7 +41,11 @@ class FacturasPrintPayloadDiscountTest {
             SchemaUtils.create(FacturasTableVE, FacturasClientesTable, EstatusTable, SalesFacturaDetalleTable)
             // Auxiliary tables LEFT JOINed by the print-payload query. Empty is fine for the
             // discount aggregation path under test.
-            exec("CREATE TABLE IF NOT EXISTS parametros_generales (id INT, rif VARCHAR(50))")
+            exec(
+                "CREATE TABLE IF NOT EXISTS parametros_generales (" +
+                    "id INT, rif VARCHAR(50), nombre_empresa VARCHAR(80), " +
+                    "direccion VARCHAR(500), telefonos VARCHAR(100))",
+            )
             exec("CREATE TABLE IF NOT EXISTS caja (id VARCHAR(36), descripcion VARCHAR(100), codigo VARCHAR(40))")
             exec(
                 "CREATE TABLE IF NOT EXISTS sucursal (id INT, sucursal VARCHAR(100), " +
@@ -114,6 +118,27 @@ class FacturasPrintPayloadDiscountTest {
             assertNotNull(payload)
             // Always two decimals so the receipt line aligns with Subtotal / Impuesto / Total.
             assertTrue(payload.descuento!!.matches(Regex("""\d+\.\d{2}""")))
+        }
+
+    @Test
+    fun print_payload_prefers_company_info_from_parametros_generales_over_fallback() =
+        runBlocking {
+            transaction(database) {
+                exec(
+                    "INSERT INTO parametros_generales (id, rif, nombre_empresa, direccion, telefonos) " +
+                        "VALUES (1, 'J-12345678-9', 'EMPRESA REAL S.A.', 'Calle Principal 123', '0212-5551234')",
+                )
+            }
+            val invoice = invoiceId()
+            seedFactura(invoice, subtotal = "100.00", baseImponible = "100.00", tax = "16.00", total = "116.00")
+
+            val payload = repository.getPrintPayload(database, "VE", invoice, "database_fallback_name")
+
+            assertNotNull(payload)
+            assertEquals("EMPRESA REAL S.A.", payload.empresa.nombre)
+            assertEquals("Calle Principal 123", payload.empresa.direccion)
+            assertEquals("0212-5551234", payload.empresa.telefono)
+            assertEquals("J-12345678-9", payload.empresa.ruc)
         }
 
     private fun seedClient() {

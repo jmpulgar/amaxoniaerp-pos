@@ -21,7 +21,8 @@ private const val DATABASE_KEEPALIVE_TIME_MS = 60_000L // 1 minuto (mantiene con
  * Debe coincidir con la zona usada en [com.amaxoniaerp.core.time.BusinessClock] para ese mismo `countryCode`.
  */
 private const val MYSQL_JDBC_PARAMS_WITHOUT_TZ =
-    "useSSL=false&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL&tinyInt1isBit=false"
+    "useSSL=false&useUnicode=true&characterEncoding=UTF-8" +
+        "&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL&tinyInt1isBit=false"
 
 /** Misma convención IANA que [com.amaxoniaerp.core.time.BusinessClock] (VE/PA). */
 private fun jdbcServerTimezoneForCountry(countryCode: String): String =

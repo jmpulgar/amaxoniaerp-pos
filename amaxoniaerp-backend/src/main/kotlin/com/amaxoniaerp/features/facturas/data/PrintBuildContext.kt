@@ -4,6 +4,13 @@ import com.amaxoniaerp.features.facturas.domain.FacturaPrintPayloadResponse
 import java.math.BigDecimal
 import java.math.RoundingMode
 
+internal data class EmpresaInfo(
+    val nombre: String? = null,
+    val direccion: String? = null,
+    val telefono: String? = null,
+    val ruc: String? = null,
+)
+
 /** Partes del payload de impresión ya resueltas (fila cabecera, productos, pagos, cambio). */
 internal data class PrintBuildContext(
     val factura: SqlRow,
@@ -17,6 +24,7 @@ internal data class PrintBuildContext(
     val descuentoTotal: BigDecimal,
     val isPanama: Boolean,
     val companyNameFallback: String,
+    val empresaInfo: EmpresaInfo = EmpresaInfo(),
 )
 
 internal fun printCountrySpecificFields(isPanama: Boolean): String =
@@ -169,6 +177,16 @@ internal fun printCambio(facturaId: String): BigDecimal? =
         """.trimIndent(),
     )?.decimalOrNull("totalizar_cambio")
 
+internal fun printEmpresaInfo(facturaRow: SqlRow): EmpresaInfo {
+    val pg = runCatching { queryOne("SELECT * FROM parametros_generales LIMIT 1") }.getOrNull()
+    return EmpresaInfo(
+        nombre = pg?.cleanedStringOrNull("nombre_empresa"),
+        direccion = pg?.cleanedStringOrNull("direccion"),
+        telefono = pg?.cleanedStringOrNull("telefonos"),
+        ruc = pg?.cleanedStringOrNull("rif") ?: facturaRow.cleanedStringOrNull("empresa_ruc"),
+    )
+}
+
 internal fun buildPrintResponse(ctx: PrintBuildContext): FacturaPrintPayloadResponse =
     FacturaPrintPayloadResponse(
         facturaId = ctx.factura.string("id_factura"),
@@ -176,10 +194,12 @@ internal fun buildPrintResponse(ctx: PrintBuildContext): FacturaPrintPayloadResp
         fecha = ctx.factura.stringOrNull("fechaFactura").orEmpty(),
         empresa =
             com.amaxoniaerp.features.facturas.domain.EmpresaPrintResponse(
-                nombre = ctx.companyNameFallback.ifBlank { "Flow Erp" },
-                ruc = ctx.factura.stringOrNull("empresa_ruc"),
-                direccion = null,
-                telefono = null,
+                nombre =
+                    ctx.empresaInfo.nombre
+                        ?: ctx.companyNameFallback.ifBlank { "Flow Erp" },
+                ruc = ctx.empresaInfo.ruc,
+                direccion = ctx.empresaInfo.direccion,
+                telefono = ctx.empresaInfo.telefono,
                 tienda =
                     ctx.factura.stringOrNull("sucursal_nombre") ?: ctx.factura.stringOrNull("sucursal_descripcion"),
                 caja = ctx.factura.stringOrNull("caja_descripcion") ?: ctx.factura.stringOrNull("caja_codigo"),

@@ -20,6 +20,10 @@ data class BestSellerDto(
     val price: Double,
     val salesCount: Int,
     val photoUrl: String = "",
+    val code: String? = null,
+    val reference: String? = null,
+    val isExempt: Boolean = false,
+    val taxRate: Double = 0.0,
 )
 
 @Serializable

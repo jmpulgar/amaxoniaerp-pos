@@ -240,6 +240,10 @@ internal class ItemsHandlers(
                             price = p.prices.firstOrNull()?.pricePlusTax ?: 0.0,
                             salesCount = salesCount.toInt(),
                             photoUrl = p.photoUrl,
+                            code = p.code,
+                            reference = p.reference,
+                            isExempt = p.isExempt,
+                            taxRate = p.taxRate,
                         )
                     }
                 }

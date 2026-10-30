@@ -32,6 +32,9 @@ class SenraiseH10Printer(
     override suspend fun printText(text: String): PrintResult {
         val dimensions = SenraiseFontSize.dimensionsFor(resolveFontSize())
         return withService { service ->
+            runCatching {
+                service.printEpson(byteArrayOf(ESC_COMMAND, SET_LINE_SPACING_COMMAND, COMPACT_LINE_SPACING_DOTS))
+            }
             service.setAlignment(0)
             service.setTextBold(false)
             service.setTextSize(dimensions.regular)
@@ -43,6 +46,9 @@ class SenraiseH10Printer(
     override suspend fun printTicket(ticket: TicketDocument): PrintResult {
         val dimensions = SenraiseFontSize.dimensionsFor(resolveFontSize())
         return withService { service ->
+            runCatching {
+                service.printEpson(byteArrayOf(ESC_COMMAND, SET_LINE_SPACING_COMMAND, COMPACT_LINE_SPACING_DOTS))
+            }
             service.setTextSize(dimensions.regular)
             ticket.elements.forEach { element ->
                 when (element) {
@@ -136,7 +142,10 @@ class SenraiseH10Printer(
 
     private companion object {
         const val QR_ERROR_CORRECTION_LEVEL = 2
-        const val TICKET_TRAILING_FEED_LINES = 4
+        const val ESC_COMMAND: Byte = 0x1B
+        const val SET_LINE_SPACING_COMMAND: Byte = 0x33
+        const val COMPACT_LINE_SPACING_DOTS: Byte = 16
+        const val TICKET_TRAILING_FEED_LINES = 2
     }
 }
 
@@ -148,8 +157,8 @@ private data class SenraiseFontDimensions(
 )
 
 private object SenraiseFontSize {
-    private val NORMAL = SenraiseFontDimensions(regular = 20f, bold = 24f, totalsRegular = 20f, totalsBold = 22f)
-    private val COMPACT = SenraiseFontDimensions(regular = 18f, bold = 22f, totalsRegular = 18f, totalsBold = 20f)
+    private val NORMAL = SenraiseFontDimensions(regular = 16f, bold = 18f, totalsRegular = 16f, totalsBold = 18f)
+    private val COMPACT = SenraiseFontDimensions(regular = 14f, bold = 16f, totalsRegular = 14f, totalsBold = 16f)
 
     fun dimensionsFor(size: TicketFontSize): SenraiseFontDimensions =
         when (size) {

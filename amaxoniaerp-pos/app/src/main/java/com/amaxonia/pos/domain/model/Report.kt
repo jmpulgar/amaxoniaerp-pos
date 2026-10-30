@@ -22,4 +22,8 @@ data class BestSellerProduct(
     val progress: Float,
     val colorHex: Long,
     val photoUrl: String = "",
+    val code: String? = null,
+    val reference: String? = null,
+    val isExempt: Boolean = false,
+    val taxRate: Double = 0.0,
 )

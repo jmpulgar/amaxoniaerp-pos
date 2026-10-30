@@ -433,7 +433,7 @@ private fun DashboardProduct.toManualProduct(): Product =
     Product(
         id = id,
         description = name,
-        prices = listOf(PriceLevel(label = "A", pricePlusTax = price)),
+        prices = listOf(PriceLevel(label = "A", price = if (isExempt || taxRate <= 0.0) price else 0.0, pricePlusTax = price)),
         taxRate = taxRate,
         isExempt = isExempt,
         department = category,

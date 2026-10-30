@@ -136,6 +136,10 @@ data class BestSellerItemResponse(
     val price: Double,
     val salesCount: Int,
     val photoUrl: String = "",
+    val code: String = "",
+    val reference: String = "",
+    val isExempt: Boolean = false,
+    val taxRate: Double = 0.0,
 )
 
 @Serializable

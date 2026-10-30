@@ -113,7 +113,7 @@ class IminSwiftPrinter(
     private companion object {
         const val FEED_UNIT_HEIGHT = 20
         const val FEED_LINES_SHORT = 40
-        const val FEED_LINES_TRAILING = 80
+        const val FEED_LINES_TRAILING = 40
     }
 }
 
@@ -125,8 +125,8 @@ private data class IminFontDimensions(
 )
 
 private object IminFontSize {
-    private val NORMAL = IminFontDimensions(regular = 20, bold = 24, totalsRegular = 20, totalsBold = 22)
-    private val COMPACT = IminFontDimensions(regular = 18, bold = 22, totalsRegular = 18, totalsBold = 20)
+    private val NORMAL = IminFontDimensions(regular = 16, bold = 18, totalsRegular = 16, totalsBold = 18)
+    private val COMPACT = IminFontDimensions(regular = 14, bold = 16, totalsRegular = 14, totalsBold = 16)
 
     fun dimensionsFor(size: TicketFontSize): IminFontDimensions =
         when (size) {
