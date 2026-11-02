@@ -41,6 +41,7 @@ fun ClientDto.toEntity(): ClientEntity =
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
         codTipoPrecio = codTipoPrecio ?: codTipoPrecioSnake ?: 2,
+        idSucursal = idSucursal ?: idSucursalSnake,
         codZona = codZona ?: codZonaSnake,
     )
 
@@ -73,6 +74,7 @@ fun ClientEntity.toDomain(): Client {
         permiteCredito = permiteCredito,
         diasCredito = diasCredito,
         codTipoPrecio = codTipoPrecio,
+        idSucursal = idSucursal,
         codZona = codZona.orEmpty(),
     )
 }

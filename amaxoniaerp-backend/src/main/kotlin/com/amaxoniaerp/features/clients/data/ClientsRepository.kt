@@ -108,7 +108,6 @@ class ClientsRepository {
         search: String?,
         includeTotal: Boolean,
         branchIds: List<Int>? = null,
-        sellerId: Int? = null,
         zoneCodes: List<String>? = null,
     ): Pair<List<Client>, Long> =
         dbQuery(database) {
@@ -120,23 +119,6 @@ class ClientsRepository {
 
             if (!zoneCodes.isNullOrEmpty()) {
                 query.andWhere { ClientsTable.codZona inList zoneCodes }
-            }
-
-            if (sellerId != null) {
-                val sellerRow =
-                    VendedorTable
-                        .select(VendedorTable.idClientes)
-                        .where { VendedorTable.idVendedor eq sellerId }
-                        .firstOrNull()
-                val rawClientIds = sellerRow?.getOrNull(VendedorTable.idClientes)?.trim().orEmpty()
-                if (rawClientIds.isNotBlank()) {
-                    val clientIds = rawClientIds.split(',').map { it.trim() }.filter { it.isNotBlank() }
-                    if (clientIds.isNotEmpty()) {
-                        query.andWhere {
-                            (ClientsTable.idCliente inList clientIds) or (ClientsTable.codCliente inList clientIds)
-                        }
-                    }
-                }
             }
 
             if (!search.isNullOrBlank()) {
@@ -251,22 +233,6 @@ class ClientsRepository {
                 it[alterna] = request.alterna
                 it[alterna2] = request.alterna2
                 it[fecha] = BusinessClock.todayForCountry(countryCode).toString()
-            }
-
-            if (request.sellerId != null) {
-                val seller =
-                    VendedorTable
-                        .select(VendedorTable.idClientes)
-                        .where { VendedorTable.idVendedor eq request.sellerId }
-                        .firstOrNull()
-
-                if (seller != null) {
-                    val currentIds = seller[VendedorTable.idClientes]?.trim().orEmpty()
-                    val updatedIds = if (currentIds.isBlank()) newId else "$currentIds,$newId"
-                    VendedorTable.update({ VendedorTable.idVendedor eq request.sellerId }) {
-                        it[idClientes] = updatedIds
-                    }
-                }
             }
 
             ClientsTable
@@ -1005,6 +971,7 @@ class ClientsRepository {
             direccionReferencia = row.text(ClientsTable.direccionReferencia),
             alterna = row.text(ClientsTable.alterna),
             alterna2 = row.text(ClientsTable.alterna2),
+            idSucursal = row[ClientsTable.idSucursal],
         )
     }
 

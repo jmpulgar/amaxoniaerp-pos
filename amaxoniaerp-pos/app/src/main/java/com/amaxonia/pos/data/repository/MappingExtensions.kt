@@ -239,6 +239,8 @@ fun ClientDto.toDomain(): Client =
         foreignIdType = foreignAuthTypeId.toForeignIdType(),
         foreignIdNumber = if (clientTypeId == 4) identification.orEmpty() else "",
         photoFilename = photoFilename.orEmpty(),
+        idSucursal = idSucursal ?: idSucursalSnake,
+        codZona = codZona ?: codZonaSnake ?: "",
     )
 
 fun Client.toCreateRequest(sellerId: Int? = null): CreateClientRequest =

@@ -12,13 +12,7 @@ data class Seller(
     @SerialName("crear_clientes")
     val crearClientes: Boolean = true,
 ) {
-    fun allowedClientIds(): Set<String> =
-        idClientes
-            ?.split(",")
-            ?.map { it.trim() }
-            ?.filter { it.isNotBlank() }
-            ?.toSet()
-            .orEmpty()
+    fun allowedClientIds(): Set<String> = emptySet()
 
     fun canCreateClients(): Boolean = crearClientes
 }

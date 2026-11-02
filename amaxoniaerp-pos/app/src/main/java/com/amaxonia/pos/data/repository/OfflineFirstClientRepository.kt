@@ -60,20 +60,19 @@ class OfflineFirstClientRepository(
     override suspend fun getAllClients(
         page: Int,
         pageSize: Int,
-    ): Result<List<Client>> = getAllClients(page, pageSize, sellerId = null, allowedClientIds = emptySet())
+    ): Result<List<Client>> = getAllClients(page, pageSize, sellerId = null)
 
     override suspend fun getAllClients(
         page: Int,
         pageSize: Int,
         sellerId: Int?,
-        allowedClientIds: Set<String>,
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = getCachedClients(pageSize, offset, scope, allowedClientIds)
+                val cached = getCachedClients(pageSize, offset, scope)
                 if (cached.isNotEmpty()) {
                     Result.success(cached)
                 } else {
@@ -110,7 +109,7 @@ class OfflineFirstClientRepository(
                     }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = getCachedClients(pageSize, offset, scope, allowedClientIds)
+                    val cached = getCachedClients(pageSize, offset, scope)
                     if (cached.isNotEmpty()) cached else throw error
                 }
         }
@@ -131,21 +130,20 @@ class OfflineFirstClientRepository(
         query: String,
         page: Int,
         pageSize: Int,
-    ): Result<List<Client>> = searchClients(query, page, pageSize, sellerId = null, allowedClientIds = emptySet())
+    ): Result<List<Client>> = searchClients(query, page, pageSize, sellerId = null)
 
     override suspend fun searchClients(
         query: String,
         page: Int,
         pageSize: Int,
         sellerId: Int?,
-        allowedClientIds: Set<String>,
     ): Result<List<Client>> {
         val token = localStore.readCompanySession()?.token
         val offset = (page - 1).coerceAtLeast(0) * pageSize
         val scope = offlineScopeProvider()
         return when {
             !networkMonitor.isOnline() -> {
-                val cached = searchCachedClients(query, pageSize, offset, scope, allowedClientIds)
+                val cached = searchCachedClients(query, pageSize, offset, scope)
                 Result.success(cached)
             }
             token.isNullOrBlank() -> Result.failure(IllegalStateException("No hay empresa seleccionada"))
@@ -178,7 +176,7 @@ class OfflineFirstClientRepository(
                     }
                     response.data.map { it.toDomain() }
                 }.recoverCatching { error ->
-                    val cached = searchCachedClients(query, pageSize, offset, scope, allowedClientIds)
+                    val cached = searchCachedClients(query, pageSize, offset, scope)
                     if (cached.isNotEmpty()) cached else throw error
                 }
         }
@@ -188,7 +186,6 @@ class OfflineFirstClientRepository(
         limit: Int,
         offset: Int,
         scope: OfflineSyncScope,
-        allowedClientIds: Set<String> = emptySet(),
     ): List<Client> {
         val entities =
             when (scope.clientFilterMode) {
@@ -196,13 +193,7 @@ class OfflineFirstClientRepository(
                 ClientFilterMode.SUCURSAL -> clientDao.getPagedBySucursales(scope.branchIds.toList(), limit, offset)
                 ClientFilterMode.ZONE -> clientDao.getPagedByZonas(scope.zoneCodes.toList(), limit, offset)
             }
-        val filtered =
-            if (allowedClientIds.isEmpty()) {
-                entities
-            } else {
-                entities.filter { it.id in allowedClientIds || it.code in allowedClientIds }
-            }
-        return filtered.map { it.toDomain() }
+        return entities.map { it.toDomain() }
     }
 
     private suspend fun searchCachedClients(
@@ -210,7 +201,6 @@ class OfflineFirstClientRepository(
         limit: Int,
         offset: Int,
         scope: OfflineSyncScope,
-        allowedClientIds: Set<String> = emptySet(),
     ): List<Client> {
         val normalized = normalizeQuery(query)
         val entities =
@@ -232,13 +222,7 @@ class OfflineFirstClientRepository(
                         offset = offset,
                     )
             }
-        val filtered =
-            if (allowedClientIds.isEmpty()) {
-                entities
-            } else {
-                entities.filter { it.id in allowedClientIds || it.code in allowedClientIds }
-            }
-        return filtered.map { it.toDomain() }
+        return entities.map { it.toDomain() }
     }
 
     override suspend fun saveClient(client: Client): Result<Unit> {

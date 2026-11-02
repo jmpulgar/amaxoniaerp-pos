@@ -34,6 +34,9 @@ data class ClientDto(
     val codZona: String? = null,
     @kotlinx.serialization.SerialName("cod_zona")
     val codZonaSnake: String? = null,
+    val idSucursal: Int? = null,
+    @kotlinx.serialization.SerialName("id_sucursal")
+    val idSucursalSnake: Int? = null,
 )
 
 @Serializable

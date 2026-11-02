@@ -65,6 +65,7 @@ data class Client(
     val direccionReferencia: String = "",
     val alterna: String = "",
     val alterna2: String = "",
+    val idSucursal: Int? = null,
 )
 
 @Serializable

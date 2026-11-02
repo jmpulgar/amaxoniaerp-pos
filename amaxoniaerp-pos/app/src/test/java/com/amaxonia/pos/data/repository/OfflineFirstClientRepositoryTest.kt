@@ -243,7 +243,7 @@ class OfflineFirstClientRepositoryTest {
         }
 
     @Test
-    fun `getAllClients offline filtra por allowedClientIds cuando no esta vacio`() =
+    fun `getAllClients offline no restringe por vendedor y devuelve todos los clientes del scope`() =
         runTest {
             store.saveCompanySession(testCompanySession())
             seedCache(client("1", name = "Ana"), client("2", name = "Pedro"), client("3", name = "Carlos"))
@@ -254,28 +254,9 @@ class OfflineFirstClientRepositoryTest {
                     page = 1,
                     pageSize = 10,
                     sellerId = 5,
-                    allowedClientIds = setOf("1", "3"),
                 )
 
-            assertEquals(listOf("Ana", "Carlos"), result.getOrThrow().map { it.firstName })
-        }
-
-    @Test
-    fun `getAllClients offline devuelve todos cuando allowedClientIds esta vacio`() =
-        runTest {
-            store.saveCompanySession(testCompanySession())
-            seedCache(client("1", name = "Ana"), client("2", name = "Pedro"))
-            val repository = repository(online = false)
-
-            val result =
-                repository.getAllClients(
-                    page = 1,
-                    pageSize = 10,
-                    sellerId = 5,
-                    allowedClientIds = emptySet(),
-                )
-
-            assertEquals(listOf("Ana", "Pedro"), result.getOrThrow().map { it.firstName })
+            assertEquals(listOf("Ana", "Carlos", "Pedro"), result.getOrThrow().map { it.firstName })
         }
 
     private fun repository(

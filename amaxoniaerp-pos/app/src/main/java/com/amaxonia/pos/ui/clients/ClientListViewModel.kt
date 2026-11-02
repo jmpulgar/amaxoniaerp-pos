@@ -7,7 +7,6 @@ import com.amaxonia.pos.domain.repository.CartRepository
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import com.amaxonia.pos.domain.repository.ProductSessionReader
-import com.amaxonia.pos.domain.repository.appendClientToCurrentSeller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -87,7 +86,6 @@ class ClientListViewModel(
             val sellerId = seller?.id
             clientRepository.createQuickClient(trimmed, sellerId).fold(
                 onSuccess = { created ->
-                    cartRepository?.appendClientToCurrentSeller(created.id)
                     _state.update { current ->
                         current.copy(
                             isCreatingQuickClient = false,
@@ -123,13 +121,12 @@ class ClientListViewModel(
             val query = _state.value.searchQuery.trim()
             val seller = cartRepository?.currentSeller?.value
             val sellerId = seller?.id
-            val allowedClientIds = seller?.allowedClientIds().orEmpty()
 
             val result =
                 if (query.isEmpty()) {
-                    clientRepository.getAllClients(_state.value.page, pageSize, sellerId, allowedClientIds)
+                    clientRepository.getAllClients(_state.value.page, pageSize, sellerId)
                 } else {
-                    clientRepository.searchClients(query, _state.value.page, pageSize, sellerId, allowedClientIds)
+                    clientRepository.searchClients(query, _state.value.page, pageSize, sellerId)
                 }
             result.fold(
                 onSuccess = { clients ->

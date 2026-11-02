@@ -6,9 +6,10 @@ import com.amaxoniaerp.features.clients.domain.CreateClientRequest
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -99,7 +100,7 @@ class ClientsRepositoryTest {
         }
 
     @Test
-    fun `listClients filtra por vendedor cuando id_clientes no esta vacio`() =
+    fun `listClients no restringe por id_clientes del vendedor y devuelve clientes`() =
         runBlocking {
             transaction(database) {
                 VendedorTable.insert {
@@ -115,36 +116,6 @@ class ClientsRepositoryTest {
                 }
             }
 
-            val filtered =
-                repository.listClients(
-                    database,
-                    limit = 10,
-                    offset = 0,
-                    search = null,
-                    includeTotal = true,
-                    sellerId = 10,
-                )
-            assertEquals(1, filtered.first.size)
-            assertEquals("client-credit", filtered.first.first().id)
-        }
-
-    @Test
-    fun `listClients devuelve todos cuando id_clientes del vendedor esta vacio`() =
-        runBlocking {
-            transaction(database) {
-                VendedorTable.insert {
-                    it[idVendedor] = 20
-                    it[codVendedor] = 20
-                    it[nombre] = "Vendedor Sin Restriccion"
-                    it[codUsuarios] = "1"
-                    it[idTiendas] = "1"
-                    it[idCajas] = "1"
-                    it[activo] = 1
-                    it[idClientes] = ""
-                    it[crearClientes] = 1
-                }
-            }
-
             val all =
                 repository.listClients(
                     database,
@@ -152,47 +123,31 @@ class ClientsRepositoryTest {
                     offset = 0,
                     search = null,
                     includeTotal = true,
-                    sellerId = 20,
                 )
             assertEquals(3, all.first.size)
         }
 
     @Test
-    fun `createClient autoasocia cliente al vendedor si sellerId viene informado`() =
+    fun `listClients mapea idSucursal correctamente y filtra por branchIds`() =
         runBlocking {
             transaction(database) {
-                VendedorTable.insert {
-                    it[idVendedor] = 30
-                    it[codVendedor] = 30
-                    it[nombre] = "Vendedor Para Autoasociar"
-                    it[codUsuarios] = "1"
-                    it[idTiendas] = "1"
-                    it[idCajas] = "1"
-                    it[activo] = 1
-                    it[idClientes] = "client-cash"
-                    it[crearClientes] = 1
+                ClientsTable.update({ ClientsTable.idCliente eq "client-credit" }) {
+                    it[idSucursal] = 10
                 }
             }
 
-            val req =
-                CreateClientRequest(
-                    name = "CLIENTE AUTOASOCIADO",
-                    sellerId = 30,
+            val filtered =
+                repository.listClients(
+                    database,
+                    limit = 10,
+                    offset = 0,
+                    search = null,
+                    includeTotal = true,
+                    branchIds = listOf(10),
                 )
-            val created = repository.createClient(database, "PA", req)
-            assertNotNull(created.id)
-            assertEquals("00000", created.identification)
-
-            val sellerRow =
-                transaction(database) {
-                    VendedorTable
-                        .select(VendedorTable.idClientes)
-                        .where { VendedorTable.idVendedor eq 30 }
-                        .single()
-                }
-            val assigned = sellerRow[VendedorTable.idClientes]
-            assertNotNull(assigned)
-            assertEquals("client-cash,${created.id}", assigned)
+            assertEquals(1, filtered.first.size)
+            assertEquals("client-credit", filtered.first.first().id)
+            assertEquals(10, filtered.first.first().idSucursal)
         }
 
     @Test

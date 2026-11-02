@@ -37,4 +37,15 @@ class ClientMappingTest {
         assertEquals(3, online.codTipoPrecio)
         assertEquals(3, cached.codTipoPrecio)
     }
+
+    @Test
+    fun `online and cached client mapping preserve idSucursal`() {
+        val dto = ClientDto(idSucursal = 10)
+
+        val online = dto.toDomain()
+        val cached = dto.toEntity().toDomain()
+
+        assertEquals(10, online.idSucursal)
+        assertEquals(10, cached.idSucursal)
+    }
 }

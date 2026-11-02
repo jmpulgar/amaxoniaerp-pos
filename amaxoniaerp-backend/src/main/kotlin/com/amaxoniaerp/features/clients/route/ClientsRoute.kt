@@ -74,8 +74,6 @@ internal class ClientsHandlers(
                     ?.split(',')
                     ?.map { it.trim() }
                     ?.filter { it.isNotBlank() }
-            val sellerId = call.request.queryParameters["sellerId"]?.toIntOrNull()
-
             val companyDb = ctx.connectDatabase()
             val (clients, total) =
                 clientsRepository.listClients(
@@ -85,7 +83,6 @@ internal class ClientsHandlers(
                     search,
                     includeTotal,
                     branchIds,
-                    sellerId,
                     zoneCodes,
                 )
             call.respond(ClientsListResponse(data = clients, total = total))

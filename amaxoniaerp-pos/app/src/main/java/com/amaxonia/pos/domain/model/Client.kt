@@ -51,4 +51,5 @@ data class Client(
     val permiteCredito: Boolean = false,
     val diasCredito: Int = 0,
     val codZona: String = "",
+    val idSucursal: Int? = null,
 )
