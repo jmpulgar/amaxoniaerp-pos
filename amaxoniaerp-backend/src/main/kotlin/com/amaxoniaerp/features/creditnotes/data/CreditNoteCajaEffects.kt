@@ -15,9 +15,11 @@ import com.amaxoniaerp.features.sales.data.SalesKardexTablePA
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertIgnore
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -191,11 +193,24 @@ internal fun registerPartialCreditNoteOnOriginalCash(cmd: PartialCashRegistratio
 internal fun restoreInventory(cmd: InventoryRestore) {
     if (cmd.lines.isEmpty()) return
 
+    ensureDevolucionMovementType()
     val kardexId = insertCreditNoteKardex(cmd)
     cmd.lines.forEach { line ->
         insertCreditNoteKardexDetalle(cmd.countryCode, kardexId, line)
         upsertStockForLine(line)
         restoreLotAvailability(line)
+    }
+}
+
+private fun ensureDevolucionMovementType() {
+    runCatching {
+        TipoMovimientoAlmacenTable.update({
+            (TipoMovimientoAlmacenTable.idTipoMovimientoAlmacen eq CREDIT_NOTE_KARDEX_MOVEMENT_TYPE) and
+                ((TipoMovimientoAlmacenTable.operacion neq "+") or (TipoMovimientoAlmacenTable.descripcion eq "Regalia"))
+        }) {
+            it[descripcion] = "Devolución (Ventas)"
+            it[operacion] = "+"
+        }
     }
 }
 
@@ -213,8 +228,8 @@ private fun insertCreditNoteKardex(cmd: InventoryRestore): String {
         it[kardexTable.estado] = "Procesado"
         it[kardexTable.idDocumento] = cmd.creditNoteId
         it[kardexTable.codProveedor] = 0
-        it[kardexTable.comprobante] = cmd.creditNoteCode
-        it[kardexTable.anio] = cmd.date.year
+        it[kardexTable.comprobante] = cmd.creditNoteCode.removePrefix("NC-")
+        it[kardexTable.anio] = cmd.date.year % TWO_DIGIT_YEAR_DIVISOR
         it[kardexTable.tipoCosto] = "PEPS"
         it[kardexTable.estatus] = 1
         it[kardexTable.entregadoACodigo] = cmd.invoice.facturarARuc.take(KARDEX_RECIPIENT_CODE_LENGTH)
@@ -224,7 +239,7 @@ private fun insertCreditNoteKardex(cmd: InventoryRestore): String {
         it[kardexTable.contabilizado] = 0
         it[kardexTable.fechaContabilizacion] = cmd.date
         it[kardexTable.usuarioContabilizacion] = cmd.username.take(MAX_USERNAME_LENGTH)
-        it[kardexTable.idAlmacenSalida] =
+        it[kardexTable.idAlmacenEntrada] =
             cmd.lines
                 .first()
                 .sourceLine.almacen

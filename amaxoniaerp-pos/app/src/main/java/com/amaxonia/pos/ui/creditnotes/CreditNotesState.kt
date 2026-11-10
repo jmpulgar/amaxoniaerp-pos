@@ -21,6 +21,7 @@ data class CreditNoteFormState(
     val devolverStock: Boolean = true,
     val generarAbono: Boolean = true,
     val idFormaPagoReintegro: Int? = null,
+    val devolucionElectronica: Boolean = false,
 )
 
 enum class InvoiceDateFilterType(

@@ -26,6 +26,10 @@ class CreditNoteFormController(
         state.update { it.copy(form = it.form.copy(devolverStock = enabled)) }
     }
 
+    fun onDevolucionElectronicaChange(enabled: Boolean) {
+        state.update { it.copy(form = it.form.copy(devolucionElectronica = enabled)) }
+    }
+
     fun onGenerarAbonoChange(generar: Boolean) {
         state.update {
             it.copy(

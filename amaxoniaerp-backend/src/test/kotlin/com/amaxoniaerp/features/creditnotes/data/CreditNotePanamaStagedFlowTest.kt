@@ -1,6 +1,7 @@
 package com.amaxoniaerp.features.creditnotes.data
 
 import com.amaxoniaerp.features.clients.data.ClientsTable
+import com.amaxoniaerp.features.creditnotes.application.CreditNoteService
 import com.amaxoniaerp.features.creditnotes.domain.CreateCreditNoteLineInput
 import com.amaxoniaerp.features.creditnotes.domain.CreateCreditNoteRequest
 import com.amaxoniaerp.features.creditnotes.domain.CreditNoteFiscalStatus
@@ -148,6 +149,41 @@ class CreditNotePanamaStagedFlowTest {
                 false,
                 transaction(database) {
                     CreditNoteFacturaDetalleTable.selectAll().single()[CreditNoteFacturaDetalleTable.anulado]
+                },
+            )
+        }
+
+    @Test
+    fun `PA credit note without electronic transmission creates directly without PAC`() =
+        withDatabase {
+            val service = CreditNoteService(repository = repository, panamaCreditNoteProcessor = null)
+            val req =
+                CreateCreditNoteRequest(
+                    idFactura = SOURCE_INVOICE_ID,
+                    fecha = LocalDate.of(2026, 1, 10).toString(),
+                    detalle = listOf(CreateCreditNoteLineInput(SOURCE_DETAIL_ID, 1.0)),
+                    devolverStock = false,
+                    idCajaSecuencia = SOURCE_CAJA_SEQUENCE_ID,
+                    settlementType = CreditNoteSettlementType.NINGUNO,
+                    devolucionElectronica = false,
+                )
+
+            val response =
+                runBlocking {
+                    service.create(
+                        database = database,
+                        countryCode = "PA",
+                        request = req,
+                        username = "admin",
+                    )
+                }
+
+            assertTrue(response.success)
+            assertEquals(CreditNoteFiscalStatus.PENDIENTE, response.fiscalStatus)
+            assertEquals(
+                3,
+                transaction(database) {
+                    CreditNoteFacturaTable.selectAll().single()[CreditNoteFacturaTable.codEstatus]
                 },
             )
         }

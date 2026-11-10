@@ -89,7 +89,7 @@ class CreditNoteService(
         username: String,
         companyDb: String? = null,
     ): CreateCreditNoteResponse {
-        if (!countryCode.equals("PA", ignoreCase = true)) {
+        if (!countryCode.equals("PA", ignoreCase = true) || !request.devolucionElectronica) {
             return dbQuery(database) {
                 repository.create(countryCode, request, username)
             }

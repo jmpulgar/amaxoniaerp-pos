@@ -31,4 +31,5 @@ fun buildCreateCreditNoteRequest(
         idCajaSecuencia = idCajaSecuencia,
         settlementType = buildSettlementType(form),
         idFormaPagoReintegro = form.idFormaPagoReintegro,
+        devolucionElectronica = form.devolucionElectronica,
     )

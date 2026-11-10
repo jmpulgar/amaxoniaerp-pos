@@ -23,6 +23,7 @@ internal const val INVENTORY_QUANTITY_SCALE = 4
 internal const val MAX_OBSERVATION_LENGTH = 300
 internal const val MAX_PERIOD_LENGTH = 20
 internal const val MAX_USERNAME_LENGTH = 50
+internal const val TWO_DIGIT_YEAR_DIVISOR = 100
 internal const val PENDING_FISCAL_CODE = "00000000"
 internal const val UNCERTAIN_FISCAL_CODE = "INCIERTA"
 internal const val REJECTED_FISCAL_CODE = "RECHAZADA"

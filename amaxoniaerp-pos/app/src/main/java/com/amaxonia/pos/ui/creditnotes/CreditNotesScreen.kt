@@ -192,6 +192,7 @@ private fun CreditNotesModeContent(
                                 onObservacionChange = viewModel.formController::onObservacionChange,
                             ),
                         onDevolverStockChange = viewModel.formController::onDevolverStockChange,
+                        onDevolucionElectronicaChange = viewModel.formController::onDevolucionElectronicaChange,
                         onGenerarAbonoChange = viewModel.formController::onGenerarAbonoChange,
                         onRefundMethodChange = viewModel.formController::onRefundMethodChange,
                         onSubmit = viewModel::submitCreditNote,
@@ -636,6 +637,7 @@ private class CreditNoteFieldHandlers(
 private class CreditNoteCreateHandlers(
     val fields: CreditNoteFieldHandlers,
     val onDevolverStockChange: (Boolean) -> Unit,
+    val onDevolucionElectronicaChange: (Boolean) -> Unit,
     val onGenerarAbonoChange: (Boolean) -> Unit,
     val onRefundMethodChange: (Int?) -> Unit,
     val onSubmit: () -> Unit,
@@ -691,6 +693,7 @@ private fun CreditNoteCreateContent(
                 state = state,
                 fields = handlers.fields,
                 onDevolverStockChange = handlers.onDevolverStockChange,
+                onDevolucionElectronicaChange = handlers.onDevolucionElectronicaChange,
             )
         }
 
@@ -794,6 +797,7 @@ private fun CreditNoteFormFieldsSection(
     state: CreditNotesState,
     fields: CreditNoteFieldHandlers,
     onDevolverStockChange: (Boolean) -> Unit,
+    onDevolucionElectronicaChange: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -826,6 +830,20 @@ private fun CreditNoteFormFieldsSection(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text("Devolver stock al inventario", fontWeight = FontWeight.Medium)
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Switch(
+                checked = state.form.devolucionElectronica,
+                onCheckedChange = onDevolucionElectronicaChange,
+                colors =
+                    androidx.compose.material3.SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    ),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text("Enviar nota de crédito electrónica (DGI)", fontWeight = FontWeight.Medium)
         }
     }
 }

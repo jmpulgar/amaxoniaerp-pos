@@ -303,6 +303,7 @@ abstract class BaseSalesKardexTable(
     val contabilizado = integer("contabilizado")
     val fechaContabilizacion = date("fecha_contabilizacion")
     val usuarioContabilizacion = varchar("usuario_contabilizacion", S.VARCHAR_LENGTH_50)
+    val idAlmacenEntrada = integer("id_almacen_entrada").nullable()
     val idAlmacenSalida = integer("id_almacen_salida").nullable()
     val idSucursal = integer("id_sucursal")
     val validadoFecha = date("validado_fecha")

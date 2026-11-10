@@ -100,7 +100,7 @@ private fun insertKardexHeader(
         it[kardexTable.estado] = "Procesado"
         it[kardexTable.idDocumento] = ctx.invoiceId
         it[kardexTable.codProveedor] = 0
-        it[kardexTable.comprobante] = "FACT"
+        it[kardexTable.comprobante] = documentCode.removePrefix("FACT-")
         it[kardexTable.anio] = Year.from(ctx.today).value % TWO_DIGIT_YEAR_MODULUS
         it[kardexTable.tipoCosto] = "PROM"
         it[kardexTable.estatus] = 1

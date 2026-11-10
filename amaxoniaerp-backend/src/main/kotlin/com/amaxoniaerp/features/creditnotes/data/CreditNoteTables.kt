@@ -278,3 +278,11 @@ object CreditNoteGiftCertificateTable : Table("certificado_regalo") {
 
     override val primaryKey = PrimaryKey(idCertificado)
 }
+
+object TipoMovimientoAlmacenTable : Table("tipo_movimiento_almacen") {
+    val idTipoMovimientoAlmacen = integer("id_tipo_movimiento_almacen")
+    val descripcion = varchar("descripcion", 50)
+    val operacion = varchar("operacion", 1)
+
+    override val primaryKey = PrimaryKey(idTipoMovimientoAlmacen)
+}
