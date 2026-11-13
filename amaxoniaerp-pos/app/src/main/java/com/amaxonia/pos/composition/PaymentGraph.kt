@@ -49,6 +49,9 @@ object PaymentGraph {
             onPaymentProcessingChanged = { isProcessing, message ->
                 DependencyContainer.customerDisplayManager.setPaymentProcessing(isProcessing, message)
             },
+            cartCorrelationProvider = {
+                DependencyContainer.cartRepository.getOrCreateCheckoutCorrelationId()
+            },
         )
 
     fun paymentSuccessViewModel(transactionId: String): PaymentSuccessViewModel =

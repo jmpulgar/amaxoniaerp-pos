@@ -17,6 +17,8 @@ import com.amaxonia.pos.domain.usecase.payment.PaymentCondition
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowEvent
 import com.amaxonia.pos.domain.usecase.payment.PaymentFlowResult
 import com.amaxonia.pos.domain.usecase.payment.PaymentOperation
+import com.amaxonia.pos.domain.usecase.payment.PaymentOperationRequest
+import com.amaxonia.pos.domain.usecase.payment.PaymentSource
 import com.amaxonia.pos.domain.usecase.payment.ValidatePaymentUseCase
 import com.amaxonia.pos.test.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -548,11 +550,38 @@ class PaymentViewModelTest {
             assertEquals(payload, state.successPayload)
         }
 
+    @Test
+    fun `processPayment passes cart correlation id to payment operation request`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            var capturedRequest: PaymentOperationRequest? = null
+            val operation =
+                PaymentOperation { request, _ ->
+                    capturedRequest = request
+                    PaymentFlowResult.Failure("characterized")
+                }
+            val viewModel =
+                viewModel(
+                    caja = caja(currency("NO", 0.0)),
+                    methods = Result.success(listOf(method(1, 1))),
+                    operation = operation,
+                    extras = PaymentExtras(cartCorrelationProvider = { "cart-correlation-xyz" }),
+                )
+
+            advanceUntilIdle()
+            payExactCash(viewModel)
+            runCurrent()
+
+            val request = checkNotNull(capturedRequest)
+            val source = request.source as PaymentSource.CurrentCart
+            assertEquals("cart-correlation-xyz", source.correlationId)
+        }
+
     private data class PaymentExtras(
         val client: Client? = null,
         val clientFlow: MutableStateFlow<Client?>? = null,
         val snapshot: SaleFinancialSnapshot? = null,
         val countryCode: String = "VE",
+        val cartCorrelationProvider: (() -> String?)? = null,
     )
 
     private fun viewModel(
@@ -582,6 +611,7 @@ class PaymentViewModelTest {
             paymentOperation = operation,
             selectedClient = resolvedClientFlow,
             cartFinancialSnapshot = MutableStateFlow(extras.snapshot),
+            cartCorrelationProvider = extras.cartCorrelationProvider,
         )
     }
 

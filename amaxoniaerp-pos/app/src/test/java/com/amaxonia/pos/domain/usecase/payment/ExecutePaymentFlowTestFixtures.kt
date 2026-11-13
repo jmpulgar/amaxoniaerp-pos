@@ -86,6 +86,7 @@ internal data class FixtureOptions(
     val reconciledTableSessionClosed: Boolean = false,
     /** idFactura for which findByCorrelationId fails (network unreachable). */
     val reconciliationFailureId: String? = null,
+    val idGenerator: IdGenerator? = null,
 )
 
 internal fun fixture(options: FixtureOptions): Fixture {
@@ -95,7 +96,7 @@ internal fun fixture(options: FixtureOptions): Fixture {
     val transactions = FakeTransactionRepository(options.transactionSaveFailure)
     val writer = CapturingOfflineWriter()
     val clock = AppClock { Instant.ofEpochMilli(1_000L) }
-    val ids = IdGenerator { "flow-id" }
+    val ids = options.idGenerator ?: IdGenerator { "flow-id" }
     val ledger = if (options.withLedger) InMemoryTransactionLogDao() else null
     val repositories = paymentRepositories(options, cart, caja, sales, transactions)
     val useCase = buildPaymentFlow(repositories, writer, clock, ids, options, ledger)

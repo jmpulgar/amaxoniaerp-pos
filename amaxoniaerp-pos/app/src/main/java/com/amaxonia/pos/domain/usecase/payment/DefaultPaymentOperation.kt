@@ -18,6 +18,11 @@ internal class DefaultPaymentOperation(
         onEvent: suspend (PaymentFlowEvent) -> Unit,
     ): PaymentFlowResult {
         val tablePayment = (request.source as? PaymentSource.TableAccount)?.payment
+        val correlationId =
+            when (val source = request.source) {
+                is PaymentSource.CurrentCart -> source.correlationId
+                is PaymentSource.TableAccount -> source.payment.correlationId
+            }
         val financialSnapshot =
             when (val source = request.source) {
                 is PaymentSource.CurrentCart -> source.financialSnapshot
@@ -36,8 +41,8 @@ internal class DefaultPaymentOperation(
                 secondaryCurrency = request.context.secondaryCurrency,
                 isMultiCurrency = request.context.isMultiCurrency,
                 availableMethods = request.context.availableMethods,
-                correlationCarryOver = tablePayment?.correlationId,
-                preferredCorrelationId = tablePayment?.correlationId,
+                correlationCarryOver = correlationId,
+                preferredCorrelationId = correlationId,
                 saleItemsOverride = tablePayment?.saleItems,
                 financialSnapshotOverride = financialSnapshot,
                 cuentaMesa = tablePayment?.saleContext,

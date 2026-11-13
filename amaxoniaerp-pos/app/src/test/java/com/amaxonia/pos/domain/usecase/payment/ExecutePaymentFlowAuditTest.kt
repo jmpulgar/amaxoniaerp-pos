@@ -1,6 +1,7 @@
 package com.amaxonia.pos.domain.usecase.payment
 
 import com.amaxonia.pos.domain.model.printer.PrinterType
+import com.amaxonia.pos.domain.system.IdGenerator
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -41,6 +42,7 @@ class ExecutePaymentFlowAuditTest {
                     FixtureOptions(
                         isOnline = true,
                         withLedger = true,
+                        idGenerator = IdGenerator { "fresh-retry-uuid-should-not-be-used" },
                     ),
                 )
             retryFixture.ledger!!.rows[firstId] =

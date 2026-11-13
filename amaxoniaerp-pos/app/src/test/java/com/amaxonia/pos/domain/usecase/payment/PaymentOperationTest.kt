@@ -70,6 +70,63 @@ class PaymentOperationTest {
             assertSame(snapshot, input.financialSnapshotOverride)
             assertEquals(PrinterType.THE_FACTORY_HKA, input.printerType)
             assertEquals(PaymentCondition.CONTADO, input.paymentCondition)
+            assertEquals(null, input.correlationCarryOver)
+            assertEquals(null, input.preferredCorrelationId)
+        }
+
+    @Test
+    fun `current cart source propagates correlationId to carryOver and preferredCorrelationId`() =
+        runTest {
+            val method =
+                FormaPago(
+                    idFormaPago = 1,
+                    siglas = "CASH",
+                    descripcion = "Efectivo",
+                    activo = 1,
+                    pos = 1,
+                    grupo = 1,
+                    orden = 1,
+                    tipoMoneda = "USD",
+                )
+            val details = cashDetails()
+            val snapshot =
+                SaleFinancialSnapshot(
+                    subtotalGross = 10.0,
+                    itemDiscounts = 0.0,
+                    subtotalNet = 10.0,
+                    tax = 0.0,
+                    total = 10.0,
+                )
+            val cartCorrelationId = "cart-session-uuid-123"
+            val request =
+                PaymentOperationRequest(
+                    payment = cashIntent(details),
+                    source = PaymentSource.CurrentCart(snapshot, correlationId = cartCorrelationId),
+                    context =
+                        PaymentExecutionContext(
+                            countryCode = "VE",
+                            availableMethods = listOf(method),
+                            exchangeRate = 1.0,
+                            secondaryCurrency = "Bs.",
+                            isMultiCurrency = false,
+                        ),
+                )
+            var captured: ExecutePaymentFlowInput? = null
+            val operation =
+                DefaultPaymentOperation(
+                    executeFlow = { input, _ ->
+                        captured = input
+                        PaymentFlowResult.Failure("stop")
+                    },
+                    printerTypeProvider = { PrinterType.NONE },
+                )
+
+            operation.execute(request) { }
+            val input = checkNotNull(captured)
+
+            assertEquals("cart-session-uuid-123", input.correlationCarryOver)
+            assertEquals("cart-session-uuid-123", input.preferredCorrelationId)
+            assertSame(snapshot, input.financialSnapshotOverride)
         }
 
     @Test

@@ -11,6 +11,7 @@ import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
 import com.amaxonia.pos.domain.model.computeFinancialSnapshot
 import com.amaxonia.pos.domain.model.options.ProductComposition
 import com.amaxonia.pos.domain.model.seller.Seller
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +68,23 @@ class CartRepository {
     private val _financialSnapshot = MutableStateFlow<SaleFinancialSnapshot?>(null)
     val financialSnapshot: StateFlow<SaleFinancialSnapshot?> = _financialSnapshot.asStateFlow()
 
+    internal val checkoutCorrelationIdState = MutableStateFlow<String?>(null)
+    val checkoutCorrelationId: StateFlow<String?> = checkoutCorrelationIdState.asStateFlow()
+
+    fun getOrCreateCheckoutCorrelationId(idGenerator: () -> String = { UUID.randomUUID().toString() }): String {
+        val current = checkoutCorrelationIdState.value
+        if (!current.isNullOrBlank()) {
+            return current
+        }
+        val minted = idGenerator()
+        checkoutCorrelationIdState.value = minted
+        return minted
+    }
+
+    fun clearCheckoutCorrelationId() {
+        checkoutCorrelationIdState.value = null
+    }
+
     fun setFinancialSnapshot(snapshot: SaleFinancialSnapshot?) {
         _financialSnapshot.value = snapshot
     }
@@ -74,6 +92,7 @@ class CartRepository {
     internal fun invalidateFinancialSnapshot() {
         val items = cartItemsState.value
         _financialSnapshot.value = if (items.isEmpty()) null else items.computeFinancialSnapshot()
+        clearCheckoutCorrelationId()
     }
 
     fun resolveItemPrice(
@@ -420,11 +439,13 @@ class CartRepository {
         selectedClientSucursalState.value = null
         clientSucursalesState.value = emptyList()
         observacionState.value = ""
+        clearCheckoutCorrelationId()
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)
     fun clearItemsOnly() {
         cartItemsState.value = emptyList()
         _financialSnapshot.value = null
+        clearCheckoutCorrelationId()
     }
 }

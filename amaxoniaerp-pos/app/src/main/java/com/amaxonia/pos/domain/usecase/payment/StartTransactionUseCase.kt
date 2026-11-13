@@ -12,11 +12,12 @@ import com.amaxonia.pos.domain.system.IdGenerator
  * the operation survives process death.
  *
  * Recovery rule: if [recoverOrStart] is invoked with a [carryOverId] that
- * already has a row in `SENDING` status (e.g. the app crashed mid-submission
- * and the user re-triggered the same operation), the existing correlation id
- * is reused so the backend deduplication (HTTP 409) kicks in. If the carried
- * id has no ledger row, or is blank, a fresh id is minted — correlation is
- * never re-derived from carrito contents (it is one-per-operation, not
+ * already has a row in `SENDING` or `FAILED` status (e.g. the app crashed mid-submission
+ * or a prior attempt failed due to timeout/network drop and the user re-triggered
+ * the same operation), the existing correlation id is reused and updated to `SENDING`
+ * so the backend deduplication (HTTP 409) kicks in. If the carried id has no ledger
+ * row, or is blank, a fresh id is minted (or [preferredId] is used if provided) —
+ * correlation is never re-derived from carrito contents (it is one-per-operation, not
  * one-per-carrito-similarity).
  *
  * Tenant rule (auditoría ítem 3 / TEN-001): every newly-opened row is stamped
@@ -37,7 +38,7 @@ class StartTransactionUseCase(
         val existing = command.carryOverId?.takeIf(String::isNotBlank)?.let { dao.findById(it) }
         val resumable =
             existing
-                ?.takeIf { it.status == STATUS_SENDING }
+                ?.takeIf { it.status == STATUS_SENDING || it.status == STATUS_FAILED }
                 ?.takeIf { command.tenant == null || it.tenantId == command.tenant.tenantId }
         val completedPreferred =
             existing
@@ -48,6 +49,9 @@ class StartTransactionUseCase(
         val tenant = command.tenant
         val result =
             if (recovered != null) {
+                if (recovered.status == STATUS_FAILED) {
+                    dao.upsert(recovered.copy(status = STATUS_SENDING, updatedAt = now))
+                }
                 StartedTransaction(clientCorrelationId = recovered.clientCorrelationId, resumed = true)
             } else if (tenant == null) {
                 null

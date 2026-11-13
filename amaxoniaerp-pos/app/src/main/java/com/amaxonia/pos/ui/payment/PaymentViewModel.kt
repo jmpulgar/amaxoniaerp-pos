@@ -42,6 +42,7 @@ class PaymentViewModel(
     private val tableAccountPaymentReader: TableAccountPaymentReader? = null,
     private val cartFinancialSnapshot: StateFlow<SaleFinancialSnapshot?> = MutableStateFlow(null),
     private val onPaymentProcessingChanged: ((Boolean, String?) -> Unit)? = null,
+    private val cartCorrelationProvider: (() -> String?)? = null,
 ) : ViewModel() {
     private var countryCode: String = DEFAULT_COUNTRY_CODE
 
@@ -322,7 +323,10 @@ class PaymentViewModel(
         val tablePayment = tableAccountPaymentReader?.current?.value
         val source =
             if (tablePayment == null) {
-                PaymentSource.CurrentCart(financialSnapshot)
+                PaymentSource.CurrentCart(
+                    financialSnapshot = financialSnapshot,
+                    correlationId = cartCorrelationProvider?.invoke(),
+                )
             } else {
                 PaymentSource.TableAccount(tablePayment)
             }

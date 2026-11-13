@@ -60,6 +60,27 @@ class StartTransactionIdempotencyTest {
         }
 
     @Test
+    fun `retry with carry over id of a FAILED row reuses the same id and resets status to SENDING`() =
+        runTest {
+            val dao = InMemoryTransactionLogDao()
+            val first = StartTransactionUseCase(dao, ids("first-id"), fixedClock())
+            val second = StartTransactionUseCase(dao, ids("SHOULD-NOT-BE-USED"), fixedClock())
+
+            first.recoverOrStart(command(carryOverId = null))
+            dao.markFailed("first-id", StartTransactionUseCase.STATUS_FAILED, "timeout")
+            assertEquals(StartTransactionUseCase.STATUS_FAILED, dao.rows.row("first-id").status)
+
+            val resumed = requireNotNull(second.recoverOrStart(command(carryOverId = "first-id")))
+
+            // KEY ASSERTION: The failed row is resumed, reuses the same idFactura,
+            // and resets status to SENDING without opening a new row.
+            assertEquals("first-id", resumed.clientCorrelationId)
+            assertTrue("resumed must be true so callers know no new ledger row was opened", resumed.resumed)
+            assertEquals(1, dao.rows.size)
+            assertEquals(StartTransactionUseCase.STATUS_SENDING, dao.rows.row("first-id").status)
+        }
+
+    @Test
     fun `carry over id with no ledger row mints a fresh id and never re-derives from carry-over`() =
         runTest {
             val dao = InMemoryTransactionLogDao()

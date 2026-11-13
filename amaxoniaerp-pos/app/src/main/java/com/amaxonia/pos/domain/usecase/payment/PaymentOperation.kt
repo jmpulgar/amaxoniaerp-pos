@@ -44,6 +44,7 @@ data class PaymentIntent(
 sealed interface PaymentSource {
     data class CurrentCart(
         val financialSnapshot: SaleFinancialSnapshot?,
+        val correlationId: String? = null,
     ) : PaymentSource
 
     data class TableAccount(
