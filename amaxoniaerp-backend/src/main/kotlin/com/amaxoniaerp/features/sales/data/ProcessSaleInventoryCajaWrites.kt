@@ -220,7 +220,7 @@ private fun insertCajaNueva(
         it[cajaNuevaTable.idCajaSecuencia] =
             ctx.request.factura.idCajaSecuencia
                 .take(SEQUENCE_ID_MAX_LENGTH)
-        it[cajaNuevaTable.idPedido] = ""
+        it[cajaNuevaTable.idPedido] = ctx.request.idPedido.orEmpty()
         it[cajaNuevaTable.idAbono] = ""
         it[cajaNuevaTable.idNotaCredito] = ""
     }

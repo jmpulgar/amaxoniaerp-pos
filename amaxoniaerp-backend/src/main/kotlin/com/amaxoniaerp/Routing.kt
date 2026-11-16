@@ -8,6 +8,7 @@ import com.amaxoniaerp.features.auth.route.authRoutes
 import com.amaxoniaerp.features.caja.cajaRouting
 import com.amaxoniaerp.features.clients.route.clientTypesRoutes
 import com.amaxoniaerp.features.clients.route.clientsRoutes
+import com.amaxoniaerp.features.cobranza.route.cobranzaRoutes
 import com.amaxoniaerp.features.creditnotes.route.creditNoteRoutes
 import com.amaxoniaerp.features.electronicinvoice.route.electronicInvoiceRoutes
 import com.amaxoniaerp.features.facturas.route.facturasRoutes
@@ -18,6 +19,7 @@ import com.amaxoniaerp.features.mesas.cuentaMesaRouting
 import com.amaxoniaerp.features.mesas.mesasRouting
 import com.amaxoniaerp.features.mesas.pedidoMesaRouting
 import com.amaxoniaerp.features.mesas.sesionMesaRouting
+import com.amaxoniaerp.features.pedidos.route.pedidoRoutes
 import com.amaxoniaerp.features.pos.posRouting
 import com.amaxoniaerp.features.promotions.route.promotionsRoutes
 import com.amaxoniaerp.features.sales.route.salesRoutes
@@ -139,6 +141,8 @@ private fun Route.installPosRoutes(deps: AppDependencies) {
     promotionsRoutes(deps.repositories.promotionsRepository)
     salesRoutes(deps.mesas.processSaleUseCase)
     creditNoteRoutes(deps.fiscal.creditNoteDependencies.creditNoteService)
+    pedidoRoutes(deps.repositories.pedidoRepository)
+    cobranzaRoutes(deps.repositories.cobranzaRepository)
     electronicInvoiceRoutes(deps.fiscal.feDependencies.feFactory)
 
     assetsRoutes(assetsBaseUrls = deps.routingConfig.assetsBaseUrls, dataBasePath = deps.routingConfig.dataBasePath)

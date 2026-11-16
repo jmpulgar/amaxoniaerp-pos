@@ -592,7 +592,7 @@ class ClientsRepository {
                     FROM caja_nueva c
                     LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
                     LEFT JOIN factura f ON f.id_factura = c.id_factura
-                    WHERE c.ing_eg = 'I' AND c.comprobante <> 'COBRO' AND c.comprobante <> 'CERT'
+                    WHERE c.ing_eg = 'I' AND c.comprobante <> 'COBRO' AND c.comprobante <> 'CERT' AND c.comprobante <> 'ICC'
                       AND (c.id_cliente = '${client.id}' OR cl.cod_cliente = '${client.code}')
                 )
                 UNION ALL

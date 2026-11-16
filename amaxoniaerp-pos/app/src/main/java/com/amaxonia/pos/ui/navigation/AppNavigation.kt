@@ -38,6 +38,8 @@ import com.amaxonia.pos.ui.cart.CartScreen
 import com.amaxonia.pos.ui.clients.ClientFormScreen
 import com.amaxonia.pos.ui.clients.ClientListScreen
 import com.amaxonia.pos.ui.clients.ClientSelectionScreen
+import com.amaxonia.pos.ui.cobranza.CobranzaCliente
+import com.amaxonia.pos.ui.cobranza.CobranzaScreen
 import com.amaxonia.pos.ui.company.CompanySelectionScreen
 import com.amaxonia.pos.ui.creditnotes.CreditNotesScreen
 import com.amaxonia.pos.ui.dashboard.DashboardScreen
@@ -50,6 +52,7 @@ import com.amaxonia.pos.ui.mesas.CuentaMesaScreen
 import com.amaxonia.pos.ui.offlinesettings.OfflineSettingsScreen
 import com.amaxonia.pos.ui.payment.PaymentScreen
 import com.amaxonia.pos.ui.payment.SuccessScreen
+import com.amaxonia.pos.ui.pedidos.PedidosScreen
 import com.amaxonia.pos.ui.products.ProductListScreen
 import com.amaxonia.pos.ui.reports.ReportsScreen
 import com.amaxonia.pos.ui.settings.SettingsScreen
@@ -62,6 +65,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 private const val NAV_LOG_TAG = "AppNavigation"
+private const val COBRANZA_CLIENT_KEY = "cobranza_cliente"
+private const val COBRANZA_CLIENT_SEPARATOR = ''
+
+private fun decodeCobranzaCliente(encoded: String): CobranzaCliente? {
+    val id = encoded.substringBefore(COBRANZA_CLIENT_SEPARATOR)
+    return if (id.isBlank()) null else CobranzaCliente(id, encoded.substringAfter(COBRANZA_CLIENT_SEPARATOR, id))
+}
 
 @Composable
 fun AppNavigation(startDestination: String) {
@@ -94,6 +104,7 @@ fun AppNavigation(startDestination: String) {
             comandaDestination(navController)
             cuentaMesaDestination(navController, cartRepository)
             operationsDestinations(navController)
+            pedidosCobranzaDestinations(navController)
             clientsDestinations(navController, cartRepository)
             productsDestinations(navController)
             cartDestination(navController)
@@ -281,6 +292,8 @@ private fun NavGraphBuilder.dashboardDestination(
             onStartNewOrder = { navController.navigateFromDrawer("client_selection_mode") },
             onNavigateToCierreCaja = { navController.navigateFromDrawer("cierre_caja") },
             onNavigateToDraftInvoices = { navController.navigateFromDrawer("draft_invoices") },
+            onNavigateToPedidos = { navController.navigateFromDrawer("pedidos") },
+            onNavigateToCobranza = { navController.navigateFromDrawer("cobranza") },
             onNavigateToAreasMesas = { navController.navigateFromDrawer("areas_mesas") },
             onNavigateToComanda = { areaId, mesaId, sesionId ->
                 navController.navigate("comanda/$areaId/$mesaId/$sesionId")
@@ -391,6 +404,44 @@ private fun NavGraphBuilder.cuentaMesaDestination(
                     TableAccountPayment(areaId, mesaId, sesionId, cuenta),
                 )
                 navController.navigate("payment/${cuenta.total}")
+            },
+        )
+    }
+}
+
+/** Pedidos por facturar y cobranza de facturas pendientes. */
+private fun NavGraphBuilder.pedidosCobranzaDestinations(navController: NavController) {
+    composable("pedidos") {
+        PedidosScreen(
+            onBack = { navController.popBackStack() },
+            onOpenCart = {
+                navController.navigate("cart") {
+                    popUpTo("dashboard") { inclusive = false }
+                }
+            },
+        )
+    }
+
+    composable("cobranza") { backStackEntry ->
+        val encoded by backStackEntry.savedStateHandle
+            .getStateFlow<String?>(COBRANZA_CLIENT_KEY, null)
+            .collectAsStateWithLifecycle()
+        CobranzaScreen(
+            selectedCliente = encoded?.let(::decodeCobranzaCliente),
+            onBack = { navController.popBackStack() },
+            onSelectCliente = { navController.navigate("cobranza_client_selection") },
+        )
+    }
+
+    composable("cobranza_client_selection") {
+        ClientSelectionScreen(
+            onBack = { navController.popBackStack() },
+            onClientSelected = { client ->
+                val nombre = "${client.firstName} ${client.lastName}".trim().ifBlank { client.code }
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set(COBRANZA_CLIENT_KEY, "${client.id}$COBRANZA_CLIENT_SEPARATOR$nombre")
+                navController.popBackStack()
             },
         )
     }

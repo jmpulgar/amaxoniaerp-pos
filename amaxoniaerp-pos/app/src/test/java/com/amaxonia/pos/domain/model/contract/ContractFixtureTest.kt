@@ -7,11 +7,13 @@ import com.amaxonia.pos.data.remote.dto.SelectCompanyRequest
 import com.amaxonia.pos.data.remote.dto.SelectCompanyResponse
 import com.amaxonia.pos.domain.model.caja.AperturaRequest
 import com.amaxonia.pos.domain.model.caja.CierreCajaRequest
+import com.amaxonia.pos.domain.model.cobranza.CreateCobranzaRequestDto
 import com.amaxonia.pos.domain.model.creditnote.ConfirmCreditNoteFiscalRequestDto
 import com.amaxonia.pos.domain.model.creditnote.CreateCreditNoteRequestDto
 import com.amaxonia.pos.domain.model.mesas.AbrirSesionRequest
 import com.amaxonia.pos.domain.model.mesas.CrearCuentaRequest
 import com.amaxonia.pos.domain.model.mesas.CrearPedidoMesaRequest
+import com.amaxonia.pos.domain.model.pedidos.CreatePedidoRequestDto
 import com.amaxonia.pos.domain.model.sales.ConfirmFacturaFiscalRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleRequestDto
 import com.amaxonia.pos.domain.model.sales.ProcessSaleResponseDto
@@ -204,6 +206,23 @@ class ContractFixtureTest {
         roundTrip("fiscal/confirm-factura-fiscal-request.json", ConfirmFacturaFiscalRequestDto.serializer()) {
             assertEquals("00000000000000000001", it.numeroDocumentoFiscal)
             assertEquals("SN-PRN-7", it.impresoraSerial)
+        }
+    }
+
+    // ─── Pedidos y cobranza ────────────────────────────────────────────────
+
+    @Test
+    fun `pedido, cobranza y venta de pedido mantienen el contrato`() {
+        roundTrip("pedidos/create-pedido-request.json", CreatePedidoRequestDto.serializer()) {
+            assertEquals("pedido-uuid-001", it.idPedido)
+            assertEquals(1, it.pedido.codEstatus)
+        }
+        roundTrip("cobranza/create-cobranza-request.json", CreateCobranzaRequestDto.serializer()) {
+            assertEquals(2, it.facturas.size)
+            assertEquals(10.0, it.pagos.last().montoRecibido, 0.0)
+        }
+        roundTrip("sale/invoice-pedido-request.json", ProcessSaleRequestDto.serializer()) {
+            assertEquals("pedido-uuid-001", it.idPedido)
         }
     }
 }

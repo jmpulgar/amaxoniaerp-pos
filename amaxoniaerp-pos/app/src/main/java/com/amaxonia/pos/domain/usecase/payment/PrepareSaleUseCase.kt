@@ -176,8 +176,15 @@ internal class PrepareSaleUseCase(
         context: BranchedSaleContext,
     ): PreparationStep<ReadySaleContext> {
         val isOnline = repositories.runtime.connectivity.isOnline()
-        if (!isOnline && input.cuentaMesa != null) {
-            return PreparationStep.Failure("Las cuentas de mesa requieren conexión para confirmar saldos en forma atómica")
+        val offlineError =
+            when {
+                isOnline -> null
+                input.cuentaMesa != null -> "Las cuentas de mesa requieren conexión para confirmar saldos en forma atómica"
+                repositories.state.cart.linkedPedido.value != null -> "Facturar un pedido requiere conexión para marcarlo como facturado"
+                else -> null
+            }
+        if (offlineError != null) {
+            return PreparationStep.Failure(offlineError)
         }
         val sequenceResult =
             if (isOnline) {
@@ -253,6 +260,9 @@ internal class AssemblePreparedSaleUseCase(
                     // FASE 1.1: propagar la selección de impresora persistida en
                     // Settings para que el backend decida HKA20 vs digital (Venezuela).
                     printerType = input.printerType,
+                    idPedido =
+                        repositories.state.cart.linkedPedido.value
+                            ?.idPedido,
                 ),
             )
         return PreparedSale(

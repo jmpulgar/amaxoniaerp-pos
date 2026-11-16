@@ -10,6 +10,7 @@ import com.amaxonia.pos.domain.model.SaleFinancialSnapshot
 import com.amaxonia.pos.domain.model.codTipoPrecioToLabel
 import com.amaxonia.pos.domain.model.computeFinancialSnapshot
 import com.amaxonia.pos.domain.model.options.ProductComposition
+import com.amaxonia.pos.domain.model.pedidos.LinkedPedido
 import com.amaxonia.pos.domain.model.seller.Seller
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +57,17 @@ class CartRepository {
 
     internal val currentSellerState = MutableStateFlow<Seller?>(null)
     val currentSeller: StateFlow<Seller?> = currentSellerState.asStateFlow()
+
+    /**
+     * Pedido del ERP que el carrito está facturando. Se envía como `idPedido` en la venta para
+     * que el backend lo marque facturado en la misma transacción. `null` en una venta normal.
+     */
+    internal val linkedPedidoState = MutableStateFlow<LinkedPedido?>(null)
+    val linkedPedido: StateFlow<LinkedPedido?> = linkedPedidoState.asStateFlow()
+
+    fun setLinkedPedido(pedido: LinkedPedido?) {
+        linkedPedidoState.value = pedido
+    }
 
     internal val observacionState = MutableStateFlow("")
     val observacion: StateFlow<String> = observacionState.asStateFlow()
@@ -420,6 +432,7 @@ class CartRepository {
         selectedClientSucursalState.value = null
         clientSucursalesState.value = emptyList()
         observacionState.value = ""
+        linkedPedidoState.value = null
     }
 
     // Función para limpiar solo items (por ejemplo, si quieres mantener el cliente)

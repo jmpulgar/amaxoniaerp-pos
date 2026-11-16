@@ -18,6 +18,13 @@ data class ProcessSaleRequest(
     @SerialName("cuenta_mesa")
     val cuentaMesa: CuentaMesaVentaInput? = null,
     /**
+     * Pedido (`pedido.id_pedido`) que esta venta factura. Cuando viene informado y la venta se
+     * procesa, el pedido queda facturado (cod_estatus=2) y enlazado a la factura en la misma
+     * transacción; si el pedido ya fue facturado por otra factura o está anulado, la venta se
+     * rechaza por regla de dominio.
+     */
+    val idPedido: String? = null,
+    /**
      * Indica explícitamente, **por venta**, que el cajero va a utilizar la impresora
      * fiscal HKA20 física en el POS (Venezuela). La fuente de verdad nunca se deduce
      * de la base de datos ni de `parametros_generales`; la decide el frontend a partir

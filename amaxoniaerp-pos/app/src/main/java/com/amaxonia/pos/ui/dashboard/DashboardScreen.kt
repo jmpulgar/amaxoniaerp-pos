@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ListAlt
@@ -53,6 +54,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PointOfSale
@@ -192,6 +194,8 @@ fun DashboardScreen(
     onStartNewOrder: () -> Unit,
     onNavigateToCierreCaja: () -> Unit = {},
     onNavigateToDraftInvoices: () -> Unit = {},
+    onNavigateToPedidos: () -> Unit = {},
+    onNavigateToCobranza: () -> Unit = {},
     onNavigateToAreasMesas: () -> Unit = {},
     onNavigateToComanda: (areaId: Int, mesaId: Int, sesionId: Int) -> Unit = { _, _, _ -> },
 ) {
@@ -631,6 +635,18 @@ fun DashboardScreen(
                             drawerState.close()
                             viewModel.onAction(DashboardSaleUiAction.StartNewOrder)
                             onStartNewOrder() // Navega a selección de cliente
+                        }
+                    }
+                    DrawerMenuItem(Icons.AutoMirrored.Filled.Assignment, "Pedidos por facturar") {
+                        scope.launch {
+                            drawerState.close()
+                            onNavigateToPedidos()
+                        }
+                    }
+                    DrawerMenuItem(Icons.Default.Payments, "Cobranza") {
+                        scope.launch {
+                            drawerState.close()
+                            onNavigateToCobranza()
                         }
                     }
                     DrawerMenuItem(Icons.AutoMirrored.Filled.ReceiptLong, "Historial Transacciones") {

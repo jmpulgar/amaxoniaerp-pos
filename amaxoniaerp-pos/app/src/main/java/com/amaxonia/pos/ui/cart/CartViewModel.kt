@@ -42,6 +42,9 @@ data class CartState(
     val sesionMesaId: Int? = null,
     val selectedTable: SelectedTable? = null,
     val observacion: String = "",
+    /** Código del pedido del ERP que se está facturando con este carrito. */
+    val linkedPedidoCode: String? = null,
+    val isSavingPedido: Boolean = false,
 ) {
     // Conversión Bs en BigDecimal (mismo camino que PaymentScreen:Money.times)
     // para no multiplicar en Double; el formateo "%.2f" legacy se preserva.
@@ -121,6 +124,9 @@ sealed interface CartUiAction {
     data object RemoveClient : CartContextUiAction
 
     data object SaveDraft : CartUiAction
+
+    /** Guarda el carrito como pedido en el ERP (sin facturar). */
+    data object SavePedido : CartUiAction
 
     data object ClearMessage : CartUiAction
 

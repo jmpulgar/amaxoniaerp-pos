@@ -20,6 +20,8 @@ object AppGraph {
     val clients get() = ClientsGraph
     val products get() = ProductsGraph
     val creditNotes get() = CreditNotesGraph
+    val pedidos get() = PedidosGraph
+    val cobranza get() = CobranzaGraph
     val drafts get() = DraftsGraph
     val history get() = HistoryGraph
     val reports get() = ReportsGraph

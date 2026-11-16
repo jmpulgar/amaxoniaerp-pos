@@ -1,0 +1,33 @@
+{
+  "idCobranza": "cobro-uuid-001",
+  "idCliente": "client-1",
+  "idCaja": "caja-1",
+  "idCajaSecuencia": "seq-1",
+  "idSucursal": 2,
+  "serieSucursal": "A01",
+  "codVendedor": 7,
+  "observacion": "Abono semanal",
+  "facturas": [
+    {
+      "idFactura": "fact-1",
+      "monto": 10.44
+    },
+    {
+      "idFactura": "fact-2",
+      "monto": 5.0
+    }
+  ],
+  "pagos": [
+    {
+      "idFormaPago": 1,
+      "monto": 5.44,
+      "montoRecibido": 10.0,
+      "efectivoCambio": 4.56
+    },
+    {
+      "idFormaPago": 4,
+      "monto": 10.0,
+      "referencia": "TRX-123"
+    }
+  ]
+}

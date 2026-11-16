@@ -5,6 +5,7 @@ import com.amaxoniaerp.features.caja.application.CajaSessionWorkflow
 import com.amaxoniaerp.features.caja.data.CajaRepository
 import com.amaxoniaerp.features.clients.data.ClientTypesRepository
 import com.amaxoniaerp.features.clients.data.ClientsRepository
+import com.amaxoniaerp.features.cobranza.data.CobranzaRepository
 import com.amaxoniaerp.features.companies.domain.CompanyService
 import com.amaxoniaerp.features.facturas.data.FacturasRepository
 import com.amaxoniaerp.features.geography.data.GeographyRepository
@@ -14,6 +15,7 @@ import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.MesasRepository
 import com.amaxoniaerp.features.mesas.data.PedidoMesaRepository
 import com.amaxoniaerp.features.mesas.data.SesionMesaRepository
+import com.amaxoniaerp.features.pedidos.data.PedidoRepository
 import com.amaxoniaerp.features.pos.data.FormasPagoRepository
 import com.amaxoniaerp.features.promotions.data.PromotionsRepository
 import com.amaxoniaerp.features.sales.application.ProcessSaleUseCase
@@ -51,6 +53,8 @@ class Repositories {
     val mesasRepository = MesasRepository()
     val syncRepository = SyncRepository()
     val sucursalRepository = SucursalRepository()
+    val pedidoRepository = PedidoRepository()
+    val cobranzaRepository = CobranzaRepository()
 }
 
 /** Caja: módulo profundo de sesión (apertura atómica/cierre/estado) sobre el repositorio de queries. */

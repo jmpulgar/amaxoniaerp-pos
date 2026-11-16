@@ -17,6 +17,8 @@ data class ProcessSaleRequestDto(
     val moneda: SaleCurrencyDto? = null,
     @SerialName("cuenta_mesa")
     val cuentaMesa: CuentaMesaVentaDto? = null,
+    /** Pedido del ERP que factura esta venta (el backend lo marca facturado). */
+    val idPedido: String? = null,
     /**
      * Indica explícitamente al backend que esta venta debe facturarse con la impresora
      * fiscal HKA20 física del POS (Venezuela) y, por tanto, el backend NO debe ejecutar
