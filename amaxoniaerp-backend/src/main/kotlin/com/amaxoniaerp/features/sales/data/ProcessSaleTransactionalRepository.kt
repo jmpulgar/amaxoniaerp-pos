@@ -8,6 +8,7 @@ import com.amaxoniaerp.features.companies.data.TasasCambioTableFactory
 import com.amaxoniaerp.features.companies.data.TasasCambioTableVE
 import com.amaxoniaerp.features.mesas.data.CuentaMesaRepository
 import com.amaxoniaerp.features.mesas.data.validarVentaEnTransaccion
+import com.amaxoniaerp.features.pedidos.data.PedidoInvoicing
 import com.amaxoniaerp.features.sales.domain.DuplicateInvoiceException
 import com.amaxoniaerp.features.sales.domain.InsufficientStockException
 import com.amaxoniaerp.features.sales.domain.InvalidSaleRequestException
@@ -77,6 +78,8 @@ open class ProcessSaleTransactionalRepository(
                         ?: throw InvalidSaleRequestException("La integración de cuenta de mesa no está configurada")
                 repository.validarVentaEnTransaccion(context, preparedRequest, invoiceId)
             }
+        val pedidoId = preparedRequest.idPedido?.trim()?.takeIf { it.isNotEmpty() && !isPending }
+        pedidoId?.let { PedidoInvoicing.lockForInvoicing(it, invoiceId) }
         val invoiceCode = resolveInvoiceCode(countryCode, preparedRequest)
 
         val writeContext =
@@ -91,6 +94,7 @@ open class ProcessSaleTransactionalRepository(
             )
 
         persistSale(writeContext)
+        pedidoId?.let { PedidoInvoicing.markInvoiced(it, invoiceId, today) }
         if (monetaryContext.multiMoneda == "SI" && monetaryContext.idTasa > 0) {
             markTasaFacturada(countryCode, monetaryContext)
         }

@@ -24,6 +24,7 @@ class BuildSaleRequestUseCase {
             pagoResumen = input.paymentSummary,
             pagos = input.payments,
             moneda = input.currency,
+            idPedido = input.idPedido,
             // FASE 1.1: la selección HKA20 es la única fuente de verdad para que el
             // backend omita la facturación digital Venezuela. Se calcula aquí a
             // partir de la configuración de impresora persistida en Settings.
@@ -47,4 +48,6 @@ data class BuildSaleRequestInput(
      * para que el backend decida entre HKA20 físico (Venezuela) o facturación digital.
      */
     val printerType: PrinterType = PrinterType.NONE,
+    /** Pedido del ERP que se factura con esta venta; null en venta normal. */
+    val idPedido: String? = null,
 )

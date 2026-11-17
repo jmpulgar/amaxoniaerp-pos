@@ -2,6 +2,7 @@ package com.amaxonia.pos.composition
 
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
 import com.amaxonia.pos.domain.usecase.cart.ResolveProductImageUrlUseCase
+import com.amaxonia.pos.domain.usecase.pedidos.CreatePedidoFromCartUseCase
 import com.amaxonia.pos.ui.cart.CartActionHandler
 import com.amaxonia.pos.ui.cart.CartConfigurationCoordinator
 import com.amaxonia.pos.ui.cart.CartStateCoordinator
@@ -41,6 +42,11 @@ object CartGraph {
                     DependencyContainer.cartRepository,
                     DependencyContainer.refreshCartProductLotsUseCase,
                     DependencyContainer.saveDraftInvoiceUseCase,
+                    CreatePedidoFromCartUseCase(
+                        cart = DependencyContainer.cartRepository,
+                        cajaContext = DependencyContainer.activeCajaContext,
+                        pedidoRepository = DependencyContainer.pedidoRepository,
+                    ),
                 ),
             resolveProductImageUrlUseCase =
                 ResolveProductImageUrlUseCase(

@@ -22,6 +22,8 @@ import com.amaxonia.pos.domain.usecase.cart.RefreshCartProductLotsUseCase
 import com.amaxonia.pos.domain.usecase.cart.ResolveClientImageUrlUseCase
 import com.amaxonia.pos.domain.usecase.cart.SaveDraftInvoiceInput
 import com.amaxonia.pos.domain.usecase.cart.SaveDraftInvoiceUseCase
+import com.amaxonia.pos.domain.usecase.pedidos.CreatePedidoAttempt
+import com.amaxonia.pos.domain.usecase.pedidos.CreatePedidoFromCartUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +51,7 @@ class CartStateCoordinator(
     private val resolveClientImageUrl = dependencies.resolveClientImageUrl
     private val selectedTableHolder = dependencies.selectedTableHolder
     private val activeCajaReader = dependencies.activeCajaReader
+
     fun start(
         scope: CoroutineScope,
         state: MutableStateFlow<CartState>,
@@ -110,6 +113,11 @@ class CartStateCoordinator(
         scope.launch {
             cartRepository.observacion.collect { obs ->
                 state.update { it.copy(observacion = obs) }
+            }
+        }
+        scope.launch {
+            cartRepository.linkedPedido.collect { pedido ->
+                state.update { it.copy(linkedPedidoCode = pedido?.codPedido) }
             }
         }
     }
@@ -249,7 +257,11 @@ class CartActionHandler(
     private val cartRepository: CartRepository,
     private val refreshProductLots: RefreshCartProductLotsUseCase,
     private val saveDraftInvoice: SaveDraftInvoiceUseCase,
+    private val createPedido: CreatePedidoFromCartUseCase? = null,
 ) {
+    /** Se conserva entre reintentos para que un timeout no duplique el pedido. */
+    private var pedidoAttempt: CreatePedidoAttempt? = null
+
     fun onAction(
         action: CartUiAction,
         scope: CoroutineScope,
@@ -260,6 +272,7 @@ class CartActionHandler(
             is CartItemUiAction -> handleItemAction(action, scope, state)
             is CartContextUiAction -> handleContextAction(action, state)
             CartUiAction.SaveDraft -> saveDraft(scope, state)
+            CartUiAction.SavePedido -> savePedido(scope, state)
             CartUiAction.ClearMessage -> state.update { it.copy(orderSuccessMessage = null) }
             CartUiAction.ClearActionError -> state.update { it.copy(cartActionError = null) }
             is CartUiAction.UpdateObservacion -> {
@@ -369,6 +382,42 @@ class CartActionHandler(
             state.update { it.copy(orderSuccessMessage = "Borrador guardado para $clientLabel (${items.size} productos)") }
         }
     }
+
+    private fun savePedido(
+        scope: CoroutineScope,
+        state: MutableStateFlow<CartState>,
+    ) {
+        val useCase = createPedido
+        if (useCase == null || !canSavePedido(state)) return
+        val attempt = pedidoAttempt ?: CreatePedidoAttempt().also { pedidoAttempt = it }
+        state.update { it.copy(isSavingPedido = true, cartActionError = null) }
+        scope.launch {
+            useCase(attempt)
+                .onSuccess { response ->
+                    pedidoAttempt = null
+                    val itemCount = state.value.items.size
+                    cartRepository.clearCart()
+                    state.update {
+                        it.copy(
+                            isSavingPedido = false,
+                            orderSuccessMessage = "Pedido #${response.codPedido} guardado ($itemCount productos)",
+                        )
+                    }
+                }.onFailure { error ->
+                    state.update {
+                        it.copy(
+                            isSavingPedido = false,
+                            cartActionError = error.message?.takeIf(String::isNotBlank) ?: "No se pudo guardar el pedido",
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun canSavePedido(state: MutableStateFlow<CartState>): Boolean =
+        state.value.items.isNotEmpty() &&
+            !state.value.isSavingPedido &&
+            validateClientBranch(state, "Selecciona la sucursal del cliente antes de guardar el pedido.")
 
     private fun validateClientBranch(
         state: MutableStateFlow<CartState>,

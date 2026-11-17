@@ -36,6 +36,7 @@ import com.amaxonia.pos.data.repository.AreaRepositoryImpl
 import com.amaxonia.pos.data.repository.AuthRepositoryImpl
 import com.amaxonia.pos.data.repository.CachedCompanyRepository
 import com.amaxonia.pos.data.repository.CajaRepositoryImpl
+import com.amaxonia.pos.data.repository.CobranzaRepositoryImpl
 import com.amaxonia.pos.data.repository.CreditNoteRepositoryImpl
 import com.amaxonia.pos.data.repository.CuentaMesaRepositoryImpl
 import com.amaxonia.pos.data.repository.FormaPagoRepositoryImpl
@@ -48,6 +49,7 @@ import com.amaxonia.pos.data.repository.OfflineFirstClientBranchRepository
 import com.amaxonia.pos.data.repository.OfflineFirstClientFormCatalogSource
 import com.amaxonia.pos.data.repository.OfflineFirstClientRepository
 import com.amaxonia.pos.data.repository.OfflineFirstProductRepository
+import com.amaxonia.pos.data.repository.PedidoRepositoryImpl
 import com.amaxonia.pos.data.repository.PedidosMesaRepositoryImpl
 import com.amaxonia.pos.data.repository.PromotionRepositoryImpl
 import com.amaxonia.pos.data.repository.RemoteProductLotRepository
@@ -57,6 +59,7 @@ import com.amaxonia.pos.data.repository.RoomOfflineInvoiceWriter
 import com.amaxonia.pos.data.repository.RoomPendingSalesReader
 import com.amaxonia.pos.data.repository.SalesRepositoryImpl
 import com.amaxonia.pos.data.repository.SesionMesaRepositoryImpl
+import com.amaxonia.pos.data.repository.TenantJsonClient
 import com.amaxonia.pos.domain.usecase.sync.PurgeOfflineCatalogDataUseCase
 import com.amaxonia.pos.data.sync.CatalogDaos
 import com.amaxonia.pos.data.sync.CatalogSyncer
@@ -68,6 +71,7 @@ import com.amaxonia.pos.domain.model.ServerCountries
 import com.amaxonia.pos.domain.model.caja.CashCloseTicketFormatter
 import com.amaxonia.pos.domain.model.printer.FiscalDeviceDiagnostics
 import com.amaxonia.pos.domain.model.tenant.SaleTenant
+import com.amaxonia.pos.domain.repository.ActiveCajaContext
 import com.amaxonia.pos.domain.repository.AddressCatalogRepository
 import com.amaxonia.pos.domain.repository.AreaRepository
 import com.amaxonia.pos.domain.repository.AuthRepository
@@ -77,6 +81,7 @@ import com.amaxonia.pos.domain.repository.ClientBranchRepository
 import com.amaxonia.pos.domain.repository.ClientFormCatalogSource
 import com.amaxonia.pos.domain.repository.ClientRepository
 import com.amaxonia.pos.domain.repository.ClientTypeRepository
+import com.amaxonia.pos.domain.repository.CobranzaRepository
 import com.amaxonia.pos.domain.repository.CompanyRepository
 import com.amaxonia.pos.domain.repository.CreditNoteRepository
 import com.amaxonia.pos.domain.repository.CuentaMesaRepository
@@ -86,6 +91,7 @@ import com.amaxonia.pos.domain.repository.ImageUrlResolver
 import com.amaxonia.pos.domain.repository.InMemoryTableAccountPaymentHolder
 import com.amaxonia.pos.domain.repository.InvoiceHistoryRepository
 import com.amaxonia.pos.domain.repository.OfflineSyncSettingsRepository
+import com.amaxonia.pos.domain.repository.PedidoRepository
 import com.amaxonia.pos.domain.repository.PedidosMesaRepository
 import com.amaxonia.pos.domain.repository.PendingSalesReader
 import com.amaxonia.pos.domain.repository.ProductLotRepository
@@ -257,6 +263,25 @@ object DependencyContainer {
         private set
     lateinit var creditNoteRepository: CreditNoteRepository
         private set
+    lateinit var pedidoRepository: PedidoRepository
+        private set
+    lateinit var cobranzaRepository: CobranzaRepository
+        private set
+
+    private fun initializePedidoCobranzaRepositories() {
+        val client = TenantJsonClient(apiClient, localStore)
+        pedidoRepository = PedidoRepositoryImpl(client)
+        cobranzaRepository = CobranzaRepositoryImpl(client)
+    }
+
+    /** Caja activa + secuencia abierta para pedidos y cobranza. */
+    val activeCajaContext: ActiveCajaContext by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        object : ActiveCajaContext {
+            override fun activeCaja() = cajaRepository.activeCaja.value
+
+            override fun activeSecuencia() = cajaRepository.activeCajaSecuencia.value
+        }
+    }
     lateinit var draftInvoiceDao: DraftInvoiceDao
         private set
     lateinit var draftInvoiceRepository: DraftInvoiceRepository
@@ -417,6 +442,7 @@ object DependencyContainer {
         if (initialized) return
         val database = initializeNetworkAndSession(context)
         initializeRemoteRepositories(database)
+        initializePedidoCobranzaRepositories()
         initializeLocalRepositories(database)
         initializeTransactionIdempotency(database)
         initializePaymentLedgers()

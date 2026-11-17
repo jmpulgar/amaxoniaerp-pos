@@ -39,6 +39,9 @@ Consecuencias para los fixtures:
 | creditnote/create-credit-note-request | Android | Backend (+ golden original) | ídem | ídem |
 | creditnote/confirm-credit-note-fiscal-request | Android | Backend | ídem | ídem |
 | fiscal/confirm-factura-fiscal-request | Android | Backend | ídem | ídem |
+| sale/invoice-pedido-request | Android (venta con `idPedido`: factura un pedido) | Backend | ídem | ídem |
+| pedidos/create-pedido-request | Android (cabecera/items de venta, `codEstatus=1`) | Backend (decode-assert: `codEstatus` default) | ídem | ídem |
+| cobranza/create-cobranza-request | Android (varias facturas y formas de pago) | Backend | ídem | ídem |
 
 ## Asimetrías conocidas (documentadas, NO errores)
 

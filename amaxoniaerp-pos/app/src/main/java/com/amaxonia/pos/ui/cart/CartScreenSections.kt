@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.AlertDialog
@@ -95,10 +96,11 @@ internal fun OrderSavedDialog(
     message: String,
     onDismiss: () -> Unit,
     onAccept: () -> Unit,
+    title: String = "Borrador Guardado",
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Borrador Guardado") },
+        title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
             Button(onClick = onAccept) { Text("Aceptar") }
@@ -199,6 +201,7 @@ internal fun CartOrderSavedOverlay(
     state.orderSuccessMessage?.let { successMessage ->
         OrderSavedDialog(
             message = successMessage,
+            title = if (successMessage.startsWith("Pedido")) "Pedido Guardado" else "Borrador Guardado",
             onDismiss = { viewModel.onAction(CartUiAction.ClearMessage) },
             onAccept = {
                 viewModel.onAction(CartUiAction.ClearMessage)
@@ -302,6 +305,7 @@ internal fun CartBottomBarArea(
         CartBottomBar(
             state = state,
             onSaveDraft = { viewModel.onAction(CartUiAction.SaveDraft) },
+            onSavePedido = { viewModel.onAction(CartUiAction.SavePedido) },
             onObservacionClick = onObservacionClick,
             onCheckout = { viewModel.onAction(CartUiAction.Checkout) },
         )
@@ -364,6 +368,11 @@ internal fun CartScreenContent(
                     }
                 }
             }
+        }
+
+        state.linkedPedidoCode?.let { codPedido ->
+            LinkedPedidoBanner(codPedido)
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // SECCIÓN CLIENTE + VENDEDOR (panel consolidado)
@@ -475,3 +484,39 @@ private fun buildCartItemActions(
                 },
             ),
     )
+
+/** Aviso de que el carrito factura un pedido del ERP (al cobrar, el pedido queda facturado). */
+@Composable
+private fun LinkedPedidoBanner(codPedido: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ReceiptLong,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = "Facturando pedido #$codPedido",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Text(
+                    text = "Al cobrar, el pedido quedará facturado. Vacía el carrito para descartarlo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                )
+            }
+        }
+    }
+}

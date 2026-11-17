@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Delete
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -191,6 +193,7 @@ internal fun CartBottomBar(
     onCheckout: () -> Unit,
     modifier: Modifier = Modifier,
     onObservacionClick: () -> Unit = {},
+    onSavePedido: () -> Unit = {},
 ) {
     var breakdownExpanded by remember { mutableStateOf(true) }
     val total = state.total
@@ -250,6 +253,12 @@ internal fun CartBottomBar(
                 CartBottomActions(
                     isMesaSession = state.sesionMesaId != null,
                     hasObservacion = state.observacion.isNotBlank(),
+                    pedidoAction =
+                        PedidoActionState(
+                            visible = state.linkedPedidoCode == null,
+                            saving = state.isSavingPedido,
+                            onClick = onSavePedido,
+                        ),
                     onSaveDraft = onSaveDraft,
                     onObservacionClick = onObservacionClick,
                     onCheckout = onCheckout,
@@ -351,6 +360,7 @@ private fun CartBottomTotalRow(
 private fun CartBottomActions(
     isMesaSession: Boolean = false,
     hasObservacion: Boolean = false,
+    pedidoAction: PedidoActionState = PedidoActionState(),
     onSaveDraft: () -> Unit,
     onObservacionClick: () -> Unit = {},
     onCheckout: () -> Unit,
@@ -380,8 +390,49 @@ private fun CartBottomActions(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SaveDraftButton(onClick = onSaveDraft)
+            if (pedidoAction.visible) {
+                SavePedidoButton(saving = pedidoAction.saving, onClick = pedidoAction.onClick)
+            }
             ObservacionButton(hasObservacion = hasObservacion, onClick = onObservacionClick)
             CheckoutButton(onClick = onCheckout, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/** Botón "Guardar como pedido" del carrito (oculto cuando el carrito ya factura un pedido). */
+internal data class PedidoActionState(
+    val visible: Boolean = false,
+    val saving: Boolean = false,
+    val onClick: () -> Unit = {},
+)
+
+@Composable
+private fun SavePedidoButton(
+    saving: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !saving,
+        modifier = Modifier.size(54.dp),
+        contentPadding = PaddingValues(0.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+    ) {
+        if (saving) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.Assignment,
+                contentDescription = "Guardar como pedido",
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -4,6 +4,7 @@ import com.amaxoniaerp.features.auth.domain.LoginRequest
 import com.amaxoniaerp.features.auth.domain.LoginResponse
 import com.amaxoniaerp.features.caja.domain.AperturaRequest
 import com.amaxoniaerp.features.caja.domain.CajaCierreSaveRequest
+import com.amaxoniaerp.features.cobranza.domain.CreateCobranzaRequest
 import com.amaxoniaerp.features.companies.domain.CompanySelectRequest
 import com.amaxoniaerp.features.companies.domain.CompanySelectResponse
 import com.amaxoniaerp.features.creditnotes.domain.ConfirmCreditNoteFiscalRequest
@@ -12,6 +13,7 @@ import com.amaxoniaerp.features.facturas.domain.ConfirmFacturaFiscalRequest
 import com.amaxoniaerp.features.mesas.domain.AbrirSesionRequest
 import com.amaxoniaerp.features.mesas.domain.CrearCuentaRequest
 import com.amaxoniaerp.features.mesas.domain.CrearPedidoMesaRequest
+import com.amaxoniaerp.features.pedidos.domain.CreatePedidoRequest
 import com.amaxoniaerp.features.sales.domain.ProcessSaleRequest
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
@@ -178,6 +180,24 @@ class ContractFixtureTest {
         }
         roundTrip("fiscal/confirm-factura-fiscal-request.json", ConfirmFacturaFiscalRequest.serializer()) {
             assertEquals("SN-PRN-7", it.impresoraSerial)
+        }
+    }
+
+    @Test
+    fun `pedidos y cobranza mantienen el contrato`() {
+        // Decode-assert: el pedido reutiliza SaleInvoiceInput (codEstatus default en backend).
+        decodeAssert("pedidos/create-pedido-request.json", CreatePedidoRequest.serializer()) {
+            assertEquals("pedido-uuid-001", it.idPedido)
+            assertEquals(1, it.pedido.codEstatus)
+            assertEquals(42, it.items.single().idItem)
+        }
+        roundTrip("cobranza/create-cobranza-request.json", CreateCobranzaRequest.serializer()) {
+            assertEquals(2, it.facturas.size)
+            assertEquals(4.56, it.pagos.first().efectivoCambio, 0.0)
+            assertEquals(10.0, it.pagos.last().montoRecibido, 0.0)
+        }
+        decodeAssert("sale/invoice-pedido-request.json", ProcessSaleRequest.serializer()) {
+            assertEquals("pedido-uuid-001", it.idPedido)
         }
     }
 }
